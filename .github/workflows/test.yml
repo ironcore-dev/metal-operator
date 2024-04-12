@@ -1,0 +1,19 @@
+name: Pull Request Code test
+
+on:
+  pull_request:
+    types: [ assigned, opened, synchronize, reopened ]
+    paths-ignore:
+    - 'docs/**'
+    - '**/*.md'
+
+jobs:
+  checks:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+    - run: make test

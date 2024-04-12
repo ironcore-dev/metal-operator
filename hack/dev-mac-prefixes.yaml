@@ -1,0 +1,9 @@
+macPrefixes:
+- macPrefix: 23
+  manufacturer: Foo
+  protocol: Redfish
+  port: 8000
+  type: bmc
+  defaultCredentials:
+  - username: foo
+    password: bar

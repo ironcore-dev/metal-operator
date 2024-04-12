@@ -1,0 +1,9 @@
+## Append samples of your project ##
+resources:
+- metal_v1alpha1_endpoint.yaml
+- metal_v1alpha1_bmcsecret.yaml
+- metal_v1alpha1_bmc.yaml
+- metal_v1alpha1_server.yaml
+- metal_v1alpha1_serverbootconfiguration.yaml
+- metal_v1alpha1_serverclaim.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

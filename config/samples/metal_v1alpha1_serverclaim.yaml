@@ -1,0 +1,12 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerClaim
+metadata:
+  labels:
+    app.kubernetes.io/name: serverclaim
+    app.kubernetes.io/instance: serverclaim-sample
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: serverclaim-sample
+spec:
+  # TODO(user): Add fields here

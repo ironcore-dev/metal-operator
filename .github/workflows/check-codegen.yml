@@ -1,0 +1,26 @@
+name: Check Codegen
+
+on:
+  pull_request:
+    paths-ignore:
+    - 'docs/**'
+    - '**/*.md'
+
+jobs:
+  check-codegen:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+    - name: Run make generate
+      run: make generate
+    - name: Compare the expected and actual generated/* directories
+      run: |
+        if [ "$(git diff --ignore-space-at-eol client-go/ | wc -l)" -gt "0" ]; then
+          echo "Detected uncommitted changes after build. Consider running 'make generate'."
+          echo "See status below:"
+          git diff
+          exit 1
+        fi

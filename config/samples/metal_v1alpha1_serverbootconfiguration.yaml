@@ -1,0 +1,12 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerBootConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: serverbootconfiguration
+    app.kubernetes.io/instance: serverbootconfiguration-sample
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: serverbootconfiguration-sample
+spec:
+  # TODO(user): Add fields here

@@ -10,7 +10,7 @@ red="$(tput setaf 1)"
 green="$(tput setaf 2)"
 normal="$(tput sgr0)"
 
-for kustomization in "$BASEDIR"/../config/*/**/kustomization.yaml; do
+for kustomization in "$BASEDIR"/../config/**/kustomization.yaml; do
   path="$(dirname "$kustomization")"
   dir="$(realpath --relative-to "$BASEDIR"/.. "$path")"
   echo "${bold}Validating $dir${normal}"

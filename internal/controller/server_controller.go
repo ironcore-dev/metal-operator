@@ -262,7 +262,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(
 	bootConfig *metalv1alpha1.ServerBootConfiguration,
 	registryURL string,
 ) error {
-	probeFlags := fmt.Sprintf("--registry-url=%s,--server-uuid=%s", registryURL, server.Spec.UUID)
+	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.UUID)
 	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags)
 	if err != nil {
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)

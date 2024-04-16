@@ -30,32 +30,30 @@ type ContainerConfig struct {
 
 // defaultIgnitionTemplate is a Go template for the default Ignition configuration.
 var defaultIgnitionTemplate = `
-ignition_version: "3.0.0"
+ignition:
+  version: "3.4.0"
 systemd:
-  units:
-    - name: docker.service
-      enabled: true
-    - name: metalprobe.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Run My Docker Container
-        Requires=docker.service
-        After=docker.service
-
-        [Service]
-        Restart=always
-        ExecStartPre=-/usr/bin/docker stop metalprobe
-        ExecStartPre=-/usr/bin/docker rm metalprobe
-        ExecStartPre=/usr/bin/docker pull {{.Image}}
-        ExecStart=/usr/bin/docker run --name metalprobe {{.Flags}} {{.Image}}
-        ExecStop=/usr/bin/docker stop metalprobe
-
-        [Install]
-        WantedBy=multi-user.target
+ units:
+   - name: docker.service
+     enabled: true
+   - name: metalprobe.service
+     enabled: true
+     contents: |-
+       [Unit]
+       Description=Run My Docker Container
+       Requires=docker.service
+       After=docker.service
+       [Service]
+       Restart=always
+       ExecStartPre=-/usr/bin/docker stop metalprobe
+       ExecStartPre=-/usr/bin/docker rm metalprobe
+       ExecStartPre=/usr/bin/docker pull {{.Image}}
+       ExecStart=/usr/bin/docker run --name metalprobe {{.Image}} {{.Flags}}
+       ExecStop=/usr/bin/docker stop metalprobe
+       [Install]
+       WantedBy=multi-user.target
 storage:
-  files: []
-
+ files: []
 passwd: {}
 `
 

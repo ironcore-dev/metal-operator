@@ -63,6 +63,7 @@ func main() {
 	var insecure bool
 	var managerNamespace string
 	var probeImage string
+	var probeOSImage string
 	var registryPort int
 	var registryProtocol string
 	var registryURL string
@@ -71,6 +72,7 @@ func main() {
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 8000, "The port to use for the registry.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
+	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
 	flag.BoolVar(&insecure, "insecure", true, "If true, use http instead of https for connecting to a BMC.")
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
@@ -90,6 +92,11 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if probeOSImage == "" {
+		setupLog.Error(nil, "probe OS image must be set")
+		os.Exit(1)
+	}
 
 	// Load MACAddress DB
 	macPRefixes := &macdb.MacPrefixes{}
@@ -194,6 +201,7 @@ func main() {
 		Insecure:         insecure,
 		ManagerNamespace: managerNamespace,
 		ProbeImage:       probeImage,
+		ProbeOSImage:     probeOSImage,
 		RegistryURL:      registryURL,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Server")

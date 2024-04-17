@@ -59,6 +59,7 @@ type ServerReconciler struct {
 	ManagerNamespace string
 	ProbeImage       string
 	RegistryURL      string
+	ProbeOSImage     string
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -249,7 +250,7 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 			IgnitionSecretRef: &v1.LocalObjectReference{
 				Name: server.Name,
 			},
-			Image: r.ProbeImage,
+			Image: r.ProbeOSImage,
 		},
 	}
 

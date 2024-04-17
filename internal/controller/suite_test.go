@@ -180,6 +180,7 @@ func SetupTest() *corev1.Namespace {
 			Insecure:         true,
 			ManagerNamespace: ns.Name,
 			ProbeImage:       "foo:latest",
+			ProbeOSImage:     "fooOS:latest",
 			RegistryURL:      registryURL,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

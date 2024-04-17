@@ -15,13 +15,13 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.serverRef
+    - jsonPath: .spec.serverRef.name
       name: ServerRef
       type: string
     - jsonPath: .spec.image
       name: Image
       type: string
-    - jsonPath: .spec.ingitionRef
+    - jsonPath: .spec.ignitionSecretRef.name
       name: IgnitionRef
       type: string
     - jsonPath: .status.state

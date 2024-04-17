@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"net/http"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/afritzler/metal-operator/internal/api/registry"
 
 	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
@@ -88,6 +90,25 @@ func (r *ServerReconciler) reconcileExists(ctx context.Context, log logr.Logger,
 }
 
 func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (ctrl.Result, error) {
+	log.V(1).Info("Deleting server")
+
+	if server.Spec.BootConfigurationRef != nil {
+		if err := r.Delete(ctx, &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: server.Spec.BootConfigurationRef.Namespace,
+				Name:      server.Spec.BootConfigurationRef.Name,
+			}}); err != nil && !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to delete server bootconfiguration: %w", err)
+		}
+		log.V(1).Info("Deleted server bootconfiguration")
+	}
+
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, server, ServerFinalizer); !apierrors.IsNotFound(err) || modified {
+		return ctrl.Result{}, err
+	}
+	log.V(1).Info("Ensured that the finalizer has been removed")
+
+	log.V(1).Info("Deleted server")
 	return ctrl.Result{}, nil
 }
 

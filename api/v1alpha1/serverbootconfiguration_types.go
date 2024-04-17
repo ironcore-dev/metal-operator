@@ -43,9 +43,9 @@ type ServerBootConfigurationStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef`
+//+kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 //+kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.spec.image`
-//+kubebuilder:printcolumn:name="IgnitionRef",type=string,JSONPath=`.spec.ingitionRef`
+//+kubebuilder:printcolumn:name="IgnitionRef",type=string,JSONPath=`.spec.ignitionSecretRef.name`
 //+kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 //+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

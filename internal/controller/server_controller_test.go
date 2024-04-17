@@ -75,7 +75,7 @@ var _ = Describe("Server Controller", func() {
 		}
 		Eventually(Object(bootConfig)).Should(SatisfyAll(
 			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
-			HaveField("Spec.Image", "foo:latest"),
+			HaveField("Spec.Image", "fooOS:latest"),
 			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
 		))

@@ -184,6 +184,13 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		}
 		log.V(1).Info("Extracted Server details")
 
+		// TODO: fix that by providing the power state to the ensure method
+		server.Spec.Power = metalv1alpha1.PowerOff
+		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to shutdown server: %w", err)
+		}
+		log.V(1).Info("Server state set to shutdown")
+
 		if err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -346,7 +353,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, server *metalv1alp
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
 
-	if err := bmcClient.PowerOn(); err != nil {
+	if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
 		return fmt.Errorf("failed to power on server: %w", err)
 	}
 	return nil
@@ -421,12 +428,12 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 
 	if powerOp == powerOpOn {
-		if err := bmcClient.PowerOn(); err != nil {
+		if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
 	}
 	if powerOp == powerOpOff {
-		if err := bmcClient.PowerOff(); err != nil {
+		if err := bmcClient.PowerOff(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power off server: %w", err)
 		}
 	}

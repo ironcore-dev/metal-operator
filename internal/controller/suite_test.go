@@ -143,7 +143,7 @@ func SetupTest() *corev1.Namespace {
 				{
 					MacPrefix:    "23",
 					Manufacturer: "Foo",
-					Protocol:     "Redfish",
+					Protocol:     "RedfishLocal",
 					Port:         8000,
 					Type:         "bmc",
 					DefaultCredentials: []macdb.Credential{

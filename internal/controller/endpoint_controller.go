@@ -36,9 +36,10 @@ import (
 )
 
 const (
-	BMCType           = "bmc"
-	ProtocolRedfish   = "Redfish"
-	EndpointFinalizer = "metal.ironcore.dev/endpoint"
+	BMCType              = "bmc"
+	ProtocolRedfish      = "Redfish"
+	ProtocolRedfishLocal = "RedfishLocal"
+	EndpointFinalizer    = "metal.ironcore.dev/endpoint"
 )
 
 // EndpointReconciler reconciles a Endpoints object
@@ -118,6 +119,25 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for endpoint")
+			case ProtocolRedfishLocal:
+				log.V(1).Info("Creating client for a local test BMC")
+				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
+				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true)
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
+				}
+				defer bmcClient.Logout()
+
+				var bmcSecret *metalv1alpha1.BMCSecret
+				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
+				}
+				log.V(1).Info("Applied local test BMC secret for endpoint")
+
+				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
+				}
+				log.V(1).Info("Applied local test BMC object for endpoint")
 			}
 			// TODO: other types like Switches can be handled here later
 		}

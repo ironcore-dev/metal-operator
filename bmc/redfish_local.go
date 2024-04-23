@@ -24,19 +24,19 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-var _ BMC = (*RedfishBMC)(nil)
+var _ BMC = (*RedfishLocalBMC)(nil)
 
-// RedfishBMC is an implementation of the BMC interface for Redfish.
-type RedfishBMC struct {
+// RedfishLocalBMC is an implementation of the BMC interface for Redfish.
+type RedfishLocalBMC struct {
 	client *gofish.APIClient
 }
 
-// NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
-func NewRedfishBMCClient(
+// NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
+func NewRedfishLocalBMCClient(
 	ctx context.Context,
 	endpoint, username, password string,
 	basicAuth bool,
-) (*RedfishBMC, error) {
+) (*RedfishLocalBMC, error) {
 	clientConfig := gofish.ClientConfig{
 		Endpoint:  endpoint,
 		Username:  username,
@@ -48,39 +48,10 @@ func NewRedfishBMCClient(
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to redfish endpoint: %w", err)
 	}
-	return &RedfishBMC{client: client}, nil
+	return &RedfishLocalBMC{client: client}, nil
 }
 
-// Logout closes the BMC client connection by logging out
-func (r *RedfishBMC) Logout() {
-	if r.client != nil {
-		r.client.Logout()
-	}
-}
-
-// PowerOn powers on the system using Redfish.
-func (r *RedfishBMC) PowerOn(systemID string) error {
-	service := r.client.GetService()
-
-	systems, err := service.Systems()
-	if err != nil {
-		return fmt.Errorf("failed to get systems: %w", err)
-	}
-
-	for _, system := range systems {
-		if system.UUID == systemID {
-			if err := system.Reset(redfish.OnResetType); err != nil {
-				return fmt.Errorf("failed to reset system to power on state: %w", err)
-			}
-			break
-		}
-	}
-
-	return nil
-}
-
-// PowerOff powers off the system using Redfish.
-func (r *RedfishBMC) PowerOff(systemID string) error {
+func (r RedfishLocalBMC) PowerOn(systemUUID string) error {
 	service := r.client.GetService()
 	systems, err := service.Systems()
 	if err != nil {
@@ -88,45 +59,44 @@ func (r *RedfishBMC) PowerOff(systemID string) error {
 	}
 
 	for _, system := range systems {
-		if system.UUID == systemID {
-			if err := system.Reset(redfish.GracefulShutdownResetType); err != nil {
-				return fmt.Errorf("failed to reset system to power on state: %w", err)
+		if system.UUID == systemUUID {
+			system.PowerState = redfish.OnPowerState
+			systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+			if err := system.Patch(systemURI, system); err != nil {
+				return fmt.Errorf("failed to set power state %s for system %s: %w", redfish.OnPowerState, systemUUID, err)
 			}
 			break
 		}
 	}
-
 	return nil
 }
 
-// Reset performs a reset on the system using Redfish.
-func (r *RedfishBMC) Reset() error {
-	// Implementation details...
-	return nil
-}
-
-// GetSystems get managed systems
-func (r *RedfishBMC) GetSystems() ([]Server, error) {
+func (r RedfishLocalBMC) PowerOff(systemUUID string) error {
 	service := r.client.GetService()
 	systems, err := service.Systems()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get systems: %w", err)
+		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	servers := make([]Server, 0, len(systems))
-	for _, s := range systems {
-		servers = append(servers, Server{
-			UUID:         s.UUID,
-			Model:        s.Model,
-			Manufacturer: s.Manufacturer,
-			PowerState:   PowerState(s.PowerState),
-			SerialNumber: s.SerialNumber,
-		})
+
+	for _, system := range systems {
+		if system.UUID == systemUUID {
+			system.PowerState = redfish.OffPowerState
+			systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+			if err := system.Patch(systemURI, system); err != nil {
+				return fmt.Errorf("failed to set power state %s for system %s: %w", redfish.OffPowerState, systemUUID, err)
+			}
+			break
+		}
 	}
-	return servers, nil
+	return nil
 }
 
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBMC) SetPXEBootOnce(systemUUID string) error {
+func (r RedfishLocalBMC) Reset() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (r RedfishLocalBMC) SetPXEBootOnce(systemUUID string) error {
 	service := r.client.GetService()
 
 	systems, err := service.Systems()
@@ -149,34 +119,7 @@ func (r *RedfishBMC) SetPXEBootOnce(systemUUID string) error {
 	return nil
 }
 
-func (r *RedfishBMC) GetManager() (*Manager, error) {
-	if r.client == nil {
-		return nil, fmt.Errorf("no client found")
-	}
-	managers, err := r.client.Service.Managers()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get managers: %w", err)
-	}
-
-	for _, m := range managers {
-		// TODO: always take the first for now.
-		return &Manager{
-			UUID:            m.UUID,
-			Manufacturer:    m.Manufacturer,
-			State:           string(m.Status.State),
-			PowerState:      string(m.PowerState),
-			SerialNumber:    m.SerialNumber,
-			FirmwareVersion: m.FirmwareVersion,
-			SKU:             m.PartNumber,
-			Model:           m.Model,
-		}, nil
-	}
-
-	return nil, err
-}
-
-// GetSystemInfo retrieves information about the system using Redfish.
-func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
+func (r RedfishLocalBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
 	service := r.client.GetService()
 
 	systems, err := service.Systems()
@@ -200,4 +143,55 @@ func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
 	}
 
 	return SystemInfo{}, nil
+}
+
+func (r RedfishLocalBMC) Logout() {
+	if r.client != nil {
+		r.client.Logout()
+	}
+}
+
+func (r RedfishLocalBMC) GetSystems() ([]Server, error) {
+	service := r.client.GetService()
+	systems, err := service.Systems()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get systems: %w", err)
+	}
+	servers := make([]Server, 0, len(systems))
+	for _, s := range systems {
+		servers = append(servers, Server{
+			UUID:         s.UUID,
+			Model:        s.Model,
+			Manufacturer: s.Manufacturer,
+			PowerState:   PowerState(s.PowerState),
+			SerialNumber: s.SerialNumber,
+		})
+	}
+	return servers, nil
+}
+
+func (r RedfishLocalBMC) GetManager() (*Manager, error) {
+	if r.client == nil {
+		return nil, fmt.Errorf("no client found")
+	}
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+
+	for _, m := range managers {
+		// TODO: always take the first for now.
+		return &Manager{
+			UUID:            m.UUID,
+			Manufacturer:    m.Manufacturer,
+			State:           string(m.Status.State),
+			PowerState:      string(m.PowerState),
+			SerialNumber:    m.SerialNumber,
+			FirmwareVersion: m.FirmwareVersion,
+			SKU:             m.PartNumber,
+			Model:           m.Model,
+		}, nil
+	}
+
+	return nil, err
 }

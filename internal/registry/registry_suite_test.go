@@ -29,8 +29,8 @@ import (
 
 var (
 	server         *registry.Server
-	testServerURL  = "http://localhost:12345"
-	testServerAddr = ":12345"
+	testServerURL  = "http://localhost:54321"
+	testServerAddr = ":54321"
 )
 
 func TestRegistry(t *testing.T) {

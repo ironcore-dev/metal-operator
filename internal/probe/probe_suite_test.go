@@ -32,8 +32,8 @@ var (
 	probeAgent     *probe.Agent
 	registryServer *registry.Server
 
-	registryAddr = ":12345"
-	registryURL  = "http://localhost:12345"
+	registryAddr = ":5432"
+	registryURL  = "http://localhost:5432"
 	systemUUID   = "1234-5678"
 )
 

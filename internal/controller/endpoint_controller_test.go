@@ -83,7 +83,7 @@ var _ = Describe("Endpoints Controller", func() {
 			HaveField("Spec.EndpointRef.Name", Equal(endpoint.Name)),
 			HaveField("Spec.BMCSecretRef.Name", Equal(bmc.Name)),
 			HaveField("Spec.Protocol", metalv1alpha1.Protocol{
-				Name: ProtocolRedfish,
+				Name: ProtocolRedfishLocal,
 				Port: 8000,
 			}),
 			HaveField("Spec.ConsoleProtocol", &metalv1alpha1.ConsoleProtocol{

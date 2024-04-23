@@ -67,6 +67,16 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}
+	case ProtocolRedfishLocal:
+		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, endpoint.Spec.IP, bmcObj.Spec.Protocol.Port)
+		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
+		}
+		bmcClient, err = bmc.NewRedfishLocalBMCClient(ctx, bmcAddress, username, password, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported BMC protocol %s", bmcObj.Spec.Protocol.Name)
 	}

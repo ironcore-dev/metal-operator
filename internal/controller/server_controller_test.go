@@ -126,7 +126,6 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
-			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 		))
@@ -143,9 +142,10 @@ var _ = Describe("Server Controller", func() {
 			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed())
 
-		By("Ensuring that the server is set to available")
+		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
 		))
 	})

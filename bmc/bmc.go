@@ -24,10 +24,10 @@ import (
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
-	PowerOn() error
+	PowerOn(systemUUID string) error
 
 	// PowerOff powers off the system.
-	PowerOff() error
+	PowerOff(systemUUID string) error
 
 	// Reset performs a reset on the system.
 	Reset() error

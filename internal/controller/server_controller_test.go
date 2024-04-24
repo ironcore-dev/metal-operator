@@ -103,6 +103,7 @@ var _ = Describe("Server Controller", func() {
 
 		By("Ensuring that the Server resource has been created")
 		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerFinalizer)),
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
 				Kind:               "BMC",

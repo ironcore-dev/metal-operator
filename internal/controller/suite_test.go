@@ -184,6 +184,11 @@ func SetupTest() *corev1.Namespace {
 			RegistryURL:      registryURL,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&ServerClaimReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		Expect((&ServerBootConfigurationReconciler{
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),

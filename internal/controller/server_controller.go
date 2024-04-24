@@ -122,7 +122,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	// do late state initialization
 	if server.Status.State == "" {
-		if err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
 			return ctrl.Result{}, err
 		}
 	}
@@ -130,83 +130,125 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
+	log.V(1).Info("Ensured finalizer has been added")
 
-	if err := r.updateServerStatus(ctx, log, server); err != nil {
-		return ctrl.Result{}, err
+	if server.Spec.ServerClaimRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
+			return ctrl.Result{}, err
+		}
 	}
-	log.V(1).Info("Updated Server status")
 
-	// Server state-machine:
-	//
-	// A Server goes through the following stages:
-	// Initial -> Available -> Reserved -> Tainted -> Available ...
-	//
-	// Initial: In the initial state we create a ServerBootConfiguration and an Ignition to start the Probe server on
-	//			the Server. This Probe server registers with the managers /registry/{uuid} endpoint it's address, so
-	//			the reconciler can fetch the server details from this endpoint. Once completed the Server is patched
-	//			to the state Available.
-	//
-	// Available: In the available state, a Server can be claimed by a ServerClaim. Here the claim reconciler takes over
-	//			  to generate the necessary boot configuration. In the available state the Power state and indicator LEDs
-	//			  are being controlled.
-	//
-	// Reserved: A Server in a reserved state can not be claimed by another claim.
-	//
-	// Tainted: A tainted Server needs to be sanitized (clean up disks etc.). This is done in a similar way as in the
-	//			initial state where the server reconciler will create a BootConfiguration and an Ignition secret to
-	//			boot the server with a cleanup agent. This agent has also an endpoint to report its health state.
-	//
-	// Maintenance: A Maintenance state represents a special case where certain operations like BIOS updates should be
-	// 				performed.
+	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
+	// 		 back to available state.
+	if server.Spec.ServerClaimRef == nil && server.Status.State == metalv1alpha1.ServerStateReserved {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+			return ctrl.Result{}, err
+		}
+	}
+
+	if err := r.ensureServerStateTransition(ctx, log, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
+	}
+
+	log.V(1).Info("Reconciled Server")
+	return ctrl.Result{}, nil
+}
+
+// Server state-machine:
+//
+// A Server goes through the following stages:
+// Initial -> Available -> Reserved -> Tainted -> Available ...
+//
+// Initial:
+// In the initial state we create a ServerBootConfiguration and an Ignition to start the Probe server on the
+// Server. This Probe server registers with the managers /registry/{uuid} endpoint it's address, so the reconciler can
+// fetch the server details from this endpoint. Once completed the Server is patched to the state Available.
+//
+// Available:
+// In the available state, a Server can be claimed by a ServerClaim. Here the claim reconciler takes over to
+// generate the necessary boot configuration. In the available state the Power state and indicator LEDs are being controlled.
+//
+// Reserved:
+// A Server in a reserved state can not be claimed by another claim.
+//
+// Tainted:
+// A tainted Server needs to be sanitized (clean up disks etc.). This is done in a similar way as in the
+// initial state where the server reconciler will create a BootConfiguration and an Ignition secret to
+// boot the server with a cleanup agent. This agent has also an endpoint to report its health state.
+//
+// Maintenance:
+// A Maintenance state represents a special case where certain operations like BIOS updates should be performed.
+func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
 	switch server.Status.State {
 	case metalv1alpha1.ServerStateInitial:
+		if err := r.updateServerStatus(ctx, log, server); err != nil {
+			return err
+		}
+		log.V(1).Info("Updated Server status")
+
 		// apply boot configuration
 		if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply server boot configuration: %w", err)
+			return fmt.Errorf("failed to apply server boot configuration: %w", err)
 		}
 		log.V(1).Info("Applied Server boot configuration")
 
 		if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
 			log.V(1).Info("Server boot configuration is not ready")
-			return ctrl.Result{}, err
+			return err
 		}
 		log.V(1).Info("Server boot configuration is ready")
 
 		if err := r.pxeBootServer(ctx, server); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to boot server: %w", err)
+			return fmt.Errorf("failed to boot server: %w", err)
 		}
 		log.V(1).Info("Booted Server in PXE")
 
-		if finished, err := r.extractServerDetailsFromRegistry(ctx, server); err != nil || !finished {
+		if err := r.extractServerDetailsFromRegistry(ctx, server); err != nil {
 			log.V(1).Info("Could not get server details from registry.")
 			// TODO: instead of requeue subscribe to registry events and requeue Server objects in SetupWithManager
-			return ctrl.Result{}, err
+			return err
 		}
 		log.V(1).Info("Extracted Server details")
 
 		// TODO: fix that by providing the power state to the ensure method
 		server.Spec.Power = metalv1alpha1.PowerOff
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to shutdown server: %w", err)
+			return fmt.Errorf("failed to shutdown server: %w", err)
 		}
-		log.V(1).Info("Server state set to shutdown")
+		log.V(1).Info("Server state set to power off")
 
-		if err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
-			return ctrl.Result{}, err
+		log.V(1).Info("Setting Server state set to available")
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+			return err
 		}
-		log.V(1).Info("Server state set to available")
 	case metalv1alpha1.ServerStateAvailable:
+		if err := r.updateServerStatus(ctx, log, server); err != nil {
+			return err
+		}
+		log.V(1).Info("Updated Server status")
+
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to ensure server power state: %w", err)
+			return fmt.Errorf("failed to ensure server power state: %w", err)
 		}
 		if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to ensure server indicator led: %w", err)
+			return fmt.Errorf("failed to ensure server indicator led: %w", err)
 		}
 		log.V(1).Info("Reconciled available state")
-	}
+	case metalv1alpha1.ServerStateReserved:
+		if err := r.updateServerStatus(ctx, log, server); err != nil {
+			return err
+		}
+		log.V(1).Info("Updated Server status")
 
-	log.V(1).Info("Reconciled Server")
-	return ctrl.Result{}, nil
+		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+			return fmt.Errorf("failed to ensure server power state: %w", err)
+		}
+		if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
+			return fmt.Errorf("failed to ensure server indicator led: %w", err)
+		}
+		log.V(1).Info("Reconciled reserved state")
+	}
+	return nil
 }
 
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -359,19 +401,19 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, server *metalv1alp
 	return nil
 }
 
-func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) error {
 	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.UUID))
 	if err != nil {
-		return false, fmt.Errorf("failed to fetch server details: %w", err)
+		return fmt.Errorf("failed to fetch server details: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("could not find server details: %s", resp.Status)
+		return fmt.Errorf("could not find server details: %s", resp.Status)
 	}
 
 	serverDetails := &registry.Server{}
 	if err := json.NewDecoder(resp.Body).Decode(serverDetails); err != nil {
-		return false, fmt.Errorf("failed to decode server details: %w", err)
+		return fmt.Errorf("failed to decode server details: %w", err)
 	}
 
 	serverBase := server.DeepCopy()
@@ -387,22 +429,30 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	server.Status.NetworkInterfaces = nics
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch server status: %w", err)
+		return fmt.Errorf("failed to patch server status: %w", err)
 	}
 
-	return true, nil
-}
-
-func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1alpha1.Server, state metalv1alpha1.ServerState) error {
-	serverBase := server.DeepCopy()
-	server.Status.State = state
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return fmt.Errorf("failed to patch server state: %w", err)
-	}
 	return nil
 }
 
+func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1alpha1.Server, state metalv1alpha1.ServerState) (bool, error) {
+	if server.Status.State == state {
+		return false, nil
+	}
+	serverBase := server.DeepCopy()
+	server.Status.State = state
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch server state: %w", err)
+	}
+	return true, nil
+}
+
 func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+	if server.Spec.Power == "" {
+		// no desired power state set
+		return nil
+	}
+
 	powerOp := powerOpNoOP
 	if server.Status.PowerState != metalv1alpha1.ServerOnPowerState &&
 		server.Status.PowerState != metalv1alpha1.ServerPoweringOnPowerState &&
@@ -443,6 +493,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 }
 
 func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+	// TODO: implement
 	return nil
 }
 

@@ -101,7 +101,7 @@ func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *
 			}}); err != nil && !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("failed to delete server bootconfiguration: %w", err)
 		}
-		log.V(1).Info("Deleted server bootconfiguration")
+		log.V(1).Info("Deleted server boot configuration")
 	}
 
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, server, ServerFinalizer); !apierrors.IsNotFound(err) || modified {
@@ -305,19 +305,6 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 
 	if err := r.Patch(ctx, bootConfig, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to apply server boot configuration: %w", err)
-	}
-
-	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &v1.ObjectReference{
-		Kind:       "ServerBootConfiguration",
-		Namespace:  r.ManagerNamespace,
-		Name:       server.Name,
-		UID:        bootConfig.UID,
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-	}
-
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return fmt.Errorf("failed to patch server boot configuration ref in server: %w", err)
 	}
 
 	if err := r.applyDefaultIgnitionForServer(ctx, server, bootConfig, r.RegistryURL); err != nil {

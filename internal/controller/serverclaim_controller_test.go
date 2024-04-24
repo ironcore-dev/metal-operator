@@ -136,6 +136,17 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.IgnitionSecretRef.Name", ignitionSecret.Name),
 		))
 
+		By("Ensuring that the server has a correct boot configuration ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Kind:       "ServerBootConfiguration",
+				Namespace:  ns.Name,
+				Name:       config.Name,
+				UID:        config.UID,
+			}),
+		))
+
 		By("Deleting the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 

@@ -17,29 +17,38 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ServerClaimSpec defines the desired state of ServerClaim
 type ServerClaimSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of ServerClaim. Edit serverclaim_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Power             Power                    `json:"power"`
+	ServerRef         *v1.LocalObjectReference `json:"serverRef,omitempty"`
+	ServerSelector    *metav1.LabelSelector    `json:"serverSelector,omitempty"`
+	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
+	Image             string                   `json:"image"`
 }
+
+type Phase string
+
+const (
+	PhaseBound   Phase = "Bound"
+	PhaseUnbound Phase = "Unbound"
+)
 
 // ServerClaimStatus defines the observed state of ServerClaim
 type ServerClaimStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Phase Phase `json:"phase,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
+// +kubebuilder:printcolumn:name="Ignition",type="string",JSONPath=".spec.ignitionRef.name"
+// +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image"
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ServerClaim is the Schema for the serverclaims API
 type ServerClaim struct {

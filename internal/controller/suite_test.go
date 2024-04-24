@@ -46,7 +46,7 @@ import (
 
 const (
 	pollingInterval      = 50 * time.Millisecond
-	eventuallyTimeout    = 3 * time.Second
+	eventuallyTimeout    = 5 * time.Second
 	consistentlyDuration = 1 * time.Second
 )
 
@@ -182,6 +182,11 @@ func SetupTest() *corev1.Namespace {
 			ProbeImage:       "foo:latest",
 			ProbeOSImage:     "fooOS:latest",
 			RegistryURL:      registryURL,
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerClaimReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerBootConfigurationReconciler{

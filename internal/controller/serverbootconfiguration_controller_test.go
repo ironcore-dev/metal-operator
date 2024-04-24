@@ -45,8 +45,8 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 		DeferCleanup(k8sClient.Delete, server)
 	})
 
-	It("should successfully reconcile the resource", func(ctx SpecContext) {
-		By("Ensuring the correct initialization of the resource")
+	It("should successfully add the boot configuration ref to server", func(ctx SpecContext) {
+		By("By creating a server boot configuration")
 		config := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
@@ -61,7 +61,18 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 		DeferCleanup(k8sClient.Delete, config)
 
 		Eventually(Object(config)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerBootConfigurationFinalizer)),
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
+		))
+
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Kind:       "ServerBootConfiguration",
+				Namespace:  ns.Name,
+				Name:       config.Name,
+				UID:        config.UID,
+			}),
 		))
 	})
 })

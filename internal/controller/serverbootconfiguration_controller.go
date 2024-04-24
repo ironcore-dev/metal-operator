@@ -18,12 +18,21 @@ package controller
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/ironcore-dev/controller-utils/clientutils"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	ServerBootConfigurationFinalizer = "metal.ironcore.dev/serverbootconfiguration"
 )
 
 // ServerBootConfigurationReconciler reconciles a ServerBootConfiguration object
@@ -56,27 +65,95 @@ func (r *ServerBootConfigurationReconciler) reconcileExists(ctx context.Context,
 }
 
 func (r *ServerBootConfigurationReconciler) delete(ctx context.Context, log logr.Logger, config *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
+	log.V(1).Info("Deleting ServerBootConfiguration")
+
+	if err := r.removeServerBootConfigRef(ctx, config); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to remove ServerBootConfigRef from server: %w", err)
+	}
+	log.V(1).Info("Ensured no server boot config is set on server")
+
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, config, ServerBootConfigurationFinalizer); !apierrors.IsNotFound(err) || modified {
+		return ctrl.Result{}, err
+	}
+	log.V(1).Info("Ensured that the finalizer has been removed")
+
+	log.V(1).Info("Deleted ServerBootConfiguration")
 	return ctrl.Result{}, nil
 }
 
 func (r *ServerBootConfigurationReconciler) reconcile(ctx context.Context, log logr.Logger, config *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
 	log.V(1).Info("Reconciling ServerBootConfiguration")
 	if config.Status.State == "" {
-		return r.patchState(ctx, config, metalv1alpha1.ServerBootConfigurationStatePending)
+		if modified, err := r.patchState(ctx, config, metalv1alpha1.ServerBootConfigurationStatePending); err != nil || modified {
+			return ctrl.Result{}, err
+		}
 	}
 	log.V(1).Info("Patched state")
+
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, config, ServerBootConfigurationFinalizer); err != nil || modified {
+		return ctrl.Result{}, err
+	}
+	log.V(1).Info("Ensured finalizer has been added")
+
+	if err := r.patchServerBootConfigRef(ctx, config); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to patch server boot config ref: %w", err)
+	}
+	log.V(1).Info("Patched server boot config ref")
 
 	log.V(1).Info("Reconciled ServerBootConfiguration")
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerBootConfigurationReconciler) patchState(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration, state metalv1alpha1.ServerBootConfigurationState) (ctrl.Result, error) {
+func (r *ServerBootConfigurationReconciler) patchState(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration, state metalv1alpha1.ServerBootConfigurationState) (bool, error) {
+	if config.Status.State == state {
+		return false, nil
+	}
 	configBase := config.DeepCopy()
 	config.Status.State = state
 	if err := r.Status().Patch(ctx, config, client.MergeFrom(configBase)); err != nil {
-		return ctrl.Result{}, err
+		return false, err
 	}
-	return ctrl.Result{}, nil
+	return true, nil
+}
+
+func (r *ServerBootConfigurationReconciler) patchServerBootConfigRef(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration) error {
+	server := &metalv1alpha1.Server{}
+	if err := r.Get(ctx, client.ObjectKey{Name: config.Spec.ServerRef.Name}, server); err != nil {
+		return err
+	}
+
+	serverBase := server.DeepCopy()
+	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+		Namespace:  config.Namespace,
+		Name:       config.Name,
+		UID:        config.UID,
+		APIVersion: "metal.ironcore.dev/v1alpha1",
+		Kind:       "ServerBootConfiguration",
+	}
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ServerBootConfigurationReconciler) removeServerBootConfigRef(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration) error {
+	server := &metalv1alpha1.Server{}
+	if err := r.Get(ctx, client.ObjectKey{Name: config.Spec.ServerRef.Name}, server); err != nil {
+		if apierrors.IsNotFound(err) {
+			// server is gone
+			return nil
+		}
+		return err
+	}
+
+	serverBase := server.DeepCopy()
+	server.Spec.BootConfigurationRef = nil
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -68,6 +68,7 @@ type ServerState string
 const (
 	ServerStateInitial   ServerState = "Initial"
 	ServerStateAvailable ServerState = "Available"
+	ServerStateReserved  ServerState = "Reserved"
 	ServerStateError     ServerState = "Error"
 )
 

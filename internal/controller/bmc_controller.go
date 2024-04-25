@@ -120,7 +120,7 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 
 	manager, err := bmcClient.GetManager()
 	if err != nil {
-		return fmt.Errorf("failed to get manager details")
+		return fmt.Errorf("failed to get manager details: %w", err)
 	}
 	if manager != nil {
 		bmcBase := bmcObj.DeepCopy()

@@ -84,6 +84,7 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 }
 
 func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
+	// TODO: use constants for secret keys
 	username, ok := secret.Data["username"]
 	if !ok {
 		return "", "", fmt.Errorf("no username found in the BMC secret")
@@ -92,7 +93,16 @@ func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, strin
 	if !ok {
 		return "", "", fmt.Errorf("no password found in the BMC secret")
 	}
-	return base64.StdEncoding.EncodeToString(username), base64.StdEncoding.EncodeToString(password), nil
+	decodedUsername, err := base64.StdEncoding.DecodeString(string(username))
+	if err != nil {
+		return "", "", fmt.Errorf("error decoding username: %w", err)
+	}
+	decodedPassword, err := base64.StdEncoding.DecodeString(string(password))
+	if err != nil {
+		return "", "", fmt.Errorf("error decoding password: %w", err)
+	}
+
+	return string(decodedUsername), string(decodedPassword), nil
 }
 
 func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {

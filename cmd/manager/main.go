@@ -233,16 +233,19 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
-	}
 
 	setupLog.Info("starting registry server", "RegistryURL", registryURL)
 	registryServer := registry.NewServer(registryAddr)
-	if err := registryServer.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running registry server")
+	go func() {
+		if err := registryServer.Start(ctx); err != nil {
+			setupLog.Error(err, "problem running registry server")
+			os.Exit(1)
+		}
+	}()
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
 }

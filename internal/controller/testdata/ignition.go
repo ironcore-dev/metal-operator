@@ -18,9 +18,8 @@ package testdata
 
 var (
 	DefaultIgnition = map[string]interface{}{
-		"ignition": map[string]interface{}{
-			"version": "3.4.0",
-		},
+		"variant": "fcos",
+		"version": "1.3.0",
 		"systemd": map[string]interface{}{
 			"units": []interface{}{
 				map[string]interface{}{

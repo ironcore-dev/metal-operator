@@ -198,7 +198,7 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		}
 		log.V(1).Info("Server boot configuration is ready")
 
-		if err := r.pxeBootServer(ctx, server); err != nil {
+		if err := r.pxeBootServer(ctx, log, server); err != nil {
 			return fmt.Errorf("failed to boot server: %w", err)
 		}
 		log.V(1).Info("Booted Server in PXE")
@@ -371,7 +371,16 @@ func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, s
 	return config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
 }
 
-func (r *ServerReconciler) pxeBootServer(ctx context.Context, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+	if server == nil {
+		log.V(1).Info("PXE boot server is nil")
+		return nil
+	}
+
+	if server.Spec.BMCRef == nil {
+		return fmt.Errorf("can only PXE boot server with valid BMC ref")
+	}
+
 	bmcClient, err := GetBMCClientFromBMCName(ctx, r.Client, server.Spec.BMCRef.Name, r.Insecure)
 	defer bmcClient.Logout()
 
@@ -392,11 +401,10 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, server *metalv1alp
 func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) error {
 	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.UUID))
 	if err != nil {
+		if resp != nil && resp.StatusCode != http.StatusNotFound {
+			return fmt.Errorf("could not find server details: %s", resp.Status)
+		}
 		return fmt.Errorf("failed to fetch server details: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("could not find server details: %s", resp.Status)
 	}
 
 	serverDetails := &registry.Server{}

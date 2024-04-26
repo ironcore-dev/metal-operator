@@ -70,7 +70,7 @@ func main() {
 
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
-	flag.IntVar(&registryPort, "registry-port", 8000, "The port to use for the registry.")
+	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")

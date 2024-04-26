@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -146,7 +147,11 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		}
 	}
 
-	if err := r.ensureServerStateTransition(ctx, log, server); err != nil {
+	requeue, err := r.ensureServerStateTransition(ctx, log, server)
+	if requeue && err == nil {
+		return ctrl.Result{Requeue: requeue, RequeueAfter: 10 * time.Second}, nil
+	}
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
 	}
 
@@ -178,77 +183,89 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 //
 // Maintenance:
 // A Maintenance state represents a special case where certain operations like BIOS updates should be performed.
-func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	switch server.Status.State {
 	case metalv1alpha1.ServerStateInitial:
 		if err := r.updateServerStatus(ctx, log, server); err != nil {
-			return err
+			return false, err
 		}
 		log.V(1).Info("Updated Server status")
 
 		// apply boot configuration
-		if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server); err != nil {
-			return fmt.Errorf("failed to apply server boot configuration: %w", err)
+		config, err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server)
+		if err != nil {
+			return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
 		}
 		log.V(1).Info("Applied Server boot configuration")
 
 		if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-			log.V(1).Info("Server boot configuration is not ready")
-			return err
+			log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+			return false, err
 		}
 		log.V(1).Info("Server boot configuration is ready")
 
 		if err := r.pxeBootServer(ctx, log, server); err != nil {
-			return fmt.Errorf("failed to boot server: %w", err)
+			return false, fmt.Errorf("failed to boot server: %w", err)
 		}
 		log.V(1).Info("Booted Server in PXE")
 
-		if err := r.extractServerDetailsFromRegistry(ctx, server); err != nil {
+		ready, err := r.extractServerDetailsFromRegistry(ctx, log, server)
+		if !ready && err == nil {
+			log.V(1).Info("Server agent did not post info to registry")
+			return true, nil
+		}
+		if err != nil {
 			log.V(1).Info("Could not get server details from registry.")
 			// TODO: instead of requeue subscribe to registry events and requeue Server objects in SetupWithManager
-			return err
+			return false, err
 		}
 		log.V(1).Info("Extracted Server details")
+
+		if err := r.ensureInitialBootConfigurationIsDeleted(ctx, config); err != nil {
+			return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
+		}
+		log.V(1).Info("Ensured initial boot configuration is deleted")
 
 		// TODO: fix that by providing the power state to the ensure method
 		server.Spec.Power = metalv1alpha1.PowerOff
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return fmt.Errorf("failed to shutdown server: %w", err)
+			return false, fmt.Errorf("failed to shutdown server: %w", err)
 		}
 		log.V(1).Info("Server state set to power off")
 
 		log.V(1).Info("Setting Server state set to available")
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-			return err
+			return false, err
 		}
 	case metalv1alpha1.ServerStateAvailable:
 		if err := r.updateServerStatus(ctx, log, server); err != nil {
-			return err
+			return false, err
 		}
 		log.V(1).Info("Updated Server status")
 
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return fmt.Errorf("failed to ensure server power state: %w", err)
+			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
 		if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
-			return fmt.Errorf("failed to ensure server indicator led: %w", err)
+			return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 		}
 		log.V(1).Info("Reconciled available state")
 	case metalv1alpha1.ServerStateReserved:
+
 		if err := r.updateServerStatus(ctx, log, server); err != nil {
-			return err
+			return false, err
 		}
 		log.V(1).Info("Updated Server status")
 
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return fmt.Errorf("failed to ensure server power state: %w", err)
+			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
 		if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
-			return fmt.Errorf("failed to ensure server indicator led: %w", err)
+			return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 		}
 		log.V(1).Info("Reconciled reserved state")
 	}
-	return nil
+	return false, nil
 }
 
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -281,7 +298,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	return nil
 }
 
-func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, error) {
 	// apply server boot configuration
 	bootConfig := &metalv1alpha1.ServerBootConfiguration{
 		TypeMeta: metav1.TypeMeta{
@@ -304,14 +321,14 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 	}
 
 	if err := r.Patch(ctx, bootConfig, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to apply server boot configuration: %w", err)
+		return nil, fmt.Errorf("failed to apply server boot configuration: %w", err)
 	}
 
 	if err := r.applyDefaultIgnitionForServer(ctx, server, bootConfig, r.RegistryURL); err != nil {
-		return fmt.Errorf("failed to apply default server ignitionSecret: %w", err)
+		return nil, fmt.Errorf("failed to apply default server ignitionSecret: %w", err)
 	}
 
-	return nil
+	return bootConfig, nil
 }
 
 func (r *ServerReconciler) applyDefaultIgnitionForServer(
@@ -398,19 +415,20 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 	return nil
 }
 
-func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.UUID))
-	if err != nil {
-		return fmt.Errorf("failed to fetch server details: %w", err)
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
+		log.V(1).Info("Did not find server information in registry")
+		return false, nil
 	}
 
-	if resp != nil && resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("could not find server details: %s", resp.Status)
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch server details: %w", err)
 	}
 
 	serverDetails := &registry.Server{}
 	if err := json.NewDecoder(resp.Body).Decode(serverDetails); err != nil {
-		return fmt.Errorf("failed to decode server details: %w", err)
+		return false, fmt.Errorf("failed to decode server details: %w", err)
 	}
 
 	serverBase := server.DeepCopy()
@@ -426,10 +444,10 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	server.Status.NetworkInterfaces = nics
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return fmt.Errorf("failed to patch server status: %w", err)
+		return false, fmt.Errorf("failed to patch server status: %w", err)
 	}
 
-	return nil
+	return true, nil
 }
 
 func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1alpha1.Server, state metalv1alpha1.ServerState) (bool, error) {
@@ -491,6 +509,13 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
 	// TODO: implement
+	return nil
+}
+
+func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration) error {
+	if err := r.Delete(ctx, config); !apierrors.IsNotFound(err) {
+		return err
+	}
 	return nil
 }
 

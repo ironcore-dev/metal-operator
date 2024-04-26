@@ -30,8 +30,8 @@ type ContainerConfig struct {
 
 // defaultIgnitionTemplate is a Go template for the default Ignition configuration.
 var defaultIgnitionTemplate = `
-ignition:
-  version: "3.4.0"
+variant: fcos
+version: "1.3.0"
 systemd:
  units:
    - name: docker.service

@@ -17,37 +17,43 @@ limitations under the License.
 package testdata
 
 var (
-	DefaultIgnition = map[string]interface{}{
-		"variant": "fcos",
-		"version": "1.3.0",
-		"systemd": map[string]interface{}{
-			"units": []interface{}{
-				map[string]interface{}{
-					"name":    "docker.service",
-					"enabled": true,
-				},
-				map[string]interface{}{
-					"name":    "metalprobe.service",
-					"enabled": true,
-					"contents": `[Unit]
-Description=Run My Docker Container
-Requires=docker.service
-After=docker.service
-[Service]
-Restart=always
-ExecStartPre=-/usr/bin/docker stop metalprobe
-ExecStartPre=-/usr/bin/docker rm metalprobe
-ExecStartPre=/usr/bin/docker pull foo:latest
-ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe foo:latest --registry-url=http://localhost:12345 --server-uuid=38947555-7742-3448-3784-823347823834
-ExecStop=/usr/bin/docker stop metalprobe
-[Install]
-WantedBy=multi-user.target`,
-				},
-			},
-		},
-		"passwd": map[string]interface{}{},
-		"storage": map[string]interface{}{
-			"files": []interface{}{},
-		},
-	}
+	DefaultIgnition = `variant: fcos
+version: "1.3.0"
+systemd:
+  units:
+    - name: docker-install.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=Install Docker
+        Before=metalprobe.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/apt-get update
+        ExecStart=/usr/bin/apt-get install docker.io -y
+        [Install]
+        WantedBy=multi-user.target
+    - name: docker.service
+      enabled: true
+    - name: metalprobe.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=Run My Docker Container
+        Requires=docker.service docker-install.service
+        After=docker.service docker-install.service
+        [Service]
+        Restart=always
+        ExecStartPre=-/usr/bin/docker stop metalprobe
+        ExecStartPre=-/usr/bin/docker rm metalprobe
+        ExecStartPre=/usr/bin/docker pull foo:latest
+        ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe foo:latest --registry-url=http://localhost:12345 --server-uuid=38947555-7742-3448-3784-823347823834
+        ExecStop=/usr/bin/docker stop metalprobe
+        [Install]
+        WantedBy=multi-user.target
+storage:
+  files: []
+passwd: {}
+`
 )

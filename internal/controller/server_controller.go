@@ -382,6 +382,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, server *metalv1alp
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
 
+	// TODO: do a proper restart if Server is already in PowerOn state
 	if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
 		return fmt.Errorf("failed to power on server: %w", err)
 	}

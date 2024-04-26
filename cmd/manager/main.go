@@ -120,8 +120,8 @@ func main() {
 			setupLog.Error(nil, "failed to set the registry URL as no address is provided")
 			os.Exit(1)
 		}
+		registryURL = fmt.Sprintf("%s://%s:%d", registryProtocol, registryAddr, registryPort)
 	}
-	registryURL = fmt.Sprintf("%s://%s:%d", registryProtocol, registryAddr, registryPort)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -235,7 +235,7 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting registry server", "RegistryURL", registryURL)
-	registryServer := registry.NewServer(registryAddr)
+	registryServer := registry.NewServer(fmt.Sprintf(":%d", registryPort))
 	go func() {
 		if err := registryServer.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running registry server")

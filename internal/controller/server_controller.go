@@ -401,7 +401,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) error {
 	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.UUID))
 	if err != nil {
-		if resp != nil && resp.StatusCode != http.StatusNotFound {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("could not find server details: %s", resp.Status)
 		}
 		return fmt.Errorf("failed to fetch server details: %w", err)

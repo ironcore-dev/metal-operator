@@ -19,10 +19,8 @@ package controller
 import (
 	"fmt"
 
-	"github.com/afritzler/metal-operator/internal/controller/testdata"
-	"sigs.k8s.io/yaml"
-
 	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
+	"github.com/afritzler/metal-operator/internal/controller/testdata"
 	"github.com/afritzler/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -87,8 +85,6 @@ var _ = Describe("Server Controller", func() {
 				Name:      bootConfig.Name,
 			},
 		}
-		ignitionData, err := yaml.Marshal(testdata.DefaultIgnition)
-		Expect(err).NotTo(HaveOccurred())
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
@@ -98,7 +94,7 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(ignitionData))),
+			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
 		))
 
 		By("Ensuring that the Server resource has been created")

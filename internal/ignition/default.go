@@ -53,8 +53,6 @@ systemd:
       contents: |-
         [Unit]
         Description=Run My Docker Container
-        Requires=docker.service docker-install.service
-        After=docker.service docker-install.service
         [Service]
         Restart=always
         ExecStartPre=-/usr/bin/docker stop metalprobe

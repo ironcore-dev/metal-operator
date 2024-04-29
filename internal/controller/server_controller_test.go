@@ -19,6 +19,8 @@ package controller
 import (
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
 	"github.com/afritzler/metal-operator/internal/controller/testdata"
 	"github.com/afritzler/metal-operator/internal/probe"
@@ -141,10 +143,20 @@ var _ = Describe("Server Controller", func() {
 
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
 		))
+
+		By("Ensuring that the boot configuration has been removed")
+		config := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      server.Name,
+			},
+		}
+		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	// TODO: test server with manual BMC registration

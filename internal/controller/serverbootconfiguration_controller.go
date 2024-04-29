@@ -149,7 +149,7 @@ func (r *ServerBootConfigurationReconciler) removeServerBootConfigRef(ctx contex
 
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = nil
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); !apierrors.IsNotFound(err) {
 		return err
 	}
 

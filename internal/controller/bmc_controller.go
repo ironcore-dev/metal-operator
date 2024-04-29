@@ -185,7 +185,8 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcObj *metalv1alph
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
-		Owns(&metalv1alpha1.Server{}).
+		// TODO: don't recreate Server if deleted manually
+		//Owns(&metalv1alpha1.Server{}).
 		// TODO: add watches for Endpoints and BMCSecrets
 		Complete(r)
 }

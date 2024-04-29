@@ -251,7 +251,6 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		}
 		log.V(1).Info("Reconciled available state")
 	case metalv1alpha1.ServerStateReserved:
-
 		if err := r.updateServerStatus(ctx, log, server); err != nil {
 			return false, err
 		}

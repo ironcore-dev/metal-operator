@@ -156,7 +156,7 @@ var _ = Describe("Server Controller", func() {
 				Name:      server.Name,
 			},
 		}
-		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
+		Consistently(Get(config)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	// TODO: test server with manual BMC registration

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -61,6 +62,7 @@ type ServerReconciler struct {
 	ProbeImage       string
 	RegistryURL      string
 	ProbeOSImage     string
+	RequeueInterval  time.Duration
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -149,7 +151,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
-		return ctrl.Result{Requeue: requeue, RequeueAfter: 10 * time.Second}, nil
+		return ctrl.Result{Requeue: requeue, RequeueAfter: r.RequeueInterval}, nil
 	}
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
@@ -216,7 +218,6 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		}
 		if err != nil {
 			log.V(1).Info("Could not get server details from registry.")
-			// TODO: instead of requeue subscribe to registry events and requeue Server objects in SetupWithManager
 			return false, err
 		}
 		log.V(1).Info("Extracted Server details")
@@ -229,9 +230,14 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		// TODO: fix that by providing the power state to the ensure method
 		server.Spec.Power = metalv1alpha1.PowerOff
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to shutdown server: %w", err)
+			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
 		log.V(1).Info("Server state set to power off")
+
+		if err := r.invalidateRegistryEntryForServer(log, server); err != nil {
+			return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
+		}
+		log.V(1).Info("Removed Server from Registry")
 
 		log.V(1).Info("Setting Server state set to available")
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
@@ -515,6 +521,31 @@ func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.C
 	if err := r.Delete(ctx, config); !apierrors.IsNotFound(err) {
 		return err
 	}
+	return nil
+}
+
+func (r *ServerReconciler) invalidateRegistryEntryForServer(log logr.Logger, server *metalv1alpha1.Server) error {
+	url := fmt.Sprintf("%s/delete/%s", r.RegistryURL, server.Spec.UUID)
+
+	c := &http.Client{}
+
+	// Create the DELETE request
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	// Send the request
+	resp, err := c.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error(err, "Failed to close response body")
+		}
+	}(resp.Body)
 	return nil
 }
 

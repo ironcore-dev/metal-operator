@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -149,7 +152,7 @@ func (r *ServerBootConfigurationReconciler) removeServerBootConfigRef(ctx contex
 
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = nil
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); !apierrors.IsNotFound(err) {
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return err
 	}
 
@@ -160,5 +163,20 @@ func (r *ServerBootConfigurationReconciler) removeServerBootConfigRef(ctx contex
 func (r *ServerBootConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.ServerBootConfiguration{}).
+		Watches(&metalv1alpha1.Server{}, r.enqueueServerBootConfigByServerRef()).
 		Complete(r)
+}
+
+func (r *ServerBootConfigurationReconciler) enqueueServerBootConfigByServerRef() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+		server := obj.(*metalv1alpha1.Server)
+		if server.Spec.BootConfigurationRef != nil {
+			return []ctrl.Request{
+				{
+					NamespacedName: types.NamespacedName{Namespace: server.Spec.BootConfigurationRef.Namespace, Name: server.Spec.BootConfigurationRef.Name},
+				},
+			}
+		}
+		return nil
+	})
 }

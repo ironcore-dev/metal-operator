@@ -259,10 +259,21 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		}
 		log.V(1).Info("Reconciled available state")
 	case metalv1alpha1.ServerStateReserved:
-		// TODO: do first PXE boot
+		if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
+			log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+			return true, err
+		}
+		log.V(1).Info("Server boot configuration is ready")
+
+		if err := r.pxeBootServer(ctx, log, server); err != nil {
+			return false, fmt.Errorf("failed to boot server: %w", err)
+		}
+		log.V(1).Info("Booted Server in PXE")
+
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
+
 		if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
 			return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 		}
@@ -407,16 +418,19 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string) ([
 }
 
 func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	if server.Spec.BootConfigurationRef == nil {
+		return false, nil
+	}
 	config := &metalv1alpha1.ServerBootConfiguration{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: r.ManagerNamespace, Name: server.Name}, config); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: server.Spec.BootConfigurationRef.Namespace, Name: server.Spec.BootConfigurationRef.Name}, config); err != nil {
 		return false, err
 	}
 	return config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
 }
 
 func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
-	if server == nil {
-		log.V(1).Info("PXE boot server is nil")
+	if server == nil || server.Spec.BootConfigurationRef == nil {
+		log.V(1).Info("Server not ready for netboot")
 		return nil
 	}
 

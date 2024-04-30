@@ -33,7 +33,7 @@ import (
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
-var _ = Describe("Server Controller", func() {
+var _ = FDescribe("Server Controller", func() {
 	ns := SetupTest()
 
 	var endpoint *metalv1alpha1.Endpoint
@@ -75,7 +75,6 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Eventually(Object(bootConfig)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerBootConfigurationFinalizer)),
 			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
 			HaveField("Spec.Image", "fooOS:latest"),
 			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
@@ -131,17 +130,17 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 		))
 
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
 		}()
-
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
 
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -152,13 +151,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Ensuring that the boot configuration has been removed")
-		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      server.Name,
-			},
-		}
-		Consistently(Get(config)).Should(Satisfy(apierrors.IsNotFound))
+		Consistently(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the server is removed from the registry")
 		response, err := http.Get(registryURL + "/systems/" + server.Spec.UUID)

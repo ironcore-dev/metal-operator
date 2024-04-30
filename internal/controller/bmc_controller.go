@@ -89,7 +89,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	}
 	log.V(1).Info("Updated BMC status")
 
-	if err := r.discoverServers(ctx, bmcObj); err != nil {
+	if err := r.discoverServers(ctx, bmcObj); err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to discover servers: %w", err)
 	}
 	log.V(1).Info("Discovered servers")

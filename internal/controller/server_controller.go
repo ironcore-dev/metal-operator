@@ -24,6 +24,9 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/afritzler/metal-operator/internal/api/registry"
@@ -35,11 +38,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 const (
@@ -149,11 +150,16 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		}
 	}
 
+	if err := r.updateServerStatus(ctx, log, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
+	}
+	log.V(1).Info("Updated Server status")
+
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
 		return ctrl.Result{Requeue: requeue, RequeueAfter: r.RequeueInterval}, nil
 	}
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
 	}
 
@@ -188,21 +194,15 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	switch server.Status.State {
 	case metalv1alpha1.ServerStateInitial:
-		if err := r.updateServerStatus(ctx, log, server); err != nil {
-			return false, err
-		}
-		log.V(1).Info("Updated Server status")
-
 		// apply boot configuration
-		config, err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server)
-		if err != nil {
+		if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server); err != nil {
 			return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
 		}
 		log.V(1).Info("Applied Server boot configuration")
 
 		if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
 			log.V(1).Info("Server boot configuration is not ready. Retrying ...")
-			return false, err
+			return true, err
 		}
 		log.V(1).Info("Server boot configuration is ready")
 
@@ -222,13 +222,13 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		}
 		log.V(1).Info("Extracted Server details")
 
-		if err := r.ensureInitialBootConfigurationIsDeleted(ctx, config); err != nil {
-			return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
-		}
-		log.V(1).Info("Ensured initial boot configuration is deleted")
-
-		// TODO: fix that by providing the power state to the ensure method
+		serverBase := server.DeepCopy()
 		server.Spec.Power = metalv1alpha1.PowerOff
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to update server power state: %w", err)
+		}
+		log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
+
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
@@ -244,10 +244,10 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 			return false, err
 		}
 	case metalv1alpha1.ServerStateAvailable:
-		if err := r.updateServerStatus(ctx, log, server); err != nil {
-			return false, err
+		if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
+			return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
 		}
-		log.V(1).Info("Updated Server status")
+		log.V(1).Info("Ensured initial boot configuration is deleted")
 
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)
@@ -257,11 +257,7 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		}
 		log.V(1).Info("Reconciled available state")
 	case metalv1alpha1.ServerStateReserved:
-		if err := r.updateServerStatus(ctx, log, server); err != nil {
-			return false, err
-		}
-		log.V(1).Info("Updated Server status")
-
+		// TODO: do first PXE boot
 		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
@@ -271,6 +267,22 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		log.V(1).Info("Reconciled reserved state")
 	}
 	return false, nil
+}
+
+func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+	serverBase := server.DeepCopy()
+	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+		Namespace:  config.Namespace,
+		Name:       config.Name,
+		UID:        config.UID,
+		APIVersion: "metal.ironcore.dev/v1alpha1",
+		Kind:       "ServerBootConfiguration",
+	}
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -303,7 +315,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	return nil
 }
 
-func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, error) {
+func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) error {
 	// apply server boot configuration
 	bootConfig := &metalv1alpha1.ServerBootConfiguration{
 		TypeMeta: metav1.TypeMeta{
@@ -326,14 +338,18 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 	}
 
 	if err := r.Patch(ctx, bootConfig, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
-		return nil, fmt.Errorf("failed to apply server boot configuration: %w", err)
+		return err
+	}
+
+	if err := r.ensureServerBootConfigRef(ctx, server, bootConfig); err != nil {
+		return err
 	}
 
 	if err := r.applyDefaultIgnitionForServer(ctx, server, bootConfig, r.RegistryURL); err != nil {
-		return nil, fmt.Errorf("failed to apply default server ignitionSecret: %w", err)
+		return err
 	}
 
-	return bootConfig, nil
+	return nil
 }
 
 func (r *ServerReconciler) applyDefaultIgnitionForServer(
@@ -517,10 +533,33 @@ func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, log logr.Logg
 	return nil
 }
 
-func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration) error {
+func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.Context, server *metalv1alpha1.Server) error {
+	if server.Spec.BootConfigurationRef == nil {
+		return nil
+	}
+
+	if server.Spec.BootConfigurationRef.Namespace != r.ManagerNamespace && server.Spec.BootConfigurationRef.Name != server.Name {
+		// hit a non initial boot config
+		return nil
+	}
+
+	config := &metalv1alpha1.ServerBootConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: server.Spec.BootConfigurationRef.Namespace,
+			Name:      server.Spec.BootConfigurationRef.Name,
+		},
+	}
+
 	if err := r.Delete(ctx, config); !apierrors.IsNotFound(err) {
 		return err
 	}
+
+	serverBase := server.DeepCopy()
+	server.Spec.BootConfigurationRef = nil
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return err
+	}
+
 	return nil
 }
 

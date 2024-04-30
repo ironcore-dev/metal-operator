@@ -33,7 +33,7 @@ import (
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
-var _ = FDescribe("Server Controller", func() {
+var _ = Describe("Server Controller", func() {
 	ns := SetupTest()
 
 	var endpoint *metalv1alpha1.Endpoint
@@ -75,6 +75,7 @@ var _ = FDescribe("Server Controller", func() {
 			},
 		}
 		Eventually(Object(bootConfig)).Should(SatisfyAll(
+			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
 			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
 			HaveField("Spec.Image", "fooOS:latest"),
 			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),

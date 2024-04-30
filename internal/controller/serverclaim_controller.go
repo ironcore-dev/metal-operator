@@ -157,7 +157,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, err
 	}
 
-	if err := r.applyBootConfiguration(ctx, claim); err != nil {
+	if err := r.applyBootConfiguration(ctx, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
 
@@ -177,7 +177,7 @@ func (r *ServerClaimReconciler) patchServerClaimPhase(ctx context.Context, claim
 	return true, nil
 }
 
-func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, claim *metalv1alpha1.ServerClaim) error {
+func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
 	config := &metalv1alpha1.ServerBootConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "metal.ironcore.dev/v1alpha1",
@@ -201,6 +201,18 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, clai
 	// TODO: we might want to add a finalizer on the ignition secret
 	if err := r.Patch(ctx, config, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to apply boot configuration: %w", err)
+	}
+
+	serverBase := server.DeepCopy()
+	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+		Namespace:  config.Namespace,
+		Name:       config.Name,
+		UID:        config.UID,
+		APIVersion: "metal.ironcore.dev/v1alpha1",
+		Kind:       "ServerBootConfiguration",
+	}
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return err
 	}
 
 	return nil

@@ -44,8 +44,10 @@ import (
 )
 
 const (
-	DefaultIgnitionSecretKeyName = "ignition"
-	ServerFinalizer              = "metal.ironcore.dev/server"
+	DefaultIgnitionSecretKeyName  = "ignition"
+	ServerFinalizer               = "metal.ironcore.dev/server"
+	InternalAnnotationTypeKeyName = "metal.ironcore.dev/type"
+	InternalAnnotationTypeValue   = "Internal"
 )
 
 const (
@@ -325,6 +327,9 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
 			Namespace: r.ManagerNamespace,
+			Annotations: map[string]string{
+				InternalAnnotationTypeKeyName: InternalAnnotationTypeValue,
+			},
 		},
 		Spec: metalv1alpha1.ServerBootConfigurationSpec{
 			ServerRef: v1.LocalObjectReference{
@@ -538,19 +543,17 @@ func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.C
 		return nil
 	}
 
-	if server.Spec.BootConfigurationRef.Namespace != r.ManagerNamespace && server.Spec.BootConfigurationRef.Name != server.Name {
-		// hit a non initial boot config
+	config := &metalv1alpha1.ServerBootConfiguration{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: server.Spec.BootConfigurationRef.Namespace, Name: server.Spec.BootConfigurationRef.Name}, config); err != nil {
+		return err
+	}
+
+	if val, ok := config.Annotations[InternalAnnotationTypeKeyName]; !ok || val != InternalAnnotationTypeValue {
+		// hit a non-initial boot config
 		return nil
 	}
 
-	config := &metalv1alpha1.ServerBootConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: server.Spec.BootConfigurationRef.Namespace,
-			Name:      server.Spec.BootConfigurationRef.Name,
-		},
-	}
-
-	if err := r.Delete(ctx, config); !apierrors.IsNotFound(err) {
+	if err := r.Delete(ctx, config); err != nil {
 		return err
 	}
 

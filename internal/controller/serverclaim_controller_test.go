@@ -153,6 +153,8 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring that the Server is available")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 		))
 	})

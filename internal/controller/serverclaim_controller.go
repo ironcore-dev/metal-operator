@@ -84,6 +84,24 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, cla
 		}
 	}
 
+	config := &metalv1alpha1.ServerBootConfiguration{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: claim.Namespace, Name: claim.Name}, config); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	if err := r.Delete(ctx, config); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to delete config: %w", err)
+	}
+	log.V(1).Info("Removed boot config")
+
+	if err := r.removeBootConfigRefFromServerAndPowerOff(ctx, config, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to remove boot config ref from server: %w", err)
+	}
+	log.V(1).Info("Removed boot config ref from server")
+
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); !apierrors.IsNotFound(err) || modified {
 		return ctrl.Result{}, err
 	}
@@ -140,6 +158,10 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
+	if err := r.applyBootConfiguration(ctx, server, claim); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
+	}
+
 	serverBase := server.DeepCopy()
 	server.Spec.ServerClaimRef = &v1.ObjectReference{
 		APIVersion: "metal.ironcore.dev/v1alpha1",
@@ -155,10 +177,6 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 
 	if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
 		return ctrl.Result{}, err
-	}
-
-	if err := r.applyBootConfiguration(ctx, server, claim); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
 
 	log.V(1).Info("Reconciled server claim")
@@ -222,6 +240,20 @@ func (r *ServerClaimReconciler) removeClaimRefFromServer(ctx context.Context, se
 	serverBase := server.DeepCopy()
 	server.Spec.ServerClaimRef = nil
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
+}
+
+func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration, server *metalv1alpha1.Server) error {
+	if ref := server.Spec.BootConfigurationRef; ref == nil || ref.UID != config.UID {
+		return nil
+	}
+
+	serverBase := server.DeepCopy()
+	server.Spec.BootConfigurationRef = nil
+	server.Spec.Power = metalv1alpha1.PowerOff
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

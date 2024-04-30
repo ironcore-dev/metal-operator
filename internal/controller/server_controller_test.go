@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"net/http"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -74,6 +75,7 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Eventually(Object(bootConfig)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerBootConfigurationFinalizer)),
 			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
 			HaveField("Spec.Image", "fooOS:latest"),
 			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
@@ -157,6 +159,11 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Consistently(Get(config)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Ensuring that the server is removed from the registry")
+		response, err := http.Get(registryURL + "/systems/" + server.Spec.UUID)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 	})
 
 	// TODO: test server with manual BMC registration

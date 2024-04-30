@@ -56,6 +56,7 @@ func NewServer(addr string) *Server {
 // routes registers the server's routes.
 func (s *Server) routes() {
 	s.mux.HandleFunc("/register", s.registerHandler)
+	s.mux.HandleFunc("/delete/", s.deleteHandler)
 	s.mux.HandleFunc("/systems/", s.systemsHandler)
 }
 
@@ -105,6 +106,31 @@ func (s *Server) systemsHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("System UUID not found: %s\n", uuid)
 		http.NotFound(w, r)
 	}
+}
+
+// deleteHandler handles the DELETE requests to remove a system by UUID.
+func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Received method: %s", r.Method)   // This will log the method of the request
+	log.Printf("Requested URI: %s", r.RequestURI) // This logs the full request URI
+
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Only DELETE method is allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	uuid := r.URL.Path[len("/delete/"):] // Assuming the URL is like /delete/{uuid}
+
+	// Attempt to delete the entry from the store
+	if _, ok := s.systemsStore.Load(uuid); !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	s.systemsStore.Delete(uuid) // Perform the deletion
+
+	// Respond with success message
+	w.WriteHeader(http.StatusOK)
+	log.Printf("System with UUID %s deleted successfully", uuid)
 }
 
 // Start starts the server on the specified address and adds logging for key events.

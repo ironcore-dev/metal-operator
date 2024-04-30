@@ -67,5 +67,18 @@ var _ = Describe("RegistryServer", func() {
 				},
 			},
 		}))
+
+		By("Ensuring that the server is removed from the registry")
+		request, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/delete/%s", testServerURL, systemRegistrationPayload.SystemUUID), nil)
+		Expect(err).NotTo(HaveOccurred())
+		c := &http.Client{}
+		response, err = c.Do(request)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.StatusCode).To(Equal(http.StatusOK))
+
+		By("Ensuring that the server is removed from the registry")
+		response, err = http.Get(fmt.Sprintf("%s/systems/%s", testServerURL, systemRegistrationPayload.SystemUUID))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 	})
 })

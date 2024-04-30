@@ -21,9 +21,6 @@ spec:
     - jsonPath: .status.ip
       name: MACAddress
       type: string
-    - jsonPath: .status.manufacturer
-      name: Manufacturer
-      type: string
     - jsonPath: .status.model
       name: Model
       type: string

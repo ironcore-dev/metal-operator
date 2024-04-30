@@ -18,7 +18,7 @@ spec:
     - jsonPath: .spec.serverRef.name
       name: Server
       type: string
-    - jsonPath: .spec.ignitionRef.name
+    - jsonPath: .spec.ignitionSecretRef.name
       name: Ignition
       type: string
     - jsonPath: .spec.image

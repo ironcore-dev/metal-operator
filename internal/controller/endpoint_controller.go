@@ -107,7 +107,23 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				}
 				defer bmcClient.Logout()
 
-				// TODO: ensure that BMC has the correct MACAddress
+				bmcManager, err := bmcClient.GetManager()
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed get the BMC Manager: %w", err)
+				}
+
+				macFound := false
+				for _, macAddress := range bmcManager.PermanentMACAddresses {
+					if macAddress == endpoint.Spec.MACAddress {
+						macFound = true
+					}
+				}
+
+				if macFound == false {
+					log.V(1).Info("MACAddress of the BMC does not match", "BMC-MACAddress", bmcManager.PermanentMACAddresses, "Endpoint-MACAddress", endpoint.Spec.MACAddress)
+					return ctrl.Result{}, nil
+				}
+				log.V(1).Info("BMC MAC address verification successful")
 
 				var bmcSecret *metalv1alpha1.BMCSecret
 				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {

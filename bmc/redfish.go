@@ -159,16 +159,32 @@ func (r *RedfishBMC) GetManager() (*Manager, error) {
 	}
 
 	for _, m := range managers {
-		// TODO: always take the first for now.
+		ethernetInterfaces, err := m.EthernetInterfaces()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ethernetInterfaces: %w", err)
+		}
+		if len(ethernetInterfaces) == 0 {
+			if err != nil {
+				return nil, fmt.Errorf("no ethernetInterfaces attached with BMC Manager: %w", err)
+			}
+		}
+
+		var permanentMACAddresses []string
+		for _, eth := range ethernetInterfaces {
+			permanentMACAddresses = append(permanentMACAddresses, eth.PermanentMACAddress)
+		}
+
+		// TODO: support BMCs with multiple managers.
 		return &Manager{
-			UUID:            m.UUID,
-			Manufacturer:    m.Manufacturer,
-			State:           string(m.Status.State),
-			PowerState:      string(m.PowerState),
-			SerialNumber:    m.SerialNumber,
-			FirmwareVersion: m.FirmwareVersion,
-			SKU:             m.PartNumber,
-			Model:           m.Model,
+			UUID:                  m.UUID,
+			Manufacturer:          m.Manufacturer,
+			State:                 string(m.Status.State),
+			PowerState:            string(m.PowerState),
+			SerialNumber:          m.SerialNumber,
+			FirmwareVersion:       m.FirmwareVersion,
+			SKU:                   m.PartNumber,
+			Model:                 m.Model,
+			PermanentMACAddresses: permanentMACAddresses,
 		}, nil
 	}
 

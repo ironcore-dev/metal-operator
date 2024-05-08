@@ -109,12 +109,13 @@ type SystemInfo struct {
 
 // Manager represents the manager information.
 type Manager struct {
-	UUID            string
-	Manufacturer    string
-	FirmwareVersion string
-	SerialNumber    string
-	SKU             string
-	Model           string
-	PowerState      string
-	State           string
+	UUID                  string
+	Manufacturer          string
+	FirmwareVersion       string
+	SerialNumber          string
+	SKU                   string
+	Model                 string
+	PowerState            string
+	State                 string
+	PermanentMACAddresses []string
 }

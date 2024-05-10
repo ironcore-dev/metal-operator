@@ -111,9 +111,6 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	bmcBase := bmcObj.DeepCopy()
 	bmcObj.Status.IP = endpoint.Spec.IP
 	bmcObj.Status.MACAddress = endpoint.Spec.MACAddress
-	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
-	}
 
 	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure)
 	if err != nil {
@@ -124,21 +121,20 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	// TODO: Secret rotation/User management
 
 	manager, err := bmcClient.GetManager()
-	if err != nil {
+	if manager == nil || err != nil {
 		return fmt.Errorf("failed to get manager details: %w", err)
 	}
-	if manager != nil {
-		bmcBase := bmcObj.DeepCopy()
-		bmcObj.Status.Manufacturer = manager.Manufacturer
-		bmcObj.Status.State = metalv1alpha1.BMCState(manager.State)
-		bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(manager.PowerState)
-		bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
-		bmcObj.Status.SerialNumber = manager.SerialNumber
-		bmcObj.Status.SKU = manager.SKU
-		bmcObj.Status.Model = manager.Model
-		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return err
-		}
+
+	bmcObj.Status.Manufacturer = manager.Manufacturer
+	bmcObj.Status.State = metalv1alpha1.BMCState(manager.State)
+	bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(manager.PowerState)
+	bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
+	bmcObj.Status.SerialNumber = manager.SerialNumber
+	bmcObj.Status.SKU = manager.SKU
+	bmcObj.Status.Model = manager.Model
+
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return err
 	}
 
 	return nil
@@ -173,7 +169,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcObj *metalv1alph
 		if err := controllerutil.SetControllerReference(bmcObj, server, r.Scheme); err != nil {
 			return fmt.Errorf("failed to set owner reference on Server: %w", err)
 		}
-		if err := r.Patch(ctx, server, client.Apply, fieldOwner); err != nil {
+		if err := r.Patch(ctx, server, client.Merge); err != nil {
 			return fmt.Errorf("failed to apply Server: %w", err)
 		}
 	}

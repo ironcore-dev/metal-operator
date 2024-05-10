@@ -203,7 +203,7 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alph
 		return err
 	}
 
-	if err := r.Patch(ctx, bmcObj, client.Apply, fieldOwner); err != nil {
+	if err := r.Patch(ctx, bmcObj, client.Merge); err != nil {
 		return err
 	}
 
@@ -229,7 +229,7 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metal
 		return nil, err
 	}
 
-	if err := r.Patch(ctx, bmcSecret, client.Apply, fieldOwner); err != nil {
+	if err := r.Patch(ctx, bmcSecret, client.Merge); err != nil {
 		return nil, err
 	}
 

@@ -20,5 +20,5 @@ const (
 	// OperationAnnotation indicates which operation should be performed outside the current spec definition flow.
 	OperationAnnotation = "metal.ironcore.dev/operation"
 	// OperationAnnotationIgnore skips the reconciliation of a resource if set to true.
-	OperationAnnotationIgnore = "ignore"
+	OperationAnnotationIgnore = "ignore" // TODO: revert
 )

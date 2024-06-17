@@ -40,6 +40,7 @@ systemd:
         Description=Install Docker
         Before=metalprobe.service
         [Service]
+        RestartSec=15
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/usr/bin/apt-get update
@@ -54,6 +55,7 @@ systemd:
         [Unit]
         Description=Run My Docker Container
         [Service]
+        RestartSec=15
         Restart=always
         ExecStartPre=-/usr/bin/docker stop metalprobe
         ExecStartPre=-/usr/bin/docker rm metalprobe

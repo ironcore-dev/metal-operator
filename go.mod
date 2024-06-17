@@ -3,7 +3,7 @@ module github.com/afritzler/metal-operator
 go 1.22.2
 
 require (
-	github.com/go-logr/logr v1.4.1
+	github.com/go-logr/logr v1.4.2
 	github.com/ironcore-dev/controller-utils v0.9.3
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1

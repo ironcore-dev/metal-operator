@@ -28,7 +28,8 @@ systemd:
         Description=Install Docker
         Before=metalprobe.service
         [Service]
-        RestartSec=15
+        Restart=on-failure
+        RestartSec=20
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/usr/bin/apt-get update
@@ -43,8 +44,8 @@ systemd:
         [Unit]
         Description=Run My Docker Container
         [Service]
-        RestartSec=15
-        Restart=always
+        Restart=on-failure
+        RestartSec=20
         ExecStartPre=-/usr/bin/docker stop metalprobe
         ExecStartPre=-/usr/bin/docker rm metalprobe
         ExecStartPre=/usr/bin/docker pull foo:latest

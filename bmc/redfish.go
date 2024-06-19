@@ -61,7 +61,6 @@ func (r *RedfishBMC) Logout() {
 // PowerOn powers on the system using Redfish.
 func (r *RedfishBMC) PowerOn(systemID string) error {
 	service := r.client.GetService()
-
 	systems, err := service.Systems()
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
@@ -69,8 +68,13 @@ func (r *RedfishBMC) PowerOn(systemID string) error {
 
 	for _, system := range systems {
 		if system.UUID == systemID {
-			if err := system.Reset(redfish.OnResetType); err != nil {
-				return fmt.Errorf("failed to reset system to power on state: %w", err)
+			powerState := system.PowerState
+			if powerState != redfish.OnPowerState {
+				if err := system.Reset(redfish.OnResetType); err != nil {
+					return fmt.Errorf("failed to reset system to power on state: %w", err)
+				}
+			} else {
+				fmt.Printf("System %s is already powered on.\n", systemID)
 			}
 			break
 		}

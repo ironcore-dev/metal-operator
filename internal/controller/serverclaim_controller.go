@@ -147,14 +147,15 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
 	}
 
-	if server.Status.State != metalv1alpha1.ServerStateAvailable {
-		log.V(1).Info("Failed to claim server in non available state", "Server", server.Name, "ServerState", server.Status.State)
+	// did somebody else claim this server?
+	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && claimRef.UID != claim.UID {
+		log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
 		return ctrl.Result{}, nil
 	}
 
-	// did somebody else claimed this server?
-	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && claimRef.UID != claim.UID {
-		log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
+	// Check server state and only proceed if it is Available or Reserved
+	if server.Status.State != metalv1alpha1.ServerStateAvailable && server.Status.State != metalv1alpha1.ServerStateReserved {
+		log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 		return ctrl.Result{}, nil
 	}
 

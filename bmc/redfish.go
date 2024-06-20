@@ -73,8 +73,6 @@ func (r *RedfishBMC) PowerOn(systemID string) error {
 				if err := system.Reset(redfish.OnResetType); err != nil {
 					return fmt.Errorf("failed to reset system to power on state: %w", err)
 				}
-			} else {
-				fmt.Printf("System %s is already powered on.\n", systemID)
 			}
 			break
 		}

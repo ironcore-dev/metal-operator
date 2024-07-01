@@ -1,4 +1,4 @@
-module github.com/afritzler/metal-operator
+module github.com/ironcore-dev/metal-operator
 
 go 1.22.2
 

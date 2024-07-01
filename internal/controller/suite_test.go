@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/afritzler/metal-operator/internal/registry"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 
-	"github.com/afritzler/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +40,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

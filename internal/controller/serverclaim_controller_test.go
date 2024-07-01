@@ -27,7 +27,7 @@ import (
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
-	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
 var _ = Describe("ServerClaim Controller", func() {

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/afritzler/metal-operator/internal/api/registry"
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

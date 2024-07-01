@@ -17,7 +17,7 @@ limitations under the License.
 package controller
 
 import (
-	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"

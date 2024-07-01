@@ -22,9 +22,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
-	"github.com/afritzler/metal-operator/internal/controller/testdata"
-	"github.com/afritzler/metal-operator/internal/probe"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller/testdata"
+	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"

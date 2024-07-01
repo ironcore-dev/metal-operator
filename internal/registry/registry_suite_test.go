@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/afritzler/metal-operator/internal/registry"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"

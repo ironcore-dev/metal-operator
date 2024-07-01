@@ -27,10 +27,10 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	metalv1alpha1 "github.com/afritzler/metal-operator/api/v1alpha1"
-	"github.com/afritzler/metal-operator/internal/api/macdb"
-	"github.com/afritzler/metal-operator/internal/controller"
-	"github.com/afritzler/metal-operator/internal/registry"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"

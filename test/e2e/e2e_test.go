@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/afritzler/metal-operator/test/utils"
+	"github.com/ironcore-dev/metal-operator/test/utils"
 )
 
 const namespace = "metal-operator-system"

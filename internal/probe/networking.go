@@ -20,7 +20,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/afritzler/metal-operator/internal/api/registry"
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 )
 
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,

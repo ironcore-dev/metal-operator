@@ -1,6 +1,6 @@
 # metal-operator
-[![REUSE status](https://api.reuse.software/badge/github.com/afritzler/metal-operator)](https://api.reuse.software/info/github.com/afritzler/metal-operator)
-[![Go Report Card](https://goreportcard.com/badge/github.com/afritzler/metal-operator)](https://goreportcard.com/report/github.com/afritzler/metal-operator)
+[![REUSE status](https://api.reuse.software/badge/github.com/ironcore-dev/metal-operator)](https://api.reuse.software/info/github.com/ironcore-dev/metal-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ironcore-dev/metal-operator)](https://goreportcard.com/report/github.com/ironcore-dev/metal-operator)
 [![GitHub License](https://img.shields.io/static/v1?label=License&message=Apache-2.0&color=blue)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
 

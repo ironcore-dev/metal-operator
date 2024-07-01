@@ -26,7 +26,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/afritzler/metal-operator/internal/api/registry"
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 )
 
 // Ensure the log output goes to standard out (this is useful if you're running in a containerized environment).

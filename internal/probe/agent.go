@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/afritzler/metal-operator/internal/api/registry"
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 

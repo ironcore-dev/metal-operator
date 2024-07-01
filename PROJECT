@@ -6,7 +6,7 @@ domain: ironcore.dev
 layout:
 - go.kubebuilder.io/v4
 projectName: metal-operator
-repo: github.com/afritzler/metal-operator
+repo: github.com/ironcore-dev/metal-operator
 resources:
 - api:
     crdVersion: v1
@@ -14,7 +14,7 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: Endpoint
-  path: github.com/afritzler/metal-operator/api/v1alpha1
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -22,7 +22,7 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: BMCSecret
-  path: github.com/afritzler/metal-operator/api/v1alpha1
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -30,7 +30,7 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: BMC
-  path: github.com/afritzler/metal-operator/api/v1alpha1
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -38,7 +38,7 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: Server
-  path: github.com/afritzler/metal-operator/api/v1alpha1
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -46,7 +46,7 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: ServerBootConfiguration
-  path: github.com/afritzler/metal-operator/api/v1alpha1
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -55,6 +55,6 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: ServerClaim
-  path: github.com/afritzler/metal-operator/api/v1alpha1
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

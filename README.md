@@ -4,15 +4,18 @@
 [![GitHub License](https://img.shields.io/static/v1?label=License&message=Apache-2.0&color=blue)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
 
-// TODO(user): Add simple overview of use/purpose
+`metal-operator` is a Kubernetes operator for automating bare metal server discovery and provisioning.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+Metal-operator is a project built using Kubebuilder and controller-runtime to facilitate the discovery and provisioning 
+of bare metal servers. It provides a robust and scalable solution for managing bare metal infrastructure, ensuring 
+seamless integration and automation within Kubernetes environments.
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.21.0+
+- go version v1.22.0+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.

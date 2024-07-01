@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         image:
-        - name: metal-controller-manager
+        - name: metal-operator-controller-manager
           target: manager
         - name: metalprobe
           target: probe

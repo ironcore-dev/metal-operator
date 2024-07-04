@@ -62,7 +62,10 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, cla
 
 	server := &metalv1alpha1.Server{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
+		}
+		log.V(1).Info("Server gone")
 	}
 
 	if server.Spec.ServerClaimRef != nil {
@@ -71,18 +74,18 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, cla
 		}
 	}
 
-	config := &metalv1alpha1.ServerBootConfiguration{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: claim.Namespace, Name: claim.Name}, config); err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, err
+	config := &metalv1alpha1.ServerBootConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claim.Name,
+			Namespace: claim.Namespace,
+		},
 	}
-
 	if err := r.Delete(ctx, config); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to delete config: %w", err)
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to delete serverbootconfig: %w", err)
+		}
+		log.V(1).Info("ServerBootConfiguration gone")
 	}
-	log.V(1).Info("Removed boot config")
 
 	if err := r.removeBootConfigRefFromServerAndPowerOff(ctx, config, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to remove boot config ref from server: %w", err)
@@ -231,14 +234,14 @@ func (r *ServerClaimReconciler) removeClaimRefFromServer(ctx context.Context, se
 }
 
 func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration, server *metalv1alpha1.Server) error {
-	if ref := server.Spec.BootConfigurationRef; ref == nil || ref.UID != config.UID {
+	if ref := server.Spec.BootConfigurationRef; ref == nil || (ref.Name != config.Name && ref.Namespace != config.Namespace) {
 		return nil
 	}
 
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = nil
 	server.Spec.Power = metalv1alpha1.PowerOff
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	return nil

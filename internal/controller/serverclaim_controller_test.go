@@ -243,4 +243,26 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("should allow deletion of ServerClaim without a Server", func(ctx SpecContext) {
+		By("Creating a ServerClaim")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: "non-existent-server"},
+				Image:     "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Deleting the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+	})
 })

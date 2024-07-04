@@ -76,7 +76,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	}
 	log.V(1).Info("Updated BMC status")
 
-	if err := r.discoverServers(ctx, bmcObj); err != nil && !errors.IsNotFound(err) {
+	if err := r.discoverServers(ctx, log, bmcObj); err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to discover servers: %w", err)
 	}
 	log.V(1).Info("Discovered servers")
@@ -131,7 +131,7 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	return nil
 }
 
-func (r *BMCReconciler) discoverServers(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
 	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
@@ -160,9 +160,12 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcObj *metalv1alph
 		if err := controllerutil.SetControllerReference(bmcObj, server, r.Scheme); err != nil {
 			return fmt.Errorf("failed to set owner reference on Server: %w", err)
 		}
-		if err := r.Patch(ctx, server, client.Apply, fieldOwner); err != nil {
-			return fmt.Errorf("failed to apply Server: %w", err)
+
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create or patch Server: %w", err)
 		}
+		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
 	}
 
 	return nil

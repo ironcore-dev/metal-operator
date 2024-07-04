@@ -184,7 +184,7 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 	switch server.Status.State {
 	case metalv1alpha1.ServerStateInitial:
 		// apply boot configuration
-		if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server); err != nil {
+		if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, log, server); err != nil {
 			return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
 		}
 		log.V(1).Info("Applied Server boot configuration")
@@ -315,7 +315,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	return nil
 }
 
-func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
 	// apply server boot configuration
 	bootConfig := &metalv1alpha1.ServerBootConfiguration{
 		TypeMeta: metav1.TypeMeta{
@@ -340,27 +340,24 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 		},
 	}
 
-	if err := r.Patch(ctx, bootConfig, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
-		return err
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bootConfig, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
 	}
+	log.V(1).Info("Created or patched", "ServerBootConfiguration", bootConfig.Name, "Operation", opResult)
 
 	if err := r.ensureServerBootConfigRef(ctx, server, bootConfig); err != nil {
 		return err
 	}
 
-	if err := r.applyDefaultIgnitionForServer(ctx, server, bootConfig, r.RegistryURL); err != nil {
+	if err := r.applyDefaultIgnitionForServer(ctx, log, server, bootConfig, r.RegistryURL); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *ServerReconciler) applyDefaultIgnitionForServer(
-	ctx context.Context,
-	server *metalv1alpha1.Server,
-	bootConfig *metalv1alpha1.ServerBootConfiguration,
-	registryURL string,
-) error {
+func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, bootConfig *metalv1alpha1.ServerBootConfiguration, registryURL string) error {
 	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.UUID)
 	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags)
 	if err != nil {
@@ -385,9 +382,11 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(
 		return fmt.Errorf("failed to set controller reference for default ignitionSecret: %w", err)
 	}
 
-	if err := r.Patch(ctx, ignitionSecret, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to apply default ignitionSecret: %w", err)
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, ignitionSecret, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create or patch Ignition Secret: %w", err)
 	}
+	log.V(1).Info("Created or patched Ignition Secret", "Secret", ignitionSecret.Name, "Operation", opResult)
 
 	return nil
 }

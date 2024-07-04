@@ -8,10 +8,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
-)
-
 func shouldIgnoreReconciliation(obj client.Object) bool {
 	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !found {

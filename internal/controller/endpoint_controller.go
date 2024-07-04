@@ -97,12 +97,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				// TODO: ensure that BMC has the correct MACAddress
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
 				log.V(1).Info("Applied BMC secret for endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for endpoint")
@@ -116,12 +116,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				defer bmcClient.Logout()
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
 				log.V(1).Info("Applied local test BMC secret for endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied local test BMC object for endpoint")
@@ -142,7 +142,7 @@ func (r *EndpointReconciler) getProtocol() string {
 	return protocol
 }
 
-func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
 	bmcObj := &metalv1alpha1.BMC{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: metalv1alpha1.GroupVersion.String(),
@@ -174,14 +174,16 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alph
 		return err
 	}
 
-	if err := r.Patch(ctx, bmcObj, client.Apply, fieldOwner); err != nil {
-		return err
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create or patch BMC: %w", err)
 	}
+	log.V(1).Info("Created or patched BMC", "BMC", bmcObj.Name, "Operation", opResult)
 
 	return nil
 }
 
-func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {
+func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {
 	bmcSecret := &metalv1alpha1.BMCSecret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: metalv1alpha1.GroupVersion.String(),
@@ -200,9 +202,11 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metal
 		return nil, err
 	}
 
-	if err := r.Patch(ctx, bmcSecret, client.Apply, fieldOwner); err != nil {
-		return nil, err
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcSecret, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create or patch BMCSecret: %w", err)
 	}
+	log.V(1).Info("Created or patched BMSecret", "BMCSecret", bmcSecret.Name, "Operation", opResult)
 
 	return bmcSecret, nil
 }

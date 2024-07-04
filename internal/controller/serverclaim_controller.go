@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -149,7 +151,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.applyBootConfiguration(ctx, server, claim); err != nil {
+	if err := r.applyBootConfiguration(ctx, log, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
 
@@ -186,7 +188,7 @@ func (r *ServerClaimReconciler) patchServerClaimPhase(ctx context.Context, claim
 	return true, nil
 }
 
-func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
+func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
 	config := &metalv1alpha1.ServerBootConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "metal.ironcore.dev/v1alpha1",
@@ -208,9 +210,11 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, serv
 	}
 
 	// TODO: we might want to add a finalizer on the ignition secret
-	if err := r.Patch(ctx, config, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to apply boot configuration: %w", err)
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
 	}
+	log.V(1).Info("Created or patched ServerBootConfiguration", "ServerBootConfiguration", config.Name, "Operation", opResult)
 
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = &v1.ObjectReference{

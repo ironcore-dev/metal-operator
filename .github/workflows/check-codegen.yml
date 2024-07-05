@@ -16,10 +16,12 @@ jobs:
         go-version-file: 'go.mod'
     - name: Run make generate
       run: make generate
+    - name: Run make docs
+      run: make docs
     - name: Compare the expected and actual generated/* directories
       run: |
         if [ "$(git diff --ignore-space-at-eol client-go/ | wc -l)" -gt "0" ]; then
-          echo "Detected uncommitted changes after build. Consider running 'make generate'."
+          echo "Detected uncommitted changes after build. Consider running 'make generate && make docs'."
           echo "See status below:"
           git diff
           exit 1

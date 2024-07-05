@@ -8,23 +8,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration
+// ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration.
 type ServerBootConfigurationSpec struct {
-	ServerRef         v1.LocalObjectReference  `json:"serverRef"`
-	Image             string                   `json:"image,omitempty"`
+	// ServerRef is a reference to the server for which this boot configuration is intended.
+	ServerRef v1.LocalObjectReference `json:"serverRef"`
+
+	// Image specifies the boot image to be used for the server.
+	// This field is optional and can be omitted if not specified.
+	Image string `json:"image,omitempty"`
+
+	// IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+	// the ignition configuration for the server. This field is optional and can be omitted if not specified.
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
 }
 
+// ServerBootConfigurationState defines the possible states of a ServerBootConfiguration.
 type ServerBootConfigurationState string
 
 const (
+	// ServerBootConfigurationStatePending indicates that the boot configuration is pending and not yet ready.
 	ServerBootConfigurationStatePending ServerBootConfigurationState = "Pending"
-	ServerBootConfigurationStateReady   ServerBootConfigurationState = "Ready"
-	ServerBootConfigurationStateError   ServerBootConfigurationState = "Error"
+
+	// ServerBootConfigurationStateReady indicates that the boot configuration is ready for use.
+	ServerBootConfigurationStateReady ServerBootConfigurationState = "Ready"
+
+	// ServerBootConfigurationStateError indicates that there is an error with the boot configuration.
+	ServerBootConfigurationStateError ServerBootConfigurationState = "Error"
 )
 
-// ServerBootConfigurationStatus defines the observed state of ServerBootConfiguration
+// ServerBootConfigurationStatus defines the observed state of ServerBootConfiguration.
 type ServerBootConfigurationStatus struct {
+	// State represents the current state of the boot configuration.
 	State ServerBootConfigurationState `json:"state,omitempty"`
 }
 

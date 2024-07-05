@@ -60,6 +60,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
+This reference is typically used to locate the BMC endpoint within the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -72,6 +74,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
+required to access the BMC. This secret includes sensitive information such as usernames and passwords.</p>
 </td>
 </tr>
 <tr>
@@ -84,6 +88,8 @@ Protocol
 </em>
 </td>
 <td>
+<p>Protocol specifies the protocol to be used for communicating with the BMC.
+It could be a standard protocol such as IPMI or Redfish.</p>
 </td>
 </tr>
 <tr>
@@ -97,6 +103,8 @@ ConsoleProtocol
 </td>
 <td>
 <em>(Optional)</em>
+<p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
+This field is optional and can be omitted if console access is not required.</p>
 </td>
 </tr>
 </table>
@@ -122,6 +130,7 @@ BMCStatus
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
 </p>
 <div>
+<p>BMCAccess defines the access details for the BMC.</p>
 </div>
 <table>
 <thead>
@@ -141,6 +150,7 @@ Protocol
 </em>
 </td>
 <td>
+<p>Protocol specifies the protocol to be used for communicating with the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -151,6 +161,7 @@ string
 </em>
 </td>
 <td>
+<p>Endpoint is the address of the BMC endpoint.</p>
 </td>
 </tr>
 <tr>
@@ -163,6 +174,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
+required to access the BMC. This secret includes sensitive information such as usernames and passwords.</p>
 </td>
 </tr>
 </tbody>
@@ -173,6 +186,7 @@ Kubernetes core/v1.LocalObjectReference
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus</a>)
 </p>
 <div>
+<p>BMCPowerState defines the possible power states for a BMC.</p>
 </div>
 <table>
 <thead>
@@ -319,6 +333,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
+This reference is typically used to locate the BMC endpoint within the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -331,6 +347,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
+required to access the BMC. This secret includes sensitive information such as usernames and passwords.</p>
 </td>
 </tr>
 <tr>
@@ -343,6 +361,8 @@ Protocol
 </em>
 </td>
 <td>
+<p>Protocol specifies the protocol to be used for communicating with the BMC.
+It could be a standard protocol such as IPMI or Redfish.</p>
 </td>
 </tr>
 <tr>
@@ -356,6 +376,8 @@ ConsoleProtocol
 </td>
 <td>
 <em>(Optional)</em>
+<p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
+This field is optional and can be omitted if console access is not required.</p>
 </td>
 </tr>
 </tbody>
@@ -366,6 +388,7 @@ ConsoleProtocol
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus</a>)
 </p>
 <div>
+<p>BMCState defines the possible states of a BMC.</p>
 </div>
 <table>
 <thead>
@@ -375,9 +398,11 @@ ConsoleProtocol
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Enabled&#34;</p></td>
-<td></td>
+<td><p>BMCStateEnabled indicates that the BMC is enabled and functioning correctly.</p>
+</td>
 </tr><tr><td><p>&#34;Error&#34;</p></td>
-<td></td>
+<td><p>BMCStateError indicates that there is an error with the BMC.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus
@@ -386,7 +411,7 @@ ConsoleProtocol
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMC">BMC</a>)
 </p>
 <div>
-<p>BMCStatus defines the observed state of BMC</p>
+<p>BMCStatus defines the observed state of BMC.</p>
 </div>
 <table>
 <thead>
@@ -404,6 +429,8 @@ string
 </em>
 </td>
 <td>
+<p>MACAddress is the MAC address of the BMC.
+The format is validated using a regular expression pattern.</p>
 </td>
 </tr>
 <tr>
@@ -416,6 +443,8 @@ IP
 </em>
 </td>
 <td>
+<p>IP is the IP address of the BMC.
+The type is specified as string and is schemaless.</p>
 </td>
 </tr>
 <tr>
@@ -426,6 +455,7 @@ string
 </em>
 </td>
 <td>
+<p>Manufacturer is the name of the BMC manufacturer.</p>
 </td>
 </tr>
 <tr>
@@ -436,6 +466,7 @@ string
 </em>
 </td>
 <td>
+<p>Model is the model number or name of the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -446,6 +477,7 @@ string
 </em>
 </td>
 <td>
+<p>SKU is the stock keeping unit identifier for the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -456,6 +488,7 @@ string
 </em>
 </td>
 <td>
+<p>SerialNumber is the serial number of the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -466,6 +499,7 @@ string
 </em>
 </td>
 <td>
+<p>FirmwareVersion is the version of the firmware currently running on the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -478,6 +512,7 @@ BMCState
 </em>
 </td>
 <td>
+<p>State represents the current state of the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -490,6 +525,7 @@ BMCPowerState
 </em>
 </td>
 <td>
+<p>PowerState represents the current power state of the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -503,6 +539,7 @@ BMCPowerState
 </td>
 <td>
 <em>(Optional)</em>
+<p>Conditions represents the latest available observations of the BMC&rsquo;s current state.</p>
 </td>
 </tr>
 </tbody>
@@ -513,6 +550,7 @@ BMCPowerState
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec</a>)
 </p>
 <div>
+<p>ConsoleProtocol defines the protocol and port used for console access to the BMC.</p>
 </div>
 <table>
 <thead>
@@ -532,6 +570,8 @@ ConsoleProtocolName
 </em>
 </td>
 <td>
+<p>Name specifies the name of the console protocol.
+This could be a protocol such as &ldquo;SSH&rdquo;, &ldquo;Telnet&rdquo;, etc.</p>
 </td>
 </tr>
 <tr>
@@ -542,6 +582,8 @@ int32
 </em>
 </td>
 <td>
+<p>Port specifies the port number used for console access.
+This port is used by the specified console protocol to establish connections.</p>
 </td>
 </tr>
 </tbody>
@@ -552,6 +594,7 @@ int32
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ConsoleProtocol">ConsoleProtocol</a>)
 </p>
 <div>
+<p>ConsoleProtocolName defines the possible names for console protocols.</p>
 </div>
 <table>
 <thead>
@@ -561,11 +604,14 @@ int32
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;IPMI&#34;</p></td>
-<td></td>
+<td><p>ConsoleProtocolNameIPMI represents the IPMI console protocol.</p>
+</td>
 </tr><tr><td><p>&#34;SSH&#34;</p></td>
-<td></td>
+<td><p>ConsoleProtocolNameSSH represents the SSH console protocol.</p>
+</td>
 </tr><tr><td><p>&#34;SSHLenovo&#34;</p></td>
-<td></td>
+<td><p>ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Endpoint">Endpoint
@@ -792,6 +838,7 @@ determined.</p>
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
 </p>
 <div>
+<p>NetworkInterface defines the details of a network interface.</p>
 </div>
 <table>
 <thead>
@@ -809,6 +856,7 @@ string
 </em>
 </td>
 <td>
+<p>Name is the name of the network interface.</p>
 </td>
 </tr>
 <tr>
@@ -821,6 +869,8 @@ IP
 </em>
 </td>
 <td>
+<p>IP is the IP address assigned to the network interface.
+The type is specified as string and is schemaless.</p>
 </td>
 </tr>
 <tr>
@@ -831,6 +881,7 @@ string
 </em>
 </td>
 <td>
+<p>MACAddress is the MAC address of the network interface.</p>
 </td>
 </tr>
 </tbody>
@@ -841,6 +892,7 @@ string
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaimStatus">ServerClaimStatus</a>)
 </p>
 <div>
+<p>Phase defines the possible phases of a ServerClaim.</p>
 </div>
 <table>
 <thead>
@@ -850,9 +902,11 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Bound&#34;</p></td>
-<td></td>
+<td><p>PhaseBound indicates that the server claim is bound to a server.</p>
+</td>
 </tr><tr><td><p>&#34;Unbound&#34;</p></td>
-<td></td>
+<td><p>PhaseUnbound indicates that the server claim is not bound to any server.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Power">Power
@@ -861,6 +915,7 @@ string
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaimSpec">ServerClaimSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
 </p>
 <div>
+<p>Power defines the possible power states for a device.</p>
 </div>
 <table>
 <thead>
@@ -870,9 +925,11 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Off&#34;</p></td>
-<td></td>
+<td><p>PowerOff indicates that the device is powered off.</p>
+</td>
 </tr><tr><td><p>&#34;On&#34;</p></td>
-<td></td>
+<td><p>PowerOn indicates that the device is powered on.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Protocol">Protocol
@@ -881,6 +938,7 @@ string
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCAccess">BMCAccess</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec</a>)
 </p>
 <div>
+<p>Protocol defines the protocol and port used for communicating with the BMC.</p>
 </div>
 <table>
 <thead>
@@ -900,6 +958,8 @@ ProtocolName
 </em>
 </td>
 <td>
+<p>Name specifies the name of the protocol.
+This could be a protocol such as &ldquo;IPMI&rdquo;, &ldquo;Redfish&rdquo;, etc.</p>
 </td>
 </tr>
 <tr>
@@ -910,6 +970,8 @@ int32
 </em>
 </td>
 <td>
+<p>Port specifies the port number used for communication.
+This port is used by the specified protocol to establish connections.</p>
 </td>
 </tr>
 </tbody>
@@ -920,6 +982,7 @@ int32
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Protocol">Protocol</a>)
 </p>
 <div>
+<p>ProtocolName defines the possible names for protocols used for communicating with the BMC.</p>
 </div>
 <table>
 <thead>
@@ -929,11 +992,14 @@ int32
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;IPMI&#34;</p></td>
-<td></td>
+<td><p>ProtocolNameIPMI represents the IPMI protocol.</p>
+</td>
 </tr><tr><td><p>&#34;Redfish&#34;</p></td>
-<td></td>
+<td><p>ProtocolNameRedfish represents the Redfish protocol.</p>
+</td>
 </tr><tr><td><p>&#34;SSH&#34;</p></td>
-<td></td>
+<td><p>ProtocolNameSSH represents the SSH protocol.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Server">Server
@@ -984,6 +1050,7 @@ string
 </em>
 </td>
 <td>
+<p>UUID is the unique identifier for the server.</p>
 </td>
 </tr>
 <tr>
@@ -996,6 +1063,7 @@ Power
 </em>
 </td>
 <td>
+<p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
 <tr>
@@ -1008,6 +1076,7 @@ IndicatorLED
 </em>
 </td>
 <td>
+<p>IndicatorLED specifies the desired state of the server&rsquo;s indicator LED.</p>
 </td>
 </tr>
 <tr>
@@ -1020,6 +1089,8 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<p>ServerClaimRef is a reference to a ServerClaim object that claims this server.
+This field is optional and can be omitted if no claim is associated with this server.</p>
 </td>
 </tr>
 <tr>
@@ -1032,6 +1103,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>BMCRef is a reference to the BMC object associated with this server.
+This field is optional and can be omitted if no BMC is associated with this server.</p>
 </td>
 </tr>
 <tr>
@@ -1044,6 +1117,8 @@ BMCAccess
 </em>
 </td>
 <td>
+<p>BMC contains the access details for the BMC.
+This field is optional and can be omitted if no BMC access is specified.</p>
 </td>
 </tr>
 <tr>
@@ -1056,6 +1131,9 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<p>BootConfigurationRef is a reference to a BootConfiguration object that specifies
+the boot configuration for this server. This field is optional and can be omitted
+if no boot configuration is specified.</p>
 </td>
 </tr>
 </table>
@@ -1125,6 +1203,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>ServerRef is a reference to the server for which this boot configuration is intended.</p>
 </td>
 </tr>
 <tr>
@@ -1135,6 +1214,8 @@ string
 </em>
 </td>
 <td>
+<p>Image specifies the boot image to be used for the server.
+This field is optional and can be omitted if not specified.</p>
 </td>
 </tr>
 <tr>
@@ -1147,6 +1228,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
 </tr>
 </table>
@@ -1172,7 +1255,7 @@ ServerBootConfigurationStatus
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBootConfiguration">ServerBootConfiguration</a>)
 </p>
 <div>
-<p>ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration</p>
+<p>ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration.</p>
 </div>
 <table>
 <thead>
@@ -1192,6 +1275,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>ServerRef is a reference to the server for which this boot configuration is intended.</p>
 </td>
 </tr>
 <tr>
@@ -1202,6 +1286,8 @@ string
 </em>
 </td>
 <td>
+<p>Image specifies the boot image to be used for the server.
+This field is optional and can be omitted if not specified.</p>
 </td>
 </tr>
 <tr>
@@ -1214,6 +1300,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
 </tr>
 </tbody>
@@ -1224,6 +1312,7 @@ Kubernetes core/v1.LocalObjectReference
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationStatus">ServerBootConfigurationStatus</a>)
 </p>
 <div>
+<p>ServerBootConfigurationState defines the possible states of a ServerBootConfiguration.</p>
 </div>
 <table>
 <thead>
@@ -1233,11 +1322,14 @@ Kubernetes core/v1.LocalObjectReference
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Error&#34;</p></td>
-<td></td>
+<td><p>ServerBootConfigurationStateError indicates that there is an error with the boot configuration.</p>
+</td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td></td>
+<td><p>ServerBootConfigurationStatePending indicates that the boot configuration is pending and not yet ready.</p>
+</td>
 </tr><tr><td><p>&#34;Ready&#34;</p></td>
-<td></td>
+<td><p>ServerBootConfigurationStateReady indicates that the boot configuration is ready for use.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerBootConfigurationStatus">ServerBootConfigurationStatus
@@ -1246,7 +1338,7 @@ Kubernetes core/v1.LocalObjectReference
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBootConfiguration">ServerBootConfiguration</a>)
 </p>
 <div>
-<p>ServerBootConfigurationStatus defines the observed state of ServerBootConfiguration</p>
+<p>ServerBootConfigurationStatus defines the observed state of ServerBootConfiguration.</p>
 </div>
 <table>
 <thead>
@@ -1266,6 +1358,7 @@ ServerBootConfigurationState
 </em>
 </td>
 <td>
+<p>State represents the current state of the boot configuration.</p>
 </td>
 </tr>
 </tbody>
@@ -1320,6 +1413,7 @@ Power
 </em>
 </td>
 <td>
+<p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
 <tr>
@@ -1332,6 +1426,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>ServerRef is a reference to a specific server to be claimed.
+This field is optional and can be omitted if the server is to be selected using ServerSelector.</p>
 </td>
 </tr>
 <tr>
@@ -1344,6 +1440,8 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
+<p>ServerSelector specifies a label selector to identify the server to be claimed.
+This field is optional and can be omitted if a specific server is referenced using ServerRef.</p>
 </td>
 </tr>
 <tr>
@@ -1356,6 +1454,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
 </tr>
 <tr>
@@ -1366,6 +1466,7 @@ string
 </em>
 </td>
 <td>
+<p>Image specifies the boot image to be used for the server.</p>
 </td>
 </tr>
 </table>
@@ -1391,7 +1492,7 @@ ServerClaimStatus
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaim">ServerClaim</a>)
 </p>
 <div>
-<p>ServerClaimSpec defines the desired state of ServerClaim</p>
+<p>ServerClaimSpec defines the desired state of ServerClaim.</p>
 </div>
 <table>
 <thead>
@@ -1411,6 +1512,7 @@ Power
 </em>
 </td>
 <td>
+<p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
 <tr>
@@ -1423,6 +1525,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>ServerRef is a reference to a specific server to be claimed.
+This field is optional and can be omitted if the server is to be selected using ServerSelector.</p>
 </td>
 </tr>
 <tr>
@@ -1435,6 +1539,8 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
+<p>ServerSelector specifies a label selector to identify the server to be claimed.
+This field is optional and can be omitted if a specific server is referenced using ServerRef.</p>
 </td>
 </tr>
 <tr>
@@ -1447,6 +1553,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
 </tr>
 <tr>
@@ -1457,6 +1565,7 @@ string
 </em>
 </td>
 <td>
+<p>Image specifies the boot image to be used for the server.</p>
 </td>
 </tr>
 </tbody>
@@ -1467,7 +1576,7 @@ string
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaim">ServerClaim</a>)
 </p>
 <div>
-<p>ServerClaimStatus defines the observed state of ServerClaim</p>
+<p>ServerClaimStatus defines the observed state of ServerClaim.</p>
 </div>
 <table>
 <thead>
@@ -1487,6 +1596,7 @@ Phase
 </em>
 </td>
 <td>
+<p>Phase represents the current phase of the server claim.</p>
 </td>
 </tr>
 </tbody>
@@ -1497,6 +1607,7 @@ Phase
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
 </p>
 <div>
+<p>ServerPowerState defines the possible power states for a server.</p>
 </div>
 <table>
 <thead>
@@ -1506,22 +1617,22 @@ Phase
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Off&#34;</p></td>
-<td><p>ServerOffPowerState the system is powered off, although some components may
-continue to have AUX power such as management controller.</p>
+<td><p>ServerOffPowerState indicates that the system is powered off, although some components may
+continue to have auxiliary power such as the management controller.</p>
 </td>
 </tr><tr><td><p>&#34;On&#34;</p></td>
-<td><p>ServerOnPowerState the system is powered on.</p>
+<td><p>ServerOnPowerState indicates that the system is powered on.</p>
 </td>
 </tr><tr><td><p>&#34;Paused&#34;</p></td>
-<td><p>ServerPausedPowerState the system is paused.</p>
+<td><p>ServerPausedPowerState indicates that the system is paused.</p>
 </td>
 </tr><tr><td><p>&#34;PoweringOff&#34;</p></td>
-<td><p>ServerPoweringOffPowerState A temporary state between On and Off. The power
-off action can take time while the OS is in the shutdown process.</p>
+<td><p>ServerPoweringOffPowerState indicates a temporary state between On and Off.
+The power off action can take time while the OS is in the shutdown process.</p>
 </td>
 </tr><tr><td><p>&#34;PoweringOn&#34;</p></td>
-<td><p>ServerPoweringOnPowerState A temporary state between Off and On. This
-temporary state can be very short.</p>
+<td><p>ServerPoweringOnPowerState indicates a temporary state between Off and On.
+This temporary state can be very short.</p>
 </td>
 </tr></tbody>
 </table>
@@ -1531,7 +1642,7 @@ temporary state can be very short.</p>
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Server">Server</a>)
 </p>
 <div>
-<p>ServerSpec defines the desired state of Server</p>
+<p>ServerSpec defines the desired state of a Server.</p>
 </div>
 <table>
 <thead>
@@ -1549,6 +1660,7 @@ string
 </em>
 </td>
 <td>
+<p>UUID is the unique identifier for the server.</p>
 </td>
 </tr>
 <tr>
@@ -1561,6 +1673,7 @@ Power
 </em>
 </td>
 <td>
+<p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
 <tr>
@@ -1573,6 +1686,7 @@ IndicatorLED
 </em>
 </td>
 <td>
+<p>IndicatorLED specifies the desired state of the server&rsquo;s indicator LED.</p>
 </td>
 </tr>
 <tr>
@@ -1585,6 +1699,8 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<p>ServerClaimRef is a reference to a ServerClaim object that claims this server.
+This field is optional and can be omitted if no claim is associated with this server.</p>
 </td>
 </tr>
 <tr>
@@ -1597,6 +1713,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>BMCRef is a reference to the BMC object associated with this server.
+This field is optional and can be omitted if no BMC is associated with this server.</p>
 </td>
 </tr>
 <tr>
@@ -1609,6 +1727,8 @@ BMCAccess
 </em>
 </td>
 <td>
+<p>BMC contains the access details for the BMC.
+This field is optional and can be omitted if no BMC access is specified.</p>
 </td>
 </tr>
 <tr>
@@ -1621,6 +1741,9 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<p>BootConfigurationRef is a reference to a BootConfiguration object that specifies
+the boot configuration for this server. This field is optional and can be omitted
+if no boot configuration is specified.</p>
 </td>
 </tr>
 </tbody>
@@ -1631,6 +1754,7 @@ Kubernetes core/v1.ObjectReference
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
 </p>
 <div>
+<p>ServerState defines the possible states of a server.</p>
 </div>
 <table>
 <thead>
@@ -1640,13 +1764,17 @@ Kubernetes core/v1.ObjectReference
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Available&#34;</p></td>
-<td></td>
+<td><p>ServerStateAvailable indicates that the server is available for use.</p>
+</td>
 </tr><tr><td><p>&#34;Error&#34;</p></td>
-<td></td>
+<td><p>ServerStateError indicates that there is an error with the server.</p>
+</td>
 </tr><tr><td><p>&#34;Initial&#34;</p></td>
-<td></td>
+<td><p>ServerStateInitial indicates that the server is in its initial state.</p>
+</td>
 </tr><tr><td><p>&#34;Reserved&#34;</p></td>
-<td></td>
+<td><p>ServerStateReserved indicates that the server is reserved for a specific use or user.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus
@@ -1655,7 +1783,7 @@ Kubernetes core/v1.ObjectReference
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Server">Server</a>)
 </p>
 <div>
-<p>ServerStatus defines the observed state of Server</p>
+<p>ServerStatus defines the observed state of Server.</p>
 </div>
 <table>
 <thead>
@@ -1673,6 +1801,7 @@ string
 </em>
 </td>
 <td>
+<p>Manufacturer is the name of the server manufacturer.</p>
 </td>
 </tr>
 <tr>
@@ -1683,6 +1812,7 @@ string
 </em>
 </td>
 <td>
+<p>SKU is the stock keeping unit identifier for the server.</p>
 </td>
 </tr>
 <tr>
@@ -1693,6 +1823,7 @@ string
 </em>
 </td>
 <td>
+<p>SerialNumber is the serial number of the server.</p>
 </td>
 </tr>
 <tr>
@@ -1705,6 +1836,7 @@ ServerPowerState
 </em>
 </td>
 <td>
+<p>PowerState represents the current power state of the server.</p>
 </td>
 </tr>
 <tr>
@@ -1717,6 +1849,7 @@ IndicatorLED
 </em>
 </td>
 <td>
+<p>IndicatorLED specifies the current state of the server&rsquo;s indicator LED.</p>
 </td>
 </tr>
 <tr>
@@ -1729,6 +1862,7 @@ ServerState
 </em>
 </td>
 <td>
+<p>State represents the current state of the server.</p>
 </td>
 </tr>
 <tr>
@@ -1741,6 +1875,7 @@ ServerState
 </em>
 </td>
 <td>
+<p>NetworkInterfaces is a list of network interfaces associated with the server.</p>
 </td>
 </tr>
 <tr>
@@ -1754,6 +1889,7 @@ ServerState
 </td>
 <td>
 <em>(Optional)</em>
+<p>Conditions represents the latest available observations of the server&rsquo;s current state.</p>
 </td>
 </tr>
 </tbody>

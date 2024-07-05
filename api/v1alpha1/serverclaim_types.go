@@ -8,24 +8,41 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ServerClaimSpec defines the desired state of ServerClaim
+// ServerClaimSpec defines the desired state of ServerClaim.
 type ServerClaimSpec struct {
-	Power             Power                    `json:"power"`
-	ServerRef         *v1.LocalObjectReference `json:"serverRef,omitempty"`
-	ServerSelector    *metav1.LabelSelector    `json:"serverSelector,omitempty"`
+	// Power specifies the desired power state of the server.
+	Power Power `json:"power"`
+
+	// ServerRef is a reference to a specific server to be claimed.
+	// This field is optional and can be omitted if the server is to be selected using ServerSelector.
+	ServerRef *v1.LocalObjectReference `json:"serverRef,omitempty"`
+
+	// ServerSelector specifies a label selector to identify the server to be claimed.
+	// This field is optional and can be omitted if a specific server is referenced using ServerRef.
+	ServerSelector *metav1.LabelSelector `json:"serverSelector,omitempty"`
+
+	// IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+	// the ignition configuration for the server. This field is optional and can be omitted if not specified.
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
-	Image             string                   `json:"image"`
+
+	// Image specifies the boot image to be used for the server.
+	Image string `json:"image"`
 }
 
+// Phase defines the possible phases of a ServerClaim.
 type Phase string
 
 const (
-	PhaseBound   Phase = "Bound"
+	// PhaseBound indicates that the server claim is bound to a server.
+	PhaseBound Phase = "Bound"
+
+	// PhaseUnbound indicates that the server claim is not bound to any server.
 	PhaseUnbound Phase = "Unbound"
 )
 
-// ServerClaimStatus defines the observed state of ServerClaim
+// ServerClaimStatus defines the observed state of ServerClaim.
 type ServerClaimStatus struct {
+	// Phase represents the current phase of the server claim.
 	Phase Phase `json:"phase,omitempty"`
 }
 

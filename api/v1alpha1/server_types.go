@@ -8,55 +8,97 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Power defines the possible power states for a device.
 type Power string
 
 const (
-	PowerOn  Power = "On"
+	// PowerOn indicates that the device is powered on.
+	PowerOn Power = "On"
+
+	// PowerOff indicates that the device is powered off.
 	PowerOff Power = "Off"
 )
 
+// ServerPowerState defines the possible power states for a server.
 type ServerPowerState string
 
 const (
-	// ServerOnPowerState the system is powered on.
+	// ServerOnPowerState indicates that the system is powered on.
 	ServerOnPowerState ServerPowerState = "On"
-	// ServerOffPowerState the system is powered off, although some components may
-	// continue to have AUX power such as management controller.
+
+	// ServerOffPowerState indicates that the system is powered off, although some components may
+	// continue to have auxiliary power such as the management controller.
 	ServerOffPowerState ServerPowerState = "Off"
-	// ServerPausedPowerState the system is paused.
+
+	// ServerPausedPowerState indicates that the system is paused.
 	ServerPausedPowerState ServerPowerState = "Paused"
-	// ServerPoweringOnPowerState A temporary state between Off and On. This
-	// temporary state can be very short.
+
+	// ServerPoweringOnPowerState indicates a temporary state between Off and On.
+	// This temporary state can be very short.
 	ServerPoweringOnPowerState ServerPowerState = "PoweringOn"
-	// ServerPoweringOffPowerState A temporary state between On and Off. The power
-	// off action can take time while the OS is in the shutdown process.
+
+	// ServerPoweringOffPowerState indicates a temporary state between On and Off.
+	// The power off action can take time while the OS is in the shutdown process.
 	ServerPoweringOffPowerState ServerPowerState = "PoweringOff"
 )
 
+// BMCAccess defines the access details for the BMC.
 type BMCAccess struct {
-	Protocol     Protocol                `json:"protocol"`
-	Endpoint     string                  `json:"endpoint"`
+	// Protocol specifies the protocol to be used for communicating with the BMC.
+	Protocol Protocol `json:"protocol"`
+
+	// Endpoint is the address of the BMC endpoint.
+	Endpoint string `json:"endpoint"`
+
+	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
+	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
 }
 
-// ServerSpec defines the desired state of Server
+// ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
-	UUID                 string                   `json:"uuid"`
-	Power                Power                    `json:"power,omitempty"`
-	IndicatorLED         IndicatorLED             `json:"indicatorLED,omitempty"`
-	ServerClaimRef       *v1.ObjectReference      `json:"serverClaimRef,omitempty"`
-	BMCRef               *v1.LocalObjectReference `json:"bmcRef,omitempty"`
-	BMC                  *BMCAccess               `json:"bmc,omitempty"`
-	BootConfigurationRef *v1.ObjectReference      `json:"bootConfigurationRef,omitempty"`
+	// UUID is the unique identifier for the server.
+	UUID string `json:"uuid"`
+
+	// Power specifies the desired power state of the server.
+	Power Power `json:"power,omitempty"`
+
+	// IndicatorLED specifies the desired state of the server's indicator LED.
+	IndicatorLED IndicatorLED `json:"indicatorLED,omitempty"`
+
+	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
+	// This field is optional and can be omitted if no claim is associated with this server.
+	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
+
+	// BMCRef is a reference to the BMC object associated with this server.
+	// This field is optional and can be omitted if no BMC is associated with this server.
+	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
+
+	// BMC contains the access details for the BMC.
+	// This field is optional and can be omitted if no BMC access is specified.
+	BMC *BMCAccess `json:"bmc,omitempty"`
+
+	// BootConfigurationRef is a reference to a BootConfiguration object that specifies
+	// the boot configuration for this server. This field is optional and can be omitted
+	// if no boot configuration is specified.
+	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
 }
 
+// ServerState defines the possible states of a server.
 type ServerState string
 
 const (
-	ServerStateInitial   ServerState = "Initial"
+	// ServerStateInitial indicates that the server is in its initial state.
+	ServerStateInitial ServerState = "Initial"
+
+	// ServerStateAvailable indicates that the server is available for use.
 	ServerStateAvailable ServerState = "Available"
-	ServerStateReserved  ServerState = "Reserved"
-	ServerStateError     ServerState = "Error"
+
+	// ServerStateReserved indicates that the server is reserved for a specific use or user.
+	ServerStateReserved ServerState = "Reserved"
+
+	// ServerStateError indicates that there is an error with the server.
+	ServerStateError ServerState = "Error"
 )
 
 // IndicatorLED represents LED indicator states
@@ -74,26 +116,48 @@ const (
 	OffIndicatorLED IndicatorLED = "Off"
 )
 
-// ServerStatus defines the observed state of Server
+// ServerStatus defines the observed state of Server.
 type ServerStatus struct {
-	Manufacturer      string             `json:"manufacturer,omitempty"`
-	SKU               string             `json:"sku,omitempty"`
-	SerialNumber      string             `json:"serialNumber,omitempty"`
-	PowerState        ServerPowerState   `json:"powerState,omitempty"`
-	IndicatorLED      IndicatorLED       `json:"indicatorLED,omitempty"`
-	State             ServerState        `json:"state,omitempty"`
+	// Manufacturer is the name of the server manufacturer.
+	Manufacturer string `json:"manufacturer,omitempty"`
+
+	// SKU is the stock keeping unit identifier for the server.
+	SKU string `json:"sku,omitempty"`
+
+	// SerialNumber is the serial number of the server.
+	SerialNumber string `json:"serialNumber,omitempty"`
+
+	// PowerState represents the current power state of the server.
+	PowerState ServerPowerState `json:"powerState,omitempty"`
+
+	// IndicatorLED specifies the current state of the server's indicator LED.
+	IndicatorLED IndicatorLED `json:"indicatorLED,omitempty"`
+
+	// State represents the current state of the server.
+	State ServerState `json:"state,omitempty"`
+
+	// NetworkInterfaces is a list of network interfaces associated with the server.
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
-	//+patchStrategy=merge
-	//+patchMergeKey=type
-	//+optional
+
+	// Conditions represents the latest available observations of the server's current state.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
+// NetworkInterface defines the details of a network interface.
 type NetworkInterface struct {
+	// Name is the name of the network interface.
 	Name string `json:"name"`
+
+	// IP is the IP address assigned to the network interface.
+	// The type is specified as string and is schemaless.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless
-	IP         IP     `json:"ip"`
+	IP IP `json:"ip"`
+
+	// MACAddress is the MAC address of the network interface.
 	MACAddress string `json:"macAddress"`
 }
 

@@ -72,8 +72,8 @@ spec:
             properties:
               bmcSecretRef:
                 description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                  BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
+                  required to access the BMC. This secret includes sensitive information such as usernames and passwords.
                 properties:
                   name:
                     default: ""
@@ -89,10 +89,19 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               consoleProtocol:
+                description: |-
+                  ConsoleProtocol specifies the protocol to be used for console access to the BMC.
+                  This field is optional and can be omitted if console access is not required.
                 properties:
                   name:
+                    description: |-
+                      Name specifies the name of the console protocol.
+                      This could be a protocol such as "SSH", "Telnet", etc.
                     type: string
                   port:
+                    description: |-
+                      Port specifies the port number used for console access.
+                      This port is used by the specified console protocol to establish connections.
                     format: int32
                     type: integer
                 required:
@@ -101,8 +110,8 @@ spec:
                 type: object
               endpointRef:
                 description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                  EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
+                  This reference is typically used to locate the BMC endpoint within the cluster.
                 properties:
                   name:
                     default: ""
@@ -118,10 +127,19 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               protocol:
+                description: |-
+                  Protocol specifies the protocol to be used for communicating with the BMC.
+                  It could be a standard protocol such as IPMI or Redfish.
                 properties:
                   name:
+                    description: |-
+                      Name specifies the name of the protocol.
+                      This could be a protocol such as "IPMI", "Redfish", etc.
                     type: string
                   port:
+                    description: |-
+                      Port specifies the port number used for communication.
+                      This port is used by the specified protocol to establish connections.
                     format: int32
                     type: integer
                 required:
@@ -134,9 +152,11 @@ spec:
             - protocol
             type: object
           status:
-            description: BMCStatus defines the observed state of BMC
+            description: BMCStatus defines the observed state of BMC.
             properties:
               conditions:
+                description: Conditions represents the latest available observations
+                  of the BMC's current state.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource.\n---\nThis struct is intended for
@@ -206,23 +226,38 @@ spec:
                   type: object
                 type: array
               firmwareVersion:
+                description: FirmwareVersion is the version of the firmware currently
+                  running on the BMC.
                 type: string
               ip:
+                description: |-
+                  IP is the IP address of the BMC.
+                  The type is specified as string and is schemaless.
                 type: string
               macAddress:
+                description: |-
+                  MACAddress is the MAC address of the BMC.
+                  The format is validated using a regular expression pattern.
                 pattern: ^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$
                 type: string
               manufacturer:
+                description: Manufacturer is the name of the BMC manufacturer.
                 type: string
               model:
+                description: Model is the model number or name of the BMC.
                 type: string
               powerState:
+                description: PowerState represents the current power state of the
+                  BMC.
                 type: string
               serialNumber:
+                description: SerialNumber is the serial number of the BMC.
                 type: string
               sku:
+                description: SKU is the stock keeping unit identifier for the BMC.
                 type: string
               state:
+                description: State represents the current state of the BMC.
                 type: string
             type: object
         type: object

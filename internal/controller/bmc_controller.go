@@ -55,7 +55,7 @@ func (r *BMCReconciler) reconcileExists(ctx context.Context, log logr.Logger, bm
 }
 
 func (r *BMCReconciler) delete(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
-	log.V(1).Info("Deleting BMC ")
+	log.V(1).Info("Deleting BMC")
 	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil {
 		return ctrl.Result{}, err
 	}

@@ -55,12 +55,12 @@ spec:
             type: object
           spec:
             description: ServerBootConfigurationSpec defines the desired state of
-              ServerBootConfiguration
+              ServerBootConfiguration.
             properties:
               ignitionSecretRef:
                 description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                  IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+                  the ignition configuration for the server. This field is optional and can be omitted if not specified.
                 properties:
                   name:
                     default: ""
@@ -76,11 +76,13 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               image:
+                description: |-
+                  Image specifies the boot image to be used for the server.
+                  This field is optional and can be omitted if not specified.
                 type: string
               serverRef:
-                description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                description: ServerRef is a reference to the server for which this
+                  boot configuration is intended.
                 properties:
                   name:
                     default: ""
@@ -100,9 +102,10 @@ spec:
             type: object
           status:
             description: ServerBootConfigurationStatus defines the observed state
-              of ServerBootConfiguration
+              of ServerBootConfiguration.
             properties:
               state:
+                description: State represents the current state of the boot configuration.
                 type: string
             type: object
         type: object

@@ -23,10 +23,7 @@ import (
 )
 
 const (
-	BMCType              = "bmc"
-	ProtocolRedfish      = "Redfish"
-	ProtocolRedfishLocal = "RedfishLocal"
-	EndpointFinalizer    = "metal.ironcore.dev/endpoint"
+	EndpointFinalizer = "metal.ironcore.dev/endpoint"
 )
 
 // EndpointReconciler reconciles a Endpoints object
@@ -79,13 +76,13 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 
 	sanitizedMACAddress := strings.Replace(endpoint.Spec.MACAddress, ":", "", -1)
 	for _, m := range r.MACPrefixes.MacPrefixes {
-		if strings.HasPrefix(sanitizedMACAddress, m.MacPrefix) && m.Type == BMCType {
+		if strings.HasPrefix(sanitizedMACAddress, m.MacPrefix) && m.Type == metalv1alpha1.BMCType {
 			log.V(1).Info("Found a BMC adapter for endpoint", "Type", m.Type, "Protocol", m.Protocol)
 			if len(m.DefaultCredentials) == 0 {
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
 			switch m.Protocol {
-			case ProtocolRedfish:
+			case metalv1alpha1.ProtocolRedfish:
 				log.V(1).Info("Creating client for BMC")
 				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
 				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true)
@@ -106,7 +103,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for endpoint")
-			case ProtocolRedfishLocal:
+			case metalv1alpha1.ProtocolRedfishLocal:
 				log.V(1).Info("Creating client for a local test BMC")
 				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true)

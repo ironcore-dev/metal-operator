@@ -8,6 +8,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	BMCType              = "bmc"
+	ProtocolRedfish      = "Redfish"
+	ProtocolRedfishLocal = "RedfishLocal"
+)
+
 // BMCSpec defines the desired state of BMC
 type BMCSpec struct {
 	// EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.

@@ -4,6 +4,7 @@
 package controller
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 
@@ -26,8 +27,8 @@ var _ = Describe("Server Controller", func() {
 	var endpoint *metalv1alpha1.Endpoint
 	var bmc *metalv1alpha1.BMC
 
-	It("should initialize a server", func(ctx SpecContext) {
-		By("Creating an Endpoints object")
+	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
+		By("Creating an Endpoint object")
 		endpoint = &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -39,7 +40,6 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, endpoint)
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc = &metalv1alpha1.BMC{
@@ -147,5 +147,123 @@ var _ = Describe("Server Controller", func() {
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 	})
 
-	// TODO: test server with manual BMC registration
+	It("Should initialize a Server with inline BMC configuration", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "foo-",
+			},
+			Data: map[string][]byte{
+				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
+				"password": []byte(base64.StdEncoding.EncodeToString([]byte("bar"))),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmcSecret)
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				UUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Endpoint: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, server)
+
+		By("Ensuring the boot configuration has been created")
+		bootConfig := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      server.Name,
+			},
+		}
+		Eventually(Object(bootConfig)).Should(SatisfyAll(
+			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
+			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
+			HaveField("Spec.Image", "fooOS:latest"),
+			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
+			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
+		))
+
+		By("Ensuring that the default ignition configuration has been created")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      bootConfig.Name,
+			},
+		}
+		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "ServerBootConfiguration",
+				Name:               bootConfig.Name,
+				UID:                bootConfig.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
+		))
+
+		By("Ensuring that the Server resource has been created")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerFinalizer)),
+			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.Power", metalv1alpha1.Power("")),
+			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
+			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+				Kind:       "ServerBootConfiguration",
+				Namespace:  ns.Name,
+				Name:       server.Name,
+				UID:        bootConfig.UID,
+				APIVersion: "metal.ironcore.dev/v1alpha1",
+			}),
+			HaveField("Status.Manufacturer", "Contoso"),
+			HaveField("Status.SKU", "8675309"),
+			HaveField("Status.SerialNumber", "437XR1138R2"),
+			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+		))
+
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
+		By("Starting the probe agent")
+		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)
+		go func() {
+			defer GinkgoRecover()
+			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
+		}()
+
+		By("Ensuring that the server is set to available and powered off")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
+			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
+		))
+
+		By("Ensuring that the boot configuration has been removed")
+		Consistently(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Ensuring that the server is removed from the registry")
+		response, err := http.Get(registryURL + "/systems/" + server.Spec.UUID)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
+	})
 })

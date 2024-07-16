@@ -8,8 +8,6 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,10 +18,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 		b := &metalv1alpha1.BMC{}
 		bmcName := server.Spec.BMCRef.Name
 		if err := c.Get(ctx, client.ObjectKey{Name: bmcName}, b); err != nil {
-			if errors.IsNotFound(err) {
-				return nil, fmt.Errorf("BMC %q not found", bmcName)
-			}
-			return nil, err
+			return nil, fmt.Errorf("failed to get BMC: %w", err)
 		}
 
 		return GetBMCClientFromBMC(ctx, c, b, insecure)
@@ -45,7 +40,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 		)
 	}
 
-	return nil, fmt.Errorf("server %s has nor a BMCRef nor an BMC configured", server.Name)
+	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
 func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool) (bmc.BMC, error) {

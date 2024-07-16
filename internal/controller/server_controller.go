@@ -97,7 +97,8 @@ func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *
 		log.V(1).Info("Deleted server boot configuration")
 	}
 
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, server, ServerFinalizer); !apierrors.IsNotFound(err) || modified {
+	log.V(1).Info("Ensuring that the finalizer is removed")
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer has been removed")
@@ -290,7 +291,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-	bmcClient, err := GetBMCClientFromBMCName(ctx, r.Client, server.Spec.BMCRef.Name, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -420,11 +421,11 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 		return nil
 	}
 
-	if server.Spec.BMCRef == nil {
-		return fmt.Errorf("can only PXE boot server with valid BMC ref")
+	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
+		return fmt.Errorf("can only PXE boot server with valid BMC ref or inline BMC configuration")
 	}
 
-	bmcClient, err := GetBMCClientFromBMCName(ctx, r.Client, server.Spec.BMCRef.Name, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
 	defer bmcClient.Logout()
 
 	if err != nil {
@@ -512,7 +513,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		return nil
 	}
 
-	bmcClient, err := GetBMCClientFromBMCName(ctx, r.Client, server.Spec.BMCRef.Name, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
 	defer bmcClient.Logout()
 	if err != nil {
 		return fmt.Errorf("failed to get BMC client: %w", err)

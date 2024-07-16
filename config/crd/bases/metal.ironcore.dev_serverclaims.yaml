@@ -53,12 +53,12 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServerClaimSpec defines the desired state of ServerClaim
+            description: ServerClaimSpec defines the desired state of ServerClaim.
             properties:
               ignitionSecretRef:
                 description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                  IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+                  the ignition configuration for the server. This field is optional and can be omitted if not specified.
                 properties:
                   name:
                     default: ""
@@ -74,13 +74,15 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               image:
+                description: Image specifies the boot image to be used for the server.
                 type: string
               power:
+                description: Power specifies the desired power state of the server.
                 type: string
               serverRef:
                 description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                  ServerRef is a reference to a specific server to be claimed.
+                  This field is optional and can be omitted if the server is to be selected using ServerSelector.
                 properties:
                   name:
                     default: ""
@@ -97,9 +99,8 @@ spec:
                 x-kubernetes-map-type: atomic
               serverSelector:
                 description: |-
-                  A label selector is a label query over a set of resources. The result of matchLabels and
-                  matchExpressions are ANDed. An empty label selector matches all objects. A null
-                  label selector matches no objects.
+                  ServerSelector specifies a label selector to identify the server to be claimed.
+                  This field is optional and can be omitted if a specific server is referenced using ServerRef.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -149,9 +150,10 @@ spec:
             - power
             type: object
           status:
-            description: ServerClaimStatus defines the observed state of ServerClaim
+            description: ServerClaimStatus defines the observed state of ServerClaim.
             properties:
               phase:
+                description: Phase represents the current phase of the server claim.
                 type: string
             type: object
         type: object

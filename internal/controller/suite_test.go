@@ -34,7 +34,7 @@ import (
 const (
 	pollingInterval      = 100 * time.Millisecond
 	eventuallyTimeout    = 3 * time.Second
-	consistentlyDuration = 1 * time.Second
+	consistentlyDuration = 3 * time.Second
 )
 
 var (

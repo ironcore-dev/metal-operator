@@ -146,6 +146,127 @@ var _ = Describe("ServerClaim Controller", func() {
 		))
 	})
 
+	It("Should successfully claim a server by reference and label selector", func(ctx SpecContext) {
+		By("Patching Server labels")
+		Eventually(Update(server, func() {
+			server.Labels = map[string]string{
+				"type": "storage",
+				"env":  "staging",
+			}
+		})).Should(Succeed())
+
+		By("Creating a ServerClaim")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOff,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"type": "storage"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{{
+						Key:      "env",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"test", "staging"},
+					}},
+				},
+				Image: "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Patching the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Ensuring that the Server has the correct claim ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef.Name", claim.Name),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		))
+
+		By("Ensuring that the ServerClaim is bound")
+		Eventually(Object(claim)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+		))
+
+		By("Deleting the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the Server is available")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		))
+	})
+
+	It("should successfully claim a server by label selector", func(ctx SpecContext) {
+		By("Patching Server labels")
+		Eventually(Update(server, func() {
+			server.Labels = map[string]string{
+				"type": "storage",
+				"env":  "prod",
+			}
+		})).Should(Succeed())
+
+		By("Creating a ServerClaim")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power: metalv1alpha1.PowerOff,
+				ServerSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"type": "storage"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{{
+						Key:      "env",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"test", "staging"},
+					}},
+				},
+				Image: "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Patching the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Ensuring that the Server has the correct claim ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef.Name", claim.Name),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		))
+
+		By("Ensuring that the ServerClaim is bound")
+		Eventually(Object(claim)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+		))
+
+		By("Deleting the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the Server is available")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		))
+	})
+
 	It("should not claim a server in a non-available state", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
@@ -242,6 +363,47 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	It("should not claim a server when labels do not match selector", func(ctx SpecContext) {
+		By("Creating a ServerClaim")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"type": "storage"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{{
+						Key:      "env",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"test", "staging"},
+					}},
+				},
+				Image: "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, claim)
+
+		By("Patching the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Ensuring that the Server has no claim ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", BeNil()),
+		))
+
+		By("Ensuring that the ServerClaim is unbound")
+		Eventually(Object(claim)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Status.Phase", metalv1alpha1.PhaseUnbound),
+		))
 	})
 
 	It("should allow deletion of ServerClaim without a Server", func(ctx SpecContext) {

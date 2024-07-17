@@ -832,6 +832,48 @@ determined.</p>
 </td>
 </tr></tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.LocalUIDReference">LocalUIDReference
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaimStatus">ServerClaimStatus</a>)
+</p>
+<div>
+<p>LocalUIDReference is a reference to another entity including its UID</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name of the referenced entity.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>UID is the UID of the referenced entity.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.NetworkInterface">NetworkInterface
 </h3>
 <p>
@@ -1597,6 +1639,20 @@ Phase
 </td>
 <td>
 <p>Phase represents the current phase of the server claim.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.LocalUIDReference">
+LocalUIDReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server which is claimed.
+This field is optional and can be omitted if the server is to be selected using ServerSelector.</p>
 </td>
 </tr>
 </tbody>

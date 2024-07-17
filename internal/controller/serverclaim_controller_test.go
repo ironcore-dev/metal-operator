@@ -100,6 +100,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+			HaveField("Status.ServerRef", Not(BeNil())),
+			HaveField("Status.ServerRef.Name", server.Name),
+			HaveField("Status.ServerRef.UID", server.UID),
 		))
 
 		By("Ensuring that the ServerBootConfiguration has been created")
@@ -193,6 +196,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+			HaveField("Status.ServerRef", Not(BeNil())),
+			HaveField("Status.ServerRef.Name", server.Name),
+			HaveField("Status.ServerRef.UID", server.UID),
 		))
 
 		By("Deleting the ServerClaim")
@@ -253,6 +259,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+			HaveField("Status.ServerRef", Not(BeNil())),
+			HaveField("Status.ServerRef.Name", server.Name),
+			HaveField("Status.ServerRef.UID", server.UID),
 		))
 
 		By("Deleting the ServerClaim")

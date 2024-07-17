@@ -45,9 +45,9 @@ type ServerClaimStatus struct {
 	// Phase represents the current phase of the server claim.
 	Phase Phase `json:"phase,omitempty"`
 
-	// ClaimedServerRef is a reference to a specific server which is claimed.
+	// ServerRef is a reference to a specific server which is claimed.
 	// This field is optional and can be omitted if the server is to be selected using ServerSelector.
-	ClaimedServerRef *v1.LocalObjectReference `json:"claimedServerRef,omitempty"`
+	ServerRef *LocalUIDReference `json:"serverRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true

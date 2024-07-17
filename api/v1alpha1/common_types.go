@@ -8,6 +8,7 @@ import (
 	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -231,4 +232,13 @@ func PtrToIPPrefix(prefix IPPrefix) *IPPrefix {
 
 func EqualIPPrefixes(a, b IPPrefix) bool {
 	return a == b
+}
+
+// LocalUIDReference is a reference to another entity including its UID
+// +structType=atomic
+type LocalUIDReference struct {
+	// Name is the name of the referenced entity.
+	Name string `json:"name"`
+	// UID is the UID of the referenced entity.
+	UID types.UID `json:"uid"`
 }

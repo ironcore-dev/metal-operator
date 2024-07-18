@@ -62,27 +62,39 @@ func (r *ServerClaimReconciler) reconcileExists(ctx context.Context, log logr.Lo
 
 func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	log.V(1).Info("Deleting server claim")
-	if claim.Status.ServerRef == nil {
-		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); !apierrors.IsNotFound(err) || modified {
-			return ctrl.Result{}, err
-		}
-		log.V(1).Info("Ensured that the finalizer has been removed")
-
+	if !controllerutil.ContainsFinalizer(claim, ServerClaimFinalizer) {
 		log.V(1).Info("Deleted server claim")
 		return ctrl.Result{}, nil
 	}
 
+	if err := r.finalize(ctx, log, claim); err != nil {
+		return ctrl.Result{}, err
+	}
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); !apierrors.IsNotFound(err) || modified {
+		return ctrl.Result{}, err
+	}
+	log.V(1).Info("Ensured that the finalizer has been removed")
+
+	log.V(1).Info("Deleted server claim")
+	return ctrl.Result{}, nil
+}
+
+func (r *ServerClaimReconciler) finalize(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) error {
+	if claim.Spec.ServerRef == nil {
+		return nil
+	}
+
 	server := &metalv1alpha1.Server{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: claim.Status.ServerRef.Name}, server); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
+			return fmt.Errorf("failed to get server: %w", err)
 		}
 		log.V(1).Info("Server gone")
 	}
 
 	if server.Spec.ServerClaimRef != nil {
 		if err := r.removeClaimRefFromServer(ctx, server); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to remove claim ref from server: %w", err)
+			return fmt.Errorf("failed to remove claim ref from server: %w", err)
 		}
 	}
 
@@ -94,23 +106,16 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, cla
 	}
 	if err := r.Delete(ctx, config); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to delete serverbootconfig: %w", err)
+			return fmt.Errorf("failed to delete serverbootconfig: %w", err)
 		}
 		log.V(1).Info("ServerBootConfiguration gone")
 	}
 
 	if err := r.removeBootConfigRefFromServerAndPowerOff(ctx, config, server); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to remove boot config ref from server: %w", err)
+		return fmt.Errorf("failed to remove boot config ref from server: %w", err)
 	}
 	log.V(1).Info("Removed boot config ref from server")
-
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); !apierrors.IsNotFound(err) || modified {
-		return ctrl.Result{}, err
-	}
-	log.V(1).Info("Ensured that the finalizer has been removed")
-
-	log.V(1).Info("Deleted server claim")
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // Reconciliation flow of a ServerClaim:
@@ -134,11 +139,6 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		}
 	}
 
-	if claim.Spec.ServerRef == nil && claim.Spec.ServerSelector == nil {
-		log.V(1).Info("Claim is not claiming any server")
-		return ctrl.Result{}, nil
-	}
-
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -151,6 +151,10 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	if server == nil {
 		log.V(1).Info("No server found for claim")
 		return ctrl.Result{}, nil
+	}
+
+	if modified, err := r.patchServerRef(ctx, claim, server.Name); err != nil || modified {
+		return ctrl.Result{}, err
 	}
 
 	if err := r.applyBootConfiguration(ctx, log, server, claim); err != nil {
@@ -169,17 +173,10 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch claim ref for server: %w", err)
 	}
+	log.V(1).Info("Patched server claim reference", "Server", server.Name, "ServerClaimRef", claim.Name)
 
 	if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
 		return ctrl.Result{}, err
-	}
-
-	if claim.Status.ServerRef == nil || claim.Status.ServerRef.Name != server.Name {
-		claimBase := claim.DeepCopy()
-		claim.Status.ServerRef = &metalv1alpha1.LocalUIDReference{Name: server.Name, UID: server.UID}
-		if err = r.Status().Patch(ctx, claim, client.MergeFrom(claimBase)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to patch claim ref for server: %w", err)
-		}
 	}
 
 	log.V(1).Info("Reconciled server claim")
@@ -198,6 +195,23 @@ func (r *ServerClaimReconciler) patchServerClaimPhase(ctx context.Context, claim
 	return true, nil
 }
 
+func (r *ServerClaimReconciler) patchServerRef(ctx context.Context, claim *metalv1alpha1.ServerClaim, server string) (bool, error) {
+	if claim.Spec.ServerRef == nil {
+		claimBase := claim.DeepCopy()
+		claim.Spec.ServerRef = &v1.LocalObjectReference{Name: server}
+		if err := r.Patch(ctx, claim, client.MergeFrom(claimBase)); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == server {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("failed to patch server ref for claim: server reference is immutable")
+}
+
 func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
 	config := &metalv1alpha1.ServerBootConfiguration{
 		TypeMeta: metav1.TypeMeta{
@@ -209,7 +223,7 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log 
 			Name:      claim.Name,
 		},
 		Spec: metalv1alpha1.ServerBootConfigurationSpec{
-			ServerRef:         v1.LocalObjectReference{Name: server.Name},
+			ServerRef:         *claim.Spec.ServerRef,
 			Image:             claim.Spec.Image,
 			IgnitionSecretRef: claim.Spec.IgnitionSecretRef,
 		},
@@ -271,6 +285,8 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		server, err = r.claimServerByReference(ctx, log, claim)
 	case claim.Spec.ServerSelector != nil:
 		server, err = r.claimServerBySelector(ctx, log, claim)
+	default:
+		server, err = r.claimFirstBestServer(ctx, log)
 	}
 	if err != nil {
 		return nil, err
@@ -278,10 +294,12 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	if server == nil {
 		return nil, nil
 	}
+	log.V(1).Info("Matching server found", "Server", server.Name)
 	return server, nil
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
+	log.V(1).Info("Trying to claim server by reference")
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err != nil {
 		return nil, err
@@ -309,6 +327,7 @@ func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log 
 }
 
 func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
+	log.V(1).Info("Trying to claim server by selector")
 	selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
 	if err != nil {
 		return nil, err
@@ -325,6 +344,26 @@ func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log l
 		}
 		if s.Status.State != metalv1alpha1.ServerStateAvailable && s.Status.State != metalv1alpha1.ServerStateReserved {
 			log.V(1).Info("Server not in a claimable state", "Server", s.Name, "ServerState", s.Status.State)
+			continue
+		}
+		server = s.DeepCopy()
+		break
+	}
+	return server, nil
+}
+
+func (r *ServerClaimReconciler) claimFirstBestServer(ctx context.Context, log logr.Logger) (*metalv1alpha1.Server, error) {
+	log.V(1).Info("Trying to claim first best server")
+	serverList := &metalv1alpha1.ServerList{}
+	if err := r.List(ctx, serverList); err != nil {
+		return nil, err
+	}
+	var server *metalv1alpha1.Server
+	for _, s := range serverList.Items {
+		if s.Spec.ServerClaimRef != nil {
+			continue
+		}
+		if s.Status.State != metalv1alpha1.ServerStateAvailable {
 			continue
 		}
 		server = s.DeepCopy()
@@ -354,7 +393,7 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 			return nil
 		}
 		for _, claim := range claimList.Items {
-			if claim.Status.ServerRef != nil && claim.Status.ServerRef.Name == host.Name {
+			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == host.Name {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
 				})

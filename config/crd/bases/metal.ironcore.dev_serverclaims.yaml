@@ -15,7 +15,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.claimedServerRef.name
+    - jsonPath: .spec.serverRef.name
       name: Server
       type: string
     - jsonPath: .spec.ignitionSecretRef.name
@@ -155,22 +155,6 @@ spec:
               phase:
                 description: Phase represents the current phase of the server claim.
                 type: string
-              serverRef:
-                description: |-
-                  ServerRef is a reference to a specific server which is claimed.
-                  This field is optional and can be omitted if the server is to be selected using ServerSelector.
-                properties:
-                  name:
-                    description: Name is the name of the referenced entity.
-                    type: string
-                  uid:
-                    description: UID is the UID of the referenced entity.
-                    type: string
-                required:
-                - name
-                - uid
-                type: object
-                x-kubernetes-map-type: atomic
             type: object
         type: object
     served: true

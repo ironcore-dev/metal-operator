@@ -18,7 +18,7 @@ patches:
 #- path: patches/webhook_in_bmcs.yaml
 #- path: patches/webhook_in_servers.yaml
 #- path: patches/webhook_in_serverbootconfigurations.yaml
-#- path: patches/webhook_in_serverclaims.yaml
+- path: patches/webhook_in_serverclaims.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -34,5 +34,5 @@ patches:
 # [WEBHOOK] To enable webhook, uncomment the following section
 # the following config is for teaching kustomize how to do kustomization for CRDs.
 
-#configurations:
-#- kustomizeconfig.yaml
+configurations:
+- kustomizeconfig.yaml

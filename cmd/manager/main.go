@@ -14,10 +14,6 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -27,6 +23,11 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/yaml"
+
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -211,6 +212,12 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerClaim")
 		os.Exit(1)
+	}
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = (&metalv1alpha1.ServerClaim{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ServerClaim")
+			os.Exit(1)
+		}
 	}
 	//+kubebuilder:scaffold:builder
 

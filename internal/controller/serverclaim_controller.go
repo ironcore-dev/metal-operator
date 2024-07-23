@@ -67,7 +67,7 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, cla
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.finalize(ctx, log, claim); err != nil {
+	if err := r.cleanupAndShutdownServer(ctx, log, claim); err != nil {
 		return ctrl.Result{}, err
 	}
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); !apierrors.IsNotFound(err) || modified {
@@ -79,7 +79,7 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, cla
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) finalize(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) error {
+func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) error {
 	if claim.Spec.ServerRef == nil {
 		return nil
 	}

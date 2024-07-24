@@ -20,10 +20,10 @@ type BMC interface {
 	Reset() error
 
 	// SetPXEBootOnce sets the boot device for the next system boot.
-	SetPXEBootOnce(systemID string) error
+	SetPXEBootOnce(systemUUID string) error
 
 	// GetSystemInfo retrieves information about the system.
-	GetSystemInfo(systemID string) (SystemInfo, error)
+	GetSystemInfo(systemUUID string) (SystemInfo, error)
 
 	// Logout closes the BMC client connection by logging out
 	Logout()
@@ -33,6 +33,59 @@ type BMC interface {
 
 	// GetManager returns the manager
 	GetManager() (*Manager, error)
+
+	GetBootOrder(systemUUID string) ([]string, error)
+
+	GetBiosSettings(systemUUID string, attributes map[string]string) (Bios, error)
+
+	SetBiosSettings(systemUUID string, attributes map[string]string) error
+
+	GetBiosVersion(systemUUID string) (string, error)
+
+	SetBootOrder(systemUUID string, order []string) error
+}
+
+type Bios struct {
+	Version  string
+	Settings map[string]string
+}
+
+type RegistryEntryAttributes struct {
+	AttributeName string
+	CurrentValue  interface{}
+	DisplayName   string
+	DisplayOrder  int
+	HelpText      string
+	Hidden        bool
+	Immutable     bool
+	MaxLength     int
+	MenuPath      string
+	MinLength     int
+	ReadOnly      bool
+	ResetRequired bool
+	Type          string
+	WriteOnly     bool
+}
+
+type RegistryEntry struct {
+	Attributes []RegistryEntryAttributes
+}
+
+// BiosRegistry describes the Message Registry file locator Resource.
+type BiosRegistry struct {
+	common.Entity
+	// ODataContext is the odata context.
+	ODataContext string `json:"@odata.context"`
+	// ODataType is the odata type.
+	ODataType string `json:"@odata.type"`
+	// Description provides a description of this resource.
+	Description string
+	// Languages is the RFC5646-conformant language codes for the
+	// available Message Registries.
+	Languages []string
+	// Registry shall contain the Message Registry name and it major and
+	// minor versions, as defined by the Redfish Specification.
+	RegistryEntries RegistryEntry
 }
 
 type NetworkInterface struct {

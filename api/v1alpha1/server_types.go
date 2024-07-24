@@ -55,6 +55,18 @@ type BMCAccess struct {
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
 }
 
+type BootOrder struct {
+	Name     string `json:"name"`
+	Priority int    `json:"priority"`
+	Device   string `json:"device"`
+}
+
+type BIOSSettings struct {
+	Version string `json:"version"`
+	//maybe use map[string]intstr.IntOrString?!; interface not possible
+	Settings map[string]string `json:"settings"`
+}
+
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
@@ -82,6 +94,9 @@ type ServerSpec struct {
 	// the boot configuration for this server. This field is optional and can be omitted
 	// if no boot configuration is specified.
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
+
+	BootOrder []BootOrder    `json:"bootOrder,omitempty"`
+	BIOS      []BIOSSettings `json:"BIOS,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -138,6 +153,8 @@ type ServerStatus struct {
 
 	// NetworkInterfaces is a list of network interfaces associated with the server.
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
+
+	BIOS BIOSSettings `json:"BIOS,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
 	// +patchStrategy=merge

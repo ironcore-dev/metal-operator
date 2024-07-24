@@ -182,3 +182,23 @@ func (r RedfishLocalBMC) GetManager() (*Manager, error) {
 
 	return nil, err
 }
+
+func (r *RedfishLocalBMC) GetBootOrder(systemUUID string) ([]string, error) {
+	return []string{}, nil
+}
+
+func (r *RedfishLocalBMC) GetBiosSettings(systemUUID string, attributes map[string]string) (Bios, error) {
+	return Bios{}, nil
+}
+
+func (r *RedfishLocalBMC) SetBiosSettings(systemUUID string, attributes map[string]string) error {
+	return nil
+}
+
+func (r *RedfishLocalBMC) SetBootOrder(systemUUID string, order []string) error {
+	return nil
+}
+
+func (r *RedfishLocalBMC) GetBiosVersion(systemUUID string) (string, error) {
+	return "", nil
+}

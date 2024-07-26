@@ -268,7 +268,7 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, e
 	if err != nil {
 		return
 	}
-	//TODO: add more tyes like maps and Enumerations
+	//TODO: add more types like maps and Enumerations
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {

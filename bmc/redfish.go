@@ -178,7 +178,13 @@ func (r *RedfishBMC) GetBiosVersion(systemUUID string) (string, error) {
 	return system.BIOSVersion, nil
 }
 
-func (r *RedfishBMC) GetBiosAttributeValues(systemUUID string, attributes []string) (result map[string]string, err error) {
+func (r *RedfishBMC) GetBiosAttributeValues(
+	systemUUID string,
+	attributes []string,
+) (
+	result map[string]string,
+	err error,
+) {
 	if len(attributes) == 0 {
 		return
 	}
@@ -204,7 +210,13 @@ func (r *RedfishBMC) GetBiosAttributeValues(systemUUID string, attributes []stri
 }
 
 // SetBiosAttributes sets given bios attributes. Returns true if bios reset is required
-func (r *RedfishBMC) SetBiosAttributes(systemUUID string, attributes map[string]string) (reset bool, err error) {
+func (r *RedfishBMC) SetBiosAttributes(
+	systemUUID string,
+	attributes map[string]string,
+) (
+	reset bool,
+	err error,
+) {
 	reset = false
 	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
@@ -240,7 +252,13 @@ func (r *RedfishBMC) SetBootOrder(systemUUID string, bootOrder []string) error {
 	)
 }
 
-func (r *RedfishBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (filtered map[string]RegistryEntryAttributes, err error) {
+func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
+	readOnly bool,
+	immutable bool,
+) (
+	filtered map[string]RegistryEntryAttributes,
+	err error,
+) {
 	registries, err := r.client.Service.Registries()
 	biosRegistry := &BiosRegistry{}
 	for _, registry := range registries {

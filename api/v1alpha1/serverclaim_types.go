@@ -46,8 +46,8 @@ type ServerClaimStatus struct {
 	Phase Phase `json:"phase,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
 // +kubebuilder:printcolumn:name="Ignition",type="string",JSONPath=".spec.ignitionSecretRef.name"
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image"
@@ -63,7 +63,7 @@ type ServerClaim struct {
 	Status ServerClaimStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServerClaimList contains a list of ServerClaim
 type ServerClaimList struct {

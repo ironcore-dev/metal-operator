@@ -67,6 +67,22 @@ spec:
           spec:
             description: ServerSpec defines the desired state of a Server.
             properties:
+              BIOS:
+                items:
+                  properties:
+                    settings:
+                      additionalProperties:
+                        type: string
+                      description: maybe use map[string]intstr.IntOrString?!; interface
+                        not possible
+                      type: object
+                    version:
+                      type: string
+                  required:
+                  - settings
+                  - version
+                  type: object
+                type: array
               bmc:
                 description: |-
                   BMC contains the access details for the BMC.
@@ -182,6 +198,21 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              bootOrder:
+                items:
+                  properties:
+                    device:
+                      type: string
+                    name:
+                      type: string
+                    priority:
+                      type: integer
+                  required:
+                  - device
+                  - name
+                  - priority
+                  type: object
+                type: array
               indicatorLED:
                 description: IndicatorLED specifies the desired state of the server's
                   indicator LED.
@@ -244,6 +275,20 @@ spec:
           status:
             description: ServerStatus defines the observed state of Server.
             properties:
+              BIOS:
+                properties:
+                  settings:
+                    additionalProperties:
+                      type: string
+                    description: maybe use map[string]intstr.IntOrString?!; interface
+                      not possible
+                    type: object
+                  version:
+                    type: string
+                required:
+                - settings
+                - version
+                type: object
               conditions:
                 description: Conditions represents the latest available observations
                   of the server's current state.

@@ -50,7 +50,7 @@ func (r *RedfishBMC) Logout() {
 
 // PowerOn powers on the system using Redfish.
 func (r *RedfishBMC) PowerOn(systemUUID string) error {
-	system, err := r.getSystemByID(systemUUID)
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -66,7 +66,7 @@ func (r *RedfishBMC) PowerOn(systemUUID string) error {
 
 // PowerOff powers off the system using Redfish.
 func (r *RedfishBMC) PowerOff(systemUUID string) error {
-	system, err := r.getSystemByID(systemUUID)
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -104,7 +104,7 @@ func (r *RedfishBMC) GetSystems() ([]Server, error) {
 
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
 func (r *RedfishBMC) SetPXEBootOnce(systemUUID string) error {
-	system, err := r.getSystemByID(systemUUID)
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -145,7 +145,7 @@ func (r *RedfishBMC) GetManager() (*Manager, error) {
 
 // GetSystemInfo retrieves information about the system using Redfish.
 func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
-	system, err := r.getSystemByID(systemUUID)
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -163,7 +163,7 @@ func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
 }
 
 func (r *RedfishBMC) GetBootOrder(systemUUID string) ([]string, error) {
-	system, err := r.getSystemByID(systemUUID)
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return []string{}, err
 	}
@@ -171,56 +171,63 @@ func (r *RedfishBMC) GetBootOrder(systemUUID string) ([]string, error) {
 }
 
 func (r *RedfishBMC) GetBiosVersion(systemUUID string) (string, error) {
-	system, err := r.getSystemByID(systemUUID)
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return "", err
 	}
 	return system.BIOSVersion, nil
 }
 
-func (r *RedfishBMC) GetBiosSettings(systemUUID string, attributes map[string]string) (Bios, error) {
-	system, err := r.getSystemByID(systemUUID)
-	if err != nil {
-		return Bios{}, err
+func (r *RedfishBMC) GetBiosAttributeValues(systemUUID string, attributes []string) (result map[string]string, err error) {
+	if len(attributes) == 0 {
+		return
 	}
-	if err := r.checkBiosAttributes(attributes); err != nil {
-		return Bios{}, err
+	system, err := r.getSystemByUUID(systemUUID)
+	if err != nil {
+		return
 	}
 	bios, err := system.Bios()
 	if err != nil {
-		return Bios{}, err
+		return
 	}
-	settings := make(map[string]string, len(bios.Attributes))
-	for name := range bios.Attributes {
-		settings[name] = bios.Attributes.String(name)
+	filteredAttr, err := r.getFilteredBiosRegistryAttributes(false, false)
+	if err != nil {
+		return
 	}
-	return Bios{
-		Version:  system.BIOSVersion,
-		Settings: settings,
-	}, nil
+	result = make(map[string]string, len(attributes))
+	for _, name := range attributes {
+		if _, ok := filteredAttr[name]; ok {
+			result[name] = bios.Attributes.String(name)
+		}
+	}
+	return
 }
 
-func (r *RedfishBMC) SetBiosSettings(systemUUID string, attributes map[string]string) error {
-	system, err := r.getSystemByID(systemUUID)
+// SetBiosAttributes sets given bios attributes. Returns true if bios reset is required
+func (r *RedfishBMC) SetBiosAttributes(systemUUID string, attributes map[string]string) (reset bool, err error) {
+	reset = false
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
-		return err
+		return
 	}
 	bios, err := system.Bios()
 	if err != nil {
-		return nil
+		return
 	}
-	if err := r.checkBiosAttributes(attributes); err != nil {
-		return err
+	reset, err = r.checkBiosAttributes(attributes)
+	if err != nil {
+		return
 	}
 	attrs := make(map[string]interface{}, len(attributes))
 	for name, value := range attributes {
 		attrs[name] = value
 	}
-	return bios.UpdateBiosAttributes(attrs)
+	return reset, bios.UpdateBiosAttributes(attrs)
 }
 
+// SetBootOrder sets bios boot order
 func (r *RedfishBMC) SetBootOrder(systemUUID string, bootOrder []string) error {
-	system, err := r.getSystemByID(systemUUID)
+	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return err
 	}
@@ -233,23 +240,33 @@ func (r *RedfishBMC) SetBootOrder(systemUUID string, bootOrder []string) error {
 	)
 }
 
-func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (err error) {
+func (r *RedfishBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (filtered map[string]RegistryEntryAttributes, err error) {
 	registries, err := r.client.Service.Registries()
 	biosRegistry := &BiosRegistry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "BiosAttributeRegistry") {
 			err = registry.Get(r.client, registry.Location[0].URI, biosRegistry)
 			if err != nil {
-				return err
+				return
 			}
 		}
 	}
 	// filter out immutable, readonly and hidden attributes
-	filtered := make(map[string]RegistryEntryAttributes)
+	filtered = make(map[string]RegistryEntryAttributes)
 	for _, entry := range biosRegistry.RegistryEntries.Attributes {
-		if !entry.Immutable && !entry.ReadOnly && !entry.Hidden {
+		if entry.Immutable == immutable && entry.ReadOnly == readOnly && !entry.Hidden {
 			filtered[entry.AttributeName] = entry
 		}
+	}
+	return
+}
+
+func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, err error) {
+	reset = false
+	// filter out immutable, readonly and hidden attributes
+	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
+	if err != nil {
+		return
 	}
 	//TODO: add more tyes like maps and Enumerations
 	for name, value := range attrs {
@@ -257,6 +274,9 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (err error) {
 		if !ok {
 			err = errors.Join(err, fmt.Errorf("attribute %s not found or immutable/hidden", name))
 			continue
+		}
+		if entryAttribute.ResetRequired {
+			reset = true
 		}
 		switch strings.ToLower(entryAttribute.Type) {
 		case "integer":
@@ -270,10 +290,10 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (err error) {
 			err = errors.Join(err, fmt.Errorf("attribute %s value has wrong type", name))
 		}
 	}
-	return err
+	return
 }
 
-func (r *RedfishBMC) getSystemByID(systemUUID string) (*redfish.ComputerSystem, error) {
+func (r *RedfishBMC) getSystemByUUID(systemUUID string) (*redfish.ComputerSystem, error) {
 	service := r.client.GetService()
 	systems, err := service.Systems()
 	if err != nil {

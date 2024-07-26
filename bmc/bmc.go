@@ -36,9 +36,9 @@ type BMC interface {
 
 	GetBootOrder(systemUUID string) ([]string, error)
 
-	GetBiosSettings(systemUUID string, attributes map[string]string) (Bios, error)
+	GetBiosAttributeValues(systemUUID string, attributes []string) (map[string]string, error)
 
-	SetBiosSettings(systemUUID string, attributes map[string]string) error
+	SetBiosAttributes(systemUUID string, attributes map[string]string) (reset bool, err error)
 
 	GetBiosVersion(systemUUID string) (string, error)
 
@@ -46,8 +46,8 @@ type BMC interface {
 }
 
 type Bios struct {
-	Version  string
-	Settings map[string]string
+	Version    string
+	Attributes map[string]string
 }
 
 type RegistryEntryAttributes struct {

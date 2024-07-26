@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"reflect"
 	"sort"
 	"time"
 
@@ -321,19 +320,24 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.Manufacturer = systemInfo.Manufacturer
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 
-	biosVersion, err := bmcClient.GetBiosVersion(server.Spec.UUID)
+	currentBiosVersion, err := bmcClient.GetBiosVersion(server.Spec.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to load bios version: %w", err)
 	}
 
 	for _, bios := range server.Spec.BIOS {
-		if bios.Version == biosVersion {
-			biosSettings, err := bmcClient.GetBiosSettings(server.Spec.UUID, bios.Settings)
+		if bios.Version == currentBiosVersion {
+			// with go 1.23: switch to maps.Keys(bios.Settings)
+			keys := make([]string, 0, len(bios.Settings))
+			for k := range bios.Settings {
+				keys = append(keys, k)
+			}
+			attributes, err := bmcClient.GetBiosAttributeValues(server.Spec.UUID, keys)
 			if err != nil {
 				return fmt.Errorf("failed load bios settings: %w", err)
 			}
-			server.Status.BIOS.Version = biosSettings.Version
-			server.Status.BIOS.Settings = biosSettings.Settings
+			server.Status.BIOS.Version = currentBiosVersion
+			server.Status.BIOS.Settings = attributes
 		}
 	}
 
@@ -693,27 +697,35 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 	}
 
 	versionMatch := false
+	diff := map[string]string{}
 	for _, bios := range server.Spec.BIOS {
 		if bios.Version == version {
 			versionMatch = true
-			eq := reflect.DeepEqual(bios.Settings, server.Status.BIOS)
-			if eq {
-				return nil
+			for key, value := range bios.Settings {
+				if res, ok := server.Status.BIOS.Settings[key]; !ok {
+					if !ok || res != value {
+						diff[key] = value
+					}
+				}
 			}
-			if err := bmcClient.SetBiosSettings(server.Spec.UUID, bios.Settings); err != nil {
+			reset, err := bmcClient.SetBiosAttributes(server.Spec.UUID, diff)
+			if err != nil {
 				return err
 			}
-			server.Status.Conditions = append(server.Status.Conditions, metav1.Condition{
-				Type: "Reboot needed",
-			})
-			if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-				return fmt.Errorf("failed to patch Server status: %w", err)
+			if reset {
+				server.Status.Conditions = append(server.Status.Conditions, metav1.Condition{
+					Type: "Reboot needed",
+				})
+				if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+					return fmt.Errorf("failed to patch Server status: %w", err)
+				}
 			}
-
+			break
 		}
 	}
 	if !versionMatch {
 		log.V(1).Info("none of the Bios versions match")
+		return nil
 	}
 	return nil
 }

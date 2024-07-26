@@ -79,7 +79,6 @@ spec:
                     version:
                       type: string
                   required:
-                  - settings
                   - version
                   type: object
                 type: array
@@ -286,7 +285,6 @@ spec:
                   version:
                     type: string
                 required:
-                - settings
                 - version
                 type: object
               conditions:

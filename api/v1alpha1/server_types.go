@@ -64,7 +64,7 @@ type BootOrder struct {
 type BIOSSettings struct {
 	Version string `json:"version"`
 	//maybe use map[string]intstr.IntOrString?!; interface not possible
-	Settings map[string]string `json:"settings"`
+	Settings map[string]string `json:"settings,omitempty"`
 }
 
 // ServerSpec defines the desired state of a Server.

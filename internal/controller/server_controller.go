@@ -24,6 +24,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	v1 "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -713,11 +714,12 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 				return err
 			}
 			if reset {
-				server.Status.Conditions = append(server.Status.Conditions, metav1.Condition{
+				if changed := meta.SetStatusCondition(&server.Status.Conditions, metav1.Condition{
 					Type: "Reboot needed",
-				})
-				if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-					return fmt.Errorf("failed to patch Server status: %w", err)
+				}); changed {
+					if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+						return fmt.Errorf("failed to patch Server status: %w", err)
+					}
 				}
 			}
 			break

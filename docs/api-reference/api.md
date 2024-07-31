@@ -10,6 +10,46 @@
 </div>
 Resource Types:
 <ul></ul>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
+</p>
+<div>
+<p>BIOSSettings represents the BIOS settings for a server.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version specifies the version of the server BIOS for which the settings are defined.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<p>Settings is a map of key-value pairs representing the BIOS settings.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMC">BMC
 </h3>
 <div>
@@ -540,6 +580,57 @@ BMCPowerState
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the BMC&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BootOrder">BootOrder
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
+</p>
+<div>
+<p>BootOrder represents the boot order of the server.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name of the boot device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>priority</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+<p>Priority is the priority of the boot device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>device</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Device is the device to boot from.</p>
 </td>
 </tr>
 </tbody>
@@ -1134,6 +1225,32 @@ Kubernetes core/v1.ObjectReference
 <p>BootConfigurationRef is a reference to a BootConfiguration object that specifies
 the boot configuration for this server. This field is optional and can be omitted
 if no boot configuration is specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bootOrder</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BootOrder">
+[]BootOrder
+</a>
+</em>
+</td>
+<td>
+<p>BootOrder specifies the boot order of the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BIOS</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
+[]BIOSSettings
+</a>
+</em>
+</td>
+<td>
+<p>BIOS specifies the BIOS settings for the server.</p>
 </td>
 </tr>
 </table>
@@ -1746,6 +1863,32 @@ the boot configuration for this server. This field is optional and can be omitte
 if no boot configuration is specified.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>bootOrder</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BootOrder">
+[]BootOrder
+</a>
+</em>
+</td>
+<td>
+<p>BootOrder specifies the boot order of the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BIOS</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
+[]BIOSSettings
+</a>
+</em>
+</td>
+<td>
+<p>BIOS specifies the BIOS settings for the server.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerState">ServerState
@@ -1876,6 +2019,18 @@ ServerState
 </td>
 <td>
 <p>NetworkInterfaces is a list of network interfaces associated with the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BIOS</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
+BIOSSettings
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 <tr>

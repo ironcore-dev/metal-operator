@@ -55,15 +55,21 @@ type BMCAccess struct {
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
 }
 
+// BootOrder represents the boot order of the server.
 type BootOrder struct {
-	Name     string `json:"name"`
-	Priority int    `json:"priority"`
-	Device   string `json:"device"`
+	// Name is the name of the boot device.
+	Name string `json:"name"`
+	// Priority is the priority of the boot device.
+	Priority int `json:"priority"`
+	// Device is the device to boot from.
+	Device string `json:"device"`
 }
 
+// BIOSSettings represents the BIOS settings for a server.
 type BIOSSettings struct {
+	// Version specifies the version of the server BIOS for which the settings are defined.
 	Version string `json:"version"`
-	//maybe use map[string]intstr.IntOrString?!; interface not possible
+	// Settings is a map of key-value pairs representing the BIOS settings.
 	Settings map[string]string `json:"settings,omitempty"`
 }
 
@@ -95,8 +101,10 @@ type ServerSpec struct {
 	// if no boot configuration is specified.
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
 
-	BootOrder []BootOrder    `json:"bootOrder,omitempty"`
-	BIOS      []BIOSSettings `json:"BIOS,omitempty"`
+	// BootOrder specifies the boot order of the server.
+	BootOrder []BootOrder `json:"bootOrder,omitempty"`
+	// BIOS specifies the BIOS settings for the server.
+	BIOS []BIOSSettings `json:"BIOS,omitempty"`
 }
 
 // ServerState defines the possible states of a server.

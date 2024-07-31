@@ -9,4 +9,14 @@ metadata:
     app.kubernetes.io/created-by: metal-operator
   name: serverclaim-sample
 spec:
-  # TODO(user): Add fields here
+  serverRef:
+    name: sample-server
+#  serverSelector:
+#    matchLabels:
+#      az: a1
+#      cpu: 100
+#      foo: bar
+  image: os-image:latest
+  ignitionSecretRef:
+    name: my-ignition
+  power: On

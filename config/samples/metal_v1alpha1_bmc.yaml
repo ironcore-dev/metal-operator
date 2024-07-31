@@ -9,4 +9,10 @@ metadata:
     app.kubernetes.io/created-by: metal-operator
   name: bmc-sample
 spec:
-  # TODO(user): Add fields here
+  endpointRef:
+    name: endpoint-sample
+  bmcSecretRef:
+    name: bmc-sample
+  protocol:
+    name: Redfish
+    port: 8080

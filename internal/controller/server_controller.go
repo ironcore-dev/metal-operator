@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +24,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	v1 "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -144,6 +146,16 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
 	log.V(1).Info("Updated Server status")
+
+	if err := r.applyBiosSettings(ctx, log, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update server bios settings: %w", err)
+	}
+	log.V(1).Info("Updated Server bios settings")
+
+	if err := r.applyBootOrder(ctx, log, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
+	}
+	log.V(1).Info("Updated Server bios boot order")
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
@@ -308,6 +320,27 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.SKU = systemInfo.SKU
 	server.Status.Manufacturer = systemInfo.Manufacturer
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
+
+	currentBiosVersion, err := bmcClient.GetBiosVersion(server.Spec.UUID)
+	if err != nil {
+		return fmt.Errorf("failed to load bios version: %w", err)
+	}
+
+	for _, bios := range server.Spec.BIOS {
+		if bios.Version == currentBiosVersion {
+			// with go 1.23: switch to maps.Keys(bios.Settings)
+			keys := make([]string, 0, len(bios.Settings))
+			for k := range bios.Settings {
+				keys = append(keys, k)
+			}
+			attributes, err := bmcClient.GetBiosAttributeValues(server.Spec.UUID, keys)
+			if err != nil {
+				return fmt.Errorf("failed load bios settings: %w", err)
+			}
+			server.Status.BIOS.Version = currentBiosVersion
+			server.Status.BIOS.Settings = attributes
+		}
+	}
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
@@ -612,4 +645,89 @@ func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.Even
 			},
 		}
 	})
+}
+
+func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
+		log.V(1).Info("Server has no BMC connection configured")
+		return nil
+	}
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	if err != nil {
+		return fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	defer bmcClient.Logout()
+
+	order, err := bmcClient.GetBootOrder(server.Spec.UUID)
+	if err != nil {
+		return fmt.Errorf("failed to create BMC client: %w", err)
+	}
+
+	sort.Slice(server.Spec.BootOrder, func(i, j int) bool {
+		return server.Spec.BootOrder[i].Priority < server.Spec.BootOrder[j].Priority
+	})
+	newOrder := []string{}
+	change := false
+	for i, boot := range server.Spec.BootOrder {
+		newOrder = append(newOrder, boot.Device)
+		if order[i] != boot.Device {
+			change = true
+		}
+	}
+	if change {
+		return bmcClient.SetBootOrder(server.Spec.UUID, newOrder)
+	}
+	return nil
+}
+
+func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+	serverBase := server.DeepCopy()
+	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
+		log.V(1).Info("Server has no BMC connection configured")
+		return nil
+	}
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	if err != nil {
+		return fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	defer bmcClient.Logout()
+
+	version, err := bmcClient.GetBiosVersion(server.Spec.UUID)
+	if err != nil {
+		return fmt.Errorf("failed to create BMC client: %w", err)
+	}
+
+	versionMatch := false
+	diff := map[string]string{}
+	for _, bios := range server.Spec.BIOS {
+		if bios.Version == version {
+			versionMatch = true
+			for key, value := range bios.Settings {
+				if res, ok := server.Status.BIOS.Settings[key]; !ok {
+					if !ok || res != value {
+						diff[key] = value
+					}
+				}
+			}
+			reset, err := bmcClient.SetBiosAttributes(server.Spec.UUID, diff)
+			if err != nil {
+				return err
+			}
+			if reset {
+				if changed := meta.SetStatusCondition(&server.Status.Conditions, metav1.Condition{
+					Type: "Reboot needed",
+				}); changed {
+					if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+						return fmt.Errorf("failed to patch Server status: %w", err)
+					}
+				}
+			}
+			break
+		}
+	}
+	if !versionMatch {
+		log.V(1).Info("none of the Bios versions match")
+		return nil
+	}
+	return nil
 }

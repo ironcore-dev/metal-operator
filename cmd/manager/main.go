@@ -57,6 +57,7 @@ func main() {
 	var registryProtocol string
 	var registryURL string
 	var requeueInterval time.Duration
+	var webhookPort int
 
 	flag.DurationVar(&requeueInterval, "requeue-interval", 10*time.Second, "Reconciler requeue interval.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
@@ -69,6 +70,7 @@ func main() {
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -131,6 +133,7 @@ func main() {
 	}
 
 	webhookServer := webhook.NewServer(webhook.Options{
+		Port:    webhookPort,
 		TLSOpts: tlsOpts,
 	})
 

@@ -34,6 +34,8 @@ import (
 
 const (
 	DefaultIgnitionSecretKeyName  = "ignition"
+	DefaultIgnitionFormatKey      = "format"
+	DefaultIgnitionFormatValue    = "fcos"
 	ServerFinalizer               = "metal.ironcore.dev/server"
 	InternalAnnotationTypeKeyName = "metal.ironcore.dev/type"
 	InternalAnnotationTypeValue   = "Internal"
@@ -408,6 +410,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 			Name:      bootConfig.Name,
 		},
 		Data: map[string][]byte{
+			DefaultIgnitionFormatKey:     []byte(DefaultIgnitionFormatValue),
 			DefaultIgnitionSecretKeyName: ignitionData,
 		},
 	}

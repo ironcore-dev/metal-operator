@@ -1909,6 +1909,9 @@ if no boot configuration is specified.</p>
 <tbody><tr><td><p>&#34;Available&#34;</p></td>
 <td><p>ServerStateAvailable indicates that the server is available for use.</p>
 </td>
+</tr><tr><td><p>&#34;Discovery&#34;</p></td>
+<td><p>ServerStateDiscovery indicates that the server is in its discovery state.</p>
+</td>
 </tr><tr><td><p>&#34;Error&#34;</p></td>
 <td><p>ServerStateError indicates that there is an error with the server.</p>
 </td>

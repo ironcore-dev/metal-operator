@@ -49,12 +49,34 @@ var _ = Describe("Server Controller", func() {
 		}
 		Eventually(Get(bmc)).Should(Succeed())
 
-		By("Ensuring the boot configuration has been created")
+		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("compute-0-%s", bmc.Name),
 			},
 		}
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerFinalizer)),
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "BMC",
+				Name:               bmc.Name,
+				UID:                bmc.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.Power", metalv1alpha1.Power("")),
+			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
+			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Status.Manufacturer", "Contoso"),
+			HaveField("Status.SKU", "8675309"),
+			HaveField("Status.SerialNumber", "437XR1138R2"),
+			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+		))
+
+		By("Ensuring the boot configuration has been created")
 		bootConfig := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
@@ -88,7 +110,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
 		))
 
-		By("Ensuring that the Server resource has been created")
+		By("Ensuring that the Server is set to discovery and powered on")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -99,11 +121,7 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
-			HaveField("Spec.Power", metalv1alpha1.Power("")),
-			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
-			HaveField("Spec.ServerClaimRef", BeNil()),
-			HaveField("Spec.BMCRef", &v1.LocalObjectReference{Name: bmc.Name}),
+			HaveField("Spec.Power", metalv1alpha1.Power("On")),
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
@@ -111,11 +129,7 @@ var _ = Describe("Server Controller", func() {
 				UID:        bootConfig.UID,
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
-			HaveField("Status.Manufacturer", "Contoso"),
-			HaveField("Status.SKU", "8675309"),
-			HaveField("Status.SerialNumber", "437XR1138R2"),
-			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
 
 		By("Patching the boot configuration to a Ready state")
@@ -221,7 +235,7 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
-			HaveField("Spec.Power", metalv1alpha1.Power("")),
+			HaveField("Spec.Power", metalv1alpha1.Power("On")),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
@@ -235,7 +249,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
 
 		By("Patching the boot configuration to a Ready state")

@@ -114,6 +114,9 @@ const (
 	// ServerStateInitial indicates that the server is in its initial state.
 	ServerStateInitial ServerState = "Initial"
 
+	// ServerStateDiscovery indicates that the server is in its discovery state.
+	ServerStateDiscovery ServerState = "Discovery"
+
 	// ServerStateAvailable indicates that the server is available for use.
 	ServerStateAvailable ServerState = "Available"
 

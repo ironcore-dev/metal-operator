@@ -174,11 +174,15 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 // Server state-machine:
 //
 // A Server goes through the following stages:
-// Initial -> Available -> Reserved -> Tainted -> Available ...
+// Initial -> Discovery -> Available -> Reserved -> Tainted -> Available ...
 //
 // Initial:
 // In the initial state we create a ServerBootConfiguration and an Ignition to start the Probe server on the
-// Server. This Probe server registers with the managers /registry/{uuid} endpoint it's address, so the reconciler can
+// Server. The Server is patched to the state Discovery.
+//
+// Discovery:
+// In the discovery state we expect the Server to come up with the Probe server running.
+// This Probe server registers with the managers /registry/{uuid} endpoint it's address, so the reconciler can
 // fetch the server details from this endpoint. Once completed the Server is patched to the state Available.
 //
 // Available:
@@ -198,89 +202,125 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	switch server.Status.State {
 	case metalv1alpha1.ServerStateInitial:
-		// apply boot configuration
-		if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
-		}
-		log.V(1).Info("Applied Server boot configuration")
-
-		if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-			log.V(1).Info("Server boot configuration is not ready. Retrying ...")
-			return true, err
-		}
-		log.V(1).Info("Server boot configuration is ready")
-
-		if err := r.pxeBootServer(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to boot server: %w", err)
-		}
-		log.V(1).Info("Booted Server in PXE")
-
-		ready, err := r.extractServerDetailsFromRegistry(ctx, log, server)
-		if !ready && err == nil {
-			log.V(1).Info("Server agent did not post info to registry")
-			return true, nil
-		}
-		if err != nil {
-			log.V(1).Info("Could not get server details from registry.")
-			return false, err
-		}
-		log.V(1).Info("Extracted Server details")
-
-		serverBase := server.DeepCopy()
-		server.Spec.Power = metalv1alpha1.PowerOff
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return false, fmt.Errorf("failed to update server power state: %w", err)
-		}
-		log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
-
-		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to ensure server power state: %w", err)
-		}
-		log.V(1).Info("Server state set to power off")
-
-		if err := r.invalidateRegistryEntryForServer(log, server); err != nil {
-			return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
-		}
-		log.V(1).Info("Removed Server from Registry")
-
-		log.V(1).Info("Setting Server state set to available")
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-			return false, err
-		}
+		return r.handleInitialState(ctx, log, server)
+	case metalv1alpha1.ServerStateDiscovery:
+		return r.handleDiscoveryState(ctx, log, server)
 	case metalv1alpha1.ServerStateAvailable:
-		if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
-			return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
-		}
-		log.V(1).Info("Ensured initial boot configuration is deleted")
-
-		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to ensure server power state: %w", err)
-		}
-		if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
-		}
-		log.V(1).Info("Reconciled available state")
+		return r.handleAvailableState(ctx, log, server)
 	case metalv1alpha1.ServerStateReserved:
-		if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-			log.V(1).Info("Server boot configuration is not ready. Retrying ...")
-			return true, err
-		}
-		log.V(1).Info("Server boot configuration is ready")
-
-		if err := r.pxeBootServer(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to boot server: %w", err)
-		}
-		log.V(1).Info("Booted Server in PXE")
-
-		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to ensure server power state: %w", err)
-		}
-
-		if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
-			return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
-		}
-		log.V(1).Info("Reconciled reserved state")
+		return r.handleReservedState(ctx, log, server)
+	default:
+		return false, nil
 	}
+}
+
+func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
+	}
+	log.V(1).Info("Applied Server boot configuration")
+
+	if err := r.pxeBootServer(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to set PXE boot for server: %w", err)
+	}
+	log.V(1).Info("Set PXE Boot for Server")
+
+	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
+		return false, err
+	}
+	return false, nil
+}
+
+func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	serverBase := server.DeepCopy()
+	server.Spec.Power = metalv1alpha1.PowerOn
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to update server power state: %w", err)
+	}
+	log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOn)
+
+	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	}
+	log.V(1).Info("Server state set to power on")
+
+	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
+		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+		return true, err
+	}
+	log.V(1).Info("Server boot configuration is ready")
+
+	ready, err := r.extractServerDetailsFromRegistry(ctx, log, server)
+	if !ready && err == nil {
+		log.V(1).Info("Server agent did not post info to registry")
+		return true, nil
+	}
+	if err != nil {
+		log.V(1).Info("Could not get server details from registry.")
+		return false, err
+	}
+	log.V(1).Info("Extracted Server details")
+
+	if err := r.invalidateRegistryEntryForServer(log, server); err != nil {
+		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
+	}
+	log.V(1).Info("Removed Server from Registry")
+
+	log.V(1).Info("Setting Server state set to available")
+	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+		return false, err
+	}
+	return false, nil
+}
+
+func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	serverBase := server.DeepCopy()
+	server.Spec.Power = metalv1alpha1.PowerOff
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to update server power state: %w", err)
+	}
+	log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
+
+	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	}
+	log.V(1).Info("Server state set to power off")
+
+	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
+	}
+	log.V(1).Info("Ensured initial boot configuration is deleted")
+
+	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	}
+	if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
+	}
+	log.V(1).Info("Reconciled available state")
+	return false, nil
+}
+
+func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
+		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+		return true, err
+	}
+	log.V(1).Info("Server boot configuration is ready")
+
+	if err := r.pxeBootServer(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to boot server: %w", err)
+	}
+	log.V(1).Info("Booted Server in PXE")
+
+	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	}
+
+	if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
+	}
+	log.V(1).Info("Reconciled reserved state")
 	return false, nil
 }
 
@@ -469,11 +509,6 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 	}
 	if err := bmcClient.SetPXEBootOnce(server.Spec.UUID); err != nil {
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
-	}
-
-	// TODO: do a proper restart if Server is already in PowerOn state
-	if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
-		return fmt.Errorf("failed to power on server: %w", err)
 	}
 	return nil
 }

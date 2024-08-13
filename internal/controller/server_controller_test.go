@@ -66,7 +66,7 @@ var _ = Describe("Server Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
-			HaveField("Spec.Power", metalv1alpha1.Power("")),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.Manufacturer", "Contoso"),
@@ -74,6 +74,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
 
 		By("Ensuring the boot configuration has been created")
@@ -110,6 +111,11 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
 		))
 
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
 		By("Ensuring that the Server is set to discovery and powered on")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
@@ -131,11 +137,6 @@ var _ = Describe("Server Controller", func() {
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
-
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
 
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)
@@ -231,6 +232,11 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
 		))
 
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
 		By("Ensuring that the Server resource has been created")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
@@ -251,11 +257,6 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
-
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
 
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)

@@ -58,6 +58,7 @@ func main() {
 	var registryURL string
 	var requeueInterval time.Duration
 	var webhookPort int
+	var enforceFirstBoot bool
 
 	flag.DurationVar(&requeueInterval, "requeue-interval", 10*time.Second, "Reconciler requeue interval.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
@@ -70,6 +71,7 @@ func main() {
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.BoolVar(&enforceFirstBoot, "enforce-first-boot", false, "Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -198,6 +200,7 @@ func main() {
 		ProbeOSImage:     probeOSImage,
 		RegistryURL:      registryURL,
 		RequeueInterval:  requeueInterval,
+		EnforceFirstBoot: enforceFirstBoot,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Server")
 		os.Exit(1)

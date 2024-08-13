@@ -170,6 +170,7 @@ func SetupTest() *corev1.Namespace {
 			ProbeOSImage:     "fooOS:latest",
 			RegistryURL:      registryURL,
 			RequeueInterval:  50 * time.Millisecond,
+			EnforceFirstBoot: true,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

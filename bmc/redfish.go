@@ -21,6 +21,16 @@ type RedfishBMC struct {
 	client *gofish.APIClient
 }
 
+var pxeBootWithSettingUEFIBootMode = redfish.Boot{
+	BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
+	BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,
+	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
+}
+var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
+	BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
+	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
+}
+
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(
 	ctx context.Context,
@@ -108,11 +118,14 @@ func (r *RedfishBMC) SetPXEBootOnce(systemUUID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	if err := system.SetBoot(redfish.Boot{
-		BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
-		BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,
-		BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
-	}); err != nil {
+	var setBoot redfish.Boot
+	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
+	if system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
+		setBoot = pxeBootWithSettingUEFIBootMode
+	} else {
+		setBoot = pxeBootWithoutSettingUEFIBootMode
+	}
+	if err := system.SetBoot(setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
 	return nil

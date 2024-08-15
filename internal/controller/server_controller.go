@@ -494,8 +494,11 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string) ([
 func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	if server.Spec.Power == "" && server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
 		requeue, err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff)
-		if err != nil || requeue {
-			return requeue, fmt.Errorf("failed to set server power state: %w", err)
+		if err != nil {
+			return false, fmt.Errorf("failed to set server power state: %w", err)
+		}
+		if requeue {
+			return requeue, nil
 		}
 	}
 
@@ -504,8 +507,11 @@ func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, log logr
 		r.EnforceFirstBoot {
 		log.V(1).Info("Server in initial state is powered on. Ensure that it is powered off.")
 		requeue, err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff)
-		if err != nil || requeue {
-			return requeue, fmt.Errorf("failed to set server power state: %w", err)
+		if err != nil {
+			return false, fmt.Errorf("failed to set server power state: %w", err)
+		}
+		if requeue {
+			return requeue, nil
 		}
 	}
 	return false, nil

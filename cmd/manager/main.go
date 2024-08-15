@@ -71,7 +71,8 @@ func main() {
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enforceFirstBoot, "enforce-first-boot", false, "Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
+	flag.BoolVar(&enforceFirstBoot, "enforce-first-boot", false,
+		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+

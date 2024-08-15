@@ -645,7 +645,11 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 
 	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
-	defer bmcClient.Logout()
+	defer func() {
+		if bmcClient != nil {
+			bmcClient.Logout()
+		}
+	}()
 	if err != nil {
 		return fmt.Errorf("failed to get BMC client: %w", err)
 	}

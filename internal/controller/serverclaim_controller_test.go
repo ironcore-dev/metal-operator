@@ -46,6 +46,15 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Get(bmc)).Should(Succeed())
 		DeferCleanup(k8sClient.Delete, bmc)
 
+		By("Ensuring that the BMCSecret will be removed")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmc.Name,
+			},
+		}
+		Eventually(Get(bmcSecret)).Should(Succeed())
+		DeferCleanup(k8sClient.Delete, bmcSecret)
+
 		By("Ensuring that the Server resource has been created")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
@@ -247,6 +256,13 @@ var _ = Describe("ServerClaim Controller", func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
 
+		By("Ensuring that the ServerClaim is bound")
+		Eventually(Object(claim)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Spec.ServerRef", Equal(&v1.LocalObjectReference{Name: server.Name})),
+			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+		))
+
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", &v1.ObjectReference{
@@ -258,14 +274,7 @@ var _ = Describe("ServerClaim Controller", func() {
 			}),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
-		))
-
-		By("Ensuring that the ServerClaim is bound")
-		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
-			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
-			HaveField("Spec.ServerRef", Not(BeNil())),
-			HaveField("Spec.ServerRef.Name", server.Name),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
 
 		By("Deleting the ServerClaim")

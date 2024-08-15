@@ -40,6 +40,7 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, endpoint)
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc = &metalv1alpha1.BMC{
@@ -48,6 +49,16 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Eventually(Get(bmc)).Should(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+
+		By("Ensuring that the BMCSecret will be removed")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmc.Name,
+			},
+		}
+		Eventually(Get(bmcSecret)).Should(Succeed())
+		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
@@ -76,6 +87,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
+		DeferCleanup(k8sClient.Delete, server)
 
 		By("Ensuring the boot configuration has been created")
 		bootConfig := &metalv1alpha1.ServerBootConfiguration{

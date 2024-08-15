@@ -156,6 +156,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	if modified, err := r.patchServerRef(ctx, claim, server.Name); err != nil || modified {
 		return ctrl.Result{}, err
 	}
+	log.V(1).Info("Patched ServerRef in Claim")
 
 	if err := r.applyBootConfiguration(ctx, log, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
@@ -173,7 +174,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch claim ref for server: %w", err)
 	}
-	log.V(1).Info("Patched server claim reference", "Server", server.Name, "ServerClaimRef", claim.Name)
+	log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
 
 	if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
 		return ctrl.Result{}, err

@@ -281,6 +281,11 @@ var _ = Describe("ServerClaim Controller", func() {
 	})
 
 	It("should not claim a server in a non-available state", func(ctx SpecContext) {
+		By("Patching the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateInitial
+		})).Should(Succeed())
+
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -295,11 +300,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, claim)
-
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateInitial
-		})).Should(Succeed())
 
 		By("Ensuring that the Server has no claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(

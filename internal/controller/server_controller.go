@@ -554,7 +554,11 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 	}
 
 	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
-	defer bmcClient.Logout()
+	defer func() {
+		if bmcClient != nil {
+			bmcClient.Logout()
+		}
+	}()
 
 	if err != nil {
 		return fmt.Errorf("failed to get BMC client: %w", err)
@@ -570,6 +574,10 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		log.V(1).Info("Did not find server information in registry")
 		return false, nil
+	}
+
+	if resp == nil {
+		return false, fmt.Errorf("failed to find server information in registry")
 	}
 
 	if err != nil {
@@ -794,7 +802,7 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 		}
 	}
 	if !versionMatch {
-		log.V(1).Info("none of the Bios versions match")
+		log.V(1).Info("None of the Bios versions match")
 		return nil
 	}
 	return nil

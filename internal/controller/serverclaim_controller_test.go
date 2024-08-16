@@ -230,6 +230,20 @@ var _ = Describe("ServerClaim Controller", func() {
 			}
 		})).Should(Succeed())
 
+		By("Patching the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		servers := &metalv1alpha1.ServerList{}
+		Eventually(ObjectList(servers)).Should(
+			HaveField("Items", HaveLen(1)))
+
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		))
+
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -250,11 +264,6 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
 
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(

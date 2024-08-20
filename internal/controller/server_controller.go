@@ -153,12 +153,12 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.applyBiosSettings(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios settings: %w", err)
 	}
-	log.V(1).Info("Updated Server bios settings")
+	log.V(1).Info("Updated Server BIOS settings")
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
 	}
-	log.V(1).Info("Updated Server bios boot order")
+	log.V(1).Info("Updated Server BIOS boot order")
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {

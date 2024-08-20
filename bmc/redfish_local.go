@@ -33,14 +33,12 @@ func NewRedfishLocalBMCClient(
 func (r RedfishLocalBMC) PowerOn(systemUUID string) error {
 	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
-		return fmt.Errorf("failed to get systems: %w", err)
+		return fmt.Errorf("failed to get system: %w", err)
 	}
-
-	powerState := system.PowerState
-	if powerState != redfish.OnPowerState {
-		if err := system.Reset(redfish.OnResetType); err != nil {
-			return fmt.Errorf("failed to reset system to power on state: %w", err)
-		}
+	system.PowerState = redfish.OnPowerState
+	systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+	if err := system.Patch(systemURI, system); err != nil {
+		return fmt.Errorf("failed to set power state %s for system %s: %w", redfish.OnPowerState, systemUUID, err)
 	}
 	return nil
 }
@@ -48,10 +46,12 @@ func (r RedfishLocalBMC) PowerOn(systemUUID string) error {
 func (r RedfishLocalBMC) PowerOff(systemUUID string) error {
 	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
-		return fmt.Errorf("failed to get systems: %w", err)
+		return fmt.Errorf("failed to get system: %w", err)
 	}
-	if err := system.Reset(redfish.GracefulShutdownResetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+	system.PowerState = redfish.OffPowerState
+	systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+	if err := system.Patch(systemURI, system); err != nil {
+		return fmt.Errorf("failed to set power state %s for system %s: %w", redfish.OffPowerState, systemUUID, err)
 	}
 	return nil
 }

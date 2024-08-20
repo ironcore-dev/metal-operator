@@ -4,7 +4,7 @@
 package controller
 
 import (
-	"fmt"
+	"encoding/base64"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -23,45 +23,39 @@ var _ = Describe("ServerClaim Controller", func() {
 	var server *metalv1alpha1.Server
 
 	BeforeEach(func(ctx SpecContext) {
-		By("Creating an Endpoints object")
-		endpoint := &metalv1alpha1.Endpoint{
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
-			Spec: metalv1alpha1.EndpointSpec{
-				// emulator BMC mac address
-				MACAddress: "23:11:8A:33:CF:EA",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+			Data: map[string][]byte{
+				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
+				"password": []byte(base64.StdEncoding.EncodeToString([]byte("bar"))),
 			},
 		}
-		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, endpoint)
-
-		By("Ensuring that the BMC resource has been created for an endpoint")
-		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("bmc-%s", endpoint.Name),
-			},
-		}
-		Eventually(Get(bmc)).Should(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
-
-		By("Ensuring that the BMCSecret will be removed")
-		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmc.Name,
-			},
-		}
-		Eventually(Get(bmcSecret)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, bmcSecret)
 
-		By("Ensuring that the Server resource has been created")
+		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: GetServerNameFromBMCandIndex(0, bmc),
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				UUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Endpoint: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
 			},
 		}
-		Eventually(Get(server)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, server)).Should(Succeed())
 		DeferCleanup(k8sClient.Delete, server)
 	})
 
@@ -235,10 +229,6 @@ var _ = Describe("ServerClaim Controller", func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
 
-		servers := &metalv1alpha1.ServerList{}
-		Eventually(ObjectList(servers)).Should(
-			HaveField("Items", HaveLen(1)))
-
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
@@ -256,8 +246,8 @@ var _ = Describe("ServerClaim Controller", func() {
 					MatchLabels: map[string]string{"type": "storage"},
 					MatchExpressions: []metav1.LabelSelectorRequirement{{
 						Key:      "env",
-						Operator: metav1.LabelSelectorOpNotIn,
-						Values:   []string{"test", "staging"},
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"prod"},
 					}},
 				},
 				Image: "foo:bar",
@@ -295,6 +285,7 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
 	})
 

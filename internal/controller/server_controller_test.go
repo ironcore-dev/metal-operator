@@ -178,7 +178,7 @@ var _ = Describe("Server Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "foo-",
+				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
 				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
@@ -280,6 +280,7 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),

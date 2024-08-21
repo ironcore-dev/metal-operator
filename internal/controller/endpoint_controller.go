@@ -121,7 +121,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
-				log.V(1).Info("Applied local test BMC object for endpoint")
+				log.V(1).Info("Applied BMC object for Endpoint")
 			}
 			// TODO: other types like Switches can be handled here later
 		}

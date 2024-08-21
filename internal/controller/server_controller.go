@@ -57,6 +57,7 @@ type ServerReconciler struct {
 	RegistryURL      string
 	ProbeOSImage     string
 	RequeueInterval  time.Duration
+	EnforceFirstBoot bool
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -152,12 +153,12 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.applyBiosSettings(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios settings: %w", err)
 	}
-	log.V(1).Info("Updated Server bios settings")
+	log.V(1).Info("Updated Server BIOS settings")
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
 	}
-	log.V(1).Info("Updated Server bios boot order")
+	log.V(1).Info("Updated Server BIOS boot order")
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
@@ -215,6 +216,16 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 }
 
 func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if requeue, err := r.ensureInitialConditions(ctx, log, server); err != nil || requeue {
+		return requeue, err
+	}
+	log.V(1).Info("Initial conditions for Server met")
+
+	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	}
+	log.V(1).Info("Ensured power state for Server")
+
 	if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, log, server); err != nil {
 		return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
 	}
@@ -232,6 +243,12 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logg
 }
 
 func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
+		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+		return true, err
+	}
+	log.V(1).Info("Server boot configuration is ready")
+
 	serverBase := server.DeepCopy()
 	server.Spec.Power = metalv1alpha1.PowerOn
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
@@ -243,12 +260,6 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
 	log.V(1).Info("Server state set to power on")
-
-	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
-		return true, err
-	}
-	log.V(1).Info("Server boot configuration is ready")
 
 	ready, err := r.extractServerDetailsFromRegistry(ctx, log, server)
 	if !ready && err == nil {
@@ -480,6 +491,47 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string) ([
 	return ignitionData, nil
 }
 
+func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if server.Spec.Power == "" && server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
+		requeue, err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff)
+		if err != nil {
+			return false, fmt.Errorf("failed to set server power state: %w", err)
+		}
+		if requeue {
+			return requeue, nil
+		}
+	}
+
+	if server.Status.State == metalv1alpha1.ServerStateInitial &&
+		server.Status.PowerState == metalv1alpha1.ServerOnPowerState &&
+		r.EnforceFirstBoot {
+		log.V(1).Info("Server in initial state is powered on. Ensure that it is powered off.")
+		requeue, err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff)
+		if err != nil {
+			return false, fmt.Errorf("failed to set server power state: %w", err)
+		}
+		if requeue {
+			return requeue, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, powerState metalv1alpha1.Power) (bool, error) {
+	op, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
+		server.Spec.Power = powerState
+		return nil
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to patch Server: %w", err)
+	}
+	if op == controllerutil.OperationResultUpdated {
+		log.V(1).Info("Server updated to power off state.")
+		return true, nil
+	}
+	return false, nil
+}
+
 func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
 	if server.Spec.BootConfigurationRef == nil {
 		return false, nil
@@ -502,7 +554,11 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 	}
 
 	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
-	defer bmcClient.Logout()
+	defer func() {
+		if bmcClient != nil {
+			bmcClient.Logout()
+		}
+	}()
 
 	if err != nil {
 		return fmt.Errorf("failed to get BMC client: %w", err)
@@ -518,6 +574,10 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		log.V(1).Info("Did not find server information in registry")
 		return false, nil
+	}
+
+	if resp == nil {
+		return false, fmt.Errorf("failed to find server information in registry")
 	}
 
 	if err != nil {
@@ -585,17 +645,21 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 
 	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
-	defer bmcClient.Logout()
+	defer func() {
+		if bmcClient != nil {
+			bmcClient.Logout()
+		}
+	}()
 	if err != nil {
 		return fmt.Errorf("failed to get BMC client: %w", err)
 	}
 
-	if powerOp == powerOpOn {
+	switch powerOp {
+	case powerOpOn:
 		if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
-	}
-	if powerOp == powerOpOff {
+	case powerOpOff:
 		if err := bmcClient.PowerOff(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power off server: %w", err)
 		}
@@ -661,28 +725,6 @@ func (r *ServerReconciler) invalidateRegistryEntryForServer(log logr.Logger, ser
 		}
 	}(resp.Body)
 	return nil
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&metalv1alpha1.Server{}).
-		Watches(
-			&metalv1alpha1.ServerBootConfiguration{},
-			r.enqueueServerByServerBootConfiguration(),
-		).
-		Complete(r)
-}
-
-func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
-		config := obj.(*metalv1alpha1.ServerBootConfiguration)
-		return []ctrl.Request{
-			{
-				NamespacedName: types.NamespacedName{Name: config.Spec.ServerRef.Name},
-			},
-		}
-	})
 }
 
 func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -764,8 +806,30 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 		}
 	}
 	if !versionMatch {
-		log.V(1).Info("none of the Bios versions match")
+		log.V(1).Info("None of the Bios versions match")
 		return nil
 	}
 	return nil
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&metalv1alpha1.Server{}).
+		Watches(
+			&metalv1alpha1.ServerBootConfiguration{},
+			r.enqueueServerByServerBootConfiguration(),
+		).
+		Complete(r)
+}
+
+func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+		config := obj.(*metalv1alpha1.ServerBootConfiguration)
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{Name: config.Spec.ServerRef.Name},
+			},
+		}
+	})
 }

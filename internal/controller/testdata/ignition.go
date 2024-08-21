@@ -36,7 +36,7 @@ systemd:
         ExecStartPre=-/usr/bin/docker stop metalprobe
         ExecStartPre=-/usr/bin/docker rm metalprobe
         ExecStartPre=/usr/bin/docker pull foo:latest
-        ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe foo:latest --registry-url=http://localhost:12345 --server-uuid=38947555-7742-3448-3784-823347823834
+        ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe foo:latest --registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834
         ExecStop=/usr/bin/docker stop metalprobe
         [Install]
         WantedBy=multi-user.target

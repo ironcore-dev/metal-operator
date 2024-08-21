@@ -33,6 +33,30 @@ var _ = Describe("BMC Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, endpoint)
+
+		By("Ensuring that the BMC will be removed")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("bmc-%s", endpoint.Name),
+			},
+		}
+		DeferCleanup(k8sClient.Delete, bmc)
+
+		By("Ensuring that the BMCSecret will be removed")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmc.Name,
+			},
+		}
+		DeferCleanup(k8sClient.Delete, bmcSecret)
+
+		By("Ensuring that the Server resource will be removed")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		DeferCleanup(k8sClient.Delete, server)
 	})
 
 	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {

@@ -51,6 +51,7 @@ var _ = Describe("Endpoints Controller", func() {
 				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
 				"password": []byte(base64.StdEncoding.EncodeToString([]byte("bar"))),
 			}))))
+		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("By ensuring that the BMC object has been created")
 		bmc := &metalv1alpha1.BMC{

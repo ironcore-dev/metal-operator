@@ -40,6 +40,7 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, endpoint)
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc = &metalv1alpha1.BMC{
@@ -48,6 +49,16 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Eventually(Get(bmc)).Should(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+
+		By("Ensuring that the BMCSecret will be removed")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmc.Name,
+			},
+		}
+		Eventually(Get(bmcSecret)).Should(Succeed())
+		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
@@ -66,15 +77,17 @@ var _ = Describe("Server Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
-			HaveField("Spec.Power", metalv1alpha1.Power("")),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
+		DeferCleanup(k8sClient.Delete, server)
 
 		By("Ensuring the boot configuration has been created")
 		bootConfig := &metalv1alpha1.ServerBootConfiguration{
@@ -110,6 +123,11 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
 		))
 
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
 		By("Ensuring that the Server is set to discovery and powered on")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
@@ -131,11 +149,6 @@ var _ = Describe("Server Controller", func() {
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
-
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
 
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)
@@ -165,7 +178,7 @@ var _ = Describe("Server Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "foo-",
+				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
 				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
@@ -231,6 +244,11 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
 		))
 
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
 		By("Ensuring that the Server resource has been created")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
@@ -252,11 +270,6 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
 
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
-
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)
 		go func() {
@@ -267,6 +280,7 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),

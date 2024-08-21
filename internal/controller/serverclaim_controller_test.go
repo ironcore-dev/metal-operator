@@ -4,7 +4,7 @@
 package controller
 
 import (
-	"fmt"
+	"encoding/base64"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -20,41 +20,43 @@ import (
 var _ = Describe("ServerClaim Controller", func() {
 	ns := SetupTest()
 
-	var server metalv1alpha1.Server
+	var server *metalv1alpha1.Server
 
 	BeforeEach(func(ctx SpecContext) {
-		By("Creating an Endpoints object")
-		endpoint := &metalv1alpha1.Endpoint{
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
-			Spec: metalv1alpha1.EndpointSpec{
-				// emulator BMC mac address
-				MACAddress: "23:11:8A:33:CF:EA",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+			Data: map[string][]byte{
+				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
+				"password": []byte(base64.StdEncoding.EncodeToString([]byte("bar"))),
 			},
 		}
-		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, endpoint)
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmcSecret)
 
-		By("Ensuring that the BMC resource has been created for an endpoint")
-		bmc := &metalv1alpha1.BMC{
+		By("Creating a Server")
+		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("bmc-%s", endpoint.Name),
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				UUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Endpoint: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
 			},
 		}
-		Eventually(Get(bmc)).Should(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
-
-		By("Creating a Server object")
-		By("Ensuring that the Server resource has been created")
-		server = metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: GetServerNameFromBMCandIndex(0, bmc),
-			},
-		}
-		Eventually(Get(&server)).Should(Succeed())
-		DeferCleanup(k8sClient.Delete, &server)
+		Expect(k8sClient.Create(ctx, server)).Should(Succeed())
+		DeferCleanup(k8sClient.Delete, server)
 	})
 
 	It("should successfully claim a server in available state", func(ctx SpecContext) {
@@ -87,12 +89,12 @@ var _ = Describe("ServerClaim Controller", func() {
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
 		By("Patching the Server to available state")
-		Eventually(UpdateStatus(&server, func() {
+		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
 
 		By("Ensuring that the Server has the correct claim ref")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
@@ -128,7 +130,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		))
 
 		By("Ensuring that the server has a correct boot configuration ref")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerBootConfiguration",
@@ -142,7 +144,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 
 		By("Ensuring that the Server is available")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
@@ -152,7 +154,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 	It("Should successfully claim a server by reference and label selector", func(ctx SpecContext) {
 		By("Patching Server labels")
-		Eventually(Update(&server, func() {
+		Eventually(Update(server, func() {
 			server.Labels = map[string]string{
 				"type": "storage",
 				"env":  "staging",
@@ -182,12 +184,12 @@ var _ = Describe("ServerClaim Controller", func() {
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
 		By("Patching the Server to available state")
-		Eventually(UpdateStatus(&server, func() {
+		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
 
 		By("Ensuring that the Server has the correct claim ref")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
@@ -205,7 +207,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 
 		By("Ensuring that the Server is available")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
@@ -215,12 +217,22 @@ var _ = Describe("ServerClaim Controller", func() {
 
 	It("should successfully claim a server by label selector", func(ctx SpecContext) {
 		By("Patching Server labels")
-		Eventually(Update(&server, func() {
+		Eventually(Update(server, func() {
 			server.Labels = map[string]string{
 				"type": "storage",
 				"env":  "prod",
 			}
 		})).Should(Succeed())
+
+		By("Patching the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		))
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
@@ -234,8 +246,8 @@ var _ = Describe("ServerClaim Controller", func() {
 					MatchLabels: map[string]string{"type": "storage"},
 					MatchExpressions: []metav1.LabelSelectorRequirement{{
 						Key:      "env",
-						Operator: metav1.LabelSelectorOpNotIn,
-						Values:   []string{"test", "staging"},
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"prod"},
 					}},
 				},
 				Image: "foo:bar",
@@ -243,39 +255,46 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(&server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
-		By("Ensuring that the Server has the correct claim ref")
-		Eventually(Object(&server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef.Name", claim.Name),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
-			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
-		))
-
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Spec.ServerRef", Equal(&v1.LocalObjectReference{Name: server.Name})),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
-			HaveField("Spec.ServerRef", Not(BeNil())),
-			HaveField("Spec.ServerRef.Name", server.Name),
+		))
+
+		By("Ensuring that the Server has the correct claim ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", &v1.ObjectReference{
+				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Kind:       "ServerClaim",
+				Name:       claim.Name,
+				Namespace:  claim.Namespace,
+				UID:        claim.UID,
+			}),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
 
 		By("Deleting the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 
 		By("Ensuring that the Server is available")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
 	})
 
 	It("should not claim a server in a non-available state", func(ctx SpecContext) {
+		By("Patching the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateInitial
+		})).Should(Succeed())
+
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -291,13 +310,8 @@ var _ = Describe("ServerClaim Controller", func() {
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, claim)
 
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(&server, func() {
-			server.Status.State = metalv1alpha1.ServerStateInitial
-		})).Should(Succeed())
-
 		By("Ensuring that the Server has no claim ref")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 		))
@@ -320,7 +334,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 	It("should not claim a server with set claim ref", func(ctx SpecContext) {
 		By("Patching the Server to available state")
-		Eventually(Update(&server, func() {
+		Eventually(Update(server, func() {
 			server.Spec.ServerClaimRef = &v1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerClaim",
@@ -346,7 +360,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		DeferCleanup(k8sClient.Delete, claim)
 
 		By("Ensuring that the Server has no claim ref")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", &v1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerClaim",
@@ -398,12 +412,12 @@ var _ = Describe("ServerClaim Controller", func() {
 		DeferCleanup(k8sClient.Delete, claim)
 
 		By("Patching the Server to available state")
-		Eventually(UpdateStatus(&server, func() {
+		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
 
 		By("Ensuring that the Server has no claim ref")
-		Eventually(Object(&server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 		))
 

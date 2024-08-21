@@ -41,7 +41,7 @@ var (
 	cfg         *rest.Config
 	k8sClient   client.Client
 	testEnv     *envtest.Environment
-	registryURL = "http://localhost:12345"
+	registryURL = "http://localhost:30000"
 )
 
 func TestControllers(t *testing.T) {
@@ -97,7 +97,7 @@ var _ = BeforeSuite(func() {
 	var mgrCtx context.Context
 	mgrCtx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
-	registryServer := registry.NewServer(":12345")
+	registryServer := registry.NewServer(":30000")
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")

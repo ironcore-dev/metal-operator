@@ -4,6 +4,9 @@ IMG ?= controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
+# Docker image name for the mkdocs based local development setup
+IMAGE=ironcore-dev/metal-operator-docs
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -101,6 +104,15 @@ lint: golangci-lint ## Run golangci-lint linter & yamllint
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
+
+.PHONY: start-docs
+start-docs: ## Start the local mkdocs based development environment.
+	docker build -t $(IMAGE) -f docs/Dockerfile . --load
+	docker run -p 8000:8000 -v `pwd`/:/docs $(IMAGE)
+
+.PHONY: clean-docs
+clean-docs: ## Remove all local mkdocs Docker images (cleanup).
+	docker container prune --force --filter "label=project=metal_operator"
 
 ##@ Build
 

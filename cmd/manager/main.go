@@ -59,11 +59,11 @@ func main() {
 	var registryResyncInterval time.Duration
 	var webhookPort int
 	var enforceFirstBoot bool
-	var resyncInterval time.Duration
+	var serverResyncInterval time.Duration
 
 	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
 		"Defines the interval at which the registry is polled for new server information.")
-	flag.DurationVar(&resyncInterval, "resync-interval", 30*time.Second,
+	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 30*time.Second,
 		"Defines the interval at which the server is polled.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
@@ -205,7 +205,7 @@ func main() {
 		ProbeOSImage:           probeOSImage,
 		RegistryURL:            registryURL,
 		RegistryResyncInterval: registryResyncInterval,
-		ResyncInterval:         resyncInterval,
+		ResyncInterval:         serverResyncInterval,
 		EnforceFirstBoot:       enforceFirstBoot,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Server")

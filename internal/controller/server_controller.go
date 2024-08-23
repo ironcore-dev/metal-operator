@@ -12,24 +12,23 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/ironcore-dev/metal-operator/internal/api/registry"
-
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -50,14 +49,15 @@ const (
 // ServerReconciler reconciles a Server object
 type ServerReconciler struct {
 	client.Client
-	Scheme           *runtime.Scheme
-	Insecure         bool
-	ManagerNamespace string
-	ProbeImage       string
-	RegistryURL      string
-	ProbeOSImage     string
-	RequeueInterval  time.Duration
-	EnforceFirstBoot bool
+	Scheme                 *runtime.Scheme
+	Insecure               bool
+	ManagerNamespace       string
+	ProbeImage             string
+	RegistryURL            string
+	ProbeOSImage           string
+	RegistryResyncInterval time.Duration
+	EnforceFirstBoot       bool
+	ResyncInterval         time.Duration
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -162,7 +162,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
-		return ctrl.Result{Requeue: requeue, RequeueAfter: r.RequeueInterval}, nil
+		return ctrl.Result{Requeue: requeue, RequeueAfter: r.RegistryResyncInterval}, nil
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
@@ -814,12 +814,38 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Create a channel to send periodic events
+	ch := make(chan event.TypedGenericEvent[*metalv1alpha1.Server])
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start a goroutine to send events to the channel at the specified interval
+	go func() {
+		ticker := time.NewTicker(r.RegistryResyncInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// Emit an event to trigger reconciliation
+				ch <- event.TypedGenericEvent[*metalv1alpha1.Server]{
+					Object: &metalv1alpha1.Server{},
+				}
+			case <-ctx.Done():
+				close(ch)
+				return
+			}
+		}
+	}()
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.Server{}).
 		Watches(
 			&metalv1alpha1.ServerBootConfiguration{},
 			r.enqueueServerByServerBootConfiguration(),
 		).
+		WatchesRawSource(source.Channel(ch, &handler.TypedEnqueueRequestForObject[*metalv1alpha1.Server]{})).
 		Complete(r)
 }
 

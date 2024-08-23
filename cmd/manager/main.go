@@ -56,11 +56,15 @@ func main() {
 	var registryPort int
 	var registryProtocol string
 	var registryURL string
-	var requeueInterval time.Duration
+	var registryResyncInterval time.Duration
 	var webhookPort int
 	var enforceFirstBoot bool
+	var serverResyncInterval time.Duration
 
-	flag.DurationVar(&requeueInterval, "requeue-interval", 10*time.Second, "Reconciler requeue interval.")
+	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
+		"Defines the interval at which the registry is polled for new server information.")
+	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 30*time.Second,
+		"Defines the interval at which the server is polled.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
@@ -193,15 +197,16 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controller.ServerReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Insecure:         insecure,
-		ManagerNamespace: managerNamespace,
-		ProbeImage:       probeImage,
-		ProbeOSImage:     probeOSImage,
-		RegistryURL:      registryURL,
-		RequeueInterval:  requeueInterval,
-		EnforceFirstBoot: enforceFirstBoot,
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		Insecure:               insecure,
+		ManagerNamespace:       managerNamespace,
+		ProbeImage:             probeImage,
+		ProbeOSImage:           probeOSImage,
+		RegistryURL:            registryURL,
+		RegistryResyncInterval: registryResyncInterval,
+		ResyncInterval:         serverResyncInterval,
+		EnforceFirstBoot:       enforceFirstBoot,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Server")
 		os.Exit(1)

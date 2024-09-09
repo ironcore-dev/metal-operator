@@ -154,6 +154,8 @@ spec:
   serverSelector:
     matchLabels:
       env: prod
+  bios:
+    version: 1.0.0
   firmwares:
     - name: ssd
       manufacturer: ACME Corp.
@@ -207,6 +209,7 @@ It consists of the following controllers:
 - [server-controller](#server-controller) (reconciles `ServerFirmware` CR)
 - [server-group-controller](#server-group-controller) (reconciles `ServerFirmwareGroup` CR)
 - [discovery-controller](#discovery-controller) (reconciles `DiscoveredFirmware` CR)
+- [validating-webhooks](#validating-webhooks) **OPTIONAL**
 
 The `server-controller` and `discovery-controller` interacts with update service, whilst `server-group-controller` only updates CRs.
 
@@ -290,6 +293,10 @@ stateDiagram-v2
     s5 --> [*]
 ```
 
+#### validating-webhooks
+
+Firmware operator MAY include validating webhooks for `ServerFirmware` and `ServerFirmwareGroup` types. If installed, these webhooks MUST ensure that BIOS and/or firmware versions are listed in the `.status` of corresponding `DiscoveredFirmware` object.
+
 ### Update service
 
 This is an application providing an API to schedule, execute and collect results of firmware update, discover and scan jobs.
@@ -318,16 +325,18 @@ It MUST expose the following endpoints:
 - Discover(DiscoverRequest) DiscoverResponse;
   - `DiscoverRequest` MUST contain the reference to concrete `DiscoveredFirmware` object.
   - `DiscoverResponse` MUST contain the status of the request with error code if any.
-- UpdateServer(UpdateServerRequest) UpdateServerResponse;
+- UpdateServer(UpdateServerRequest) UpdateServerResponse; This endpoint MUST be used by update or scan jobs after a task is finished to send results and invoke the object's update.
   - `UpdateServerRequest` MUST contain the reference to concrete `Server` object and the list of installed firmware-versions.
-  This endpoint MUST be used by update or scan jobs after a task if finished to send results and invoke the object's update.
   - `UpdateServerResponse` MUST contain the status of the request with error code if any.
-- UpdateDiscoveredFirmware(UpdateDiscoveredFirmwareRequest) UpdateDiscoveredFirmwareResponse;
+- UpdateDiscoveredFirmware(UpdateDiscoveredFirmwareRequest) UpdateDiscoveredFirmwareResponse; This endpoint MUST be used by discovery jobs after a task is finished to send results and invoke the object's update.
   - `UpdateDiscoveredFirmwareRequest` MUST contain the reference to concrete `DiscoveredFirmware` object and the list of discovered firmware-versions.
-  This endpoint MUST be used by discovery jobs after a task is finished to send results and invoke the object's update.
   - `UpdateDiscoveredFirmwareResponse` MUST contain the status of the request with error code if any.
+- SetServerState(SetServerStateRequest) SetServerStateResponse; This endpoint MUST be used by update jobs after a task is finished to unset server object's **Maintenance** state.
+  - `SetServerStateRequest` MUST contain the reference to concrete `Server` object and the data related to desired state (depending on the implementation of the state).
+  - `SetServerStateResponse` MUST contain the status of the request with error code if any.
 
 Depending on the type of the request, it SHOULD be forwarded to the corresponding scheduler's queue.
+Before enqueuing the update task, API server MUST set target server object to the **Maintenance** state. In case server's state update fails, API server MUST discard the request and send response with corresponding error code and message.
 
 #### Scheduler
 
@@ -366,6 +375,13 @@ Job MUST include an embedded client to be able to interact with the API server u
 
 - UpdateServer(UpdateServerRequest) UpdateServerResponse;
 - UpdateDiscoveredFirmware(UpdateDiscoveredFirmwareRequest) UpdateDiscoveredFirmwareResponse;
+- SetServerState(SetServerStateRequest) SetServerStateResponse;
+
+After **discovery** job is finished successfully, job MUST send `UpdateDiscoveredFirmware` request to API server.
+After **scan** job is finished successfully, job MUST send `UpdateServer` request to API server.
+After **update** job is finished successfully, job MUST:
+1. send `UpdateServer` request to API server;
+2. send `SetServerState` request to API server to unset the **Maintenance** state;
 
 #### Request handling
 

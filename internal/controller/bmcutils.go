@@ -114,13 +114,5 @@ func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, strin
 }
 
 func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {
-	return fmt.Sprintf("compute-%d-%s", index, bmc.Name)
-}
-
-func GetBMCNameFromEndpoint(endpoint *metalv1alpha1.Endpoint) string {
-	return fmt.Sprintf("bmc-%s", endpoint.Name)
-}
-
-func GetBMCSecretNameFromEndpoint(endpoint *metalv1alpha1.Endpoint) string {
-	return fmt.Sprintf("bmc-%s", endpoint.Name)
+	return fmt.Sprintf("%s-%s-%d", bmc.Name, "system", index)
 }

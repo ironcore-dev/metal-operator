@@ -146,8 +146,7 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 			Kind:       "BMC",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// TODO: make name prefix configurable
-			Name: fmt.Sprintf("bmc-%s", endpoint.Name),
+			Name: endpoint.Name,
 		},
 		Spec: metalv1alpha1.BMCSpec{
 			EndpointRef: corev1.LocalObjectReference{
@@ -187,7 +186,7 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger
 			Kind:       "BMCSecret",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: GetBMCSecretNameFromEndpoint(endpoint),
+			Name: endpoint.Name,
 		},
 		Data: map[string][]byte{
 			"username": []byte(base64.StdEncoding.EncodeToString([]byte(m.DefaultCredentials[0].Username))),

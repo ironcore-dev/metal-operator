@@ -93,7 +93,7 @@ func (r *RedfishBMC) Reset(systemUUID string, resetType redfish.ResetType) error
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(resetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+		return fmt.Errorf("failed to reset system: %w", err)
 	}
 	return nil
 }

@@ -828,11 +828,11 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
-	log.Info("Handling operation", "Operation", operation)
+	log.V(1).Info("Handling operation", "Operation", operation)
 	if err := bmcClient.Reset(server.Spec.UUID, redfish.ResetType(operation)); err != nil {
 		return false, fmt.Errorf("failed to reset server: %w", err)
 	}
-	log.Info("Successfully executed operation", "Operation", operation)
+	log.V(1).Info("Successfully executed operation", "Operation", operation)
 	serverBase := server.DeepCopy()
 	delete(annotations, metalv1alpha1.OperationAnnotation)
 	server.SetAnnotations(annotations)

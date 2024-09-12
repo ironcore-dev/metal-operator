@@ -12,6 +12,8 @@ import (
 	"sort"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -818,11 +820,10 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	ch := make(chan event.TypedGenericEvent[*metalv1alpha1.Server])
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Start a goroutine to send events to the channel at the specified interval
 	go func() {
-		ticker := time.NewTicker(r.RegistryResyncInterval)
+		ticker := time.NewTicker(r.ResyncInterval)
 		defer ticker.Stop()
 
 		for {
@@ -838,6 +839,15 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 		}
 	}()
+
+	// Ensure the context is canceled when the manager stops
+	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		<-ctx.Done()
+		cancel()
+		return nil
+	})); err != nil {
+		return err
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.Server{}).

@@ -87,8 +87,14 @@ func (r *RedfishBMC) PowerOff(systemUUID string) error {
 }
 
 // Reset performs a reset on the system using Redfish.
-func (r *RedfishBMC) Reset() error {
-	// Implementation details...
+func (r *RedfishBMC) Reset(systemUUID string, resetType redfish.ResetType) error {
+	system, err := r.getSystemByUUID(systemUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if err := system.Reset(resetType); err != nil {
+		return fmt.Errorf("failed to reset system to power on state: %w", err)
+	}
 	return nil
 }
 

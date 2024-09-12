@@ -39,7 +39,6 @@ const (
 	ServerFinalizer               = "metal.ironcore.dev/server"
 	InternalAnnotationTypeKeyName = "metal.ironcore.dev/type"
 	InternalAnnotationTypeValue   = "Internal"
-	AnnotationOperationKey        = "metal.ironcore.dev/operation"
 )
 
 const (

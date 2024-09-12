@@ -35,7 +35,7 @@ var _ = Describe("Endpoints Controller", func() {
 		By("Ensuring that the BMC secret has been created")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: GetBMCSecretNameFromEndpoint(endpoint),
+				Name: endpoint.Name,
 			},
 		}
 		Eventually(Object(bmcSecret)).Should(SatisfyAll(
@@ -56,7 +56,7 @@ var _ = Describe("Endpoints Controller", func() {
 		By("By ensuring that the BMC object has been created")
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: GetBMCNameFromEndpoint(endpoint),
+				Name: endpoint.Name,
 			},
 		}
 		Eventually(Object(bmc)).Should(SatisfyAll(

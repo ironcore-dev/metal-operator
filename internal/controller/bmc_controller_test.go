@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"fmt"
-
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,7 +35,7 @@ var _ = Describe("BMC Controller", func() {
 		By("Ensuring that the BMC will be removed")
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("bmc-%s", endpoint.Name),
+				Name: endpoint.Name,
 			},
 		}
 		DeferCleanup(k8sClient.Delete, bmc)
@@ -63,7 +61,7 @@ var _ = Describe("BMC Controller", func() {
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("bmc-%s", endpoint.Name),
+				Name: endpoint.Name,
 			},
 		}
 		Eventually(Object(bmc)).Should(SatisfyAll(
@@ -99,7 +97,7 @@ var _ = Describe("BMC Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
-			HaveField("Spec.BMCRef.Name", GetBMCNameFromEndpoint(endpoint)),
+			HaveField("Spec.BMCRef.Name", endpoint.Name),
 		))
 	})
 })

@@ -45,7 +45,7 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("bmc-%s", endpoint.Name),
+				Name: endpoint.Name,
 			},
 		}
 		Eventually(Get(bmc)).Should(Succeed())
@@ -63,7 +63,7 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("compute-0-%s", bmc.Name),
+				Name: fmt.Sprintf("%s-system-0", bmc.Name),
 			},
 		}
 		Eventually(Object(server)).Should(SatisfyAll(

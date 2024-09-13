@@ -832,12 +832,12 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 	if err := bmcClient.Reset(server.Spec.UUID, redfish.ResetType(operation)); err != nil {
 		return false, fmt.Errorf("failed to reset server: %w", err)
 	}
-	log.V(1).Info("Successfully executed operation", "Operation", operation)
+	log.V(1).Info("Operation completed", "Operation", operation)
 	serverBase := server.DeepCopy()
 	delete(annotations, metalv1alpha1.OperationAnnotation)
 	server.SetAnnotations(annotations)
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch Server Annotations: %w", err)
+		return false, fmt.Errorf("failed to patch server annotations: %w", err)
 	}
 	return true, nil
 }

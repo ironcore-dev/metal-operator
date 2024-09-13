@@ -12,6 +12,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -308,9 +311,6 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Ensured initial boot configuration is deleted")
 
-	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-		return false, fmt.Errorf("failed to ensure server power state: %w", err)
-	}
 	if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
@@ -665,13 +665,34 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
+		if err := waitForServerPowerState(ctx, log, bmcClient, server, redfish.OnPowerState); err != nil {
+			return fmt.Errorf("failed to wait for server power on server: %w", err)
+		}
 	case powerOpOff:
 		if err := bmcClient.PowerOff(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power off server: %w", err)
 		}
+		if err := waitForServerPowerState(ctx, log, bmcClient, server, redfish.OffPowerState); err != nil {
+			return fmt.Errorf("failed to wait for server power off server: %w", err)
+		}
 	}
 	log.V(1).Info("Ensured server power state", "PowerState", server.Spec.Power)
 
+	return nil
+}
+
+func waitForServerPowerState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, powerState redfish.PowerState) error {
+	if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		log.V(1).Info("Waiting for Server to reach target power state", "TargetPowerState", powerState)
+		sysInfo, err := bmcClient.GetSystemInfo(server.Spec.UUID)
+		if err != nil {
+			return false, fmt.Errorf("failed to get system info: %w", err)
+		}
+		log.V(1).Info("Read Server power state", "PowerState", sysInfo.PowerState, "TargetPowerState", powerState)
+		return sysInfo.PowerState == powerState, nil
+	}); err != nil {
+		return fmt.Errorf("failed to wait for for server power state: %w", err)
+	}
 	return nil
 }
 

@@ -4,16 +4,32 @@
 package probe_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/ironcore-dev/metal-operator/internal/probe"
 
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ProbeServer", func() {
+var _ = Describe("ProbeAgent", func() {
+	BeforeEach(func() {
+		By("Starting the probe agent")
+		ctx, cancel := context.WithCancel(context.Background())
+		DeferCleanup(cancel)
+
+		// Initialize your probe agent
+		probeAgent = probe.NewAgent(systemUUID, registryURL)
+		go func() {
+			defer GinkgoRecover()
+			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
+		}()
+	})
+
 	It("should ensure the correct endpoints have been registered", func() {
 		By("performing a GET request to the /systems/{uuid} endpoint")
 		var resp *http.Response

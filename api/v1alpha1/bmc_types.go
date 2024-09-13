@@ -12,6 +12,7 @@ const (
 	BMCType              = "bmc"
 	ProtocolRedfish      = "Redfish"
 	ProtocolRedfishLocal = "RedfishLocal"
+	ProtocolRedfishKube  = "RedfishKube"
 )
 
 // BMCSpec defines the desired state of BMC

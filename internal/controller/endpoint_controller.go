@@ -122,6 +122,26 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
+			case metalv1alpha1.ProtocolRedfishKube:
+				log.V(1).Info("Creating client for a kube test BMC")
+				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
+				bmcClient, err := bmc.NewRedfishKubeBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true, r.Client, DefaultKubeNamespace)
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
+				}
+				defer bmcClient.Logout()
+
+				var bmcSecret *metalv1alpha1.BMCSecret
+				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
+				}
+				log.V(1).Info("Applied kube test BMC secret for endpoint")
+
+				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
+				}
+				log.V(1).Info("Applied BMC object for Endpoint")
+
 			}
 			// TODO: other types like Switches can be handled here later
 		}

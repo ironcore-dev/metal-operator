@@ -13,6 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const DefaultKubeNamespace = "default"
+
 func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, insecure bool) (bmc.BMC, error) {
 	if server.Spec.BMCRef != nil {
 		b := &metalv1alpha1.BMC{}
@@ -32,6 +34,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 
 		return CreateBMCClient(
 			ctx,
+			c,
 			insecure,
 			server.Spec.BMC.Protocol.Name,
 			metalv1alpha1.MustParseIP(server.Spec.BMC.Endpoint),
@@ -54,10 +57,10 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 	}
 
-	return CreateBMCClient(ctx, insecure, bmcObj.Spec.Protocol.Name, endpoint.Spec.IP, bmcObj.Spec.Protocol.Port, bmcSecret)
+	return CreateBMCClient(ctx, c, insecure, bmcObj.Spec.Protocol.Name, endpoint.Spec.IP, bmcObj.Spec.Protocol.Port, bmcSecret)
 }
 
-func CreateBMCClient(ctx context.Context, insecure bool, bmcProtocol metalv1alpha1.ProtocolName, endpoint metalv1alpha1.IP, port int32, bmcSecret *metalv1alpha1.BMCSecret) (bmc.BMC, error) {
+func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcProtocol metalv1alpha1.ProtocolName, endpoint metalv1alpha1.IP, port int32, bmcSecret *metalv1alpha1.BMCSecret) (bmc.BMC, error) {
 	protocol := "https"
 	if insecure {
 		protocol = "http"
@@ -82,6 +85,16 @@ func CreateBMCClient(ctx context.Context, insecure bool, bmcProtocol metalv1alph
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
 		}
 		bmcClient, err = bmc.NewRedfishLocalBMCClient(ctx, bmcAddress, username, password, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+		}
+	case metalv1alpha1.ProtocolRedfishKube:
+		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, endpoint, port)
+		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
+		}
+		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, bmcAddress, username, password, true, c, DefaultKubeNamespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}

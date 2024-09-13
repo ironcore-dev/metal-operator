@@ -1,0 +1,3 @@
+resources:
+- redfish_mockup_endpoint.yaml
+- redfish_mockup_service.yaml

@@ -1,0 +1,12 @@
+macPrefixes:
+- macPrefix: 23
+  manufacturer: Foo
+  protocol: RedfishKube
+  port: 8000
+  type: bmc
+  defaultCredentials:
+    - username: foo
+      password: bar
+  console:
+    type: ssh
+    port: 22

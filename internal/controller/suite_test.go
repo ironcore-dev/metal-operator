@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/config"
+
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
@@ -122,6 +125,11 @@ func SetupTest() *corev1.Namespace {
 
 		k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 			Scheme: scheme.Scheme,
+			Controller: config.Controller{
+				// need to skip unique controller name validation
+				// since all tests need a dedicated controller
+				SkipNameValidation: ptr.To(true),
+			},
 		})
 		Expect(err).ToNot(HaveOccurred())
 

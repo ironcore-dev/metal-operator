@@ -6,8 +6,10 @@ package controller
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/ptr"
 	"path/filepath"
 	"runtime"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"testing"
 	"time"
 

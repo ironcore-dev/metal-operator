@@ -111,7 +111,7 @@ var _ = BeforeSuite(func() {
 			CertDir: webhookInstallOptions.LocalServingCertDir,
 		}),
 		LeaderElection: false,
-		Metrics:        metricsserver.Options{BindAddress: "0"},
+		Metrics:        metricsserver.Options{BindAddress: ":8081"},
 	})
 	Expect(err).NotTo(HaveOccurred())
 
@@ -122,8 +122,7 @@ var _ = BeforeSuite(func() {
 
 	go func() {
 		defer GinkgoRecover()
-		err = mgr.Start(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(mgr.Start(ctx)).NotTo(HaveOccurred())
 	}()
 
 	// wait for the webhook server to get ready

@@ -17,7 +17,7 @@ type BMC interface {
 	PowerOff(systemUUID string) error
 
 	// Reset performs a reset on the system.
-	Reset() error
+	Reset(systemUUID string, resetType redfish.ResetType) error
 
 	// SetPXEBootOnce sets the boot device for the next system boot.
 	SetPXEBootOnce(systemUUID string) error

@@ -17,6 +17,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
+	"github.com/stmcginnis/gofish/redfish"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -125,6 +126,10 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 			return ctrl.Result{}, err
 		}
 	}
+	if modified, err := r.handleAnnotionOperations(ctx, log, server); err != nil || modified {
+		return ctrl.Result{}, err
+	}
+	log.V(1).Info("Handled annotation operations")
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
@@ -810,6 +815,31 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 		return nil
 	}
 	return nil
+}
+
+func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	annotations := server.GetAnnotations()
+	operation, ok := annotations[metalv1alpha1.OperationAnnotation]
+	if !ok {
+		return false, nil
+	}
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	if err != nil {
+		return false, fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	defer bmcClient.Logout()
+	log.V(1).Info("Handling operation", "Operation", operation)
+	if err := bmcClient.Reset(server.Spec.UUID, redfish.ResetType(operation)); err != nil {
+		return false, fmt.Errorf("failed to reset server: %w", err)
+	}
+	log.V(1).Info("Operation completed", "Operation", operation)
+	serverBase := server.DeepCopy()
+	delete(annotations, metalv1alpha1.OperationAnnotation)
+	server.SetAnnotations(annotations)
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch server annotations: %w", err)
+	}
+	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

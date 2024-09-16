@@ -19,14 +19,16 @@ import (
 type Agent struct {
 	SystemUUID  string
 	RegistryURL string
+	Duration    time.Duration
 	Server      *registry.Server // Pointer to Server for late initialization.
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(systemUUID, registryURL string) *Agent {
+func NewAgent(systemUUID, registryURL string, duration time.Duration) *Agent {
 	return &Agent{
 		SystemUUID:  systemUUID,
 		RegistryURL: registryURL,
+		Duration:    duration,
 	}
 }
 
@@ -88,7 +90,7 @@ func (a *Agent) registerServer(ctx context.Context) error {
 		ctx,
 		wait.Backoff{
 			Steps:    1,
-			Duration: 5 * time.Second,
+			Duration: a.Duration,
 			Factor:   2.0,
 			Jitter:   0.1,
 		},

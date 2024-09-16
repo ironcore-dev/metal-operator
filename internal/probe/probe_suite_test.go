@@ -6,6 +6,7 @@ package probe_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/ironcore-dev/metal-operator/internal/probe"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
@@ -43,7 +44,7 @@ var _ = BeforeSuite(func() {
 	}()
 
 	// Initialize your probe server
-	probeAgent = probe.NewAgent(systemUUID, registryURL)
+	probeAgent = probe.NewAgent(systemUUID, registryURL, 100*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

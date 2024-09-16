@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -151,7 +152,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)
+		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 100*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -271,7 +272,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL)
+		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 100*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

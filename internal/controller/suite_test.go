@@ -6,10 +6,8 @@ package controller
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/ptr"
 	"path/filepath"
 	"runtime"
-	"sigs.k8s.io/controller-runtime/pkg/config"
 	"testing"
 	"time"
 
@@ -73,7 +71,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.29.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error

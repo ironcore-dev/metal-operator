@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/ironcore-dev/metal-operator/internal/probe"
 
@@ -23,7 +24,7 @@ var _ = Describe("ProbeAgent", func() {
 		DeferCleanup(cancel)
 
 		// Initialize your probe agent
-		probeAgent = probe.NewAgent(systemUUID, registryURL)
+		probeAgent = probe.NewAgent(systemUUID, registryURL, 100*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

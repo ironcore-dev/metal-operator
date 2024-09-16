@@ -180,6 +180,8 @@ func SetupTest() *corev1.Namespace {
 			RegistryResyncInterval: 50 * time.Millisecond,
 			ResyncInterval:         100 * time.Millisecond,
 			EnforceFirstBoot:       true,
+			PowerPollingInterval:   50 * time.Millisecond,
+			PowerPollingTimeout:    200 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

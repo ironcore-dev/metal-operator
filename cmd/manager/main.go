@@ -60,7 +60,12 @@ func main() {
 	var webhookPort int
 	var enforceFirstBoot bool
 	var serverResyncInterval time.Duration
+	var powerPollingInterval time.Duration
+	var powerPollingTimeout time.Duration
 
+	flag.DurationVar(&powerPollingInterval, "power-polling-interval", 5*time.Second,
+		"Interval between polling power state")
+	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
 	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
 		"Defines the interval at which the registry is polled for new server information.")
 	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 30*time.Second,
@@ -207,6 +212,8 @@ func main() {
 		RegistryResyncInterval: registryResyncInterval,
 		ResyncInterval:         serverResyncInterval,
 		EnforceFirstBoot:       enforceFirstBoot,
+		PowerPollingInterval:   powerPollingInterval,
+		PowerPollingTimeout:    powerPollingTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Server")
 		os.Exit(1)

@@ -62,6 +62,8 @@ type ServerReconciler struct {
 	RegistryResyncInterval time.Duration
 	EnforceFirstBoot       bool
 	ResyncInterval         time.Duration
+	PowerPollingInterval   time.Duration
+	PowerPollingTimeout    time.Duration
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -665,14 +667,14 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
-		if err := waitForServerPowerState(ctx, log, bmcClient, server, redfish.OnPowerState); err != nil {
+		if err := r.waitForServerPowerState(ctx, log, bmcClient, server, redfish.OnPowerState); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
 	case powerOpOff:
 		if err := bmcClient.PowerOff(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power off server: %w", err)
 		}
-		if err := waitForServerPowerState(ctx, log, bmcClient, server, redfish.OffPowerState); err != nil {
+		if err := r.waitForServerPowerState(ctx, log, bmcClient, server, redfish.OffPowerState); err != nil {
 			return fmt.Errorf("failed to wait for server power off server: %w", err)
 		}
 	}
@@ -681,8 +683,8 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	return nil
 }
 
-func waitForServerPowerState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, powerState redfish.PowerState) error {
-	if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
+func (r *ServerReconciler) waitForServerPowerState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, powerState redfish.PowerState) error {
+	if err := wait.PollUntilContextTimeout(ctx, r.PowerPollingInterval, r.PowerPollingTimeout, true, func(ctx context.Context) (done bool, err error) {
 		log.V(1).Info("Waiting for Server to reach target power state", "TargetPowerState", powerState)
 		sysInfo, err := bmcClient.GetSystemInfo(server.Spec.UUID)
 		if err != nil {

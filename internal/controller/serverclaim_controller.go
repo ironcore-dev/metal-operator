@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
@@ -411,6 +412,9 @@ func (r *ServerClaimReconciler) claimFirstBestServer(ctx context.Context, log lo
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
 		For(&metalv1alpha1.ServerClaim{}).
 		Owns(&metalv1alpha1.ServerBootConfiguration{}).
 		Watches(&metalv1alpha1.Server{}, r.enqueueServerClaimByRefs()).

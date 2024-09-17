@@ -59,6 +59,7 @@ func main() {
 	var registryResyncInterval time.Duration
 	var webhookPort int
 	var enforceFirstBoot bool
+	var enforcePowerOff bool
 	var serverResyncInterval time.Duration
 	var powerPollingInterval time.Duration
 	var powerPollingTimeout time.Duration
@@ -82,6 +83,8 @@ func main() {
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enforceFirstBoot, "enforce-first-boot", false,
 		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
+	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
+		"Enforce the power off of a Server when graceful shutdown fails.")
 	flag.IntVar(&webhookPort, "webhook-port", 9445, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -212,6 +215,7 @@ func main() {
 		RegistryResyncInterval: registryResyncInterval,
 		ResyncInterval:         serverResyncInterval,
 		EnforceFirstBoot:       enforceFirstBoot,
+		EnforcePowerOff:        enforcePowerOff,
 		PowerPollingInterval:   powerPollingInterval,
 		PowerPollingTimeout:    powerPollingTimeout,
 	}).SetupWithManager(mgr); err != nil {

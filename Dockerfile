@@ -34,6 +34,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot AS manager
+LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
@@ -41,6 +42,7 @@ USER 65532:65532
 ENTRYPOINT ["/manager"]
 
 FROM gcr.io/distroless/static:nonroot AS probe
+LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
 COPY --from=builder /workspace/metalprobe .
 USER 65532:65532

@@ -74,13 +74,25 @@ func (r *RedfishBMC) PowerOn(systemUUID string) error {
 	return nil
 }
 
-// PowerOff powers off the system using Redfish.
+// PowerOff gracefully shuts down the system using Redfish.
 func (r *RedfishBMC) PowerOff(systemUUID string) error {
 	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(redfish.GracefulShutdownResetType); err != nil {
+		return fmt.Errorf("failed to reset system to power on state: %w", err)
+	}
+	return nil
+}
+
+// ForcePowerOff powers off the system using Redfish.
+func (r *RedfishBMC) ForcePowerOff(systemUUID string) error {
+	system, err := r.getSystemByUUID(systemUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if err := system.Reset(redfish.ForceOffResetType); err != nil {
 		return fmt.Errorf("failed to reset system to power on state: %w", err)
 	}
 	return nil

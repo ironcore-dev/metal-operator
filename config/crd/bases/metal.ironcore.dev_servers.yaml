@@ -23,7 +23,6 @@ spec:
       type: string
     - jsonPath: .status.model
       name: Model
-      priority: 100
       type: string
     - jsonPath: .status.sku
       name: SKU

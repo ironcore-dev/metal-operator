@@ -82,6 +82,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.Manufacturer", "Contoso"),
+			HaveField("Status.Model", "3500"),
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),

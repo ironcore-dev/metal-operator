@@ -161,7 +161,7 @@ const (
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="MACAddress",type=string,JSONPath=`.status.macAddress`
 // +kubebuilder:printcolumn:name="MACAddress",type=string,JSONPath=`.status.ip`
-// +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+// +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`,priority=100
 // +kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
 // +kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
 // +kubebuilder:printcolumn:name="FirmwareVersion",type=string,JSONPath=`.status.firmwareVersion`,priority=100

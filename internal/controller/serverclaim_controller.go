@@ -439,6 +439,12 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 				})
 				return req
 			}
+			if claim.Spec.ServerRef == nil {
+				req = append(req, reconcile.Request{
+					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+				})
+				return req
+			}
 		}
 		return req
 	})

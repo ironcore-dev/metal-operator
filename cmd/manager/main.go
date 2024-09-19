@@ -69,7 +69,7 @@ func main() {
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
 	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
 		"Defines the interval at which the registry is polled for new server information.")
-	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 30*time.Second,
+	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 2*time.Minute,
 		"Defines the interval at which the server is polled.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")

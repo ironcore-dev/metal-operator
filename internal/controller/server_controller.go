@@ -174,7 +174,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
-		return ctrl.Result{Requeue: requeue, RequeueAfter: r.RegistryResyncInterval}, nil
+		return ctrl.Result{Requeue: requeue, RequeueAfter: r.ResyncInterval}, nil
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
@@ -318,7 +318,7 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
 	log.V(1).Info("Reconciled available state")
-	return false, nil
+	return true, nil
 }
 
 func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
@@ -328,11 +328,13 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 	}
 	log.V(1).Info("Server boot configuration is ready")
 
-	if err := r.pxeBootServer(ctx, log, server); err != nil {
-		return false, fmt.Errorf("failed to boot server: %w", err)
+	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
+	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
+		if err := r.pxeBootServer(ctx, log, server); err != nil {
+			return false, fmt.Errorf("failed to boot server: %w", err)
+		}
+		log.V(1).Info("Server is powered off, booting Server in PXE")
 	}
-	log.V(1).Info("Booted Server in PXE")
-
 	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
@@ -341,7 +343,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
 	log.V(1).Info("Reconciled reserved state")
-	return false, nil
+	return true, nil
 }
 
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
@@ -890,7 +892,7 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Start a goroutine to send events to the channel at the specified interval
 	go func() {
-		ticker := time.NewTicker(r.RegistryResyncInterval)
+		ticker := time.NewTicker(r.ResyncInterval)
 		defer ticker.Stop()
 
 		for {

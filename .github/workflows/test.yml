@@ -13,7 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+
     - uses: actions/setup-go@v5
       with:
         go-version-file: 'go.mod'
+
+    - name: Check if anything is using port 8080 and kill it
+      run: |
+        if lsof -i :8080; then
+          echo "Port 8080 is in use by:"
+          lsof -i :8080
+          echo "Killing process using port 8080..."
+          kill -9 $(lsof -t -i :8080)
+        else
+          echo "Port 8080 is not in use."
+        fi
+
     - run: make test

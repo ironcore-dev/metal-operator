@@ -19,7 +19,7 @@ spec:
       name: MACAddress
       type: string
     - jsonPath: .status.ip
-      name: MACAddress
+      name: IP
       type: string
     - jsonPath: .status.model
       name: Model

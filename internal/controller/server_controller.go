@@ -383,6 +383,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.SerialNumber = systemInfo.SerialNumber
 	server.Status.SKU = systemInfo.SKU
 	server.Status.Manufacturer = systemInfo.Manufacturer
+	server.Status.Model = systemInfo.Model
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 
 	currentBiosVersion, err := bmcClient.GetBiosVersion(server.Spec.UUID)

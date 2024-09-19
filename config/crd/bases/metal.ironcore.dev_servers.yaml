@@ -21,6 +21,9 @@ spec:
     - jsonPath: .status.manufacturer
       name: Manufacturer
       type: string
+    - jsonPath: .status.model
+      name: Model
+      type: string
     - jsonPath: .status.sku
       name: SKU
       priority: 100
@@ -357,6 +360,9 @@ spec:
                 type: string
               manufacturer:
                 description: Manufacturer is the name of the server manufacturer.
+                type: string
+              model:
+                description: Model is the model of the server.
                 type: string
               networkInterfaces:
                 description: NetworkInterfaces is a list of network interfaces associated

@@ -18,20 +18,13 @@ reviewers:
     - [Goals](#goals)
     - [Non-Goals](#non-goals)
 - [Proposal](#proposal)
-  - [Custom resources](#custom-resources)
-      - [ServerFirmware](#serverfirmware)
-      - [ServerFirmwareGroup](#serverfirmwaregroup)
-      - [DiscoveredFirmware](#discoveredfirmware)
-  - [Firmware operator](#firmware-operator)
-      - [server-controller](#server-controller)
-      - [server-group-controller](#server-group-controller)
-      - [discovery-controller](#discovery-controller)
-  - [Update service](#update-service)
-      - [API server](#api-server)
-      - [Scheduler](#scheduler)
-      - [Job runner](#job-runner)
-      - [Update/scan/discovery job](#updatescandiscovery-job)
-      - [Request handling](#request-handling)
+    - [Custom resources](#custom-resources)
+        - [ServerFirmware](#serverfirmware)
+        - [AvailableFirmware](#availablefirmware)
+    - [Firmware operator](#firmware-operator)
+        - [configuration](#configuration)
+        - [server-controller](#server-firmware-controller)
+        - [webhooks](#admission-webhooks)
 - [Alternatives](#alternatives)
 
 ## Summary
@@ -43,8 +36,6 @@ The following sections guide through:
 
 - Kubernetes API types, which represent servers' firmware state;
 - Kubernetes operator, which reconciles these API types;
-- Dedicated service, which provides API to schedule and execute firmware updates on specified servers;
-- Communication between operator and update service;
 
 Throughout this document, the words are used to define and the significance of particular requirements is capitalized:
 
@@ -57,11 +48,11 @@ Throughout this document, the words are used to define and the significance of p
 Throughout this document, the following terminology is used:
 
 - `firmware operator`: the application running as a workload in Kubernetes cluster, interacting with Kubernetes API. It reconciles custom resources (hereafter CR) related to servers' firmware update workflow;
-- `update service`: the application running as a workload in Kubernetes cluster, providing API to schedule update jobs, execute these jobs, collect jobs' results and update corresponding Kubernetes objects;
 - `update job`: the execution item, which runs concrete implementation of the BIOS/firmware update routine on target hardware server;
 - `scan job`: the execution item, which runs concrete implementation for scanning of the firmware installed on target hardware server;
-- `discovery job`: discovering of the BIOS/firmware versions available for download or installation. Vendor-specific as an `update job`;
-- `update strategy`: the path chosen to apply updates, e.g.: pre-built boot image with updates, docker image with baked updates, vendor-specific CLI tool, etc.
+- `update strategy`: the path chosen to apply updates, e.g.: pre-built boot image with updates, docker image with baked updates, vendor-specific CLI tool, etc.;
+
+The approach described in below allows to separate the vendor-agnostic common workflow and the concrete update job implementations that might be vendor-specific.
 
 ## Motivation
 
@@ -74,10 +65,10 @@ It SHOULD provide the ability to automate the update process along with the abil
 
 The following list gives general design goals for BIOS/Firmware updates:
 
-- the solution SHOULD be vendor-agnostic aside from concrete update job implementation;
+- the solution SHOULD be vendor-agnostic aside from concrete scan/update job implementation;
 - the solution SHOULD allow automated hardware servers' firmware lifecycle maintaining;
 - the solution MUST be extensible by the possibility of using plugins for update strategy;
-- the solution MUST be extensible by the possibility of adding vendor-specific update jobs;
+- the solution MUST be extensible by the possibility of adding vendor-specific update job implementations;
 - the solution SHOULD be as kubernetes-native as possible;
 
 ### Non-Goals
@@ -86,22 +77,20 @@ The following list gives general design goals for BIOS/Firmware updates:
 
 ### Custom resources
 
-The following CRs aimed to represent the current state of a particular server, a desired state of a group of servers and available firmware versions for a particular manufacturer-model:
+The following CRs aimed to represent the current state of a particular server and available firmware versions for a particular manufacturer-model:
 
 - [ServerFirmware](#serverfirmware)
-- [ServerFirmwareGroup](#serverfirmwaregroup)
-- [DiscoveredFirmware](#discoveredfirmware)
+- [AvailableFirmware](#availablefirmware)
 
 All the following CRs MUST be cluster-scoped.
-The firmware versions defined for concrete `ServerFirmware` object MUST take precedence over those provided by corresponding `ServerFirmwareGroup` object.
 
 #### ServerFirmware
 
 `ServerFirmware` CR represents the desired state of concrete hardware server.
-The `.spec` of this type references the `Server` object, reflects its `.status.bios` field and contains the list of firmwares desired to be installed.
+The `.spec` of this type references the `Server` object, reflects its `.status.bios` field into `.spec.bios` field and contains the list of firmwares desired to be installed.
 The `.status` of this type contains information about the BIOS/firmware versions which are actually installed on the server.
 Aside from that `.spec` contains the scan threshold and the `.status` contains last scan operation timestamp.
-These two fields allow calculating whether the scanning for installed firmware is required or not.
+These two fields required to make decision whether the scanning for installed firmware is required or not.
 The `ServerFirmware` object SHOULD be created along with corresponding `Server` object and MUST be unique across the cluster.
 
 ```yaml
@@ -135,61 +124,30 @@ status:
       version: 2.0.0
 ```
 
-#### ServerFirmwareGroup
+#### AvailableFirmware
 
-`ServerFirmwareGroup` CR represents the groups of hardware servers and their desired firmware versions.
-The group of servers MUST be manufacturer- and model-specific to ensure that defined firmware will be applicable.
-The `.spec` of this type contains built-in label selector and the list of firmwares desired to be installed.
-The `.status` of this type contains the information about number of servers within the defined group which are in desired state.
-The group MUST have a unique selector and selectors in different `ServerFirmwareGroup` objects MUST NOT intersect.
+`AvailableFirmware` CR represents available firmware versions for a specific manufacturer-model.
+The `.spec` of this type contains
 
-```yaml
-apiVersion: metal.ironcore.dev/v1alpha1
-kind: ServerFirmwareGroup
-metadata:
-  name: bar-group
-spec:
-  manufacturer: Lenovo
-  model: 7x21
-  serverSelector:
-    matchLabels:
-      env: prod
-  bios:
-    version: 1.0.0
-  firmwares:
-    - name: ssd
-      manufacturer: ACME Corp.
-      version: 1.0.0
-    - name: nic
-      manufacturer: Intel
-      version: 2.0.0
-status:
-  serversInGroup: 4
-  updatesApplied: 3
-  updatesNotApplied: 1
-```
+- manufacturer
+- model
+- the desired number of versions to store
+- the list of firmwares and their versions available for specified manufacturer-model pair
 
-#### DiscoveredFirmware
-
-`DiscoveredFirmware` CR represents discovered firmware versions for a specific manufacturer-model.
-The `.spec` of this type contains information about manufacture, concrete model,the desired number of versions to store and the interval between each firmware version discovery run.
-The `.status` of this type contains the list of firmwares and the last discovery job run time.
-Each entry represents the name of individual firmware and the list of available versions.
-The maximum length of this list MUST NOT exceed one defined in `.spec`.
-The `DiscoveredFirmware` object SHOULD be created as soon as a new manufacturer-model pair is found and MUST be unique across the cluster.
+Each entry represents the name of individual firmware and the list of available versions sorted in ascending order.
+The maximum length of this list MUST NOT exceed the value defined in `.spec.versionsHistory`.
+In case of automated objects creation, the `AvailableFirmware` object SHOULD be created as soon as a new manufacturer-model pair was discovered
+The `AvailableFirmware` object MUST be unique across the cluster basing on manufacturer-model pair.
 
 ```yaml
 apiVersion: metal.ironcore.dev/v1alpha1
-kind: DiscoveredFirmware
+kind: AvailableFirmware
 metadata:
   name: baz
 spec:
   manufacturer: Lenovo
   model: 7x21
-  discoveryInterval: 24h
-  versionsToStore: 3
-status:
-  lastDiscoveryTime: 01-01-2001 01:00:00
+  versionsHistory: 3
   bios:
     versions: [1.0.0]
   firmwares:
@@ -199,6 +157,7 @@ status:
     - name: nic
       manufacturer: Intel
       version: [1.5.0, 1.7.0, 2.0.0]
+status: {}
 ```
 
 ### Firmware operator
@@ -206,192 +165,67 @@ status:
 This is an application that watches and reconciles CRs listed in the previous section.
 It consists of the following controllers:
 
-- [server-controller](#server-controller) (reconciles `ServerFirmware` CR)
-- [server-group-controller](#server-group-controller) (reconciles `ServerFirmwareGroup` CR)
-- [discovery-controller](#discovery-controller) (reconciles `DiscoveredFirmware` CR)
-- [validating-webhooks](#validating-webhooks) **OPTIONAL**
+- [server-firmware-controller](#server-firmware-controller) (reconciles `ServerFirmware` CR)
 
-The `server-controller` and `discovery-controller` interacts with update service, whilst `server-group-controller` only updates CRs.
+#### Configuration
 
-#### server-controller
+Operator's configuration:
+
+- MUST contain update strategy, i.e.:
+  - "BootFromImage", server boots from prepared boot image with update tool;
+  - "RedFish", updates are installed remotely using redfish API;
+  - etc.;
+
+  Update strategy entries MUST be mutual exclusive;
+- Update strategy entry MUST contain mapping for vendor and boot image, mapping for vendor and job executor image, etc., depending on strategy;
+- MAY contain source of the bios/firmware updates;
+
+#### server-firmware-controller
 
 This controller reconciles `ServerFirmware` CR.
-When an object of this kind is being reconciled, the controller MUST send a scan request to the update service in case `.status.lastScanTime` exceeds the `.spec.scanThreshold`.
-After the object becomes updated with actually installed firmware versions, the controller computes the difference between desired state defined in object's `.spec` and actual state reflected in object's `.status`.
-If there is discrepancy between these two states, then `server-controller` MUST send an update request to the update service.
-After sending any of the mentioned requests, it MUST stop reconciliation by returning an empty result and nil error in case the request was successful and an error otherwise.
+When an object of this kind is being reconciled, the controller MUST invoke a scan job in case `.status.lastScanTime` exceeds the `.spec.scanThreshold`.
+Scan job MUST update corresponding `ServerFirmware` object's `.status` with installed firmware versions.
+After the object becomes updated, the controller computes the difference between desired state defined in object's `.spec` and actual state reflected in object's `.status`.
+If there is discrepancy observed between these two states, then `server-firmware-controller` MUST set **"Maintenance"** state for target server and invoke an update job.
+After invoking any of the mentioned job types, `server-firmware-controller` MUST stop reconciliation by returning an empty result and an error if any, otherwise empty result and nil value.
+Invoked jobs depend on chosen update strategy and its configuration provided to operator.
 
-```mermaid
-stateDiagram-v2
-    s1: server-controller
-    s2: last scan within threshold?
-    s3: scan request
-    s4: update required?
-    s5: update request
-    s6: update service
-
-    [*] --> s1: reconciliation request
-    s1 --> s2: get object and check conditions
-    s2 --> s3: No
-    s2 --> s4: Yes
-    s3 --> s6
-    s6 --> [*]
-    s4 --> s5: Yes
-    s5 --> s6
-    s4 --> [*]: No
-```
-
-#### server-group-controller
-
-This controller reconciles `ServerFirmwareGroup` CR.
-When an object of this kind is being reconciled, the controller:
-
-1. MUST discover all `ServerFirmware` objects that matches the defined label selector;
-2. for each discovered object it MUST merge `.spec.firmwares` considering that items defined in `ServerFirmware` object's spec take precedence over those defined in `ServerFirmwareGroup` object's spec;
-3. MUST update `ServerFirmware` object's `.spec.firmwares` field with a resulting list of firmware versions;
-4. SHOULD update object's `.status` with actual values;
-
-```mermaid
-stateDiagram-v2
-    s1: server-group-controller
-    s2: get matching Server objects
-    s3: for each Server object
-    s4: merge firmwares
-    s5: update Server object
-    s6: update ServerFirmwareGroup object status
-
-    [*] --> s1: reconciliation request
-    s1 --> s2: get object
-    s2 --> s3
-    s3 --> s4
-    s4 --> s5
-    s5 --> s3
-    s3 --> s6: all matching servers processed
-    s6 --> [*]
-```
-
-#### discovery-controller
-
-This controller reconciles `DiscoveredFirmware` CR.
-It MUST send discovery request to the update service to enqueue a firmware discovery job if `.status.lastDiscoveryTime` is older than `.spec.discoveryInterval`.
-After sending the request, it MUST stop reconciliation by returning an empty result and nil error in case the request was successful and an error otherwise.
-
-```mermaid
-stateDiagram-v2
-    s1: discovery-controller
-    s2: last discovery older than defined interval?
-    s3: discovery request
-    s4: update service
-    s5: requeue after t
-
-    [*] --> s1: reconciliation request
-    s1 --> s2: get object and check conditions
-    s2 --> s5: No
-    s2 --> s3: Yes
-    s3 --> s4
-    s4 --> [*]
-    s5 --> [*]
-```
-
-#### validating-webhooks
-
-Firmware operator MAY include validating webhooks for `ServerFirmware` and `ServerFirmwareGroup` types. If installed, these webhooks MUST ensure that BIOS and/or firmware versions are listed in the `.status` of corresponding `DiscoveredFirmware` object.
-
-### Update service
-
-This is an application providing an API to schedule, execute and collect results of firmware update, discover and scan jobs.
-It consists of the following components:
-
-- [API server](#api-server)
-- [scheduler](#scheduler)
-- [job runner](#job-runner)
-- [update/scan/discovery jobs](#updatescandiscovery-job) (concrete implementations)
-
-Update service MUST be extensible in part of the possibility of using plugins for update strategy.
-At the same time, the only update strategy can be enabled for a particular update service instance.
-Update service MAY also include the component to download and store the firmwares.
-
-#### API server
-
-API server exposes update service endpoints and forwards incoming requests to the scheduler.
-It MUST expose the following endpoints:
-
-- Update(UpdateRequest) UpdateResponse;
-  - `UpdateRequest` MUST contain the reference to concrete `Server` object and the list of the firmware-version to be installed.
-  - `UpdateResponse` MUST contain the status of the request with error code if any.
-- Scan(ScanRequest) ScanResponse;
-  - `ScanRequest` MUST contain the reference to concrete `Server` object.
-  - `ScanResponse` MUST contain the status of the request with error code if any.
-- Discover(DiscoverRequest) DiscoverResponse;
-  - `DiscoverRequest` MUST contain the reference to concrete `DiscoveredFirmware` object.
-  - `DiscoverResponse` MUST contain the status of the request with error code if any.
-- UpdateServer(UpdateServerRequest) UpdateServerResponse; This endpoint MUST be used by update or scan jobs after a task is finished to send results and invoke the object's update.
-  - `UpdateServerRequest` MUST contain the reference to concrete `Server` object and the list of installed firmware-versions.
-  - `UpdateServerResponse` MUST contain the status of the request with error code if any.
-- UpdateDiscoveredFirmware(UpdateDiscoveredFirmwareRequest) UpdateDiscoveredFirmwareResponse; This endpoint MUST be used by discovery jobs after a task is finished to send results and invoke the object's update.
-  - `UpdateDiscoveredFirmwareRequest` MUST contain the reference to concrete `DiscoveredFirmware` object and the list of discovered firmware-versions.
-  - `UpdateDiscoveredFirmwareResponse` MUST contain the status of the request with error code if any.
-- SetServerState(SetServerStateRequest) SetServerStateResponse; This endpoint MUST be used by update jobs after a task is finished to unset server object's **Maintenance** state.
-  - `SetServerStateRequest` MUST contain the reference to concrete `Server` object and the data related to desired state (depending on the implementation of the state).
-  - `SetServerStateResponse` MUST contain the status of the request with error code if any.
-
-Depending on the type of the request, it SHOULD be forwarded to the corresponding scheduler's queue.
-Before enqueuing the update task, API server MUST set target server object to the **Maintenance** state. In case server's state update fails, API server MUST discard the request and send response with corresponding error code and message.
-
-#### Scheduler
-
-Scheduler is a component of the update service that is responsible for scheduling jobs:
-
-- it MUST NOT allow running several jobs on the same target server simultaneously;
-- it MAY discard incoming update or scan requests if the same jobs targeting the same server are already scheduled;
-- it MAY discard incoming discovery requests if the job targeting the same manufacturer-model pair is already scheduled;
-- it MUST have a mechanism to limit the number of parallel jobs;
-- it MUST have a mechanism to limit the job queue length;
-
-Scheduler SHOULD have an embedded job runner component corresponding to the update strategy defined on the update service application start.
-
-#### Job runner
-
-Job runner is a component that acts as a pool to spawn worker for a concrete job, considering the chosen update strategy and target server's manufacturer and model pair.
-
-- it MUST have a mechanism to store the metadata of spawned jobs;
-- it MUST have a mechanism to interrupt a running job;
-- it MAY have a mechanism to request the state of a long-running task;
-
-#### Update/scan/discovery job
-
-Standalone application which is a concrete implementation of firmware update/scan/discovery for a particular manufacturer or manufacturer-model pair.
-Implementation depends on the chosen update strategy.
-The application MUST run an API server providing the following endpoints:
-
-- CancelTask(CancelTaskRequest) CancelTaskResponse;
-  - `CancelTaskRequest` MAY contain the timeout for graceful stop and a flag to force stop.
-  - `CancelTaskResponse` MUST contain the status of the request with error code if any.
-
-Discovery job MAY provide additional functionality to download firmware from manufacturer's servers and to upload it to the local storage.
-Local in this context does not refer to the local filesystem but rather to storage running and available from within the infrastructure.
-
-Job MUST include an embedded client to be able to interact with the API server using endpoints:
-
-- UpdateServer(UpdateServerRequest) UpdateServerResponse;
-- UpdateDiscoveredFirmware(UpdateDiscoveredFirmwareRequest) UpdateDiscoveredFirmwareResponse;
-- SetServerState(SetServerStateRequest) SetServerStateResponse;
-
-After **discovery** job is finished successfully, job MUST send `UpdateDiscoveredFirmware` request to API server.
-After **scan** job is finished successfully, job MUST send `UpdateServer` request to API server.
-After **update** job is finished successfully, job MUST:
-1. send `UpdateServer` request to API server;
-2. send `SetServerState` request to API server to unset the **Maintenance** state;
-
-#### Request handling
+Reconciliation workflow when scan required:
 
 ```mermaid
 sequenceDiagram
-    Firmware operator ->>+API server: send request
-    API server ->>+Scheduler: enqueue request
-    Scheduler ->>+Job runner: assign free worker
-    Job runner ->>+Job: spawn concrete job executor
-    Job ->>-API server: update request
+    request ->>+reconciler: start reconciliation
+    reconciler ->>+scan-phase: check scan time
+    scan-phase ->>+invoke-job: scan time exceeded threshold
+    invoke-job ->>+job: run scan job
+    invoke-job -->>exit: stop reconciliation
+    job ->>-request: scan job completed and updates object
 ```
+
+Reconciliation workflow when update required:
+
+```mermaid
+sequenceDiagram
+    request ->>+reconciler: start reconciliation
+    reconciler ->>+scan-phase: check scan time
+    scan-phase ->>-reconciler: scan time within threshold
+    reconciler ->>+update-phase: compare spec and status
+    update-phase ->>+invoke-job: discrepancy observed
+    invoke-job ->>+job: run update job
+    invoke-job -->>exit: stop reconciliation
+    job ->>-request: update job completed and updates object
+```
+
+#### Admission webhooks
+
+Firmware operator SHOULD implement validating webhooks for provided CRs.
+Webhook for `AvailableFirmware` MUST validate:
+
+- on CREATE that objects to be created are unique across the cluster;
+
+Webhook for `ServerFirmware` MUST validate:
+
+- on CREATE that objects to be created are unique across the cluster;
+- on UPDATE that object's spec contains only bios/firmware versions listed in corresponding `AvailableFirmware` object;
 
 ## Alternatives

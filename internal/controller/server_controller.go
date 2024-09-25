@@ -65,6 +65,7 @@ type ServerReconciler struct {
 	ResyncInterval         time.Duration
 	PowerPollingInterval   time.Duration
 	PowerPollingTimeout    time.Duration
+	DiscoveryTimeout       time.Duration
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -272,6 +273,13 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
 	log.V(1).Info("Server state set to power on")
+
+	if r.checkLastStatusUpdateAfter(r.DiscoveryTimeout, server) {
+		log.V(1).Info("Server did not post info to registry in time, back to initial state")
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
+			return false, err
+		}
+	}
 
 	ready, err := r.extractServerDetailsFromRegistry(ctx, log, server)
 	if !ready && err == nil {
@@ -881,6 +889,18 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 		return false, fmt.Errorf("failed to patch server annotations: %w", err)
 	}
 	return true, nil
+}
+
+func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, server *metalv1alpha1.Server) bool {
+	length := len(server.ManagedFields) - 1
+	if server.ManagedFields[length].Operation == "Update" {
+		if server.ManagedFields[length].Subresource == "status" {
+			if server.ManagedFields[length].Time.Add(duration).After(time.Now()) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // SetupWithManager sets up the controller with the Manager.

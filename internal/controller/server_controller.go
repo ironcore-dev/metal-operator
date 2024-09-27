@@ -895,7 +895,7 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 	length := len(server.ManagedFields) - 1
 	if server.ManagedFields[length].Operation == "Update" {
 		if server.ManagedFields[length].Subresource == "status" {
-			if server.ManagedFields[length].Time.Add(duration).After(time.Now()) {
+			if server.ManagedFields[length].Time.Add(duration).Before(time.Now()) {
 				return true
 			}
 		}

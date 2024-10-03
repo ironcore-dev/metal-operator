@@ -65,14 +65,6 @@ type BootOrder struct {
 	Device string `json:"device"`
 }
 
-// BIOSSettings represents the BIOS settings for a server.
-type BIOSSettings struct {
-	// Version specifies the version of the server BIOS for which the settings are defined.
-	Version string `json:"version"`
-	// Settings is a map of key-value pairs representing the BIOS settings.
-	Settings map[string]string `json:"settings,omitempty"`
-}
-
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
@@ -103,8 +95,9 @@ type ServerSpec struct {
 
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
-	// BIOS specifies the BIOS settings for the server.
-	BIOS []BIOSSettings `json:"BIOS,omitempty"`
+
+	// BIOSSettingsRef is a reference to a ServerBIOS object.
+	BIOSSettingsRef v1.LocalObjectReference `json:"biOSSettingsRef,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -168,8 +161,6 @@ type ServerStatus struct {
 	// NetworkInterfaces is a list of network interfaces associated with the server.
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
 
-	BIOS BIOSSettings `json:"BIOS,omitempty"`
-
 	// Conditions represents the latest available observations of the server's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
@@ -192,18 +183,18 @@ type NetworkInterface struct {
 	MACAddress string `json:"macAddress"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
-//+kubebuilder:printcolumn:name="UUID",type=string,JSONPath=`.spec.uuid`
-//+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
-//+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
-//+kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
-//+kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
-//+kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`
-//+kubebuilder:printcolumn:name="IndicatorLED",type=string,JSONPath=`.status.indicatorLED`,priority=100
-//+kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
-//+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="UUID",type=string,JSONPath=`.spec.uuid`
+// +kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
+// +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+// +kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
+// +kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
+// +kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`
+// +kubebuilder:printcolumn:name="IndicatorLED",type=string,JSONPath=`.status.indicatorLED`,priority=100
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // Server is the Schema for the servers API
 type Server struct {
@@ -214,7 +205,7 @@ type Server struct {
 	Status ServerStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServerList contains a list of Server
 type ServerList struct {

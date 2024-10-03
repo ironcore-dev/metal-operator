@@ -11,6 +11,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
+type JobType string
+
+const (
+	ScanBIOSVersionJobType   JobType = "ScanBIOSVersion"
+	UpdateBIOSVersionJobType JobType = "UpdateBIOSVersion"
+	ApplyBIOSSettingsJobType JobType = "ApplyBiosSettings"
+)
+
+// RunningJobRef contains job type and reference to Job object
+type RunningJobRef struct {
+	// Type reflects the type of the job.
+	// +kubebuilder:validation:Enum=ScanBIOSVersion;UpdateBIOSVersion;ApplyBiosSettings
+	// +required
+	Type JobType `json:"type"`
+
+	// JobRef contains the reference to the Job object.
+	// +required
+	JobRef v1.ObjectReference `json:"jobRef"`
+}
+
 // IP is an IP address.
 type IP struct {
 	netip.Addr `json:"-"`

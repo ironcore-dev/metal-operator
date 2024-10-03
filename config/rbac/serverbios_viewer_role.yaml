@@ -1,0 +1,27 @@
+# permissions for end users to view servers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: serverbios-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: metal-operator
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: serverbios-viewer-role
+rules:
+  - apiGroups:
+      - metal.ironcore.dev
+    resources:
+      - serverbioses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - metal.ironcore.dev
+    resources:
+      - serverbioses/status
+    verbs:
+      - get

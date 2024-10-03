@@ -21,7 +21,6 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,15 +65,15 @@ type ServerReconciler struct {
 	DiscoveryTimeout       time.Duration
 }
 
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/finalizers,verbs=update
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverconfigurations,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverconfigurations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -160,11 +159,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
 	log.V(1).Info("Updated Server status", "Status", server.Status.State)
-
-	if err := r.applyBiosSettings(ctx, log, server); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update server bios settings: %w", err)
-	}
-	log.V(1).Info("Updated Server BIOS settings")
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
@@ -377,7 +371,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 	}
 	log.V(1).Info("Server boot configuration is ready")
 
-	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
+	// TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
 		if err := r.pxeBootServer(ctx, log, server); err != nil {
 			return false, fmt.Errorf("failed to boot server: %w", err)
@@ -435,27 +429,6 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.Model = systemInfo.Model
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
-
-	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to load bios version: %w", err)
-	}
-
-	for _, bios := range server.Spec.BIOS {
-		if bios.Version == currentBiosVersion {
-			// with go 1.23: switch to maps.Keys(bios.Settings)
-			keys := make([]string, 0, len(bios.Settings))
-			for k := range bios.Settings {
-				keys = append(keys, k)
-			}
-			attributes, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemUUID, keys)
-			if err != nil {
-				return fmt.Errorf("failed load bios settings: %w", err)
-			}
-			server.Status.BIOS.Version = currentBiosVersion
-			server.Status.BIOS.Settings = attributes
-		}
-	}
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
@@ -840,58 +813,6 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, 
 	}
 	if change {
 		return bmcClient.SetBootOrder(ctx, server.Spec.SystemUUID, newOrder)
-	}
-	return nil
-}
-
-func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
-	serverBase := server.DeepCopy()
-	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
-		log.V(1).Info("Server has no BMC connection configured")
-		return nil
-	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
-	}
-	defer bmcClient.Logout()
-
-	version, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
-	}
-
-	versionMatch := false
-	diff := map[string]string{}
-	for _, bios := range server.Spec.BIOS {
-		if bios.Version == version {
-			versionMatch = true
-			for key, value := range bios.Settings {
-				if res, ok := server.Status.BIOS.Settings[key]; !ok {
-					if !ok || res != value {
-						diff[key] = value
-					}
-				}
-			}
-			reset, err := bmcClient.SetBiosAttributes(ctx, server.Spec.SystemUUID, diff)
-			if err != nil {
-				return err
-			}
-			if reset {
-				if changed := meta.SetStatusCondition(&server.Status.Conditions, metav1.Condition{
-					Type: "Reboot needed",
-				}); changed {
-					if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-						return fmt.Errorf("failed to patch Server status: %w", err)
-					}
-				}
-			}
-			break
-		}
-	}
-	if !versionMatch {
-		log.V(1).Info("None of the Bios versions match")
-		return nil
 	}
 	return nil
 }

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package controller
+package bmcutils
 
 import (
 	"context"
@@ -10,10 +10,9 @@ import (
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-const DefaultKubeNamespace = "default"
 
 func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, insecure bool) (bmc.BMC, error) {
 	if server.Spec.BMCRef != nil {
@@ -94,7 +93,7 @@ func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcPro
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
 		}
-		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, bmcAddress, username, password, true, c, DefaultKubeNamespace)
+		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, bmcAddress, username, password, true, c, metav1.NamespaceDefault)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}

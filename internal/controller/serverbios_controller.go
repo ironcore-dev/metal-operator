@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -29,6 +30,7 @@ type ServerBIOSReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
+	Insecure bool
 	// todo: need to decide how to provide jobs' configuration to controller
 	JobNamespace          string
 	JobImage              string
@@ -282,6 +284,10 @@ func (r *ServerBIOSReconciler) createJob(
 								{
 									Name:  "SERVER_BIOS_REF",
 									Value: serverBIOS.Name,
+								},
+								{
+									Name:  "INSECURE",
+									Value: strconv.FormatBool(r.Insecure),
 								},
 							},
 						},

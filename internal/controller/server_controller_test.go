@@ -276,7 +276,7 @@ var _ = Describe("Server Controller", func() {
 		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 100*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
-			time.Sleep(550 * time.Millisecond) // force discovery timeout
+			time.Sleep(100 * time.Millisecond) // force discovery timeout
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
 		}()
 

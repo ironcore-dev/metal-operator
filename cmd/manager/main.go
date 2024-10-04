@@ -67,7 +67,7 @@ func main() {
 		discoveryTimeout       time.Duration
 	)
 
-	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for BMC discovery")
+	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
 	flag.DurationVar(&powerPollingInterval, "power-polling-interval", 5*time.Second,
 		"Interval between polling power state")
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")

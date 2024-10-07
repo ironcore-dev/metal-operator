@@ -5,7 +5,6 @@ package controller
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -209,8 +208,8 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger
 			Name: endpoint.Name,
 		},
 		Data: map[string][]byte{
-			"username": []byte(base64.StdEncoding.EncodeToString([]byte(m.DefaultCredentials[0].Username))),
-			"password": []byte(base64.StdEncoding.EncodeToString([]byte(m.DefaultCredentials[0].Password))),
+			"username": []byte(m.DefaultCredentials[0].Username),
+			"password": []byte(m.DefaultCredentials[0].Password),
 		},
 	}
 

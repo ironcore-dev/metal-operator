@@ -272,18 +272,17 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
 
+		By("Ensuring that the server is set back to initial due to the discovery check timing out")
+		Eventually(Object(server), "500ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+		))
+
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 100*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
-			time.Sleep(100 * time.Millisecond) // force discovery timeout
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
 		}()
-
-		By("Ensuring that the server is set back to initial due to the discovery check timing out")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
-		))
 
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(

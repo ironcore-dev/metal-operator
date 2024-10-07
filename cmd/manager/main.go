@@ -43,27 +43,31 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var secureMetrics bool
-	var enableHTTP2 bool
-	var macPrefixesFile string
-	var insecure bool
-	var managerNamespace string
-	var probeImage string
-	var probeOSImage string
-	var registryPort int
-	var registryProtocol string
-	var registryURL string
-	var registryResyncInterval time.Duration
-	var webhookPort int
-	var enforceFirstBoot bool
-	var enforcePowerOff bool
-	var serverResyncInterval time.Duration
-	var powerPollingInterval time.Duration
-	var powerPollingTimeout time.Duration
+	var (
+		metricsAddr            string
+		enableLeaderElection   bool
+		probeAddr              string
+		secureMetrics          bool
+		enableHTTP2            bool
+		macPrefixesFile        string
+		insecure               bool
+		managerNamespace       string
+		probeImage             string
+		probeOSImage           string
+		registryPort           int
+		registryProtocol       string
+		registryURL            string
+		registryResyncInterval time.Duration
+		webhookPort            int
+		enforceFirstBoot       bool
+		enforcePowerOff        bool
+		serverResyncInterval   time.Duration
+		powerPollingInterval   time.Duration
+		powerPollingTimeout    time.Duration
+		discoveryTimeout       time.Duration
+	)
 
+	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
 	flag.DurationVar(&powerPollingInterval, "power-polling-interval", 5*time.Second,
 		"Interval between polling power state")
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
@@ -218,6 +222,7 @@ func main() {
 		EnforcePowerOff:        enforcePowerOff,
 		PowerPollingInterval:   powerPollingInterval,
 		PowerPollingTimeout:    powerPollingTimeout,
+		DiscoveryTimeout:       discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Server")
 		os.Exit(1)

@@ -182,6 +182,7 @@ func SetupTest() *corev1.Namespace {
 			EnforceFirstBoot:       true,
 			PowerPollingInterval:   50 * time.Millisecond,
 			PowerPollingTimeout:    200 * time.Millisecond,
+			DiscoveryTimeout:       500 * time.Millisecond, // Force timeout to be quick for tests
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

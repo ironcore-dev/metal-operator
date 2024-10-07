@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"encoding/base64"
-
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,8 +46,8 @@ var _ = Describe("Endpoints Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", Equal(map[string][]byte{
-				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
-				"password": []byte(base64.StdEncoding.EncodeToString([]byte("bar"))),
+				"username": []byte("foo"),
+				"password": []byte("bar"),
 			}))))
 		DeferCleanup(k8sClient.Delete, bmcSecret)
 

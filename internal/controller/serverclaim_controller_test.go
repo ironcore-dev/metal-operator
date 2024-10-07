@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"encoding/base64"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -29,8 +27,8 @@ var _ = Describe("ServerClaim Controller", func() {
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
-				"username": []byte(base64.StdEncoding.EncodeToString([]byte("foo"))),
-				"password": []byte(base64.StdEncoding.EncodeToString([]byte("bar"))),
+				"username": []byte("foo"),
+				"password": []byte("bar"),
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())

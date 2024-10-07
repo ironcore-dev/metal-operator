@@ -70,25 +70,20 @@ spec:
           spec:
             description: ServerSpec defines the desired state of a Server.
             properties:
-              BIOS:
-                description: BIOS specifies the BIOS settings for the server.
-                items:
-                  description: BIOSSettings represents the BIOS settings for a server.
-                  properties:
-                    settings:
-                      additionalProperties:
-                        type: string
-                      description: Settings is a map of key-value pairs representing
-                        the BIOS settings.
-                      type: object
-                    version:
-                      description: Version specifies the version of the server BIOS
-                        for which the settings are defined.
-                      type: string
-                  required:
-                  - version
-                  type: object
-                type: array
+              biOSSettingsRef:
+                description: BIOSSettingsRef is a reference to a ServerBIOS object.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               bmc:
                 description: |-
                   BMC contains the access details for the BMC.
@@ -280,22 +275,6 @@ spec:
           status:
             description: ServerStatus defines the observed state of Server.
             properties:
-              BIOS:
-                description: BIOSSettings represents the BIOS settings for a server.
-                properties:
-                  settings:
-                    additionalProperties:
-                      type: string
-                    description: Settings is a map of key-value pairs representing
-                      the BIOS settings.
-                    type: object
-                  version:
-                    description: Version specifies the version of the server BIOS
-                      for which the settings are defined.
-                    type: string
-                required:
-                - version
-                type: object
               conditions:
                 description: Conditions represents the latest available observations
                   of the server's current state.

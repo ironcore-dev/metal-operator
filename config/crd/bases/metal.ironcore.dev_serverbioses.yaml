@@ -1,0 +1,170 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.3
+  name: serverbioses.metal.ironcore.dev
+spec:
+  group: metal.ironcore.dev
+  names:
+    kind: ServerBIOS
+    listKind: ServerBIOSList
+    plural: serverbioses
+    singular: serverbios
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: Server name
+      jsonPath: .spec.serverRef.name
+      name: Server
+      type: string
+    - description: Installed BIOS Version
+      jsonPath: .status.version
+      name: BIOS Version
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServerBIOS is the Schema for the serverbios API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServerBIOSSpec defines the desired state of ServerBIOS
+            properties:
+              bios:
+                description: BIOS contains a bios version and settings.
+                properties:
+                  settings:
+                    additionalProperties:
+                      type: string
+                    description: Settings contains BIOS settings as map
+                    type: object
+                  version:
+                    description: Version contains BIOS version
+                    type: string
+                required:
+                - version
+                type: object
+              scanPeriodMinutes:
+                default: 30
+                description: ScanPeriodMinutes defines the period in minutes after
+                  which scanned data is considered obsolete.
+                format: int32
+                type: integer
+              serverRef:
+                description: ServerRef is a reference to Server object
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            type: object
+          status:
+            description: ServerBIOSStatus defines the observed state of ServerBIOS
+            properties:
+              bios:
+                description: BIOS contains a bios version and settings.
+                properties:
+                  settings:
+                    additionalProperties:
+                      type: string
+                    description: Settings contains BIOS settings as map
+                    type: object
+                  version:
+                    description: Version contains BIOS version
+                    type: string
+                required:
+                - version
+                type: object
+              lastScanTime:
+                description: LastScanTime reflects the timestamp when the scanning
+                  for installed firmware was performed
+                format: date-time
+                type: string
+              runningJob:
+                description: RunningJob reflects the invoked scan or update job running
+                properties:
+                  jobRef:
+                    description: JobRef contains the reference to the Job object.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  type:
+                    description: Type reflects the type of the job.
+                    enum:
+                    - ScanBIOSVersion
+                    - UpdateBIOSVersion
+                    - ApplyBiosSettings
+                    type: string
+                required:
+                - jobRef
+                - type
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

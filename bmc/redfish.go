@@ -342,6 +342,35 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, e
 	return
 }
 
+func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
+	system, err := r.getSystemByUUID(systemUUID)
+	if err != nil {
+		return nil, err
+	}
+	storage, err := system.Storage()
+	if err != nil {
+		return nil, err
+	}
+	storages := make([]Storage, 0, len(storage))
+	for _, s := range storage {
+		drives, err := s.Drives()
+		if err != nil {
+			return nil, err
+		}
+		for _, d := range drives {
+			storages = append(storages, Storage{
+				Name:       d.Name,
+				Rotational: d.RotationSpeedRPM != 0,
+				Type:       d.DriveFormFactor,
+				SizeBytes:  d.CapacityBytes,
+				Vendor:     d.Manufacturer,
+				Model:      d.Model,
+			})
+		}
+	}
+	return storages, nil
+}
+
 func (r *RedfishBMC) getSystemByUUID(systemUUID string) (*redfish.ComputerSystem, error) {
 	service := r.client.GetService()
 	systems, err := service.Systems()

@@ -42,6 +42,32 @@ const (
 	ServerPoweringOffPowerState ServerPowerState = "PoweringOff"
 )
 
+// Capacity is a disk size in Bytes.
+type Capacity int64
+
+// Capacity multipliers.
+const (
+	Byte     Capacity = 1
+	KibiByte          = Byte * 1024
+	KiloByte          = Byte * 1000
+	MebiByte          = KibiByte * 1024
+	MegaByte          = KiloByte * 1000
+	GibiByte          = MebiByte * 1024
+	GigaByte          = MegaByte * 1000
+	TebiByte          = GibiByte * 1024
+	TeraByte          = GigaByte * 1000
+)
+
+// DiskType is a disk type, i.e. HDD, SSD, NVME.
+type DiskType string
+
+// DiskType constants.
+const (
+	HDD  DiskType = "HDD"
+	SSD  DiskType = "SSD"
+	NVME DiskType = "NVME"
+)
+
 // BMCAccess defines the access details for the BMC.
 type BMCAccess struct {
 	// Protocol specifies the protocol to be used for communicating with the BMC.
@@ -168,6 +194,9 @@ type ServerStatus struct {
 	// NetworkInterfaces is a list of network interfaces associated with the server.
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
 
+	// Storages is a list of storages (disk, SSD, etc.) associated with the server.
+	Storages []Storage `json:"storages,omitempty"`
+
 	BIOS BIOSSettings `json:"BIOS,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
@@ -190,6 +219,22 @@ type NetworkInterface struct {
 
 	// MACAddress is the MAC address of the network interface.
 	MACAddress string `json:"macAddress"`
+}
+
+// Storage defines the details of one storage device
+type Storage struct {
+	// Name is the name of the storage interface.
+	Name string `json:"name,omitempty"`
+	// Rotational specifies whether the storage device is rotational.
+	Rotational bool `json:"rotational,omitempty"`
+	// Type specifies the type of the storage device.
+	Type DiskType `json:"type,omitempty"`
+	// SizeBytes specifies the size of the storage device in bytes.
+	SizeBytes Capacity `json:"sizeBytes,omitempty"`
+	// Vendor specifies the vendor of the storage device.
+	Vendor string `json:"vendor,omitempty"`
+	// Model specifies the model of the storage device.
+	Model string `json:"model,omitempty"`
 }
 
 //+kubebuilder:object:root=true

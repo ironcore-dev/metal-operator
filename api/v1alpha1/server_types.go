@@ -42,32 +42,6 @@ const (
 	ServerPoweringOffPowerState ServerPowerState = "PoweringOff"
 )
 
-// Capacity is a disk size in Bytes.
-type Capacity int64
-
-// Capacity multipliers.
-const (
-	Byte     Capacity = 1
-	KibiByte          = Byte * 1024
-	KiloByte          = Byte * 1000
-	MebiByte          = KibiByte * 1024
-	MegaByte          = KiloByte * 1000
-	GibiByte          = MebiByte * 1024
-	GigaByte          = MegaByte * 1000
-	TebiByte          = GibiByte * 1024
-	TeraByte          = GigaByte * 1000
-)
-
-// DiskType is a disk type, i.e. HDD, SSD, NVME.
-type DiskType string
-
-// DiskType constants.
-const (
-	HDD  DiskType = "HDD"
-	SSD  DiskType = "SSD"
-	NVME DiskType = "NVME"
-)
-
 // BMCAccess defines the access details for the BMC.
 type BMCAccess struct {
 	// Protocol specifies the protocol to be used for communicating with the BMC.

@@ -275,6 +275,29 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Server state set to power on")
 
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	if err != nil {
+		return false, fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	storages, err := bmcClient.GetStorages(server.Spec.UUID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get storages for Server: %w", err)
+	}
+	server.Status.Storages = nil
+	for _, storage := range storages {
+		server.Status.Storages = append(server.Status.Storages, metalv1alpha1.Storage{
+			Name:     storage.Name,
+			Model:    storage.Model,
+			Capacity: resource.NewQuantity(storage.SizeBytes, resource.BinarySI),
+			Type:     string(storage.Type),
+			Vendor:   storage.Vendor,
+			State:    metalv1alpha1.StorageState(storage.State),
+		})
+	}
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch Server status: %w", err)
+	}
+
 	if r.checkLastStatusUpdateAfter(r.DiscoveryTimeout, server) {
 		log.V(1).Info("Server did not post info to registry in time, back to initial state")
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
@@ -387,23 +410,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 		return fmt.Errorf("failed to get system info for Server: %w", err)
 	}
 
-	storages, err := bmcClient.GetStorages(server.Spec.UUID)
-	if err != nil {
-		return fmt.Errorf("failed to get storages for Server: %w", err)
-	}
 	serverBase := server.DeepCopy()
-	server.Status.Storages = nil
-	for _, storage := range storages {
-		q := resource.NewQuantity(storage.SizeBytes, resource.BinarySI)
-		server.Status.Storages = append(server.Status.Storages, metalv1alpha1.Storage{
-			Name:     storage.Name,
-			Model:    storage.Model,
-			Capacity: *q,
-			Type:     string(storage.Type),
-			Vendor:   storage.Vendor,
-			State:    metalv1alpha1.StorageState(storage.State),
-		})
-	}
 	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
 	server.Status.SerialNumber = systemInfo.SerialNumber
 	server.Status.SKU = systemInfo.SKU

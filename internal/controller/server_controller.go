@@ -394,11 +394,11 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	serverBase := server.DeepCopy()
 	server.Status.Storages = nil
 	for _, storage := range storages {
-		q := resource.NewQuantity(storage.SizeBytes, resource.DecimalSI)
+		q := resource.NewQuantity(storage.SizeBytes, resource.BinarySI)
 		server.Status.Storages = append(server.Status.Storages, metalv1alpha1.Storage{
 			Name:     storage.Name,
 			Model:    storage.Model,
-			Capacity: q.String(),
+			Capacity: *q,
 			Type:     string(storage.Type),
 			Vendor:   storage.Vendor,
 			State:    metalv1alpha1.StorageState(storage.State),

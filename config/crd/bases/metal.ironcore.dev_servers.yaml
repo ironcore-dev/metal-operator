@@ -406,9 +406,13 @@ spec:
                   description: Storage defines the details of one storage device
                   properties:
                     capacity:
+                      anyOf:
+                      - type: integer
+                      - type: string
                       description: SizeBytes specifies the size of the storage device
                         in bytes.
-                      type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
                     model:
                       description: Model specifies the model of the storage device.
                       type: string

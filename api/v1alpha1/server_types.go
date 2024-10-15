@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -218,7 +219,7 @@ type Storage struct {
 	// Type specifies the type of the storage device.
 	Type string `json:"type,omitempty"`
 	// SizeBytes specifies the size of the storage device in bytes.
-	Capacity string `json:"capacity,omitempty"`
+	Capacity resource.Quantity `json:"capacity,omitempty"`
 	// Vendor specifies the vendor of the storage device.
 	Vendor string `json:"vendor,omitempty"`
 	// Model specifies the model of the storage device.

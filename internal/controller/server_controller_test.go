@@ -87,6 +87,15 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
+			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
+				Name:       "SATA Bay 1",
+				Rotational: false,
+				Capacity:   "8T",
+				Vendor:     "Contoso",
+				Model:      "3000GT8",
+				State:      metalv1alpha1.StorageStateEnabled,
+			})),
+			HaveField("Status.Storages", HaveLen(4)),
 		))
 		DeferCleanup(k8sClient.Delete, server)
 

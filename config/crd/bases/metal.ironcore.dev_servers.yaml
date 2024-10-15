@@ -400,6 +400,36 @@ spec:
               state:
                 description: State represents the current state of the server.
                 type: string
+              storages:
+                description: Storages is a list of storages associated with the server.
+                items:
+                  description: Storage defines the details of one storage device
+                  properties:
+                    capacity:
+                      description: SizeBytes specifies the size of the storage device
+                        in bytes.
+                      type: string
+                    model:
+                      description: Model specifies the model of the storage device.
+                      type: string
+                    name:
+                      description: Name is the name of the storage interface.
+                      type: string
+                    rotational:
+                      description: Rotational specifies whether the storage device
+                        is rotational.
+                      type: boolean
+                    state:
+                      description: State specifies the state of the storage device.
+                      type: string
+                    type:
+                      description: Type specifies the type of the storage device.
+                      type: string
+                    vendor:
+                      description: Vendor specifies the vendor of the storage device.
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true

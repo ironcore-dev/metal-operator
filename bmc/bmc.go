@@ -119,7 +119,8 @@ type Storage struct {
 	// Vendor specifies the vendor of the storage device.
 	Vendor string `json:"vendor,omitempty"`
 	// Model specifies the model of the storage device.
-	Model string `json:"model,omitempty"`
+	Model string       `json:"model,omitempty"`
+	State common.State `json:"state,omitempty"`
 }
 
 // PowerState is the power state of the system.

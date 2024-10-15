@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -386,7 +387,23 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 		return fmt.Errorf("failed to get system info for Server: %w", err)
 	}
 
+	storages, err := bmcClient.GetStorages(server.Spec.UUID)
+	if err != nil {
+		return fmt.Errorf("failed to get storages for Server: %w", err)
+	}
 	serverBase := server.DeepCopy()
+	server.Status.Storages = nil
+	for _, storage := range storages {
+		q := resource.NewQuantity(storage.SizeBytes, resource.DecimalSI)
+		server.Status.Storages = append(server.Status.Storages, metalv1alpha1.Storage{
+			Name:     storage.Name,
+			Model:    storage.Model,
+			Capacity: q.String(),
+			Type:     string(storage.Type),
+			Vendor:   storage.Vendor,
+			State:    metalv1alpha1.StorageState(storage.State),
+		})
+	}
 	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
 	server.Status.SerialNumber = systemInfo.SerialNumber
 	server.Status.SKU = systemInfo.SKU

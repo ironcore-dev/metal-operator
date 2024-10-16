@@ -9,6 +9,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/controller/testdata"
@@ -290,6 +291,15 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
+			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
+				Name:       "SATA Bay 1",
+				Rotational: false,
+				Capacity:   resource.NewQuantity(8000000000000, resource.BinarySI),
+				Vendor:     "Contoso",
+				Model:      "3000GT8",
+				State:      metalv1alpha1.StorageStateEnabled,
+			})),
+			HaveField("Status.Storages", HaveLen(4)),
 		))
 
 		By("Ensuring that the boot configuration has been removed")

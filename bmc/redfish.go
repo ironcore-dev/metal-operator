@@ -342,6 +342,56 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, e
 	return
 }
 
+func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
+	system, err := r.getSystemByUUID(systemUUID)
+	if err != nil {
+		return nil, err
+	}
+	systemStorage, err := system.Storage()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Storage, 0, len(systemStorage))
+	for _, s := range systemStorage {
+		drives, err := s.Drives()
+		if err != nil {
+			return nil, err
+		}
+		for _, d := range drives {
+			result = append(result, Storage{
+				Name:       d.Name,
+				Rotational: d.RotationSpeedRPM != 0,
+				Type:       d.DriveFormFactor,
+				SizeBytes:  d.CapacityBytes,
+				Vendor:     d.Manufacturer,
+				Model:      d.Model,
+				State:      d.Status.State,
+			})
+		}
+	}
+	if len(result) == 0 {
+		// if no storage is found, fall back to simpleStorage (outdated storage API)
+		simpleStorages, err := system.SimpleStorages()
+		result = make([]Storage, 0, len(systemStorage))
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range simpleStorages {
+			for _, d := range s.Devices {
+				result = append(result, Storage{
+					Name:      d.Name,
+					SizeBytes: d.CapacityBytes,
+					Vendor:    d.Manufacturer,
+					Model:     d.Model,
+					State:     d.Status.State,
+				})
+			}
+		}
+		return result, nil
+	}
+	return result, nil
+}
+
 func (r *RedfishBMC) getSystemByUUID(systemUUID string) (*redfish.ComputerSystem, error) {
 	service := r.client.GetService()
 	systems, err := service.Systems()

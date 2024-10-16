@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -142,6 +143,20 @@ const (
 	OffIndicatorLED IndicatorLED = "Off"
 )
 
+// StorageState represents Storage states
+type StorageState string
+
+const (
+	// StorageStateEnabled indicates that the storage device is enabled.
+	StorageStateEnabled StorageState = "Enabled"
+
+	// StorageStateDisabled indicates that the storage device is disabled.
+	StorageStateDisabled StorageState = "Disabled"
+
+	// StorageStateAbsent indicates that the storage device is absent.
+	StorageStateAbsent StorageState = "Absent"
+)
+
 // ServerStatus defines the observed state of Server.
 type ServerStatus struct {
 	// Manufacturer is the name of the server manufacturer.
@@ -168,6 +183,9 @@ type ServerStatus struct {
 	// NetworkInterfaces is a list of network interfaces associated with the server.
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
 
+	// Storages is a list of storages associated with the server.
+	Storages []Storage `json:"storages,omitempty"`
+
 	BIOS BIOSSettings `json:"BIOS,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
@@ -190,6 +208,24 @@ type NetworkInterface struct {
 
 	// MACAddress is the MAC address of the network interface.
 	MACAddress string `json:"macAddress"`
+}
+
+// Storage defines the details of one storage device
+type Storage struct {
+	// Name is the name of the storage interface.
+	Name string `json:"name,omitempty"`
+	// Rotational specifies whether the storage device is rotational.
+	Rotational bool `json:"rotational,omitempty"`
+	// Type specifies the type of the storage device.
+	Type string `json:"type,omitempty"`
+	// SizeBytes specifies the size of the storage device in bytes.
+	Capacity *resource.Quantity `json:"capacity,omitempty"`
+	// Vendor specifies the vendor of the storage device.
+	Vendor string `json:"vendor,omitempty"`
+	// Model specifies the model of the storage device.
+	Model string `json:"model,omitempty"`
+	// State specifies the state of the storage device.
+	State StorageState `json:"state,omitempty"`
 }
 
 //+kubebuilder:object:root=true

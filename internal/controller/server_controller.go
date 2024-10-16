@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -273,6 +274,29 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
 	log.V(1).Info("Server state set to power on")
+
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	if err != nil {
+		return false, fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	storages, err := bmcClient.GetStorages(server.Spec.UUID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get storages for Server: %w", err)
+	}
+	server.Status.Storages = nil
+	for _, storage := range storages {
+		server.Status.Storages = append(server.Status.Storages, metalv1alpha1.Storage{
+			Name:     storage.Name,
+			Model:    storage.Model,
+			Capacity: resource.NewQuantity(storage.SizeBytes, resource.BinarySI),
+			Type:     string(storage.Type),
+			Vendor:   storage.Vendor,
+			State:    metalv1alpha1.StorageState(storage.State),
+		})
+	}
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch Server status: %w", err)
+	}
 
 	if r.checkLastStatusUpdateAfter(r.DiscoveryTimeout, server) {
 		log.V(1).Info("Server did not post info to registry in time, back to initial state")

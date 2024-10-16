@@ -46,6 +46,8 @@ type BMC interface {
 	GetBiosVersion(systemUUID string) (string, error)
 
 	SetBootOrder(systemUUID string, order []string) error
+
+	GetStorages(systemUUID string) ([]Storage, error)
 }
 
 type Bios struct {
@@ -103,6 +105,23 @@ type Server struct {
 	Manufacturer string
 	PowerState   PowerState
 	SerialNumber string
+}
+
+type Storage struct {
+	// Name is the name of the storage interface.
+	Name string `json:"name,omitempty"`
+	// Rotational specifies whether the storage device is rotational.
+	Rotational bool `json:"rotational,omitempty"`
+	// Type specifies the type of the storage device.
+	Type redfish.FormFactor `json:"type,omitempty"`
+	// SizeBytes specifies the size of the storage device in bytes.
+	SizeBytes int64 `json:"sizeBytes,omitempty"`
+	// Vendor specifies the vendor of the storage device.
+	Vendor string `json:"vendor,omitempty"`
+	// Model specifies the model of the storage device.
+	Model string `json:"model,omitempty"`
+	// State specifies the state of the storage device.
+	State common.State `json:"state,omitempty"`
 }
 
 // PowerState is the power state of the system.

@@ -1952,6 +1952,17 @@ string
 </tr>
 <tr>
 <td>
+<code>model</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Model is the model of the server.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>sku</code><br/>
 <em>
 string
@@ -2026,6 +2037,19 @@ ServerState
 </tr>
 <tr>
 <td>
+<code>storages</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Storage">
+[]Storage
+</a>
+</em>
+</td>
+<td>
+<p>Storages is a list of storages associated with the server.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>BIOS</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
@@ -2051,6 +2075,131 @@ BIOSSettings
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.Storage">Storage
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
+</p>
+<div>
+<p>Storage defines the details of one storage device</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name of the storage interface.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rotational</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Rotational specifies whether the storage device is rotational.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Type specifies the type of the storage device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>capacity</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity">
+k8s.io/apimachinery/pkg/api/resource.Quantity
+</a>
+</em>
+</td>
+<td>
+<p>SizeBytes specifies the size of the storage device in bytes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vendor</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Vendor specifies the vendor of the storage device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>model</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Model specifies the model of the storage device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.StorageState">
+StorageState
+</a>
+</em>
+</td>
+<td>
+<p>State specifies the state of the storage device.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.StorageState">StorageState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Storage">Storage</a>)
+</p>
+<div>
+<p>StorageState represents Storage states</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Absent&#34;</p></td>
+<td><p>StorageStateAbsent indicates that the storage device is absent.</p>
+</td>
+</tr><tr><td><p>&#34;Disabled&#34;</p></td>
+<td><p>StorageStateDisabled indicates that the storage device is disabled.</p>
+</td>
+</tr><tr><td><p>&#34;Enabled&#34;</p></td>
+<td><p>StorageStateEnabled indicates that the storage device is enabled.</p>
+</td>
+</tr></tbody>
 </table>
 <hr/>
 <p><em>

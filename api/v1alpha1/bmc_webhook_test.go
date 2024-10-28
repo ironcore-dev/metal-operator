@@ -15,15 +15,16 @@ import (
 var _ = Describe("BMC Webhook", func() {
 	_ = SetupTest()
 
-	It("Should deny if the BMC has EndpointRef and Access spec fields", func() {
+	It("Should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func() {
 		bmc := &BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-invalid",
 			},
 			Spec: BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
-				Access: &Access{
-					Address: "localhost",
+				Endpoint: &InlineEndpoint{
+					IP:         MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
 		}
@@ -31,7 +32,7 @@ var _ = Describe("BMC Webhook", func() {
 		Eventually(Get(bmc)).Should(Satisfy(errors.IsNotFound))
 	})
 
-	It("Should deny if the BMC has no EndpointRef and Access spec fields", func() {
+	It("Should deny if the BMC has no EndpointRef and InlineEndpoint spec fields", func() {
 		bmc := &BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-empty",
@@ -42,7 +43,7 @@ var _ = Describe("BMC Webhook", func() {
 		Eventually(Get(bmc)).Should(Satisfy(errors.IsNotFound))
 	})
 
-	It("Should admit if the BMC has an EndpointRef but no Access spec field", func() {
+	It("Should admit if the BMC has an EndpointRef but no InlineEndpoint spec field", func() {
 		bmc := &BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -75,7 +76,7 @@ var _ = Describe("BMC Webhook", func() {
 			"Spec.EndpointRef", &v1.LocalObjectReference{Name: "foo"})))
 	})
 
-	It("Should admit if the BMC is changing EndpointRef to Access spec field", func() {
+	It("Should admit if the BMC is changing EndpointRef to InlineEndpoint spec field", func() {
 		bmc := &BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -89,20 +90,22 @@ var _ = Describe("BMC Webhook", func() {
 
 		Eventually(Update(bmc, func() {
 			bmc.Spec.EndpointRef = nil
-			bmc.Spec.Access = &Access{
-				Address: "localhost",
+			bmc.Spec.Endpoint = &InlineEndpoint{
+				IP:         MustParseIP("127.0.0.1"),
+				MACAddress: "aa:bb:cc:dd:ee:ff",
 			}
 		})).Should(Succeed())
 	})
 
-	It("Should admit if the BMC has no EndpointRef but an Access spec field", func() {
+	It("Should admit if the BMC has no EndpointRef but an InlineEndpoint spec field", func() {
 		bmc := &BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
 			Spec: BMCSpec{
-				Access: &Access{
-					Address: "localhost",
+				Endpoint: &InlineEndpoint{
+					IP:         MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
 		}
@@ -110,14 +113,15 @@ var _ = Describe("BMC Webhook", func() {
 		DeferCleanup(k8sClient.Delete, bmc)
 	})
 
-	It("Should deny if the BMC Access spec field has been removed", func() {
+	It("Should deny if the BMC InlineEndpoint spec field has been removed", func() {
 		bmc := &BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
 			Spec: BMCSpec{
-				Access: &Access{
-					Address: "localhost",
+				Endpoint: &InlineEndpoint{
+					IP:         MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
 		}
@@ -125,21 +129,24 @@ var _ = Describe("BMC Webhook", func() {
 		DeferCleanup(k8sClient.Delete, bmc)
 
 		Eventually(Update(bmc, func() {
-			bmc.Spec.Access = nil
+			bmc.Spec.Endpoint = nil
 		})).Should(Not(Succeed()))
 
-		Eventually(Object(bmc)).Should(SatisfyAll(HaveField(
-			"Spec.Access.Address", "localhost")))
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.Endpoint.IP", MustParseIP("127.0.0.1")),
+			HaveField("Spec.Endpoint.MACAddress", "aa:bb:cc:dd:ee:ff"),
+		))
 	})
 
-	It("Should admit if the BMC has is changing to an EndpointRef from an Access spec field", func() {
+	It("Should admit if the BMC has is changing to an EndpointRef from an InlineEndpoint spec field", func() {
 		bmc := &BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
 			Spec: BMCSpec{
-				Access: &Access{
-					Address: "localhost",
+				Endpoint: &InlineEndpoint{
+					IP:         MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
 		}
@@ -148,7 +155,7 @@ var _ = Describe("BMC Webhook", func() {
 
 		Eventually(Update(bmc, func() {
 			bmc.Spec.EndpointRef = &v1.LocalObjectReference{Name: "foo"}
-			bmc.Spec.Access = nil
+			bmc.Spec.Endpoint = nil
 		})).Should(Succeed())
 	})
 

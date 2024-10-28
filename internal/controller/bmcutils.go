@@ -56,8 +56,8 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		address = endpoint.Spec.IP.String()
 	}
 
-	if bmcObj.Spec.Access != nil {
-		address = bmcObj.Spec.Access.Address
+	if bmcObj.Spec.Endpoint != nil {
+		address = bmcObj.Spec.Endpoint.IP.String()
 	}
 
 	bmcSecret := &metalv1alpha1.BMCSecret{}

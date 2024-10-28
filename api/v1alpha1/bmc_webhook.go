@@ -47,13 +47,13 @@ func (r *BMC) ValidateCreate() (admission.Warnings, error) {
 func ValidateCreateBMCSpec(spec BMCSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if spec.EndpointRef != nil && spec.Access != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointRef"), spec.EndpointRef, "only one of 'endpointRef' or 'access' should be specified"))
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("access"), spec.Access, "only one of 'endpointRef' or 'access' should be specified"))
+	if spec.EndpointRef != nil && spec.Endpoint != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointRef"), spec.EndpointRef, "only one of 'endpointRef' or 'endpoint' should be specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("endpoint"), spec.Endpoint, "only one of 'endpointRef' or 'endpoint' should be specified"))
 	}
-	if spec.EndpointRef == nil && spec.Access == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointRef"), spec.EndpointRef, "either 'endpointRef' or 'access' must be specified"))
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("access"), spec.Access, "either 'endpointRef' or 'access' must be specified"))
+	if spec.EndpointRef == nil && spec.Endpoint == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointRef"), spec.EndpointRef, "either 'endpointRef' or 'endpoint' must be specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("endpoint"), spec.Endpoint, "either 'endpointRef' or 'endpoint' must be specified"))
 	}
 
 	return allErrs

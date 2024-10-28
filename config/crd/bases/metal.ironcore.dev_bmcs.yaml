@@ -72,15 +72,18 @@ spec:
             properties:
               access:
                 description: |-
-                  Access allows inline configuration of network access details for the BMC.
+                  Endpoint allows inline configuration of network access details for the BMC.
                   Use this field if access settings like address are to be configured directly within the BMC resource.
                 properties:
-                  address:
-                    description: Address is the IP or hostname used for accessing
-                      the BMC.
+                  ip:
+                    description: IP is the IP address of the BMC.
+                    type: string
+                  macAddress:
+                    description: MACAddress is the MAC address of the endpoint.
                     type: string
                 required:
-                - address
+                - ip
+                - macAddress
                 type: object
               bmcSecretRef:
                 description: |-

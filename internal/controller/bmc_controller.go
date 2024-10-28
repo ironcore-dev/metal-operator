@@ -6,7 +6,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"net"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -105,20 +104,9 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		log.V(1).Info("Got Endpoints for BMC", "Endpoints", endpoint.Name)
 	}
 
-	if bmcObj.Spec.Access != nil {
-		ips, err := net.LookupIP(bmcObj.Spec.Access.Address)
-		if err != nil {
-			return fmt.Errorf("failed to lookup IP for BMC address: %w", err)
-		}
-		if len(ips) > 0 {
-			// pick the the IPv4 address
-			// TODO: handle multiple IPs for a BMC (IPv4 and IPv6)
-			for _, ipaddress := range ips {
-				if ipaddress.To4() != nil {
-					ip = metalv1alpha1.MustParseIP(ipaddress.String())
-				}
-			}
-		}
+	if bmcObj.Spec.Endpoint != nil {
+		ip = bmcObj.Spec.Endpoint.IP
+		macAddress = bmcObj.Spec.Endpoint.MACAddress
 	}
 
 	bmcBase := bmcObj.DeepCopy()

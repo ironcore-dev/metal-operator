@@ -122,8 +122,9 @@ var _ = Describe("BMC Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
-				Access: &metalv1alpha1.Access{
-					Address: "localhost",
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
@@ -139,8 +140,7 @@ var _ = Describe("BMC Controller", func() {
 
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Status.IP", metalv1alpha1.MustParseIP("127.0.0.1")),
-			// TODO: in the inline access case we can't easily retrieve the MACAddress of a BMC
-			HaveField("Status.MACAddress", ""),
+			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
 			HaveField("Status.Model", "Joo Janta 200"),
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),

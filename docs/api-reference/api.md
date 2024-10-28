@@ -10,6 +10,35 @@
 </div>
 Resource Types:
 <ul></ul>
+<h3 id="metal.ironcore.dev/v1alpha1.Access">Access
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec</a>)
+</p>
+<div>
+<p>Access defines inline network access configuration for the BMC.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>address</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Address is the IP or hostname used for accessing the BMC.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
 </h3>
 <p>
@@ -100,8 +129,24 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
 This reference is typically used to locate the BMC endpoint within the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>access</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Access">
+Access
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Access allows inline configuration of network access details for the BMC.
+Use this field if access settings like address are to be configured directly within the BMC resource.</p>
 </td>
 </tr>
 <tr>
@@ -195,13 +240,13 @@ Protocol
 </tr>
 <tr>
 <td>
-<code>endpoint</code><br/>
+<code>address</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Endpoint is the address of the BMC endpoint.</p>
+<p>Address is the address of the BMC.</p>
 </td>
 </tr>
 <tr>
@@ -373,8 +418,24 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
 This reference is typically used to locate the BMC endpoint within the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>access</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Access">
+Access
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Access allows inline configuration of network access details for the BMC.
+Use this field if access settings like address are to be configured directly within the BMC resource.</p>
 </td>
 </tr>
 <tr>

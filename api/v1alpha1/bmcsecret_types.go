@@ -8,6 +8,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// BMCSecretUsernameKeyName is the secret key name for the username.
+	BMCSecretUsernameKeyName = "username"
+	// BMCSecretPasswordKeyName is the secret key name for the password.F
+	BMCSecretPasswordKeyName = "password"
+)
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster

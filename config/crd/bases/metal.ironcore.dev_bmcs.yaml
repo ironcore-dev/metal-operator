@@ -70,6 +70,18 @@ spec:
           spec:
             description: BMCSpec defines the desired state of BMC
             properties:
+              access:
+                description: |-
+                  Access allows inline configuration of network access details for the BMC.
+                  Use this field if access settings like address are to be configured directly within the BMC resource.
+                properties:
+                  address:
+                    description: Address is the IP or hostname used for accessing
+                      the BMC.
+                    type: string
+                required:
+                - address
+                type: object
               bmcSecretRef:
                 description: |-
                   BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
@@ -144,7 +156,6 @@ spec:
                 type: object
             required:
             - bmcSecretRef
-            - endpointRef
             - protocol
             type: object
           status:

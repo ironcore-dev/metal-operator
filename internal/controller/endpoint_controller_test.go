@@ -46,8 +46,8 @@ var _ = Describe("Endpoints Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", Equal(map[string][]byte{
-				"username": []byte("foo"),
-				"password": []byte("bar"),
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
 			}))))
 		DeferCleanup(k8sClient.Delete, bmcSecret)
 

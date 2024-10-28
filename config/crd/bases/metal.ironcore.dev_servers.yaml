@@ -94,6 +94,9 @@ spec:
                   BMC contains the access details for the BMC.
                   This field is optional and can be omitted if no BMC access is specified.
                 properties:
+                  address:
+                    description: Address is the address of the BMC.
+                    type: string
                   bmcSecretRef:
                     description: |-
                       BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
@@ -110,9 +113,6 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
-                  endpoint:
-                    description: Endpoint is the address of the BMC endpoint.
-                    type: string
                   protocol:
                     description: Protocol specifies the protocol to be used for communicating
                       with the BMC.
@@ -133,8 +133,8 @@ spec:
                     - port
                     type: object
                 required:
+                - address
                 - bmcSecretRef
-                - endpoint
                 - protocol
                 type: object
               bmcRef:

@@ -48,8 +48,8 @@ type BMCAccess struct {
 	// Protocol specifies the protocol to be used for communicating with the BMC.
 	Protocol Protocol `json:"protocol"`
 
-	// Endpoint is the address of the BMC endpoint.
-	Endpoint string `json:"endpoint"`
+	// Address is the address of the BMC.
+	Address string `json:"address"`
 
 	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
 	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.

@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -86,18 +87,41 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 }
 
 func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
-	endpoint := &metalv1alpha1.Endpoint{}
-	if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
+	var (
+		ip         metalv1alpha1.IP
+		macAddress string
+	)
+
+	if bmcObj.Spec.EndpointRef != nil {
+		endpoint := &metalv1alpha1.Endpoint{}
+		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("failed to get Endpoints for BMC: %w", err)
 		}
-		return fmt.Errorf("failed to get Endpoints for BMC: %w", err)
+		log.V(1).Info("Got Endpoints for BMC", "Endpoints", endpoint.Name)
 	}
-	log.V(1).Info("Got Endpoints for BMC", "Endpoints", endpoint.Name)
+
+	if bmcObj.Spec.Access != nil {
+		ips, err := net.LookupIP(bmcObj.Spec.Access.Address)
+		if err != nil {
+			return fmt.Errorf("failed to lookup IP for BMC address: %w", err)
+		}
+		if len(ips) > 0 {
+			// pick the the IPv4 address
+			// TODO: handle multiple IPs for a BMC (IPv4 and IPv6)
+			for _, ipaddress := range ips {
+				if ipaddress.To4() != nil {
+					ip = metalv1alpha1.MustParseIP(ipaddress.String())
+				}
+			}
+		}
+	}
 
 	bmcBase := bmcObj.DeepCopy()
-	bmcObj.Status.IP = endpoint.Spec.IP
-	bmcObj.Status.MACAddress = endpoint.Spec.MACAddress
+	bmcObj.Status.IP = ip
+	bmcObj.Status.MACAddress = macAddress
 	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}

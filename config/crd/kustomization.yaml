@@ -15,7 +15,7 @@ patches:
 # patches here are for enabling the conversion webhook for each CRD
 #- path: patches/webhook_in_endpoints.yaml
 #- path: patches/webhook_in_bmcsecrets.yaml
-#- path: patches/webhook_in_bmcs.yaml
+- path: patches/webhook_in_bmcs.yaml
 #- path: patches/webhook_in_servers.yaml
 #- path: patches/webhook_in_serverbootconfigurations.yaml
 - path: patches/webhook_in_serverclaims.yaml

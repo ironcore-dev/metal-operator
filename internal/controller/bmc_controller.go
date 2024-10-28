@@ -100,6 +100,8 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 			}
 			return fmt.Errorf("failed to get Endpoints for BMC: %w", err)
 		}
+		ip = endpoint.Spec.IP
+		macAddress = endpoint.Spec.MACAddress
 		log.V(1).Info("Got Endpoints for BMC", "Endpoints", endpoint.Name)
 	}
 

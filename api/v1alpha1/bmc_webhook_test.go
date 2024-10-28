@@ -23,7 +23,7 @@ var _ = Describe("BMC Webhook", func() {
 			Spec: BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 				Access: &Access{
-					Address: "http://localhost:8080",
+					Address: "localhost",
 				},
 			},
 		}
@@ -90,7 +90,7 @@ var _ = Describe("BMC Webhook", func() {
 		Eventually(Update(bmc, func() {
 			bmc.Spec.EndpointRef = nil
 			bmc.Spec.Access = &Access{
-				Address: "http://localhost:8080",
+				Address: "localhost",
 			}
 		})).Should(Succeed())
 	})
@@ -102,7 +102,7 @@ var _ = Describe("BMC Webhook", func() {
 			},
 			Spec: BMCSpec{
 				Access: &Access{
-					Address: "http://localhost:8080",
+					Address: "localhost",
 				},
 			},
 		}
@@ -117,7 +117,7 @@ var _ = Describe("BMC Webhook", func() {
 			},
 			Spec: BMCSpec{
 				Access: &Access{
-					Address: "http://localhost:8080",
+					Address: "localhost",
 				},
 			},
 		}
@@ -129,7 +129,7 @@ var _ = Describe("BMC Webhook", func() {
 		})).Should(Not(Succeed()))
 
 		Eventually(Object(bmc)).Should(SatisfyAll(HaveField(
-			"Spec.Access.Address", "http://localhost:8080")))
+			"Spec.Access.Address", "localhost")))
 	})
 
 	It("Should admit if the BMC has is changing to an EndpointRef from an Access spec field", func() {
@@ -139,7 +139,7 @@ var _ = Describe("BMC Webhook", func() {
 			},
 			Spec: BMCSpec{
 				Access: &Access{
-					Address: "http://localhost:8080",
+					Address: "localhost",
 				},
 			},
 		}

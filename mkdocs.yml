@@ -48,13 +48,17 @@ markdown_extensions:
 
 nav:
 - Home: README.md
-- Architecture:
-  - Overview: README.md
-- Usage:
-  - Discover Servers: README.md
-  - Provision Servers: README.md
-- Developer Guide:
-  - Local Setup: dev_setup.md
+- Architecture: architecture.md
+- Concepts:
+    - Endpoints: concepts/endpoints.md
+    - BMCs: concepts/bmcs.md
+    - BMCSecrets: concepts/bmcsecrets.md
+    - Servers: concepts/servers.md
+    - ServerBootConfigurations: concepts/serverbootconfigurations.md
+    - ServerClaims: concepts/serverclaims.md
+- Development Guide:
+  - Local Setup: development/dev_setup.md
+  - Documentation: development/dev_docs.md
 - API Reference: api-reference/api.md
 
 extra:

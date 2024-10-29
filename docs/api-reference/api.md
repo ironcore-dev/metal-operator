@@ -67,7 +67,7 @@ map[string]string
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -94,7 +94,7 @@ BMCSpec
 <td>
 <code>endpointRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -108,7 +108,7 @@ This reference is typically used to locate the BMC endpoint within the cluster.<
 <td>
 <code>bmcSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -208,7 +208,7 @@ string
 <td>
 <code>bmcSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -272,7 +272,7 @@ temporary state can be very short.</p>
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -334,7 +334,7 @@ The stringData field is never output when reading from the API.</p>
 <td>
 <code>type</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#secrettype-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#secrettype-v1-core">
 Kubernetes core/v1.SecretType
 </a>
 </em>
@@ -367,7 +367,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/secret/#se
 <td>
 <code>endpointRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -381,7 +381,7 @@ This reference is typically used to locate the BMC endpoint within the cluster.<
 <td>
 <code>bmcSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -572,7 +572,7 @@ BMCPowerState
 <td>
 <code>conditions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#condition-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">
 []Kubernetes meta/v1.Condition
 </a>
 </em>
@@ -722,7 +722,7 @@ This port is used by the specified console protocol to establish connections.</p
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1110,7 +1110,7 @@ This port is used by the specified protocol to establish connections.</p>
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1174,7 +1174,7 @@ IndicatorLED
 <td>
 <code>serverClaimRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -1188,7 +1188,7 @@ This field is optional and can be omitted if no claim is associated with this se
 <td>
 <code>bmcRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1216,7 +1216,7 @@ This field is optional and can be omitted if no BMC access is specified.</p>
 <td>
 <code>bootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -1287,7 +1287,7 @@ ServerStatus
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1314,7 +1314,7 @@ ServerBootConfigurationSpec
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1339,7 +1339,7 @@ This field is optional and can be omitted if not specified.</p>
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1386,7 +1386,7 @@ ServerBootConfigurationStatus
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1411,7 +1411,7 @@ This field is optional and can be omitted if not specified.</p>
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1497,7 +1497,7 @@ ServerBootConfigurationState
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1537,7 +1537,7 @@ Power
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1551,7 +1551,7 @@ This field is optional and can be omitted if the server is to be selected using 
 <td>
 <code>serverSelector</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#labelselector-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
 </a>
 </em>
@@ -1565,7 +1565,7 @@ This field is optional and can be omitted if a specific server is referenced usi
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1636,7 +1636,7 @@ Power
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1650,7 +1650,7 @@ This field is optional and can be omitted if the server is to be selected using 
 <td>
 <code>serverSelector</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#labelselector-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
 </a>
 </em>
@@ -1664,7 +1664,7 @@ This field is optional and can be omitted if a specific server is referenced usi
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1810,7 +1810,7 @@ IndicatorLED
 <td>
 <code>serverClaimRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -1824,7 +1824,7 @@ This field is optional and can be omitted if no claim is associated with this se
 <td>
 <code>bmcRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1852,7 +1852,7 @@ This field is optional and can be omitted if no BMC access is specified.</p>
 <td>
 <code>bootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -2064,7 +2064,7 @@ BIOSSettings
 <td>
 <code>conditions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.30/#condition-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">
 []Kubernetes meta/v1.Condition
 </a>
 </em>

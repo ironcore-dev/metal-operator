@@ -10,35 +10,6 @@
 </div>
 Resource Types:
 <ul></ul>
-<h3 id="metal.ironcore.dev/v1alpha1.Access">Access
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec</a>)
-</p>
-<div>
-<p>Access defines inline network access configuration for the BMC.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>address</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Address is the IP or hostname used for accessing the BMC.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
 </h3>
 <p>
@@ -138,14 +109,14 @@ This reference is typically used to locate the BMC endpoint within the cluster.<
 <td>
 <code>access</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.Access">
-Access
+<a href="#metal.ironcore.dev/v1alpha1.InlineEndpoint">
+InlineEndpoint
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Access allows inline configuration of network access details for the BMC.
+<p>Endpoint allows inline configuration of network access details for the BMC.
 Use this field if access settings like address are to be configured directly within the BMC resource.</p>
 </td>
 </tr>
@@ -427,14 +398,14 @@ This reference is typically used to locate the BMC endpoint within the cluster.<
 <td>
 <code>access</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.Access">
-Access
+<a href="#metal.ironcore.dev/v1alpha1.InlineEndpoint">
+InlineEndpoint
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Access allows inline configuration of network access details for the BMC.
+<p>Endpoint allows inline configuration of network access details for the BMC.
 Use this field if access settings like address are to be configured directly within the BMC resource.</p>
 </td>
 </tr>
@@ -900,7 +871,7 @@ IP
 <h3 id="metal.ironcore.dev/v1alpha1.IP">IP
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus</a>, <a href="#metal.ironcore.dev/v1alpha1.EndpointSpec">EndpointSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.NetworkInterface">NetworkInterface</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus</a>, <a href="#metal.ironcore.dev/v1alpha1.EndpointSpec">EndpointSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.InlineEndpoint">InlineEndpoint</a>, <a href="#metal.ironcore.dev/v1alpha1.NetworkInterface">NetworkInterface</a>)
 </p>
 <div>
 <p>IP is an IP address.</p>
@@ -983,6 +954,48 @@ net/netip.Prefix
 determined.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.InlineEndpoint">InlineEndpoint
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec</a>)
+</p>
+<div>
+<p>InlineEndpoint defines inline network access configuration for the BMC.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>macAddress</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>MACAddress is the MAC address of the endpoint.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ip</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.IP">
+IP
+</a>
+</em>
+</td>
+<td>
+<p>IP is the IP address of the BMC.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.NetworkInterface">NetworkInterface
 </h3>

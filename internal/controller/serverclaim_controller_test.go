@@ -27,8 +27,8 @@ var _ = Describe("ServerClaim Controller", func() {
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
-				"username": []byte("foo"),
-				"password": []byte("bar"),
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
@@ -46,7 +46,7 @@ var _ = Describe("ServerClaim Controller", func() {
 						Name: metalv1alpha1.ProtocolRedfishLocal,
 						Port: 8000,
 					},
-					Endpoint: "127.0.0.1",
+					Address: "127.0.0.1",
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},

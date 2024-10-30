@@ -202,7 +202,7 @@ var _ = Describe("Server Controller", func() {
 						Name: metalv1alpha1.ProtocolRedfishLocal,
 						Port: 8000,
 					},
-					Endpoint: "127.0.0.1",
+					Address: "127.0.0.1",
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},

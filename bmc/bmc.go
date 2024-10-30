@@ -179,4 +179,5 @@ type Manager struct {
 	Model           string
 	PowerState      string
 	State           string
+	MACAddress      string
 }

@@ -36,7 +36,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			c,
 			insecure,
 			server.Spec.BMC.Protocol.Name,
-			metalv1alpha1.MustParseIP(server.Spec.BMC.Endpoint),
+			server.Spec.BMC.Address,
 			server.Spec.BMC.Protocol.Port,
 			bmcSecret,
 		)
@@ -46,9 +46,18 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 }
 
 func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool) (bmc.BMC, error) {
-	endpoint := &metalv1alpha1.Endpoint{}
-	if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
-		return nil, fmt.Errorf("failed to get Endpoints for BMC: %w", err)
+	var address string
+
+	if bmcObj.Spec.EndpointRef != nil {
+		endpoint := &metalv1alpha1.Endpoint{}
+		if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
+			return nil, fmt.Errorf("failed to get Endpoints for BMC: %w", err)
+		}
+		address = endpoint.Spec.IP.String()
+	}
+
+	if bmcObj.Spec.Endpoint != nil {
+		address = bmcObj.Spec.Endpoint.IP.String()
 	}
 
 	bmcSecret := &metalv1alpha1.BMCSecret{}
@@ -56,10 +65,10 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 	}
 
-	return CreateBMCClient(ctx, c, insecure, bmcObj.Spec.Protocol.Name, endpoint.Spec.IP, bmcObj.Spec.Protocol.Port, bmcSecret)
+	return CreateBMCClient(ctx, c, insecure, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret)
 }
 
-func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcProtocol metalv1alpha1.ProtocolName, endpoint metalv1alpha1.IP, port int32, bmcSecret *metalv1alpha1.BMCSecret) (bmc.BMC, error) {
+func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcProtocol metalv1alpha1.ProtocolName, address string, port int32, bmcSecret *metalv1alpha1.BMCSecret) (bmc.BMC, error) {
 	protocol := "https"
 	if insecure {
 		protocol = "http"
@@ -68,7 +77,7 @@ func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcPro
 	var bmcClient bmc.BMC
 	switch bmcProtocol {
 	case metalv1alpha1.ProtocolRedfish:
-		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, endpoint, port)
+		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, address, port)
 		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
@@ -78,7 +87,7 @@ func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcPro
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}
 	case metalv1alpha1.ProtocolRedfishLocal:
-		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, endpoint, port)
+		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, address, port)
 		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
@@ -88,7 +97,7 @@ func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcPro
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}
 	case metalv1alpha1.ProtocolRedfishKube:
-		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, endpoint, port)
+		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, address, port)
 		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)

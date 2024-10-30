@@ -19,7 +19,13 @@ const (
 type BMCSpec struct {
 	// EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
 	// This reference is typically used to locate the BMC endpoint within the cluster.
-	EndpointRef v1.LocalObjectReference `json:"endpointRef"`
+	// +optional
+	EndpointRef *v1.LocalObjectReference `json:"endpointRef"`
+
+	// Endpoint allows inline configuration of network access details for the BMC.
+	// Use this field if access settings like address are to be configured directly within the BMC resource.
+	// +optional
+	Endpoint *InlineEndpoint `json:"access,omitempty"`
 
 	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
 	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.
@@ -33,6 +39,16 @@ type BMCSpec struct {
 	// This field is optional and can be omitted if console access is not required.
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
+}
+
+// InlineEndpoint defines inline network access configuration for the BMC.
+type InlineEndpoint struct {
+	// MACAddress is the MAC address of the endpoint.
+	MACAddress string `json:"macAddress"`
+	// IP is the IP address of the BMC.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Schemaless
+	IP IP `json:"ip"`
 }
 
 // ConsoleProtocol defines the protocol and port used for console access to the BMC.

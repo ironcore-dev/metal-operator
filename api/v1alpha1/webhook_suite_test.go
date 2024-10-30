@@ -92,8 +92,7 @@ var _ = BeforeSuite(func() {
 	Expect(corev1.AddToScheme(scheme)).To(Succeed())
 	Expect(err).NotTo(HaveOccurred())
 
-	err = admissionv1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(admissionv1.AddToScheme(scheme)).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 
@@ -115,8 +114,8 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&ServerClaim{}).SetupWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
+	Expect((&ServerClaim{}).SetupWebhookWithManager(mgr)).NotTo(HaveOccurred())
+	Expect((&BMC{}).SetupWebhookWithManager(mgr)).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:webhook
 

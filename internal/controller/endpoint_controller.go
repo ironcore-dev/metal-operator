@@ -168,7 +168,7 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 			Name: endpoint.Name,
 		},
 		Spec: metalv1alpha1.BMCSpec{
-			EndpointRef: corev1.LocalObjectReference{
+			EndpointRef: &corev1.LocalObjectReference{
 				Name: endpoint.Name,
 			},
 			BMCSecretRef: corev1.LocalObjectReference{
@@ -208,8 +208,8 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger
 			Name: endpoint.Name,
 		},
 		Data: map[string][]byte{
-			"username": []byte(m.DefaultCredentials[0].Username),
-			"password": []byte(m.DefaultCredentials[0].Password),
+			metalv1alpha1.BMCSecretUsernameKeyName: []byte(m.DefaultCredentials[0].Username),
+			metalv1alpha1.BMCSecretPasswordKeyName: []byte(m.DefaultCredentials[0].Password),
 		},
 	}
 

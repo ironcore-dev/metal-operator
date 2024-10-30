@@ -86,18 +86,32 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 }
 
 func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
-	endpoint := &metalv1alpha1.Endpoint{}
-	if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
+	var (
+		ip         metalv1alpha1.IP
+		macAddress string
+	)
+
+	if bmcObj.Spec.EndpointRef != nil {
+		endpoint := &metalv1alpha1.Endpoint{}
+		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("failed to get Endpoints for BMC: %w", err)
 		}
-		return fmt.Errorf("failed to get Endpoints for BMC: %w", err)
+		ip = endpoint.Spec.IP
+		macAddress = endpoint.Spec.MACAddress
+		log.V(1).Info("Got Endpoints for BMC", "Endpoints", endpoint.Name)
 	}
-	log.V(1).Info("Got Endpoints for BMC", "Endpoints", endpoint.Name)
+
+	if bmcObj.Spec.Endpoint != nil {
+		ip = bmcObj.Spec.Endpoint.IP
+		macAddress = bmcObj.Spec.Endpoint.MACAddress
+	}
 
 	bmcBase := bmcObj.DeepCopy()
-	bmcObj.Status.IP = endpoint.Spec.IP
-	bmcObj.Status.MACAddress = endpoint.Spec.MACAddress
+	bmcObj.Status.IP = ip
+	bmcObj.Status.MACAddress = macAddress
 	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}

@@ -164,11 +164,6 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Applied BootConfiguration for ServerClaim")
 
-	if modified, err := r.ensureObjectRefForServer(ctx, log, claim, server); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
-
 	if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -185,6 +180,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 
 func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
 	if server.Spec.ServerClaimRef != nil {
+		log.V(1).Info("Server is already claimed", "Server", server.Name, "Claim", server.Spec.ServerClaimRef.Name)
 		return false, nil
 	}
 
@@ -332,6 +328,12 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		return nil, nil
 	}
 	log.V(1).Info("Matching server found", "Server", server.Name)
+
+	if modified, err := r.ensureObjectRefForServer(ctx, log, claim, server); err != nil || modified {
+		return nil, err
+	}
+	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
+
 	return server, nil
 }
 

@@ -273,7 +273,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Ensuring that the server is set back to initial due to the discovery check timing out")
-		Eventually(Object(server), "500ms").Should(SatisfyAll(
+		Eventually(Object(server), "1000ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 		))
 

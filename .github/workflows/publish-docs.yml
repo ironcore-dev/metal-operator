@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 'pypy3.9'
+          python-version: 'pypy3.10'
       - uses: actions/cache@v4
         with:
           key: ${{ github.ref }}

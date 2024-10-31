@@ -330,17 +330,18 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 
 func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	serverBase := server.DeepCopy()
-	server.Spec.Power = metalv1alpha1.PowerOff
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to update server power state: %w", err)
-	}
-	log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
+	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+		server.Spec.Power = metalv1alpha1.PowerOff
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to update server power state: %w", err)
+		}
+		log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
 
-	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+			return false, fmt.Errorf("failed to ensure server power state: %w", err)
+		}
+		log.V(1).Info("Server state set to power off")
 	}
-	log.V(1).Info("Server state set to power off")
-
 	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
 	}

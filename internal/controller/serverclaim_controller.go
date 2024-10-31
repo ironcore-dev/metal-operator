@@ -385,6 +385,10 @@ func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log l
 			log.V(1).Info("Server not in a claimable state", "Server", s.Name, "ServerState", s.Status.State)
 			continue
 		}
+		if s.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+			log.V(1).Info("Server is not powered off", "Server", s.Name, "PowerState", s.Status.PowerState)
+			continue
+		}
 		server = s.DeepCopy()
 		break
 	}

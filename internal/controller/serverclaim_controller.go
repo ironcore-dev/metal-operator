@@ -351,6 +351,10 @@ func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log 
 		log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 		return nil, nil
 	}
+	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+		log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
+		return nil, nil
+	}
 	if claim.Spec.ServerSelector == nil {
 		return server, nil
 	}
@@ -383,6 +387,10 @@ func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log l
 		}
 		if s.Status.State != metalv1alpha1.ServerStateAvailable && s.Status.State != metalv1alpha1.ServerStateReserved {
 			log.V(1).Info("Server not in a claimable state", "Server", s.Name, "ServerState", s.Status.State)
+			continue
+		}
+		if s.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+			log.V(1).Info("Server is not powered off", "Server", s.Name, "PowerState", s.Status.PowerState)
 			continue
 		}
 		server = s.DeepCopy()

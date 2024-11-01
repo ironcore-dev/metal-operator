@@ -399,7 +399,7 @@ func (r *RedfishBMC) getSystemByUUID(systemUUID string) (*redfish.ComputerSystem
 		return nil, err
 	}
 	for _, system := range systems {
-		if system.UUID == systemUUID {
+		if strings.ToLower(system.UUID) == systemUUID {
 			return system, nil
 		}
 	}

@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -166,7 +167,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 				Name: GetServerNameFromBMCandIndex(i, bmcObj),
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:   s.UUID,
+				UUID:   strings.ToLower(s.UUID), // always use lower-case uuids
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 			},
 		}

@@ -40,17 +40,9 @@ type BIOSSettings struct {
 
 // ServerBIOSStatus defines the observed state of ServerBIOS
 type ServerBIOSStatus struct {
-	// LastScanTime reflects the timestamp when the scanning for installed firmware was performed
-	// +optional
-	LastScanTime metav1.Time `json:"lastScanTime,omitempty"`
-
 	// BIOS contains a bios version and settings.
 	// +optional
 	BIOS BIOSSettings `json:"bios,omitempty"`
-
-	// RunningJob reflects the invoked scan or update job running
-	// +optional
-	RunningJob RunningJobRef `json:"runningJob,omitempty"`
 }
 
 // +kubebuilder:object:root=true

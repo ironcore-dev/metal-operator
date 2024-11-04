@@ -5,23 +5,26 @@ package controller
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+type TaskExecutor interface {
+	ExecuteScan(ctx context.Context, log logr.Logger, serverBIOSRef string) (string, map[string]string, error)
+	ExecuteSettingsApply(ctx context.Context, log logr.Logger, serverBIOSRef string) error
+	ExecuteVersionUpdate(ctx context.Context, log logr.Logger, serverBIOSRef string) error
+	IsTaskInProgress(ctx context.Context, log logr.Logger, serverBIOSRef string) (bool, error)
+}
 
 const serverBIOSFinalizer = "metal.ironcore.dev/serverbios"
 
@@ -30,11 +33,8 @@ type ServerBIOSReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	Insecure bool
-	// todo: need to decide how to provide jobs' configuration to controller
-	JobNamespace          string
-	JobImage              string
-	JobServiceAccountName string
+	TaskExecutor    TaskExecutor
+	RequeueInterval time.Duration
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses,verbs=get;list;watch;create;update;patch;delete
@@ -57,7 +57,6 @@ func (r *ServerBIOSReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // - object is being deleted;
 // - object does not contain reference to server;
 // - object contains reference to server, but server references to another object;
-// - there is active job related to the object already running;
 func (r *ServerBIOSReconciler) reconciliationRequired(
 	ctx context.Context,
 	log logr.Logger,
@@ -94,12 +93,6 @@ func (r *ServerBIOSReconciler) reconciliationRequired(
 		}
 	}
 	log.V(1).Info("ensured mutual reference", "server", server.Name)
-
-	// if related job is already running - stop reconciliation
-	if jobInProgress, err := r.jobInProgress(ctx, log, serverBIOS.Status.RunningJob); err != nil || jobInProgress {
-		log.V(1).Info("related job is already running")
-		return ctrl.Result{}, err
-	}
 
 	return r.reconcile(ctx, log, serverBIOS)
 }
@@ -146,16 +139,15 @@ func (r *ServerBIOSReconciler) cleanupReferences(
 // Reconciliation flow for ServerBIOS:
 //  1. Ensure finalizer is set on the object
 //  2. Ensure info about current BIOS version and settings is not outdated, otherwise:
-//     2.1. Invoke scan job and set reference to this job in status
-//     2.2. Wait until object will be updated by job runner with up-to-date info, empty reference to the job and the
-//     last scan time
+//     2.2. Invoke scan job
+//     2.2. Exit if no discrepancy is found
 //  3. Ensure referred server is in Available state
 //  4. Ensure desired and current BIOS versions match, otherwise:
-//     4.1. Invoke BIOS version update job and set reference to this job in status
-//     4.2. Wait until object will be updated by job runner with up-to-date info and empty reference to the job
+//     4.1. Exit if some task is already in progress
+//     4.2. Invoke BIOS version update job
 //  5. Ensure desired and current BIOS settings match, otherwise:
-//     5.1. Invoke BIOS settings update job and set reference to this job in status
-//     5.2. Wait until object will be updated by job runner with up-to-date info and empty reference to the job
+//     5.1. Exit if some task is already in progress
+//     5.2. Invoke BIOS settings update job
 func (r *ServerBIOSReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -166,27 +158,38 @@ func (r *ServerBIOSReconciler) reconcile(
 	}
 	log.V(1).Info("ensured finalizer has been added")
 
-	// if scanned data outdated - run scan
-	if time.Since(serverBIOS.Status.LastScanTime.Time) > time.Duration(serverBIOS.Spec.ScanPeriodMinutes)*time.Minute {
-		return r.reconcileScan(ctx, log, serverBIOS)
+	updateRequired, err := r.reconcileScan(ctx, log, serverBIOS)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
-	return r.reconcileUpdate(ctx, log, serverBIOS)
+	if updateRequired {
+		return r.reconcileUpdate(ctx, log, serverBIOS)
+
+	}
+	return ctrl.Result{RequeueAfter: r.RequeueInterval}, nil
 }
 
 func (r *ServerBIOSReconciler) reconcileScan(
 	ctx context.Context,
 	log logr.Logger,
 	serverBIOS *metalv1alpha1.ServerBIOS,
-) (ctrl.Result, error) {
+) (bool, error) {
 	log.V(1).Info("invoking scan job")
-	jobReference, err := r.createJob(ctx, log, serverBIOS, metalv1alpha1.ScanBIOSVersionJobType)
+	version, settings, err := r.TaskExecutor.ExecuteScan(ctx, log, serverBIOS.Name)
 	if err != nil {
-		return ctrl.Result{}, err
+		return false, err
 	}
-	return r.patchJobReference(ctx, log, serverBIOS, metalv1alpha1.RunningJobRef{
-		Type:   metalv1alpha1.ScanBIOSVersionJobType,
-		JobRef: jobReference,
-	})
+	serverBIOSBase := serverBIOS.DeepCopy()
+	versionUpdateRequired := serverBIOS.Spec.BIOS.Version != version
+	if !versionUpdateRequired {
+		serverBIOS.Status.BIOS.Version = version
+	}
+	settingsUpdateRequired := !cmp.Equal(serverBIOS.Spec.BIOS.Settings, settings)
+	if !settingsUpdateRequired {
+		serverBIOS.Status.BIOS.Settings = settings
+	}
+	updateRequired := versionUpdateRequired || settingsUpdateRequired
+	return updateRequired, r.Status().Patch(ctx, serverBIOSBase, client.MergeFrom(serverBIOS))
 }
 
 func (r *ServerBIOSReconciler) reconcileUpdate(
@@ -200,8 +203,7 @@ func (r *ServerBIOSReconciler) reconcileUpdate(
 	}
 	// if referred server is not in Available state - stop reconciliation
 	if server.Status.State != metalv1alpha1.ServerStateAvailable {
-		// todo: maybe return ctrl.Result{RequeueAfter: ?}
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: r.RequeueInterval}, nil
 	}
 	// if desired bios version does not match actual version - run version update
 	if serverBIOS.Spec.BIOS.Version != serverBIOS.Status.BIOS.Version {
@@ -220,14 +222,10 @@ func (r *ServerBIOSReconciler) reconcileVersionUpdate(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (ctrl.Result, error) {
 	log.V(1).Info("invoking version update job")
-	jobReference, err := r.createJob(ctx, log, serverBIOS, metalv1alpha1.UpdateBIOSVersionJobType)
-	if err != nil {
-		return ctrl.Result{}, err
+	if inProgress, err := r.TaskExecutor.IsTaskInProgress(ctx, log, serverBIOS.Name); err != nil || inProgress {
+		return ctrl.Result{RequeueAfter: r.RequeueInterval}, err
 	}
-	return r.patchJobReference(ctx, log, serverBIOS, metalv1alpha1.RunningJobRef{
-		Type:   metalv1alpha1.UpdateBIOSVersionJobType,
-		JobRef: jobReference,
-	})
+	return ctrl.Result{}, r.TaskExecutor.ExecuteVersionUpdate(ctx, log, serverBIOS.Name)
 }
 
 func (r *ServerBIOSReconciler) reconcileSettingsUpdate(
@@ -236,81 +234,10 @@ func (r *ServerBIOSReconciler) reconcileSettingsUpdate(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (ctrl.Result, error) {
 	log.V(1).Info("invoking settings update job")
-	jobReference, err := r.createJob(ctx, log, serverBIOS, metalv1alpha1.ApplyBIOSSettingsJobType)
-	if err != nil {
-		return ctrl.Result{}, err
+	if inProgress, err := r.TaskExecutor.IsTaskInProgress(ctx, log, serverBIOS.Name); err != nil || inProgress {
+		return ctrl.Result{RequeueAfter: r.RequeueInterval}, err
 	}
-	return r.patchJobReference(ctx, log, serverBIOS, metalv1alpha1.RunningJobRef{
-		Type:   metalv1alpha1.ApplyBIOSSettingsJobType,
-		JobRef: jobReference,
-	})
-}
-
-func (r *ServerBIOSReconciler) createJob(
-	ctx context.Context,
-	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
-	jobType metalv1alpha1.JobType,
-) (corev1.ObjectReference, error) {
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-", serverBIOS.Name),
-			Namespace:    r.JobNamespace,
-		},
-		Spec: batchv1.JobSpec{
-			Completions: nil,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"metal.ironcore.dev/serverbios": serverBIOS.Name,
-					"metal.ironcore.dev/jobtype":    string(jobType),
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"metal.ironcore.dev/serverbios": serverBIOS.Name,
-						"metal.ironcore.dev/jobtype":    string(jobType),
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Image: r.JobImage,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "JOB_TYPE",
-									Value: string(jobType),
-								},
-								{
-									Name:  "SERVER_BIOS_REF",
-									Value: serverBIOS.Name,
-								},
-								{
-									Name:  "INSECURE",
-									Value: strconv.FormatBool(r.Insecure),
-								},
-							},
-						},
-					},
-					ServiceAccountName:           r.JobServiceAccountName,
-					AutomountServiceAccountToken: ptr.To(true),
-					RestartPolicy:                corev1.RestartPolicyNever,
-				},
-			},
-		},
-	}
-	if err := r.Create(ctx, job); err != nil {
-		log.Error(err, "failed to create job")
-		return corev1.ObjectReference{}, err
-	}
-	reference := corev1.ObjectReference{
-		Kind:       "Job",
-		Namespace:  job.Namespace,
-		Name:       job.Name,
-		UID:        job.UID,
-		APIVersion: "batch/v1",
-	}
-	return reference, nil
+	return ctrl.Result{}, r.TaskExecutor.ExecuteSettingsApply(ctx, log, serverBIOS.Name)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -334,24 +261,6 @@ func (r *ServerBIOSReconciler) getReferredServer(
 	return server, nil
 }
 
-func (r *ServerBIOSReconciler) jobInProgress(
-	ctx context.Context,
-	log logr.Logger,
-	jobReference metalv1alpha1.RunningJobRef,
-) (bool, error) {
-	if jobReference == (metalv1alpha1.RunningJobRef{}) {
-		return false, nil
-	}
-	key := client.ObjectKey{Namespace: r.JobNamespace, Name: r.JobImage}
-	job := batchv1.Job{}
-	if err := r.Get(ctx, key, &job); err != nil {
-		log.Error(err, "failed to get job")
-		return false, err
-	}
-	log.V(1).Info("active job found")
-	return job.Status.Active > 0, nil
-}
-
 func (r *ServerBIOSReconciler) patchBIOSSettingsRef(
 	ctx context.Context,
 	log logr.Logger,
@@ -365,19 +274,4 @@ func (r *ServerBIOSReconciler) patchBIOSSettingsRef(
 		log.Error(err, "failed to patch bios settings ref")
 	}
 	return err
-}
-
-func (r *ServerBIOSReconciler) patchJobReference(
-	ctx context.Context,
-	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
-	jobReference metalv1alpha1.RunningJobRef,
-) (ctrl.Result, error) {
-	var err error
-	serverBIOSBase := serverBIOS.DeepCopy()
-	serverBIOS.Status.RunningJob = jobReference
-	if err = r.Patch(ctx, serverBIOSBase, client.MergeFrom(serverBIOS)); err != nil {
-		log.Error(err, "failed to patch server BIOS")
-	}
-	return ctrl.Result{}, err
 }

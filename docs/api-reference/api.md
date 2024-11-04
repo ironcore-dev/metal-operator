@@ -2179,6 +2179,74 @@ string
 </tr>
 <tr>
 <td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.StorageState">
+StorageState
+</a>
+</em>
+</td>
+<td>
+<p>State specifies the state of the storage device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.StorageVolume">
+[]StorageVolume
+</a>
+</em>
+</td>
+<td>
+<p>Volumes is a collection of volumes associated with this storage.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>drives</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.StorageDrive">
+[]StorageDrive
+</a>
+</em>
+</td>
+<td>
+<p>Drives is a collection of drives associated with this storage.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.StorageDrive">StorageDrive
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Storage">Storage</a>)
+</p>
+<div>
+<p>StorageDrive defines the details of one storage drive</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name of the storage interface.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>rotational</code><br/>
 <em>
 bool
@@ -2209,7 +2277,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
-<p>SizeBytes specifies the size of the storage device in bytes.</p>
+<p>Capacity specifies the size of the storage device in bytes.</p>
 </td>
 </tr>
 <tr>
@@ -2252,7 +2320,7 @@ StorageState
 <h3 id="metal.ironcore.dev/v1alpha1.StorageState">StorageState
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Storage">Storage</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Storage">Storage</a>, <a href="#metal.ironcore.dev/v1alpha1.StorageDrive">StorageDrive</a>, <a href="#metal.ironcore.dev/v1alpha1.StorageVolume">StorageVolume</a>)
 </p>
 <div>
 <p>StorageState represents Storage states</p>
@@ -2274,6 +2342,83 @@ StorageState
 <td><p>StorageStateEnabled indicates that the storage device is enabled.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.StorageVolume">StorageVolume
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Storage">Storage</a>)
+</p>
+<div>
+<p>StorageVolume defines the details of one storage volume</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name of the storage interface.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>capacity</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity">
+k8s.io/apimachinery/pkg/api/resource.Quantity
+</a>
+</em>
+</td>
+<td>
+<p>Capacity specifies the size of the storage device in bytes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.StorageState">
+StorageState
+</a>
+</em>
+</td>
+<td>
+<p>Status specifies the status of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>raidType</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>RAIDType specifies the RAID type of the associated Volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeUsage</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>VolumeUsage specifies the volume usage type for the Volume.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <hr/>
 <p><em>

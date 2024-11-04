@@ -50,6 +50,13 @@ type BMC interface {
 	GetStorages(systemUUID string) ([]Storage, error)
 }
 
+type Entity struct {
+	// ID uniquely identifies the resource.
+	ID string `json:"Id"`
+	// Name is the name of the resource or array element.
+	Name string `json:"name"`
+}
+
 type Bios struct {
 	Version    string
 	Attributes map[string]string
@@ -107,9 +114,20 @@ type Server struct {
 	SerialNumber string
 }
 
-type Storage struct {
-	// Name is the name of the storage interface.
-	Name string `json:"name,omitempty"`
+type Volume struct {
+	Entity
+	// CapacityBytes specifies the capacity of the volume in bytes.
+	SizeBytes int64 `json:"sizeBytes,omitempty"`
+	// Status specifies the status of the volume.
+	State common.State `json:"state,omitempty"`
+	// RAIDType specifies the RAID type of the associated Volume.
+	RAIDType redfish.RAIDType `json:"raidType,omitempty"`
+	// VolumeUsage specifies the volume usage type for the Volume.
+	VolumeUsage string `json:"volumeUsage,omitempty"`
+}
+
+type Drive struct {
+	Entity
 	// Rotational specifies whether the storage device is rotational.
 	Rotational bool `json:"rotational,omitempty"`
 	// Type specifies the type of the storage device.
@@ -122,6 +140,17 @@ type Storage struct {
 	Model string `json:"model,omitempty"`
 	// State specifies the state of the storage device.
 	State common.State `json:"state,omitempty"`
+}
+
+type Storage struct {
+	Entity
+	State common.State `json:"state,omitempty"`
+	// Description provides a description of this resource.
+	Description string `json:"description,omitempty"`
+	// Drives is a collection of drives associated with this storage.
+	Drives []Drive `json:"drives,omitempty"`
+	// Volumes is a collection of volumes associated with this storage.
+	Volumes []Volume `json:"volumes,omitempty"`
 }
 
 // PowerState is the power state of the system.

@@ -1,13 +1,8 @@
 package app
 
 import (
-	"path/filepath"
-
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 
 	metalv1alphav1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -33,8 +28,4 @@ func NewCommand() *cobra.Command {
 	}
 	root.AddCommand(NewMoveCommand())
 	return root
-}
-
-func GetKubeconfig() (*rest.Config, error) {
-	return clientcmd.BuildConfigFromFlags("", filepath.Join(homedir.HomeDir(), ".kube", "config"))
 }

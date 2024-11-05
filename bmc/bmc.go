@@ -50,6 +50,13 @@ type BMC interface {
 	GetStorages(systemUUID string) ([]Storage, error)
 }
 
+type Entity struct {
+	// ID uniquely identifies the resource.
+	ID string `json:"Id"`
+	// Name is the name of the resource or array element.
+	Name string `json:"name"`
+}
+
 type Bios struct {
 	Version    string
 	Attributes map[string]string
@@ -107,11 +114,24 @@ type Server struct {
 	SerialNumber string
 }
 
-type Storage struct {
-	// Name is the name of the storage interface.
-	Name string `json:"name,omitempty"`
-	// Rotational specifies whether the storage device is rotational.
-	Rotational bool `json:"rotational,omitempty"`
+// Volume represents a storage volume.
+type Volume struct {
+	Entity
+	// CapacityBytes specifies the capacity of the volume in bytes.
+	SizeBytes int64 `json:"sizeBytes,omitempty"`
+	// Status specifies the status of the volume.
+	State common.State `json:"state,omitempty"`
+	// RAIDType specifies the RAID type of the associated Volume.
+	RAIDType redfish.RAIDType `json:"raidType,omitempty"`
+	// VolumeUsage specifies the volume usage type for the Volume.
+	VolumeUsage string `json:"volumeUsage,omitempty"`
+}
+
+// Drive represents a storage drive.
+type Drive struct {
+	Entity
+	// MediaType specifies the media type of the storage device.
+	MediaType string `json:"mediaType,omitempty"`
 	// Type specifies the type of the storage device.
 	Type redfish.FormFactor `json:"type,omitempty"`
 	// SizeBytes specifies the size of the storage device in bytes.
@@ -122,6 +142,17 @@ type Storage struct {
 	Model string `json:"model,omitempty"`
 	// State specifies the state of the storage device.
 	State common.State `json:"state,omitempty"`
+}
+
+// Storage represents a storage resource.
+type Storage struct {
+	Entity
+	// State specifies the state of the storage.
+	State common.State `json:"state,omitempty"`
+	// Drives is a collection of drives associated with this storage.
+	Drives []Drive `json:"drives,omitempty"`
+	// Volumes is a collection of volumes associated with this storage.
+	Volumes []Volume `json:"volumes,omitempty"`
 }
 
 // PowerState is the power state of the system.

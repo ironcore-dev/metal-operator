@@ -210,15 +210,15 @@ type NetworkInterface struct {
 	MACAddress string `json:"macAddress"`
 }
 
-// Storage defines the details of one storage device
-type Storage struct {
+// StorageDrive defines the details of one storage drive
+type StorageDrive struct {
 	// Name is the name of the storage interface.
 	Name string `json:"name,omitempty"`
-	// Rotational specifies whether the storage device is rotational.
-	Rotational bool `json:"rotational,omitempty"`
+	// MediaType specifies the media type of the storage device.
+	MediaType string `json:"mediaType,omitempty"`
 	// Type specifies the type of the storage device.
 	Type string `json:"type,omitempty"`
-	// SizeBytes specifies the size of the storage device in bytes.
+	// Capacity specifies the size of the storage device in bytes.
 	Capacity *resource.Quantity `json:"capacity,omitempty"`
 	// Vendor specifies the vendor of the storage device.
 	Vendor string `json:"vendor,omitempty"`
@@ -226,6 +226,32 @@ type Storage struct {
 	Model string `json:"model,omitempty"`
 	// State specifies the state of the storage device.
 	State StorageState `json:"state,omitempty"`
+}
+
+// StorageVolume defines the details of one storage volume
+type StorageVolume struct {
+	// Name is the name of the storage interface.
+	Name string `json:"name,omitempty"`
+	// Capacity specifies the size of the storage device in bytes.
+	Capacity *resource.Quantity `json:"capacity,omitempty"`
+	// Status specifies the status of the volume.
+	State StorageState `json:"state,omitempty"`
+	// RAIDType specifies the RAID type of the associated Volume.
+	RAIDType string `json:"raidType,omitempty"`
+	// VolumeUsage specifies the volume usage type for the Volume.
+	VolumeUsage string `json:"volumeUsage,omitempty"`
+}
+
+// Storage defines the details of one storage device
+type Storage struct {
+	// Name is the name of the storage interface.
+	Name string `json:"name,omitempty"`
+	// State specifies the state of the storage device.
+	State StorageState `json:"state,omitempty"`
+	// Volumes is a collection of volumes associated with this storage.
+	Volumes []StorageVolume `json:"volumes,omitempty"`
+	// Drives is a collection of drives associated with this storage.
+	Drives []StorageDrive `json:"drives,omitempty"`
 }
 
 //+kubebuilder:object:root=true

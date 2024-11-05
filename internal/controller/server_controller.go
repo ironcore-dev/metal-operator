@@ -285,14 +285,32 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	server.Status.Storages = nil
 	for _, storage := range storages {
-		server.Status.Storages = append(server.Status.Storages, metalv1alpha1.Storage{
-			Name:     storage.Name,
-			Model:    storage.Model,
-			Capacity: resource.NewQuantity(storage.SizeBytes, resource.BinarySI),
-			Type:     string(storage.Type),
-			Vendor:   storage.Vendor,
-			State:    metalv1alpha1.StorageState(storage.State),
-		})
+		metalStorage := metalv1alpha1.Storage{
+			Name:  storage.Name,
+			State: metalv1alpha1.StorageState(storage.State),
+		}
+		for _, drive := range storage.Drives {
+			metalStorage.Drives = append(metalStorage.Drives, metalv1alpha1.StorageDrive{
+				Name:      drive.Name,
+				Model:     drive.Model,
+				Vendor:    drive.Vendor,
+				Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
+				Type:      string(drive.Type),
+				State:     metalv1alpha1.StorageState(drive.State),
+				MediaType: drive.MediaType,
+			})
+		}
+		metalStorage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))
+		for _, volume := range storage.Volumes {
+			metalStorage.Volumes = append(metalStorage.Volumes, metalv1alpha1.StorageVolume{
+				Name:        volume.Name,
+				Capacity:    resource.NewQuantity(volume.SizeBytes, resource.BinarySI),
+				State:       metalv1alpha1.StorageState(volume.State),
+				RAIDType:    string(volume.RAIDType),
+				VolumeUsage: volume.VolumeUsage,
+			})
+		}
+		server.Status.Storages = append(server.Status.Storages, metalStorage)
 	}
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to patch Server status: %w", err)

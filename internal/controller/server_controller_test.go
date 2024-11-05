@@ -285,6 +285,9 @@ var _ = Describe("Server Controller", func() {
 		}()
 
 		By("Ensuring that the server is set to available and powered off")
+		zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
+		// force calculation of zero capacity string
+		_ = zeroCapacity.String()
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
@@ -292,14 +295,35 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
 			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
-				Name:       "SATA Bay 1",
-				Rotational: false,
-				Capacity:   resource.NewQuantity(8000000000000, resource.BinarySI),
-				Vendor:     "Contoso",
-				Model:      "3000GT8",
-				State:      metalv1alpha1.StorageStateEnabled,
+				Name: "Simple Storage Controller",
+				Drives: []metalv1alpha1.StorageDrive{
+					{
+						Name:     "SATA Bay 1",
+						Capacity: resource.NewQuantity(8000000000000, resource.BinarySI),
+						Vendor:   "Contoso",
+						Model:    "3000GT8",
+						State:    metalv1alpha1.StorageStateEnabled,
+					},
+					{
+						Name:     "SATA Bay 2",
+						Capacity: resource.NewQuantity(4000000000000, resource.BinarySI),
+						Vendor:   "Contoso",
+						Model:    "3000GT7",
+						State:    metalv1alpha1.StorageStateEnabled,
+					},
+					{
+						Name:     "SATA Bay 3",
+						State:    metalv1alpha1.StorageStateAbsent,
+						Capacity: zeroCapacity,
+					},
+					{
+						Name:     "SATA Bay 4",
+						State:    metalv1alpha1.StorageStateAbsent,
+						Capacity: zeroCapacity,
+					},
+				},
 			})),
-			HaveField("Status.Storages", HaveLen(4)),
+			HaveField("Status.Storages", HaveLen(1)),
 		))
 
 		By("Ensuring that the boot configuration has been removed")

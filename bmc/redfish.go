@@ -353,21 +353,39 @@ func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
 	}
 	result := make([]Storage, 0, len(systemStorage))
 	for _, s := range systemStorage {
+		storage := Storage{
+			Entity: Entity{ID: s.ID, Name: s.Name},
+		}
+		volumes, err := s.Volumes()
+		if err != nil {
+			return nil, err
+		}
+		storage.Volumes = make([]Volume, 0, len(volumes))
+		for _, v := range volumes {
+			storage.Volumes = append(storage.Volumes, Volume{
+				Entity:    Entity{ID: v.ID, Name: v.Name},
+				SizeBytes: int64(v.CapacityBytes),
+				RAIDType:  v.RAIDType,
+				State:     v.Status.State,
+			})
+		}
 		drives, err := s.Drives()
 		if err != nil {
 			return nil, err
 		}
+		storage.Drives = make([]Drive, 0, len(drives))
 		for _, d := range drives {
-			result = append(result, Storage{
-				Name:       d.Name,
-				Rotational: d.RotationSpeedRPM != 0,
-				Type:       d.DriveFormFactor,
-				SizeBytes:  d.CapacityBytes,
-				Vendor:     d.Manufacturer,
-				Model:      d.Model,
-				State:      d.Status.State,
+			storage.Drives = append(storage.Drives, Drive{
+				Entity:    Entity{ID: d.ID, Name: d.Name},
+				MediaType: string(d.MediaType),
+				Type:      d.DriveFormFactor,
+				SizeBytes: d.CapacityBytes,
+				Vendor:    d.Manufacturer,
+				Model:     d.Model,
+				State:     d.Status.State,
 			})
 		}
+		result = append(result, storage)
 	}
 	if len(result) == 0 {
 		// if no storage is found, fall back to simpleStorage (outdated storage API)
@@ -377,15 +395,21 @@ func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
 			return nil, err
 		}
 		for _, s := range simpleStorages {
+			storage := Storage{
+				Entity: Entity{ID: s.ID, Name: s.Name},
+			}
+
+			storage.Drives = make([]Drive, 0, len(s.Devices))
 			for _, d := range s.Devices {
-				result = append(result, Storage{
-					Name:      d.Name,
+				storage.Drives = append(storage.Drives, Drive{
+					Entity:    Entity{Name: d.Name},
 					SizeBytes: d.CapacityBytes,
 					Vendor:    d.Manufacturer,
 					Model:     d.Model,
 					State:     d.Status.State,
 				})
 			}
+			result = append(result, storage)
 		}
 		return result, nil
 	}

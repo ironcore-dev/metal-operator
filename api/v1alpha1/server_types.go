@@ -214,8 +214,8 @@ type NetworkInterface struct {
 type StorageDrive struct {
 	// Name is the name of the storage interface.
 	Name string `json:"name,omitempty"`
-	// Rotational specifies whether the storage device is rotational.
-	Rotational bool `json:"rotational,omitempty"`
+	// MediaType specifies the media type of the storage device.
+	MediaType string `json:"mediaType,omitempty"`
 	// Type specifies the type of the storage device.
 	Type string `json:"type,omitempty"`
 	// Capacity specifies the size of the storage device in bytes.

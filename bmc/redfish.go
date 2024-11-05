@@ -354,8 +354,7 @@ func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
 	result := make([]Storage, 0, len(systemStorage))
 	for _, s := range systemStorage {
 		storage := Storage{
-			Description: s.Description,
-			Entity:      Entity{ID: s.ID, Name: s.Name},
+			Entity: Entity{ID: s.ID, Name: s.Name},
 		}
 		volumes, err := s.Volumes()
 		if err != nil {
@@ -377,13 +376,13 @@ func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
 		storage.Drives = make([]Drive, 0, len(drives))
 		for _, d := range drives {
 			storage.Drives = append(storage.Drives, Drive{
-				Entity:     Entity{ID: d.ID, Name: d.Name},
-				Rotational: d.RotationSpeedRPM != 0,
-				Type:       d.DriveFormFactor,
-				SizeBytes:  d.CapacityBytes,
-				Vendor:     d.Manufacturer,
-				Model:      d.Model,
-				State:      d.Status.State,
+				Entity:    Entity{ID: d.ID, Name: d.Name},
+				MediaType: string(d.MediaType),
+				Type:      d.DriveFormFactor,
+				SizeBytes: d.CapacityBytes,
+				Vendor:    d.Manufacturer,
+				Model:     d.Model,
+				State:     d.Status.State,
 			})
 		}
 		result = append(result, storage)
@@ -397,8 +396,7 @@ func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
 		}
 		for _, s := range simpleStorages {
 			storage := Storage{
-				Description: s.Description,
-				Entity:      Entity{ID: s.ID, Name: s.Name},
+				Entity: Entity{ID: s.ID, Name: s.Name},
 			}
 
 			storage.Drives = make([]Drive, 0, len(s.Devices))

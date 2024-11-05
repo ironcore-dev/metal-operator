@@ -291,13 +291,13 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 		}
 		for _, drive := range storage.Drives {
 			a1Storage.Drives = append(a1Storage.Drives, metalv1alpha1.StorageDrive{
-				Name:       drive.Name,
-				Model:      drive.Model,
-				Vendor:     drive.Vendor,
-				Capacity:   resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
-				Type:       string(drive.Type),
-				State:      metalv1alpha1.StorageState(drive.State),
-				Rotational: drive.Rotational,
+				Name:      drive.Name,
+				Model:     drive.Model,
+				Vendor:    drive.Vendor,
+				Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
+				Type:      string(drive.Type),
+				State:     metalv1alpha1.StorageState(drive.State),
+				MediaType: drive.MediaType,
 			})
 		}
 		a1Storage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))

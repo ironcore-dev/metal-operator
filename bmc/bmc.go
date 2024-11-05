@@ -114,6 +114,7 @@ type Server struct {
 	SerialNumber string
 }
 
+// Volume represents a storage volume.
 type Volume struct {
 	Entity
 	// CapacityBytes specifies the capacity of the volume in bytes.
@@ -126,10 +127,11 @@ type Volume struct {
 	VolumeUsage string `json:"volumeUsage,omitempty"`
 }
 
+// Drive represents a storage drive.
 type Drive struct {
 	Entity
-	// Rotational specifies whether the storage device is rotational.
-	Rotational bool `json:"rotational,omitempty"`
+	// MediaType specifies the media type of the storage device.
+	MediaType string `json:"mediaType,omitempty"`
 	// Type specifies the type of the storage device.
 	Type redfish.FormFactor `json:"type,omitempty"`
 	// SizeBytes specifies the size of the storage device in bytes.
@@ -142,11 +144,11 @@ type Drive struct {
 	State common.State `json:"state,omitempty"`
 }
 
+// Storage represents a storage resource.
 type Storage struct {
 	Entity
+	// State specifies the state of the storage.
 	State common.State `json:"state,omitempty"`
-	// Description provides a description of this resource.
-	Description string `json:"description,omitempty"`
 	// Drives is a collection of drives associated with this storage.
 	Drives []Drive `json:"drives,omitempty"`
 	// Volumes is a collection of volumes associated with this storage.

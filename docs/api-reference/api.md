@@ -2247,13 +2247,13 @@ string
 </tr>
 <tr>
 <td>
-<code>rotational</code><br/>
+<code>mediaType</code><br/>
 <em>
-bool
+string
 </em>
 </td>
 <td>
-<p>Rotational specifies whether the storage device is rotational.</p>
+<p>MediaType specifies the media type of the storage device.</p>
 </td>
 </tr>
 <tr>

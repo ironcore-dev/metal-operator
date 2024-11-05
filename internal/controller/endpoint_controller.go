@@ -84,6 +84,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 			case metalv1alpha1.ProtocolRedfish:
 				log.V(1).Info("Creating client for BMC")
 				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
+				log.V(1).Info("Creating client for BMC", "Address", bmcAddress)
 				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)

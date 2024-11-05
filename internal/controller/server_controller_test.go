@@ -305,7 +305,7 @@ var _ = Describe("Server Controller", func() {
 						State:    metalv1alpha1.StorageStateEnabled,
 					},
 					{
-						Name:     "SATA Bay 22",
+						Name:     "SATA Bay 2",
 						Capacity: resource.NewQuantity(4000000000000, resource.BinarySI),
 						Vendor:   "Contoso",
 						Model:    "3000GT7",

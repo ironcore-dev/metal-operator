@@ -139,7 +139,7 @@ var _ = Describe("BMC Controller", func() {
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: GetServerNameFromBMCandIndex(0, bmc),
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 			},
 		}
 		Eventually(Object(server)).Should(SatisfyAll(

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/executor"
+	"github.com/ironcore-dev/metal-operator/fmi"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -71,9 +71,27 @@ func main() {
 		resourcePollingInterval time.Duration
 		resourcePollingTimeout  time.Duration
 		discoveryTimeout        time.Duration
+		fmiServerAddress         string
+		fmiServerProtocol        string
+		fmiClientCAFile          string
+		fmiClientCertFile        string
+		fmiClientKeyFile         string
+		fmiClientInsecure        bool
+		fmiServerShutdownTimeout time.Duration
 		serverBIOSResyncInterval time.Duration
 	)
 
+	flag.StringVar(&fmiServerAddress, "fmi-server-address", "localhost:11000",
+		"The address the BIOS task runner binds to.")
+	flag.StringVar(&fmiServerProtocol, "fmi-server-protocol", "http", "The protocol of the BIOS task runner.")
+	flag.StringVar(&fmiClientCAFile, "fmi-client-ca-file", "", "File containing the CA to verify the BIOS task runner.")
+	flag.StringVar(&fmiClientCertFile, "fmi-client-cert-file", "",
+		"File containing the client certificate for the BIOS task runner.")
+	flag.StringVar(&fmiClientKeyFile, "fmi-client-key-file", "",
+		"File containing the client key for the BIOS task runner.")
+	flag.BoolVar(&fmiClientInsecure, "fmi-client-insecure", true, "Skip TLS verification for the BIOS task runner.")
+	flag.DurationVar(&fmiServerShutdownTimeout, "fmi-server-shutdown-timeout", 5*time.Second,
+		"Timeout for FMI server graceful shutdown")
 	flag.DurationVar(&serverBIOSResyncInterval, "server-bios-resync-interval", 10*time.Second, "Timeout for BIOS resync")
 	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
 	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second,
@@ -195,6 +213,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	biosTaskRunnerClient, err := fmi.NewClientForConfig(fmi.ClientConfig{
+		ServerURL:             fmt.Sprintf("%s://%s", fmiServerProtocol, fmiServerAddress),
+		ScanEndpoint:          "scan",
+		SettingsApplyEndpoint: "settings-apply",
+		VersionUpdateEndpoint: "version-update",
+		CAFile:                fmiClientCAFile,
+		CertFile:              fmiClientCertFile,
+		KeyFile:               fmiClientKeyFile,
+		InsecureSkipVerify:    fmiClientInsecure,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create FMI client")
+		os.Exit(1)
+	}
+
 	if err = (&controller.EndpointReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -258,10 +291,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controller.ServerBIOSReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		// TODO define the executor to use by command-line flag
-		TaskExecutor:    executor.New(mgr.GetClient(), insecure),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		TaskExecutor:    biosTaskRunnerClient,
 		RequeueInterval: serverBIOSResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerBIOS")
@@ -292,6 +324,15 @@ func main() {
 	go func() {
 		if err := registryServer.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running registry server")
+			os.Exit(1)
+		}
+	}()
+
+	setupLog.Info("starting FMI server", "FMIServerAddress", fmiServerAddress)
+	biosTaskRunner := fmi.NewDefaultFMIServer(fmiServerAddress, mgr.GetClient(), fmiServerShutdownTimeout, insecure)
+	go func() {
+		if err := biosTaskRunner.Start(ctx); err != nil {
+			setupLog.Error(err, "problem running FMI server")
 			os.Exit(1)
 		}
 	}()

@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/fmi"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,13 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-type TaskExecutor interface {
-	ExecuteScan(ctx context.Context, log logr.Logger, serverBIOSRef string) (string, map[string]string, error)
-	ExecuteSettingsApply(ctx context.Context, log logr.Logger, serverBIOSRef string) error
-	ExecuteVersionUpdate(ctx context.Context, log logr.Logger, serverBIOSRef string) error
-	IsTaskInProgress(ctx context.Context, log logr.Logger, serverBIOSRef string) (bool, error)
-}
-
 const serverBIOSFinalizer = "metal.ironcore.dev/serverbios"
 
 // ServerBIOSReconciler reconciles a ServerBIOS object
@@ -33,7 +27,7 @@ type ServerBIOSReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	TaskExecutor    TaskExecutor
+	TaskExecutor    fmi.TaskRunnerClient
 	RequeueInterval time.Duration
 }
 
@@ -175,21 +169,21 @@ func (r *ServerBIOSReconciler) reconcileScan(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (bool, error) {
 	log.V(1).Info("invoking scan job")
-	version, settings, err := r.TaskExecutor.ExecuteScan(ctx, log, serverBIOS.Name)
+	result, err := r.TaskExecutor.Scan(ctx, serverBIOS.Name)
 	if err != nil {
 		return false, err
 	}
 	serverBIOSBase := serverBIOS.DeepCopy()
-	versionUpdateRequired := serverBIOS.Spec.BIOS.Version != version
+	versionUpdateRequired := serverBIOS.Spec.BIOS.Version != result.Version
 	if !versionUpdateRequired {
-		serverBIOS.Status.BIOS.Version = version
+		serverBIOS.Status.BIOS.Version = result.Version
 	}
-	settingsUpdateRequired := !cmp.Equal(serverBIOS.Spec.BIOS.Settings, settings)
+	settingsUpdateRequired := !cmp.Equal(serverBIOS.Spec.BIOS.Settings, result.Settings)
 	if !settingsUpdateRequired {
-		serverBIOS.Status.BIOS.Settings = settings
+		serverBIOS.Status.BIOS.Settings = result.Settings
 	}
 	updateRequired := versionUpdateRequired || settingsUpdateRequired
-	return updateRequired, r.Status().Patch(ctx, serverBIOSBase, client.MergeFrom(serverBIOS))
+	return updateRequired, r.Status().Patch(ctx, serverBIOS, client.MergeFrom(serverBIOSBase))
 }
 
 func (r *ServerBIOSReconciler) reconcileUpdate(
@@ -222,10 +216,7 @@ func (r *ServerBIOSReconciler) reconcileVersionUpdate(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (ctrl.Result, error) {
 	log.V(1).Info("invoking version update job")
-	if inProgress, err := r.TaskExecutor.IsTaskInProgress(ctx, log, serverBIOS.Name); err != nil || inProgress {
-		return ctrl.Result{RequeueAfter: r.RequeueInterval}, err
-	}
-	return ctrl.Result{}, r.TaskExecutor.ExecuteVersionUpdate(ctx, log, serverBIOS.Name)
+	return ctrl.Result{}, r.TaskExecutor.VersionUpdate(ctx, serverBIOS.Name)
 }
 
 func (r *ServerBIOSReconciler) reconcileSettingsUpdate(
@@ -234,10 +225,7 @@ func (r *ServerBIOSReconciler) reconcileSettingsUpdate(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (ctrl.Result, error) {
 	log.V(1).Info("invoking settings update job")
-	if inProgress, err := r.TaskExecutor.IsTaskInProgress(ctx, log, serverBIOS.Name); err != nil || inProgress {
-		return ctrl.Result{RequeueAfter: r.RequeueInterval}, err
-	}
-	return ctrl.Result{}, r.TaskExecutor.ExecuteSettingsApply(ctx, log, serverBIOS.Name)
+	return ctrl.Result{}, r.TaskExecutor.SettingsApply(ctx, serverBIOS.Name)
 }
 
 // SetupWithManager sets up the controller with the Manager.

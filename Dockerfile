@@ -14,9 +14,11 @@ RUN go mod download
 # Copy the go source
 COPY cmd/manager/main.go cmd/manager/main.go
 COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
+COPY cmd/fmiserver/main.go cmd/fmiserver/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
+COPY fmi/ fmi/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -26,9 +28,14 @@ COPY bmc/ bmc/
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/manager/main.go
+
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/metalprobe/main.go
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o fmi-server cmd/fmiserver/main.go
 
 
 # Use distroless as minimal base image to package the manager binary
@@ -48,3 +55,11 @@ COPY --from=builder /workspace/metalprobe .
 USER 65532:65532
 
 ENTRYPOINT ["/metalprobe"]
+
+FROM gcr.io/distroless/static:nonroot AS fmi-server
+LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
+WORKDIR /
+COPY --from=builder /workspace/fmi-server .
+USER 65532:65532
+
+ENTRYPOINT ["/fmi-server"]

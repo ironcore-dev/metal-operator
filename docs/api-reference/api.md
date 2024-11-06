@@ -13,10 +13,10 @@ Resource Types:
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBIOSSpec">ServerBIOSSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerBIOSStatus">ServerBIOSStatus</a>)
 </p>
 <div>
-<p>BIOSSettings represents the BIOS settings for a server.</p>
+<p>BIOSSettings contains a version, settings and a flag defining whether it is a current version</p>
 </div>
 <table>
 <thead>
@@ -34,7 +34,7 @@ string
 </em>
 </td>
 <td>
-<p>Version specifies the version of the server BIOS for which the settings are defined.</p>
+<p>Version contains BIOS version</p>
 </td>
 </tr>
 <tr>
@@ -45,7 +45,8 @@ map[string]string
 </em>
 </td>
 <td>
-<p>Settings is a map of key-value pairs representing the BIOS settings.</p>
+<em>(Optional)</em>
+<p>Settings contains BIOS settings as map</p>
 </td>
 </tr>
 </tbody>
@@ -1328,15 +1329,15 @@ if no boot configuration is specified.</p>
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biOSSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a ServerBIOS object.</p>
 </td>
 </tr>
 </table>
@@ -1352,6 +1353,193 @@ ServerStatus
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerBIOS">ServerBIOS
+</h3>
+<div>
+<p>ServerBIOS is the Schema for the serverbios API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerBIOSSpec">
+ServerBIOSSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>scanPeriodMinutes</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScanPeriodMinutes defines the period in minutes after which scanned data is considered obsolete.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerRef is a reference to Server object</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bios</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
+BIOSSettings
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BIOS contains a bios version and settings.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerBIOSStatus">
+ServerBIOSStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerBIOSSpec">ServerBIOSSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBIOS">ServerBIOS</a>)
+</p>
+<div>
+<p>ServerBIOSSpec defines the desired state of ServerBIOS</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>scanPeriodMinutes</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScanPeriodMinutes defines the period in minutes after which scanned data is considered obsolete.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerRef is a reference to Server object</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bios</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
+BIOSSettings
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BIOS contains a bios version and settings.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerBIOSStatus">ServerBIOSStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBIOS">ServerBIOS</a>)
+</p>
+<div>
+<p>ServerBIOSStatus defines the observed state of ServerBIOS</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>bios</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
+BIOSSettings
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BIOS contains a bios version and settings.</p>
 </td>
 </tr>
 </tbody>
@@ -1976,15 +2164,15 @@ if no boot configuration is specified.</p>
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biOSSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a ServerBIOS object.</p>
 </td>
 </tr>
 </tbody>
@@ -2157,18 +2345,6 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </td>
 <td>
 <p>Storages is a list of storages associated with the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>BIOS</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-BIOSSettings
-</a>
-</em>
-</td>
-<td>
 </td>
 </tr>
 <tr>

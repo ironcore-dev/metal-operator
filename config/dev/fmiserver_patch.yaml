@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fmi-server
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: fmi-server
+        args:
+        - --task-runner-type=fake
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9080
+          protocol: TCP
+      - name: redfish
+        image: dmtf/redfish-mockup-server:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          protocol: TCP

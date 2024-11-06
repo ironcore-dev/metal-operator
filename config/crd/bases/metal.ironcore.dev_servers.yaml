@@ -70,7 +70,7 @@ spec:
           spec:
             description: ServerSpec defines the desired state of a Server.
             properties:
-              biOSSettingsRef:
+              biosSettingsRef:
                 description: BIOSSettingsRef is a reference to a ServerBIOS object.
                 properties:
                   name:

@@ -20,7 +20,7 @@ spec:
       name: Server
       type: string
     - description: Installed BIOS Version
-      jsonPath: .status.version
+      jsonPath: .status.bios.version
       name: BIOS Version
       type: string
     name: v1alpha1
@@ -62,12 +62,6 @@ spec:
                 required:
                 - version
                 type: object
-              scanPeriodMinutes:
-                default: 30
-                description: ScanPeriodMinutes defines the period in minutes after
-                  which scanned data is considered obsolete.
-                format: int32
-                type: integer
               serverRef:
                 description: ServerRef is a reference to Server object
                 properties:

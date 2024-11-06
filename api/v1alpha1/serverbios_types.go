@@ -13,11 +13,6 @@ import (
 
 // ServerBIOSSpec defines the desired state of ServerBIOS
 type ServerBIOSSpec struct {
-	// ScanPeriodMinutes defines the period in minutes after which scanned data is considered obsolete.
-	// +kubebuilder:default=30
-	// +optional
-	ScanPeriodMinutes int32 `json:"scanPeriodMinutes,omitempty"`
-
 	// ServerRef is a reference to Server object
 	// +optional
 	ServerRef v1.LocalObjectReference `json:"serverRef,omitempty"`
@@ -49,7 +44,7 @@ type ServerBIOSStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Server",type=string,JSONPath=`.spec.serverRef.name`,description="Server name"
-// +kubebuilder:printcolumn:name="BIOS Version",type=string,JSONPath=`.status.version`,description="Installed BIOS Version"
+// +kubebuilder:printcolumn:name="BIOS Version",type=string,JSONPath=`.status.bios.version`,description="Installed BIOS Version"
 
 // ServerBIOS is the Schema for the serverbios API
 type ServerBIOS struct {

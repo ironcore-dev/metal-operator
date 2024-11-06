@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package v1alpha1;
+
+import "common/v1alpha1/api.proto";
+
+option go_package = "github.com/ironcore-dev/metal-operator/api/gen/serverbios/v1alpha1";
+
+message BIOSScanRequest {
+  string server_bios_ref = 1;
+}
+
+message BIOSScanResponse {
+  v1alpha1.RequestResult result = 1;
+  string version = 2;
+  map<string, string> settings = 3;
+}
+
+message BIOSSettingsApplyRequest {
+  string server_bios_ref = 1;
+}
+
+message BIOSSettingsApplyResponse {
+  v1alpha1.RequestResult result = 1;
+  bool reboot_required = 2;
+}
+
+message BIOSVersionUpdateRequest {
+  string server_bios_ref = 1;
+}
+
+message BIOSVersionUpdateResponse {
+  v1alpha1.RequestResult result = 1;
+}
+
+service ServerBIOSService {
+  rpc BIOSScan(BIOSScanRequest) returns (BIOSScanResponse);
+  rpc BIOSSettingsApply(BIOSSettingsApplyRequest) returns (BIOSSettingsApplyResponse);
+  rpc BIOSVersionUpdate(BIOSVersionUpdateRequest) returns (BIOSVersionUpdateResponse);
+}

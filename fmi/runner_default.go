@@ -7,8 +7,6 @@ import (
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -57,22 +55,25 @@ func (s *DefaultTaskRunner) ExecuteScan(ctx context.Context, serverBIOSRef strin
 }
 
 // ExecuteSettingsApply applies the settings to the server.
-func (s *DefaultTaskRunner) ExecuteSettingsApply(ctx context.Context, serverBIOSRef string) error {
+func (s *DefaultTaskRunner) ExecuteSettingsApply(
+	ctx context.Context,
+	serverBIOSRef string,
+) (SettingsApplyResult, error) {
 	inProgress, err := s.isTaskInProgress(ctx, serverBIOSRef)
 	if err != nil {
-		return err
+		return SettingsApplyResult{}, err
 	}
 	if inProgress {
-		return nil
+		return SettingsApplyResult{}, nil
 	}
 
 	serverBIOS, server, err := s.getObjects(ctx, serverBIOSRef)
 	if err != nil {
-		return err
+		return SettingsApplyResult{}, err
 	}
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, s.Client, server, s.insecure)
 	if err != nil {
-		return err
+		return SettingsApplyResult{}, err
 	}
 	defer bmcClient.Logout()
 
@@ -85,14 +86,11 @@ func (s *DefaultTaskRunner) ExecuteSettingsApply(ctx context.Context, serverBIOS
 	}
 	reset, err := bmcClient.SetBiosAttributes(server.Spec.UUID, diff)
 	if err != nil {
-		return err
+		return SettingsApplyResult{}, err
 	}
-	if reset {
-		if err = s.patchServerCondition(ctx, server); err != nil {
-			return fmt.Errorf("failed to patch Server status: %w", err)
-		}
-	}
-	return nil
+	return SettingsApplyResult{
+		RebootRequired: reset,
+	}, nil
 }
 
 // todo: remove nolint
@@ -136,17 +134,4 @@ func (s *DefaultTaskRunner) getObjects(
 		return nil, nil, err
 	}
 	return serverBIOS, server, nil
-}
-
-// patchServerCondition patches the Server status with the given condition.
-func (s *DefaultTaskRunner) patchServerCondition(ctx context.Context, server *metalv1alpha1.Server) error {
-	serverBase := server.DeepCopy()
-	changed := meta.SetStatusCondition(&server.Status.Conditions, metav1.Condition{
-		Type: "RebootRequired",
-	})
-	if changed {
-		return s.Status().Patch(ctx, serverBase, client.MergeFrom(server))
-
-	}
-	return nil
 }

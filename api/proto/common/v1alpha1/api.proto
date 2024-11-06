@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package v1alpha1;
+
+option go_package = "github.com/ironcore-dev/metal-operator/api/gen/common/v1alpha1";
+
+enum RequestResult {
+  REQUEST_RESULT_UNSPECIFIED = 0;
+  REQUEST_RESULT_SCHEDULED = 1;
+  REQUEST_RESULT_SUCCESS = 2;
+  REQUEST_RESULT_FAILURE = 3;
+}

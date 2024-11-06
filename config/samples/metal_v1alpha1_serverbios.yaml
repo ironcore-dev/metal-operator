@@ -1,0 +1,15 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerBIOS
+metadata:
+  labels:
+    app.kubernetes.io/name: serverbios
+    app.kubernetes.io/instance: serverbios-sample
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: serverbios-sample
+spec:
+  serverRef:
+    name: endpoint-sample-system-0
+  bios:
+    version: "1.0.0-fake"

@@ -13,6 +13,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/fmi"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,8 +28,8 @@ type ServerBIOSReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	TaskExecutor    fmi.TaskRunnerClient
-	RequeueInterval time.Duration
+	TaskRunnerClient fmi.TaskRunnerClient
+	RequeueInterval  time.Duration
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses,verbs=get;list;watch;create;update;patch;delete
@@ -169,7 +170,7 @@ func (r *ServerBIOSReconciler) reconcileScan(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (bool, error) {
 	log.V(1).Info("invoking scan job")
-	result, err := r.TaskExecutor.Scan(ctx, serverBIOS.Name)
+	result, err := r.TaskRunnerClient.Scan(ctx, serverBIOS.Name)
 	if err != nil {
 		return false, err
 	}
@@ -216,7 +217,7 @@ func (r *ServerBIOSReconciler) reconcileVersionUpdate(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (ctrl.Result, error) {
 	log.V(1).Info("invoking version update job")
-	return ctrl.Result{}, r.TaskExecutor.VersionUpdate(ctx, serverBIOS.Name)
+	return ctrl.Result{}, r.TaskRunnerClient.VersionUpdate(ctx, serverBIOS.Name)
 }
 
 func (r *ServerBIOSReconciler) reconcileSettingsUpdate(
@@ -225,7 +226,16 @@ func (r *ServerBIOSReconciler) reconcileSettingsUpdate(
 	serverBIOS *metalv1alpha1.ServerBIOS,
 ) (ctrl.Result, error) {
 	log.V(1).Info("invoking settings update job")
-	return ctrl.Result{}, r.TaskExecutor.SettingsApply(ctx, serverBIOS.Name)
+	result, err := r.TaskRunnerClient.SettingsApply(ctx, serverBIOS.Name)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	server, err := r.getReferredServer(ctx, log, serverBIOS.Spec.ServerRef.Name)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, r.patchServerCondition(ctx, &server, result.RebootRequired)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -262,4 +272,25 @@ func (r *ServerBIOSReconciler) patchBIOSSettingsRef(
 		log.Error(err, "failed to patch bios settings ref")
 	}
 	return err
+}
+
+// patchServerCondition patches the Server status with the given condition.
+func (r *ServerBIOSReconciler) patchServerCondition(ctx context.Context, server *metalv1alpha1.Server, reboot bool) error {
+	status := metav1.ConditionFalse
+	reason := ""
+	if reboot {
+		status = metav1.ConditionTrue
+		reason = "BIOSSettingsChanged"
+	}
+	serverBase := server.DeepCopy()
+	changed := meta.SetStatusCondition(&server.Status.Conditions, metav1.Condition{
+		Type:   "RebootRequired",
+		Status: status,
+		Reason: reason,
+	})
+	if changed {
+		return r.Status().Patch(ctx, serverBase, client.MergeFrom(server))
+
+	}
+	return nil
 }

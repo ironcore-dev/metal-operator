@@ -71,27 +71,24 @@ func main() {
 		resourcePollingInterval time.Duration
 		resourcePollingTimeout  time.Duration
 		discoveryTimeout        time.Duration
+		fmiClientType            string
 		fmiServerAddress         string
-		fmiServerProtocol        string
-		fmiClientCAFile          string
+		fmiCACertFile            string
 		fmiClientCertFile        string
 		fmiClientKeyFile         string
-		fmiClientInsecure        bool
-		fmiServerShutdownTimeout time.Duration
+		fmiInsecureSkipVerify    bool
+		fmiRequestTimeout        time.Duration
 		serverBIOSResyncInterval time.Duration
 	)
 
+	flag.StringVar(&fmiClientType, "fmi-client-type", "grpc", "The type of FMI client to use. Values: 'grpc', 'http'.")
 	flag.StringVar(&fmiServerAddress, "fmi-server-address", "localhost:11000",
 		"The address the BIOS task runner binds to.")
-	flag.StringVar(&fmiServerProtocol, "fmi-server-protocol", "http", "The protocol of the BIOS task runner.")
-	flag.StringVar(&fmiClientCAFile, "fmi-client-ca-file", "", "File containing the CA to verify the BIOS task runner.")
-	flag.StringVar(&fmiClientCertFile, "fmi-client-cert-file", "",
-		"File containing the client certificate for the BIOS task runner.")
-	flag.StringVar(&fmiClientKeyFile, "fmi-client-key-file", "",
-		"File containing the client key for the BIOS task runner.")
-	flag.BoolVar(&fmiClientInsecure, "fmi-client-insecure", true, "Skip TLS verification for the BIOS task runner.")
-	flag.DurationVar(&fmiServerShutdownTimeout, "fmi-server-shutdown-timeout", 5*time.Second,
-		"Timeout for FMI server graceful shutdown")
+	flag.StringVar(&fmiCACertFile, "fmi-ca-cert-file", "", "Path to the CA certificate file.")
+	flag.StringVar(&fmiClientCertFile, "fmi-client-cert-file", "", "Path to the client certificate file.")
+	flag.StringVar(&fmiClientKeyFile, "fmi-client-key-file", "", "Path to the client key file.")
+	flag.BoolVar(&fmiInsecureSkipVerify, "fmi-insecure-skip-verify", false, "Skip TLS verification for FMI client.")
+	flag.DurationVar(&fmiRequestTimeout, "fmi-request-timeout", 5*time.Second, "Timeout for BIOS task runner requests.")
 	flag.DurationVar(&serverBIOSResyncInterval, "server-bios-resync-interval", 10*time.Second, "Timeout for BIOS resync")
 	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
 	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second,
@@ -185,6 +182,19 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
+	fmiClient, err := fmi.NewClientForConfig(fmiClientType, fmi.ClientConfig{
+		ServerURL:          fmiServerAddress,
+		CAFile:             fmiCACertFile,
+		CertFile:           fmiClientCertFile,
+		KeyFile:            fmiClientKeyFile,
+		InsecureSkipVerify: fmiInsecureSkipVerify,
+		RequestTimeout:     fmiRequestTimeout,
+	})
+	if err != nil {
+		setupLog.Error(err, "failed to create FMI client")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -210,21 +220,6 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	biosTaskRunnerClient, err := fmi.NewClientForConfig(fmi.ClientConfig{
-		ServerURL:             fmt.Sprintf("%s://%s", fmiServerProtocol, fmiServerAddress),
-		ScanEndpoint:          "scan",
-		SettingsApplyEndpoint: "settings-apply",
-		VersionUpdateEndpoint: "version-update",
-		CAFile:                fmiClientCAFile,
-		CertFile:              fmiClientCertFile,
-		KeyFile:               fmiClientKeyFile,
-		InsecureSkipVerify:    fmiClientInsecure,
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to create FMI client")
 		os.Exit(1)
 	}
 
@@ -291,10 +286,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controller.ServerBIOSReconciler{
-		Client:          mgr.GetClient(),
-		Scheme:          mgr.GetScheme(),
-		TaskExecutor:    biosTaskRunnerClient,
-		RequeueInterval: serverBIOSResyncInterval,
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		TaskRunnerClient: fmiClient,
+		RequeueInterval:  serverBIOSResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerBIOS")
 		os.Exit(1)
@@ -324,15 +319,6 @@ func main() {
 	go func() {
 		if err := registryServer.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running registry server")
-			os.Exit(1)
-		}
-	}()
-
-	setupLog.Info("starting FMI server", "FMIServerAddress", fmiServerAddress)
-	biosTaskRunner := fmi.NewDefaultFMIServer(fmiServerAddress, mgr.GetClient(), fmiServerShutdownTimeout, insecure)
-	go func() {
-		if err := biosTaskRunner.Start(ctx); err != nil {
-			setupLog.Error(err, "problem running FMI server")
 			os.Exit(1)
 		}
 	}()

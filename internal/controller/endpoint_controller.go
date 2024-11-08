@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -83,7 +84,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
 				log.V(1).Info("Creating client for BMC")
-				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
+				bmcAddress := fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				log.V(1).Info("Creating client for BMC", "Address", bmcAddress)
 				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true)
 				if err != nil {
@@ -105,7 +106,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				log.V(1).Info("Applied BMC object for endpoint")
 			case metalv1alpha1.ProtocolRedfishLocal:
 				log.V(1).Info("Creating client for a local test BMC")
-				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
+				bmcAddress := fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
@@ -124,7 +125,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				log.V(1).Info("Applied BMC object for Endpoint")
 			case metalv1alpha1.ProtocolRedfishKube:
 				log.V(1).Info("Creating client for a kube test BMC")
-				bmcAddress := fmt.Sprintf("%s://%s:%d", r.getProtocol(), endpoint.Spec.IP, m.Port)
+				bmcAddress := fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				bmcClient, err := bmc.NewRedfishKubeBMCClient(ctx, bmcAddress, m.DefaultCredentials[0].Username, m.DefaultCredentials[0].Password, true, r.Client, DefaultKubeNamespace)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)

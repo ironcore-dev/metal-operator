@@ -12,6 +12,7 @@ import (
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
@@ -181,7 +182,7 @@ func SetupTest() *corev1.Namespace {
 			RegistryResyncInterval: 50 * time.Millisecond,
 			ResyncInterval:         100 * time.Millisecond,
 			EnforceFirstBoot:       true,
-			PollingOptionsBMC: PollingOptionsBMC{
+			BMCPollingOptions: bmc.PollingOptions{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 			},

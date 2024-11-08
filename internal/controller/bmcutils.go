@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
@@ -16,14 +15,7 @@ import (
 
 const DefaultKubeNamespace = "default"
 
-type PollingOptionsBMC struct {
-	PowerPollingInterval    time.Duration
-	PowerPollingTimeout     time.Duration
-	ResourcePollingInterval time.Duration
-	ResourcePollingTimeout  time.Duration
-}
-
-func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, insecure bool, polling PollingOptionsBMC) (bmc.BMC, error) {
+func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, insecure bool, polling bmc.PollingOptions) (bmc.BMC, error) {
 	if server.Spec.BMCRef != nil {
 		b := &metalv1alpha1.BMC{}
 		bmcName := server.Spec.BMCRef.Name
@@ -55,7 +47,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
-func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, polling PollingOptionsBMC) (bmc.BMC, error) {
+func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, polling bmc.PollingOptions) (bmc.BMC, error) {
 	var address string
 
 	if bmcObj.Spec.EndpointRef != nil {
@@ -86,7 +78,7 @@ func CreateBMCClient(
 	address string,
 	port int32,
 	bmcSecret *metalv1alpha1.BMCSecret,
-	polling PollingOptionsBMC,
+	polling bmc.PollingOptions,
 ) (bmc.BMC, error) {
 	protocol := "https"
 	if insecure {
@@ -94,42 +86,34 @@ func CreateBMCClient(
 	}
 
 	var bmcClient bmc.BMC
-	var err error
-	options := bmc.Options{
-		BasicAuth:               true,
-		PowerPollingInterval:    polling.PowerPollingInterval,
-		PowerPollingTimeout:     polling.PowerPollingTimeout,
-		ResourcePollingInterval: polling.ResourcePollingInterval,
-		ResourcePollingTimeout:  polling.ResourcePollingTimeout,
-	}
 	switch bmcProtocol {
 	case metalv1alpha1.ProtocolRedfish:
-		options.Endpoint = fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
-		options.Username, options.Password, err = GetBMCCredentialsFromSecret(bmcSecret)
+		endpoint := fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
+		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
 		}
-		bmcClient, err = bmc.NewRedfishBMCClient(ctx, options)
+		bmcClient, err = bmc.NewRedfishBMCClient(ctx, endpoint, username, password, true, polling)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}
 	case metalv1alpha1.ProtocolRedfishLocal:
-		options.Endpoint = fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
-		options.Username, options.Password, err = GetBMCCredentialsFromSecret(bmcSecret)
+		endpoint := fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
+		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
 		}
-		bmcClient, err = bmc.NewRedfishLocalBMCClient(ctx, options)
+		bmcClient, err = bmc.NewRedfishLocalBMCClient(ctx, endpoint, username, password, true, polling)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}
 	case metalv1alpha1.ProtocolRedfishKube:
-		options.Endpoint = fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
-		options.Username, options.Password, err = GetBMCCredentialsFromSecret(bmcSecret)
+		endpoint := fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
+		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
 		}
-		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, options, c, DefaultKubeNamespace)
+		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, endpoint, username, password, true, polling, c, DefaultKubeNamespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}

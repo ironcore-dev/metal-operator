@@ -18,10 +18,7 @@ import (
 
 var _ BMC = (*RedfishBMC)(nil)
 
-type Options struct {
-	Endpoint, Username, Password string
-	BasicAuth                    bool
-
+type PollingOptions struct {
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
@@ -30,9 +27,10 @@ type Options struct {
 
 // RedfishBMC is an implementation of the BMC interface for Redfish.
 type RedfishBMC struct {
-	client *gofish.APIClient
-
-	options Options
+	client                       *gofish.APIClient
+	endpoint, username, password string
+	basicAuth                    bool
+	options                      PollingOptions
 }
 
 var pxeBootWithSettingUEFIBootMode = redfish.Boot{
@@ -48,14 +46,17 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(
 	ctx context.Context,
-	options Options,
+	endpoint, username, password string,
+	basicAuth bool,
+
+	options PollingOptions,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
-		Endpoint:  options.Endpoint,
-		Username:  options.Username,
-		Password:  options.Password,
+		Endpoint:  endpoint,
+		Username:  username,
+		Password:  password,
 		Insecure:  true,
-		BasicAuth: options.BasicAuth,
+		BasicAuth: basicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {

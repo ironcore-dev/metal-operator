@@ -37,11 +37,13 @@ type RedfishKubeBMC struct {
 // NewRedfishKubeBMCClient creates a new RedfishKubeBMC with the given connection details.
 func NewRedfishKubeBMCClient(
 	ctx context.Context,
-	bmcOptions Options,
+	endpoint, username, password string,
+	basicAuth bool,
+	options PollingOptions,
 	c client.Client,
 	ns string,
 ) (BMC, error) {
-	bmc, err := NewRedfishBMCClient(ctx, bmcOptions)
+	bmc, err := NewRedfishBMCClient(ctx, endpoint, username, password, basicAuth, options)
 	if err != nil {
 		return nil, err
 	}

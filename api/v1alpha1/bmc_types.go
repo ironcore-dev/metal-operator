@@ -16,15 +16,20 @@ const (
 )
 
 // BMCSpec defines the desired state of BMC
+// +kubebuilder:validation:XValidation:rule="has(self.access) != has(self.endpointRef)",message="exactly one of access or endpointRef needs to be set"
 type BMCSpec struct {
 	// EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
 	// This reference is typically used to locate the BMC endpoint within the cluster.
 	// +optional
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="endpointRef is immutable"
 	EndpointRef *v1.LocalObjectReference `json:"endpointRef"`
 
 	// Endpoint allows inline configuration of network access details for the BMC.
 	// Use this field if access settings like address are to be configured directly within the BMC resource.
 	// +optional
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="access is immutable"
 	Endpoint *InlineEndpoint `json:"access,omitempty"`
 
 	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials

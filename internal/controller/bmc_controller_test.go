@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -165,6 +166,155 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.BMCRef.Name", bmc.Name),
 		))
+	})
+
+})
+
+var _ = Describe("BMC Validation", func() {
+	_ = SetupTest()
+
+	It("Should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-invalid",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(HaveOccurred())
+		Eventually(Get(bmc)).Should(Satisfy(errors.IsNotFound))
+	})
+
+	It("Should deny if the BMC has no EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-empty",
+			},
+			Spec: metalv1alpha1.BMCSpec{},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(HaveOccurred())
+		Eventually(Get(bmc)).Should(Satisfy(errors.IsNotFound))
+	})
+
+	It("Should admit if the BMC has an EndpointRef but no InlineEndpoint spec field", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+	})
+
+	It("Should deny if the BMC EndpointRef spec field has been removed", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+
+		Eventually(Update(bmc, func() {
+			bmc.Spec.EndpointRef = nil
+		})).Should(Not(Succeed()))
+
+		Eventually(Object(bmc)).Should(SatisfyAll(HaveField(
+			"Spec.EndpointRef", &v1.LocalObjectReference{Name: "foo"})))
+	})
+
+	It("Should admit if the BMC is changing EndpointRef to InlineEndpoint spec field", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+
+		Eventually(Update(bmc, func() {
+			bmc.Spec.EndpointRef = nil
+			bmc.Spec.Endpoint = &metalv1alpha1.InlineEndpoint{
+				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+				MACAddress: "aa:bb:cc:dd:ee:ff",
+			}
+		})).Should(Succeed())
+	})
+
+	It("Should admit if the BMC has no EndpointRef but an InlineEndpoint spec field", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+	})
+
+	It("Should deny if the BMC InlineEndpoint spec field has been removed", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+
+		Eventually(Update(bmc, func() {
+			bmc.Spec.Endpoint = nil
+		})).Should(Not(Succeed()))
+
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.Endpoint.IP", metalv1alpha1.MustParseIP("127.0.0.1")),
+			HaveField("Spec.Endpoint.MACAddress", "aa:bb:cc:dd:ee:ff"),
+		))
+	})
+
+	It("Should admit if the BMC has is changing to an EndpointRef from an InlineEndpoint spec field", func(ctx SpecContext) {
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, bmc)
+
+		Eventually(Update(bmc, func() {
+			bmc.Spec.EndpointRef = &v1.LocalObjectReference{Name: "foo"}
+			bmc.Spec.Endpoint = nil
+		})).Should(Succeed())
 	})
 
 })

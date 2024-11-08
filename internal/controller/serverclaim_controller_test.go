@@ -448,3 +448,102 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })
+
+var _ = Describe("ServerClaim Validation", func() {
+	ns := SetupTest()
+
+	var claim *metalv1alpha1.ServerClaim
+	var claimWithSelector *metalv1alpha1.ServerClaim
+
+	BeforeEach(func(ctx SpecContext) {
+		By("creating a new ServerClaim")
+		claim = &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "claim-",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, claim)
+
+		By("updating the ServerRef to claim a Server")
+		Eventually(Update(claim, func() {
+			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
+		})).Should(Succeed())
+
+		By("creating a new ServerClaim")
+		claimWithSelector = &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "claim-",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claimWithSelector)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, claimWithSelector)
+
+		By("updating the ServerSelector to claim a Server")
+		Eventually(Update(claimWithSelector, func() {
+			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "bar",
+				},
+			}
+		})).Should(Succeed())
+	})
+
+	It("Should deny if the ServerRef changes", func() {
+		By("updating the ServerRef to claim a different Server")
+		Eventually(Update(claim, func() {
+			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "bar"}
+		})).Should(HaveOccurred())
+
+		By("ensuring that the ServerRef did not change")
+		Consistently(Object(claim)).Should(HaveField("Spec.ServerRef.Name", Equal("foo")))
+	})
+
+	It("Should allow a change of ServerClaim by not changing the ServerRef", func() {
+		By("updating the ServerRef to claim a different Server")
+		Eventually(Update(claim, func() {
+			claim.Spec.Power = metalv1alpha1.PowerOn
+			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
+		})).Should(Succeed())
+
+		By("ensuring that the PowerState changed")
+		Consistently(Object(claim)).Should(SatisfyAll(
+			HaveField("Spec.Power", Equal(metalv1alpha1.PowerOn)),
+			HaveField("Spec.ServerRef.Name", Equal("foo")),
+		))
+	})
+
+	It("Should deny if the ServerSelector changes", func() {
+		By("updating the ServerRef to claim a different Server")
+		Eventually(Update(claimWithSelector, func() {
+			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"bar": "foo",
+				},
+			}
+		})).Should(HaveOccurred())
+
+		By("ensuring that the ServerRef did not change")
+		Consistently(Object(claimWithSelector)).Should(
+			HaveField("Spec.ServerSelector.MatchLabels", Equal(map[string]string{"foo": "bar"})))
+	})
+
+	It("Should allow a change of ServerClaim by not changing the ServerSelector", func() {
+		By("updating the ServerRef to claim a different Server")
+		Eventually(Update(claimWithSelector, func() {
+			claimWithSelector.Spec.Power = metalv1alpha1.PowerOn
+			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "bar",
+				},
+			}
+		})).Should(Succeed())
+
+		By("ensuring that the PowerState changed")
+		Consistently(Object(claimWithSelector)).Should(SatisfyAll(
+			HaveField("Spec.Power", Equal(metalv1alpha1.PowerOn)),
+			HaveField("Spec.ServerSelector.MatchLabels", Equal(map[string]string{"foo": "bar"}))))
+	})
+})

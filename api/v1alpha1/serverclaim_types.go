@@ -9,16 +9,22 @@ import (
 )
 
 // ServerClaimSpec defines the desired state of ServerClaim.
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.serverRef) || has(self.serverRef)", message="serverRef is required once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.serverSelector) || has(self.serverSelector)", message="serverSelector is required once set"
 type ServerClaimSpec struct {
 	// Power specifies the desired power state of the server.
 	Power Power `json:"power"`
 
 	// ServerRef is a reference to a specific server to be claimed.
 	// This field is optional and can be omitted if the server is to be selected using ServerSelector.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *v1.LocalObjectReference `json:"serverRef,omitempty"`
 
 	// ServerSelector specifies a label selector to identify the server to be claimed.
 	// This field is optional and can be omitted if a specific server is referenced using ServerRef.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverSelector is immutable"
 	ServerSelector *metav1.LabelSelector `json:"serverSelector,omitempty"`
 
 	// IgnitionSecretRef is a reference to the Kubernetes Secret object that contains

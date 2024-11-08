@@ -182,14 +182,15 @@ func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
 	}
 
 	return SystemInfo{
-		SystemUUID:   system.UUID,
-		Manufacturer: system.Manufacturer,
-		Model:        system.Model,
-		Status:       system.Status,
-		PowerState:   system.PowerState,
-		SerialNumber: system.SerialNumber,
-		SKU:          system.SKU,
-		IndicatorLED: string(system.IndicatorLED),
+		SystemUUID:             system.UUID,
+		Manufacturer:           system.Manufacturer,
+		Model:                  system.Model,
+		Status:                 system.Status,
+		PowerState:             system.PowerState,
+		SerialNumber:           system.SerialNumber,
+		SKU:                    system.SKU,
+		IndicatorLED:           string(system.IndicatorLED),
+		TotalSystemMemoryBytes: int64(system.MemorySummary.TotalSystemMemoryGiB) * 1024 * 1024 * 1024,
 	}, nil
 }
 

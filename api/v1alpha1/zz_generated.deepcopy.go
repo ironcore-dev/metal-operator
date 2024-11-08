@@ -8,7 +8,7 @@
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -732,6 +732,11 @@ func (in *ServerStatus) DeepCopyInto(out *ServerStatus) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.TotalSystemMemory != nil {
+		in, out := &in.TotalSystemMemory, &out.TotalSystemMemory
+		x := (*in).DeepCopy()
+		*out = &x
 	}
 	if in.Storages != nil {
 		in, out := &in.Storages, &out.Storages

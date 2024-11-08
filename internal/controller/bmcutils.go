@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
@@ -77,7 +78,7 @@ func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcPro
 	var bmcClient bmc.BMC
 	switch bmcProtocol {
 	case metalv1alpha1.ProtocolRedfish:
-		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, address, port)
+		bmcAddress := fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
 		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
@@ -87,7 +88,7 @@ func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcPro
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}
 	case metalv1alpha1.ProtocolRedfishLocal:
-		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, address, port)
+		bmcAddress := fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
 		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
@@ -97,7 +98,7 @@ func CreateBMCClient(ctx context.Context, c client.Client, insecure bool, bmcPro
 			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
 		}
 	case metalv1alpha1.ProtocolRedfishKube:
-		bmcAddress := fmt.Sprintf("%s://%s:%d", protocol, address, port)
+		bmcAddress := fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
 		username, password, err := GetBMCCredentialsFromSecret(bmcSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)

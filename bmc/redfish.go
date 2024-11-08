@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var _ BMC = (*RedfishBMC)(nil)
@@ -342,14 +344,29 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, e
 	return
 }
 
-func (r *RedfishBMC) GetStorages(systemUUID string) ([]Storage, error) {
+func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {
 	system, err := r.getSystemByUUID(systemUUID)
 	if err != nil {
 		return nil, err
 	}
-	systemStorage, err := system.Storage()
+	var systemStorage []*redfish.Storage
+	err = wait.PollUntilContextTimeout(
+		ctx,
+		10*time.Second,
+		5*time.Minute,
+		true,
+		func(ctx context.Context) (bool, error) {
+			if ctx.Err() != nil {
+				return false, ctx.Err()
+			}
+			systemStorage, err = system.Storage()
+			if err != nil {
+				return false, nil
+			}
+			return len(systemStorage) > 0, nil
+		})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to wait for for server storages to be ready: %w", err)
 	}
 	result := make([]Storage, 0, len(systemStorage))
 	for _, s := range systemStorage {
@@ -428,4 +445,23 @@ func (r *RedfishBMC) getSystemByUUID(systemUUID string) (*redfish.ComputerSystem
 		}
 	}
 	return nil, errors.New("no system found")
+}
+
+func (r *RedfishBMC) WaitForServerPowerState(
+	ctx context.Context,
+	systemUUID string,
+	interval,
+	timeout time.Duration,
+	powerState redfish.PowerState,
+) error {
+	if err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
+		sysInfo, err := r.getSystemByUUID(systemUUID)
+		if err != nil {
+			return false, fmt.Errorf("failed to get system info: %w", err)
+		}
+		return sysInfo.PowerState == powerState, nil
+	}); err != nil {
+		return fmt.Errorf("failed to wait for for server power state: %w", err)
+	}
+	return nil
 }

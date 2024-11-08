@@ -4,6 +4,9 @@
 package bmc
 
 import (
+	"context"
+	"time"
+
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 )
@@ -47,7 +50,9 @@ type BMC interface {
 
 	SetBootOrder(systemUUID string, order []string) error
 
-	GetStorages(systemUUID string) ([]Storage, error)
+	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
+
+	WaitForServerPowerState(ctx context.Context, systemUUID string, interval, timeout time.Duration, powerState redfish.PowerState) error
 }
 
 type Entity struct {

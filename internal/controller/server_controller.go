@@ -12,9 +12,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ironcore-dev/metal-operator/bmc"
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -279,7 +276,7 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	if err != nil {
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
-	storages, err := bmcClient.GetStorages(server.Spec.UUID)
+	storages, err := bmcClient.GetStorages(ctx, server.Spec.UUID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get storages for Server: %w", err)
 	}
@@ -722,7 +719,12 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
-		if err := r.waitForServerPowerState(ctx, log, bmcClient, server, redfish.OnPowerState); err != nil {
+		if err := bmcClient.WaitForServerPowerState(
+			ctx, server.Spec.UUID,
+			r.PowerPollingInterval,
+			r.PowerPollingTimeout,
+			redfish.OnPowerState,
+		); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
 	case powerOpOff:
@@ -731,14 +733,26 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		if err := powerOffType(server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power off server: %w", err)
 		}
-		if err := r.waitForServerPowerState(ctx, log, bmcClient, server, redfish.OffPowerState); err != nil {
+		if err := bmcClient.WaitForServerPowerState(
+			ctx,
+			server.Spec.UUID,
+			r.PowerPollingInterval,
+			r.PowerPollingTimeout,
+			redfish.OffPowerState,
+		); err != nil {
 			if r.EnforcePowerOff {
 				log.V(1).Info("Failed to wait for server graceful shutdown, retrying with force power off")
 				powerOffType = bmcClient.ForcePowerOff
 				if err := powerOffType(server.Spec.UUID); err != nil {
 					return fmt.Errorf("failed to power off server: %w", err)
 				}
-				if err := r.waitForServerPowerState(ctx, log, bmcClient, server, redfish.OffPowerState); err != nil {
+				if err := bmcClient.WaitForServerPowerState(
+					ctx,
+					server.Spec.UUID,
+					r.PowerPollingInterval,
+					r.PowerPollingTimeout,
+					redfish.OffPowerState,
+				); err != nil {
 					return fmt.Errorf("failed to wait for server force power off: %w", err)
 				}
 			} else {
@@ -748,21 +762,6 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 	log.V(1).Info("Ensured server power state", "PowerState", server.Spec.Power)
 
-	return nil
-}
-
-func (r *ServerReconciler) waitForServerPowerState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, powerState redfish.PowerState) error {
-	if err := wait.PollUntilContextTimeout(ctx, r.PowerPollingInterval, r.PowerPollingTimeout, true, func(ctx context.Context) (done bool, err error) {
-		log.V(1).Info("Waiting for Server to reach target power state", "TargetPowerState", powerState)
-		sysInfo, err := bmcClient.GetSystemInfo(server.Spec.UUID)
-		if err != nil {
-			return false, fmt.Errorf("failed to get system info: %w", err)
-		}
-		log.V(1).Info("Read Server power state", "PowerState", sysInfo.PowerState, "TargetPowerState", powerState)
-		return sysInfo.PowerState == powerState, nil
-	}); err != nil {
-		return fmt.Errorf("failed to wait for for server power state: %w", err)
-	}
 	return nil
 }
 

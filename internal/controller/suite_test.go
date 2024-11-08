@@ -181,9 +181,11 @@ func SetupTest() *corev1.Namespace {
 			RegistryResyncInterval: 50 * time.Millisecond,
 			ResyncInterval:         100 * time.Millisecond,
 			EnforceFirstBoot:       true,
-			PowerPollingInterval:   50 * time.Millisecond,
-			PowerPollingTimeout:    200 * time.Millisecond,
-			DiscoveryTimeout:       500 * time.Millisecond, // Force timeout to be quick for tests
+			PollingOptionsBMC: PollingOptionsBMC{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+			},
+			DiscoveryTimeout: 500 * time.Millisecond, // Force timeout to be quick for tests
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

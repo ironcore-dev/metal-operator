@@ -26,8 +26,9 @@ const BMCFinalizer = "metal.ironcore.dev/bmc"
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Insecure bool
+	Scheme            *runtime.Scheme
+	Insecure          bool
+	PollingOptionsBMC PollingOptionsBMC
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -117,7 +118,7 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}
 
-	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure)
+	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.PollingOptionsBMC)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -147,13 +148,13 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 }
 
 func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
-	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure)
+	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.PollingOptionsBMC)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 
-	servers, err := bmcClient.GetSystems()
+	servers, err := bmcClient.GetSystems(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get Servers from BMC: %w", err)
 	}

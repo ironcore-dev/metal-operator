@@ -18,9 +18,21 @@ import (
 
 var _ BMC = (*RedfishBMC)(nil)
 
+type Options struct {
+	Endpoint, Username, Password string
+	BasicAuth                    bool
+
+	ResourcePollingInterval time.Duration
+	ResourcePollingTimeout  time.Duration
+	PowerPollingInterval    time.Duration
+	PowerPollingTimeout     time.Duration
+}
+
 // RedfishBMC is an implementation of the BMC interface for Redfish.
 type RedfishBMC struct {
 	client *gofish.APIClient
+
+	options Options
 }
 
 var pxeBootWithSettingUEFIBootMode = redfish.Boot{
@@ -36,21 +48,35 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(
 	ctx context.Context,
-	endpoint, username, password string,
-	basicAuth bool,
+	options Options,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
-		Endpoint:  endpoint,
-		Username:  username,
-		Password:  password,
+		Endpoint:  options.Endpoint,
+		Username:  options.Username,
+		Password:  options.Password,
 		Insecure:  true,
-		BasicAuth: basicAuth,
+		BasicAuth: options.BasicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to redfish endpoint: %w", err)
 	}
-	return &RedfishBMC{client: client}, nil
+	bmc := &RedfishBMC{client: client}
+	if options.ResourcePollingInterval == 0 {
+		options.ResourcePollingInterval = 5 * time.Second
+	}
+	if options.ResourcePollingTimeout == 0 {
+		options.ResourcePollingTimeout = 5 * time.Minute
+	}
+	if options.PowerPollingInterval == 0 {
+		options.PowerPollingInterval = 5 * time.Second
+	}
+	if options.PowerPollingTimeout == 0 {
+		options.PowerPollingTimeout = 5 * time.Minute
+	}
+	bmc.options = options
+
+	return bmc, nil
 }
 
 // Logout closes the BMC client connection by logging out
@@ -61,8 +87,8 @@ func (r *RedfishBMC) Logout() {
 }
 
 // PowerOn powers on the system using Redfish.
-func (r *RedfishBMC) PowerOn(systemUUID string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) PowerOn(ctx context.Context, systemUUID string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -77,8 +103,8 @@ func (r *RedfishBMC) PowerOn(systemUUID string) error {
 }
 
 // PowerOff gracefully shuts down the system using Redfish.
-func (r *RedfishBMC) PowerOff(systemUUID string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) PowerOff(ctx context.Context, systemUUID string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -89,8 +115,8 @@ func (r *RedfishBMC) PowerOff(systemUUID string) error {
 }
 
 // ForcePowerOff powers off the system using Redfish.
-func (r *RedfishBMC) ForcePowerOff(systemUUID string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemUUID string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -101,8 +127,8 @@ func (r *RedfishBMC) ForcePowerOff(systemUUID string) error {
 }
 
 // Reset performs a reset on the system using Redfish.
-func (r *RedfishBMC) Reset(systemUUID string, resetType redfish.ResetType) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) Reset(ctx context.Context, systemUUID string, resetType redfish.ResetType) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -113,7 +139,7 @@ func (r *RedfishBMC) Reset(systemUUID string, resetType redfish.ResetType) error
 }
 
 // GetSystems get managed systems
-func (r *RedfishBMC) GetSystems() ([]Server, error) {
+func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	service := r.client.GetService()
 	systems, err := service.Systems()
 	if err != nil {
@@ -133,8 +159,8 @@ func (r *RedfishBMC) GetSystems() ([]Server, error) {
 }
 
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBMC) SetPXEBootOnce(systemUUID string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -177,8 +203,8 @@ func (r *RedfishBMC) GetManager() (*Manager, error) {
 }
 
 // GetSystemInfo retrieves information about the system using Redfish.
-func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error) {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -195,16 +221,16 @@ func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
 	}, nil
 }
 
-func (r *RedfishBMC) GetBootOrder(systemUUID string) ([]string, error) {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemUUID string) ([]string, error) {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return []string{}, err
 	}
 	return system.Boot.BootOrder, nil
 }
 
-func (r *RedfishBMC) GetBiosVersion(systemUUID string) (string, error) {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return "", err
 	}
@@ -212,6 +238,7 @@ func (r *RedfishBMC) GetBiosVersion(systemUUID string) (string, error) {
 }
 
 func (r *RedfishBMC) GetBiosAttributeValues(
+	ctx context.Context,
 	systemUUID string,
 	attributes []string,
 ) (
@@ -221,7 +248,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	if len(attributes) == 0 {
 		return
 	}
-	system, err := r.getSystemByUUID(systemUUID)
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return
 	}
@@ -244,6 +271,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 
 // SetBiosAttributes sets given bios attributes. Returns true if bios reset is required
 func (r *RedfishBMC) SetBiosAttributes(
+	ctx context.Context,
 	systemUUID string,
 	attributes map[string]string,
 ) (
@@ -251,7 +279,7 @@ func (r *RedfishBMC) SetBiosAttributes(
 	err error,
 ) {
 	reset = false
-	system, err := r.getSystemByUUID(systemUUID)
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return
 	}
@@ -271,8 +299,8 @@ func (r *RedfishBMC) SetBiosAttributes(
 }
 
 // SetBootOrder sets bios boot order
-func (r *RedfishBMC) SetBootOrder(systemUUID string, bootOrder []string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemUUID string, bootOrder []string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return err
 	}
@@ -345,15 +373,15 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, e
 }
 
 func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {
-	system, err := r.getSystemByUUID(systemUUID)
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return nil, err
 	}
 	var systemStorage []*redfish.Storage
 	err = wait.PollUntilContextTimeout(
 		ctx,
-		10*time.Second,
-		5*time.Minute,
+		r.options.ResourcePollingInterval,
+		r.options.ResourcePollingTimeout,
 		true,
 		func(ctx context.Context) (bool, error) {
 			if ctx.Err() != nil {
@@ -363,7 +391,7 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 			if err != nil {
 				return false, nil
 			}
-			return len(systemStorage) > 0, nil
+			return true, nil
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for for server storages to be ready: %w", err)
@@ -433,11 +461,24 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 	return result, nil
 }
 
-func (r *RedfishBMC) getSystemByUUID(systemUUID string) (*redfish.ComputerSystem, error) {
+func (r *RedfishBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*redfish.ComputerSystem, error) {
 	service := r.client.GetService()
-	systems, err := service.Systems()
+	var systems []*redfish.ComputerSystem
+	err := wait.PollUntilContextTimeout(
+		ctx,
+		r.options.ResourcePollingInterval,
+		r.options.ResourcePollingTimeout,
+		true,
+		func(ctx context.Context) (bool, error) {
+			if ctx.Err() != nil {
+				return false, ctx.Err()
+			}
+			var err error
+			systems, err = service.Systems()
+			return err == nil, nil
+		})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to wait for for server systems to be ready: %w", err)
 	}
 	for _, system := range systems {
 		if strings.ToLower(system.UUID) == systemUUID {
@@ -450,17 +491,20 @@ func (r *RedfishBMC) getSystemByUUID(systemUUID string) (*redfish.ComputerSystem
 func (r *RedfishBMC) WaitForServerPowerState(
 	ctx context.Context,
 	systemUUID string,
-	interval,
-	timeout time.Duration,
 	powerState redfish.PowerState,
 ) error {
-	if err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
-		sysInfo, err := r.getSystemByUUID(systemUUID)
-		if err != nil {
-			return false, fmt.Errorf("failed to get system info: %w", err)
-		}
-		return sysInfo.PowerState == powerState, nil
-	}); err != nil {
+	if err := wait.PollUntilContextTimeout(
+		ctx,
+		r.options.PowerPollingInterval,
+		r.options.PowerPollingTimeout,
+		true,
+		func(ctx context.Context) (done bool, err error) {
+			sysInfo, err := r.getSystemByUUID(ctx, systemUUID)
+			if err != nil {
+				return false, fmt.Errorf("failed to get system info: %w", err)
+			}
+			return sysInfo.PowerState == powerState, nil
+		}); err != nil {
 		return fmt.Errorf("failed to wait for for server power state: %w", err)
 	}
 	return nil

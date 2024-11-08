@@ -20,18 +20,17 @@ type RedfishLocalBMC struct {
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
 func NewRedfishLocalBMCClient(
 	ctx context.Context,
-	endpoint, username, password string,
-	basicAuth bool,
+	options Options,
 ) (BMC, error) {
-	bmc, err := NewRedfishBMCClient(ctx, endpoint, username, password, basicAuth)
+	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
 }
 
-func (r RedfishLocalBMC) PowerOn(systemUUID string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get system: %w", err)
 	}
@@ -43,8 +42,8 @@ func (r RedfishLocalBMC) PowerOn(systemUUID string) error {
 	return nil
 }
 
-func (r RedfishLocalBMC) PowerOff(systemUUID string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get system: %w", err)
 	}

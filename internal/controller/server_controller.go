@@ -61,8 +61,7 @@ type ServerReconciler struct {
 	EnforceFirstBoot       bool
 	EnforcePowerOff        bool
 	ResyncInterval         time.Duration
-	PowerPollingInterval   time.Duration
-	PowerPollingTimeout    time.Duration
+	PollingOptionsBMC      PollingOptionsBMC
 	DiscoveryTimeout       time.Duration
 }
 
@@ -272,7 +271,7 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Server state set to power on")
 
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.PollingOptionsBMC)
 	if err != nil {
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -357,6 +356,7 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 		}
 		log.V(1).Info("Server state set to power off")
 	}
+	log.V(1).Info("ensureInitialBootConfigurationIsDeleted")
 	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
 	}
@@ -415,13 +415,13 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.PollingOptionsBMC)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 
-	systemInfo, err := bmcClient.GetSystemInfo(server.Spec.UUID)
+	systemInfo, err := bmcClient.GetSystemInfo(ctx, server.Spec.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to get system info for Server: %w", err)
 	}
@@ -434,7 +434,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.Model = systemInfo.Model
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 
-	currentBiosVersion, err := bmcClient.GetBiosVersion(server.Spec.UUID)
+	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to load bios version: %w", err)
 	}
@@ -446,7 +446,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 			for k := range bios.Settings {
 				keys = append(keys, k)
 			}
-			attributes, err := bmcClient.GetBiosAttributeValues(server.Spec.UUID, keys)
+			attributes, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.UUID, keys)
 			if err != nil {
 				return fmt.Errorf("failed load bios settings: %w", err)
 			}
@@ -613,7 +613,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 		return fmt.Errorf("can only PXE boot server with valid BMC ref or inline BMC configuration")
 	}
 
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.PollingOptionsBMC)
 	defer func() {
 		if bmcClient != nil {
 			bmcClient.Logout()
@@ -623,7 +623,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 	if err != nil {
 		return fmt.Errorf("failed to get BMC client: %w", err)
 	}
-	if err := bmcClient.SetPXEBootOnce(server.Spec.UUID); err != nil {
+	if err := bmcClient.SetPXEBootOnce(ctx, server.Spec.UUID); err != nil {
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
 	return nil
@@ -704,7 +704,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		return nil
 	}
 
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.PollingOptionsBMC)
 	defer func() {
 		if bmcClient != nil {
 			bmcClient.Logout()
@@ -716,13 +716,11 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 	switch powerOp {
 	case powerOpOn:
-		if err := bmcClient.PowerOn(server.Spec.UUID); err != nil {
+		if err := bmcClient.PowerOn(ctx, server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
 		if err := bmcClient.WaitForServerPowerState(
 			ctx, server.Spec.UUID,
-			r.PowerPollingInterval,
-			r.PowerPollingTimeout,
 			redfish.OnPowerState,
 		); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
@@ -730,29 +728,17 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	case powerOpOff:
 		powerOffType := bmcClient.PowerOff
 
-		if err := powerOffType(server.Spec.UUID); err != nil {
+		if err := powerOffType(ctx, server.Spec.UUID); err != nil {
 			return fmt.Errorf("failed to power off server: %w", err)
 		}
-		if err := bmcClient.WaitForServerPowerState(
-			ctx,
-			server.Spec.UUID,
-			r.PowerPollingInterval,
-			r.PowerPollingTimeout,
-			redfish.OffPowerState,
-		); err != nil {
+		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.UUID, redfish.OffPowerState); err != nil {
 			if r.EnforcePowerOff {
 				log.V(1).Info("Failed to wait for server graceful shutdown, retrying with force power off")
 				powerOffType = bmcClient.ForcePowerOff
-				if err := powerOffType(server.Spec.UUID); err != nil {
+				if err := powerOffType(ctx, server.Spec.UUID); err != nil {
 					return fmt.Errorf("failed to power off server: %w", err)
 				}
-				if err := bmcClient.WaitForServerPowerState(
-					ctx,
-					server.Spec.UUID,
-					r.PowerPollingInterval,
-					r.PowerPollingTimeout,
-					redfish.OffPowerState,
-				); err != nil {
+				if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.UUID, redfish.OffPowerState); err != nil {
 					return fmt.Errorf("failed to wait for server force power off: %w", err)
 				}
 			} else {
@@ -828,13 +814,13 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, 
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.PollingOptionsBMC)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 
-	order, err := bmcClient.GetBootOrder(server.Spec.UUID)
+	order, err := bmcClient.GetBootOrder(ctx, server.Spec.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -851,7 +837,7 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, 
 		}
 	}
 	if change {
-		return bmcClient.SetBootOrder(server.Spec.UUID, newOrder)
+		return bmcClient.SetBootOrder(ctx, server.Spec.UUID, newOrder)
 	}
 	return nil
 }
@@ -862,13 +848,13 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.PollingOptionsBMC)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 
-	version, err := bmcClient.GetBiosVersion(server.Spec.UUID)
+	version, err := bmcClient.GetBiosVersion(ctx, server.Spec.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -885,7 +871,7 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 					}
 				}
 			}
-			reset, err := bmcClient.SetBiosAttributes(server.Spec.UUID, diff)
+			reset, err := bmcClient.SetBiosAttributes(ctx, server.Spec.UUID, diff)
 			if err != nil {
 				return err
 			}
@@ -914,13 +900,13 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 	if !ok {
 		return false, nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure)
+	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.PollingOptionsBMC)
 	if err != nil {
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 	log.V(1).Info("Handling operation", "Operation", operation)
-	if err := bmcClient.Reset(server.Spec.UUID, redfish.ResetType(operation)); err != nil {
+	if err := bmcClient.Reset(ctx, server.Spec.UUID, redfish.ResetType(operation)); err != nil {
 		return false, fmt.Errorf("failed to reset server: %w", err)
 	}
 	log.V(1).Info("Operation completed", "Operation", operation)

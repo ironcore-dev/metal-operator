@@ -44,30 +44,34 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr            string
-		enableLeaderElection   bool
-		probeAddr              string
-		secureMetrics          bool
-		enableHTTP2            bool
-		macPrefixesFile        string
-		insecure               bool
-		managerNamespace       string
-		probeImage             string
-		probeOSImage           string
-		registryPort           int
-		registryProtocol       string
-		registryURL            string
-		registryResyncInterval time.Duration
-		webhookPort            int
-		enforceFirstBoot       bool
-		enforcePowerOff        bool
-		serverResyncInterval   time.Duration
-		powerPollingInterval   time.Duration
-		powerPollingTimeout    time.Duration
-		discoveryTimeout       time.Duration
+		metricsAddr             string
+		enableLeaderElection    bool
+		probeAddr               string
+		secureMetrics           bool
+		enableHTTP2             bool
+		macPrefixesFile         string
+		insecure                bool
+		managerNamespace        string
+		probeImage              string
+		probeOSImage            string
+		registryPort            int
+		registryProtocol        string
+		registryURL             string
+		registryResyncInterval  time.Duration
+		webhookPort             int
+		enforceFirstBoot        bool
+		enforcePowerOff         bool
+		serverResyncInterval    time.Duration
+		powerPollingInterval    time.Duration
+		powerPollingTimeout     time.Duration
+		resourcePollingInterval time.Duration
+		resourcePollingTimeout  time.Duration
+		discoveryTimeout        time.Duration
 	)
 
 	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
+	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second, "Interval between polling resources")
+	flag.DurationVar(&resourcePollingTimeout, "resource-polling-timeout", 2*time.Minute, "Timeout for polling resources")
 	flag.DurationVar(&powerPollingInterval, "power-polling-interval", 5*time.Second,
 		"Interval between polling power state")
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
@@ -220,9 +224,13 @@ func main() {
 		ResyncInterval:         serverResyncInterval,
 		EnforceFirstBoot:       enforceFirstBoot,
 		EnforcePowerOff:        enforcePowerOff,
-		PowerPollingInterval:   powerPollingInterval,
-		PowerPollingTimeout:    powerPollingTimeout,
-		DiscoveryTimeout:       discoveryTimeout,
+		PollingOptionsBMC: controller.PollingOptionsBMC{
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+		DiscoveryTimeout: discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Server")
 		os.Exit(1)

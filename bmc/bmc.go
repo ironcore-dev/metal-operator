@@ -6,6 +6,7 @@ package bmc
 import (
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -194,7 +195,7 @@ type SystemInfo struct {
 	PowerState             redfish.PowerState
 	NetworkInterfaces      []NetworkInterface
 	Processors             []Processor
-	TotalSystemMemoryBytes int64
+	TotalSystemMemoryBytes resource.Quantity
 	SystemUUID             string
 	SerialNumber           string
 	SKU                    string

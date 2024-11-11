@@ -71,7 +71,8 @@ func main() {
 	)
 
 	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
-	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second, "Interval between polling resources")
+	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second,
+		"Interval between polling resources")
 	flag.DurationVar(&resourcePollingTimeout, "resource-polling-timeout", 2*time.Minute, "Timeout for polling resources")
 	flag.DurationVar(&powerPollingInterval, "power-polling-interval", 5*time.Second,
 		"Interval between polling power state")

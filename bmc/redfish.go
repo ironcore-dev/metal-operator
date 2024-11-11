@@ -27,10 +27,8 @@ type PollingOptions struct {
 
 // RedfishBMC is an implementation of the BMC interface for Redfish.
 type RedfishBMC struct {
-	client                       *gofish.APIClient
-	endpoint, username, password string
-	basicAuth                    bool
-	options                      PollingOptions
+	client  *gofish.APIClient
+	options PollingOptions
 }
 
 var pxeBootWithSettingUEFIBootMode = redfish.Boot{

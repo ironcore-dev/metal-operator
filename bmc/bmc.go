@@ -189,17 +189,17 @@ type Processor struct {
 
 // SystemInfo represents basic information about the system.
 type SystemInfo struct {
-	Manufacturer           string
-	Model                  string
-	Status                 common.Status
-	PowerState             redfish.PowerState
-	NetworkInterfaces      []NetworkInterface
-	Processors             []Processor
-	TotalSystemMemoryBytes resource.Quantity
-	SystemUUID             string
-	SerialNumber           string
-	SKU                    string
-	IndicatorLED           string
+	Manufacturer      string
+	Model             string
+	Status            common.Status
+	PowerState        redfish.PowerState
+	NetworkInterfaces []NetworkInterface
+	Processors        []Processor
+	TotalSystemMemory resource.Quantity
+	SystemUUID        string
+	SerialNumber      string
+	SKU               string
+	IndicatorLED      string
 }
 
 // Manager represents the manager information.

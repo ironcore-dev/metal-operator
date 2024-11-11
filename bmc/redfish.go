@@ -188,15 +188,15 @@ func (r *RedfishBMC) GetSystemInfo(systemUUID string) (SystemInfo, error) {
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
 	return SystemInfo{
-		SystemUUID:             system.UUID,
-		Manufacturer:           system.Manufacturer,
-		Model:                  system.Model,
-		Status:                 system.Status,
-		PowerState:             system.PowerState,
-		SerialNumber:           system.SerialNumber,
-		SKU:                    system.SKU,
-		IndicatorLED:           string(system.IndicatorLED),
-		TotalSystemMemoryBytes: quantity,
+		SystemUUID:        system.UUID,
+		Manufacturer:      system.Manufacturer,
+		Model:             system.Model,
+		Status:            system.Status,
+		PowerState:        system.PowerState,
+		SerialNumber:      system.SerialNumber,
+		SKU:               system.SKU,
+		IndicatorLED:      string(system.IndicatorLED),
+		TotalSystemMemory: quantity,
 	}, nil
 }
 

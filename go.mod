@@ -7,7 +7,7 @@ require (
 	github.com/ironcore-dev/controller-utils v0.9.4
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.1
-	github.com/stmcginnis/gofish v0.19.0
+	github.com/stmcginnis/gofish v0.20.0
 	k8s.io/api v0.31.1
 	k8s.io/apimachinery v0.31.1
 	k8s.io/client-go v0.31.1

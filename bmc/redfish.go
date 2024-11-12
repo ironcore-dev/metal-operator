@@ -18,6 +18,18 @@ import (
 
 var _ BMC = (*RedfishBMC)(nil)
 
+const (
+	// DefaultResourcePollingInterval is the default interval for polling resources.
+	DefaultResourcePollingInterval = 30 * time.Second
+	// DefaultResourcePollingTimeout is the default timeout for polling resources.
+	DefaultResourcePollingTimeout = 5 * time.Minute
+	// DefaultPowerPollingInterval is the default interval for polling power state.
+	DefaultPowerPollingInterval = 30 * time.Second
+	// DefaultPowerPollingTimeout is the default timeout for polling power state.
+	DefaultPowerPollingTimeout = 5 * time.Minute
+)
+
+// PollingOptions contains the options for polling server resources
 type PollingOptions struct {
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
@@ -62,16 +74,16 @@ func NewRedfishBMCClient(
 	}
 	bmc := &RedfishBMC{client: client}
 	if options.ResourcePollingInterval == 0 {
-		options.ResourcePollingInterval = 5 * time.Second
+		options.ResourcePollingInterval = DefaultResourcePollingInterval
 	}
 	if options.ResourcePollingTimeout == 0 {
-		options.ResourcePollingTimeout = 5 * time.Minute
+		options.ResourcePollingTimeout = DefaultResourcePollingTimeout
 	}
 	if options.PowerPollingInterval == 0 {
-		options.PowerPollingInterval = 5 * time.Second
+		options.PowerPollingInterval = DefaultPowerPollingInterval
 	}
 	if options.PowerPollingTimeout == 0 {
-		options.PowerPollingTimeout = 5 * time.Minute
+		options.PowerPollingTimeout = DefaultPowerPollingTimeout
 	}
 	bmc.options = options
 

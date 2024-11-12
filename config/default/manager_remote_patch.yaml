@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - args:
+        - --leader-elect
+        - --kubeconfig=/kubeconfig/kubeconfig
+        name: manager
+        volumeMounts:
+        - name: remote-kubeconfig
+          mountPath: /kubeconfig
+          readOnly: true
+      volumes:
+      - name: remote-kubeconfig
+        secret:
+          secretName: remote-kubeconfig

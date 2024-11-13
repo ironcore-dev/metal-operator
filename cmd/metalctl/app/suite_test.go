@@ -18,7 +18,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sSchema "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,7 +34,6 @@ const (
 )
 
 var (
-	cfg     *rest.Config
 	clients Clients
 )
 
@@ -53,7 +51,7 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	// Source client with CRDs
-	testEnv := &envtest.Environment{
+	sourceEnv := &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 
@@ -66,25 +64,23 @@ var _ = BeforeSuite(func() {
 			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
-	var err error
-	// cfg is defined in this file globally.
-	cfg, err = testEnv.Start()
+	sourceCfg, err := sourceEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
+	Expect(sourceCfg).NotTo(BeNil())
 
-	DeferCleanup(testEnv.Stop)
+	DeferCleanup(sourceEnv.Stop)
 
 	Expect(metalv1alpha1.AddToScheme(k8sSchema.Scheme)).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 
-	clients.source, err = client.New(cfg, client.Options{Scheme: k8sSchema.Scheme})
+	clients.source, err = client.New(sourceCfg, client.Options{Scheme: k8sSchema.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(clients.source).NotTo(BeNil())
 
 	// Target client without CRDs
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases", "metal.ironcore.dev_bmcs.yaml")},
+	targetEnv := &envtest.Environment{
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases", "metal.ironcore.dev_endpoints.yaml")},
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
 		// without call the makefile target test. If not informed it will look for the
 		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
@@ -95,13 +91,13 @@ var _ = BeforeSuite(func() {
 	}
 
 	// cfg is defined in this file globally.
-	cfg, err = testEnv.Start()
+	targetCfg, err := targetEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
+	Expect(targetCfg).NotTo(BeNil())
 
-	DeferCleanup(testEnv.Stop)
+	DeferCleanup(targetEnv.Stop)
 
-	clients.target, err = client.New(cfg, client.Options{Scheme: k8sSchema.Scheme})
+	clients.target, err = client.New(targetCfg, client.Options{Scheme: k8sSchema.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(clients.target).NotTo(BeNil())
 
@@ -121,10 +117,6 @@ func SetupTest() *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
-		// var mgrCtx context.Context
-		// mgrCtx, cancel := context.WithCancel(context.Background())
-		// DeferCleanup(cancel)
-
 		*ns = corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -139,21 +131,6 @@ func SetupTest() *corev1.Namespace {
 		Expect(clients.target.Create(ctx, &targetNs)).To(Succeed(), "failed to create test namespace")
 		DeferCleanup(clients.source.Delete, ns)
 		DeferCleanup(clients.target.Delete, &targetNs)
-
-		// k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		// 	Scheme: k8sSchema.Scheme,
-		// 	Controller: config.Controller{
-		// 		// need to skip unique controller name validation
-		// 		// since all tests need a dedicated controller
-		// 		SkipNameValidation: ptr.To(true),
-		// 	},
-		// })
-		// Expect(err).ToNot(HaveOccurred())
-
-		// go func() {
-		// 	defer GinkgoRecover()
-		// 	Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
-		// }()
 	})
 
 	return ns

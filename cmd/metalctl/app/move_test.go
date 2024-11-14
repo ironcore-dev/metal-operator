@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -42,7 +43,8 @@ var _ = Describe("metalctl move", func() {
 			return clients.source.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), sourceEndpoint)
 		}).Should(Succeed())
 
-		sourceBmc := &metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"}}
+		sourceBmc := &metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+			Spec: metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}}}
 		controllerutil.SetOwnerReference(sourceCommonEndpoint, sourceBmc, k8sSchema.Scheme)
 		Expect(clients.source.Create(ctx, sourceBmc)).To(Succeed())
 		Eventually(func(g Gomega) error {

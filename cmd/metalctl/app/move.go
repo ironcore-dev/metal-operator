@@ -116,16 +116,16 @@ func getMetalCrs(ctx context.Context, cl client.Client, crds []*apiextensionsv1.
 	return crs, nil
 }
 
-func clearFields(obj client.Object) map[string]interface{} {
+func clearFields(obj client.Object) map[string]any {
 	so, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 
 	for _, field := range []string{"creationTimestamp", "resourceVersion", "uid", "generation", "managedFields"} {
-		delete(so["metadata"].(map[string]interface{}), field)
+		delete(so["metadata"].(map[string]any), field)
 	}
 
-	if so["status"] != nil && so["status"].(map[string]interface{})["conditions"] != nil {
-		for _, field := range so["status"].(map[string]interface{})["conditions"].([]interface{}) {
-			delete(field.(map[string]interface{}), "lastTransitionTime")
+	if so["status"] != nil && so["status"].(map[string]any)["conditions"] != nil {
+		for _, field := range so["status"].(map[string]any)["conditions"].([]interface{}) {
+			delete(field.(map[string]any), "lastTransitionTime")
 		}
 	}
 
@@ -237,13 +237,13 @@ func moveCrds(ctx context.Context, cl client.Client, sourceCrds []*apiextensions
 	return
 }
 
-func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, uid ...types.UID) (movedCrs []*unstructured.Unstructured, err error) {
+func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid ...types.UID) (movedCrs []*unstructured.Unstructured, err error) {
 	movedCrs = make([]*unstructured.Unstructured, 0)
 
 	for _, crsTree := range crsTrees {
 		ownerReferences := crsTree.Cr.GetOwnerReferences()
-		if len(ownerReferences) == 1 && len(uid) == 1 {
-			ownerReferences[0].UID = uid[0]
+		if len(ownerReferences) == 1 && len(ownerUid) == 1 {
+			ownerReferences[0].UID = ownerUid[0]
 			crsTree.Cr.SetOwnerReferences(ownerReferences)
 		}
 

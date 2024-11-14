@@ -395,9 +395,6 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 		r.options.ResourcePollingTimeout,
 		true,
 		func(ctx context.Context) (bool, error) {
-			if ctx.Err() != nil {
-				return false, ctx.Err()
-			}
 			systemStorage, err = system.Storage()
 			if err != nil {
 				return false, nil
@@ -481,9 +478,6 @@ func (r *RedfishBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*r
 		r.options.ResourcePollingTimeout,
 		true,
 		func(ctx context.Context) (bool, error) {
-			if ctx.Err() != nil {
-				return false, ctx.Err()
-			}
 			var err error
 			systems, err = service.Systems()
 			return err == nil, nil

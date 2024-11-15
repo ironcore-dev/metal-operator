@@ -20,11 +20,9 @@ type RedfishLocalBMC struct {
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
 func NewRedfishLocalBMCClient(
 	ctx context.Context,
-	endpoint, username, password string,
-	basicAuth bool,
-	options PollingOptions,
+	options BMCOptions,
 ) (BMC, error) {
-	bmc, err := NewRedfishBMCClient(ctx, endpoint, username, password, basicAuth, options)
+	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
 	}

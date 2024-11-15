@@ -226,7 +226,8 @@ func main() {
 		ResyncInterval:         serverResyncInterval,
 		EnforceFirstBoot:       enforceFirstBoot,
 		EnforcePowerOff:        enforcePowerOff,
-		BMCPollingOptions: bmc.PollingOptions{
+		BMCOptions: bmc.BMCOptions{
+			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,

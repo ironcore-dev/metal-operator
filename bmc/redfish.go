@@ -29,8 +29,13 @@ const (
 	DefaultPowerPollingTimeout = 5 * time.Minute
 )
 
-// PollingOptions contains the options for polling server resources
-type PollingOptions struct {
+// BMCOptions contains the options for the BMC redfish client.
+type BMCOptions struct {
+	Endpoint  string
+	Username  string
+	Password  string
+	BasicAuth bool
+
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
@@ -40,7 +45,7 @@ type PollingOptions struct {
 // RedfishBMC is an implementation of the BMC interface for Redfish.
 type RedfishBMC struct {
 	client  *gofish.APIClient
-	options PollingOptions
+	options BMCOptions
 }
 
 var pxeBootWithSettingUEFIBootMode = redfish.Boot{
@@ -56,17 +61,14 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(
 	ctx context.Context,
-	endpoint, username, password string,
-	basicAuth bool,
-
-	options PollingOptions,
+	options BMCOptions,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
-		Endpoint:  endpoint,
-		Username:  username,
-		Password:  password,
+		Endpoint:  options.Endpoint,
+		Username:  options.Username,
+		Password:  options.Password,
 		Insecure:  true,
-		BasicAuth: basicAuth,
+		BasicAuth: options.BasicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {

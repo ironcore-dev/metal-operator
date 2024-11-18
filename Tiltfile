@@ -81,7 +81,6 @@ def waitforsystem():
 deploy_cert_manager()
 
 docker_build('controller', '.', target = 'manager')
-docker_build('fmi-server', '.', target = 'fmi-server')
 
 deploy_boot()
 

@@ -18,7 +18,7 @@ spec:
           - --registry-url=http://127.0.0.1:30000
           - --registry-port=30000
           - --enforce-first-boot
-          - --fmi-server-address=metal-operator-fmi-server-svc:80
+          - --fmi-task-runner=fake
         ports:
         - containerPort: 30000
         volumeMounts:

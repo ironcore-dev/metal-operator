@@ -71,8 +71,11 @@ func main() {
 		resourcePollingInterval time.Duration
 		resourcePollingTimeout  time.Duration
 		discoveryTimeout        time.Duration
-		fmiClientType            string
-		fmiServerAddress         string
+		fmiServerLocal           bool
+		fmiTaskRunner            string
+		fmiProtocol              string
+		fmiServerHostname        string
+		fmiServerPort            int
 		fmiCACertFile            string
 		fmiClientCertFile        string
 		fmiClientKeyFile         string
@@ -81,9 +84,12 @@ func main() {
 		serverBIOSResyncInterval time.Duration
 	)
 
-	flag.StringVar(&fmiClientType, "fmi-client-type", "grpc", "The type of FMI client to use. Values: 'grpc', 'http'.")
-	flag.StringVar(&fmiServerAddress, "fmi-server-address", "localhost:11000",
+	flag.StringVar(&fmiProtocol, "fmi-protocol", "grpc", "The type of FMI client to use. Values: 'grpc', 'http'.")
+	flag.BoolVar(&fmiServerLocal, "fmi-server-local", true, "Whether the FMI server is running on the same machine.")
+	flag.StringVar(&fmiTaskRunner, "fmi-task-runner", "default", "The type of FMI task runner to use. Values: 'default'")
+	flag.StringVar(&fmiServerHostname, "fmi-server-address", "localhost",
 		"The address the BIOS task runner binds to.")
+	flag.IntVar(&fmiServerPort, "fmi-server-port", 11000, "The port the BIOS task runner binds to.")
 	flag.StringVar(&fmiCACertFile, "fmi-ca-cert-file", "", "Path to the CA certificate file.")
 	flag.StringVar(&fmiClientCertFile, "fmi-client-cert-file", "", "Path to the client certificate file.")
 	flag.StringVar(&fmiClientKeyFile, "fmi-client-key-file", "", "Path to the client key file.")
@@ -182,8 +188,8 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
-	fmiClient, err := fmi.NewClientForConfig(fmiClientType, fmi.ClientConfig{
-		ServerURL:          fmiServerAddress,
+	fmiClient, err := fmi.NewClientForConfig(fmiProtocol, fmi.ClientConfig{
+		ServerURL:          fmt.Sprintf("%s:%d", fmiServerHostname, fmiServerPort),
 		CAFile:             fmiCACertFile,
 		CertFile:           fmiClientCertFile,
 		KeyFile:            fmiClientKeyFile,
@@ -322,6 +328,27 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	if fmiServerLocal {
+		serverConfig := fmi.ServerConfig{
+			Hostname:       fmiServerHostname,
+			Port:           fmiServerPort,
+			KubeClient:     mgr.GetClient(),
+			TaskRunnerType: fmiTaskRunner,
+		}
+		setupLog.Info("starting FMI server")
+		go func() {
+			srv, err := fmi.NewServer(fmiProtocol, serverConfig, insecure)
+			if err != nil {
+				setupLog.Error(err, "unable to create FMI server")
+				os.Exit(1)
+			}
+			if err := srv.Start(ctx); err != nil {
+				setupLog.Error(err, "problem running FMI server")
+				os.Exit(1)
+			}
+		}()
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

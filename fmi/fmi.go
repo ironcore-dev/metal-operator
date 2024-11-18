@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	ClientTypeHTTP = "http"
-	ClientTypeGRPC = "grpc"
+	ProtocolHTTP = "http"
+	ProtocolGRPC = "grpc"
 )
 
 const (
@@ -99,6 +99,12 @@ type TaskRunnerClient interface {
 	VersionUpdate(ctx context.Context, serverBIOSRef string) error
 }
 
+// TaskRunnerServer is the interface for a task runner server.
+type TaskRunnerServer interface {
+	// Start runs the task runner server.
+	Start(ctx context.Context) error
+}
+
 // TaskRunner is the interface for a task runner.
 type TaskRunner interface {
 	// ExecuteScan executes a scan task.
@@ -111,15 +117,26 @@ type TaskRunner interface {
 	ExecuteVersionUpdate(ctx context.Context, serverBIOSRef string) error
 }
 
+func NewServer(protocol string, config ServerConfig, insecureBMC bool) (TaskRunnerServer, error) {
+	switch protocol {
+	case ProtocolHTTP:
+		return NewServerHTTP(config, insecureBMC)
+	case ProtocolGRPC:
+		return NewServerGRPC(config, insecureBMC)
+	default:
+		return nil, fmt.Errorf("unknown server type: %s", protocol)
+	}
+}
+
 // NewClientForConfig returns the client for the server for given config.
-func NewClientForConfig(clientType string, config ClientConfig) (TaskRunnerClient, error) {
-	switch clientType {
-	case ClientTypeHTTP:
+func NewClientForConfig(protocol string, config ClientConfig) (TaskRunnerClient, error) {
+	switch protocol {
+	case ProtocolHTTP:
 		return NewClientHTTP(config)
-	case ClientTypeGRPC:
+	case ProtocolGRPC:
 		return NewClientGRPC(config)
 	default:
-		return nil, fmt.Errorf("unknown client type: %s", clientType)
+		return nil, fmt.Errorf("unknown client type: %s", protocol)
 	}
 }
 

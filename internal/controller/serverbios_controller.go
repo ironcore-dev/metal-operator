@@ -175,11 +175,12 @@ func (r *ServerBIOSReconciler) reconcileScan(
 		return false, err
 	}
 	serverBIOSBase := serverBIOS.DeepCopy()
-	versionUpdateRequired := serverBIOS.Spec.BIOS.Version != result.Version
+	versionUpdateRequired := serverBIOS.Spec.BIOS.Version != "" && (serverBIOS.Spec.BIOS.Version != result.Version)
 	if !versionUpdateRequired {
 		serverBIOS.Status.BIOS.Version = result.Version
 	}
-	settingsUpdateRequired := !cmp.Equal(serverBIOS.Spec.BIOS.Settings, result.Settings)
+	settingsUpdateRequired := len(serverBIOS.Spec.BIOS.Settings) != 0 &&
+		!cmp.Equal(serverBIOS.Spec.BIOS.Settings, result.Settings)
 	if !settingsUpdateRequired {
 		serverBIOS.Status.BIOS.Settings = result.Settings
 	}

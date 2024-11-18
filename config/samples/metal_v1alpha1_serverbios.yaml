@@ -11,5 +11,5 @@ metadata:
 spec:
   serverRef:
     name: endpoint-sample-system-0
-  bios:
-    version: "1.0.0-fake"
+#  bios:
+#    version: "1.0.0-fake"

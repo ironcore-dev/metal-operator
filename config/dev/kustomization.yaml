@@ -6,7 +6,6 @@ resources:
 patches:
 - path: delete_manager_auth_proxy_patch.yaml
 - path: manager_patch.yaml
-- path: fmiserver_patch.yaml
 
 secretGenerator:
 - name: macdb

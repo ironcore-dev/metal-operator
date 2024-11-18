@@ -18,7 +18,7 @@ import (
 var _ = Describe("metalctl move", func() {
 	_ = SetupTest()
 
-	It("Should successfully create metal CRDs and CRs from a source cluster on a target cluster", func(ctx SpecContext) {
+	It("Should successfully move metal CRs from a source cluster on a target cluster", func(ctx SpecContext) {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 
 		// source cluster setup

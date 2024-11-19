@@ -2111,6 +2111,19 @@ ServerState
 </tr>
 <tr>
 <td>
+<code>totalSystemMemory</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity">
+k8s.io/apimachinery/pkg/api/resource.Quantity
+</a>
+</em>
+</td>
+<td>
+<p>TotalSystemMemoryBytes is the total amount of memory in bytes available on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>storages</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.Storage">

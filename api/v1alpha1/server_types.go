@@ -183,6 +183,9 @@ type ServerStatus struct {
 	// NetworkInterfaces is a list of network interfaces associated with the server.
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
 
+	// TotalSystemMemory is the total amount of memory in bytes available on the server.
+	TotalSystemMemory *resource.Quantity `json:"totalSystemMemory,omitempty"`
+
 	// Storages is a list of storages associated with the server.
 	Storages []Storage `json:"storages,omitempty"`
 

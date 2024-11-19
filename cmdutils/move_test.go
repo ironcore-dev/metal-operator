@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package app
+package cmdutils
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sSchema "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -37,52 +38,58 @@ var _ = Describe("metalctl move", func() {
 				MACAddress: "23:11:8A:33:CF:EB",
 				IP:         metalv1alpha1.MustParseIP("127.0.0.2"),
 			}}
-		Expect(clients.source.Create(ctx, sourceCommonEndpoint)).To(Succeed())
-		Expect(clients.source.Create(ctx, sourceEndpoint)).To(Succeed())
+		Expect(clients.Source.Create(ctx, sourceCommonEndpoint)).To(Succeed())
+		Expect(clients.Source.Create(ctx, sourceEndpoint)).To(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.source.Get(ctx, client.ObjectKeyFromObject(sourceCommonEndpoint), sourceCommonEndpoint)
+			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceCommonEndpoint), sourceCommonEndpoint)
 		}).Should(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.source.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), sourceEndpoint)
+			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), sourceEndpoint)
 		}).Should(Succeed())
 
 		sourceBmc := &metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
-			Spec: metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}}}
+			Spec:   metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}},
+			Status: metalv1alpha1.BMCStatus{State: metalv1alpha1.BMCStateEnabled}}
 		controllerutil.SetOwnerReference(sourceCommonEndpoint, sourceBmc, k8sSchema.Scheme)
-		Expect(clients.source.Create(ctx, sourceBmc)).To(Succeed())
+		Expect(clients.Source.Create(ctx, sourceBmc)).To(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), sourceBmc)
+			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), sourceBmc)
 		}).Should(Succeed())
 
 		sourceBmcSecret := &metalv1alpha1.BMCSecret{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"}}
 		controllerutil.SetOwnerReference(sourceBmc, sourceBmcSecret, k8sSchema.Scheme)
-		Expect(clients.source.Create(ctx, sourceBmcSecret)).To(Succeed())
+		Expect(clients.Source.Create(ctx, sourceBmcSecret)).To(Succeed())
 
 		// target cluster setup
 		targetCommonEndpoint := sourceCommonEndpoint.DeepCopy()
 		targetCommonEndpoint.SetResourceVersion("")
-		Expect(clients.target.Create(ctx, targetCommonEndpoint)).To(Succeed())
+		Expect(clients.Target.Create(ctx, targetCommonEndpoint)).To(Succeed())
 		targetEndpoint := &metalv1alpha1.Endpoint{}
 		targetBmc := &metalv1alpha1.BMC{}
 		targetBmcSecret := &metalv1alpha1.BMCSecret{}
 
 		// TEST
-		err := move(context.TODO(), clients)
+		crsSchema := []schema.GroupVersionKind{}
+		for _, crdKind := range []string{"BMC", "BMCSecret", "Endpoint", "Server", "ServerBootConfiguration", "ServerClaim"} {
+			crsSchema = append(crsSchema, schema.GroupVersionKind{Group: "metal.ironcore.dev", Version: "v1alpha1", Kind: crdKind})
+		}
+		err := Move(context.TODO(), clients, crsSchema, "", false)
 		Expect(err).To(BeNil())
 
 		Eventually(func(g Gomega) error {
-			return clients.source.Get(ctx, client.ObjectKeyFromObject(targetCommonEndpoint), targetCommonEndpoint)
+			return clients.Source.Get(ctx, client.ObjectKeyFromObject(targetCommonEndpoint), targetCommonEndpoint)
 		}).Should(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.source.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), targetEndpoint)
+			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), targetEndpoint)
 		}).Should(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), targetBmc)
+			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), targetBmc)
 		}).Should(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.source.Get(ctx, client.ObjectKeyFromObject(sourceBmcSecret), targetBmcSecret)
+			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmcSecret), targetBmcSecret)
 		}).Should(Succeed())
 		Expect(targetBmc.GetOwnerReferences()[0].UID).To(Equal(targetCommonEndpoint.GetUID()))
+		Expect(targetBmc.Status.State).To(Equal(sourceBmc.Status.State))
 		Expect(targetBmcSecret.GetOwnerReferences()[0].UID).To(Equal(targetBmc.GetUID()))
 	})
 })

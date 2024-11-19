@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package app
+package cmdutils
 
 import (
 	"context"
@@ -51,7 +51,7 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	sourceEnv := &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
@@ -59,7 +59,7 @@ var _ = BeforeSuite(func() {
 		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
-		BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s",
+		BinaryAssetsDirectory: filepath.Join("..", "bin", "k8s",
 			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
@@ -73,12 +73,12 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	clients.source, err = client.New(sourceCfg, client.Options{Scheme: k8sSchema.Scheme})
+	clients.Source, err = client.New(sourceCfg, client.Options{Scheme: k8sSchema.Scheme})
 	Expect(err).NotTo(HaveOccurred())
-	Expect(clients.source).NotTo(BeNil())
+	Expect(clients.Source).NotTo(BeNil())
 
 	targetEnv := &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
@@ -86,7 +86,7 @@ var _ = BeforeSuite(func() {
 		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
-		BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s",
+		BinaryAssetsDirectory: filepath.Join("..", "bin", "k8s",
 			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
@@ -97,9 +97,9 @@ var _ = BeforeSuite(func() {
 
 	DeferCleanup(targetEnv.Stop)
 
-	clients.target, err = client.New(targetCfg, client.Options{Scheme: k8sSchema.Scheme})
+	clients.Target, err = client.New(targetCfg, client.Options{Scheme: k8sSchema.Scheme})
 	Expect(err).NotTo(HaveOccurred())
-	Expect(clients.target).NotTo(BeNil())
+	Expect(clients.Target).NotTo(BeNil())
 
 	By("Starting the registry server")
 	var mgrCtx context.Context
@@ -127,10 +127,10 @@ func SetupTest() *corev1.Namespace {
 				GenerateName: "test-",
 			},
 		}
-		Expect(clients.source.Create(ctx, ns)).To(Succeed(), "failed to create test namespace")
-		Expect(clients.target.Create(ctx, &targetNs)).To(Succeed(), "failed to create test namespace")
-		DeferCleanup(clients.source.Delete, ns)
-		DeferCleanup(clients.target.Delete, &targetNs)
+		Expect(clients.Source.Create(ctx, ns)).To(Succeed(), "failed to create test namespace")
+		Expect(clients.Target.Create(ctx, &targetNs)).To(Succeed(), "failed to create test namespace")
+		DeferCleanup(clients.Source.Delete, ns)
+		DeferCleanup(clients.Target.Delete, &targetNs)
 	})
 
 	return ns

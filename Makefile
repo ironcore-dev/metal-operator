@@ -114,6 +114,17 @@ startdocs: ## Start the local mkdocs based development environment.
 cleandocs: ## Remove all local mkdocs Docker images (cleanup).
 	docker container prune --force --filter "label=project=metal_operator"
 
+.PHONY: add-license
+add-license: addlicense ## Add license headers to all go files.
+	find . -name '*.go' -exec $(ADDLICENSE) -f hack/license-header.txt {} +
+
+.PHONY: check-license
+check-license: addlicense ## Check that every file has a license header present.
+	find . -name '*.go' -exec $(ADDLICENSE) -check -c 'IronCore authors' {} +
+
+.PHONY: check
+check: generate manifests add-license fmt lint test # Generate manifests, code, lint, add licenses, test
+
 ##@ Build
 
 .PHONY: docs
@@ -208,6 +219,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 GOIMPORTS ?= $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)
 GEN_CRD_API_REFERENCE_DOCS ?= $(LOCALBIN)/gen-crd-api-reference-docs-$(GEN_CRD_API_REFERENCE_DOCS_VERSION)
+ADDLICENSE ?= $(LOCALBIN)/addlicense-$(ADDLICENSE_VERSION)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.3.0
@@ -216,6 +228,12 @@ ENVTEST_VERSION ?= latest
 GOLANGCI_LINT_VERSION ?= v1.61.0
 GOIMPORTS_VERSION ?= v0.25.0
 GEN_CRD_API_REFERENCE_DOCS_VERSION ?= v0.3.0
+ADDLICENSE_VERSION ?= v1.1.1
+
+.PHONY: addlicense
+addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
+$(ADDLICENSE): $(LOCALBIN)
+	$(call go-install-tool,$(ADDLICENSE),github.com/google/addlicense,$(ADDLICENSE_VERSION))
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.

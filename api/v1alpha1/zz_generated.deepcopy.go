@@ -733,6 +733,11 @@ func (in *ServerStatus) DeepCopyInto(out *ServerStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.TotalSystemMemory != nil {
+		in, out := &in.TotalSystemMemory, &out.TotalSystemMemory
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	if in.Storages != nil {
 		in, out := &in.Storages, &out.Storages
 		*out = make([]Storage, len(*in))

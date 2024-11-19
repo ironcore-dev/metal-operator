@@ -14,6 +14,7 @@ import (
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var _ BMC = (*RedfishBMC)(nil)
@@ -221,16 +222,22 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
 	}
+	memoryString := fmt.Sprintf("%.fGi", system.MemorySummary.TotalSystemMemoryGiB)
+	quantity, err := resource.ParseQuantity(memoryString)
 
+	if err != nil {
+		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
+	}
 	return SystemInfo{
-		SystemUUID:   system.UUID,
-		Manufacturer: system.Manufacturer,
-		Model:        system.Model,
-		Status:       system.Status,
-		PowerState:   system.PowerState,
-		SerialNumber: system.SerialNumber,
-		SKU:          system.SKU,
-		IndicatorLED: string(system.IndicatorLED),
+		SystemUUID:        system.UUID,
+		Manufacturer:      system.Manufacturer,
+		Model:             system.Model,
+		Status:            system.Status,
+		PowerState:        system.PowerState,
+		SerialNumber:      system.SerialNumber,
+		SKU:               system.SKU,
+		IndicatorLED:      string(system.IndicatorLED),
+		TotalSystemMemory: quantity,
 	}, nil
 }
 

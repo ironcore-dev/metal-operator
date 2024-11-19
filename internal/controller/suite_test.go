@@ -12,6 +12,7 @@ import (
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
@@ -181,9 +182,12 @@ func SetupTest() *corev1.Namespace {
 			RegistryResyncInterval: 50 * time.Millisecond,
 			ResyncInterval:         100 * time.Millisecond,
 			EnforceFirstBoot:       true,
-			PowerPollingInterval:   50 * time.Millisecond,
-			PowerPollingTimeout:    200 * time.Millisecond,
-			DiscoveryTimeout:       500 * time.Millisecond, // Force timeout to be quick for tests
+			BMCOptions: bmc.BMCOptions{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
+			DiscoveryTimeout: 500 * time.Millisecond, // Force timeout to be quick for tests
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

@@ -4,6 +4,8 @@
 package bmc
 
 import (
+	"context"
+
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -12,43 +14,45 @@ import (
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
-	PowerOn(systemUUID string) error
+	PowerOn(ctx context.Context, systemUUID string) error
 
 	// PowerOff gracefully shuts down the system.
-	PowerOff(systemUUID string) error
+	PowerOff(ctx context.Context, systemUUID string) error
 
 	// ForcePowerOff powers off the system.
-	ForcePowerOff(systemUUID string) error
+	ForcePowerOff(ctx context.Context, systemUUID string) error
 
 	// Reset performs a reset on the system.
-	Reset(systemUUID string, resetType redfish.ResetType) error
+	Reset(ctx context.Context, systemUUID string, resetType redfish.ResetType) error
 
 	// SetPXEBootOnce sets the boot device for the next system boot.
-	SetPXEBootOnce(systemUUID string) error
+	SetPXEBootOnce(ctx context.Context, systemUUID string) error
 
 	// GetSystemInfo retrieves information about the system.
-	GetSystemInfo(systemUUID string) (SystemInfo, error)
+	GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error)
 
 	// Logout closes the BMC client connection by logging out
 	Logout()
 
 	// GetSystems returns the managed systems
-	GetSystems() ([]Server, error)
+	GetSystems(ctx context.Context) ([]Server, error)
 
 	// GetManager returns the manager
 	GetManager() (*Manager, error)
 
-	GetBootOrder(systemUUID string) ([]string, error)
+	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
 
-	GetBiosAttributeValues(systemUUID string, attributes []string) (map[string]string, error)
+	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]string, error)
 
-	SetBiosAttributes(systemUUID string, attributes map[string]string) (reset bool, err error)
+	SetBiosAttributes(ctx context.Context, systemUUID string, attributes map[string]string) (reset bool, err error)
 
-	GetBiosVersion(systemUUID string) (string, error)
+	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
 
-	SetBootOrder(systemUUID string, order []string) error
+	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
 
-	GetStorages(systemUUID string) ([]Storage, error)
+	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
+
+	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 }
 
 type Entity struct {

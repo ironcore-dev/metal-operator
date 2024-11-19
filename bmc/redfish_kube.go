@@ -37,12 +37,11 @@ type RedfishKubeBMC struct {
 // NewRedfishKubeBMCClient creates a new RedfishKubeBMC with the given connection details.
 func NewRedfishKubeBMCClient(
 	ctx context.Context,
-	endpoint, username, password string,
-	basicAuth bool,
+	options BMCOptions,
 	c client.Client,
 	ns string,
 ) (BMC, error) {
-	bmc, err := NewRedfishBMCClient(ctx, endpoint, username, password, basicAuth)
+	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -58,8 +57,8 @@ func NewRedfishKubeBMCClient(
 }
 
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishKubeBMC) SetPXEBootOnce(systemUUID string) error {
-	system, err := r.getSystemByUUID(systemUUID)
+func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) error {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}

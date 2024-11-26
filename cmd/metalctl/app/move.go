@@ -8,10 +8,12 @@ import (
 	"log/slog"
 
 	"github.com/spf13/cobra"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	utils "github.com/ironcore-dev/metal-operator/cmdutils"
 )
 
@@ -72,9 +74,16 @@ func runMove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	ctx := cmd.Context()
+
+	crdList := &apiextensionsv1.CustomResourceDefinitionList{}
+	if err := clients.Source.List(ctx, crdList); err != nil {
+		return err
+	}
 	crsSchema := []schema.GroupVersionKind{}
-	for _, crdKind := range []string{"BMC", "BMCSecret", "Endpoint", "Server", "ServerBootConfiguration", "ServerClaim"} {
-		crsSchema = append(crsSchema, schema.GroupVersionKind{Group: "metal.ironcore.dev", Version: "v1alpha1", Kind: crdKind})
+	for _, crd := range crdList.Items {
+		if crd.GroupVersionKind().GroupVersion() == metalv1alpha1.GroupVersion {
+			crsSchema = append(crsSchema, crd.GroupVersionKind())
+		}
 	}
 	return utils.Move(ctx, clients, crsSchema, namespace, dryRun)
 }

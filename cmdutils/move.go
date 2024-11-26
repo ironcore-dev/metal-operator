@@ -22,6 +22,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	pollInterval = time.Second / 10
+	pollTimeout  = time.Second * 30
+)
+
 func getCrs(ctx context.Context, cl client.Client, crsGvk []schema.GroupVersionKind, namespace string) ([]*unstructured.Unstructured, error) {
 	crs := make([]*unstructured.Unstructured, 0)
 
@@ -131,7 +136,7 @@ func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid .
 	}
 
 	for _, crsTree := range crsTrees {
-		err = wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 			// retrive uid of an owner
 			ownerCr := crsTree.Cr.DeepCopy()
 			if err := cl.Get(ctx, client.ObjectKeyFromObject(crsTree.Cr), ownerCr); err != nil {

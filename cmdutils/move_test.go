@@ -5,6 +5,7 @@ package cmdutils
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -48,12 +49,21 @@ var _ = Describe("metalctl move", func() {
 		}).Should(Succeed())
 
 		sourceBmc := &metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
-			Spec:   metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}},
-			Status: metalv1alpha1.BMCStatus{State: metalv1alpha1.BMCStateEnabled}}
+			Spec: metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}}}
 		controllerutil.SetOwnerReference(sourceCommonEndpoint, sourceBmc, k8sSchema.Scheme)
 		Expect(clients.Source.Create(ctx, sourceBmc)).To(Succeed())
 		Eventually(func(g Gomega) error {
 			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), sourceBmc)
+		}).Should(Succeed())
+		sourceBmc.Status.PowerState = metalv1alpha1.PoweringOnPowerState
+		Expect(clients.Source.Status().Update(ctx, sourceBmc)).To(Succeed())
+		Eventually(func(g Gomega) error {
+			if err := clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), sourceBmc); err == nil {
+				if sourceBmc.Status.PowerState == metalv1alpha1.PoweringOnPowerState {
+					return nil
+				}
+			}
+			return errors.New("waiting for status update")
 		}).Should(Succeed())
 
 		sourceBmcSecret := &metalv1alpha1.BMCSecret{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"}}
@@ -89,7 +99,7 @@ var _ = Describe("metalctl move", func() {
 			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmcSecret), targetBmcSecret)
 		}).Should(Succeed())
 		Expect(targetBmc.GetOwnerReferences()[0].UID).To(Equal(targetCommonEndpoint.GetUID()))
-		Expect(targetBmc.Status.State).To(Equal(sourceBmc.Status.State))
+		Expect(targetBmc.Status.PowerState).To(Equal(sourceBmc.Status.PowerState))
 		Expect(targetBmcSecret.GetOwnerReferences()[0].UID).To(Equal(targetBmc.GetUID()))
 	})
 })

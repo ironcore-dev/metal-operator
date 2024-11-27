@@ -53,7 +53,7 @@ func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj runtim
 
 	endpoint, ok := obj.(*metalv1alpha1.Endpoint)
 	if !ok {
-		return nil, fmt.Errorf("expected a Endpoint object but got %T", obj)
+		return nil, fmt.Errorf("expected an Endpoint object but got %T", obj)
 	}
 	endpointlog.Info("Validation for Endpoint upon creation", "name", endpoint.GetName())
 
@@ -74,7 +74,7 @@ func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, ne
 
 	endpoint, ok := newObj.(*metalv1alpha1.Endpoint)
 	if !ok {
-		return nil, fmt.Errorf("expected a Endpoint object for the newObj but got %T", newObj)
+		return nil, fmt.Errorf("expected an Endpoint object for the newObj but got %T", newObj)
 	}
 	endpointlog.Info("Validation for Endpoint upon update", "name", endpoint.GetName())
 
@@ -93,7 +93,7 @@ func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, ne
 func (v *EndpointCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	endpoint, ok := obj.(*metalv1alpha1.Endpoint)
 	if !ok {
-		return nil, fmt.Errorf("expected a Endpoint object but got %T", obj)
+		return nil, fmt.Errorf("expected an Endpoint object but got %T", obj)
 	}
 	endpointlog.Info("Validation for Endpoint upon deletion", "name", endpoint.GetName())
 

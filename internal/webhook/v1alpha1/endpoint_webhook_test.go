@@ -9,7 +9,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	// TODO (user): Add any additional imports if needed
 )
 
 var _ = Describe("Endpoint Webhook", func() {
@@ -30,9 +29,9 @@ var _ = Describe("Endpoint Webhook", func() {
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
 	})
 
-	Context("When creating or updating Endpoint under Validating Webhook", func() {
+	Context("When creating or updating an Endpoint under Validating Webhook", func() {
 		It("Should deny creation if an Endpoint has a duplicate MAC address", func(ctx SpecContext) {
-			By("creating an Endpoint")
+			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
@@ -45,7 +44,7 @@ var _ = Describe("Endpoint Webhook", func() {
 			Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
 			DeferCleanup(k8sClient.Delete, endpoint)
 
-			By("creating an Endpoint with existing MAC address")
+			By("Creating an Endpoint with existing MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
@@ -58,8 +57,8 @@ var _ = Describe("Endpoint Webhook", func() {
 			Expect(validator.ValidateCreate(ctx, existingEndpoint)).Error().To(HaveOccurred())
 		})
 
-		It("Should allow creation if an Endpoint has an unique MAC address", func(ctx SpecContext) {
-			By("creating an Endpoint")
+		It("Should allow creation if an Endpoint has a unique MAC address", func(ctx SpecContext) {
+			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
@@ -72,7 +71,7 @@ var _ = Describe("Endpoint Webhook", func() {
 			Expect(k8sClient.Create(ctx, endpoint)).ToNot(HaveOccurred())
 			DeferCleanup(k8sClient.Delete, endpoint)
 
-			By("creating an Endpoint with non-existing MAC address")
+			By("Creating an Endpoint with non-existing MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
@@ -86,7 +85,7 @@ var _ = Describe("Endpoint Webhook", func() {
 		})
 
 		It("Should deny update of an Endpoint with existing MAC address", func() {
-			By("creating an Endpoint")
+			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
@@ -99,7 +98,7 @@ var _ = Describe("Endpoint Webhook", func() {
 			Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
 			DeferCleanup(k8sClient.Delete, endpoint)
 
-			By("creating an Endpoint with different MAC address")
+			By("Creating an Endpoint with different MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
@@ -119,7 +118,7 @@ var _ = Describe("Endpoint Webhook", func() {
 		})
 
 		It("Should allow update an IP address of the same Endpoint", func() {
-			By("creating an Endpoint")
+			By("Creating an Endpoint")
 			existingEndpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",

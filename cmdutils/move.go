@@ -121,36 +121,34 @@ func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid .
 	movedCrs = make([]*unstructured.Unstructured, 0)
 
 	for _, crsTree := range crsTrees {
-		ownerReferences := crsTree.Cr.GetOwnerReferences()
+		cr := crsTree.Cr.DeepCopy()
+		ownerReferences := cr.GetOwnerReferences()
 		if len(ownerReferences) == 1 && len(ownerUid) == 1 {
 			ownerReferences[0].UID = ownerUid[0]
-			crsTree.Cr.SetOwnerReferences(ownerReferences)
+			cr.SetOwnerReferences(ownerReferences)
 		}
-
-		crsTree.Cr.SetResourceVersion("")
-		if err = cl.Create(ctx, crsTree.Cr); err != nil {
-			err = fmt.Errorf("CR %s couldn't be created in the target cluster: %w", crName(crsTree.Cr), err)
+		cr.SetResourceVersion("")
+		if err = cl.Create(ctx, cr); err != nil {
+			err = fmt.Errorf("CR %s couldn't be created in the target cluster: %w", crName(cr), err)
 			return
 		}
-		movedCrs = append(movedCrs, crsTree.Cr)
+		movedCrs = append(movedCrs, cr)
 	}
 
 	for _, crsTree := range crsTrees {
 		err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
-			// retrive uid of an owner
-			ownerCr := crsTree.Cr.DeepCopy()
-			if err := cl.Get(ctx, client.ObjectKeyFromObject(crsTree.Cr), ownerCr); err != nil {
+			// get CR from target cluster
+			cr := crsTree.Cr.DeepCopy()
+			if err := cl.Get(ctx, client.ObjectKeyFromObject(cr), cr); err != nil {
 				return false, client.IgnoreNotFound(err)
 			}
 
-			crsTree.Cr.SetResourceVersion(ownerCr.GetResourceVersion())
-			if err = cl.Status().Update(ctx, ownerCr); err != nil {
+			if err := copyStatus(ctx, cl, crsTree.Cr, cr); err != nil {
 				return false, err
 			}
 
 			// create children CRs
-			var movedChildrenCrs []*unstructured.Unstructured
-			movedChildrenCrs, err = moveCrs(ctx, cl, crsTree.Children, ownerCr.GetUID())
+			movedChildrenCrs, err := moveCrs(ctx, cl, crsTree.Children, cr.GetUID())
 			movedCrs = slices.Concat(movedCrs, movedChildrenCrs)
 			return true, err
 		})
@@ -160,6 +158,21 @@ func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid .
 	}
 
 	return
+}
+
+func copyStatus(ctx context.Context, cl client.Client, sourceCr, targetCr *unstructured.Unstructured) error {
+	status, found, err := unstructured.NestedMap(sourceCr.Object, "status")
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+
+	if err := unstructured.SetNestedField(targetCr.Object, status, "status"); err != nil {
+		return err
+	}
+	return cl.Status().Update(ctx, targetCr)
 }
 
 func Move(ctx context.Context, clients Clients, crsGvk []schema.GroupVersionKind, namespace string, dryRun bool) error {

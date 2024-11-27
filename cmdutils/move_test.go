@@ -50,7 +50,7 @@ var _ = Describe("metalctl move", func() {
 
 		sourceBmc := &metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
 			Spec: metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}}}
-		controllerutil.SetOwnerReference(sourceCommonEndpoint, sourceBmc, k8sSchema.Scheme)
+		controllerutil.SetOwnerReference(sourceEndpoint, sourceBmc, k8sSchema.Scheme)
 		Expect(clients.Source.Create(ctx, sourceBmc)).To(Succeed())
 		Eventually(func(g Gomega) error {
 			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), sourceBmc)
@@ -87,18 +87,18 @@ var _ = Describe("metalctl move", func() {
 		Expect(err).To(BeNil())
 
 		Eventually(func(g Gomega) error {
-			return clients.Source.Get(ctx, client.ObjectKeyFromObject(targetCommonEndpoint), targetCommonEndpoint)
+			return clients.Target.Get(ctx, client.ObjectKeyFromObject(targetCommonEndpoint), targetCommonEndpoint)
 		}).Should(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), targetEndpoint)
+			return clients.Target.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), targetEndpoint)
 		}).Should(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), targetBmc)
+			return clients.Target.Get(ctx, client.ObjectKeyFromObject(sourceBmc), targetBmc)
 		}).Should(Succeed())
 		Eventually(func(g Gomega) error {
-			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmcSecret), targetBmcSecret)
+			return clients.Target.Get(ctx, client.ObjectKeyFromObject(sourceBmcSecret), targetBmcSecret)
 		}).Should(Succeed())
-		Expect(targetBmc.GetOwnerReferences()[0].UID).To(Equal(targetCommonEndpoint.GetUID()))
+		Expect(targetBmc.GetOwnerReferences()[0].UID).To(Equal(targetEndpoint.GetUID()))
 		Expect(targetBmc.Status.PowerState).To(Equal(sourceBmc.Status.PowerState))
 		Expect(targetBmcSecret.GetOwnerReferences()[0].UID).To(Equal(targetBmc.GetUID()))
 	})

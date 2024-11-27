@@ -81,8 +81,12 @@ func runMove(cmd *cobra.Command, args []string) error {
 	}
 	crsSchema := []schema.GroupVersionKind{}
 	for _, crd := range crdList.Items {
-		if crd.GroupVersionKind().GroupVersion() == metalv1alpha1.GroupVersion {
-			crsSchema = append(crsSchema, crd.GroupVersionKind())
+		if crd.Spec.Group == metalv1alpha1.GroupVersion.Group {
+			crsSchema = append(crsSchema, schema.GroupVersionKind{
+				Group:   crd.Spec.Group,
+				Version: crd.Spec.Versions[0].Name,
+				Kind:    crd.Spec.Names.Kind,
+			})
 		}
 	}
 	return utils.Move(ctx, clients, crsSchema, namespace, dryRun)

@@ -119,7 +119,7 @@ func ValidateMACAddressCreate(ctx context.Context, c client.Client, spec metalv1
 	return allErrs
 }
 
-func ValidateMACAddressUpdate(ctx context.Context, c client.Client, existing *metalv1alpha1.Endpoint, path *field.Path) field.ErrorList {
+func ValidateMACAddressUpdate(ctx context.Context, c client.Client, updatedEndpoint *metalv1alpha1.Endpoint, path *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	endpoints := &metalv1alpha1.EndpointList{}
@@ -128,7 +128,7 @@ func ValidateMACAddressUpdate(ctx context.Context, c client.Client, existing *me
 	}
 
 	for _, e := range endpoints.Items {
-		if e.Spec.MACAddress == existing.Spec.MACAddress && e.Name != existing.Name {
+		if e.Spec.MACAddress == updatedEndpoint.Spec.MACAddress && e.Name != updatedEndpoint.Name {
 			allErrs = append(allErrs, field.Duplicate(field.NewPath("spec").Child("MACAddress"), e.Spec.MACAddress))
 		}
 	}

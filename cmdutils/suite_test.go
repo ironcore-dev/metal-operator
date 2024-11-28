@@ -4,14 +4,11 @@
 package cmdutils
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
-
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -100,17 +97,6 @@ var _ = BeforeSuite(func() {
 	clients.Target, err = client.New(targetCfg, client.Options{Scheme: k8sSchema.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(clients.Target).NotTo(BeNil())
-
-	By("Starting the registry server")
-	var mgrCtx context.Context
-	mgrCtx, cancel := context.WithCancel(context.Background())
-	DeferCleanup(cancel)
-	registryServer := registry.NewServer("localhost:30000")
-	go func() {
-		defer GinkgoRecover()
-		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
-	}()
-
 })
 
 func SetupTest() *corev1.Namespace {

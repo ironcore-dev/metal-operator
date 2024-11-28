@@ -50,7 +50,7 @@ var _ = Describe("metalctl move", func() {
 
 		sourceBmc := &metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
 			Spec: metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}}}
-		controllerutil.SetOwnerReference(sourceEndpoint, sourceBmc, k8sSchema.Scheme)
+		Expect(controllerutil.SetOwnerReference(sourceEndpoint, sourceBmc, k8sSchema.Scheme)).To(Succeed())
 		Expect(clients.Source.Create(ctx, sourceBmc)).To(Succeed())
 		Eventually(func(g Gomega) error {
 			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceBmc), sourceBmc)
@@ -67,7 +67,7 @@ var _ = Describe("metalctl move", func() {
 		}).Should(Succeed())
 
 		sourceBmcSecret := &metalv1alpha1.BMCSecret{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"}}
-		controllerutil.SetOwnerReference(sourceBmc, sourceBmcSecret, k8sSchema.Scheme)
+		Expect(controllerutil.SetOwnerReference(sourceBmc, sourceBmcSecret, k8sSchema.Scheme)).To(Succeed())
 		Expect(clients.Source.Create(ctx, sourceBmcSecret)).To(Succeed())
 
 		// target cluster setup
@@ -84,7 +84,7 @@ var _ = Describe("metalctl move", func() {
 			crsSchema = append(crsSchema, schema.GroupVersionKind{Group: "metal.ironcore.dev", Version: "v1alpha1", Kind: crdKind})
 		}
 		err := Move(context.TODO(), clients, crsSchema, "", false)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func(g Gomega) error {
 			return clients.Target.Get(ctx, client.ObjectKeyFromObject(targetCommonEndpoint), targetCommonEndpoint)

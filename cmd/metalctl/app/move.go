@@ -36,8 +36,8 @@ func NewMoveCommand() *cobra.Command {
 	move.Flags().StringVar(&namespace, "namespace", "", "namespace to filter CRs to migrate. Defaults to all namespaces if not specified")
 	move.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be moved without executing the migration")
 	move.Flags().BoolVar(&verbose, "verbose", false, "enable verbose logging for detailed output during migration")
-	move.MarkFlagRequired("source-kubeconfig")
-	move.MarkFlagRequired("target-kubeconfig")
+	_ = move.MarkFlagRequired("source-kubeconfig")
+	_ = move.MarkFlagRequired("target-kubeconfig")
 
 	if verbose {
 		slog.SetLogLoggerLevel(slog.LevelDebug)

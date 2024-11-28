@@ -117,8 +117,8 @@ func cleanup(ctx context.Context, cl client.Client, crs []*unstructured.Unstruct
 	return errors.Join(cleanupErrs...)
 }
 
-func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid ...types.UID) (movedCrs []*unstructured.Unstructured, err error) {
-	movedCrs = make([]*unstructured.Unstructured, 0)
+func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid ...types.UID) ([]*unstructured.Unstructured, error) {
+	movedCrs := make([]*unstructured.Unstructured, 0)
 
 	for _, crsTree := range crsTrees {
 		cr := crsTree.Cr.DeepCopy()
@@ -128,15 +128,15 @@ func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid .
 			cr.SetOwnerReferences(ownerReferences)
 		}
 		cr.SetResourceVersion("")
-		if err = cl.Create(ctx, cr); err != nil {
+		if err := cl.Create(ctx, cr); err != nil {
 			err = fmt.Errorf("CR %s couldn't be created in the target cluster: %w", crName(cr), err)
-			return
+			return movedCrs, err
 		}
 		movedCrs = append(movedCrs, cr)
 	}
 
 	for _, crsTree := range crsTrees {
-		err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 			// get CR from target cluster
 			cr := crsTree.Cr.DeepCopy()
 			if err := cl.Get(ctx, client.ObjectKeyFromObject(cr), cr); err != nil {
@@ -153,11 +153,11 @@ func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid .
 			return true, err
 		})
 		if err != nil {
-			return
+			return movedCrs, err
 		}
 	}
 
-	return
+	return movedCrs, nil
 }
 
 func copyStatus(ctx context.Context, cl client.Client, sourceCr, targetCr *unstructured.Unstructured) error {

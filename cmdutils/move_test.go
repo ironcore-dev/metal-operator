@@ -81,7 +81,8 @@ var _ = Describe("metalctl move", func() {
 		// TEST
 		crsSchema := []schema.GroupVersionKind{}
 		for _, crdKind := range []string{"BMC", "BMCSecret", "Endpoint", "Server", "ServerBootConfiguration", "ServerClaim"} {
-			crsSchema = append(crsSchema, schema.GroupVersionKind{Group: "metal.ironcore.dev", Version: "v1alpha1", Kind: crdKind})
+			crsSchema = append(crsSchema,
+				schema.GroupVersionKind{Group: "metal.ironcore.dev", Version: "v1alpha1", Kind: crdKind})
 		}
 		err := Move(context.TODO(), clients, crsSchema, "", false)
 		Expect(err).ToNot(HaveOccurred())

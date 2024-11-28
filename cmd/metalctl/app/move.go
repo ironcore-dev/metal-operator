@@ -33,7 +33,8 @@ func NewMoveCommand() *cobra.Command {
 	}
 	move.Flags().StringVar(&sourceKubeconfig, "source-kubeconfig", "", "Kubeconfig pointing to the source cluster")
 	move.Flags().StringVar(&targetKubeconfig, "target-kubeconfig", "", "Kubeconfig pointing to the target cluster")
-	move.Flags().StringVar(&namespace, "namespace", "", "namespace to filter CRs to migrate. Defaults to all namespaces if not specified")
+	move.Flags().StringVar(&namespace, "namespace", "",
+		"namespace to filter CRs to migrate. Defaults to all namespaces if not specified")
 	move.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be moved without executing the migration")
 	move.Flags().BoolVar(&verbose, "verbose", false, "enable verbose logging for detailed output during migration")
 	_ = move.MarkFlagRequired("source-kubeconfig")

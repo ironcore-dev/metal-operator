@@ -27,7 +27,12 @@ const (
 	pollTimeout  = time.Second * 30
 )
 
-func getCrs(ctx context.Context, cl client.Client, crsGvk []schema.GroupVersionKind, namespace string) ([]*unstructured.Unstructured, error) {
+func getCrs(
+	ctx context.Context,
+	cl client.Client,
+	crsGvk []schema.GroupVersionKind,
+	namespace string,
+) ([]*unstructured.Unstructured, error) {
 	crs := make([]*unstructured.Unstructured, 0)
 
 	for _, crGvk := range crsGvk {
@@ -61,7 +66,11 @@ func clearFields(obj client.Object) map[string]any {
 	return so
 }
 
-func getCrsToBeMoved(ctx context.Context, targetClient client.Client, sourceCrs []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
+func getCrsToBeMoved(
+	ctx context.Context,
+	targetClient client.Client,
+	sourceCrs []*unstructured.Unstructured,
+) ([]*unstructured.Unstructured, error) {
 	crsToMove := make([]*unstructured.Unstructured, 0, len(sourceCrs))
 	for _, sourceCr := range sourceCrs {
 		targetCr := sourceCr.DeepCopy()
@@ -79,7 +88,9 @@ func getCrsToBeMoved(ctx context.Context, targetClient client.Client, sourceCrs 
 			slog.Debug("source and target CRs are the same", slog.String("CR", crName(sourceCr)))
 			continue
 		}
-		return nil, fmt.Errorf("a CR %s/%s already exists in the target cluster and is different then in the source cluster", sourceCr.GetNamespace(), sourceCr.GetName())
+		return nil, fmt.Errorf(
+			"a CR %s/%s already exists in the target cluster and is different then in the source cluster",
+			sourceCr.GetNamespace(), sourceCr.GetName())
 	}
 	return crsToMove, nil
 }
@@ -117,7 +128,12 @@ func cleanup(ctx context.Context, cl client.Client, crs []*unstructured.Unstruct
 	return errors.Join(cleanupErrs...)
 }
 
-func moveCrs(ctx context.Context, cl client.Client, crsTrees []*Node, ownerUid ...types.UID) ([]*unstructured.Unstructured, error) {
+func moveCrs(
+	ctx context.Context,
+	cl client.Client,
+	crsTrees []*Node,
+	ownerUid ...types.UID,
+) ([]*unstructured.Unstructured, error) {
 	movedCrs := make([]*unstructured.Unstructured, 0)
 
 	for _, crsTree := range crsTrees {
@@ -175,7 +191,13 @@ func copyStatus(ctx context.Context, cl client.Client, sourceCr, targetCr *unstr
 	return cl.Status().Update(ctx, targetCr)
 }
 
-func Move(ctx context.Context, clients Clients, crsGvk []schema.GroupVersionKind, namespace string, dryRun bool) error {
+func Move(
+	ctx context.Context,
+	clients Clients,
+	crsGvk []schema.GroupVersionKind,
+	namespace string,
+	dryRun bool,
+) error {
 	sourceCrs, err := getCrs(ctx, clients.Source, crsGvk, namespace)
 	if err != nil {
 		return err
@@ -195,9 +217,11 @@ func Move(ctx context.Context, clients Clients, crsGvk []schema.GroupVersionKind
 		if movedCrs, err = moveCrs(ctx, clients.Target, crsTrees); err != nil {
 			cleanupErr := cleanup(ctx, clients.Target, movedCrs)
 			err = errors.Join(err,
-				fmt.Errorf("clean up of CRs was performed to restore a target cluster's state with error result: %w", cleanupErr))
+				fmt.Errorf("clean up of CRs was performed to restore a target cluster's state with error result: %w",
+					cleanupErr))
 		} else {
-			slog.Debug(fmt.Sprintf("all %s CRs from the source cluster were moved to the target cluster", metalv1alphav1.GroupVersion.Group))
+			slog.Debug(fmt.Sprintf("all %s CRs from the source cluster were moved to the target cluster",
+				metalv1alphav1.GroupVersion.Group))
 		}
 	}
 

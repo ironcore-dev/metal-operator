@@ -169,8 +169,9 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 				Name: GetServerNameFromBMCandIndex(i, bmcObj),
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:   strings.ToLower(s.UUID), // always use lower-case uuids
-				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
+				UUID:       strings.ToLower(s.UUID), // always use lower-case uuids
+				SystemUUID: strings.ToLower(s.UUID), // always use lower-case uuids
+				BMCRef:     &v1.LocalObjectReference{Name: bmcObj.Name},
 			},
 		}
 

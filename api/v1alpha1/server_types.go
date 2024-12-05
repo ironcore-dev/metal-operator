@@ -77,7 +77,11 @@ type BIOSSettings struct {
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
+	// Deprecated in favor of systemUUID.
 	UUID string `json:"uuid"`
+
+	// SystemUUID is the unique identifier for the server.
+	SystemUUID string `json:"systemUUID,omitempty"`
 
 	// Power specifies the desired power state of the server.
 	Power Power `json:"power,omitempty"`

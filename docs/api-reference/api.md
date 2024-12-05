@@ -1215,7 +1215,19 @@ string
 </em>
 </td>
 <td>
-<p>UUID is the unique identifier for the server.</p>
+<p>UUID is the unique identifier for the server.
+Deprecated in favor of systemUUID.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemUUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemUUID is the unique identifier for the server.</p>
 </td>
 </tr>
 <tr>
@@ -1851,7 +1863,19 @@ string
 </em>
 </td>
 <td>
-<p>UUID is the unique identifier for the server.</p>
+<p>UUID is the unique identifier for the server.
+Deprecated in favor of systemUUID.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemUUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemUUID is the unique identifier for the server.</p>
 </td>
 </tr>
 <tr>
@@ -2119,7 +2143,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
-<p>TotalSystemMemoryBytes is the total amount of memory in bytes available on the server.</p>
+<p>TotalSystemMemory is the total amount of memory in bytes available on the server.</p>
 </td>
 </tr>
 <tr>

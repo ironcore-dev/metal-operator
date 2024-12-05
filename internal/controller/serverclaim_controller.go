@@ -145,9 +145,9 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	server, err := r.claimServer(ctx, log, claim)
-	if err != nil {
-		return ctrl.Result{}, err
+	server, modified, err := r.claimServer(ctx, log, claim)
+	if err != nil || modified {
+		return ctrl.Result{Requeue: true}, err
 	}
 	if server == nil {
 		log.V(1).Info("No server found for claim")
@@ -308,7 +308,7 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 	return nil
 }
 
-func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
+func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, bool, error) {
 	var (
 		server *metalv1alpha1.Server
 		err    error
@@ -319,22 +319,23 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	case claim.Spec.ServerSelector != nil:
 		server, err = r.claimServerBySelector(ctx, log, claim)
 	default:
-		server, err = r.claimFirstBestServer(ctx, log)
+		server, err = r.claimFirstBestServer(ctx, log, claim)
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if server == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 	log.V(1).Info("Matching server found", "Server", server.Name)
 
-	if modified, err := r.ensureObjectRefForServer(ctx, log, claim, server); err != nil || modified {
-		return nil, err
+	modified, err := r.ensureObjectRefForServer(ctx, log, claim, server)
+	if err != nil {
+		return nil, modified, err
 	}
 	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
 
-	return server, nil
+	return server, modified, nil
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
@@ -379,44 +380,59 @@ func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log l
 	if err := r.List(ctx, serverList, client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return nil, err
 	}
-	var server *metalv1alpha1.Server
-	for _, s := range serverList.Items {
-		if claimRef := s.Spec.ServerClaimRef; claimRef != nil && claimRef.UID != claim.UID {
-			log.V(1).Info("Server claim ref UID does not match claim", "Server", s.Name, "ClaimUID", claimRef.UID)
+	for _, server := range serverList.Items {
+		if claimRef := server.Spec.ServerClaimRef; claimRef != nil && claimRef.UID != claim.UID {
+			log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
 			continue
 		}
-		if s.Status.State != metalv1alpha1.ServerStateAvailable && s.Status.State != metalv1alpha1.ServerStateReserved {
-			log.V(1).Info("Server not in a claimable state", "Server", s.Name, "ServerState", s.Status.State)
+		if server.Status.State != metalv1alpha1.ServerStateAvailable && server.Status.State != metalv1alpha1.ServerStateReserved {
+			log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 			continue
 		}
-		if s.Status.PowerState != metalv1alpha1.ServerOffPowerState {
-			log.V(1).Info("Server is not powered off", "Server", s.Name, "PowerState", s.Status.PowerState)
+		if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+			log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
 			continue
 		}
-		server = s.DeepCopy()
-		break
+		return &server, nil
+
 	}
-	return server, nil
+	return nil, nil
 }
 
-func (r *ServerClaimReconciler) claimFirstBestServer(ctx context.Context, log logr.Logger) (*metalv1alpha1.Server, error) {
-	log.V(1).Info("Trying to claim first best server")
+func checkForPrevUsedServer(log logr.Logger, servers []metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) *metalv1alpha1.Server {
+	log.V(1).Info("Check for previous claimed server")
+	for _, server := range servers {
+		if ref := server.Spec.ServerClaimRef; ref != nil {
+			if ref.UID == claim.UID && ref.Name == claim.Name && ref.Namespace == claim.Namespace {
+				return &server
+			}
+		}
+	}
+	return nil
+}
+
+func (r *ServerClaimReconciler) claimFirstBestServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
 		return nil, err
 	}
-	var server *metalv1alpha1.Server
-	for _, s := range serverList.Items {
-		if s.Spec.ServerClaimRef != nil {
-			continue
-		}
-		if s.Status.State != metalv1alpha1.ServerStateAvailable {
-			continue
-		}
-		server = s.DeepCopy()
-		break
+
+	if server := checkForPrevUsedServer(log, serverList.Items, claim); server != nil {
+		return server, nil
 	}
-	return server, nil
+
+	log.V(1).Info("Trying to claim first best server")
+	for _, server := range serverList.Items {
+		if server.Spec.ServerClaimRef != nil {
+			continue
+		}
+		if server.Status.State != metalv1alpha1.ServerStateAvailable {
+			continue
+		}
+		return &server, nil
+	}
+
+	return nil, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

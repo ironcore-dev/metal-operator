@@ -159,7 +159,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status")
+	log.V(1).Info("Updated Server status", "Status", server.Status.State)
 
 	if err := r.applyBiosSettings(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios settings: %w", err)

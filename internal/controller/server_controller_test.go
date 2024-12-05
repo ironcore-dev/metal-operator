@@ -25,12 +25,9 @@ import (
 var _ = Describe("Server Controller", func() {
 	ns := SetupTest()
 
-	var endpoint *metalv1alpha1.Endpoint
-	var bmc *metalv1alpha1.BMC
-
 	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
-		endpoint = &metalv1alpha1.Endpoint{
+		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
@@ -44,7 +41,7 @@ var _ = Describe("Server Controller", func() {
 		DeferCleanup(k8sClient.Delete, endpoint)
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
-		bmc = &metalv1alpha1.BMC{
+		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: endpoint.Name,
 			},
@@ -273,12 +270,12 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Ensuring that the server is set back to initial due to the discovery check timing out")
-		Eventually(Object(server), "1000ms").Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 100*time.Millisecond)
+		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 50*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

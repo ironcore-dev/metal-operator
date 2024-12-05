@@ -132,17 +132,13 @@ func (r *ServerBIOSReconciler) cleanupReferences(
 }
 
 // Reconciliation flow for ServerBIOS:
-//  1. Ensure finalizer is set on the object
-//  2. Ensure info about current BIOS version and settings is not outdated, otherwise:
-//     2.2. Invoke scan job
-//     2.2. Exit if no discrepancy is found
-//  3. Ensure referred server is in Available state
-//  4. Ensure desired and current BIOS versions match, otherwise:
-//     4.1. Exit if some task is already in progress
-//     4.2. Invoke BIOS version update job
-//  5. Ensure desired and current BIOS settings match, otherwise:
-//     5.1. Exit if some task is already in progress
-//     5.2. Invoke BIOS settings update job
+//  1. Invoke BIOS version and settings scan
+//  2. If observed BIOS version is equal to desired BIOS version - update BIOS version in status
+//  3. If observed BIOS settings are equal to desired BIOS settings - update BIOS settings in status
+//  4. If BIOS version and(or) settings require update:
+//     4.1. If server is not in Maintenance state - invoke server maintenance and exit
+//     4.2. If server is in Maintenance state - invoke BIOS version or settings update jobs and exit
+//  5. Patch server BIOS object status
 func (r *ServerBIOSReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -197,8 +193,10 @@ func (r *ServerBIOSReconciler) reconcileUpdate(
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	// if referred server is not in Available state - stop reconciliation
-	if server.Status.State != metalv1alpha1.ServerStateAvailable {
+	// if referred server is not in Maintenance state - invoke server maintenance and stop reconciliation
+	if server.Status.State != metalv1alpha1.ServerStateMaintenance {
+		// todo: put server into Maintenance state
+		//  REF: https://github.com/ironcore-dev/metal-operator/issues/76
 		return ctrl.Result{RequeueAfter: r.RequeueInterval}, nil
 	}
 	// if desired bios version does not match actual version - run version update

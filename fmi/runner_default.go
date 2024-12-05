@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -13,8 +14,9 @@ import (
 // DefaultTaskRunner is the default implementation of the TaskRunner interface.
 type DefaultTaskRunner struct {
 	client.Client
-	insecure bool
-	tasks    *sync.Map
+	insecure   bool
+	tasks      *sync.Map
+	bmcOptions bmc.BMCOptions
 }
 
 // NewDefaultTaskRunner creates a new DefaultTaskRunner.
@@ -32,11 +34,11 @@ func (s *DefaultTaskRunner) ExecuteScan(ctx context.Context, serverBIOSRef strin
 	if err != nil {
 		return ScanResult{}, err
 	}
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, s.Client, server, s.insecure)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, s.Client, server, s.insecure, s.bmcOptions)
 	if err != nil {
 		return ScanResult{}, err
 	}
-	currentBIOSVersion, err := bmcClient.GetBiosVersion(server.Spec.UUID)
+	currentBIOSVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.UUID)
 	if err != nil {
 		return ScanResult{}, err
 	}
@@ -44,7 +46,7 @@ func (s *DefaultTaskRunner) ExecuteScan(ctx context.Context, serverBIOSRef strin
 	for k := range serverBIOS.Spec.BIOS.Settings {
 		attributes = append(attributes, k)
 	}
-	currentSettings, err := bmcClient.GetBiosAttributeValues(server.Spec.UUID, attributes)
+	currentSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.UUID, attributes)
 	if err != nil {
 		return ScanResult{}, err
 	}
@@ -71,7 +73,7 @@ func (s *DefaultTaskRunner) ExecuteSettingsApply(
 	if err != nil {
 		return SettingsApplyResult{}, err
 	}
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, s.Client, server, s.insecure)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, s.Client, server, s.insecure, s.bmcOptions)
 	if err != nil {
 		return SettingsApplyResult{}, err
 	}
@@ -84,7 +86,7 @@ func (s *DefaultTaskRunner) ExecuteSettingsApply(
 		}
 		diff[k] = v
 	}
-	reset, err := bmcClient.SetBiosAttributes(server.Spec.UUID, diff)
+	reset, err := bmcClient.SetBiosAttributes(ctx, server.Spec.UUID, diff)
 	if err != nil {
 		return SettingsApplyResult{}, err
 	}

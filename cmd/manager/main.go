@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/fmi"
+	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -48,29 +48,29 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr             string
-		enableLeaderElection    bool
-		probeAddr               string
-		secureMetrics           bool
-		enableHTTP2             bool
-		macPrefixesFile         string
-		insecure                bool
-		managerNamespace        string
-		probeImage              string
-		probeOSImage            string
-		registryPort            int
-		registryProtocol        string
-		registryURL             string
-		registryResyncInterval  time.Duration
-		webhookPort             int
-		enforceFirstBoot        bool
-		enforcePowerOff         bool
-		serverResyncInterval    time.Duration
-		powerPollingInterval    time.Duration
-		powerPollingTimeout     time.Duration
-		resourcePollingInterval time.Duration
-		resourcePollingTimeout  time.Duration
-		discoveryTimeout        time.Duration
+		metricsAddr              string
+		enableLeaderElection     bool
+		probeAddr                string
+		secureMetrics            bool
+		enableHTTP2              bool
+		macPrefixesFile          string
+		insecure                 bool
+		managerNamespace         string
+		probeImage               string
+		probeOSImage             string
+		registryPort             int
+		registryProtocol         string
+		registryURL              string
+		registryResyncInterval   time.Duration
+		webhookPort              int
+		enforceFirstBoot         bool
+		enforcePowerOff          bool
+		serverResyncInterval     time.Duration
+		powerPollingInterval     time.Duration
+		powerPollingTimeout      time.Duration
+		resourcePollingInterval  time.Duration
+		resourcePollingTimeout   time.Duration
+		discoveryTimeout         time.Duration
 		fmiServerLocal           bool
 		fmiTaskRunner            string
 		fmiProtocol              string

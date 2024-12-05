@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	EndpointFinalizer = "metal.ironcore.dev/endpoint"
+	DefaultKubeNamespace = "default"
+	EndpointFinalizer    = "metal.ironcore.dev/endpoint"
 )
 
 // EndpointReconciler reconciles a Endpoints object

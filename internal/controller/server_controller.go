@@ -14,7 +14,6 @@ import (
 
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"

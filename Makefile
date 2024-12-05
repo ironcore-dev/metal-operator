@@ -121,10 +121,12 @@ cleandocs: ## Remove all local mkdocs Docker images (cleanup).
 .PHONY: add-license
 add-license: addlicense ## Add license headers to all go files.
 	find . -name '*.go' -exec $(ADDLICENSE) -f hack/license-header.txt {} +
+	find . -name '*.proto' -exec $(ADDLICENSE) -f hack/license-header.txt {} +
 
 .PHONY: check-license
 check-license: addlicense ## Check that every file has a license header present.
 	find . -name '*.go' -exec $(ADDLICENSE) -check -c 'IronCore authors' {} +
+	find . -name '*.proto' -exec $(ADDLICENSE) -check -c 'IronCore authors' {} +
 
 .PHONY: check
 check: generate manifests add-license fmt lint test # Generate manifests, code, lint, add licenses, test

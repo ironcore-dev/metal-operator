@@ -75,6 +75,7 @@ var _ = Describe("Server Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -150,7 +151,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 100*time.Millisecond)
+		probeAgent := probe.NewAgent(server.Spec.SystemUUID, registryURL, 100*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -168,7 +169,7 @@ var _ = Describe("Server Controller", func() {
 		Consistently(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the server is removed from the registry")
-		response, err := http.Get(registryURL + "/systems/" + server.Spec.UUID)
+		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 	})
@@ -193,7 +194,8 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID: "38947555-7742-3448-3784-823347823834",
+				UUID:       "38947555-7742-3448-3784-823347823834",
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
@@ -275,7 +277,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(server.Spec.UUID, registryURL, 50*time.Millisecond)
+		probeAgent := probe.NewAgent(server.Spec.SystemUUID, registryURL, 50*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -327,7 +329,7 @@ var _ = Describe("Server Controller", func() {
 		Consistently(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the server is removed from the registry")
-		response, err := http.Get(registryURL + "/systems/" + server.Spec.UUID)
+		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 	})

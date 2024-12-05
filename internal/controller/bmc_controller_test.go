@@ -85,6 +85,7 @@ var _ = Describe("BMC Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.BMCRef.Name", endpoint.Name),
 		))
 	})
@@ -150,6 +151,7 @@ var _ = Describe("BMC Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.BMCRef.Name", bmc.Name),
 		))
 	})

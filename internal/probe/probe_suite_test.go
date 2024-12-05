@@ -5,6 +5,7 @@ package probe_test
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -42,6 +43,11 @@ var _ = BeforeSuite(func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(ctx)).To(Succeed(), "failed to start registry agent")
 	}()
+
+	Eventually(func() error {
+		_, err := http.Get(registryURL)
+		return err
+	}).Should(Succeed())
 
 	// Initialize your probe server
 	probeAgent = probe.NewAgent(systemUUID, registryURL, 100*time.Millisecond)

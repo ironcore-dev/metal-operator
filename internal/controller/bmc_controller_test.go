@@ -17,11 +17,9 @@ import (
 var _ = Describe("BMC Controller", func() {
 	_ = SetupTest()
 
-	var endpoint *metalv1alpha1.Endpoint
-
-	BeforeEach(func(ctx SpecContext) {
+	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
-		endpoint = &metalv1alpha1.Endpoint{
+		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
@@ -57,15 +55,8 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		DeferCleanup(k8sClient.Delete, server)
-	})
 
-	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {
 		By("Ensuring that the BMC resource has been created for an endpoint")
-		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: endpoint.Name,
-			},
-		}
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
@@ -84,11 +75,6 @@ var _ = Describe("BMC Controller", func() {
 		))
 
 		By("Ensuring that the Server resource has been created")
-		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: GetServerNameFromBMCandIndex(0, bmc),
-			},
-		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",

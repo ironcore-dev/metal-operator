@@ -180,7 +180,7 @@ func SetupTest() *corev1.Namespace {
 			ProbeOSImage:           "fooOS:latest",
 			RegistryURL:            registryURL,
 			RegistryResyncInterval: 50 * time.Millisecond,
-			ResyncInterval:         100 * time.Millisecond,
+			ResyncInterval:         50 * time.Millisecond,
 			EnforceFirstBoot:       true,
 			BMCOptions: bmc.BMCOptions{
 				PowerPollingInterval: 50 * time.Millisecond,

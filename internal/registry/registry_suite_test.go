@@ -5,6 +5,7 @@ package registry_test
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/ironcore-dev/metal-operator/internal/registry"
@@ -36,4 +37,9 @@ var _ = BeforeSuite(func() {
 		defer GinkgoRecover()
 		Expect(server.Start(ctx)).To(Succeed(), "failed to start registry server")
 	}()
+
+	Eventually(func() error {
+		_, err := http.Get(testServerURL)
+		return err
+	}).Should(Succeed())
 })

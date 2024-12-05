@@ -25,7 +25,7 @@ to its previous state.
 
 > Warning!: 
 `metalctl move` has been designed and developed around the bootstrap use case described below, and currently this is
-the only use case verified by Cluster API E2E tests.
+the only use case verified .
 >
 >If someone intends to use `metalctl move` outside of this scenario, it's recommended to set up a custom validation
 pipeline of it before using the command on a production environment.

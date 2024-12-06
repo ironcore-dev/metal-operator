@@ -18,266 +18,378 @@ reviewers:
     - [Goals](#goals)
     - [Non-Goals](#non-goals)
 - [Proposal](#proposal)
-    - [Custom resources](#custom-resources)
-        - [ServerBIOS](#serverbios)
-        - [ServerFirmware](#serverfirmware)
-    - [Controllers](#controllers)
-        - [configuration](#configuration)
-        - [serverbios-controller](#serverbios-controller)
-        - [serverfirmware-controller](#serverfirmware-controller)
-- [Alternatives](#alternatives)
+    - [API Design](#api-design)
+        - [ServerBIOS CRD](#serverbios-crd)
+        - [ServerFirmware CRD](#serverfirmware-crd)
+    - [Components](#components)
+        - [ServerBIOS Controller](#serverbios-controller)
+        - [ServerFirmware Controller](#serverfirmware-controller)
+        - [FMI (Firmware Management Interface)](#fmi-firmware-management-interface)
+    - [Workflow](#workflow)
+      - [ServerBIOS state management](#serverbios-state-management)
+      - [ServerFirmware state management](#serverfirmware-state-management)
+    - [Safety considerations](#safety-considerations)
+    - [Implementation Details](#implementation-details)
+    - [Implementation Plan](#implementation-plan)
+        - [Phase 1: BIOS Controller and Scan Functionality](#phase-1-bios-controller-and-scan-functionality)
+        - [Phase 2: Maintenance Mode and Settings Update](#phase-2-maintenance-mode-and-settings-update)
+        - [Phase 3: BIOS Version Update and Settings Compatibility](#phase-3-bios-version-update-and-settings-compatibility)
+        - [Phase 4: Firmware Controller and Scan Functionality](#phase-4-firmware-controller-and-scan-functionality)
+        - [Phase 5: Firmware Version Update and Settings Compatibility](#phase-5-firmware-version-update-and-settings-compatibility)
+        - [Phase 6: Finalization](#phase-6-finalization)
+    - [Testing Strategy](#testing-strategy)
+- [Future Work](#future-work)
 
 ## Summary
 
 Linked issue: [#99 BIOS/Firmware Update](https://github.com/ironcore-dev/metal-operator/issues/99)
-PoC implementation: [#138 PoC: BIOS version & settings management](https://github.com/ironcore-dev/metal-operator/pull/138) (includes only )
+PoC implementation: [#138 PoC: BIOS version & settings management](https://github.com/ironcore-dev/metal-operator/pull/138)
 
-The following is a concept of a solution aimed to solve listed problems in regard to hardware servers' BIOS/Firmware updates.
-The following sections guide through:
-
-- Kubernetes API types, which represent servers' firmware state;
-- Kubernetes controllers, which reconcile these API types;
-
-Throughout this document, the words are used to define and the significance of particular requirements is capitalized:
-
-- `MUST` or `REQUIRED` means that the item is mandatory requirement;
-- `MUST NOT` means that the item is an absolute prohibition;
-- `SHOULD` or `RECOMMENDED` means that there may exist valid reasons in particular circumstances for not complying with an item;
-- `SHOULD NOT` means that there may exist valid reasons in particular circumstances when listed behavior is acceptable;
-- `MAY` or `OPTIONAL` means that the item is truly optional;
-
-Throughout this document, the following terminology is used:
-
-- `controller`: the unit which watches for the particular Kubernetes resource and executes reconciliation logic;
-- `job` or `job executor`: the execution item, that runs concrete implementation of a specific task on target hardware server. MIGHT be vendor-specific;
-
-The approach described in below allows to separate the vendor-agnostic common workflow and the concrete update job implementations that might be vendor-specific.
+This proposal outlines the design for managing server BIOS configurations in the metal-operator, including version control and settings management through a dedicated ServerBIOS controller.
 
 ## Motivation
 
-It is necessary to provide a robust, reliable and scalable solution to automate servers' firmware updating process.
-Aside from that, it SHOULD also be as much kubernetes-native as possible.
-It SHOULD provide a clear and concise API.
-It SHOULD provide the ability to automate the update process along with the ability to override common settings in particular circumstances for particular servers.
+It is necessary to provide a robust and scalable solution to automate servers' BIOS management. It should provide a clear and concise API. It should provide the ability to override common settings in particular circumstances for particular servers. It should be capable to:
+
+- Monitor current BIOS versions and settings;
+- Update BIOS versions safely;
+- Modify BIOS settings consistently;
+- Handle these operations at scale through Kubernetes native patterns;
 
 ### Goals
 
-The following list gives general design goals for BIOS/Firmware updates:
-
-- the solution SHOULD be vendor-agnostic aside from concrete scan/update job implementation;
-- the solution SHOULD allow automated hardware servers' firmware lifecycle maintaining;
-- the solution MUST be extensible by the possibility of adding vendor-specific job implementations;
-- the solution SHOULD be as kubernetes-native as possible;
+- Provide declarative BIOS management through Kubernetes CRDs
+- Enable automated BIOS version updates
+- Support BIOS settings modifications
+- Ensure safe operations with proper server state handling
+- Implement vendor-agnostic BIOS management interface
 
 ### Non-Goals
 
+- Vendor-specific BIOS feature management
+- Direct low-level BIOS programming
+
 ## Proposal
 
-### Custom resources
+### API Design
 
 The following CRs aimed to represent the current state of a particular server:
 
-- [ServerBIOS](#serverbios)
-- [ServerFirmware](#serverfirmware)
+- [ServerBIOS CRD](#serverbios-crd)
+- [ServerFirmware CRD](#serverfirmware-crd)
 
-All these CRs MUST be cluster-scoped.
+Listed custom resources must be cluster-scoped.
 
-#### ServerBIOS
+#### ServerBIOS CRD
 
-`ServerBIOS` CR represents the desired BIOS version and settings of concrete hardware server.
-The `.spec` of this type contains:
+`ServerBIOS` CR represents the desired BIOS version and settings for concrete hardware server. The `.spec` of this type defines:
 
 - the reference to the `Server` object;
 - desired BIOS version and BIOS settings;
-- the duration in minutes after which information listed in object's `.status` considered to be outdated;
 
-The `.status` of this type contains:
+The `.status` of this type reflects:
 
 - information about the BIOS version and settings which are actually applied;
-- the timestamp when this information was updated;
-- a reference to the running scan/update job if any.
 
 ```yaml
 apiVersion: metal.ironcore.dev/v1alpha1
 kind: ServerBIOS
-metadata:
-  name: foo
 spec:
-  scanPeriodMinutes: 30
   serverRef:
-    name: bar
+    name: string
   bios:
-    version: 1.0.0
-    settings: {}
+    version: string
+    settings:
+      setting1: value1
+      setting2: value2
 status:
-  lastScanTime: 01-01-2001 00:00:00
   bios:
-    version: 0.1.0
-    settings: {}
-  runningJob:
-    name: foobar
-    namespace: default
+    version: string
+    settings:
+      setting1: value1
+      setting2: value2
 ```
 
 The target `Server` object MUST also contain the reference to the `ServerBIOS` object.
-The `.status.bios.settings` map MUST contain only keys exist in `.spec.bios.settings` map.
 
-#### ServerFirmware
+#### ServerFirmware CRD
 
-`ServerFirmware` CR represents the desired state of concrete hardware server.
-The `.spec` of this type contains:
+`ServerFirmware` CR represents the desired firmware version for concrete hardware server. The `.spec` of this type defines:
 
 - the reference to the `Server` object;
-- the list of firmwares desired to be installed;
-- the duration in minutes after which information listed in object's `.status` considered to be outdated;
+- desired firmware versions;
 
-The `.status` of this type contains:
+The `.status` of this type reflects:
 
-- information about the firmware versions which are actually installed on the server;
-- the timestamp when this information was updated;
-- a reference to the running scan/update job if any.
+- information about the firmware versions which are actually applied;
 
 ```yaml
 apiVersion: metal.ironcore.dev/v1alpha1
 kind: ServerFirmware
-metadata:
-  name: foo
 spec:
-  scanPeriodMinutes: 30m
   serverRef:
-    name: bar
+    name: string
   firmwares:
-    - name: ssd
-      manufacturer: ACME Corp.
-      version: 1.0.0
-    - name: nic
-      manufacturer: Intel
-      version: 2.0.0
+    - version: string
+      name: string
+      manufacturer: string
+    - version: string
+      name: string
+      manufacturer: string
+    - version: string
+      name: string
+      manufacturer: string
 status:
-  lastScanTime: 01-01-2001 01:00:00
   firmwares:
-    - name: ssd
-      manufacturer: ACME Corp.
-      version: 1.0.0
-    - name: nic
-      manufacturer: Intel
-      version: 2.0.0
-  runningJob:
-    name: foobar
-    namespace: default
+    - version: string
+      name: string
+      manufacturer: string
+    - version: string
+      name: string
+      manufacturer: string
+    - version: string
+      name: string
+      manufacturer: string
 ```
 
-### Controllers
+The target `Server` object MUST also contain the reference to the `ServerFirmware` object.
 
-- [configuration](#configuration)
-- [serverbios-controller](#serverbios-controller) (reconciles `ServerBIOS` CR)
-- [serverfirmware-controller](#serverfirmware-controller) (reconciles `ServerFirmware` CR)
+### Components
 
-#### Configuration
+#### ServerBIOS Controller
 
-Solution MUST provide a flexible yet transparent way to configure job runners. The minimal configuration provided:
+Responsible for:
+- Reconciling desired vs actual BIOS state
+- Managing BIOS version updates
+- Applying BIOS settings changes
+- Coordinating with server maintenance states
 
-- MUST include container image to be run as job executor;
-- SHOULD include specific `ServiceAccount` reference to be used by job executor to get and update cluster resources;
-- SHOULD include specific namespace in which job executors will run;
-- MAY specify where to get updated versions to install;
-- MAY include reference to specific configuration;
+#### ServerFirmware Controller
 
-There are a number of approaches that can be used to provide the configuration.
+Responsible for:
+- Reconciling desired vs actual firmware state
+- Managing firmware version updates
+- Coordinating with server maintenance states
 
-##### Command-line arguments
+#### FMI (Firmware Management Interface)
 
-Providing of necessary configuration using command-line arguments on controller's start.
+Provides:
+- Task runner interface for BIOS/Firmware operations
+- Server interface for invoking task runner operations
+- Client interface for requesting BIOS/Firmware operations
 
-PROS:
+### Workflow
 
-CONS:
-- controller restart required to change configuration;
-- implementation of complex configuration will lead to the mess in command-line args;
+#### ServerBIOS state management
 
-##### ConfigMap
+1. Pre-flight checks
 
-Providing of necessary configuration using native Kubernetes `ConfigMap`.
-`ConfigMap` SHOULD be referenced using command-line argument.
+    - Ensure reference to Server object exists
+    - Ensure referred Server object exists
+    - Ensure Server has mutual reference to ServerBIOS object
 
-PROS:
-- reading configuration right before use allow the re-configuration without controller restart;
+2. Discovery Phase
 
-CONS:
-- schemaless nature of `ConfigMap` data requires additional validation;
-- forcing end-users to create `ConfigMap`'s with specific data format;
+    - Controller initiates BIOS scan via FMI
+    - Observed version and settings are recorded in status if (one of):
+        * desired state is not specified
+        * desired state matches observed state
 
-##### CustomResource
+3. Update Detection
 
-Providing of necessary configuration using custom resource.
+    - Controller compares spec vs status
+    - Determines if version or settings updates needed
 
-PROS:
-- reading configuration right before use allow the re-configuration without controller restart;
-- easy to implement validation;
-- leveraging of built-in Kubernetes mechanisms, like label selectors, can be used for mapping between configuration and server bios/firmware objects;
+4. Maintenance Mode
 
-CONS:
-- necessity to maintain API versions;
+    - Server placed in maintenance state before updates to ensure safe BIOS modifications
 
-#### serverbios-controller
+5. Update Execution
 
-This controller reconciles `ServerBIOS` CR.
-When a `ServerBIOS` object is being reconciled, the controller MUST invoke a scan job in case `.status.lastScanTime` exceeds the `.spec.scanPeriodMinutes`.
-When the `Job` object is created, the controller MUST update `ServerBIOS` object's `.status.runningJob` field with the reference to created job.
-Scan job MUST update corresponding `ServerBIOS` object's status on completion:
+    - Version updates performed if needed
+    - Settings changes applied if needed
+    - Reboot coordination if required
 
-- update `.status.bios.version` field
-- update `.status.bios.settings` field
-- update `.status.lastScanTime` field
-- remove reference to job in `.status.runningJob` field
+6. Post-flight
 
-When an object contains up-to-date info in `.status.bios` field, the controller MUST check whether the target `Server` is in "Available" state.
-If the server is not in "Available" state, then reconciliation stops.
-Otherwise, the controller MUST compare the desired and current BIOS versions stored in `.spec.bios.version` and `.status.bios.version` fields accordingly.
-If BIOS versions do not match, the controller MUST invoke BIOS version update job.
-When the `Job` object is created, the controller MUST update `ServerBIOS` object's `.status.runningJob` field with the reference to created job.
-BIOS version update job MUST update corresponding `ServerBIOS` object's status on completion:
+    - Server removed from maintenance state
 
-- update `.status.bios.version` field
-- remove reference to job in `.status.runningJob` field
+#### ServerFirmware state management
 
-When a `ServerBIOS` object's desired and current BIOS versions match, the controller MUST compare the desired and current BIOS settings stored in `.spec.bios.settings` and `.status.bios.settings` fields accordingly.
-If there is discrepancy between desired and current settings, the controller MUST invoke BIOS settings update job.
-When the `Job` object is created, the controller MUST update `ServerBIOS` object's `.status.runningJob` field with the reference to created job.
-BIOS settings update job MUST update corresponding `ServerBIOS` object's status on completion:
+1. Pre-flight checks
 
-- update `.status.bios.settings` field
-- remove reference to job in `.status.runningJob` field
+    - Ensure reference to Server object exists
+    - Ensure referred Server object exists
+    - Ensure Server has mutual reference to ServerFirmware object
 
-<details>
-    <summary>Reconciliation flow diagram</summary>
-    <img src="../assets/serverbios-controller-flow.jpg" width="50%">
-</details>
+2. Discovery Phase
 
-#### serverfirmware-controller
+    - Controller initiates firmware scan via FMI
+    - Observed firmware versions are recorded in status if (one of):
+        * desired state is not specified
+        * desired state matches observed state
 
-This controller reconciles `ServerFirmware` CR.
-When a `ServerFirmware` object is being reconciled, the controller MUST invoke a scan job in case `.status.lastScanTime` exceeds the `.spec.scanPeriodMinutes`.
-When the `Job` object is created, the controller MUST update `ServerFirmware` object's `.status.runningJob` field with the reference to created job.
-Scan job MUST update corresponding `ServerFirmware` object's status on completion:
+3. Update Detection
 
-- update `.status.firmwares` field
-- update `.status.lastScanTime` field
-- remove reference to job in `.status.runningJob` field
+    - Controller compares spec vs status
+    - Determines if version updates needed
 
-When an object contains up-to-date info in `.status.firmwares` field, the controller MUST check whether the target `Server` is in "Available" state.
-If the server is not in "Available" state, then reconciliation stops.
-Otherwise, the controller MUST compare the desired and current firmware versions stored in `.spec.firmwares` and `.status.firmwares` fields accordingly.
-If there is discrepancy between desired and current firmware versions, the controller MUST invoke firmware update job.
-When the `Job` object is created, the controller MUST update `ServerFirmware` object's `.status.runningJob` field with the reference to created job.
-Firmware versions update job MUST update corresponding `ServerFirmware` object's status on completion:
+4. Maintenance Mode
 
-- update `.status.firmwares` field
-- remove reference to job in `.status.runningJob` field
+    - Server placed in maintenance state before updates to ensure safe firmware modifications
 
-<details>
-    <summary>Reconciliation flow diagram</summary>
-    <img src="../assets/serverfirmware-controller-flow.jpg" width="50%">
-</details>
+5. Update Execution
 
-## Alternatives
+    - Firmware updates performed if needed
+    - Reboot coordination if required
+
+6. Post-flight
+
+    - Server removed from maintenance state
+
+### Safety Considerations
+
+1. Server State Management
+
+    - Updates only performed in maintenance mode
+    - Proper finalizer handling for cleanup
+
+2. Update Validation
+
+    - Version compatibility checking
+    - Settings validation before apply
+
+3. Error Handling
+
+    - Graceful failure recovery
+    - Status condition updates
+    - Requeue mechanism for retries
+
+### Implementation Details
+
+1. Reconciliation Loop
+
+    ```go
+    func (r *ServerBIOSReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+        // 1. Get ServerBIOS object
+        // 2. Check if reconciliation required
+        // 3. Perform scan operation
+        // 4. Handle updates if needed
+        // 5. Update status
+    }
+    ```
+
+    ```go
+    func (r *ServerFirmwareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+        // 1. Get ServerFirmware object
+        // 2. Check if reconciliation required
+        // 3. Perform scan operation
+        // 4. Handle updates if needed
+        // 5. Update status
+    }
+    ```
+
+2. Task Runner Interface
+
+    ```go
+    type TaskRunnerBIOS interface {
+        ExecuteScan(ctx context.Context, serverBIOSRef string) (ScanResult, error)
+        ExecuteSettingsApply(ctx context.Context, serverBIOSRef string) (SettingsApplyResult, error)
+        ExecuteVersionUpdate(ctx context.Context, serverBIOSRef string) error
+    }
+    ```
+
+    ```go
+    type TaskRunnerFirmware interface {
+        ExecuteScan(ctx context.Context, serverFirmwareRef string) (ScanResult, error)
+        ExecuteVersionUpdate(ctx context.Context, serverFirmwareRef string) error
+    }
+    ```
+
+3. Server Interface
+
+    ```go
+    type Server interface {
+        TaskRunnerBIOS
+        TaskRunnerFirmware
+        Start(ctx context.Context) error
+    }
+    ```
+
+   Server interface embeds TaskRunner interface to guarantee server is capable of running BIOS operations.
+
+4. Client Interface
+
+    ```go
+    type TaskRunnerClient interface {
+        ScanBIOS(ctx context.Context, serverBIOSRef string) (ScanResult, error)
+        BIOSSettingsApply(ctx context.Context, serverBIOSRef string) (SettingsApplyResult, error)
+        BIOSVersionUpdate(ctx context.Context, serverBIOSRef string) error
+        ScanFirmware(ctx context.Context, serverFirmwareRef string) (ScanResult, error)
+        FirmwareVersionUpdate(ctx context.Context, serverFirmwareRef string) error
+    }
+    ```
+
+### Implementation Plan
+
+#### Phase 1: BIOS Controller and Scan Functionality
+
+- Basic ServerBIOS CRD implementation
+- Core controller logic
+- Scan functionality
+- Documentation and testing
+
+#### Phase 2: Maintenance Mode and Settings Update
+
+- Maintenance mode integration
+- Settings update functionality
+- Documentation and testing
+
+#### Phase 3: BIOS Version Update and Settings Compatibility
+
+- Version update functionality
+- Settings compatibility validation
+- Documentation and testing
+
+#### Phase 4: Firmware Controller and Scan Functionality
+
+- Basic ServerFirmware CRD implementation
+- Core controller logic
+- Scan functionality
+- Documentation and testing
+
+#### Phase 5: Firmware Version Update and Settings Compatibility
+
+- Version update functionality
+- Documentation and testing
+
+#### Phase 6: Finalization
+
+- Error handling improvements
+- Status reporting enhancements
+- Documentation and testing
+
+### Testing Strategy
+
+1. Unit Tests
+
+    - Controller logic
+    - Task runner implementations
+    - State transitions
+
+2. Integration Tests
+
+    - End-to-end BIOS updates
+    - Settings modifications
+    - Error scenarios
+
+3. Performance Tests
+
+    - Scale testing
+    - Concurrent operations
+
+## Future Work
+
+- ServerBIOS group support based on built-in Kubernetes mechanisms like labels and selectors;
+- Long-running tasks state tracking;
+- ServerFirmware group support;

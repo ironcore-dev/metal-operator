@@ -8,8 +8,8 @@ require (
 	github.com/ironcore-dev/controller-utils v0.9.5
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.0
-	github.com/stmcginnis/gofish v0.20.0
 	github.com/spf13/cobra v1.8.1
+	github.com/stmcginnis/gofish v0.20.0
 	golang.org/x/sync v0.8.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.35.1

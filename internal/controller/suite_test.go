@@ -13,6 +13,7 @@ import (
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/fmi"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
@@ -30,13 +31,20 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 const (
 	pollingInterval      = 50 * time.Millisecond
 	eventuallyTimeout    = 3 * time.Second
 	consistentlyDuration = 1 * time.Second
+
+	fmiHost     = "localhost"
+	fmiPort     = 30001
+	fmiProtocol = "grpc"
+	fmiRunner   = "default"
+
+	bmcInsecure = true
 )
 
 var (
@@ -86,7 +94,7 @@ var _ = BeforeSuite(func() {
 	err = metalv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
@@ -103,6 +111,19 @@ var _ = BeforeSuite(func() {
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
+	}()
+
+	fmiServerConfig := fmi.ServerConfig{
+		Hostname:       fmiHost,
+		Port:           fmiPort,
+		KubeClient:     k8sClient,
+		TaskRunnerType: fmiRunner,
+	}
+	fmiServer, err := fmi.NewServer(fmiProtocol, fmiServerConfig, bmcInsecure)
+	Expect(err).NotTo(HaveOccurred())
+	go func() {
+		defer GinkgoRecover()
+		Expect(fmiServer.Start(mgrCtx)).To(Succeed(), "failed to start FMI server")
 	}()
 })
 
@@ -198,6 +219,20 @@ func SetupTest() *corev1.Namespace {
 		Expect((&ServerBootConfigurationReconciler{
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		fmiClient, err := fmi.NewClientForConfig(fmiProtocol, fmi.ClientConfig{
+			ServerURL:          fmt.Sprintf("%s:%d", fmiHost, fmiPort),
+			InsecureSkipVerify: true,
+			RequestTimeout:     5 * time.Second,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect((&ServerBIOSReconciler{
+			Client:           k8sManager.GetClient(),
+			Scheme:           k8sManager.GetScheme(),
+			TaskRunnerClient: fmiClient,
+			RequeueInterval:  5 * time.Second,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		go func() {

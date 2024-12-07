@@ -1,0 +1,15 @@
+version: v2
+managed:
+  enabled: true
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.32.0
+    out: api/gen
+    opt:
+      - paths=source_relative
+  - local: ["go", "run", "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1"]
+    out: api/gen
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+inputs:
+  - directory: api/proto

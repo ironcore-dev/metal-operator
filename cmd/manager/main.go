@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/fmi"
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -31,7 +32,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -42,36 +43,59 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(metalv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
 	var (
-		metricsAddr             string
-		enableLeaderElection    bool
-		probeAddr               string
-		secureMetrics           bool
-		enableHTTP2             bool
-		macPrefixesFile         string
-		insecure                bool
-		managerNamespace        string
-		probeImage              string
-		probeOSImage            string
-		registryPort            int
-		registryProtocol        string
-		registryURL             string
-		registryResyncInterval  time.Duration
-		webhookPort             int
-		enforceFirstBoot        bool
-		enforcePowerOff         bool
-		serverResyncInterval    time.Duration
-		powerPollingInterval    time.Duration
-		powerPollingTimeout     time.Duration
-		resourcePollingInterval time.Duration
-		resourcePollingTimeout  time.Duration
-		discoveryTimeout        time.Duration
+		metricsAddr              string
+		enableLeaderElection     bool
+		probeAddr                string
+		secureMetrics            bool
+		enableHTTP2              bool
+		macPrefixesFile          string
+		insecure                 bool
+		managerNamespace         string
+		probeImage               string
+		probeOSImage             string
+		registryPort             int
+		registryProtocol         string
+		registryURL              string
+		registryResyncInterval   time.Duration
+		webhookPort              int
+		enforceFirstBoot         bool
+		enforcePowerOff          bool
+		serverResyncInterval     time.Duration
+		powerPollingInterval     time.Duration
+		powerPollingTimeout      time.Duration
+		resourcePollingInterval  time.Duration
+		resourcePollingTimeout   time.Duration
+		discoveryTimeout         time.Duration
+		fmiServerLocal           bool
+		fmiTaskRunner            string
+		fmiProtocol              string
+		fmiServerHostname        string
+		fmiServerPort            int
+		fmiCACertFile            string
+		fmiClientCertFile        string
+		fmiClientKeyFile         string
+		fmiInsecureSkipVerify    bool
+		fmiRequestTimeout        time.Duration
+		serverBIOSResyncInterval time.Duration
 	)
 
+	flag.StringVar(&fmiProtocol, "fmi-protocol", "grpc", "The type of FMI client to use. Values: 'grpc', 'http'.")
+	flag.BoolVar(&fmiServerLocal, "fmi-server-local", true, "Whether the FMI server is running on the same machine.")
+	flag.StringVar(&fmiTaskRunner, "fmi-task-runner", "default", "The type of FMI task runner to use. Values: 'default'")
+	flag.StringVar(&fmiServerHostname, "fmi-server-address", "localhost",
+		"The address the BIOS task runner binds to.")
+	flag.IntVar(&fmiServerPort, "fmi-server-port", 11000, "The port the BIOS task runner binds to.")
+	flag.StringVar(&fmiCACertFile, "fmi-ca-cert-file", "", "Path to the CA certificate file.")
+	flag.StringVar(&fmiClientCertFile, "fmi-client-cert-file", "", "Path to the client certificate file.")
+	flag.StringVar(&fmiClientKeyFile, "fmi-client-key-file", "", "Path to the client key file.")
+	flag.BoolVar(&fmiInsecureSkipVerify, "fmi-insecure-skip-verify", false, "Skip TLS verification for FMI client.")
+	flag.DurationVar(&fmiRequestTimeout, "fmi-request-timeout", 5*time.Second, "Timeout for BIOS task runner requests.")
+	flag.DurationVar(&serverBIOSResyncInterval, "server-bios-resync-interval", 10*time.Second, "Timeout for BIOS resync")
 	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
 	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second,
 		"Interval between polling resources")
@@ -164,6 +188,19 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
+	fmiClient, err := fmi.NewClientForConfig(fmiProtocol, fmi.ClientConfig{
+		ServerURL:          fmt.Sprintf("%s:%d", fmiServerHostname, fmiServerPort),
+		CAFile:             fmiCACertFile,
+		CertFile:           fmiClientCertFile,
+		KeyFile:            fmiClientKeyFile,
+		InsecureSkipVerify: fmiInsecureSkipVerify,
+		RequestTimeout:     fmiRequestTimeout,
+	})
+	if err != nil {
+		setupLog.Error(err, "failed to create FMI client")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -254,6 +291,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerClaim")
 		os.Exit(1)
 	}
+	if err = (&controller.ServerBIOSReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		TaskRunnerClient: fmiClient,
+		RequeueInterval:  serverBIOSResyncInterval,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ServerBIOS")
+		os.Exit(1)
+	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = webhookmetalv1alpha1.SetupEndpointWebhookWithManager(mgr); err != nil {
@@ -261,7 +307,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
@@ -282,6 +328,27 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	if fmiServerLocal {
+		serverConfig := fmi.ServerConfig{
+			Hostname:       fmiServerHostname,
+			Port:           fmiServerPort,
+			KubeClient:     mgr.GetClient(),
+			TaskRunnerType: fmiTaskRunner,
+		}
+		setupLog.Info("starting FMI server")
+		go func() {
+			srv, err := fmi.NewServer(fmiProtocol, serverConfig, insecure)
+			if err != nil {
+				setupLog.Error(err, "unable to create FMI server")
+				os.Exit(1)
+			}
+			if err := srv.Start(ctx); err != nil {
+				setupLog.Error(err, "problem running FMI server")
+				os.Exit(1)
+			}
+		}()
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

@@ -176,7 +176,7 @@ func (r *ServerBIOSReconciler) reconcileScan(
 		serverBIOS.Status.BIOS.Version = result.Version
 	}
 	settingsUpdateRequired := len(serverBIOS.Spec.BIOS.Settings) != 0 &&
-		!cmp.Equal(serverBIOS.Spec.BIOS.Settings, result.Settings)
+		biosSettingsUpdateRequired(serverBIOS.Spec.BIOS.Settings, result.Settings)
 	if !settingsUpdateRequired {
 		serverBIOS.Status.BIOS.Settings = result.Settings
 	}
@@ -292,4 +292,17 @@ func (r *ServerBIOSReconciler) patchServerCondition(ctx context.Context, server 
 
 	}
 	return nil
+}
+
+func biosSettingsUpdateRequired(desired, observed map[string]string) bool {
+	for k, v := range desired {
+		attr, ok := observed[k]
+		if !ok {
+			return false
+		}
+		if attr != v {
+			return false
+		}
+	}
+	return true
 }

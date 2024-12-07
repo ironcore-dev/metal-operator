@@ -14,10 +14,10 @@ import (
 )
 
 type ServerHTTP struct {
+	TaskRunner
 	address         string
 	mux             *http.ServeMux
 	shutdownTimeout time.Duration
-	taskRunner      TaskRunner
 }
 
 // NewServerHTTP creates a new ServerHTTP.
@@ -28,10 +28,10 @@ func NewServerHTTP(config ServerConfig, insecureBMC bool) (*ServerHTTP, error) {
 		return nil, err
 	}
 	server := &ServerHTTP{
+		TaskRunner:      taskRunner,
 		address:         fmt.Sprintf("%s:%d", config.Hostname, config.Port),
 		mux:             mux,
 		shutdownTimeout: config.ShutdownTimeout,
-		taskRunner:      taskRunner,
 	}
 	server.registerRoutes()
 	return server, nil
@@ -79,7 +79,7 @@ func (s *ServerHTTP) scanHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := s.taskRunner.ExecuteScan(r.Context(), payload.ServerBIOSRef)
+	result, err := s.ExecuteScan(r.Context(), payload.ServerBIOSRef)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -101,7 +101,7 @@ func (s *ServerHTTP) settingsApplyHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := s.taskRunner.ExecuteSettingsApply(r.Context(), payload.ServerBIOSRef)
+	result, err := s.ExecuteSettingsApply(r.Context(), payload.ServerBIOSRef)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -124,7 +124,7 @@ func (s *ServerHTTP) versionUpdateHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := s.taskRunner.ExecuteVersionUpdate(r.Context(), payload.ServerBIOSRef); err != nil {
+	if err := s.ExecuteVersionUpdate(r.Context(), payload.ServerBIOSRef); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

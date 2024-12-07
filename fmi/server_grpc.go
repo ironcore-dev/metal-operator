@@ -17,9 +17,9 @@ import (
 
 // ServerGRPC implements the ServerBIOS gRPC service.
 type ServerGRPC struct {
+	TaskRunner
 	port            int
 	shutdownTimeout time.Duration
-	taskRunner      TaskRunner
 }
 
 // NewServerGRPC creates a new ServerGRPC.
@@ -29,9 +29,9 @@ func NewServerGRPC(config ServerConfig, insecureBMC bool) (*ServerGRPC, error) {
 		return nil, err
 	}
 	return &ServerGRPC{
+		TaskRunner:      taskRunner,
 		port:            config.Port,
 		shutdownTimeout: config.ShutdownTimeout,
-		taskRunner:      taskRunner,
 	}, nil
 }
 
@@ -71,7 +71,7 @@ func (s *ServerGRPC) BIOSScan(
 	ctx context.Context,
 	request *v1alpha1.BIOSScanRequest,
 ) (*v1alpha1.BIOSScanResponse, error) {
-	result, err := s.taskRunner.ExecuteScan(ctx, request.ServerBiosRef)
+	result, err := s.ExecuteScan(ctx, request.ServerBiosRef)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (s *ServerGRPC) BIOSSettingsApply(
 	ctx context.Context,
 	request *v1alpha1.BIOSSettingsApplyRequest,
 ) (*v1alpha1.BIOSSettingsApplyResponse, error) {
-	result, err := s.taskRunner.ExecuteSettingsApply(ctx, request.ServerBiosRef)
+	result, err := s.ExecuteSettingsApply(ctx, request.ServerBiosRef)
 	if err != nil {
 		return nil, err
 	}

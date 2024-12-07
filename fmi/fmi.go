@@ -104,6 +104,7 @@ type TaskRunnerClient interface {
 
 // TaskRunnerServer is the interface for a task runner server.
 type TaskRunnerServer interface {
+	TaskRunner
 	// Start runs the task runner server.
 	Start(ctx context.Context) error
 }

@@ -30,5 +30,6 @@ func NewCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 	root.AddCommand(NewMoveCommand())
+	root.AddCommand(NewConsoleCommand())
 	return root
 }

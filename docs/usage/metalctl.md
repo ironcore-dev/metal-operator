@@ -10,6 +10,21 @@ go install https://github.com/ironcore-dev/metal-operator/cmd/metalctl@latest
 
 ## Commands
 
+### console
+
+The `metalctl console` command allows you to access the serial console of a `Server`.
+
+To open a connection to the `Servers` serial console run
+
+```bash
+metalctl console my-server
+```
+
+In order to authenticate against the API server you need either to provide a path to a `kubeconfig` via `--kubeconfig`
+or set the `KUBECONFIG` environment variable by pointing to an effective `kubeconfig` file.
+
+By default, the serial console on `ttyS1` will be opened. You can override this by setting `--serial-console-number`.
+
 ### move
 
 The `metalctl move` command allows to move the metal Custom Resources, like e.g. `Endpoint`, `BMC`, `Server`, etc. from one

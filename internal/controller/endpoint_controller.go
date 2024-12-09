@@ -14,6 +14,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -135,7 +136,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				bmcClient, err := bmc.NewRedfishKubeBMCClient(
 					ctx,
 					bmcOptions,
-					r.Client, DefaultKubeNamespace)
+					r.Client, bmcutils.DefaultKubeNamespace)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}

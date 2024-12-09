@@ -9,34 +9,34 @@ flowchart LR
     subgraph Out-of-Band Network
         EndpointReconciler
     end
-    EndpointReconciler -- Discovers --> EndpointCRD
-    EndpointCRD -- Uses --> MACPrefixDatabase
+    EndpointReconciler -- Discovers --> Endpoint
+    Endpoint -- Uses --> MACPrefixDatabase
     EndpointReconciler -- Creates --> BMC & BMCSecret
 
     BMCReconciler -- Manages --> BMC
     BMCReconciler -- Uses --> BMCSecret
-    BMCReconciler -- Discovers Servers --> ServerCRD
+    BMCReconciler -- Discovers Servers --> Server
 
-    ServerReconciler -- Manages --> ServerCRD
+    ServerReconciler -- Manages --> Server
     ServerReconciler -- Uses --> metalprobe
     ServerReconciler -- Waits for --> ServerBootConfiguration
 
-    ServerClaimReconciler -- Manages --> ServerClaimCRD
-    ServerClaimCRD -- References --> ServerCRD
+    ServerClaimReconciler -- Manages --> ServerClaim
+    ServerClaim -- References --> Server
     ServerClaimReconciler -- Creates --> ServerBootConfiguration
 
     BootOperator -- Watches --> ServerBootConfiguration
     BootOperator -- Prepares --> BootEnvironment
     BootOperator -- Updates --> ServerBootConfiguration
 
-    ServerReconciler -- Powers On --> ServerCRD
+    ServerReconciler -- Powers On --> Server
 
     classDef operator fill:#f9f,stroke:#333,stroke-width:2px;
     classDef crd fill:#9f9,stroke:#333,stroke-width:2px;
     classDef external fill:#ff9,stroke:#333,stroke-width:2px;
 
     class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler operator;
-    class EndpointCRD,BMC,ServerCRD,ServerClaimCRD,ServerBootConfiguration crd;
+    class Endpoint,BMC,Server,ServerClaim,ServerBootConfiguration crd;
     class BootOperator external;
 ```
 

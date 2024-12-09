@@ -56,12 +56,12 @@ nav:
     - Servers: concepts/servers.md
     - ServerBootConfigurations: concepts/serverbootconfigurations.md
     - ServerClaims: concepts/serverclaims.md
+- Usage:
+  - metalctl: usage/metalctl.md
 - Development Guide:
   - Local Setup: development/dev_setup.md
   - Documentation: development/dev_docs.md
 - API Reference: api-reference/api.md
-- Usage: 
-  - Metalctl: usage/metalctl.md
 
 extra:
   social:

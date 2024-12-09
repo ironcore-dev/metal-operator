@@ -6,6 +6,7 @@ resources:
 - bases/metal.ironcore.dev_bmcsecrets.yaml
 - bases/metal.ironcore.dev_bmcs.yaml
 - bases/metal.ironcore.dev_servers.yaml
+- bases/metal.ironcore.dev_serverbioses.yaml
 - bases/metal.ironcore.dev_serverbootconfigurations.yaml
 - bases/metal.ironcore.dev_serverclaims.yaml
 #+kubebuilder:scaffold:crdkustomizeresource

@@ -20,6 +20,9 @@ Files:
   mkdocs.yml
   go.sum
   hack/*
+  api/gen/*
+  api/proto/buf.yaml
+  buf.gen.yaml
 Copyright: 2024 SAP SE or an SAP affiliate company and IronCore contributors
 License: Apache-2.0
 

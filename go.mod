@@ -4,11 +4,15 @@ go 1.23.0
 
 require (
 	github.com/go-logr/logr v1.4.2
+	github.com/google/go-cmp v0.6.0
 	github.com/ironcore-dev/controller-utils v0.9.5
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.0
-	github.com/stmcginnis/gofish v0.20.0
 	github.com/spf13/cobra v1.8.1
+	github.com/stmcginnis/gofish v0.20.0
+	golang.org/x/sync v0.8.0
+	google.golang.org/grpc v1.65.0
+	google.golang.org/protobuf v1.35.1
 	k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver v0.31.0
 	k8s.io/apimachinery v0.31.1
@@ -35,7 +39,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -65,7 +68,7 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/protobuf v1.35.1 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

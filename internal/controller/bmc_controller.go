@@ -14,6 +14,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -119,7 +120,7 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}
 
-	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -149,7 +150,7 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 }
 
 func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
-	bmcClient, err := GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -166,7 +167,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 				Kind:       "Server",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: GetServerNameFromBMCandIndex(i, bmcObj),
+				Name: bmcutils.GetServerNameFromBMCandIndex(i, bmcObj),
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       strings.ToLower(s.UUID), // always use lower-case uuids

@@ -1,17 +1,65 @@
 // SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package controller
+package bmcutils
 
 import (
 	"context"
 	"fmt"
 	"net"
 
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
+	// TODO: use constants for secret keys
+	username, ok := secret.Data["username"]
+	if !ok {
+		return "", "", fmt.Errorf("no username found in the BMC secret")
+	}
+	password, ok := secret.Data["password"]
+	if !ok {
+		return "", "", fmt.Errorf("no password found in the BMC secret")
+	}
+	return string(username), string(password), nil
+}
+
+func GetBMCFromBMCName(ctx context.Context, c client.Client, bmcName string) (*metalv1alpha1.BMC, error) {
+	bmcObj := &metalv1alpha1.BMC{}
+	if err := c.Get(ctx, client.ObjectKey{Name: bmcName}, bmcObj); err != nil {
+		return nil, fmt.Errorf("failed to get bmc %q: %w", bmcName, err)
+	}
+	return bmcObj, nil
+}
+
+func GetBMCCredentialsForBMCSecretName(ctx context.Context, c client.Client, bmcSecretName string) (string, string, error) {
+	bmcSecret := &metalv1alpha1.BMCSecret{}
+	if err := c.Get(ctx, client.ObjectKey{Name: bmcSecretName}, bmcSecret); err != nil {
+		return "", "", fmt.Errorf("failed to get bmc secret: %w", err)
+	}
+	return GetBMCCredentialsFromSecret(bmcSecret)
+}
+
+func GetBMCAddressForBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) (string, error) {
+	var address string
+
+	if bmcObj.Spec.EndpointRef != nil {
+		endpoint := &metalv1alpha1.Endpoint{}
+		if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
+			return "", fmt.Errorf("failed to get Endpoints for BMC: %w", err)
+		}
+		return endpoint.Spec.IP.String(), nil
+	}
+
+	if bmcObj.Spec.Endpoint != nil {
+		return bmcObj.Spec.Endpoint.IP.String(), nil
+	}
+
+	return address, nil
+}
 
 const DefaultKubeNamespace = "default"
 
@@ -122,19 +170,6 @@ func CreateBMCClient(
 		return nil, fmt.Errorf("unsupported BMC protocol %s", bmcProtocol)
 	}
 	return bmcClient, nil
-}
-
-func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
-	// TODO: use constants for secret keys
-	username, ok := secret.Data["username"]
-	if !ok {
-		return "", "", fmt.Errorf("no username found in the BMC secret")
-	}
-	password, ok := secret.Data["password"]
-	if !ok {
-		return "", "", fmt.Errorf("no password found in the BMC secret")
-	}
-	return string(username), string(password), nil
 }
 
 func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {

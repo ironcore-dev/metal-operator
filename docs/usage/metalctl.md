@@ -25,6 +25,9 @@ or set the `KUBECONFIG` environment variable by pointing to an effective `kubeco
 
 By default, the serial console on `ttyS1` will be opened. You can override this by setting `--serial-console-number`.
 
+Additionally, you can skip the host validation by providing the `--skip-host-key-validation=true` flag. If set to `false`
+it is possible provide a custom `known_hosts` file via the `--known-hosts-file` flag.
+
 ### move
 
 The `metalctl move` command allows to move the metal Custom Resources, like e.g. `Endpoint`, `BMC`, `Server`, etc. from one

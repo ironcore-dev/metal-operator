@@ -44,7 +44,7 @@ func TestControllers(t *testing.T) {
 	SetDefaultConsistentlyDuration(consistentlyDuration)
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Controller Suite")
+	RunSpecs(t, "Console Suite")
 }
 
 var _ = BeforeSuite(func() {

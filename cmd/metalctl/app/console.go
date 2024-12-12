@@ -10,19 +10,23 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 
 	"github.com/ironcore-dev/metal-operator/internal/console"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 var (
-	kubeconfigPath      string
-	kubeconfig          string
-	serialConsoleNumber int
+	kubeconfigPath        string
+	kubeconfig            string
+	serialConsoleNumber   int
+	skipHostKeyValidation bool
+	knownHostsFile        string
 )
 
 func NewConsoleCommand() *cobra.Command {
@@ -34,6 +38,8 @@ func NewConsoleCommand() *cobra.Command {
 
 	consoleCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
 	consoleCmd.Flags().IntVar(&serialConsoleNumber, "serial-console-number", 1, "Serial console number.")
+	consoleCmd.Flags().BoolVar(&skipHostKeyValidation, "skip-host-key-validation", false, "Skip host key validation.")
+	consoleCmd.Flags().StringVar(&knownHostsFile, "known-hosts-file", "~/.ssh/known_hosts", "Path to known_hosts file.")
 
 	return consoleCmd
 }
@@ -69,14 +75,27 @@ func openConsoleStream(ctx context.Context, k8sClient client.Client, serverName 
 		return fmt.Errorf("console config is nil")
 	}
 
+	var hostKeyCallback ssh.HostKeyCallback
+	if skipHostKeyValidation {
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else {
+		expandedPath, err := expandPath(knownHostsFile)
+		if err != nil {
+			return fmt.Errorf("failed to expand known_hosts file path: %w", err)
+		}
+		hostKeyCallback, err = knownhosts.New(expandedPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse known_hosts file: %w", err)
+		}
+	}
+
 	// Create SSH client configuration
 	sshConfig := &ssh.ClientConfig{
 		User: consoleConfig.Username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(consoleConfig.Password),
 		},
-		// TODO: use proper key verification
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 	}
 
 	// Connect to the BMC
@@ -169,4 +188,15 @@ func createClient() (client.Client, error) {
 		return nil, fmt.Errorf("failed creating controller-runtime client: %w", err)
 	}
 	return k8sClient, nil
+}
+
+func expandPath(path string) (string, error) {
+	if len(path) > 0 && path[0] == '~' {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(homeDir, path[1:]), nil
+	}
+	return path, nil
 }

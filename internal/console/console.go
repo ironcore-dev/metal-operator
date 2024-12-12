@@ -59,5 +59,5 @@ func GetConfigForServerName(ctx context.Context, c client.Client, serverName str
 		}, nil
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("failed to create configuration for accessing server %s", serverName)
 }

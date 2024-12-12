@@ -5,6 +5,7 @@ package controller
 
 import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -51,7 +52,7 @@ var _ = Describe("BMC Controller", func() {
 		By("Ensuring that the Server resource will be removed")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: GetServerNameFromBMCandIndex(0, bmc),
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 			},
 		}
 		DeferCleanup(k8sClient.Delete, server)
@@ -138,7 +139,7 @@ var _ = Describe("BMC Controller", func() {
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: GetServerNameFromBMCandIndex(0, bmc),
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 			},
 		}
 		Eventually(Object(server)).Should(SatisfyAll(

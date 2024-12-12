@@ -12,6 +12,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -272,7 +274,7 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Server state set to power on")
 
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -416,7 +418,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -615,7 +617,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, s
 		return fmt.Errorf("can only PXE boot server with valid BMC ref or inline BMC configuration")
 	}
 
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	defer func() {
 		if bmcClient != nil {
 			bmcClient.Logout()
@@ -706,7 +708,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		return nil
 	}
 
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	defer func() {
 		if bmcClient != nil {
 			bmcClient.Logout()
@@ -816,7 +818,7 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, 
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -850,7 +852,7 @@ func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logge
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -902,7 +904,7 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 	if !ok {
 		return false, nil
 	}
-	bmcClient, err := GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}

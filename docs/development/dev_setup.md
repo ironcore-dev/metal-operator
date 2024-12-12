@@ -14,7 +14,7 @@ run a local mock Redfish instance to simulate operations performed by various re
 
 ```mermaid
 graph TD
-    A[Kubernetes Controller Runtime Based Reconcilers] -->|Interacts with| B[`envtest` Kube-apiserver Environment]
+    A[Kubernetes Controller Runtime Based Reconcilers] -->|Interacts with| B[envtest Kube-apiserver Environment]
     A -->|Interacts with| C[Redfish Mock Server]
     C -->|Runs as a| D[Docker Container]
 ```

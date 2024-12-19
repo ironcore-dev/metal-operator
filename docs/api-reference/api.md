@@ -10,46 +10,6 @@
 </div>
 Resource Types:
 <ul></ul>
-<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
-</p>
-<div>
-<p>BIOSSettings represents the BIOS settings for a server.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Version specifies the version of the server BIOS for which the settings are defined.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settings</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<p>Settings is a map of key-value pairs representing the BIOS settings.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMC">BMC
 </h3>
 <div>
@@ -1328,15 +1288,16 @@ if no boot configuration is specified.</p>
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biosSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a ServerBIOS object that specifies
+the BIOS configuration for this server.</p>
 </td>
 </tr>
 </table>
@@ -1976,15 +1937,16 @@ if no boot configuration is specified.</p>
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biosSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a ServerBIOS object that specifies
+the BIOS configuration for this server.</p>
 </td>
 </tr>
 </tbody>
@@ -2015,6 +1977,9 @@ if no boot configuration is specified.</p>
 </td>
 </tr><tr><td><p>&#34;Initial&#34;</p></td>
 <td><p>ServerStateInitial indicates that the server is in its initial state.</p>
+</td>
+</tr><tr><td><p>&#34;Maintenance&#34;</p></td>
+<td><p>ServerStateMaintenance indicates that the server is in maintenance mode.</p>
 </td>
 </tr><tr><td><p>&#34;Reserved&#34;</p></td>
 <td><p>ServerStateReserved indicates that the server is reserved for a specific use or user.</p>
@@ -2157,18 +2122,6 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </td>
 <td>
 <p>Storages is a list of storages associated with the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>BIOS</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-BIOSSettings
-</a>
-</em>
-</td>
-<td>
 </td>
 </tr>
 <tr>

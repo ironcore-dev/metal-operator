@@ -246,28 +246,16 @@ func (r *ServerClaimReconciler) patchServerRef(ctx context.Context, claim *metal
 }
 
 func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
-	config := &metalv1alpha1.ServerBootConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerBootConfiguration",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: claim.Namespace,
-			Name:      claim.Name,
-		},
-		Spec: metalv1alpha1.ServerBootConfigurationSpec{
-			ServerRef:         *claim.Spec.ServerRef,
-			Image:             claim.Spec.Image,
-			IgnitionSecretRef: claim.Spec.IgnitionSecretRef,
-		},
-	}
-
-	if err := ctrl.SetControllerReference(claim, config, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference: %w", err)
-	}
-
-	// TODO: we might want to add a finalizer on the ignition secret
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, nil)
+	config := &metalv1alpha1.ServerBootConfiguration{}
+	config.Name = claim.Name
+	config.Namespace = claim.Namespace
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, func() error {
+		// TODO: we might want to add a finalizer on the ignition secret
+		config.Spec.ServerRef = *claim.Spec.ServerRef
+		config.Spec.Image = claim.Spec.Image
+		config.Spec.IgnitionSecretRef = claim.Spec.IgnitionSecretRef
+		return ctrl.SetControllerReference(claim, config, r.Scheme)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
 	}
@@ -281,11 +269,7 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log 
 		APIVersion: "metal.ironcore.dev/v1alpha1",
 		Kind:       "ServerBootConfiguration",
 	}
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return err
-	}
-
-	return nil
+	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
 func (r *ServerClaimReconciler) removeClaimRefFromServer(ctx context.Context, server *metalv1alpha1.Server) error {

@@ -16,7 +16,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -161,26 +160,15 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 		return fmt.Errorf("failed to get Servers from BMC: %w", err)
 	}
 	for i, s := range servers {
-		server := &metalv1alpha1.Server{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-				Kind:       "Server",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(i, bmcObj),
-			},
-			Spec: metalv1alpha1.ServerSpec{
-				UUID:       strings.ToLower(s.UUID), // always use lower-case uuids
-				SystemUUID: strings.ToLower(s.UUID), // always use lower-case uuids
-				BMCRef:     &v1.LocalObjectReference{Name: bmcObj.Name},
-			},
-		}
+		server := &metalv1alpha1.Server{}
+		server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
 
-		if err := controllerutil.SetControllerReference(bmcObj, server, r.Scheme); err != nil {
-			return fmt.Errorf("failed to set owner reference on Server: %w", err)
-		}
-
-		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, nil)
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
+			server.Spec.UUID = strings.ToLower(s.UUID)
+			server.Spec.SystemUUID = strings.ToLower(s.UUID)
+			server.Spec.BMCRef = &v1.LocalObjectReference{Name: bmcObj.Name}
+			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to create or patch Server: %w", err)
 		}

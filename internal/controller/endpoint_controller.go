@@ -16,7 +16,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -171,37 +170,22 @@ func (r *EndpointReconciler) getProtocol() string {
 }
 
 func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
-	bmcObj := &metalv1alpha1.BMC{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: metalv1alpha1.GroupVersion.String(),
-			Kind:       "BMC",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: endpoint.Name,
-		},
-		Spec: metalv1alpha1.BMCSpec{
-			EndpointRef: &corev1.LocalObjectReference{
-				Name: endpoint.Name,
-			},
-			BMCSecretRef: corev1.LocalObjectReference{
-				Name: secret.Name,
-			},
-			Protocol: metalv1alpha1.Protocol{
-				Name: metalv1alpha1.ProtocolName(m.Protocol),
-				Port: m.Port,
-			},
-			ConsoleProtocol: &metalv1alpha1.ConsoleProtocol{
-				Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),
-				Port: m.Console.Port,
-			},
-		},
-	}
-
-	if err := controllerutil.SetControllerReference(endpoint, bmcObj, r.Client.Scheme()); err != nil {
-		return err
-	}
-
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, nil)
+	bmcObj := &metalv1alpha1.BMC{}
+	bmcObj.Name = endpoint.Name
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, func() error {
+		spec := &bmcObj.Spec
+		spec.EndpointRef = &corev1.LocalObjectReference{Name: endpoint.Name}
+		spec.BMCSecretRef = corev1.LocalObjectReference{Name: secret.Name}
+		spec.Protocol = metalv1alpha1.Protocol{
+			Name: metalv1alpha1.ProtocolName(m.Protocol),
+			Port: m.Port,
+		}
+		spec.ConsoleProtocol = &metalv1alpha1.ConsoleProtocol{
+			Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),
+			Port: m.Console.Port,
+		}
+		return controllerutil.SetControllerReference(endpoint, bmcObj, r.Client.Scheme())
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create or patch BMC: %w", err)
 	}
@@ -211,25 +195,15 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 }
 
 func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {
-	bmcSecret := &metalv1alpha1.BMCSecret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: metalv1alpha1.GroupVersion.String(),
-			Kind:       "BMCSecret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: endpoint.Name,
-		},
-		Data: map[string][]byte{
+	bmcSecret := &metalv1alpha1.BMCSecret{}
+	bmcSecret.Name = endpoint.Name
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcSecret, func() error {
+		bmcSecret.Data = map[string][]byte{
 			metalv1alpha1.BMCSecretUsernameKeyName: []byte(m.DefaultCredentials[0].Username),
 			metalv1alpha1.BMCSecretPasswordKeyName: []byte(m.DefaultCredentials[0].Password),
-		},
-	}
-
-	if err := controllerutil.SetControllerReference(endpoint, bmcSecret, r.Client.Scheme()); err != nil {
-		return nil, err
-	}
-
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcSecret, nil)
+		}
+		return controllerutil.SetControllerReference(endpoint, bmcSecret, r.Client.Scheme())
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create or patch BMCSecret: %w", err)
 	}

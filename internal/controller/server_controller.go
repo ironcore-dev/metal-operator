@@ -467,31 +467,19 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 }
 
 func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
-	// apply server boot configuration
-	bootConfig := &metalv1alpha1.ServerBootConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerBootConfiguration",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name,
-			Namespace: r.ManagerNamespace,
-			Annotations: map[string]string{
-				InternalAnnotationTypeKeyName: InternalAnnotationTypeValue,
-			},
-		},
-		Spec: metalv1alpha1.ServerBootConfigurationSpec{
-			ServerRef: v1.LocalObjectReference{
-				Name: server.Name,
-			},
-			IgnitionSecretRef: &v1.LocalObjectReference{
-				Name: server.Name,
-			},
-			Image: r.ProbeOSImage,
-		},
-	}
-
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bootConfig, nil)
+	bootConfig := &metalv1alpha1.ServerBootConfiguration{}
+	bootConfig.Name = server.Name
+	bootConfig.Namespace = r.ManagerNamespace
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bootConfig, func() error {
+		if bootConfig.Annotations == nil {
+			bootConfig.Annotations = make(map[string]string)
+		}
+		bootConfig.Annotations[InternalAnnotationTypeKeyName] = InternalAnnotationTypeValue
+		bootConfig.Spec.ServerRef = v1.LocalObjectReference{Name: server.Name}
+		bootConfig.Spec.IgnitionSecretRef = &v1.LocalObjectReference{Name: server.Name}
+		bootConfig.Spec.Image = r.ProbeOSImage
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
 	}
@@ -500,12 +488,7 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 	if err := r.ensureServerBootConfigRef(ctx, server, bootConfig); err != nil {
 		return err
 	}
-
-	if err := r.applyDefaultIgnitionForServer(ctx, log, server, bootConfig, r.RegistryURL); err != nil {
-		return err
-	}
-
-	return nil
+	return r.applyDefaultIgnitionForServer(ctx, log, server, bootConfig, r.RegistryURL)
 }
 
 func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, bootConfig *metalv1alpha1.ServerBootConfiguration, registryURL string) error {
@@ -515,26 +498,16 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
 	}
 
-	ignitionSecret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: r.ManagerNamespace,
-			Name:      bootConfig.Name,
-		},
-		Data: map[string][]byte{
+	ignitionSecret := &v1.Secret{}
+	ignitionSecret.Name = bootConfig.Name
+	ignitionSecret.Namespace = r.ManagerNamespace
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, ignitionSecret, func() error {
+		ignitionSecret.Data = map[string][]byte{
 			DefaultIgnitionFormatKey:     []byte(DefaultIgnitionFormatValue),
 			DefaultIgnitionSecretKeyName: ignitionData,
-		},
-	}
-
-	if err := controllerutil.SetControllerReference(bootConfig, ignitionSecret, r.Client.Scheme()); err != nil {
-		return fmt.Errorf("failed to set controller reference for default ignitionSecret: %w", err)
-	}
-
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, ignitionSecret, nil)
+		}
+		return controllerutil.SetControllerReference(bootConfig, ignitionSecret, r.Client.Scheme())
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create or patch Ignition Secret: %w", err)
 	}

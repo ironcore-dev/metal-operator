@@ -5,18 +5,17 @@ package controller
 
 import (
 	"fmt"
-	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"net/http"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -130,6 +129,8 @@ var _ = Describe("Server Controller", func() {
 			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 			SSHPublicKey: string(sshSecret.Data["public"]),
 		})
+		Expect(err).NotTo(HaveOccurred())
+
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
@@ -277,6 +278,8 @@ var _ = Describe("Server Controller", func() {
 			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 			SSHPublicKey: string(sshSecret.Data["public"]),
 		})
+		Expect(err).NotTo(HaveOccurred())
+
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,

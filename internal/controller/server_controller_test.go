@@ -25,7 +25,7 @@ import (
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
-var _ = FDescribe("Server Controller", func() {
+var _ = Describe("Server Controller", func() {
 	ns := SetupTest()
 
 	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
@@ -306,6 +306,10 @@ var _ = FDescribe("Server Controller", func() {
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
 			HaveField("Data", HaveKeyWithValue(SShKeyPairSecretPasswordKeyName, Not(BeEmpty()))),
 		))
+		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
+		Expect(err).NotTo(HaveOccurred())
+		_, _, _, _, err = ssh.ParseAuthorizedKey(sshSecret.Data[SSHKeyPairSecretPublicKeyName])
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring that the default ignition configuration has been created")
 		ignitionSecret := &v1.Secret{
@@ -339,7 +343,7 @@ var _ = FDescribe("Server Controller", func() {
 		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
 			Image:        "foo:latest",
 			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-			SSHPublicKey: string(sshSecret.Data["public"]),
+			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
 			PasswordHash: passwordHash,
 		})
 		Expect(err).NotTo(HaveOccurred())

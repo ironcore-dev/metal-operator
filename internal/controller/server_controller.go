@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -567,11 +566,11 @@ func generateSSHKeyPairAndPassword() ([]byte, []byte, []byte, error) {
 		return nil, nil, nil, fmt.Errorf("failed to generate private key: %w", err)
 	}
 
-	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	privateKeyPem := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: privateKeyBytes,
-	})
+	privateKeyBlock, err := ssh.MarshalPrivateKey(privateKey, "")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	privateKeyPem := pem.EncodeToMemory(privateKeyBlock)
 
 	sshPubKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
 	if err != nil {

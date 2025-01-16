@@ -14,6 +14,7 @@ type Config struct {
 	Image        string
 	Flags        string
 	SSHPublicKey string
+	PasswordHash string
 }
 
 // defaultIgnitionTemplate is a Go template for the default Ignition configuration.
@@ -58,7 +59,7 @@ storage:
 passwd:
   users:
     - name: metal
-      password_hash: "$6$nq7WpLYJhmsUn7Pa$SDFlU/34qMoEnscBK03Fqc26/RaV01QYB2dMvIgoRTFmNNYQVg7YYzTOG4phKAgMw5UwRU4ePwKndYea9X/iO0"
+      password_hash: {{.PasswordHash}}
       groups: [ "wheel" ]
       ssh_authorized_keys: [ {{.SSHPublicKey}} ]
 `

@@ -5,7 +5,11 @@ package controller
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -406,11 +410,7 @@ func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server
 		APIVersion: "metal.ironcore.dev/v1alpha1",
 		Kind:       "ServerBootConfiguration",
 	}
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return err
-	}
-
-	return nil
+	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -492,21 +492,51 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 }
 
 func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, bootConfig *metalv1alpha1.ServerBootConfiguration, registryURL string) error {
+	sshPrivateKey, sshPublicKey, err := generateSSHKeyPairs()
+	if err != nil {
+		return fmt.Errorf("failed to generate SSH keypairs: %w", err)
+	}
+
+	sshSecret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: r.ManagerNamespace,
+			Name:      fmt.Sprintf("%s-ssh", bootConfig.Name),
+		},
+		Data: map[string][]byte{
+			"public":  sshPublicKey,
+			"private": sshPrivateKey,
+		},
+	}
+	if err := controllerutil.SetControllerReference(bootConfig, sshSecret, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference: %w", err)
+	}
+	if err := r.Patch(ctx, sshSecret, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
+		return fmt.Errorf("failed to apply default SSH keypairs: %w", err)
+	}
+	log.V(1).Info("Applied SSH keypairs secret", "SSHKeyPair", client.ObjectKeyFromObject(sshSecret))
+
 	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
-	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags)
+	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
 	}
 
-	ignitionSecret := &v1.Secret{}
-	ignitionSecret.Name = bootConfig.Name
-	ignitionSecret.Namespace = r.ManagerNamespace
+	ignitionSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: r.ManagerNamespace,
+			Name:      bootConfig.Name,
+		},
+	}
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, ignitionSecret, func() error {
 		ignitionSecret.Data = map[string][]byte{
 			DefaultIgnitionFormatKey:     []byte(DefaultIgnitionFormatValue),
 			DefaultIgnitionSecretKeyName: ignitionData,
 		}
-		return controllerutil.SetControllerReference(bootConfig, ignitionSecret, r.Client.Scheme())
+		return controllerutil.SetControllerReference(bootConfig, ignitionSecret, r.Scheme)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create or patch Ignition Secret: %w", err)
@@ -516,10 +546,35 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 	return nil
 }
 
-func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string) ([]byte, error) {
-	ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.ContainerConfig{
-		Image: r.ProbeImage,
-		Flags: flags,
+func generateSSHKeyPairs() ([]byte, []byte, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate private key: %w", err)
+	}
+
+	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	privateKeyPem := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	})
+
+	publicKey := &privateKey.PublicKey
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal public key: %w", err)
+	}
+	publicKeyPem := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKeyBytes,
+	})
+	return privateKeyPem, publicKeyPem, nil
+}
+
+func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, sshPublicKey []byte) ([]byte, error) {
+	ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+		Image:        r.ProbeImage,
+		Flags:        flags,
+		SSHPublicKey: string(sshPublicKey),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate default ignition data: %w", err)

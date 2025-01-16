@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"net/http"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller/testdata"
 	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -104,7 +104,32 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
 		))
 
+		By("Ensuring that the SSH keypair has been created")
+		sshSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      bootConfig.Name + "-ssh",
+			},
+		}
+		Eventually(Object(sshSecret)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "ServerBootConfiguration",
+				Name:               bootConfig.Name,
+				UID:                bootConfig.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Data", HaveKeyWithValue("public", Not(BeEmpty()))),
+			HaveField("Data", HaveKeyWithValue("private", Not(BeEmpty()))),
+		))
+
 		By("Ensuring that the default ignition configuration has been created")
+		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+			Image:        "foo:latest",
+			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+			SSHPublicKey: string(sshSecret.Data["public"]),
+		})
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
@@ -120,7 +145,7 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
+			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(ignitionData))),
 		))
 
 		By("Patching the boot configuration to a Ready state")
@@ -226,7 +251,32 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
 		))
 
+		By("Ensuring that the SSH keypair has been created")
+		sshSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      bootConfig.Name + "-ssh",
+			},
+		}
+		Eventually(Object(sshSecret)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "ServerBootConfiguration",
+				Name:               bootConfig.Name,
+				UID:                bootConfig.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Data", HaveKeyWithValue("public", Not(BeEmpty()))),
+			HaveField("Data", HaveKeyWithValue("private", Not(BeEmpty()))),
+		))
+
 		By("Ensuring that the default ignition configuration has been created")
+		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+			Image:        "foo:latest",
+			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+			SSHPublicKey: string(sshSecret.Data["public"]),
+		})
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
@@ -242,7 +292,7 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
+			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(ignitionData))),
 		))
 
 		By("Patching the boot configuration to a Ready state")

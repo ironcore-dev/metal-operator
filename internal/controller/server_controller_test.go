@@ -8,15 +8,18 @@ import (
 	"net/http"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/ssh"
+	"gopkg.in/yaml.v3"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller/testdata"
+	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -104,6 +107,31 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
 		))
 
+		By("Ensuring that the SSH keypair has been created")
+		sshSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      bootConfig.Name + "-ssh",
+			},
+		}
+		Eventually(Object(sshSecret)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "ServerBootConfiguration",
+				Name:               bootConfig.Name,
+				UID:                bootConfig.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeNil()))),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
+			HaveField("Data", HaveKeyWithValue(SShKeyPairSecretPasswordKeyName, Not(BeNil()))),
+		))
+		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
+		Expect(err).NotTo(HaveOccurred())
+		_, _, _, _, err = ssh.ParseAuthorizedKey(sshSecret.Data[SSHKeyPairSecretPublicKeyName])
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Ensuring that the default ignition configuration has been created")
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -111,6 +139,37 @@ var _ = Describe("Server Controller", func() {
 				Name:      bootConfig.Name,
 			},
 		}
+		Eventually(Get(ignitionSecret)).Should(Succeed())
+
+		// Since the bycrypted password hash is not deterministic we will extract if from the actual secret and
+		// add it to our ignition data which we want to compare the rest with.
+		var parsedData map[string]interface{}
+		Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).ToNot(HaveOccurred())
+
+		passwd, ok := parsedData["passwd"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+
+		users, _ := passwd["users"].([]interface{})
+		Expect(users).To(HaveLen(1))
+
+		user, ok := users[0].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(user).To(HaveKeyWithValue("name", "metal"))
+
+		passwordHash, ok := user["password_hash"].(string)
+		Expect(ok).To(BeTrue(), "password_hash should be a string")
+
+		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SShKeyPairSecretPasswordKeyName])
+		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
+
+		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+			Image:        "foo:latest",
+			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
+			PasswordHash: passwordHash,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
@@ -120,7 +179,8 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
+			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
+			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
 		))
 
 		By("Patching the boot configuration to a Ready state")
@@ -226,6 +286,31 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
 		))
 
+		By("Ensuring that the SSH keypair has been created")
+		sshSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      bootConfig.Name + "-ssh",
+			},
+		}
+		Eventually(Object(sshSecret)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "ServerBootConfiguration",
+				Name:               bootConfig.Name,
+				UID:                bootConfig.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
+			HaveField("Data", HaveKeyWithValue(SShKeyPairSecretPasswordKeyName, Not(BeEmpty()))),
+		))
+		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
+		Expect(err).NotTo(HaveOccurred())
+		_, _, _, _, err = ssh.ParseAuthorizedKey(sshSecret.Data[SSHKeyPairSecretPublicKeyName])
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Ensuring that the default ignition configuration has been created")
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -233,6 +318,36 @@ var _ = Describe("Server Controller", func() {
 				Name:      bootConfig.Name,
 			},
 		}
+		Eventually(Get(ignitionSecret)).Should(Succeed())
+
+		// Since the bycrypted password hash is not deterministic we will extract if from the actual secret and
+		// add it to our ignition data which we want to compare the rest with.
+		var parsedData map[string]interface{}
+		Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).ToNot(HaveOccurred())
+
+		passwd, ok := parsedData["passwd"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+
+		users, _ := passwd["users"].([]interface{})
+		Expect(users).To(HaveLen(1))
+
+		user, ok := users[0].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(user).To(HaveKeyWithValue("name", "metal"))
+
+		passwordHash, ok := user["password_hash"].(string)
+		Expect(ok).To(BeTrue(), "password_hash should be a string")
+
+		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SShKeyPairSecretPasswordKeyName])).Should(Succeed())
+
+		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+			Image:        "foo:latest",
+			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
+			PasswordHash: passwordHash,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
@@ -242,7 +357,8 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Data", HaveKeyWithValue("ignition", MatchYAML(testdata.DefaultIgnition))),
+			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
+			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
 		))
 
 		By("Patching the boot configuration to a Ready state")

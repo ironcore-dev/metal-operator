@@ -9,10 +9,12 @@ import (
 	"text/template"
 )
 
-// ContainerConfig holds the Docker image and flags.
-type ContainerConfig struct {
-	Image string
-	Flags string
+// Config holds the Docker image and flags.
+type Config struct {
+	Image        string
+	Flags        string
+	SSHPublicKey string
+	PasswordHash string
 }
 
 // defaultIgnitionTemplate is a Go template for the default Ignition configuration.
@@ -54,11 +56,16 @@ systemd:
         WantedBy=multi-user.target
 storage:
   files: []
-passwd: {}
+passwd:
+  users:
+    - name: metal
+      password_hash: {{.PasswordHash}}
+      groups: [ "wheel" ]
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]
 `
 
-// GenerateDefaultIgnitionData renders the defaultIgnitionTemplate with the given ContainerConfig.
-func GenerateDefaultIgnitionData(config ContainerConfig) ([]byte, error) {
+// GenerateDefaultIgnitionData renders the defaultIgnitionTemplate with the given Config.
+func GenerateDefaultIgnitionData(config Config) ([]byte, error) {
 	tmpl, err := template.New("defaultIgnition").Parse(defaultIgnitionTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("parsing template failed: %w", err)

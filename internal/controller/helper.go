@@ -4,8 +4,16 @@
 package controller
 
 import (
+	"crypto/rand"
+	"fmt"
+	"math/big"
+
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
 )
 
 func shouldIgnoreReconciliation(obj client.Object) bool {
@@ -14,4 +22,17 @@ func shouldIgnoreReconciliation(obj client.Object) bool {
 		return false
 	}
 	return val == metalv1alpha1.OperationAnnotationIgnore
+}
+
+func GenerateRandomPassword(length int) ([]byte, error) {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate random password: %w", err)
+		}
+		result[i] = letters[n.Int64()]
+	}
+	return result, nil
 }

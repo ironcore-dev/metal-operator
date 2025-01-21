@@ -5,12 +5,19 @@ package controller
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
 	"sort"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 
@@ -37,9 +44,13 @@ import (
 )
 
 const (
-	DefaultIgnitionSecretKeyName  = "ignition"
-	DefaultIgnitionFormatKey      = "format"
-	DefaultIgnitionFormatValue    = "fcos"
+	DefaultIgnitionSecretKeyName    = "ignition"
+	DefaultIgnitionFormatKey        = "format"
+	DefaultIgnitionFormatValue      = "fcos"
+	SSHKeyPairSecretPrivateKeyName  = "pem"
+	SSHKeyPairSecretPublicKeyName   = "pub"
+	SShKeyPairSecretPasswordKeyName = "password"
+
 	ServerFinalizer               = "metal.ironcore.dev/server"
 	InternalAnnotationTypeKeyName = "metal.ironcore.dev/type"
 	InternalAnnotationTypeValue   = "Internal"
@@ -406,11 +417,7 @@ func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server
 		APIVersion: "metal.ironcore.dev/v1alpha1",
 		Kind:       "ServerBootConfiguration",
 	}
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return err
-	}
-
-	return nil
+	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -492,34 +499,104 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 }
 
 func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, bootConfig *metalv1alpha1.ServerBootConfiguration, registryURL string) error {
+	sshPrivateKey, sshPublicKey, password, err := generateSSHKeyPairAndPassword()
+	if err != nil {
+		return fmt.Errorf("failed to generate SSH keypair: %w", err)
+	}
+
+	sshSecret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: r.ManagerNamespace,
+			Name:      fmt.Sprintf("%s-ssh", bootConfig.Name),
+		},
+		Data: map[string][]byte{
+			SSHKeyPairSecretPublicKeyName:   sshPublicKey,
+			SSHKeyPairSecretPrivateKeyName:  sshPrivateKey,
+			SShKeyPairSecretPasswordKeyName: password,
+		},
+	}
+	if err := controllerutil.SetControllerReference(bootConfig, sshSecret, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference: %w", err)
+	}
+	if err := r.Patch(ctx, sshSecret, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
+		return fmt.Errorf("failed to apply default SSH keypair: %w", err)
+	}
+	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", client.ObjectKeyFromObject(sshSecret))
+
 	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
-	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags)
+	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey, password)
 	if err != nil {
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
 	}
 
-	ignitionSecret := &v1.Secret{}
-	ignitionSecret.Name = bootConfig.Name
-	ignitionSecret.Namespace = r.ManagerNamespace
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, ignitionSecret, func() error {
-		ignitionSecret.Data = map[string][]byte{
+	ignitionSecret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: r.ManagerNamespace,
+			Name:      bootConfig.Name,
+		},
+		Data: map[string][]byte{
 			DefaultIgnitionFormatKey:     []byte(DefaultIgnitionFormatValue),
 			DefaultIgnitionSecretKeyName: ignitionData,
-		}
-		return controllerutil.SetControllerReference(bootConfig, ignitionSecret, r.Client.Scheme())
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create or patch Ignition Secret: %w", err)
+		},
 	}
-	log.V(1).Info("Created or patched Ignition Secret", "Secret", ignitionSecret.Name, "Operation", opResult)
+
+	if err := controllerutil.SetControllerReference(bootConfig, ignitionSecret, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference: %w", err)
+	}
+
+	if err := r.Patch(ctx, ignitionSecret, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
+		return fmt.Errorf("failed to apply default ignition secret: %w", err)
+	}
+	log.V(1).Info("Applied Ignition Secret")
 
 	return nil
 }
 
-func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string) ([]byte, error) {
-	ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.ContainerConfig{
-		Image: r.ProbeImage,
-		Flags: flags,
+func generateSSHKeyPairAndPassword() ([]byte, []byte, []byte, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to generate private key: %w", err)
+	}
+
+	privateKeyBlock, err := ssh.MarshalPrivateKey(privateKey, "")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	privateKeyPem := pem.EncodeToMemory(privateKeyBlock)
+
+	sshPubKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create SSH public key: %w", err)
+	}
+	publicKeyAuthorized := ssh.MarshalAuthorizedKey(sshPubKey)
+
+	password, err := GenerateRandomPassword(20)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to generate password: %w", err)
+	}
+
+	return privateKeyPem, publicKeyAuthorized, password, nil
+}
+
+func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, sshPublicKey []byte, password []byte) ([]byte, error) {
+	passwordHash, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate password hash: %w", err)
+	}
+
+	ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+		Image:        r.ProbeImage,
+		Flags:        flags,
+		SSHPublicKey: string(sshPublicKey),
+		PasswordHash: string(passwordHash),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate default ignition data: %w", err)

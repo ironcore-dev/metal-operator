@@ -164,6 +164,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 		server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
+			server.Labels = mergeLabels(bmcObj.Labels, server.Labels)
 			server.Spec.UUID = strings.ToLower(s.UUID)
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.BMCRef = &v1.LocalObjectReference{Name: bmcObj.Name}
@@ -185,4 +186,14 @@ func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&metalv1alpha1.Server{}).
 		// TODO: add watches for Endpoints and BMCSecrets
 		Complete(r)
+}
+
+func mergeLabels(bmcLabels, serverLabels map[string]string) map[string]string {
+	if serverLabels == nil {
+		serverLabels = make(map[string]string)
+	}
+	for key, value := range bmcLabels {
+		serverLabels[key] = value
+	}
+	return serverLabels
 }

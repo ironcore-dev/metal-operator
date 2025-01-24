@@ -105,10 +105,15 @@ var _ = Describe("BMC Controller", func() {
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, bmcSecret)
 
+		bmcLabels := map[string]string{
+			"foo": "bar",
+		}
+
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
+				Labels:       bmcLabels,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -151,6 +156,7 @@ var _ = Describe("BMC Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
+			HaveField("ObjectMeta.Labels", bmcLabels),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.BMCRef.Name", bmc.Name),

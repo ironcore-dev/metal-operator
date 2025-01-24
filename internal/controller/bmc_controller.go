@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
+	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
@@ -164,6 +165,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 		server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
+			metautils.SetLabels(server, bmcObj.Labels)
 			server.Spec.UUID = strings.ToLower(s.UUID)
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.BMCRef = &v1.LocalObjectReference{Name: bmcObj.Name}

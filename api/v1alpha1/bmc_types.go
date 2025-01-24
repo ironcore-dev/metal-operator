@@ -49,7 +49,7 @@ type BMCSpec struct {
 // InlineEndpoint defines inline network access configuration for the BMC.
 type InlineEndpoint struct {
 	// MACAddress is the MAC address of the endpoint.
-	MACAddress string `json:"macAddress"`
+	MACAddress string `json:"macAddress,omitempty"`
 	// IP is the IP address of the BMC.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless

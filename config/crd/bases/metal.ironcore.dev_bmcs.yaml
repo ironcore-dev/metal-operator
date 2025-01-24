@@ -83,7 +83,6 @@ spec:
                     type: string
                 required:
                 - ip
-                - macAddress
                 type: object
                 x-kubernetes-validations:
                 - message: access is immutable

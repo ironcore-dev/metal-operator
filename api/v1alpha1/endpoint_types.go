@@ -10,7 +10,7 @@ import (
 // EndpointSpec defines the desired state of Endpoint
 type EndpointSpec struct {
 	// MACAddress is the MAC address of the endpoint.
-	MACAddress string `json:"macAddress,omitempty"`
+	MACAddress string `json:"macAddress"`
 	// IP is the IP address of the endpoint.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless

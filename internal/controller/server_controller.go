@@ -398,7 +398,10 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 			Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				log.V(1).Info("ServerClaim not found, removing ServerClaimRef", "ServerClaim", server.Spec.ServerClaimRef.Name)
+				log.V(1).Info(
+					"ServerClaim not found, removing ServerClaimRef",
+					"Server", server.Name,
+					"ServerClaim", server.Spec.ServerClaimRef.Name)
 				serverBase := server.DeepCopy()
 				server.Spec.ServerClaimRef = nil
 				if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {

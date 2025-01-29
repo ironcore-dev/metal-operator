@@ -390,6 +390,26 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 	}
 	log.V(1).Info("Server boot configuration is ready")
 
+	// TODO: fix properly, we need to free up the server if the claim does not exist anymore
+	if server.Spec.ServerClaimRef != nil {
+		claim := &metalv1alpha1.ServerClaim{}
+		err := r.Get(ctx, client.ObjectKey{
+			Name:      server.Spec.ServerClaimRef.Name,
+			Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				log.V(1).Info("ServerClaim not found, removing ServerClaimRef", "ServerClaim", server.Spec.ServerClaimRef.Name)
+				serverBase := server.DeepCopy()
+				server.Spec.ServerClaimRef = nil
+				if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+					return false, fmt.Errorf("failed to remove ServerClaimRef: %w", err)
+				}
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to get ServerClaim: %w", err)
+		}
+	}
+
 	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
 		if err := r.pxeBootServer(ctx, log, server); err != nil {

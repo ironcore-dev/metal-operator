@@ -34,7 +34,7 @@ systemd:
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/usr/bin/apt-get update
-        ExecStart=/usr/bin/apt-get install docker.io -y
+        ExecStart=/usr/bin/apt-get install docker.io docker-cli -y
         [Install]
         WantedBy=multi-user.target
     - name: docker.service

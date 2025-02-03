@@ -601,6 +601,11 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		}
 	}
 
+	BeforeEach(func(ctx SpecContext) {
+		var server metalv1alpha1.Server
+		Expect(k8sClient.DeleteAllOf(ctx, &server)).To(Succeed())
+	})
+
 	It("binds four out of ten server for four best effort claims", func(ctx SpecContext) {
 		for range 10 {
 			makeServer(ctx)

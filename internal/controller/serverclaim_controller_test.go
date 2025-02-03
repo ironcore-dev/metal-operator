@@ -4,11 +4,14 @@
 package controller
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
@@ -546,5 +549,97 @@ var _ = Describe("ServerClaim Validation", func() {
 		Consistently(Object(claimWithSelector)).Should(SatisfyAll(
 			HaveField("Spec.Power", Equal(metalv1alpha1.PowerOn)),
 			HaveField("Spec.ServerSelector.MatchLabels", Equal(map[string]string{"foo": "bar"}))))
+	})
+})
+
+var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
+	ns := SetupTest()
+
+	makeServer := func(ctx context.Context) {
+		server := metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
+				},
+				Labels: map[string]string{"foo": "bar"},
+			},
+		}
+		ExpectWithOffset(1, k8sClient.Create(ctx, &server)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, &server)
+		server.Status.State = metalv1alpha1.ServerStateAvailable
+		server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		ExpectWithOffset(1, k8sClient.Status().Update(ctx, &server)).To(Succeed())
+	}
+
+	makeClaim := func(ctx context.Context, labelSelector *metav1.LabelSelector) {
+		claim := metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "claim-",
+				Namespace:    ns.Name,
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				ServerSelector: labelSelector,
+			},
+		}
+		ExpectWithOffset(1, k8sClient.Create(ctx, &claim)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, &claim)
+	}
+
+	countBoundServer := func(ctx context.Context, serverCount int) func(Gomega) int {
+		return func(g Gomega) int {
+			var serverList metalv1alpha1.ServerList
+			g.Expect(k8sClient.List(ctx, &serverList)).To(Succeed())
+			g.Expect(serverList.Items).To(HaveLen(serverCount))
+			count := 0
+			for _, server := range serverList.Items {
+				if server.Spec.ServerClaimRef != nil {
+					count++
+				}
+			}
+			return count
+		}
+	}
+
+	It("binds four out of ten server for four best effort claims", func(ctx SpecContext) {
+		for range 10 {
+			makeServer(ctx)
+		}
+		for range 4 {
+			makeClaim(ctx, nil)
+		}
+		Eventually(countBoundServer(ctx, 10)).Should(Equal(4))
+		Consistently(countBoundServer(ctx, 10)).Should(Equal(4))
+	})
+
+	It("binds four out of ten server for four label selector claims", func(ctx SpecContext) {
+		for range 10 {
+			makeServer(ctx)
+		}
+		for range 4 {
+			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))
+		}
+		Eventually(countBoundServer(ctx, 10)).Should(Equal(4))
+		Consistently(countBoundServer(ctx, 10)).Should(Equal(4))
+	})
+
+	It("should not bind the same server to multiple best effort claims", func(ctx SpecContext) {
+		By("Creating eight ServerClaims")
+		for range 8 {
+			makeClaim(ctx, nil)
+		}
+		makeServer(ctx)
+		Eventually(countBoundServer(ctx, 1)).Should(Equal(1))
+		Consistently(countBoundServer(ctx, 1)).Should(Equal(1))
+	})
+
+	It("should not bind the same server to multiple label selector claims", func(ctx SpecContext) {
+		By("Creating eight ServerClaims")
+		for range 8 {
+			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))
+		}
+		makeServer(ctx)
+		Eventually(countBoundServer(ctx, 1)).Should(Equal(1))
+		Consistently(countBoundServer(ctx, 1)).Should(Equal(1))
 	})
 })

@@ -108,6 +108,7 @@ type ServerSpec struct {
 
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
+
 	// BIOS specifies the BIOS settings for the server.
 	BIOS []BIOSSettings `json:"BIOS,omitempty"`
 }

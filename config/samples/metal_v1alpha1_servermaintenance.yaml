@@ -1,0 +1,23 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerMaintenance
+metadata:
+  labels:
+    app.kubernetes.io/name: servermaintenance
+    app.kubernetes.io/instance: servermaintenance-sample
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: servermaintenance-sample
+  annotations:
+    metal.ironcore.dev/reason: "sample maintenance"
+spec:
+  serverRef:
+    name: sample-server
+  serverBootConfigurationTemplate:
+    name: sample-server-bootconfig
+    spec:
+      serverRef:
+        name: sample-server
+      ignitionSecretRef:
+        name: my-ignition
+      image: os-image:latest

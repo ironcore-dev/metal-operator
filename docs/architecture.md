@@ -20,6 +20,10 @@ flowchart LR
     ServerReconciler -- Manages --> Server
     ServerReconciler -- Uses --> metalprobe
     ServerReconciler -- Waits for --> ServerBootConfiguration
+    
+    ServerMaintenanceReconciler -- Manages --> ServerMaintenance
+    ServerMaintenanceReconciler -- Creates/Deletes --> ServerBootConfiguration
+    ServerMaintenanceReconciler -- Ensures Power --> Server
 
     ServerClaimReconciler -- Manages --> ServerClaim
     ServerClaim -- References --> Server
@@ -31,12 +35,12 @@ flowchart LR
 
     ServerReconciler -- Powers On --> Server
 
-    classDef operator fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef crd fill:#9f9,stroke:#333,stroke-width:2px;
-    classDef external fill:#ff9,stroke:#333,stroke-width:2px;
+    classDef operator fill:#9575cd, stroke:#000, stroke-width:2px, color:#000;
+    classDef crd fill:#4db6ac, stroke:#000, stroke-width:2px, color:#000;
+    classDef external fill:#f48fb1, stroke:#000, stroke-width:2px, color:#000;
 
-    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler operator;
-    class Endpoint,BMC,Server,ServerClaim,ServerBootConfiguration crd;
+    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler operator;
+    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance crd;
     class BootOperator external;
 ```
 

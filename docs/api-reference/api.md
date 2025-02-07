@@ -1077,7 +1077,7 @@ string
 <h3 id="metal.ironcore.dev/v1alpha1.Power">Power
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaimSpec">ServerClaimSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaimSpec">ServerClaimSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
 </p>
 <div>
 <p>Power defines the possible power states for a device.</p>
@@ -1455,7 +1455,7 @@ ServerBootConfigurationStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerBootConfigurationSpec">ServerBootConfigurationSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBootConfiguration">ServerBootConfiguration</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBootConfiguration">ServerBootConfiguration</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">ServerBootConfigurationTemplate</a>)
 </p>
 <div>
 <p>ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration.</p>
@@ -1562,6 +1562,91 @@ ServerBootConfigurationState
 </td>
 <td>
 <p>State represents the current state of the boot configuration.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">ServerBootConfigurationTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+</p>
+<div>
+<p>ServerBootConfigurationTemplate defines the parameters to be used for rendering a boot configuration.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the name of the boot configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationSpec">
+ServerBootConfigurationSpec
+</a>
+</em>
+</td>
+<td>
+<p>Parameters specifies the parameters to be used for rendering the boot configuration.</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to the server for which this boot configuration is intended.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Image specifies the boot image to be used for the server.
+This field is optional and can be omitted if not specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ignitionSecretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
+the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
+</td>
+</tr>
+</table>
 </td>
 </tr>
 </tbody>
@@ -1800,6 +1885,257 @@ Phase
 </td>
 <td>
 <p>Phase represents the current phase of the server claim.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenance">ServerMaintenance
+</h3>
+<div>
+<p>ServerMaintenance is the Schema for the ServerMaintenance API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">
+ServerMaintenanceSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>policy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>Policy specifies the maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to the server that is to be maintained.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverPower</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Power">
+Power
+</a>
+</em>
+</td>
+<td>
+<p>ServerPower specifies the power state of the server during maintenance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverBootConfigurationTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">
+ServerBootConfigurationTemplate
+</a>
+</em>
+</td>
+<td>
+<p>ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceStatus">
+ServerMaintenanceStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Enforced&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;OwnerApproval&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenance">ServerMaintenance</a>)
+</p>
+<div>
+<p>ServerMaintenanceSpec defines the desired state of a ServerMaintenance</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>policy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>Policy specifies the maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to the server that is to be maintained.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverPower</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Power">
+Power
+</a>
+</em>
+</td>
+<td>
+<p>ServerPower specifies the power state of the server during maintenance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverBootConfigurationTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">
+ServerBootConfigurationTemplate
+</a>
+</em>
+</td>
+<td>
+<p>ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceState">ServerMaintenanceState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceStatus">ServerMaintenanceStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;InMaintenance&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceStatus">ServerMaintenanceStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenance">ServerMaintenance</a>)
+</p>
+<div>
+<p>ServerMaintenanceStatus defines the observed state of a ServerMaintenance</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceState">
+ServerMaintenanceState
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>

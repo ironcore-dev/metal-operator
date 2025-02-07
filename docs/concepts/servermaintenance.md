@@ -1,7 +1,8 @@
 # ServerMaintenance
 
 `ServerMaintenance` represents a maintenance operation for a physical server. It transitions a `Server` from its 
-current operational state (e.g., Available/Reserved) into a Maintenance state. Each `ServerMaintenance` object tracks the lifecycle of a maintenance task, ensuring servers are properly taken offline, updated, and restored.
+current operational state (e.g., Available/Reserved) into a Maintenance state. Each `ServerMaintenance` object tracks
+the lifecycle of a maintenance task, ensuring servers are properly taken offline, updated, and restored.
 
 ## Key Points
 
@@ -22,37 +23,14 @@ current operational state (e.g., Available/Reserved) into a Maintenance state. E
 3. If `policy` is `OwnerApproval` and the `ok-to-maintenance` label is present (or if `alwaysPerformMaintenance` is 
    enabled), or if the policy is `Forceful`, the `metal-operator` transitions the `Server` into `Maintenance` and 
    updates the `ServerMaintenance` state accordingly.
-4. The maintenance operator powers off the `Server`, applies a `ServerBootConfiguration` (if needed), performs the 
-   maintenance, and sets `ServerMaintenance` to `Complete`.
-5. The `metal-operator` transitions the `Server` back to its prior state. If additional `ServerMaintenance` objects are
+4. The `ServerMaintenanceReconciler` creates a `ServerBootConfiguration` out of the `ServerMaintenance`'s 
+   `ServerBootConfigurationTemplate` and applies it to the `Server`. The power state of the `Server` can set by providing the
+   `ServerPower` field in the `ServerMaintenance` object. Once the maintenance task is complete, the maintenance operator
+   sets the `ServerMaintenance` state to `Complete`.
+5. (optional) In case no `ServerBootConfigurationTemplate` is provided, the maintenance operator powers off the `Server`, 
+   applies a `ServerBootConfiguration` (if needed), performs the maintenance, and sets `ServerMaintenance` to `Complete`.
+6. The `metal-operator` transitions the `Server` back to its prior state. If additional `ServerMaintenance` objects are
    pending, the next one is processed.
-
-## Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    participant Ext as External entity (e.g. foo-maintenance-operator)
-    participant SC as ServerClaim
-    participant MO as metal-operator
-    participant SM as ServerMaintenance
-    participant S as Server
-    participant SBC as ServerBootConfiguration
-
-    Ext->>MO: Create SM (ServerMaintenance) resource for S
-    MO->>SC: Check for ok-to-maintenance label (if policy=OwnerApproval)
-    alt Policy = OwnerApproval AND no ok-to-maintenance label
-        Note over MO: SM stays Pending, Server remains unchanged
-    else Policy = OwnerApproval AND label present OR Policy = Forceful
-        MO->>S: Update Server state to "InMaintenance"
-        MO->>SM: Set SM state to "InMaintenance"
-        Ext->>S: Power off Server
-        Ext->>MO: Create SBC and reference in Server
-        Note over Ext: Perform maintenance
-        Ext->>SM: Update SM state to "Complete"
-        MO->>S: Return Server to Available/Reserved
-        Ext->>S: Power on Server
-    end
-```
 
 ## Example
 
@@ -62,15 +40,26 @@ kind: ServerMaintenance
 metadata:
   name: bios-update
   namespace: ops
+  annotations:
+    metal.ironcore.dev/reason: "BIOS update"
 spec:
   policy: OwnerApproval
   serverRef:
     name: server-foo
+  serverPower: On # or Off
+  serverBootConfigurationTemplate:
+    name: bios-update-config
+    spec:
+      image: "bios-update-image"
+      serverRef:
+        name: server-foo
+      ignitionSecretRef:
+        name: bios-update-ignition
 status:
   state: Pending
 ```
 
 If `policy: OwnerApproval` and no `ok-to-maintenance` label exists on the `ServerClaim`, this `ServerMaintenance` 
 remains `Pending`, and the `Server` stays as is. Once the label is added (or if the operator setting 
-`alwaysPerformMaintenance` is enabled), the `metal-operator` transitions the `Server` to `InMaintenance`, and the 
+`alwaysPerformMaintenance` is enabled), the `metal-operator` transitions the `Server` to `Maintenance`, and the 
 maintenance operator performs the maintenance task.

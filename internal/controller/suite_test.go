@@ -56,6 +56,38 @@ func TestControllers(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
+func DeleteAllMetalResources(ctx context.Context, namespace string) {
+	var serverClaim metalv1alpha1.ServerClaim
+	Expect(k8sClient.DeleteAllOf(ctx, &serverClaim, client.InNamespace(namespace))).To(Succeed())
+	var serverClaimList metalv1alpha1.ServerClaimList
+	Eventually(ObjectList(&serverClaimList)).Should(HaveField("Items", BeEmpty()))
+
+	var endpoint metalv1alpha1.Endpoint
+	Expect(k8sClient.DeleteAllOf(ctx, &endpoint)).To(Succeed())
+	var endpointList metalv1alpha1.EndpointList
+	Eventually(ObjectList(&endpointList)).Should(HaveField("Items", BeEmpty()))
+
+	var bmc metalv1alpha1.BMC
+	Expect(k8sClient.DeleteAllOf(ctx, &bmc)).To(Succeed())
+	var bmcList metalv1alpha1.BMCList
+	Eventually(ObjectList(&bmcList)).Should(HaveField("Items", BeEmpty()))
+
+	var serverBootConfiguration metalv1alpha1.ServerBootConfiguration
+	Expect(k8sClient.DeleteAllOf(ctx, &serverBootConfiguration, client.InNamespace(namespace))).To(Succeed())
+	var serverBootConfigurationList metalv1alpha1.ServerBootConfigurationList
+	Eventually(ObjectList(&serverBootConfigurationList)).Should(HaveField("Items", BeEmpty()))
+
+	var server metalv1alpha1.Server
+	Expect(k8sClient.DeleteAllOf(ctx, &server)).To(Succeed())
+	var serverList metalv1alpha1.ServerList
+	Eventually(ObjectList(&serverList)).Should(HaveField("Items", BeEmpty()))
+
+	var bmcSecret metalv1alpha1.BMCSecret
+	Expect(k8sClient.DeleteAllOf(ctx, &bmcSecret)).To(Succeed())
+	var bmcSecretList metalv1alpha1.BMCSecretList
+	Eventually(ObjectList(&bmcSecretList)).Should(HaveField("Items", BeEmpty()))
+}
+
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 

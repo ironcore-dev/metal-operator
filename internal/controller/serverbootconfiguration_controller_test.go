@@ -21,7 +21,7 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 		By("Creating a Server object")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-severbootconfig-",
 				Annotations: map[string]string{
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 				},
@@ -29,7 +29,10 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 			Spec: metalv1alpha1.ServerSpec{},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, server)
+	})
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
 	It("should successfully add the boot configuration ref to server", func(ctx SpecContext) {
@@ -45,7 +48,6 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, config)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, config)
 
 		Eventually(Object(config)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),

@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,15 +19,13 @@ var _ = Describe("BMCSecret Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
-		ctx := context.Background()
-
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		bmcsecret := &metalv1alpha1.BMCSecret{}
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind BMCSecret")
 			err := k8sClient.Get(ctx, typeNamespacedName, bmcsecret)
 			if err != nil && errors.IsNotFound(err) {
@@ -38,13 +34,12 @@ var _ = Describe("BMCSecret Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &metalv1alpha1.BMCSecret{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
@@ -53,7 +48,8 @@ var _ = Describe("BMCSecret Controller", func() {
 			By("Cleanup the specific resource instance BMCSecret")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
-		It("should successfully reconcile the resource", func() {
+
+		It("should successfully reconcile the resource", func(ctx SpecContext) {
 			By("Reconciling the created resource")
 			controllerReconciler := &BMCSecretReconciler{
 				Client: k8sClient,
@@ -63,7 +59,7 @@ var _ = Describe("BMCSecret Controller", func() {
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(Succeed())
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})

@@ -28,11 +28,15 @@ import (
 var _ = Describe("Server Controller", func() {
 	ns := SetupTest()
 
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
+	})
+
 	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-server-",
 			},
 			Spec: metalv1alpha1.EndpointSpec{
 				// emulator BMC mac address
@@ -41,7 +45,6 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, endpoint)
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc := &metalv1alpha1.BMC{
@@ -50,7 +53,6 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Eventually(Get(bmc)).Should(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 
 		By("Ensuring that the BMCSecret will be removed")
 		bmcSecret := &metalv1alpha1.BMCSecret{
@@ -59,7 +61,6 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Eventually(Get(bmcSecret)).Should(Succeed())
-		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
@@ -90,7 +91,6 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
-		DeferCleanup(k8sClient.Delete, server)
 
 		By("Ensuring the boot configuration has been created")
 		bootConfig := &metalv1alpha1.ServerBootConfiguration{
@@ -238,7 +238,7 @@ var _ = Describe("Server Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-server-",
 			},
 			Data: map[string][]byte{
 				"username": []byte("foo"),
@@ -246,7 +246,6 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("Creating a Server with inline BMC configuration")
 		server := &metalv1alpha1.Server{
@@ -269,7 +268,6 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, server)
 
 		By("Ensuring the boot configuration has been created")
 		bootConfig := &metalv1alpha1.ServerBootConfiguration{

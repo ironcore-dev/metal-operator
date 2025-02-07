@@ -35,12 +35,11 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-claim-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       "38947555-7742-3448-3784-823347823834",
@@ -58,7 +57,10 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).Should(Succeed())
-		DeferCleanup(k8sClient.Delete, server)
+	})
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
 	It("should successfully claim a server in available state", func(ctx SpecContext) {
@@ -73,7 +75,6 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, ignitionSecret)
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
@@ -310,7 +311,6 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, claim)
 
 		By("Ensuring that the Server has no claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -359,7 +359,6 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, claim)
 
 		By("Ensuring that the Server has no claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -411,7 +410,6 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, claim)
 
 		By("Patching the Server to available state")
 		Eventually(UpdateStatus(server, func() {
@@ -468,7 +466,6 @@ var _ = Describe("ServerClaim Validation", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, claim)
 
 		By("updating the ServerRef to claim a Server")
 		Eventually(Update(claim, func() {
@@ -483,7 +480,6 @@ var _ = Describe("ServerClaim Validation", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, claimWithSelector)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, claimWithSelector)
 
 		By("updating the ServerSelector to claim a Server")
 		Eventually(Update(claimWithSelector, func() {
@@ -493,6 +489,10 @@ var _ = Describe("ServerClaim Validation", func() {
 				},
 			}
 		})).Should(Succeed())
+	})
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
 	It("Should deny if the ServerRef changes", func() {
@@ -566,7 +566,6 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 			},
 		}
 		ExpectWithOffset(1, k8sClient.Create(ctx, &server)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, &server)
 		server.Status.State = metalv1alpha1.ServerStateAvailable
 		server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 		ExpectWithOffset(1, k8sClient.Status().Update(ctx, &server)).To(Succeed())
@@ -583,7 +582,6 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 			},
 		}
 		ExpectWithOffset(1, k8sClient.Create(ctx, &claim)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, &claim)
 	}
 
 	countBoundServer := func(ctx context.Context, serverCount int) func(Gomega) int {
@@ -602,8 +600,13 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 	}
 
 	BeforeEach(func(ctx SpecContext) {
-		var server metalv1alpha1.Server
-		Expect(k8sClient.DeleteAllOf(ctx, &server)).To(Succeed())
+		var serverList metalv1alpha1.ServerList
+		Expect(k8sClient.List(ctx, &serverList)).To(Succeed())
+		Expect(serverList.Items).To(BeEmpty())
+	})
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
 	It("binds four out of ten server for four best effort claims", func(ctx SpecContext) {

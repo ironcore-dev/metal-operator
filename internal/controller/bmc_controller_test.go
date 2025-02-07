@@ -16,13 +16,17 @@ import (
 )
 
 var _ = Describe("BMC Controller", func() {
-	_ = SetupTest()
+	ns := SetupTest()
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
+	})
 
 	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.EndpointSpec{
 				// emulator BMC mac address
@@ -31,7 +35,6 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, endpoint)
 
 		By("Ensuring that the BMC will be removed")
 		bmc := &metalv1alpha1.BMC{
@@ -39,15 +42,6 @@ var _ = Describe("BMC Controller", func() {
 				Name: endpoint.Name,
 			},
 		}
-		DeferCleanup(k8sClient.Delete, bmc)
-
-		By("Ensuring that the BMCSecret will be removed")
-		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmc.Name,
-			},
-		}
-		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("Ensuring that the Server resource will be removed")
 		server := &metalv1alpha1.Server{
@@ -55,7 +49,6 @@ var _ = Describe("BMC Controller", func() {
 				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 			},
 		}
-		DeferCleanup(k8sClient.Delete, server)
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		Eventually(Object(bmc)).Should(SatisfyAll(
@@ -103,7 +96,6 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		bmcLabels := map[string]string{
 			"foo": "bar",
@@ -112,7 +104,7 @@ var _ = Describe("BMC Controller", func() {
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 				Labels:       bmcLabels,
 			},
 			Spec: metalv1alpha1.BMCSpec{
@@ -130,7 +122,6 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Status.IP", metalv1alpha1.MustParseIP("127.0.0.1")),
@@ -166,7 +157,11 @@ var _ = Describe("BMC Controller", func() {
 })
 
 var _ = Describe("BMC Validation", func() {
-	_ = SetupTest()
+	ns := SetupTest()
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
+	})
 
 	It("Should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
@@ -199,27 +194,25 @@ var _ = Describe("BMC Validation", func() {
 	It("Should admit if the BMC has an EndpointRef but no InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 	})
 
 	It("Should deny if the BMC EndpointRef spec field has been removed", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 
 		Eventually(Update(bmc, func() {
 			bmc.Spec.EndpointRef = nil
@@ -232,14 +225,13 @@ var _ = Describe("BMC Validation", func() {
 	It("Should admit if the BMC is changing EndpointRef to InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 
 		Eventually(Update(bmc, func() {
 			bmc.Spec.EndpointRef = nil
@@ -253,7 +245,7 @@ var _ = Describe("BMC Validation", func() {
 	It("Should admit if the BMC has no EndpointRef but an InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -263,13 +255,12 @@ var _ = Describe("BMC Validation", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 	})
 
 	It("Should deny if the BMC InlineEndpoint spec field has been removed", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -279,7 +270,6 @@ var _ = Describe("BMC Validation", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 
 		Eventually(Update(bmc, func() {
 			bmc.Spec.Endpoint = nil
@@ -294,7 +284,7 @@ var _ = Describe("BMC Validation", func() {
 	It("Should admit if the BMC has is changing to an EndpointRef from an InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
+				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -304,7 +294,6 @@ var _ = Describe("BMC Validation", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 
 		Eventually(Update(bmc, func() {
 			bmc.Spec.EndpointRef = &v1.LocalObjectReference{Name: "foo"}

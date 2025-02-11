@@ -8,4 +8,6 @@ const (
 	OperationAnnotation = "metal.ironcore.dev/operation"
 	// OperationAnnotationIgnore skips the reconciliation of a resource if set to true.
 	OperationAnnotationIgnore = "ignore"
+	// InstanceTypeAnnotation is used to specify the type of Server.
+	InstanceTypeAnnotation = "metal.ironcore.dev/instance-type"
 )

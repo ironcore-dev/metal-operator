@@ -385,11 +385,6 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
 
-		By("Ensuring that the server is set back to initial due to the discovery check timing out")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
-		))
-
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(server.Spec.SystemUUID, registryURL, 50*time.Millisecond)
 		go func() {
@@ -398,6 +393,11 @@ var _ = Describe("Server Controller", func() {
 		}()
 
 		By("Ensuring that the server is set to available and powered off")
+		// check that the available state is set first, as that is as part of handling
+		// the discovery state. The ServerBootConfig deletion happens in a later
+		// reconciliation as part of handling the available state.
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
 		zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
 		// force calculation of zero capacity string
 		_ = zeroCapacity.String()
@@ -446,5 +446,66 @@ var _ = Describe("Server Controller", func() {
 		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
+	})
+
+	It("Should reset a Server into initial state on discovery failure", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				UUID:       "38947555-7742-3448-3784-823347823834",
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Address: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
+
+		By("Ensuring the boot configuration has been created")
+		bootConfig := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      server.Name,
+			},
+		}
+		Eventually(Object(bootConfig)).Should(SatisfyAll(
+			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
+			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
+			HaveField("Spec.Image", "fooOS:latest"),
+			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
+			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
+		))
+
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
 	})
 })

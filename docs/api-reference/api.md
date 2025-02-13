@@ -2004,6 +2004,7 @@ ServerMaintenanceStatus
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
+<p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
 </div>
 <table>
 <thead>
@@ -2013,9 +2014,11 @@ ServerMaintenanceStatus
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Enforced&#34;</p></td>
-<td></td>
+<td><p>ServerMaintenancePolicyEnforced specifies that the maintenance policy is enforced.</p>
+</td>
 </tr><tr><td><p>&#34;OwnerApproval&#34;</p></td>
-<td></td>
+<td><p>ServerMaintenancePolicyOwnerApproval specifies that the maintenance policy requires owner approval.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec
@@ -2094,6 +2097,7 @@ ServerBootConfigurationTemplate
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceStatus">ServerMaintenanceStatus</a>)
 </p>
 <div>
+<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
 </div>
 <table>
 <thead>
@@ -2103,11 +2107,17 @@ ServerBootConfigurationTemplate
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Completed&#34;</p></td>
-<td></td>
+<td><p>ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>ServerMaintenanceStateFailed specifies that the server maintenance has failed.</p>
+</td>
 </tr><tr><td><p>&#34;InMaintenance&#34;</p></td>
-<td></td>
+<td><p>ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.</p>
+</td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td></td>
+<td><p>ServerMaintenanceStatePending specifies that the server maintenance is pending.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceStatus">ServerMaintenanceStatus
@@ -2136,6 +2146,7 @@ ServerMaintenanceState
 </em>
 </td>
 <td>
+<p>State specifies the current state of the server maintenance.</p>
 </td>
 </tr>
 </tbody>

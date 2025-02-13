@@ -142,6 +142,7 @@ spec:
             description: ServerMaintenanceStatus defines the observed state of a ServerMaintenance
             properties:
               state:
+                description: State specifies the current state of the server maintenance.
                 type: string
             type: object
         type: object

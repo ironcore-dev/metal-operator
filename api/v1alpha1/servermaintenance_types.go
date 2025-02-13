@@ -9,7 +9,9 @@ import (
 )
 
 const (
-	ServerMaintenanceNeededLabelKey      = "metal.ironcore.dev/maintenance-needed"
+	// ServerMaintenanceNeededLabelKey is a label key that is used to indicate that a server requires maintenance.
+	ServerMaintenanceNeededLabelKey = "metal.ironcore.dev/maintenance-needed"
+	// ServerMaintenanceReasonAnnotationKey is an annotation key that is used to store the reason for a server maintenance.
 	ServerMaintenanceReasonAnnotationKey = "metal.ironcore.dev/reason"
 )
 
@@ -33,25 +35,34 @@ type ServerMaintenanceSpec struct {
 	ServerBootConfigurationTemplate *ServerBootConfigurationTemplate `json:"serverBootConfigurationTemplate,omitempty"`
 }
 
+// ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.
 type ServerMaintenancePolicy string
 
 const (
+	// ServerMaintenancePolicyOwnerApproval specifies that the maintenance policy requires owner approval.
 	ServerMaintenancePolicyOwnerApproval ServerMaintenancePolicy = "OwnerApproval"
-	ServerMaintenancePolicyEnforced      ServerMaintenancePolicy = "Enforced"
+	// ServerMaintenancePolicyEnforced specifies that the maintenance policy is enforced.
+	ServerMaintenancePolicyEnforced ServerMaintenancePolicy = "Enforced"
 )
 
 // ServerMaintenanceStatus defines the observed state of a ServerMaintenance
 type ServerMaintenanceStatus struct {
+	// State specifies the current state of the server maintenance.
 	State ServerMaintenanceState `json:"state,omitempty"`
 }
 
+// ServerMaintenanceState specifies the current state of the server maintenance.
 type ServerMaintenanceState string
 
 const (
-	ServerMaintenanceStatePending       ServerMaintenanceState = "Pending"
+	// ServerMaintenanceStatePending specifies that the server maintenance is pending.
+	ServerMaintenanceStatePending ServerMaintenanceState = "Pending"
+	// ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
-	ServerMaintenanceStateCompleted     ServerMaintenanceState = "Completed"
-	ServerMaintenanceStateFailed        ServerMaintenanceState = "Failed"
+	// ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.
+	ServerMaintenanceStateCompleted ServerMaintenanceState = "Completed"
+	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
+	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
 )
 
 // +kubebuilder:object:root=true

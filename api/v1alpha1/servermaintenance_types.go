@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	ServerMaintenanceNeededLabelKey      = "metal.ironcore.dev/maintenance-needed"
 	ServerMaintenanceReasonAnnotationKey = "metal.ironcore.dev/reason"
 )
 
@@ -50,6 +51,7 @@ const (
 	ServerMaintenanceStatePending       ServerMaintenanceState = "Pending"
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
 	ServerMaintenanceStateCompleted     ServerMaintenanceState = "Completed"
+	ServerMaintenanceStateFailed        ServerMaintenanceState = "Failed"
 )
 
 // +kubebuilder:object:root=true

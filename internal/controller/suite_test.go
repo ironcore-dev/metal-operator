@@ -204,16 +204,17 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
-			Client:                 k8sManager.GetClient(),
-			Scheme:                 k8sManager.GetScheme(),
-			Insecure:               true,
-			ManagerNamespace:       ns.Name,
-			ProbeImage:             "foo:latest",
-			ProbeOSImage:           "fooOS:latest",
-			RegistryURL:            registryURL,
-			RegistryResyncInterval: 50 * time.Millisecond,
-			ResyncInterval:         50 * time.Millisecond,
-			EnforceFirstBoot:       true,
+			Client:                  k8sManager.GetClient(),
+			Scheme:                  k8sManager.GetScheme(),
+			Insecure:                true,
+			ManagerNamespace:        ns.Name,
+			ProbeImage:              "foo:latest",
+			ProbeOSImage:            "fooOS:latest",
+			RegistryURL:             registryURL,
+			RegistryResyncInterval:  50 * time.Millisecond,
+			ResyncInterval:          50 * time.Millisecond,
+			EnforceFirstBoot:        true,
+			MaxConcurrentReconciles: 5,
 			BMCOptions: bmc.BMCOptions{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

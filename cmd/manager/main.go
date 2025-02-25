@@ -47,31 +47,34 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr             string
-		enableLeaderElection    bool
-		probeAddr               string
-		secureMetrics           bool
-		enableHTTP2             bool
-		macPrefixesFile         string
-		insecure                bool
-		managerNamespace        string
-		probeImage              string
-		probeOSImage            string
-		registryPort            int
-		registryProtocol        string
-		registryURL             string
-		registryResyncInterval  time.Duration
-		webhookPort             int
-		enforceFirstBoot        bool
-		enforcePowerOff         bool
-		serverResyncInterval    time.Duration
-		powerPollingInterval    time.Duration
-		powerPollingTimeout     time.Duration
-		resourcePollingInterval time.Duration
-		resourcePollingTimeout  time.Duration
-		discoveryTimeout        time.Duration
+		metricsAddr                   string
+		enableLeaderElection          bool
+		probeAddr                     string
+		secureMetrics                 bool
+		enableHTTP2                   bool
+		macPrefixesFile               string
+		insecure                      bool
+		managerNamespace              string
+		probeImage                    string
+		probeOSImage                  string
+		registryPort                  int
+		registryProtocol              string
+		registryURL                   string
+		registryResyncInterval        time.Duration
+		webhookPort                   int
+		enforceFirstBoot              bool
+		enforcePowerOff               bool
+		serverResyncInterval          time.Duration
+		powerPollingInterval          time.Duration
+		powerPollingTimeout           time.Duration
+		resourcePollingInterval       time.Duration
+		resourcePollingTimeout        time.Duration
+		discoveryTimeout              time.Duration
+		serverMaxConcurrentReconciles int
 	)
 
+	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
+		"The maximum number of concurrent Server reconciles.")
 	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
 	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second,
 		"Interval between polling resources")

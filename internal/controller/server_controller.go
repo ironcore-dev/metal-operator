@@ -15,6 +15,8 @@ import (
 	"sort"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"golang.org/x/crypto/ssh"
@@ -65,18 +67,19 @@ const (
 // ServerReconciler reconciles a Server object
 type ServerReconciler struct {
 	client.Client
-	Scheme                 *runtime.Scheme
-	Insecure               bool
-	ManagerNamespace       string
-	ProbeImage             string
-	RegistryURL            string
-	ProbeOSImage           string
-	RegistryResyncInterval time.Duration
-	EnforceFirstBoot       bool
-	EnforcePowerOff        bool
-	ResyncInterval         time.Duration
-	BMCOptions             bmc.BMCOptions
-	DiscoveryTimeout       time.Duration
+	Scheme                  *runtime.Scheme
+	Insecure                bool
+	ManagerNamespace        string
+	ProbeImage              string
+	RegistryURL             string
+	ProbeOSImage            string
+	RegistryResyncInterval  time.Duration
+	EnforceFirstBoot        bool
+	EnforcePowerOff         bool
+	ResyncInterval          time.Duration
+	BMCOptions              bmc.BMCOptions
+	DiscoveryTimeout        time.Duration
+	MaxConcurrentReconciles int
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -1036,6 +1039,9 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
+		}).
 		For(&metalv1alpha1.Server{}).
 		Watches(
 			&metalv1alpha1.ServerBootConfiguration{},

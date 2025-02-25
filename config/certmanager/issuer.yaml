@@ -4,6 +4,9 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
   name: selfsigned-issuer
   namespace: system
 spec:

@@ -4,6 +4,8 @@ kind: ServiceMonitor
 metadata:
   labels:
     control-plane: controller-manager
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
   name: controller-manager-metrics-monitor
   namespace: system
 spec:
@@ -22,3 +24,5 @@ spec:
   selector:
     matchLabels:
       control-plane: controller-manager
+      app.kubernetes.io/name: metal-operator
+

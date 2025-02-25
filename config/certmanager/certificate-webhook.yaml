@@ -1,6 +1,9 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
   name: serving-cert  # this name should match the one appeared in kustomizeconfig.yaml
   namespace: system
 spec:

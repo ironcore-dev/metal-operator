@@ -799,10 +799,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		if err := bmcClient.PowerOn(ctx, server.Spec.SystemUUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
-		if err := bmcClient.WaitForServerPowerState(
-			ctx, server.Spec.SystemUUID,
-			redfish.OnPowerState,
-		); err != nil {
+		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemUUID, redfish.OnPowerState); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
 	case powerOpOff:

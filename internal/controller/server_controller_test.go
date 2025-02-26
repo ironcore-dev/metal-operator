@@ -101,6 +101,7 @@ var _ = Describe("Server Controller", func() {
 		}
 		Eventually(Object(bootConfig)).Should(SatisfyAll(
 			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
+			HaveField("Annotations", HaveKeyWithValue(IsDefaultServerBootConfigOSImageKeyName, "true")),
 			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
 			HaveField("Spec.Image", "fooOS:latest"),
 			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
@@ -278,6 +279,7 @@ var _ = Describe("Server Controller", func() {
 		}
 		Eventually(Object(bootConfig)).Should(SatisfyAll(
 			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
+			HaveField("Annotations", HaveKeyWithValue(IsDefaultServerBootConfigOSImageKeyName, "true")),
 			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
 			HaveField("Spec.Image", "fooOS:latest"),
 			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
@@ -495,6 +497,7 @@ var _ = Describe("Server Controller", func() {
 		}
 		Eventually(Object(bootConfig)).Should(SatisfyAll(
 			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
+			HaveField("Annotations", HaveKeyWithValue(IsDefaultServerBootConfigOSImageKeyName, "true")),
 			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
 			HaveField("Spec.Image", "fooOS:latest"),
 			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),

@@ -1,0 +1,9 @@
+resources:
+- ../default
+
+patches:
+#  --registry-url and --probe-os-image are mandatory flags.
+# The following patch will add value for above flags
+- path: manager_args_patch.yaml
+  target:
+    kind: Deployment

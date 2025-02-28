@@ -6,8 +6,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -27,12 +30,17 @@ import (
 
 const (
 	ServerClaimFinalizer = "metal.ironcore.dev/serverclaim"
+
+	cacheUpdateInterval time.Duration = 20 * time.Millisecond
+	cacheUpdateTimeout  time.Duration = time.Second
 )
 
 // ServerClaimReconciler reconciles a ServerClaim object
 type ServerClaimReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme                  *runtime.Scheme
+	MaxConcurrentReconciles int
+	claimMutex              sync.Mutex
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverclaims,verbs=get;list;watch;create;update;patch;delete
@@ -293,10 +301,8 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 }
 
 func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, bool, error) {
-	var (
-		server *metalv1alpha1.Server
-		err    error
-	)
+	// fast path: check if the server is already points to the current claim
+	// read-only operation, no need to lock
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
 		return nil, false, err
@@ -305,6 +311,15 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		return server, false, nil
 	}
 
+	// slow path: claim a server
+	// The claimMutex ensures that claiming operations are serialized.
+	r.claimMutex.Lock()
+	defer r.claimMutex.Unlock()
+
+	var (
+		server *metalv1alpha1.Server
+		err    error
+	)
 	switch {
 	case claim.Spec.ServerRef != nil:
 		server, err = r.claimServerByReference(ctx, log, claim)
@@ -326,8 +341,21 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		return nil, modified, err
 	}
 	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
-
-	return server, modified, nil
+	if !modified {
+		return server, modified, nil
+	}
+	// controller-runtime does use a cached client by default, which is updated asynchronously.
+	// As the next claiming operation might be performed as soon as the mutex is released
+	// it is required to ensure that the server object is up-to-date. Otherwise, the same server
+	// might be claimed again by another claim.
+	err = wait.PollUntilContextTimeout(ctx, cacheUpdateInterval, cacheUpdateTimeout, true, func(ctx context.Context) (bool, error) {
+		var nextServer metalv1alpha1.Server
+		if err := r.Get(ctx, client.ObjectKey{Name: server.Name}, &nextServer); err != nil {
+			return false, err
+		}
+		return nextServer.ResourceVersion >= server.ResourceVersion, nil
+	})
+	return server, modified, err
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
@@ -425,7 +453,7 @@ func (r *ServerClaimReconciler) claimFirstBestServer(ctx context.Context, log lo
 func (r *ServerClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 1,
+			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
 		}).
 		For(&metalv1alpha1.ServerClaim{}).
 		Owns(&metalv1alpha1.ServerBootConfiguration{}).

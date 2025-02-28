@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -353,7 +354,15 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		if err := r.Get(ctx, client.ObjectKey{Name: server.Name}, &nextServer); err != nil {
 			return false, err
 		}
-		return nextServer.ResourceVersion >= server.ResourceVersion, nil
+		nextVersion, err := strconv.Atoi(nextServer.ResourceVersion)
+		if err != nil {
+			return false, err
+		}
+		currentVersion, err := strconv.Atoi(server.ResourceVersion)
+		if err != nil {
+			return false, err
+		}
+		return nextVersion >= currentVersion, nil
 	})
 	return server, modified, err
 }

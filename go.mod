@@ -9,7 +9,7 @@ require (
 	github.com/onsi/gomega v1.36.2
 	github.com/spf13/cobra v1.9.1
 	github.com/stmcginnis/gofish v0.20.0
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.35.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.4
 	k8s.io/apiextensions-apiserver v0.31.4

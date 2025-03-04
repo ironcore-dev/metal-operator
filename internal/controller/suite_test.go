@@ -225,6 +225,7 @@ func SetupTest() *corev1.Namespace {
 
 		Expect((&ServerClaimReconciler{
 			Client:                  k8sManager.GetClient(),
+			Cache:                   k8sManager.GetCache(),
 			Scheme:                  k8sManager.GetScheme(),
 			MaxConcurrentReconciles: 5,
 		}).SetupWithManager(k8sManager)).To(Succeed())

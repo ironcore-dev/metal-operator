@@ -6,12 +6,12 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/wait"
+	toolscache "k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -32,13 +32,13 @@ import (
 const (
 	ServerClaimFinalizer = "metal.ironcore.dev/serverclaim"
 
-	cacheUpdateInterval time.Duration = 20 * time.Millisecond
-	cacheUpdateTimeout  time.Duration = time.Second
+	cacheUpdateTimeout time.Duration = time.Second
 )
 
 // ServerClaimReconciler reconciles a ServerClaim object
 type ServerClaimReconciler struct {
 	client.Client
+	Cache                   cache.Cache
 	Scheme                  *runtime.Scheme
 	MaxConcurrentReconciles int
 	claimMutex              sync.Mutex
@@ -302,7 +302,7 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 }
 
 func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, bool, error) {
-	// fast path: check if the server is already points to the current claim
+	// fast path: check if the server already points to the current claim
 	// read-only operation, no need to lock
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
@@ -337,6 +337,35 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	}
 	log.V(1).Info("Matching server found", "Server", server.Name)
 
+	// controller-runtime does use a cached client by default, which is updated asynchronously.
+	// As the next claiming operation might be performed as soon as the mutex is released
+	// it is required to ensure that the cached server object is up-to-date. Otherwise, the same
+	// server might be claimed again by another claim. This is achieved by establishing a temporary
+	// watch on server objects and waiting for an update containing the expected resource version.
+	informer, err := r.Cache.GetInformer(ctx, server)
+	if err != nil {
+		return nil, false, err
+	}
+	versions := make(chan string)
+	defer close(versions)
+
+	handler := toolscache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldObj, newObj any) {
+			newServer := newObj.(*metalv1alpha1.Server)
+			if newServer.Name != server.Name || newServer.Namespace != server.Namespace {
+				return
+			}
+			versions <- newServer.ResourceVersion
+		},
+	}
+	// The watch is initialized before calling ensureObjectRefForServer to ensure that the
+	// issued update is not missed.
+	registration, err := informer.AddEventHandler(handler)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = informer.RemoveEventHandler(registration) }()
+
 	modified, err := r.ensureObjectRefForServer(ctx, log, claim, server)
 	if err != nil {
 		return nil, modified, err
@@ -345,26 +374,16 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	if !modified {
 		return server, modified, nil
 	}
-	// controller-runtime does use a cached client by default, which is updated asynchronously.
-	// As the next claiming operation might be performed as soon as the mutex is released
-	// it is required to ensure that the server object is up-to-date. Otherwise, the same server
-	// might be claimed again by another claim.
-	err = wait.PollUntilContextTimeout(ctx, cacheUpdateInterval, cacheUpdateTimeout, true, func(ctx context.Context) (bool, error) {
-		var nextServer metalv1alpha1.Server
-		if err := r.Get(ctx, client.ObjectKey{Name: server.Name}, &nextServer); err != nil {
-			return false, err
+	for {
+		select {
+		case cachedVersion := <-versions:
+			if cachedVersion == server.ResourceVersion {
+				return server, modified, nil
+			}
+		case <-time.After(cacheUpdateTimeout):
+			return nil, modified, fmt.Errorf("timeout waiting for server update")
 		}
-		nextVersion, err := strconv.Atoi(nextServer.ResourceVersion)
-		if err != nil {
-			return false, err
-		}
-		currentVersion, err := strconv.Atoi(server.ResourceVersion)
-		if err != nil {
-			return false, err
-		}
-		return nextVersion >= currentVersion, nil
-	})
-	return server, modified, err
+	}
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {

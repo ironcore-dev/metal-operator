@@ -584,18 +584,32 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		ExpectWithOffset(1, k8sClient.Create(ctx, &claim)).To(Succeed())
 	}
 
-	countBoundServer := func(ctx context.Context, serverCount int) func(Gomega) int {
+	countUniqueBoundServers := func(ctx context.Context, serverCount int) func(Gomega) int {
 		return func(g Gomega) int {
 			var serverList metalv1alpha1.ServerList
 			g.Expect(k8sClient.List(ctx, &serverList)).To(Succeed())
 			g.Expect(serverList.Items).To(HaveLen(serverCount))
-			count := 0
+			claimNames := make(map[string]struct{})
 			for _, server := range serverList.Items {
 				if server.Spec.ServerClaimRef != nil {
-					count++
+					claimNames[server.Spec.ServerClaimRef.Name] = struct{}{}
 				}
 			}
-			return count
+			return len(claimNames)
+		}
+	}
+
+	countUniqueBoundClaims := func(ctx context.Context) func(Gomega) int {
+		return func(g Gomega) int {
+			var claimList metalv1alpha1.ServerClaimList
+			g.Expect(k8sClient.List(ctx, &claimList)).To(Succeed())
+			serverNames := make(map[string]struct{})
+			for _, claim := range claimList.Items {
+				if claim.Spec.ServerRef != nil {
+					serverNames[claim.Spec.ServerRef.Name] = struct{}{}
+				}
+			}
+			return len(serverNames)
 		}
 	}
 
@@ -616,8 +630,10 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for range 4 {
 			makeClaim(ctx, nil)
 		}
-		Eventually(countBoundServer(ctx, 10)).Should(Equal(4))
-		Consistently(countBoundServer(ctx, 10)).Should(Equal(4))
+		Eventually(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
+		Consistently(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
+		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(4))
+		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
 	})
 
 	It("binds four out of ten server for four label selector claims", func(ctx SpecContext) {
@@ -627,8 +643,10 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for range 4 {
 			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))
 		}
-		Eventually(countBoundServer(ctx, 10)).Should(Equal(4))
-		Consistently(countBoundServer(ctx, 10)).Should(Equal(4))
+		Eventually(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
+		Consistently(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
+		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(4))
+		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
 	})
 
 	It("should not bind the same server to multiple best effort claims", func(ctx SpecContext) {
@@ -637,8 +655,10 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 			makeClaim(ctx, nil)
 		}
 		makeServer(ctx)
-		Eventually(countBoundServer(ctx, 1)).Should(Equal(1))
-		Consistently(countBoundServer(ctx, 1)).Should(Equal(1))
+		Eventually(countUniqueBoundServers(ctx, 1)).Should(Equal(1))
+		Consistently(countUniqueBoundServers(ctx, 1)).Should(Equal(1))
+		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(1))
+		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(1))
 	})
 
 	It("should not bind the same server to multiple label selector claims", func(ctx SpecContext) {
@@ -647,7 +667,9 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))
 		}
 		makeServer(ctx)
-		Eventually(countBoundServer(ctx, 1)).Should(Equal(1))
-		Consistently(countBoundServer(ctx, 1)).Should(Equal(1))
+		Eventually(countUniqueBoundServers(ctx, 1)).Should(Equal(1))
+		Consistently(countUniqueBoundServers(ctx, 1)).Should(Equal(1))
+		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(1))
+		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(1))
 	})
 })

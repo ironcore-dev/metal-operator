@@ -224,8 +224,10 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:                  k8sManager.GetClient(),
+			Cache:                   k8sManager.GetCache(),
+			Scheme:                  k8sManager.GetScheme(),
+			MaxConcurrentReconciles: 5,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerBootConfigurationReconciler{

@@ -8,6 +8,7 @@ resources:
 - bases/metal.ironcore.dev_servers.yaml
 - bases/metal.ironcore.dev_serverbootconfigurations.yaml
 - bases/metal.ironcore.dev_serverclaims.yaml
+- bases/metal.ironcore.dev_accounts.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -29,6 +30,7 @@ patches:
 #- path: patches/cainjection_in_servers.yaml
 #- path: patches/cainjection_in_serverbootconfigurations.yaml
 #- path: patches/cainjection_in_serverclaims.yaml
+#- path: patches/cainjection_in_accounts.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section

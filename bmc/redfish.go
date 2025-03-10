@@ -478,6 +478,48 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 	return result, nil
 }
 
+func (r *RedfishBMC) CreateOrUpdateAccount(ctx context.Context, accountName, userName, role, password string, enabled bool) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if len(accounts) == 0 {
+		return errors.New("no account found")
+	}
+	for _, a := range accounts {
+		if a.Name == accountName {
+			a.RoleID = role
+			a.Name = userName
+			a.Enabled = enabled
+			return a.Update()
+		}
+	}
+	_, err = service.CreateAccount(userName, "", role)
+	if err != nil {
+		return fmt.Errorf("failed to update account: %w", err)
+	}
+	return nil
+}
+
+func (r *RedfishBMC) SetAccountPassword(ctx context.Context, accountName, password string) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if len(accounts) == 0 {
+		return errors.New("no account found")
+	}
+
+	for _, a := range accounts {
+		if a.Name == accountName {
+			return a.ChangePassword(password, r.options.Password)
+		}
+	}
+	return errors.New("account not found")
+}
+
 func (r *RedfishBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*redfish.ComputerSystem, error) {
 	service := r.client.GetService()
 	var systems []*redfish.ComputerSystem

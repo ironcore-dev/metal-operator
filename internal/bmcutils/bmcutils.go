@@ -14,17 +14,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
+func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (username string, password string, err error) {
 	// TODO: use constants for secret keys
-	username, ok := secret.Data["username"]
+	user, ok := secret.Data["username"]
 	if !ok {
-		return "", "", fmt.Errorf("no username found in the BMC secret")
+		return username, password, fmt.Errorf("no username found in the BMC secret")
 	}
-	password, ok := secret.Data["password"]
+	username = string(user)
+	pw, ok := secret.Data["password"]
 	if !ok {
-		return "", "", fmt.Errorf("no password found in the BMC secret")
+		return username, password, fmt.Errorf("no password found in the BMC secret")
 	}
-	return string(username), string(password), nil
+	password = string(pw)
+	return
 }
 
 func GetBMCFromBMCName(ctx context.Context, c client.Client, bmcName string) (*metalv1alpha1.BMC, error) {

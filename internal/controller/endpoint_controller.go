@@ -82,15 +82,18 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 			if len(m.DefaultCredentials) == 0 {
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
+
 			bmcOptions := bmc.BMCOptions{
 				BasicAuth: true,
 				Username:  m.DefaultCredentials[0].Username,
 				Password:  m.DefaultCredentials[0].Password,
 			}
+
+			protocol := r.getProtocol(m)
+			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
-				log.V(1).Info("Creating client for BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(m), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				log.V(1).Info("Creating client for BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcOptions)
 				if err != nil {
@@ -111,8 +114,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				}
 				log.V(1).Info("Applied BMC object for endpoint")
 			case metalv1alpha1.ProtocolRedfishLocal:
-				log.V(1).Info("Creating client for a local test BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(m), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+				log.V(1).Info("Creating client for a local test BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
@@ -130,12 +132,8 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
 			case metalv1alpha1.ProtocolRedfishKube:
-				log.V(1).Info("Creating client for a kube test BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(m), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
-				bmcClient, err := bmc.NewRedfishKubeBMCClient(
-					ctx,
-					bmcOptions,
-					r.Client, bmcutils.DefaultKubeNamespace)
+				log.V(1).Info("Creating client for a kube test BMC", "Address", bmcOptions.Endpoint)
+				bmcClient, err := bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, r.Client, bmcutils.DefaultKubeNamespace)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}

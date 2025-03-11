@@ -89,8 +89,8 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				Password:  m.DefaultCredentials[0].Password,
 			}
 
-			protocol := r.getProtocol(m)
-			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.Insecure)
+			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
@@ -157,16 +157,6 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 	log.V(1).Info("Reconciled endpoint")
 
 	return ctrl.Result{}, nil
-}
-
-func (r *EndpointReconciler) getProtocol(m macdb.MacPrefix) metalv1alpha1.ProtocolScheme {
-	if m.ProtocolScheme != "" {
-		return m.ProtocolScheme
-	}
-	if r.Insecure {
-		return metalv1alpha1.HTTPProtocolScheme
-	}
-	return metalv1alpha1.HTTPSProtocolScheme
 }
 
 func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {

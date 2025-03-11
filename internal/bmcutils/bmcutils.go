@@ -13,9 +13,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetProtocolScheme(protocol metalv1alpha1.Protocol, insecure bool) metalv1alpha1.ProtocolScheme {
-	if protocol.Scheme != "" {
-		return protocol.Scheme
+func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {
+	if scheme != "" {
+		return scheme
 	}
 	if insecure {
 		return metalv1alpha1.HTTPProtocolScheme
@@ -89,7 +89,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 		}
 
-		protocolScheme := GetProtocolScheme(server.Spec.BMC.Protocol, insecure)
+		protocolScheme := GetProtocolScheme(server.Spec.BMC.Protocol.Scheme, insecure)
 
 		return CreateBMCClient(
 			ctx,
@@ -126,7 +126,7 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 	}
 
-	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol, insecure)
+	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
 
 	return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
 }

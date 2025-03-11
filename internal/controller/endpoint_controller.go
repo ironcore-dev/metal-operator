@@ -90,7 +90,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
 				log.V(1).Info("Creating client for BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(m), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				log.V(1).Info("Creating client for BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcOptions)
 				if err != nil {
@@ -112,7 +112,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				log.V(1).Info("Applied BMC object for endpoint")
 			case metalv1alpha1.ProtocolRedfishLocal:
 				log.V(1).Info("Creating client for a local test BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(m), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
@@ -131,7 +131,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				log.V(1).Info("Applied BMC object for Endpoint")
 			case metalv1alpha1.ProtocolRedfishKube:
 				log.V(1).Info("Creating client for a kube test BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(m), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				bmcClient, err := bmc.NewRedfishKubeBMCClient(
 					ctx,
 					bmcOptions,
@@ -161,12 +161,14 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) getProtocol() string {
-	protocol := "https"
-	if r.Insecure {
-		protocol = "http"
+func (r *EndpointReconciler) getProtocol(m macdb.MacPrefix) macdb.ProtocolScheme {
+	if m.ProtocolScheme != "" {
+		return m.ProtocolScheme
 	}
-	return protocol
+	if r.Insecure {
+		return macdb.HTTPProtocolScheme
+	}
+	return macdb.HTTPSProtocolScheme
 }
 
 func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {

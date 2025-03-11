@@ -177,8 +177,9 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 		spec.EndpointRef = &corev1.LocalObjectReference{Name: endpoint.Name}
 		spec.BMCSecretRef = corev1.LocalObjectReference{Name: secret.Name}
 		spec.Protocol = metalv1alpha1.Protocol{
-			Name: metalv1alpha1.ProtocolName(m.Protocol),
-			Port: m.Port,
+			Name:   metalv1alpha1.ProtocolName(m.Protocol),
+			Port:   m.Port,
+			Scheme: macdbProtocolSchemeToBMCProtocolScheme(m.ProtocolScheme),
 		}
 		spec.ConsoleProtocol = &metalv1alpha1.ConsoleProtocol{
 			Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),
@@ -192,6 +193,16 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 	log.V(1).Info("Created or patched BMC", "BMC", bmcObj.Name, "Operation", opResult)
 
 	return nil
+}
+
+func macdbProtocolSchemeToBMCProtocolScheme(scheme macdb.ProtocolScheme) metalv1alpha1.ProtocolScheme {
+	if scheme == macdb.HTTPProtocolScheme {
+		return metalv1alpha1.HTTPProtocolScheme
+	}
+	if scheme == macdb.HTTPSProtocolScheme {
+		return metalv1alpha1.HTTPSProtocolScheme
+	}
+	return ""
 }
 
 func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {

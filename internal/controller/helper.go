@@ -16,6 +16,7 @@ const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
 )
 
+// shouldIgnoreReconciliation checks if the object should be ignored during reconciliation.
 func shouldIgnoreReconciliation(obj client.Object) bool {
 	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !found {
@@ -24,6 +25,7 @@ func shouldIgnoreReconciliation(obj client.Object) bool {
 	return val == metalv1alpha1.OperationAnnotationIgnore
 }
 
+// GenerateRandomPassword generates a random password of the given length.
 func GenerateRandomPassword(length int) ([]byte, error) {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)

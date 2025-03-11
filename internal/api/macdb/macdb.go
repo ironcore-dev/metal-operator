@@ -3,6 +3,8 @@
 
 package macdb
 
+import metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+
 // MacPrefixes is a list of MacPrefix
 type MacPrefixes struct {
 	// MacPrefixes is a list of MacPrefix
@@ -27,7 +29,7 @@ type MacPrefix struct {
 	// Protocol is the protocol
 	Protocol string `json:"protocol"`
 	// ProtocolScheme is the protocol scheme (http, https)
-	ProtocolScheme ProtocolScheme `json:"protocolScheme,omitempty"`
+	ProtocolScheme metalv1alpha1.ProtocolScheme `json:"protocolScheme,omitempty"`
 	// Port is the port
 	Port int32 `json:"port"`
 	// Type is the type
@@ -37,16 +39,6 @@ type MacPrefix struct {
 	// Console is the console
 	Console Console `json:"console,omitempty"`
 }
-
-// ProtocolScheme is a string that contains the protocol scheme
-type ProtocolScheme string
-
-const (
-	// HTTPProtocolScheme is the http protocol scheme
-	HTTPProtocolScheme ProtocolScheme = "http"
-	// HTTPSProtocolScheme is the https protocol scheme
-	HTTPSProtocolScheme ProtocolScheme = "https"
-)
 
 // Credential is a struct that contains the username and password
 type Credential struct {

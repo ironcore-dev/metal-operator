@@ -22,6 +22,7 @@ spec:
   protocol:
     name: Redfish
     port: 8000
+    scheme: http
   consoleProtocol:
     name: SSH
     port: 22
@@ -35,7 +36,7 @@ kind: BMC
 metadata:
   name: my-bmc-inline
 spec:
-  endpoint:
+  access:
     macAddress: "00:1A:2B:3C:4D:5E"
     ip: "192.168.100.10"
   bmcSecretRef:

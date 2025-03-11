@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/go-logr/logr"
@@ -75,12 +78,18 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.updateBMCStatusDetails(ctx, log, bmcObj); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get BMC details: %w", err)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	defer bmcClient.Logout()
+
+	if err := r.updateBMCStatusDetails(ctx, log, bmcClient, bmcObj); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update BMC status: %w", err)
 	}
 	log.V(1).Info("Updated BMC status")
 
-	if err := r.discoverServers(ctx, log, bmcObj); err != nil && !errors.IsNotFound(err) {
+	if err := r.discoverServers(ctx, log, bmcClient, bmcObj); err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to discover servers: %w", err)
 	}
 	log.V(1).Info("Discovered servers")
@@ -89,7 +98,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
 	var (
 		ip         metalv1alpha1.IP
 		macAddress string
@@ -120,17 +129,11 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
-	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
-	}
-	defer bmcClient.Logout()
-
 	// TODO: Secret rotation/User management
 
 	manager, err := bmcClient.GetManager()
 	if err != nil {
-		return fmt.Errorf("failed to get manager details: %w", err)
+		return fmt.Errorf("failed to get manager details for BMC %s: %w", bmcObj.Name, err)
 	}
 	if manager != nil {
 		bmcBase := bmcObj.DeepCopy()
@@ -142,24 +145,22 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		bmcObj.Status.SKU = manager.SKU
 		bmcObj.Status.Model = manager.Model
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return err
+			return fmt.Errorf("failed to patch manager details for BMC %s: %w", bmcObj.Name, err)
 		}
+	} else {
+		log.V(1).Info("Manager details not available for BMC", "BMC", bmcObj.Name)
 	}
 
 	return nil
 }
 
-func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
-	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
-	}
-	defer bmcClient.Logout()
-
+func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
 	servers, err := bmcClient.GetSystems(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get Servers from BMC: %w", err)
+		return fmt.Errorf("failed to get servers from BMC %s: %w", bmcObj.Name, err)
 	}
+
+	var errs []error
 	for i, s := range servers {
 		server := &metalv1alpha1.Server{}
 		server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
@@ -172,12 +173,32 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to create or patch Server: %w", err)
+			errs = append(errs, fmt.Errorf("failed to create or patch server %s: %w", server.Name, err))
+			continue
 		}
 		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
 	}
+	if len(errs) > 0 {
+		return fmt.Errorf("errors occurred during server discovery: %v", errs)
+	}
 
 	return nil
+}
+
+func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {
+	return []ctrl.Request{
+		{
+			NamespacedName: types.NamespacedName{Name: obj.(*metalv1alpha1.Endpoint).Name},
+		},
+	}
+}
+
+func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Object) []ctrl.Request {
+	return []ctrl.Request{
+		{
+			NamespacedName: types.NamespacedName{Name: obj.(*metalv1alpha1.BMCSecret).Name},
+		},
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -185,6 +206,7 @@ func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).
-		// TODO: add watches for Endpoints and BMCSecrets
+		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
+		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
 		Complete(r)
 }

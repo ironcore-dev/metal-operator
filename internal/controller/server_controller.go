@@ -15,21 +15,16 @@ import (
 	"sort"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-
-	"golang.org/x/crypto/bcrypt"
-
-	"golang.org/x/crypto/ssh"
-
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/stmcginnis/gofish/redfish"
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -39,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -46,21 +42,34 @@ import (
 )
 
 const (
-	DefaultIgnitionSecretKeyName    = "ignition"
-	DefaultIgnitionFormatKey        = "format"
-	DefaultIgnitionFormatValue      = "fcos"
-	SSHKeyPairSecretPrivateKeyName  = "pem"
-	SSHKeyPairSecretPublicKeyName   = "pub"
+	// DefaultIgnitionSecretKeyName is the default key name for the ignition secret
+	DefaultIgnitionSecretKeyName = "ignition"
+	// DefaultIgnitionFormatKey is the key for the ignition format annotation
+	DefaultIgnitionFormatKey = "format"
+	// DefaultIgnitionFormatValue is the value for the ignition format annotation
+	DefaultIgnitionFormatValue = "fcos"
+	// SSHKeyPairSecretPrivateKeyName is the key name for the private key in the SSH key pair secret
+	SSHKeyPairSecretPrivateKeyName = "pem"
+	// SSHKeyPairSecretPublicKeyName is the key name for the public key in the SSH key pair secret
+	SSHKeyPairSecretPublicKeyName = "pub"
+	// SSHKeyPairSecretPasswordKeyName is the key name for the password in the SSH key pair secret
 	SShKeyPairSecretPasswordKeyName = "password"
-
-	ServerFinalizer               = "metal.ironcore.dev/server"
+	// ServerFinalizer is the finalizer for the server
+	ServerFinalizer = "metal.ironcore.dev/server"
+	// InternalAnnotationTypeKeyName is the key name for the internal annotation type
 	InternalAnnotationTypeKeyName = "metal.ironcore.dev/type"
-	InternalAnnotationTypeValue   = "Internal"
+	// IsDefaultServerBootConfigOSImageKeyName is the key name for the is default OS image annotation
+	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
+	// InternalAnnotationTypeValue is the value for the internal annotation type
+	InternalAnnotationTypeValue = "Internal"
 )
 
 const (
-	powerOpOn   = "PowerOn"
-	powerOpOff  = "PowerOff"
+	// powerOpOn is the power on operation
+	powerOpOn = "PowerOn"
+	// powerOpOff is the power off operation
+	powerOpOff = "PowerOff"
+	// powerOpNoOP is the no operation
 	powerOpNoOP = "NoOp"
 )
 
@@ -508,6 +517,7 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 			bootConfig.Annotations = make(map[string]string)
 		}
 		bootConfig.Annotations[InternalAnnotationTypeKeyName] = InternalAnnotationTypeValue
+		bootConfig.Annotations[IsDefaultServerBootConfigOSImageKeyName] = "true"
 		bootConfig.Spec.ServerRef = v1.LocalObjectReference{Name: server.Name}
 		bootConfig.Spec.IgnitionSecretRef = &v1.LocalObjectReference{Name: server.Name}
 		bootConfig.Spec.Image = r.ProbeOSImage

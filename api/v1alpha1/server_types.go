@@ -106,6 +106,11 @@ type ServerSpec struct {
 	// if no boot configuration is specified.
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
 
+	// MaintenanceBootConfigurationRef is a reference to a MaintenanceConfiguration object that specifies
+	// the boot configuration for this server during maintenance mode. This field is optional and can be omitted
+	// if no maintenance configuration is specified.
+	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
+
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 

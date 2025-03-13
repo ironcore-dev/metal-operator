@@ -134,6 +134,9 @@ const (
 	// ServerStateReserved indicates that the server is reserved for a specific use or user.
 	ServerStateReserved ServerState = "Reserved"
 
+	// ServerStateMaintenance indicates that the server is in maintenance mode.
+	ServerStateMaintenance ServerState = "Maintenance"
+
 	// ServerStateError indicates that there is an error with the server.
 	ServerStateError ServerState = "Error"
 )

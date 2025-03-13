@@ -1315,6 +1315,21 @@ if no boot configuration is specified.</p>
 </tr>
 <tr>
 <td>
+<code>maintenanceBootConfigurationRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>MaintenanceBootConfigurationRef is a reference to a MaintenanceConfiguration object that specifies
+the boot configuration for this server during maintenance mode. This field is optional and can be omitted
+if no maintenance configuration is specified.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>bootOrder</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BootOrder">
@@ -2310,6 +2325,21 @@ if no boot configuration is specified.</p>
 </tr>
 <tr>
 <td>
+<code>maintenanceBootConfigurationRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>MaintenanceBootConfigurationRef is a reference to a MaintenanceConfiguration object that specifies
+the boot configuration for this server during maintenance mode. This field is optional and can be omitted
+if no maintenance configuration is specified.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>bootOrder</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BootOrder">
@@ -2362,6 +2392,9 @@ if no boot configuration is specified.</p>
 </td>
 </tr><tr><td><p>&#34;Initial&#34;</p></td>
 <td><p>ServerStateInitial indicates that the server is in its initial state.</p>
+</td>
+</tr><tr><td><p>&#34;Maintenance&#34;</p></td>
+<td><p>ServerStateMaintenance indicates that the server is in maintenance mode.</p>
 </td>
 </tr><tr><td><p>&#34;Reserved&#34;</p></td>
 <td><p>ServerStateReserved indicates that the server is reserved for a specific use or user.</p>

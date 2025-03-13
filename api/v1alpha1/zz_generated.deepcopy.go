@@ -8,7 +8,7 @@
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -807,6 +807,11 @@ func (in *ServerSpec) DeepCopyInto(out *ServerSpec) {
 	}
 	if in.BootConfigurationRef != nil {
 		in, out := &in.BootConfigurationRef, &out.BootConfigurationRef
+		*out = new(v1.ObjectReference)
+		**out = **in
+	}
+	if in.MaintenanceBootConfigurationRef != nil {
+		in, out := &in.MaintenanceBootConfigurationRef, &out.MaintenanceBootConfigurationRef
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}

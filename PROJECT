@@ -5,6 +5,8 @@
 domain: ironcore.dev
 layout:
 - go.kubebuilder.io/v4
+plugins:
+  helm.kubebuilder.io/v1-alpha: {}
 projectName: metal-operator
 repo: github.com/ironcore-dev/metal-operator
 resources:

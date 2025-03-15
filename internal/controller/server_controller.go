@@ -167,7 +167,13 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	if server.Spec.ServerClaimRef != nil {
+	if server.Spec.ServerMaintenanceRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
+			return ctrl.Result{}, err
+		}
+	}
+
+	if server.Spec.ServerClaimRef != nil && server.Spec.ServerMaintenanceRef == nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
 			return ctrl.Result{}, err
 		}

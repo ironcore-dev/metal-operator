@@ -263,6 +263,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerClaim")
 		os.Exit(1)
 	}
+	if err = (&controller.ServerMaintenanceReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ServerMaintenance")
+		os.Exit(1)
+	}
+
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = webhookmetalv1alpha1.SetupEndpointWebhookWithManager(mgr); err != nil {

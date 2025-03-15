@@ -12,7 +12,9 @@ const (
 	// ServerMaintenanceNeededLabelKey is a label key that is used to indicate that a server requires maintenance.
 	ServerMaintenanceNeededLabelKey = "metal.ironcore.dev/maintenance-needed"
 	// ServerMaintenanceReasonAnnotationKey is an annotation key that is used to store the reason for a server maintenance.
-	ServerMaintenanceReasonAnnotationKey = "metal.ironcore.dev/reason"
+	ServerMaintenanceReasonAnnotationKey = "metal.ironcore.dev/maintenance-reason"
+	// ServerMaintenanceApprovalKey is an annotation key that is used to store the approval status for a server maintenance.
+	ServerMaintenanceApprovalKey = "metal.ironcore.dev/maintenance-approval"
 )
 
 // ServerBootConfigurationTemplate defines the parameters to be used for rendering a boot configuration.
@@ -28,7 +30,7 @@ type ServerMaintenanceSpec struct {
 	// Policy specifies the maintenance policy to be enforced on the server.
 	Policy ServerMaintenancePolicy `json:"policy,omitempty"`
 	// ServerRef is a reference to the server that is to be maintained.
-	ServerRef corev1.LocalObjectReference `json:"serverRef"`
+	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
 	// ServerPower specifies the power state of the server during maintenance.
 	ServerPower Power `json:"serverPower,omitempty"`
 	// ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.

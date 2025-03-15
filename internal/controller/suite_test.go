@@ -57,6 +57,11 @@ func TestControllers(t *testing.T) {
 }
 
 func DeleteAllMetalResources(ctx context.Context, namespace string) {
+	//var serverMaintenance metalv1alpha1.ServerMaintenance
+	//Expect(k8sClient.DeleteAllOf(ctx, &serverMaintenance)).To(Succeed())
+	//var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+	//Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+
 	var serverClaim metalv1alpha1.ServerClaim
 	Expect(k8sClient.DeleteAllOf(ctx, &serverClaim, client.InNamespace(namespace))).To(Succeed())
 	var serverClaimList metalv1alpha1.ServerClaimList
@@ -231,6 +236,11 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerBootConfigurationReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerMaintenanceReconciler{
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())

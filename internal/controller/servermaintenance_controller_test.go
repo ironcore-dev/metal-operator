@@ -158,10 +158,11 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Spec.MaintenanceBootConfigurationRef", Not(BeNil())),
 		))
 		bootConfig := &metalv1alpha1.ServerBootConfiguration{}
-		Eventually(k8sClient.Get(ctx, types.NamespacedName{
+
+		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
 			Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
 			Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
-		}, bootConfig)).Should(Succeed())
+		}, bootConfig).Should(Succeed())
 
 		By("Patching the boot configuration to a Ready state")
 		Eventually(UpdateStatus(bootConfig, func() {

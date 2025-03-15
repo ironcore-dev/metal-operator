@@ -77,24 +77,28 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, log logr.Lo
 			return ctrl.Result{}, err
 		}
 	}
-	return r.ensureServerMaintenanceStateTransition(ctx, log, serverMaintenance, server)
+	return r.ensureServerMaintenanceStateTransition(ctx, log, serverMaintenance)
 }
 
-func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (ctrl.Result, error) {
+func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	switch serverMaintenance.Status.State {
 	case metalv1alpha1.ServerMaintenanceStatePending:
-		return r.handlePendingState(ctx, log, serverMaintenance, server)
+		return r.handlePendingState(ctx, log, serverMaintenance)
 	case metalv1alpha1.ServerMaintenanceStateInMaintenance:
-		return r.handleInMaintenanceState(ctx, log, serverMaintenance, server)
+		return r.handleInMaintenanceState(ctx, log, serverMaintenance)
 	case metalv1alpha1.ServerMaintenanceStateCompleted:
-		return r.handleCompletedState(ctx, log, serverMaintenance, server)
+		return r.handleCompletedState(ctx, log, serverMaintenance)
 	case metalv1alpha1.ServerMaintenanceStateFailed:
-		return r.handleFailedState(ctx, log, serverMaintenance, server)
+		return r.handleFailedState(ctx, log, serverMaintenance)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (ctrl.Result, error) {
+func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+	server, err := r.getServerRef(ctx, serverMaintenance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if server.Spec.ServerMaintenanceRef != nil {
 		if server.Spec.ServerMaintenanceRef.UID != serverMaintenance.UID {
 			log.V(1).Info("Server is already in maintenance", "Server", server.Name, "Maintenance", server.Spec.ServerMaintenanceRef.Name)
@@ -146,7 +150,11 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (ctrl.Result, error) {
+func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+	server, err := r.getServerRef(ctx, serverMaintenance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	// put server in maintenance
 	if err := r.patchServerRef(ctx, serverMaintenance, server); err != nil {
 		return ctrl.Result{}, err
@@ -227,15 +235,19 @@ func (r *ServerMaintenanceReconciler) patchServerRef(ctx context.Context, mainte
 	return nil
 }
 
-func (r *ServerMaintenanceReconciler) handleCompletedState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (ctrl.Result, error) {
+func (r *ServerMaintenanceReconciler) handleCompletedState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+	server, err := r.getServerRef(ctx, serverMaintenance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	log.V(1).Info("Server maintenance completed", "Server", server.Name)
-	if err := r.cleanup(ctx, serverMaintenance, server); err != nil {
+	if err := r.cleanup(ctx, server); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) handleFailedState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (ctrl.Result, error) {
+func (r *ServerMaintenanceReconciler) handleFailedState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
@@ -243,14 +255,11 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 	if serverMaintenance.Spec.ServerRef == nil {
 		return ctrl.Result{}, nil
 	}
-	server := &metalv1alpha1.Server{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
-		}
-		log.V(1).Info("Server gone")
+	server, err := r.getServerRef(ctx, serverMaintenance)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
-	if err := r.cleanup(ctx, serverMaintenance, server); err != nil {
+	if err := r.cleanup(ctx, server); err != nil {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensuring that the finalizer is removed")
@@ -260,7 +269,18 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) error {
+func (r *ServerMaintenanceReconciler) getServerRef(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance) (*metalv1alpha1.Server, error) {
+	server := &metalv1alpha1.Server{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get server: %w", err)
+		}
+		return nil, fmt.Errorf("server not found")
+	}
+	return server, nil
+}
+
+func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 	if server != nil && server.Spec.ServerMaintenanceRef != nil {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {

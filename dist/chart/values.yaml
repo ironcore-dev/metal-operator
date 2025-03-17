@@ -3,8 +3,8 @@ controllerManager:
   replicas: 1
   container:
     image:
-      repository: docker.io/library/metal
-      tag: "03131"
+      repository: registry/metal-operator
+      tag: "v0.1.0"
     args:
       - --probe-image=probe-image
       - --probe-os-image=probe-os-image
@@ -39,6 +39,12 @@ controllerManager:
       type: RuntimeDefault
   terminationGracePeriodSeconds: 10
   serviceAccountName: metal-operator-controller-manager
+  nodeSelector:
+    kubernetes.io/os: linux
+    kubernetes.io/arch: arm64
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
 
 # [RBAC]: To enable RBAC (Permissions) configurations
 rbac:

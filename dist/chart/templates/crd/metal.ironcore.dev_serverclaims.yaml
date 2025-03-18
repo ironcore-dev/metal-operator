@@ -12,7 +12,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.17.1
   name: serverclaims.metal.ironcore.dev
 spec:
   {{- if .Values.webhook.enable }}

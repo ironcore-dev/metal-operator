@@ -174,14 +174,14 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Checking the Server is in maintenance")
 		Eventually(Object(server), "1s").Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 		))
 
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
 			HaveField("ObjectMeta.Annotations", maintenanceLabels),
 		))
 
-		By("Checking the ServerMaintenance is completed")
+		By("Checking the ServerMaintenance is in maintenance")
 		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))
@@ -193,11 +193,13 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateCompleted),
 		))
+		By("Checking the Server is not in maintenance and cleaned up")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
 			HaveField("Spec.MaintenanceBootConfigurationRef", BeNil()),
 		))
+		By("Checking the ServerClaim is cleaned up")
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
 			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededLabelKey))),
 		))

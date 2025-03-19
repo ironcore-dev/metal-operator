@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -162,36 +163,15 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	if err := r.patchServerRef(ctx, serverMaintenance, server); err != nil {
 		return ctrl.Result{}, err
 	}
-	config := &metalv1alpha1.ServerBootConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-maintenance", server.Name),
-			Namespace: serverMaintenance.Namespace,
-		},
+	config, err := r.createServerBootConfiguration(ctx, serverMaintenance, server)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
-	if server.Spec.MaintenanceBootConfigurationRef == nil {
-		log.V(1).Info("Creating server maintenance boot configuration", "Server", server.Name)
-		config.Spec = serverMaintenance.Spec.ServerBootConfigurationTemplate.Spec
-		if err := r.Client.Create(ctx, config); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to create server boot configuration: %w", err)
+	if config == nil {
+		if err := r.setAndPatchServerPowerState(ctx, server, serverMaintenance); err != nil {
+			return ctrl.Result{}, err
 		}
-		serverBase := server.DeepCopy()
-		server.Spec.MaintenanceBootConfigurationRef = &v1.ObjectReference{
-			Namespace:  config.Namespace,
-			Name:       config.Name,
-			UID:        config.UID,
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerBootConfiguration",
-		}
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to patch server maintenance boot configuration ref: %w", err)
-		}
-		//if err := controllerutil.SetControllerReference(serverMaintenance, config, r.Scheme); err != nil {
-		//	return ctrl.Result{}, fmt.Errorf("failed to set controller reference: %w", err)
-		//}
-	} else {
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: server.Spec.MaintenanceBootConfigurationRef.Name, Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace}, config); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get server boot configuration: %w", err)
-		}
+		return ctrl.Result{}, nil
 	}
 	if config.Status.State == metalv1alpha1.ServerBootConfigurationStatePending || config.Status.State == "" {
 		log.V(1).Info("Server boot configuration is pending", "Server", server.Name)
@@ -205,14 +185,63 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	}
 	if config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady {
 		log.V(1).Info("Server maintenance boot configuration is ready", "Server", server.Name)
-		serverBase := server.DeepCopy()
-		server.Spec.Power = serverMaintenance.Spec.ServerPower
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		if err := r.setAndPatchServerPowerState(ctx, server, serverMaintenance); err != nil {
 			return ctrl.Result{}, err
 		}
-		log.V(1).Info("Patched server power state", "Server", server.Name, "Power", server.Spec.Power)
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ServerMaintenanceReconciler) createServerBootConfiguration(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, error) {
+	log := ctrl.LoggerFrom(ctx)
+	if maintenance.Spec.ServerBootConfigurationTemplate == nil {
+		log.V(1).Info("No ServerBootConfigurationTemplate specified")
+		return nil, nil
+	}
+	config := &metalv1alpha1.ServerBootConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-maintenance", server.Name),
+			Namespace: maintenance.Namespace,
+		},
+	}
+	if server.Spec.MaintenanceBootConfigurationRef == nil {
+		log.V(1).Info("Creating server maintenance boot configuration", "Server", server.Name)
+		config.Spec = maintenance.Spec.ServerBootConfigurationTemplate.Spec
+		if err := r.Client.Create(ctx, config); err != nil {
+			return config, fmt.Errorf("failed to create server boot configuration: %w", err)
+		}
+		serverBase := server.DeepCopy()
+		server.Spec.MaintenanceBootConfigurationRef = &v1.ObjectReference{
+			Namespace:  config.Namespace,
+			Name:       config.Name,
+			UID:        config.UID,
+			APIVersion: "metal.ironcore.dev/v1alpha1",
+			Kind:       "ServerBootConfiguration",
+		}
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return config, fmt.Errorf("failed to patch server maintenance boot configuration ref: %w", err)
+		}
+		if err := controllerutil.SetControllerReference(maintenance, config, r.Scheme); err != nil {
+			return config, fmt.Errorf("failed to set controller reference: %w", err)
+		}
+	} else {
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: server.Spec.MaintenanceBootConfigurationRef.Name, Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace}, config); err != nil {
+			return config, fmt.Errorf("failed to get server boot configuration: %w", err)
+		}
+	}
+	return config, nil
+}
+
+func (r *ServerMaintenanceReconciler) setAndPatchServerPowerState(ctx context.Context, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) error {
+	log := ctrl.LoggerFrom(ctx)
+	serverBase := server.DeepCopy()
+	server.Spec.Power = maintenance.Spec.ServerPower
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return fmt.Errorf("failed to patch server power state: %w", err)
+	}
+	log.V(1).Info("Patched server power state", "Server", server.Name, "Power", server.Spec.Power)
+
+	return nil
 }
 
 func (r *ServerMaintenanceReconciler) patchServerRef(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) error {

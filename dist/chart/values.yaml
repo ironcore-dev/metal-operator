@@ -39,6 +39,7 @@ controllerManager:
       type: RuntimeDefault
   terminationGracePeriodSeconds: 10
   serviceAccountName: metal-operator-controller-manager
+  hostNetwork: false
   nodeSelector:
     kubernetes.io/os: linux
     kubernetes.io/arch: arm64

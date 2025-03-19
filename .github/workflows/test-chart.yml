@@ -17,6 +17,17 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Verify Helm installation
+        run: helm version
+
+      - name: Lint Helm Chart
+        run: |
+          helm lint ./dist/chart
+
       - name: Install the latest version of kind
         run: |
           curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
@@ -31,20 +42,9 @@ jobs:
 
       - name: Prepare metal-operator
         run: |
-          go mod tidy
+          go mod download
           make docker-build IMG=metal-operator:v0.1.0
           kind load docker-image metal-operator:v0.1.0
-
-      - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-      - name: Verify Helm installation
-        run: helm version
-
-      - name: Lint Helm Chart
-        run: |
-          helm lint ./dist/chart
 
       - name: Install cert-manager via Helm
         run: |

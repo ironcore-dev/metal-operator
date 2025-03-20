@@ -66,14 +66,6 @@ type BootOrder struct {
 	Device string `json:"device"`
 }
 
-// BIOSSettings represents the BIOS settings for a server.
-type BIOSSettings struct {
-	// Version specifies the version of the server BIOS for which the settings are defined.
-	Version string `json:"version"`
-	// Settings is a map of key-value pairs representing the BIOS settings.
-	Settings map[string]string `json:"settings,omitempty"`
-}
-
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
@@ -116,8 +108,9 @@ type ServerSpec struct {
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 
-	// BIOS specifies the BIOS settings for the server.
-	BIOS []BIOSSettings `json:"BIOS,omitempty"`
+	// BIOSSettingsRef is a reference to a ServerBIOS object that specifies
+	// the BIOS configuration for this server.
+	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -203,8 +196,6 @@ type ServerStatus struct {
 
 	// Storages is a list of storages associated with the server.
 	Storages []Storage `json:"storages,omitempty"`
-
-	BIOS BIOSSettings `json:"BIOS,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
 	// +patchStrategy=merge

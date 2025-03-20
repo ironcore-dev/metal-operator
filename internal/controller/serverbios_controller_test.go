@@ -64,7 +64,7 @@ var _ = Describe("ServerBIOS Controller", func() {
 		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
-	It("should successfully patch its reference to refered server", func(ctx SpecContext) {
+	It("should successfully patch its reference to referred server", func(ctx SpecContext) {
 		BIOSSetting := make(map[string]string)
 
 		By("Ensuring that the server has Initial state")
@@ -94,23 +94,19 @@ var _ = Describe("ServerBIOS Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, serverBIOS)).To(Succeed())
-
-		By("Ensuring that the serverBIOS has the correct state")
-		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStatePending),
-		))
-		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInMaintenance),
-		))
 
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
 			HaveField("Spec.BIOSSettingsRef.Name", serverBIOS.Name),
 		))
+
+		Eventually(Object(serverBIOS)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateCompleted),
+		))
 	})
 
-	It("should move to completed if no bios setting changes to refered server", func(ctx SpecContext) {
+	It("should move to completed if no bios setting changes to referred server", func(ctx SpecContext) {
 		BIOSSetting := make(map[string]string)
 
 		By("Ensuring that the server has Initial state")
@@ -140,14 +136,6 @@ var _ = Describe("ServerBIOS Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, serverBIOS)).To(Succeed())
-
-		By("Ensuring that the serverBIOS has the correct state")
-		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStatePending),
-		))
-		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInMaintenance),
-		))
 
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -199,12 +187,9 @@ var _ = Describe("ServerBIOS Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, serverBIOS)).To(Succeed())
 
-		By("Ensuring that the serverBIOS has the correct state, initially pending and entered InUpgrade")
+		By("Ensuring that the serverBIOS has the correct state, reached InVersionUpgrade")
 		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStatePending),
-		))
-		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInUpgrade),
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade),
 		))
 
 		By("Ensuring that the Server has the correct claim ref")
@@ -229,7 +214,7 @@ var _ = Describe("ServerBIOS Controller", func() {
 
 		By("Ensuring that the state is still in INUpgrade State")
 		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInUpgrade),
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade),
 		))
 
 		By("update the server to refer the Maintenance request and grant Maintenance state")
@@ -254,9 +239,9 @@ var _ = Describe("ServerBIOS Controller", func() {
 			HaveField("Spec.ServerMaintenanceRef.UID", serverBIOS.Spec.ServerMaintenanceRef.UID),
 		))
 
-		By("Ensuring that the serverBIOS has completed Upgrade and moved the state to InMaintenance/completed state")
+		By("Ensuring that the serverBIOS has completed Upgrade and setting update moved the state to completed")
+
 		Eventually(Object(serverBIOS)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInMaintenance),
 			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateCompleted),
 		))
 

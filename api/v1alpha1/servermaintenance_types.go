@@ -28,7 +28,7 @@ type ServerMaintenanceSpec struct {
 	// Policy specifies the maintenance policy to be enforced on the server.
 	Policy ServerMaintenancePolicy `json:"policy,omitempty"`
 	// ServerRef is a reference to the server that is to be maintained.
-	ServerRef corev1.LocalObjectReference `json:"serverRef"`
+	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
 	// ServerPower specifies the power state of the server during maintenance.
 	ServerPower Power `json:"serverPower,omitempty"`
 	// ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.

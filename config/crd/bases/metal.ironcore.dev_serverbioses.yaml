@@ -54,9 +54,13 @@ spec:
                 required:
                 - version
                 type: object
+              maintenancePolicy:
+                description: ServerMaintenancePolicy is maintenance policy to be enforced
+                  on the server.
+                type: string
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
-                  object that that BIOS has requested for the refered server.
+                  object that that BIOS has requested for the referred server.
                 properties:
                   apiVersion:
                     description: API version of the referent.

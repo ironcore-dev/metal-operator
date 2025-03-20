@@ -307,7 +307,7 @@ func (r *RedfishBMC) SetBiosAttributes(
 	if err != nil {
 		return
 	}
-	reset, err = r.checkBiosAttributes(attributes)
+	reset, err = r.CheckBiosAttributes(attributes)
 	if err != nil {
 		return
 	}
@@ -360,7 +360,7 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 	return
 }
 
-func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, err error) {
+func (r *RedfishBMC) CheckBiosAttributes(attrs map[string]string) (reset bool, err error) {
 	reset = false
 	// filter out immutable, readonly and hidden attributes
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)

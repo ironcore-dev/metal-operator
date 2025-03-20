@@ -23,7 +23,10 @@ type ServerBIOSSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the refered server.
+	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
+	ServerMaintenancePolicy ServerMaintenancePolicy `json:"maintenancePolicy,omitempty"`
+
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
@@ -43,11 +46,11 @@ type BIOSMaintenanceState string
 const (
 	// BIOSMaintenanceStatePending specifies that the server bios maintenance is pending.
 	BIOSMaintenanceStatePending BIOSMaintenanceState = "Pending"
-	// BIOSMaintenanceStateInUpgrade specifies that the server bios is in upgrade path.
-	BIOSMaintenanceStateInUpgrade BIOSMaintenanceState = "InUpgrade"
-	// BIOSMaintenanceStateInMaintenance specifies that the server bios is in Maintainace path.
-	BIOSMaintenanceStateInMaintenance BIOSMaintenanceState = "InMaintainace"
-	// BIOSMaintenanceStateCompleted specifies that the server maintenance has been completed.
+	// BIOSMaintenanceStateInVersionUpgrade specifies that the server bios is in version upgrade path.
+	BIOSMaintenanceStateInVersionUpgrade BIOSMaintenanceState = "InVersionUpgrade"
+	// BIOSMaintenanceStateInSettingUpdate specifies that the server bios is in setting update path.
+	BIOSMaintenanceStateInSettingUpdate BIOSMaintenanceState = "InSettingUpdate"
+	// BIOSMaintenanceStateCompleted specifies that the server bios maintenance has been completed.
 	BIOSMaintenanceStateCompleted BIOSMaintenanceState = "Completed"
 	// BIOSMaintenanceStateFailed specifies that the server maintenance has failed.
 	BIOSMaintenanceStateFailed BIOSMaintenanceState = "Failed"

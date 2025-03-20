@@ -44,6 +44,8 @@ type BMC interface {
 
 	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]string, error)
 
+	CheckBiosAttributes(attrs map[string]string) (reset bool, err error)
+
 	SetBiosAttributes(ctx context.Context, systemUUID string, attributes map[string]string) (reset bool, err error)
 
 	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)

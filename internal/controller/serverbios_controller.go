@@ -83,25 +83,25 @@ func (r *ServerBIOSReconciler) reconciliationRequired(
 	// if referred server contains reference to different ServerBIOS object - stop reconciliation
 	server, err := r.getReferredServer(ctx, log, serverBIOS.Spec.ServerRef)
 	if err != nil {
-		log.V(1).Info("refered server object could not be fetched")
+		log.V(1).Info("referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}
 	// patch server with serverbios reference
 	if server.Spec.BIOSSettingsRef == nil {
-		if err := r.patchBIOSSettingsRef(ctx, log, &server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
+		if err := r.patchServerBIOSRefOnServer(ctx, log, &server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else if server.Spec.BIOSSettingsRef.Name != serverBIOS.Name {
-		referedBIOSSetting, err := r.getReferredBIOSSetting(ctx, log, server.Spec.BIOSSettingsRef)
+		referredBIOSSetting, err := r.getReferredserverBIOS(ctx, log, server.Spec.BIOSSettingsRef)
 		if err != nil {
 			log.V(1).Info("referred server contains reference to different ServerBIOS object, unable to fetch the referenced bios setting")
 			return ctrl.Result{}, err
 		}
 		// check if the current BIOS setting version is newer and update reference if it is newer
 		// todo : handle version checks correctly
-		if referedBIOSSetting.Spec.BIOS.Version < serverBIOS.Spec.BIOS.Version {
+		if referredBIOSSetting.Spec.BIOS.Version < serverBIOS.Spec.BIOS.Version {
 			log.V(1).Info("Updating BIOSSetting reference to the latest BIOS version")
-			if err := r.patchBIOSSettingsRef(ctx, log, &server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
+			if err := r.patchServerBIOSRefOnServer(ctx, log, &server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -137,25 +137,24 @@ func (r *ServerBIOSReconciler) cleanupReferences(
 		// try to get the serverMaintaince created
 		serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, serverBIOS.Spec.ServerMaintenanceRef)
 		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get refered serverMaintenance obj from serverBIOS: %w", err)
+			return fmt.Errorf("failed to get referred serverMaintenance obj from serverBIOS: %w", err)
 		}
 		// if we got it, try to delete it
 		if err == nil {
 			if errD := r.Delete(ctx, &serverMaintenance); errD != nil {
 				if !apierrors.IsNotFound(errD) {
-					return fmt.Errorf("failed to delete refered serverMaintenance obj: %w", err)
+					return fmt.Errorf("failed to delete referred serverMaintenance obj: %w", err)
 				}
-				log.V(1).Info("refered serverMaintenance gone")
+				log.V(1).Info("referred serverMaintenance gone")
 			}
 		}
 		// if already deleted or have deleted it remove reference
 		if apierrors.IsNotFound(err) || err == nil {
-			err = r.patchBIOSMaintenanceRequestRef(ctx, log, serverBIOS, nil)
+			err = r.patchMaintenanceRequestRefOnServerBIOS(ctx, log, serverBIOS, nil)
 			if err != nil {
 				return fmt.Errorf("failed to clean up serverMaintenance ref in serverBIOS status: %w", err)
 			}
 		}
-
 	}
 
 	if serverBIOS.Spec.ServerRef != nil {
@@ -173,7 +172,7 @@ func (r *ServerBIOSReconciler) cleanupReferences(
 				if server.Spec.BIOSSettingsRef.Name != serverBIOS.Name {
 					return nil
 				}
-				return r.patchBIOSSettingsRef(ctx, log, &server, nil)
+				return r.patchServerBIOSRefOnServer(ctx, log, &server, nil)
 			} else {
 				// nothing else to clean up
 				return nil
@@ -196,7 +195,7 @@ func (r *ServerBIOSReconciler) reconcile(ctx context.Context, log logr.Logger, s
 
 	// set the BIOS state to pending if it is not set
 	if serverBIOS.Status.State == "" {
-		if err := r.updateBIOSStatusState(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStatePending); err != nil {
+		if err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStatePending); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -208,10 +207,10 @@ func (r *ServerBIOSReconciler) ensureServerMaintenanceStateTransition(ctx contex
 	switch serverBIOS.Status.State {
 	case metalv1alpha1.BIOSMaintenanceStatePending:
 		return r.handleInPendingState(ctx, log, serverBIOS, server)
-	case metalv1alpha1.BIOSMaintenanceStateInUpgrade:
-		return r.handleInUpgradeState(ctx, log, serverBIOS, server)
-	case metalv1alpha1.BIOSMaintenanceStateInMaintenance:
-		return r.handleInMaintenanceState(ctx, log, serverBIOS, server)
+	case metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade:
+		return r.handleVersionUpgradeState(ctx, log, serverBIOS, server)
+	case metalv1alpha1.BIOSMaintenanceStateInSettingUpdate:
+		return r.handleSettingUpdateState(ctx, log, serverBIOS, server)
 	case metalv1alpha1.BIOSMaintenanceStateCompleted:
 		return r.handleCompletedState(ctx, log, serverBIOS, server)
 	case metalv1alpha1.BIOSMaintenanceStateFailed:
@@ -236,20 +235,20 @@ func (r *ServerBIOSReconciler) handleInPendingState(ctx context.Context, log log
 	// todo: handle version check to detect and upgrade only higher version
 	if currentBiosVersion != serverBIOS.Spec.BIOS.Version {
 		// upgrade the version before applying the bios setting
-		if err := r.updateBIOSStatusState(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInUpgrade); err != nil {
+		if err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// move status to Maintenance to check the BIOS setting
-	if err := r.updateBIOSStatusState(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInMaintenance); err != nil {
+	if err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInSettingUpdate); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, nil
 
 }
-func (r *ServerBIOSReconciler) handleInUpgradeState(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) (ctrl.Result, error) {
+func (r *ServerBIOSReconciler) handleVersionUpgradeState(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) (ctrl.Result, error) {
 
 	// BIOS upgrade always need server reboot, Hence need maintenance request.
 	if serverBIOS.Spec.ServerMaintenanceRef == nil {
@@ -257,15 +256,12 @@ func (r *ServerBIOSReconciler) handleInUpgradeState(ctx context.Context, log log
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		// wait for maintenance request to be granted
-		if err := r.handleInMaintenanceRequest(ctx, log, serverBIOS, server); err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		// wait for maintenance request to be granted
-		if err := r.handleInMaintenanceRequest(ctx, log, serverBIOS, server); err != nil {
-			return ctrl.Result{}, err
-		}
+	}
+
+	// wait for maintenance request to be granted
+	if err := r.waitOnMaintenanceRequest(ctx, log, serverBIOS, server); err != nil {
+		log.V(1).Info("Waiting for maintenance to be granted before continuing with version upgrade", "reason", err)
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// todo: do actual upgrade here.
@@ -273,17 +269,18 @@ func (r *ServerBIOSReconciler) handleInUpgradeState(ctx context.Context, log log
 	log.V(1).Info("Updated Server BIOS settings")
 
 	// move status to inMaintenance to check if settings needs to be upgraded
-	if err := r.updateBIOSStatusState(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInMaintenance); err != nil {
+	if err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInSettingUpdate); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func (r *ServerBIOSReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) (ctrl.Result, error) {
+func (r *ServerBIOSReconciler) handleSettingUpdateState(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) (ctrl.Result, error) {
 	// check if we had requested a maintenance and the system is rebooted
-	if err := r.handleInMaintenanceRequest(ctx, log, serverBIOS, server); err != nil {
-		return ctrl.Result{}, err
+	if err := r.waitOnMaintenanceRequest(ctx, log, serverBIOS, server); err != nil {
+		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings", "reason", err)
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
@@ -304,37 +301,50 @@ func (r *ServerBIOSReconciler) handleInMaintenanceState(ctx context.Context, log
 
 	diff := map[string]string{}
 	for key, value := range serverBIOS.Spec.BIOS.Settings {
-		if res, ok := currentSettings[key]; !ok {
-			if !ok || res != value {
+		res, ok := currentSettings[key]
+		if ok {
+			if res != value {
 				diff[key] = value
 			}
+		} else {
+			diff[key] = value
 		}
 	}
 
 	// if setting is not different, complete the BIOS tasks
 	if len(diff) == 0 {
 		// move status to completed
-		if err := r.updateBIOSStatusState(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateCompleted); err != nil {
+		if err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateCompleted); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
-	resetReq, err := bmcClient.SetBiosAttributes(ctx, server.Spec.SystemUUID, diff)
-
-	if resetReq {
-		// request maintenance if needed, even if err was reported.
-		errMain := r.requestMaintenanceOnServer(ctx, log, serverBIOS, server)
+	// check if we need to request maintenance if we dont have it already
+	if serverBIOS.Spec.ServerMaintenanceRef == nil {
+		resetReq, err := bmcClient.CheckBiosAttributes(diff)
+		if resetReq {
+			// request maintenance if needed, even if err was reported.
+			errMainReq := r.requestMaintenanceOnServer(ctx, log, serverBIOS, server)
+			if err != nil {
+				return ctrl.Result{}, errors.Join(err, errMainReq)
+			}
+			// reque to check for the maintenance is granted and continue with workflow
+			return ctrl.Result{Requeue: true}, err
+		}
 		if err != nil {
-			return ctrl.Result{}, errors.Join(err, errMain)
+			return ctrl.Result{}, fmt.Errorf("failed to check BMC settings provided: %w", err)
 		}
 	}
+
+	_, err = bmcClient.SetBiosAttributes(ctx, server.Spec.SystemUUID, diff)
+
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
 	}
 
 	// move status to completed
-	if err := r.updateBIOSStatusState(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateCompleted); err != nil {
+	if err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateCompleted); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -344,25 +354,27 @@ func (r *ServerBIOSReconciler) handleInMaintenanceState(ctx context.Context, log
 
 func (r *ServerBIOSReconciler) handleCompletedState(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) (ctrl.Result, error) {
 	// todo: may be we need to reschedule it to be able to periodically check the bios setting?
+	log.V(1).Info("Done with bios setting update", "ctx", ctx, "serverBIOS", serverBIOS, "server", server)
 	return ctrl.Result{Requeue: false}, nil
 }
 
 func (r *ServerBIOSReconciler) handleFailedState(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) (ctrl.Result, error) {
 	// todo: may be we need to put the server in maintenance to be able to get it to right state
+	log.V(1).Info("Done with bios setting update", "ctx", ctx, "serverBIOS", serverBIOS, "server", server)
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func (r *ServerBIOSReconciler) handleInMaintenanceRequest(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) error {
+func (r *ServerBIOSReconciler) waitOnMaintenanceRequest(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) error {
 	var waitForMaintenance bool
 	switch serverBIOS.Status.State {
-	case metalv1alpha1.BIOSMaintenanceStateInMaintenance:
+	case metalv1alpha1.BIOSMaintenanceStateInSettingUpdate:
 		if serverBIOS.Spec.ServerMaintenanceRef == nil {
 			// if no maintenance req, nothing to do
 			return nil
 		} else {
 			waitForMaintenance = true
 		}
-	case metalv1alpha1.BIOSMaintenanceStateInUpgrade:
+	case metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade:
 		if serverBIOS.Spec.ServerMaintenanceRef == nil {
 			return nil
 		} else {
@@ -371,32 +383,43 @@ func (r *ServerBIOSReconciler) handleInMaintenanceRequest(ctx context.Context, l
 	}
 
 	if waitForMaintenance {
-		if server.Spec.ServerMaintenanceRef != nil {
-			if server.Spec.ServerMaintenanceRef.UID != serverBIOS.Spec.ServerMaintenanceRef.UID {
+		serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, serverBIOS.Spec.ServerMaintenanceRef)
+		if err != nil {
+			return fmt.Errorf("unable to get the referred server maintenance")
+		}
+
+		if serverMaintenance.Status.State == metalv1alpha1.ServerMaintenanceStateInMaintenance {
+			if server.Spec.ServerMaintenanceRef == nil {
+				// server in maintenance for other tasks.
+				log.V(1).Info("Server does not have maintenance reference", "Server", server.Name, "Maintenance", server.Spec.ServerMaintenanceRef)
+				return fmt.Errorf("server missing maintenance reference")
+			} else if server.Spec.ServerMaintenanceRef.UID != serverBIOS.Spec.ServerMaintenanceRef.UID {
 				// server in maintenance for other tasks.
 				log.V(1).Info("Server is already in maintenance for other tasks", "Server", server.Name, "Maintenance", server.Spec.ServerMaintenanceRef.Name)
 				return fmt.Errorf("server is already in maintenance by other tasks")
-			} else if server.Spec.Power == metalv1alpha1.PowerOn {
-				// server in Maintenance for us and restarted
-				// note, restart happens in two step here
-				// maintenance is scheduled with power off.
-				// if its power on state, we assume the server to be restared.
-				// todo: give ability to restart the power.
-				return nil
-			} else if server.Spec.Power == metalv1alpha1.PowerOff {
-				err := r.ensurePowerStateForServer(ctx, log, metalv1alpha1.PowerOn, server)
-				if err != nil {
-					return err
-				}
-				return fmt.Errorf("waiting for reboot to complete")
 			} else {
-				// server in maintenance, but the power state in not as expected.
-				// todo: may be we reboot the system manually?
-				return fmt.Errorf("server in Maintenance but unknown state")
+				if server.Spec.Power == metalv1alpha1.PowerOn {
+					// server in Maintenance for us and restarted
+					// note, restart happens in two step here
+					// maintenance is scheduled with power off.
+					// if its power on state, we assume the server to be restared.
+					// todo: give ability to restart the power.
+					return nil
+				} else if server.Spec.Power == metalv1alpha1.PowerOff {
+					err := r.ensurePowerStateForServer(ctx, log, metalv1alpha1.PowerOn, server)
+					if err != nil {
+						return err
+					}
+					return fmt.Errorf("waiting for reboot to complete")
+				} else {
+					// server in maintenance, but the power state in not as expected.
+					// todo: may be we reboot the system manually?
+					return fmt.Errorf("server in maintenance but unknown power state")
+				}
 			}
 		} else {
 			// we still need to wait for server to enter maintenance
-			return fmt.Errorf("server is not yet in maintenance")
+			return fmt.Errorf("requested maintenance has not yet been granted")
 		}
 	}
 
@@ -408,17 +431,25 @@ func (r *ServerBIOSReconciler) ensurePowerStateForServer(ctx context.Context, lo
 	serverBase := server.DeepCopy()
 	server.Spec.Power = power
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return fmt.Errorf("failed to patch power for server: %w", err)
+		return fmt.Errorf("failed to patch power state for server: %w", err)
 	}
+
+	log.V(1).Info("Patched desired Power of the claimed Server", "Server", server.Name, "state", power)
 	return nil
 }
 
 func (r *ServerBIOSReconciler) requestMaintenanceOnServer(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, server *metalv1alpha1.Server) error {
+
+	// if Server maintenance ref is already given. no further action required.
+	if serverBIOS.Spec.ServerMaintenanceRef != nil {
+		return nil
+	}
+
 	serverMaintenance := &metalv1alpha1.ServerMaintenance{}
 	serverMaintenance.Name = serverBIOS.Name
 	serverMaintenance.Namespace = r.ManagerNamespace
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
-		serverMaintenance.Spec.Policy = metalv1alpha1.ServerMaintenancePolicyOwnerApproval
+		serverMaintenance.Spec.Policy = serverBIOS.Spec.ServerMaintenancePolicy
 		serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOff
 		serverMaintenance.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
 
@@ -429,7 +460,7 @@ func (r *ServerBIOSReconciler) requestMaintenanceOnServer(ctx context.Context, l
 	}
 	log.V(1).Info("Created serverMaintenance", "serverMaintenance", serverMaintenance.Name, "Operation", opResult)
 
-	err = r.patchBIOSMaintenanceRequestRef(ctx, log, serverBIOS, serverMaintenance)
+	err = r.patchMaintenanceRequestRefOnServerBIOS(ctx, log, serverBIOS, serverMaintenance)
 
 	if err != nil {
 		return fmt.Errorf("failed to patch serverMaintenance ref in serverBIOS status: %w", err)
@@ -466,12 +497,12 @@ func (r *ServerBIOSReconciler) getReferredServerMaintenance(
 	return *serverMaintenance, nil
 }
 
-func (r *ServerBIOSReconciler) getReferredBIOSSetting(
+func (r *ServerBIOSReconciler) getReferredserverBIOS(
 	ctx context.Context,
 	log logr.Logger,
-	referedBIOSSetteingRef *corev1.LocalObjectReference,
+	referredBIOSSetteingRef *corev1.LocalObjectReference,
 ) (metalv1alpha1.ServerBIOS, error) {
-	key := client.ObjectKey{Name: referedBIOSSetteingRef.Name, Namespace: metav1.NamespaceNone}
+	key := client.ObjectKey{Name: referredBIOSSetteingRef.Name, Namespace: metav1.NamespaceNone}
 	serverBIOS := metalv1alpha1.ServerBIOS{}
 	if err := r.Get(ctx, key, &serverBIOS); err != nil {
 		log.V(1).Error(err, "failed to get referred BIOSSetting")
@@ -480,7 +511,7 @@ func (r *ServerBIOSReconciler) getReferredBIOSSetting(
 	return serverBIOS, nil
 }
 
-func (r *ServerBIOSReconciler) patchBIOSSettingsRef(
+func (r *ServerBIOSReconciler) patchServerBIOSRefOnServer(
 	ctx context.Context,
 	log logr.Logger,
 	server *metalv1alpha1.Server,
@@ -500,7 +531,7 @@ func (r *ServerBIOSReconciler) patchBIOSSettingsRef(
 	return err
 }
 
-func (r *ServerBIOSReconciler) patchBIOSMaintenanceRequestRef(
+func (r *ServerBIOSReconciler) patchMaintenanceRequestRefOnServerBIOS(
 	ctx context.Context,
 	log logr.Logger,
 	serverBIOS *metalv1alpha1.ServerBIOS,
@@ -528,13 +559,15 @@ func (r *ServerBIOSReconciler) patchBIOSMaintenanceRequestRef(
 	return nil
 }
 
-func (r *ServerBIOSReconciler) updateBIOSStatusState(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, state metalv1alpha1.BIOSMaintenanceState) error {
+func (r *ServerBIOSReconciler) updateServerBIOSStatus(ctx context.Context, log logr.Logger, serverBIOS *metalv1alpha1.ServerBIOS, state metalv1alpha1.BIOSMaintenanceState) error {
 	serverBIOSbase := serverBIOS.DeepCopy()
 	serverBIOS.Status.State = state
 
 	if err := r.Status().Patch(ctx, serverBIOS, client.MergeFrom(serverBIOSbase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
 	}
+
+	log.V(1).Info("Updated serverBIOS state ", "new state", state)
 
 	return nil
 }

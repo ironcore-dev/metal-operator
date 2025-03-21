@@ -18,9 +18,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -106,7 +109,7 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 	if server.Spec.ServerMaintenanceRef != nil {
 		if server.Spec.ServerMaintenanceRef.UID != serverMaintenance.UID {
 			log.V(1).Info("Server is already in maintenance", "Server", server.Name, "Maintenance", server.Spec.ServerMaintenanceRef.Name)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{}, nil
 		}
 	}
 	if server.Spec.ServerClaimRef == nil {
@@ -125,7 +128,7 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 			return ctrl.Result{}, fmt.Errorf("failed to get server claim: %w", err)
 		}
 		log.V(1).Info("ServerClaim gone")
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{}, nil
 	}
 	claimAnnotations := map[string]string{
 		metalv1alpha1.ServerMaintenanceNeededLabelKey:      "true",
@@ -135,10 +138,10 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 		return ctrl.Result{}, err
 	}
 	if serverMaintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
-		anno := serverClaim.GetAnnotations()
-		if _, ok := anno[metalv1alpha1.ServerMaintenanceApprovalKey]; !ok {
+		claimAnnotations := serverClaim.GetAnnotations()
+		if _, ok := claimAnnotations[metalv1alpha1.ServerMaintenanceApprovalKey]; !ok {
 			log.V(1).Info("Server not approved for maintenance, waiting for approval", "Server", server.Name)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{}, nil
 		}
 		log.V(1).Info("Server approved for maintenance", "Server", server.Name, "Maintenance", serverMaintenance.Name)
 		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
@@ -175,7 +178,7 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	}
 	if config.Status.State == metalv1alpha1.ServerBootConfigurationStatePending || config.Status.State == "" {
 		log.V(1).Info("Server boot configuration is pending", "Server", server.Name)
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{}, nil
 	}
 	if config.Status.State == metalv1alpha1.ServerBootConfigurationStateError {
 		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed); err != nil || modified {
@@ -419,5 +422,70 @@ func (r *ServerMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.ServerMaintenance{}).
 		Owns(&metalv1alpha1.ServerBootConfiguration{}).
+		Watches(&metalv1alpha1.Server{}, r.enqueueMaintenanceByServerRefs()).
+		Watches(&metalv1alpha1.ServerClaim{}, r.enqueueMaintenanceByClaimRefs()).
 		Complete(r)
+}
+
+func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+		log := ctrl.LoggerFrom(ctx)
+		server := object.(*metalv1alpha1.Server)
+		var req []reconcile.Request
+
+		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+		if err := r.List(ctx, maintenanceList); err != nil {
+			log.Error(err, "failed to list host serverMaintenances")
+			return nil
+		}
+		for _, maintenance := range maintenanceList.Items {
+			if server.Spec.ServerMaintenanceRef != nil && maintenance.Spec.ServerRef.Name == server.Spec.ServerMaintenanceRef.Name {
+				req = append(req, reconcile.Request{
+					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
+				})
+				return req
+			}
+			if server.Spec.ServerMaintenanceRef == nil {
+				req = append(req, reconcile.Request{
+					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
+				})
+				return req
+			}
+		}
+
+		return req
+	})
+}
+
+func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+		log := ctrl.LoggerFrom(ctx)
+		claim := object.(*metalv1alpha1.ServerClaim)
+		var req []reconcile.Request
+		annotations := claim.GetAnnotations()
+		if _, ok := annotations[metalv1alpha1.ServerMaintenanceNeededLabelKey]; !ok {
+			return req
+		}
+
+		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+		if err := r.List(ctx, maintenanceList); err != nil {
+			log.Error(err, "failed to list host serverMaintenances")
+			return nil
+		}
+		for _, maintenance := range maintenanceList.Items {
+			if maintenance.Spec.ServerRef != nil && maintenance.Spec.ServerRef.Name == claim.Spec.ServerRef.Name {
+				req = append(req, reconcile.Request{
+					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Spec.ServerRef.Name},
+				})
+				return req
+			}
+			if maintenance.Spec.ServerRef == nil {
+				req = append(req, reconcile.Request{
+					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Spec.ServerRef.Name},
+				})
+				return req
+			}
+		}
+		return req
+	})
 }

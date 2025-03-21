@@ -122,6 +122,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				Name:      "test-claim",
 				Namespace: ns.Name,
 			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
 		}
 		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
 		By("Patching the Server to reserved state")

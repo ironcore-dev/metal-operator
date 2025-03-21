@@ -18,10 +18,12 @@ jobs:
       run: make generate
     - name: Run make docs
       run: make docs
+    - name: Run make helm
+      run: make helm
     - name: Compare the expected and actual generated/* directories
       run: |
         if [ "$(git diff --ignore-space-at-eol client-go/ | wc -l)" -gt "0" ]; then
-          echo "Detected uncommitted changes after build. Consider running 'make generate && make docs'."
+          echo "Detected uncommitted changes after build. Consider running 'make generate && make docs && make helm'."
           echo "See status below:"
           git diff
           exit 1

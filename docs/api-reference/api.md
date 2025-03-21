@@ -1139,6 +1139,19 @@ int32
 This port is used by the specified protocol to establish connections.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>scheme</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ProtocolScheme">
+ProtocolScheme
+</a>
+</em>
+</td>
+<td>
+<p>Scheme specifies the scheme used for communication.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ProtocolName">ProtocolName
@@ -1164,6 +1177,29 @@ This port is used by the specified protocol to establish connections.</p>
 </td>
 </tr><tr><td><p>&#34;SSH&#34;</p></td>
 <td><p>ProtocolNameSSH represents the SSH protocol.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ProtocolScheme">ProtocolScheme
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Protocol">Protocol</a>)
+</p>
+<div>
+<p>ProtocolScheme is a string that contains the protocol scheme</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;http&#34;</p></td>
+<td><p>HTTPProtocolScheme is the http protocol scheme</p>
+</td>
+</tr><tr><td><p>&#34;https&#34;</p></td>
+<td><p>HTTPSProtocolScheme is the https protocol scheme</p>
 </td>
 </tr></tbody>
 </table>

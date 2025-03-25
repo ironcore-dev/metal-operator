@@ -23,4 +23,7 @@ resources:
 - servermaintenance_admin_role.yaml
 - servermaintenance_editor_role.yaml
 - servermaintenance_viewer_role.yaml
+- ServerMaintenanceReplica_admin_role.yaml
+- ServerMaintenanceReplica_editor_role.yaml
+- ServerMaintenanceReplica_viewer_role.yaml
 

@@ -128,11 +128,12 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
 		By("Patching the Server to reserved state")
-		server.Spec.ServerClaimRef = &v1.ObjectReference{
-			Name:      serverClaim.Name,
-			Namespace: serverClaim.Namespace,
-		}
-		Expect(k8sClient.Update(ctx, server)).To(Succeed())
+		Eventually(Update(server, func() {
+			server.Spec.ServerClaimRef = &v1.ObjectReference{
+				Name:      serverClaim.Name,
+				Namespace: serverClaim.Namespace,
+			}
+		})).Should(Succeed())
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateReserved
 		})).Should(Succeed())
@@ -147,12 +148,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		))
 
 		By("Approving the maintenance")
-		Expect(k8sClient.Get(ctx, types.NamespacedName{
-			Name:      serverClaim.Name,
-			Namespace: serverClaim.Namespace,
-		}, serverClaim)).To(Succeed())
-		metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
-		Expect(k8sClient.Update(ctx, serverClaim)).To(Succeed())
+		Eventually(Update(serverClaim, func() {
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
+		})).Should(Succeed())
 
 		maintenanceLabels := map[string]string{
 			metalv1alpha1.ServerMaintenanceNeededLabelKey:      "true",

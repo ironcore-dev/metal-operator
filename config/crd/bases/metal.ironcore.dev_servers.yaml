@@ -224,8 +224,9 @@ spec:
                   indicator LED.
                 type: string
               maintenanceBootConfigurationRef:
-                description: ObjectReference contains enough information to let you
-                  inspect or modify the referred object.
+                description: |-
+                  MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
+                  the boot configuration for this server during maintenance. This field is optional and can be omitted
                 properties:
                   apiVersion:
                     description: API version of the referent.

@@ -131,8 +131,10 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 		return ctrl.Result{}, nil
 	}
 	claimAnnotations := map[string]string{
-		metalv1alpha1.ServerMaintenanceNeededLabelKey:      "true",
-		metalv1alpha1.ServerMaintenanceReasonAnnotationKey: serverMaintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey],
+		metalv1alpha1.ServerMaintenanceNeededLabelKey: "true",
+	}
+	if serverMaintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] != "" {
+		claimAnnotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] = serverMaintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey]
 	}
 	if err := r.patchServerClaimAnnotation(ctx, serverClaim, claimAnnotations); err != nil {
 		return ctrl.Result{}, err
@@ -209,10 +211,14 @@ func (r *ServerMaintenanceReconciler) createServerBootConfiguration(ctx context.
 	}
 	if server.Spec.MaintenanceBootConfigurationRef == nil {
 		log.V(1).Info("Creating server maintenance boot configuration", "Server", server.Name)
-		config.Spec = maintenance.Spec.ServerBootConfigurationTemplate.Spec
-		if err := r.Client.Create(ctx, config); err != nil {
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, func() error {
+			config.Spec = maintenance.Spec.ServerBootConfigurationTemplate.Spec
+			return controllerutil.SetControllerReference(maintenance, config, r.Scheme)
+		})
+		if err != nil {
 			return config, fmt.Errorf("failed to create server boot configuration: %w", err)
 		}
+		log.V(1).Info("Created or patched Config", "Config", config.Name, "Operation", opResult)
 		serverBase := server.DeepCopy()
 		server.Spec.MaintenanceBootConfigurationRef = &v1.ObjectReference{
 			Namespace:  config.Namespace,

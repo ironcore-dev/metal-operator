@@ -60,4 +60,13 @@ resources:
   kind: ServerClaim
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: ServerMaintenanceReplica
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

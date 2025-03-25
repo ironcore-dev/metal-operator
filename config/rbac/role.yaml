@@ -31,6 +31,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - ServerMaintenanceReplicas
   - bmcs
   - bmcsecrets
   - endpoints
@@ -49,6 +50,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - ServerMaintenanceReplicas/finalizers
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - endpoints/finalizers
@@ -60,6 +62,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - ServerMaintenanceReplicas/status
   - bmcs/status
   - bmcsecrets/status
   - endpoints/status

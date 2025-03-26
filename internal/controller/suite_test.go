@@ -72,6 +72,11 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	var bmcList metalv1alpha1.BMCList
 	Eventually(ObjectList(&bmcList)).Should(HaveField("Items", BeEmpty()))
 
+	var serverMaintenance metalv1alpha1.ServerMaintenance
+	Expect(k8sClient.DeleteAllOf(ctx, &serverMaintenance, client.InNamespace(namespace))).To(Succeed())
+	var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+	Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+
 	var serverBootConfiguration metalv1alpha1.ServerBootConfiguration
 	Expect(k8sClient.DeleteAllOf(ctx, &serverBootConfiguration, client.InNamespace(namespace))).To(Succeed())
 	var serverBootConfigurationList metalv1alpha1.ServerBootConfigurationList

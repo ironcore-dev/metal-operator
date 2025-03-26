@@ -6,13 +6,11 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmc"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,23 +31,22 @@ const (
 // ServerMaintenanceReconciler reconciles a ServerMaintenance object
 type ServerMaintenanceReconciler struct {
 	client.Client
-	Scheme                  *runtime.Scheme
-	Insecure                bool
-	ManagerNamespace        string
-	ProbeImage              string
-	RegistryURL             string
-	ProbeOSImage            string
-	RegistryResyncInterval  time.Duration
-	EnforceFirstBoot        bool
-	EnforcePowerOff         bool
-	ResyncInterval          time.Duration
-	BMCOptions              bmc.BMCOptions
-	DiscoveryTimeout        time.Duration
-	MaxConcurrentReconciles int
+	Scheme *runtime.Scheme
 }
+
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
+// TODO(user): Modify the Reconcile function to compare the state specified by
+// the ServerMaintenance object against the actual cluster state, and then
+// perform operations to make the cluster state reflect the state specified by
+// the user.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.2/pkg/reconcile
 func (r *ServerMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	serverMaintenance := &metalv1alpha1.ServerMaintenance{}
@@ -203,40 +200,32 @@ func (r *ServerMaintenanceReconciler) createServerBootConfiguration(ctx context.
 		log.V(1).Info("No ServerBootConfigurationTemplate specified")
 		return nil, nil
 	}
+
+	log.V(1).Info("Creating/Patching server maintenance boot configuration", "Server", server.Name)
 	config := &metalv1alpha1.ServerBootConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-maintenance", server.Name),
+			Name:      maintenance.Name,
 			Namespace: maintenance.Namespace,
 		},
 	}
-	if server.Spec.MaintenanceBootConfigurationRef == nil {
-		log.V(1).Info("Creating server maintenance boot configuration", "Server", server.Name)
-		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, func() error {
-			config.Spec = maintenance.Spec.ServerBootConfigurationTemplate.Spec
-			return controllerutil.SetControllerReference(maintenance, config, r.Scheme)
-		})
-		if err != nil {
-			return config, fmt.Errorf("failed to create server boot configuration: %w", err)
-		}
-		log.V(1).Info("Created or patched Config", "Config", config.Name, "Operation", opResult)
-		serverBase := server.DeepCopy()
-		server.Spec.MaintenanceBootConfigurationRef = &v1.ObjectReference{
-			Namespace:  config.Namespace,
-			Name:       config.Name,
-			UID:        config.UID,
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerBootConfiguration",
-		}
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return config, fmt.Errorf("failed to patch server maintenance boot configuration ref: %w", err)
-		}
-		if err := controllerutil.SetControllerReference(maintenance, config, r.Scheme); err != nil {
-			return config, fmt.Errorf("failed to set controller reference: %w", err)
-		}
-	} else {
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: server.Spec.MaintenanceBootConfigurationRef.Name, Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace}, config); err != nil {
-			return config, fmt.Errorf("failed to get server boot configuration: %w", err)
-		}
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, func() error {
+		config.Spec = maintenance.Spec.ServerBootConfigurationTemplate.Spec
+		return controllerutil.SetControllerReference(maintenance, config, r.Scheme)
+	})
+	if err != nil {
+		return config, fmt.Errorf("failed to create server boot configuration: %w", err)
+	}
+	log.V(1).Info("Created or patched Config", "Config", config.Name, "Operation", opResult)
+	serverBase := server.DeepCopy()
+	server.Spec.MaintenanceBootConfigurationRef = &v1.ObjectReference{
+		Namespace:  config.Namespace,
+		Name:       config.Name,
+		UID:        config.UID,
+		APIVersion: "metal.ironcore.dev/v1alpha1",
+		Kind:       "ServerBootConfiguration",
+	}
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return config, fmt.Errorf("failed to patch server maintenance boot configuration ref: %w", err)
 	}
 	return config, nil
 }
@@ -481,13 +470,13 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 		for _, maintenance := range maintenanceList.Items {
 			if maintenance.Spec.ServerRef != nil && maintenance.Spec.ServerRef.Name == claim.Spec.ServerRef.Name {
 				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Spec.ServerRef.Name},
+					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
 				})
 				return req
 			}
 			if maintenance.Spec.ServerRef == nil {
 				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Spec.ServerRef.Name},
+					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
 				})
 				return req
 			}

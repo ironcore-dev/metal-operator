@@ -4,14 +4,15 @@
 package controller
 
 import (
-	"github.com/ironcore-dev/controller-utils/metautils"
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+
+	"github.com/ironcore-dev/controller-utils/metautils"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
 var _ = Describe("ServerMaintenance Controller", func() {
@@ -174,7 +175,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		})).Should(Succeed())
 
 		By("Checking the Server is in maintenance")
-		Eventually(Object(server), "1s").Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 		))
 

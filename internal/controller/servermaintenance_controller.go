@@ -444,10 +444,8 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
 				})
-				return req
 			}
 		}
-
 		return req
 	})
 }

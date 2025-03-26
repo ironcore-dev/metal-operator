@@ -275,6 +275,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateCompleted),
 		))
 
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+			HaveField("Spec.MaintenanceBootConfigurationRef", BeNil()),
+		))
+
+		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		))
+
 		By("Checking the second ServerMaintenance is now in maintenance")
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),

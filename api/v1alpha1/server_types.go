@@ -93,6 +93,9 @@ type ServerSpec struct {
 	// This field is optional and can be omitted if no claim is associated with this server.
 	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
 
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
+	ServerMaintenanceRef *v1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+
 	// BMCRef is a reference to the BMC object associated with this server.
 	// This field is optional and can be omitted if no BMC is associated with this server.
 	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
@@ -105,6 +108,10 @@ type ServerSpec struct {
 	// the boot configuration for this server. This field is optional and can be omitted
 	// if no boot configuration is specified.
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
+
+	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
+	// the boot configuration for this server during maintenance. This field is optional and can be omitted
+	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
@@ -131,6 +138,9 @@ const (
 
 	// ServerStateError indicates that there is an error with the server.
 	ServerStateError ServerState = "Error"
+
+	// ServerStateMaintenance indicates that the server is in maintenance.
+	ServerStateMaintenance ServerState = "Maintenance"
 )
 
 // IndicatorLED represents LED indicator states

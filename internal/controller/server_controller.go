@@ -167,6 +167,12 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
+	if server.Spec.ServerMaintenanceRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
+			return ctrl.Result{}, err
+		}
+	}
+
 	if server.Spec.ServerClaimRef != nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
 			return ctrl.Result{}, err
@@ -246,6 +252,8 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		return r.handleAvailableState(ctx, log, server)
 	case metalv1alpha1.ServerStateReserved:
 		return r.handleReservedState(ctx, log, server)
+	case metalv1alpha1.ServerStateMaintenance:
+		return r.handleMaintenanceState(ctx, log, server)
 	default:
 		return false, nil
 	}
@@ -441,6 +449,17 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 	}
 	log.V(1).Info("Reconciled reserved state")
 	return true, nil
+}
+
+func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef == nil {
+		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
+	}
+	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef != nil {
+		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
+	}
+	log.V(1).Info("Reconciled maintenance state")
+	return false, nil
 }
 
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {

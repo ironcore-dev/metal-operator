@@ -95,7 +95,7 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, lo
 	}
 
 	server := &metalv1alpha1.Server{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get server: %w", err)
 		}
@@ -411,7 +411,7 @@ func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log 
 	if err != nil {
 		return nil, err
 	}
-	if !selector.Matches(labels.Set(server.ObjectMeta.Labels)) {
+	if !selector.Matches(labels.Set(server.Labels)) {
 		log.V(1).Info("Specified server does not match label selector", "Server", server.Name, "Claim", claim.Name)
 		return nil, nil
 	}

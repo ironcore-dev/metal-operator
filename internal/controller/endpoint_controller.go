@@ -75,7 +75,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 		return ctrl.Result{}, nil
 	}
 
-	sanitizedMACAddress := strings.Replace(endpoint.Spec.MACAddress, ":", "", -1)
+	sanitizedMACAddress := strings.ReplaceAll(endpoint.Spec.MACAddress, ":", "")
 	for _, m := range r.MACPrefixes.MacPrefixes {
 		if strings.HasPrefix(sanitizedMACAddress, m.MacPrefix) && m.Type == metalv1alpha1.BMCType {
 			log.V(1).Info("Found a BMC adapter for endpoint", "Type", m.Type, "Protocol", m.Protocol)

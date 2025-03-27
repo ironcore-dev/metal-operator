@@ -204,6 +204,12 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
 	}
 
+	// we need to update the ServerStatus after state transition to make sure it reflects the changes done
+	if err := r.updateServerStatus(ctx, log, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
+	}
+	log.V(1).Info("Updated Server status after transistions", "Status", server.Status.State)
+
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{}, nil
 }
@@ -452,6 +458,11 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.
 	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef != nil {
 		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
 	}
+
+	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	}
+
 	log.V(1).Info("Reconciled maintenance state")
 	return false, nil
 }

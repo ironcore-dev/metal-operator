@@ -24,7 +24,7 @@ type ServerBIOSSpec struct {
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
 	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"maintenancePolicy,omitempty"`
+	ServerMaintenancePolicy ServerMaintenancePolicy `json:"ServerMaintenancePolicyTemplate,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
@@ -44,25 +44,36 @@ type BIOSSettings struct {
 type BIOSMaintenanceState string
 
 const (
-	// BIOSMaintenanceStatePending specifies that the server bios maintenance is pending.
-	BIOSMaintenanceStatePending BIOSMaintenanceState = "Pending"
 	// BIOSMaintenanceStateInVersionUpgrade specifies that the server bios is in version upgrade path.
 	BIOSMaintenanceStateInVersionUpgrade BIOSMaintenanceState = "InVersionUpgrade"
 	// BIOSMaintenanceStateInSettingUpdate specifies that the server bios is in setting update path.
 	BIOSMaintenanceStateInSettingUpdate BIOSMaintenanceState = "InSettingUpdate"
-	// BIOSMaintenanceStateCompleted specifies that the server bios maintenance has been completed.
-	BIOSMaintenanceStateCompleted BIOSMaintenanceState = "Completed"
+	// BIOSMaintenanceStateSynced specifies that the server bios maintenance has been completed.
+	BIOSMaintenanceStateSynced BIOSMaintenanceState = "SyncSettingsCompleted"
 	// BIOSMaintenanceStateFailed specifies that the server maintenance has failed.
 	BIOSMaintenanceStateFailed BIOSMaintenanceState = "Failed"
 )
 
+type BIOSSettingUpdateState string
+
+const (
+	// SettingUpdateStateWaitOnServerReboot specifies that the bios setting state is waiting on server to turn off during Reboot.
+	BIOSSettingUpdateWaitOnServerRebootPowerOff BIOSSettingUpdateState = "WaitOnServerRebootPowerOff"
+	// BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.
+	BIOSSettingUpdateWaitOnServerRebootPowerOn BIOSSettingUpdateState = "WaitOnServerRebootPowerOn"
+	// SettingUpdateStateIssued specifies that the bios new setting was posted to RedFish
+	BIOSSettingUpdateStateIssue BIOSSettingUpdateState = "IssueSettingUpdate"
+	// SettingUpdateStateCompleted specifies that the bios setting has been completed.
+	BIOSSettingUpdateStateVerification BIOSSettingUpdateState = "VerifySettingUpdate"
+)
+
 // ServerBIOSStatus defines the observed state of ServerBIOS.
 type ServerBIOSStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
 	// State represents the current state of the bios configuration task.
 	State BIOSMaintenanceState `json:"state,omitempty"`
+	// UpdateSettingState represents the current state of the bios setting update task.
+	UpdateSettingState BIOSSettingUpdateState `json:"updateSettingState,omitempty"`
 }
 
 // +kubebuilder:object:root=true

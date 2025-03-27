@@ -96,14 +96,14 @@ var _ = Describe("ServerBIOS Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, serverBIOS)).To(Succeed())
 
-		By("Ensuring that the Server has the correct claim ref")
+		By("Ensuring that the Server has the correct server bios setting ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
 			HaveField("Spec.BIOSSettingsRef.Name", serverBIOS.Name),
 		))
 
 		Eventually(Object(serverBIOS)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateCompleted),
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateSynced),
 		))
 	})
 
@@ -139,14 +139,14 @@ var _ = Describe("ServerBIOS Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, serverBIOS)).To(Succeed())
 
-		By("Ensuring that the Server has the correct claim ref")
+		By("Ensuring that the Server has the bios setting ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
 			HaveField("Spec.BIOSSettingsRef.Name", serverBIOS.Name),
 		))
 
 		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateCompleted),
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateSynced),
 		))
 
 		By("Deleting the ServerBIOS")
@@ -183,7 +183,7 @@ var _ = Describe("ServerBIOS Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.ServerBIOSSpec{
-				BIOS:                    metalv1alpha1.BIOSSettings{Version: "P79 v1.0 (12/06/2017)", Settings: BIOSSetting},
+				BIOS:                    metalv1alpha1.BIOSSettings{Version: "P79 v2.0 (12/06/2017)", Settings: BIOSSetting},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -195,45 +195,28 @@ var _ = Describe("ServerBIOS Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade),
 		))
 
-		By("Ensuring that the Server has the correct claim ref")
+		By("Ensuring that the Server has the correct bios server settings ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
 			HaveField("Spec.BIOSSettingsRef.Name", serverBIOS.Name),
 		))
 
-		By("Ensuring that the serverBIOS has created the Maintenance request")
-		serverMaintenance := &metalv1alpha1.ServerMaintenance{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      serverBIOS.Name,
-			},
-		}
-		Eventually(Get(serverMaintenance)).Should(Succeed())
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
 
 		By("Ensuring that the Maintenance resource has been referenced by serverBIOS")
 		Eventually(Object(serverBIOS)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
 		))
 
-		By("Ensuring that the state is still in INUpgrade State")
-		Eventually(Object(serverBIOS)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade),
-		))
-
-		By("update the server to refer the Maintenance request and grant Maintenance state")
-		Eventually(Update(server, func() {
-			server.Spec.Power = metalv1alpha1.PowerOff
-			server.Spec.ServerMaintenanceRef = &v1.ObjectReference{
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-				Kind:       "ServerMaintenance",
-				Namespace:  serverMaintenance.Namespace,
-				Name:       serverMaintenance.Name,
-				UID:        serverMaintenance.UID,
-			}
-		})).Should(Succeed())
-		Eventually(UpdateStatus(serverMaintenance, func() {
-			serverMaintenance.Status.State = metalv1alpha1.ServerMaintenanceStateInMaintenance
-		})).Should(Succeed())
+		By("Ensuring that the serverBIOS has created the Maintenance request")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      serverBIOS.Spec.ServerMaintenanceRef.Name,
+			},
+		}
+		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the server has accepted the Maintenance request")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -242,20 +225,38 @@ var _ = Describe("ServerBIOS Controller", func() {
 			HaveField("Spec.ServerMaintenanceRef.UID", serverBIOS.Spec.ServerMaintenanceRef.UID),
 		))
 
-		By("Ensuring that the serverBIOS has completed Upgrade and setting update moved the state to completed")
-
+		By("Ensuring that the serverBIOS state is correct State inVersionUpgrade")
 		Eventually(Object(serverBIOS)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateCompleted),
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade),
 		))
+
+		By("Simulate the server BIOS version update by matching the spec version")
+		Eventually(Update(serverBIOS, func() {
+			serverBIOS.Spec.BIOS.Version = "P79 v1.45 (12/06/2017)"
+		})).Should(Succeed())
+
+		By("Ensuring that the serverBIOS has completed Upgrade and setting update moved the state")
+		Eventually(Object(serverBIOS)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateInSettingUpdate),
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateSynced),
+		))
+		Eventually(Object(serverBIOS)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSMaintenanceStateSynced),
+		))
+
+		By("Ensuring that the Server Maintenance BIOS ref is empty")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		))
+
+		By("Ensuring that the serverMaintenance is deleted")
+		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Deleting the ServerBIOS")
 		Expect(k8sClient.Delete(ctx, serverBIOS)).To(Succeed())
 
 		By("Ensuring that the serverBIOS is removed")
 		Eventually(Get(serverBIOS)).Should(Satisfy(apierrors.IsNotFound))
-
-		By("Ensuring that the serverMaintenance is removed")
-		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the Server BIOS ref is empty")
 		Eventually(Object(server)).Should(SatisfyAll(

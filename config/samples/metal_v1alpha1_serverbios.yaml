@@ -6,4 +6,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: serverbios-sample
 spec:
-  # TODO(user): Add fields here
+  serverRef:
+    name: endpoint-sample-system-0
+  bios:
+    version: 2.10.3
+    settings:
+      PxeDev1EnDis: Disable
+  ServerMaintenancePolicyTemplate: OwnerApproval

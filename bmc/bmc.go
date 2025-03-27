@@ -42,11 +42,11 @@ type BMC interface {
 
 	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
 
-	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]string, error)
+	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]interface{}, error)
 
 	CheckBiosAttributes(attrs map[string]string) (reset bool, err error)
 
-	SetBiosAttributes(ctx context.Context, systemUUID string, attributes map[string]string) (reset bool, err error)
+	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes map[string]string) (err error)
 
 	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
 
@@ -69,6 +69,11 @@ type Bios struct {
 	Attributes map[string]string
 }
 
+type AllowedValues struct {
+	ValueDisplayName string
+	ValueName        string
+}
+
 type RegistryEntryAttributes struct {
 	AttributeName string
 	CurrentValue  interface{}
@@ -84,6 +89,7 @@ type RegistryEntryAttributes struct {
 	ResetRequired bool
 	Type          string
 	WriteOnly     bool
+	Value         []AllowedValues
 }
 
 type RegistryEntry struct {

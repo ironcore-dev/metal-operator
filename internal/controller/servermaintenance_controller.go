@@ -164,7 +164,7 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	if err := r.patchServerRef(ctx, log, serverMaintenance, server); err != nil {
 		return ctrl.Result{}, err
 	}
-	config, err := r.createServerBootConfiguration(ctx, log, serverMaintenance, server)
+	config, err := r.applyServerBootConfiguration(ctx, log, serverMaintenance, server)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -193,7 +193,7 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) createServerBootConfiguration(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, error) {
+func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, error) {
 	if maintenance.Spec.ServerBootConfigurationTemplate == nil {
 		log.V(1).Info("No ServerBootConfigurationTemplate specified")
 		return nil, nil

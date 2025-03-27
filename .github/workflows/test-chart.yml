@@ -4,8 +4,10 @@ permissions:
   contents: read
 
 on:
-  push:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 jobs:
   test-e2e:

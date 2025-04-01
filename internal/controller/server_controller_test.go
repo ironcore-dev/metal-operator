@@ -126,7 +126,7 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeNil()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
-			HaveField("Data", HaveKeyWithValue(SShKeyPairSecretPasswordKeyName, Not(BeNil()))),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPasswordKeyName, Not(BeNil()))),
 		))
 		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
 		Expect(err).NotTo(HaveOccurred())
@@ -160,7 +160,7 @@ var _ = Describe("Server Controller", func() {
 		passwordHash, ok := user["password_hash"].(string)
 		Expect(ok).To(BeTrue(), "password_hash should be a string")
 
-		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SShKeyPairSecretPasswordKeyName])
+		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
 		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
 
 		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
@@ -304,7 +304,7 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
-			HaveField("Data", HaveKeyWithValue(SShKeyPairSecretPasswordKeyName, Not(BeEmpty()))),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPasswordKeyName, Not(BeEmpty()))),
 		))
 		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
 		Expect(err).NotTo(HaveOccurred())
@@ -338,7 +338,7 @@ var _ = Describe("Server Controller", func() {
 		passwordHash, ok := user["password_hash"].(string)
 		Expect(ok).To(BeTrue(), "password_hash should be a string")
 
-		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SShKeyPairSecretPasswordKeyName])).Should(Succeed())
+		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
 
 		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
 			Image:        "foo:latest",

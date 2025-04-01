@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
-  name: servermaintenancereplicas.metal.ironcore.dev
+  name: servermaintenancesets.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
   names:
-    kind: ServerMaintenanceReplica
-    listKind: ServerMaintenanceReplicaList
-    plural: ServerMaintenanceReplicas
-    singular: ServerMaintenanceReplica
+    kind: ServerMaintenanceSet
+    listKind: ServerMaintenanceSetList
+    plural: servermaintenancesets
+    singular: servermaintenanceset
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ServerMaintenanceReplica is the Schema for the ServerMaintenanceReplicas
+        description: ServerMaintenanceSet is the Schema for the ServerMaintenanceSet
           API.
         properties:
           apiVersion:
@@ -38,8 +38,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServerMaintenanceReplicaSpec defines the desired state of
-              ServerMaintenanceReplica.
+            description: ServerMaintenanceSetSpec defines the desired state of ServerMaintenanceSet.
             properties:
               serverLabelSelector:
                 description: ServerLabelSelector specifies a label selector to identify
@@ -174,25 +173,25 @@ spec:
                 type: object
             type: object
           status:
-            description: ServerMaintenanceReplicaStatus defines the observed state
-              of ServerMaintenanceReplica.
+            description: ServerMaintenanceSetStatus defines the observed state of
+              ServerMaintenanceSet.
             properties:
-              servers:
+              completed:
+                format: int32
+                type: integer
+              failed:
+                format: int32
+                type: integer
+              inMaintenance:
+                format: int32
+                type: integer
+              maintenances:
                 description: |-
                   INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
                   Important: Run "make" to regenerate code after modifying this file
                 format: int32
                 type: integer
-              serversCompleted:
-                format: int32
-                type: integer
-              serversFailed:
-                format: int32
-                type: integer
-              serversInMaintenance:
-                format: int32
-                type: integer
-              serversPending:
+              pending:
                 format: int32
                 type: integer
             type: object

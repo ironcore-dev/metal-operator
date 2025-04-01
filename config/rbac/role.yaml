@@ -31,7 +31,6 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - ServerMaintenanceReplicas
   - bmcs
   - bmcsecrets
   - endpoints
@@ -39,6 +38,7 @@ rules:
   - serverclaims
   - serverconfigurations
   - servermaintenances
+  - servermaintenancesets
   - servers
   verbs:
   - create
@@ -51,26 +51,26 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - ServerMaintenanceReplicas/finalizers
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - endpoints/finalizers
   - serverbootconfigurations/finalizers
   - serverclaims/finalizers
   - servermaintenances/finalizers
+  - servermaintenancesets/finalizers
   - servers/finalizers
   verbs:
   - update
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - ServerMaintenanceReplicas/status
   - bmcs/status
   - bmcsecrets/status
   - endpoints/status
   - serverbootconfigurations/status
   - serverclaims/status
   - servermaintenances/status
+  - servermaintenancesets/status
   - servers/status
   verbs:
   - get

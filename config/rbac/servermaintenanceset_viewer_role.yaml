@@ -11,12 +11,12 @@ metadata:
   labels:
     app.kubernetes.io/name: metal-operator
     app.kubernetes.io/managed-by: kustomize
-  name: ServerMaintenanceReplica-viewer-role
+  name: servermaintenanceset-viewer-role
 rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - ServerMaintenanceReplicas
+  - servermaintenancesets
   verbs:
   - get
   - list
@@ -24,6 +24,6 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - ServerMaintenanceReplicas/status
+  - servermaintenancesets/status
   verbs:
   - get

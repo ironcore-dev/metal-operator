@@ -17,7 +17,6 @@ import (
 
 var _ = Describe("ServerMaintenanceSet Controller", func() {
 	ns := SetupTest()
-	const resourceName = "test-resource"
 
 	var servermaintenanceset *metalv1alpha1.ServerMaintenanceSet
 	var server01 *metalv1alpha1.Server

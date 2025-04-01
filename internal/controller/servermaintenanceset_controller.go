@@ -113,12 +113,12 @@ func (r *ServerMaintenanceSetReconciler) reconcile(ctx context.Context, log logr
 
 	// If all servers have a maintenance object, only update the status
 	if len(servers.Items) == len(maintenancelist.Items) {
-		if modified, err := r.patchStatus(ctx, replica, calculateStatus(maintenancelist.Items, log)); err != nil || modified {
+		if modified, err := r.patchStatus(ctx, replica, calculateStatus(maintenancelist.Items)); err != nil || modified {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
-
+	var errs []error
 out:
 	for i, server := range servers.Items {
 		log.V(1).Info("Reconciling server", "server", server.Name)
@@ -135,10 +135,7 @@ out:
 				Namespace: replica.Namespace,
 			},
 		}
-		//if err := controllerutil.SetOwnerReference(replica, &maintenance, r.Scheme, controllerutil.WithBlockOwnerDeletion(false)); err != nil {
-		//	return ctrl.Result{}, err
-		//}
-		controllerutil.CreateOrPatch(ctx, r.Client, &maintenance, func() error {
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &maintenance, func() error {
 			metautils.SetLabels(&maintenance, map[string]string{ServerMaintenanceSetFinalizer: replica.Name})
 			maintenance.Spec = metalv1alpha1.ServerMaintenanceSpec{
 				ServerRef:                       &v1.LocalObjectReference{Name: server.Name},
@@ -148,7 +145,14 @@ out:
 			}
 			return controllerutil.SetControllerReference(replica, &maintenance, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 		})
-		log.V(1).Info("Created ServerMaintenance", "Name", maintenance.Name)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to create or patch serverMaintenance %s: %w", maintenance.Name, err))
+			continue
+		}
+		log.V(1).Info("Created or patched ServerMaintenance", "ServerMaintenance", maintenance.Name, "Operation", opResult)
+	}
+	if len(errs) > 0 {
+		return ctrl.Result{}, fmt.Errorf("errors occurred during servermaintenances creation: %v", errs)
 	}
 
 	// Fetch the list of maintenances again to get the updated status
@@ -157,7 +161,7 @@ out:
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Fetched ServerMaintenances", "Count", len(maintenancelist.Items))
-	if modified, err := r.patchStatus(ctx, replica, calculateStatus(maintenancelist.Items, log)); err != nil || modified {
+	if modified, err := r.patchStatus(ctx, replica, calculateStatus(maintenancelist.Items)); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Reconciled ServerMaintenanceSet", "Name", replica.Name)
@@ -207,7 +211,7 @@ func (r *ServerMaintenanceSetReconciler) getServersBySelector(ctx context.Contex
 	return serverList, nil
 }
 
-func calculateStatus(maintenances []metalv1alpha1.ServerMaintenance, log logr.Logger) metalv1alpha1.ServerMaintenanceSetStatus {
+func calculateStatus(maintenances []metalv1alpha1.ServerMaintenance) metalv1alpha1.ServerMaintenanceSetStatus {
 	var newStatus metalv1alpha1.ServerMaintenanceSetStatus
 	pendingCount := 0
 	maintenanceCount := 0

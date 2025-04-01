@@ -20,10 +20,4 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- servermaintenanceset_admin_role.yaml
-- servermaintenanceset_editor_role.yaml
-- servermaintenanceset_viewer_role.yaml
-- servermaintenance_admin_role.yaml
-- servermaintenance_editor_role.yaml
-- servermaintenance_viewer_role.yaml
 

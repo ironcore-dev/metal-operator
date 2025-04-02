@@ -53,7 +53,7 @@ const (
 	// SSHKeyPairSecretPublicKeyName is the key name for the public key in the SSH key pair secret
 	SSHKeyPairSecretPublicKeyName = "pub"
 	// SSHKeyPairSecretPasswordKeyName is the key name for the password in the SSH key pair secret
-	SShKeyPairSecretPasswordKeyName = "password"
+	SSHKeyPairSecretPasswordKeyName = "password"
 	// ServerFinalizer is the finalizer for the server
 	ServerFinalizer = "metal.ironcore.dev/server"
 	// InternalAnnotationTypeKeyName is the key name for the internal annotation type
@@ -571,7 +571,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 		Data: map[string][]byte{
 			SSHKeyPairSecretPublicKeyName:   sshPublicKey,
 			SSHKeyPairSecretPrivateKeyName:  sshPrivateKey,
-			SShKeyPairSecretPasswordKeyName: password,
+			SSHKeyPairSecretPasswordKeyName: password,
 		},
 	}
 	if err := controllerutil.SetControllerReference(bootConfig, sshSecret, r.Scheme); err != nil {

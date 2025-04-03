@@ -24,3 +24,11 @@ resources:
 - servermaintenance_editor_role.yaml
 - servermaintenance_viewer_role.yaml
 
+# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
+# default, aiding admins in cluster management. Those roles are
+# not used by the {{ .ProjectName }} itself. You can comment the following lines
+# if you do not want those helpers be installed with your Project.
+- serverbios_admin_role.yaml
+- serverbios_editor_role.yaml
+- serverbios_viewer_role.yaml
+

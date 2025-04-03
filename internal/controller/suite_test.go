@@ -245,6 +245,18 @@ func SetupTest() *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&ServerBIOSReconciler{
+			Client:           k8sManager.GetClient(),
+			ManagerNamespace: ns.Name,
+			Insecure:         true,
+			Scheme:           k8sManager.GetScheme(),
+			BMCOptions: bmc.BMCOptions{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		go func() {
 			defer GinkgoRecover()
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")

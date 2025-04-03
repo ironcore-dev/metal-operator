@@ -179,6 +179,9 @@ spec:
                       This port is used by the specified protocol to establish connections.
                     format: int32
                     type: integer
+                  scheme:
+                    description: Scheme specifies the scheme used for communication.
+                    type: string
                 required:
                 - name
                 - port

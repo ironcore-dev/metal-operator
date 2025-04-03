@@ -35,6 +35,7 @@ rules:
   - bmcs
   - bmcsecrets
   - endpoints
+  - oobmsettings
   - serverbootconfigurations
   - serverclaims
   - serverconfigurations
@@ -55,6 +56,7 @@ rules:
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - endpoints/finalizers
+  - oobmsettings/finalizers
   - serverbootconfigurations/finalizers
   - serverclaims/finalizers
   - servermaintenances/finalizers
@@ -68,6 +70,7 @@ rules:
   - bmcs/status
   - bmcsecrets/status
   - endpoints/status
+  - oobmsettings/status
   - serverbootconfigurations/status
   - serverclaims/status
   - servermaintenances/status

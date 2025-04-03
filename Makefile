@@ -252,6 +252,7 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 ADDLICENSE ?= $(LOCALBIN)/addlicense
 GEN_CRD_API_REFERENCE_DOCS ?= $(LOCALBIN)/gen-crd-api-reference-docs
+KUBEBUILDER ?= $(LOCALBIN)/kubebuilder-$(KUBEBUILDER_VERSION)
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions

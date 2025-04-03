@@ -5,6 +5,7 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -59,11 +60,19 @@ type BMC interface {
 
 	GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error)
 
+	GetBMCAttributeValues(ctx context.Context, attributes []string) (redfish.SettingsAttributes, error)
+
 	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
+
+	CheckBMCAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
 
 	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) (err error)
 
+	SetBMCAttributesImediately(ctx context.Context, attributes redfish.SettingsAttributes) (err error)
+
 	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
+
+	GetBMCVersion(ctx context.Context) (string, error)
 
 	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
 
@@ -82,6 +91,28 @@ type BMC interface {
 	) (*redfish.Task, error)
 
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
+}
+
+type ServerManagerManufacturer string
+
+const (
+	DellServers   ServerManagerManufacturer = "Dell Inc."
+	LenovoServers ServerManagerManufacturer = "Lenovo"
+	HPEServers    ServerManagerManufacturer = "HPE"
+)
+
+type SettingAttributeValueTypes string
+
+const (
+	TypeInteger      SettingAttributeValueTypes = "integer"
+	TypeString       SettingAttributeValueTypes = "string"
+	TypeEnumerations SettingAttributeValueTypes = "enumeration"
+)
+
+type OEMManagerInterface interface {
+	GetOEMBMCSettingAttribute() ([]oem.DellAttributes, error)
+	GetObjFromUri(uri string, respObj any) ([]string, error)
+	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
 }
 
 type Entity struct {
@@ -118,8 +149,8 @@ type RegistryEntry struct {
 	Attributes []RegistryEntryAttributes
 }
 
-// BiosRegistry describes the Message Registry file locator Resource.
-type BiosRegistry struct {
+// Registry describes the Message Registry file locator Resource.
+type Registry struct {
 	common.Entity
 	// ODataContext is the odata context.
 	ODataContext string `json:"@odata.context"`
@@ -257,6 +288,23 @@ type Manager struct {
 	PowerState      string
 	State           string
 	MACAddress      string
+	OemLinks        json.RawMessage
+}
+
+type OEMManager struct {
+	OEMManagerInterface
+}
+
+func NewOEMManager(ooem *redfish.Manager) (*OEMManager, error) {
+	switch ooem.Manufacturer {
+	case string(DellServers):
+		return &OEMManager{
+			OEMManagerInterface: &oem.DellIdracManager{
+				OoBM: ooem,
+			}}, nil
+	default:
+		return &OEMManager{}, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
+	}
 }
 
 type OEMInterface interface {

@@ -736,6 +736,20 @@ ConsoleProtocol
 This field is optional and can be omitted if console access is not required.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>oobmSettingsRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>OoBMSettingRef is a reference to a OOBMSetting object that specifies
+the OoBM configuration for this BMC.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1023,6 +1037,20 @@ ConsoleProtocol
 <em>(Optional)</em>
 <p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
 This field is optional and can be omitted if console access is not required.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>oobmSettingsRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>OoBMSettingRef is a reference to a OOBMSetting object that specifies
+the OoBM configuration for this BMC.</p>
 </td>
 </tr>
 </tbody>
@@ -1676,6 +1704,356 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.OOBMSettings">OOBMSettings
+</h3>
+<div>
+<p>OOBMSettings is the Schema for the oobmsettings API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsSpec">
+OOBMSettingsSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>OoBM</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsMap">
+OOBMSettingsMap
+</a>
+</em>
+</td>
+<td>
+<p>OOBMSettings specifies the OoBM settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server&rsquo;s Manager to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ServerMaintenancePolicyTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for human approval
+ServerMaintenancePolicyEnforced will not create a maintenance request.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that OoBM has requested for the referred server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsStatus">
+OOBMSettingsStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.OOBMSettingsMap">OOBMSettingsMap
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsSpec">OOBMSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains OoBM version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Settings contains OoBM settings as map</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.OOBMSettingsSpec">OOBMSettingsSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.OOBMSettings">OOBMSettings</a>)
+</p>
+<div>
+<p>OOBMSettingsSpec defines the desired state of OOBMSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>OoBM</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsMap">
+OOBMSettingsMap
+</a>
+</em>
+</td>
+<td>
+<p>OOBMSettings specifies the OoBM settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server&rsquo;s Manager to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ServerMaintenancePolicyTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for human approval
+ServerMaintenancePolicyEnforced will not create a maintenance request.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that OoBM has requested for the referred server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.OOBMSettingsStatus">OOBMSettingsStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.OOBMSettings">OOBMSettings</a>)
+</p>
+<div>
+<p>OOBMSettingsStatus defines the observed state of OOBMSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.OoBMMaintenanceState">
+OoBMMaintenanceState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the OoBM configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateSettingState</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.OoBMSettingUpdateState">
+OoBMSettingUpdateState
+</a>
+</em>
+</td>
+<td>
+<p>UpdateSettingState represents the current state of the OoBM setting update task.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.OoBMMaintenanceState">OoBMMaintenanceState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsStatus">OOBMSettingsStatus</a>)
+</p>
+<div>
+<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>OoBMMaintenanceStateFailed specifies that the server maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InSettingUpdate&#34;</p></td>
+<td><p>OoBMMaintenanceStateInSettingUpdate specifies that the server OoBM is in setting update path.</p>
+</td>
+</tr><tr><td><p>&#34;InVersionUpgrade&#34;</p></td>
+<td><p>OoBMMaintenanceStateInVersionUpgrade specifies that the server OoBM is in version upgrade path.</p>
+</td>
+</tr><tr><td><p>&#34;SyncSettingsCompleted&#34;</p></td>
+<td><p>OoBMMaintenanceStateSynced specifies that the server OoBM maintenance has been completed.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.OoBMSettingUpdateState">OoBMSettingUpdateState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsStatus">OOBMSettingsStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
+<td><p>SettingUpdateStateIssued specifies that the OoBM new setting was posted to RedFish</p>
+</td>
+</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
+<td><p>SettingUpdateStateCompleted specifies that the OoBM setting has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
+<td><p>SettingUpdateStateWaitOnServerReboot specifies that the OoBM setting state is waiting on server to turn off during Reboot.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
+<td><p>OoBMSettingUpdateWaitOnServerRebootPowerOn specifies that the OoBM setting state is waiting on server to turn on during Reboot.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
@@ -2808,7 +3186,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsSpec">OOBMSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>

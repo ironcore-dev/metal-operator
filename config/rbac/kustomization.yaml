@@ -25,6 +25,9 @@ resources:
 - biosversion_admin_role.yaml
 - biosversion_editor_role.yaml
 - biosversion_viewer_role.yaml
+- oobmsettings_admin_role.yaml
+- oobmsettings_editor_role.yaml
+- oobmsettings_viewer_role.yaml
 - servermaintenance_admin_role.yaml
 - servermaintenance_editor_role.yaml
 - servermaintenance_viewer_role.yaml

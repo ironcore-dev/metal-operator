@@ -2,8 +2,6 @@
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= controller:latest
 METALPROBE_IMG ?= metalprobe:latest
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.31.0
 
 # Docker image name for the mkdocs based local development setup
 IMAGE=ironcore-dev/metal-operator-docs
@@ -64,8 +62,9 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
-fmt: ## Run go fmt against code.
-	go fmt ./...
+fmt: goimports ## Run goimports against code.
+	$(GOIMPORTS) -w .
+
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -254,6 +253,7 @@ ADDLICENSE ?= $(LOCALBIN)/addlicense
 GEN_CRD_API_REFERENCE_DOCS ?= $(LOCALBIN)/gen-crd-api-reference-docs
 KUBEBUILDER ?= $(LOCALBIN)/kubebuilder
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GOIMPORTS ?= $(LOCALBIN)/goimports
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.5.0
@@ -261,7 +261,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.17.1
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
-ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
+ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d.%d",$$3, $$2}')
 GOLANGCI_LINT_VERSION ?= v2.0
 GOIMPORTS_VERSION ?= v0.29.0
 GEN_CRD_API_REFERENCE_DOCS_VERSION ?= v0.3.0
@@ -309,6 +309,10 @@ golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
 
+.PHONY: goimports
+goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
+$(GOIMPORTS): $(LOCALBIN)
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
 
 .PHONY: gen-crd-api-reference-docs
 gen-crd-api-reference-docs: $(GEN_CRD_API_REFERENCE_DOCS) ## Download gen-crd-api-reference-docs locally if necessary.

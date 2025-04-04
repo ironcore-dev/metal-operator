@@ -1,0 +1,9 @@
+# Add the --probe-os-image argument for controller-manager
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --probe-os-image=linux
+
+# Add the --registry-url argument for the controller-manager
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --registry-url=http://localhost:30000

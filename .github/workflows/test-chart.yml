@@ -48,8 +48,8 @@ jobs:
       - name: Prepare metal-operator
         run: |
           go mod download
-          make docker-build IMG=metal-operator:v0.1.0
-          kind load docker-image metal-operator:v0.1.0
+          make docker-build CONTROLLER_IMG=metal-operator:v0.1.0 METALPROBE_IMG=metal-probe:v0.1.0
+          kind load docker-image metal-operator:v0.1.0 metal-probe:v0.1.0
 
       - name: Install cert-manager via Helm
         run: |

@@ -13,3 +13,4 @@ spec:
       targetPort: 9445
   selector:
     control-plane: controller-manager
+    app.kubernetes.io/name: metal-operator

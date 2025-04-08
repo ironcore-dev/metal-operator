@@ -62,8 +62,6 @@ const (
 	// ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
 	// ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.
-	ServerMaintenanceStateCompleted ServerMaintenanceState = "Completed"
-	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
 	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
 )
 

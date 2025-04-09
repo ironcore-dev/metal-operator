@@ -91,6 +91,11 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Expect(k8sClient.DeleteAllOf(ctx, &bmcSecret)).To(Succeed())
 	var bmcSecretList metalv1alpha1.BMCSecretList
 	Eventually(ObjectList(&bmcSecretList)).Should(HaveField("Items", BeEmpty()))
+
+	var serverBIOS metalv1alpha1.ServerBIOS
+	Expect(k8sClient.DeleteAllOf(ctx, &serverBIOS)).To(Succeed())
+	var serverBIOSList metalv1alpha1.ServerBIOSList
+	Eventually(ObjectList(&serverBIOSList)).Should(HaveField("Items", BeEmpty()))
 }
 
 var _ = BeforeSuite(func() {

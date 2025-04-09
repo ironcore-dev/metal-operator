@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +38,7 @@ type ServerBIOSReconciler struct {
 
 const serverBIOSFinalizer = "firmware.ironcore.dev/serverbios"
 
-const serverBIOSCreatorLabel = "firmware.ironcore.dev/CreatedBy"
+const serverBIOSCreatorLabel = "firmware.ironcore.dev/created-by"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses/status,verbs=get;update;patch
@@ -95,7 +97,11 @@ func (r *ServerBIOSReconciler) reconcileExists(
 		if err := r.patchServerBIOSRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
 			return ctrl.Result{}, err
 		}
-	} else if server.Spec.BIOSSettingsRef.Name != serverBIOS.Name {
+		// because we requeue server only after serverMaintenance is created. we need to manually requeue here.
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	if server.Spec.BIOSSettingsRef.Name != serverBIOS.Name {
 		referredBIOSSetting, err := r.getReferredserverBIOS(ctx, log, server.Spec.BIOSSettingsRef)
 		if err != nil {
 			log.V(1).Info("referred server contains reference to different ServerBIOS object, unable to fetch the referenced bios setting")
@@ -108,6 +114,8 @@ func (r *ServerBIOSReconciler) reconcileExists(
 			if err := r.patchServerBIOSRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
 				return ctrl.Result{}, err
 			}
+			// because we requeue server only after serverMaintenance is created. we need to manually requeue here.
+			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
@@ -294,7 +302,7 @@ func (r *ServerBIOSReconciler) handleVersionUpgradeState(
 	}
 
 	// wait for maintenance request to be granted
-	if ok := r.checkIfMaintenanceGranted(log, serverBIOS, server); ok {
+	if ok := r.checkIfMaintenanceGranted(log, serverBIOS, server); !ok {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with version upgrade")
 		return ctrl.Result{}, nil
 	}
@@ -326,7 +334,7 @@ func (r *ServerBIOSReconciler) handleSettingUpdateState(
 		return ctrl.Result{}, err
 	}
 
-	if req, err := r.checkAndRequestMaintenance(ctx, log, serverBIOS, server, &settingsDiff); err != nil || req {
+	if req, err := r.checkAndRequestMaintenance(ctx, log, serverBIOS, server, settingsDiff); err != nil || req {
 		return ctrl.Result{}, err
 	}
 
@@ -336,7 +344,7 @@ func (r *ServerBIOSReconciler) handleSettingUpdateState(
 		return ctrl.Result{}, nil
 	}
 
-	return r.applySettingUpdateStateTransition(ctx, log, serverBIOS, server, &settingsDiff)
+	return r.applySettingUpdateStateTransition(ctx, log, serverBIOS, server, settingsDiff)
 }
 
 func (r *ServerBIOSReconciler) checkAndRequestMaintenance(
@@ -344,7 +352,7 @@ func (r *ServerBIOSReconciler) checkAndRequestMaintenance(
 	log logr.Logger,
 	serverBIOS *metalv1alpha1.ServerBIOS,
 	server *metalv1alpha1.Server,
-	settingsDiff *map[string]string,
+	settingsDiff map[string]string,
 ) (bool, error) {
 	// check if we need to request maintenance if we dont have it already
 	// note: having this check will reduce the call made to BMC.
@@ -355,7 +363,7 @@ func (r *ServerBIOSReconciler) checkAndRequestMaintenance(
 		}
 		defer bmcClient.Logout()
 
-		resetReq, err := bmcClient.CheckBiosAttributes(*settingsDiff)
+		resetReq, err := bmcClient.CheckBiosAttributes(settingsDiff)
 		if resetReq {
 			// request maintenance if needed, even if err was reported.
 			requeue, errMainReq := r.requestMaintenanceOnServer(ctx, log, serverBIOS, server)
@@ -373,7 +381,7 @@ func (r *ServerBIOSReconciler) applySettingUpdateStateTransition(
 	log logr.Logger,
 	serverBIOS *metalv1alpha1.ServerBIOS,
 	server *metalv1alpha1.Server,
-	settingsDiff *map[string]string,
+	settingsDiff map[string]string,
 ) (ctrl.Result, error) {
 	switch serverBIOS.Status.UpdateSettingState {
 	case "":
@@ -394,11 +402,18 @@ func (r *ServerBIOSReconciler) applySettingUpdateStateTransition(
 		}
 		defer bmcClient.Logout()
 
-		err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemUUID, *settingsDiff)
+		err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemUUID, settingsDiff)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
 		}
-		err = r.updateBIOSSettingUpdateStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff)
+
+		// if we dont need (have not requested maintenance) reboot. skip reboot steps.
+		nextState := metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff
+		if serverBIOS.Spec.ServerMaintenanceRef == nil {
+			nextState = metalv1alpha1.BIOSSettingUpdateStateVerification
+		}
+
+		err = r.updateBIOSSettingUpdateStatus(ctx, log, serverBIOS, nextState)
 		return ctrl.Result{}, err
 	case metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff:
 		// expected state it to be off and initial state is to be on.
@@ -525,10 +540,7 @@ func (r *ServerBIOSReconciler) getBiosSettingDifference(
 	}
 	defer bmcClient.Logout()
 
-	keys := make([]string, 0, len(serverBIOS.Spec.BIOS.Settings))
-	for k := range serverBIOS.Spec.BIOS.Settings {
-		keys = append(keys, k)
-	}
+	keys := slices.Collect(maps.Keys(serverBIOS.Spec.BIOS.Settings))
 
 	currentSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemUUID, keys)
 	if err != nil {
@@ -686,12 +698,11 @@ func (r *ServerBIOSReconciler) patchServerBIOSRefOnServer(
 	log logr.Logger,
 	server *metalv1alpha1.Server,
 	serverBIOSReference *corev1.LocalObjectReference,
-) error {
+) (err error) {
 	if server.Spec.BIOSSettingsRef == serverBIOSReference {
 		return nil
 	}
 
-	var err error
 	serverBase := server.DeepCopy()
 	server.Spec.BIOSSettingsRef = serverBIOSReference
 	if err = r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
@@ -713,7 +724,7 @@ func (r *ServerBIOSReconciler) patchMaintenanceRequestRefOnServerBIOS(
 		serverBIOS.Spec.ServerMaintenanceRef = nil
 	} else {
 		serverBIOS.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
-			APIVersion: "metal.ironcore.dev/v1alpha1",
+			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			Kind:       "ServerMaintenance",
 			Namespace:  serverMaintenance.Namespace,
 			Name:       serverMaintenance.Name,

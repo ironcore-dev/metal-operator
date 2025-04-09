@@ -49,21 +49,6 @@ spec:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
                   on the server.
                 type: string
-              bios:
-                description: BIOS specifies the BIOS settings for the selected serverRef
-                  or serverSelector.
-                properties:
-                  settings:
-                    additionalProperties:
-                      type: string
-                    description: Settings contains BIOS settings as map
-                    type: object
-                  version:
-                    description: Version contains BIOS version
-                    type: string
-                required:
-                - version
-                type: object
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
                   object that that BIOS has requested for the referred server.
@@ -109,7 +94,8 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               serverRef:
-                description: ServerRef is a reference to a specific server to be claimed.
+                description: ServerRef is a reference to a specific server to apply
+                  bios setting on.
                 properties:
                   name:
                     default: ""
@@ -125,6 +111,21 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
+              settings:
+                description: BIOS specifies the BIOS settings for the selected serverRef
+                  or serverSelector.
+                properties:
+                  settings:
+                    additionalProperties:
+                      type: string
+                    description: Settings contains BIOS settings as map
+                    type: object
+                  version:
+                    description: Version contains BIOS version
+                    type: string
+                required:
+                - version
+                type: object
             type: object
           status:
             description: ServerBIOSStatus defines the observed state of ServerBIOS.

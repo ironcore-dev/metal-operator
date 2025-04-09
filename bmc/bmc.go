@@ -42,7 +42,7 @@ type BMC interface {
 
 	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
 
-	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]interface{}, error)
+	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error)
 
 	CheckBiosAttributes(attrs map[string]string) (reset bool, err error)
 
@@ -62,11 +62,6 @@ type Entity struct {
 	ID string `json:"Id"`
 	// Name is the name of the resource or array element.
 	Name string `json:"name"`
-}
-
-type Bios struct {
-	Version    string
-	Attributes map[string]string
 }
 
 type AllowedValues struct {

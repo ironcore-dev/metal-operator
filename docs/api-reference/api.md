@@ -16,7 +16,7 @@ Resource Types:
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBIOSStatus">ServerBIOSStatus</a>)
 </p>
 <div>
-<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
+<p>BIOSMaintenanceState specifies the current state of the BIOS maintenance.</p>
 </div>
 <table>
 <thead>
@@ -1519,7 +1519,7 @@ ServerBIOSSpec
 <table>
 <tr>
 <td>
-<code>bios</code><br/>
+<code>settings</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
 BIOSSettings
@@ -1540,7 +1540,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>ServerRef is a reference to a specific server to be claimed.</p>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
 </td>
 </tr>
 <tr>
@@ -1604,7 +1604,7 @@ ServerBIOSStatus
 <tbody>
 <tr>
 <td>
-<code>bios</code><br/>
+<code>settings</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
 BIOSSettings
@@ -1625,7 +1625,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>ServerRef is a reference to a specific server to be claimed.</p>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
 </td>
 </tr>
 <tr>

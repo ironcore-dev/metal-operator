@@ -17,9 +17,9 @@ type ServerBIOSSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// BIOS specifies the BIOS settings for the selected serverRef or serverSelector.
-	BIOS BIOSSettings `json:"bios,omitempty"`
+	BIOS BIOSSettings `json:"settings,omitempty"`
 
-	// ServerRef is a reference to a specific server to be claimed.
+	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
@@ -40,7 +40,7 @@ type BIOSSettings struct {
 	Settings map[string]string `json:"settings,omitempty"`
 }
 
-// ServerMaintenanceState specifies the current state of the server maintenance.
+// BIOSMaintenanceState specifies the current state of the BIOS maintenance.
 type BIOSMaintenanceState string
 
 const (

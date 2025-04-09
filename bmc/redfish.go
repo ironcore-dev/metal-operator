@@ -265,7 +265,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	systemUUID string,
 	attributes []string,
 ) (
-	result map[string]interface{},
+	result redfish.SettingsAttributes,
 	err error,
 ) {
 	if len(attributes) == 0 {
@@ -283,7 +283,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	if err != nil {
 		return
 	}
-	result = make(map[string]interface{}, len(attributes))
+	result = make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if _, ok := filteredAttr[name]; ok {
 			result[name] = bios.Attributes[name]
@@ -297,7 +297,7 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 	systemUUID string,
 	attributes []string,
 ) (
-	result map[string]interface{},
+	result redfish.SettingsAttributes,
 	err error,
 ) {
 	system, err := r.getSystemByUUID(ctx, systemUUID)
@@ -305,9 +305,8 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 		return result, err
 	}
 
-	type tempSys redfish.ComputerSystem
 	var tSys struct {
-		tempSys
+		redfish.ComputerSystem
 		Bios common.Link
 	}
 
@@ -316,10 +315,7 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 		return result, err
 	}
 
-	type tempBios Bios
-
 	var tBios struct {
-		tempBios
 		Settings common.Settings `json:"@Redfish.Settings"`
 	}
 
@@ -356,7 +352,7 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 	}
 
 	var tBiosSetting struct {
-		Attributes map[string]interface{} `json:"Attributes"`
+		Attributes redfish.SettingsAttributes `json:"Attributes"`
 	}
 
 	err = json.Unmarshal(biosSettingRawBody, &tBiosSetting)
@@ -382,7 +378,7 @@ func (r *RedfishBMC) SetBiosAttributesOnReset(
 		return
 	}
 
-	attrs := make(map[string]interface{}, len(attributes))
+	attrs := make(redfish.SettingsAttributes, len(attributes))
 	for name, value := range attributes {
 		attrs[name] = value
 	}
@@ -439,11 +435,12 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs map[string]string) (reset bool, e
 	if err != nil {
 		return reset, err
 	}
+	var errs []error
 	//TODO: add more types like maps and Enumerations
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
-			err = errors.Join(err, fmt.Errorf("attribute %s not found or immutable/hidden", name))
+			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
 			continue
 		}
 		if entryAttribute.ResetRequired {
@@ -451,16 +448,15 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs map[string]string) (reset bool, e
 		}
 		switch strings.ToLower(entryAttribute.Type) {
 		case "integer":
-			_, Aerr := strconv.Atoi(value)
-			if Aerr != nil {
-				err = errors.Join(
-					err,
+			_, err := strconv.Atoi(value)
+			if err != nil {
+				errs = append(
+					errs,
 					fmt.Errorf(
 						"attribute %s value has wrong type. needed %s for %v ",
 						name,
 						entryAttribute.Type,
-						entryAttribute,
-					))
+						entryAttribute))
 			}
 		case "string":
 			continue
@@ -473,12 +469,12 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs map[string]string) (reset bool, e
 				}
 			}
 			if !ok {
-				err = errors.Join(err, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
+				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
 			}
 			continue
 		default:
-			err = errors.Join(
-				err,
+			errs = append(
+				errs,
 				fmt.Errorf("attribute %s value has wrong type. needed %s for %v ",
 					name,
 					entryAttribute.Type,
@@ -486,7 +482,7 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs map[string]string) (reset bool, e
 				))
 		}
 	}
-	return reset, err
+	return reset, errors.Join(errs...)
 }
 
 func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {

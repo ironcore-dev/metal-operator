@@ -43,11 +43,11 @@ const serverBIOSCreatorLabel = "firmware.ironcore.dev/created-by"
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses/finalizers,verbs=update
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;update
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -621,9 +621,11 @@ func (r *ServerBIOSReconciler) requestMaintenanceOnServer(
 		return false, nil
 	}
 
-	serverMaintenance := &metalv1alpha1.ServerMaintenance{}
-	serverMaintenance.Name = serverBIOS.Name
-	serverMaintenance.Namespace = r.ManagerNamespace
+	serverMaintenance := &metalv1alpha1.ServerMaintenance{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: r.ManagerNamespace,
+			Name:      serverBIOS.Name,
+		}}
 
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
 		serverMaintenance.SetLabels(map[string]string{serverBIOSCreatorLabel: serverBIOS.Name})

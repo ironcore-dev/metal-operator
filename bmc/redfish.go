@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
@@ -269,19 +268,19 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	err error,
 ) {
 	if len(attributes) == 0 {
-		return
+		return result, err
 	}
 	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
-		return
+		return result, err
 	}
 	bios, err := system.Bios()
 	if err != nil {
-		return
+		return result, err
 	}
 	filteredAttr, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil {
-		return
+		return result, err
 	}
 	result = make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
@@ -289,7 +288,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 			result[name] = bios.Attributes[name]
 		}
 	}
-	return
+	return result, err
 }
 
 func (r *RedfishBMC) GetPendingAttributeValues(
@@ -367,7 +366,7 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 func (r *RedfishBMC) SetBiosAttributesOnReset(
 	ctx context.Context,
 	systemUUID string,
-	attributes map[string]string,
+	attributes redfish.SettingsAttributes,
 ) (err error) {
 	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
@@ -428,13 +427,21 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 }
 
 // check if the arrtibutes need to reboot when changed, and are correct type.
-func (r *RedfishBMC) CheckBiosAttributes(attrs map[string]string) (reset bool, err error) {
+func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
 	// filter out immutable, readonly and hidden attributes
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil {
 		return reset, err
 	}
+	return r.checkBiosAttribues(attrs, filtered)
+}
+
+func (r *RedfishBMC) checkBiosAttribues(
+	attrs redfish.SettingsAttributes,
+	filtered map[string]RegistryEntryAttributes,
+) (reset bool, err error) {
+	reset = false
 	var errs []error
 	//TODO: add more types like maps and Enumerations
 	for name, value := range attrs {
@@ -448,35 +455,59 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs map[string]string) (reset bool, e
 		}
 		switch strings.ToLower(entryAttribute.Type) {
 		case "integer":
-			_, err := strconv.Atoi(value)
-			if err != nil {
+			if _, ok := value.(int); !ok {
 				errs = append(
 					errs,
 					fmt.Errorf(
-						"attribute %s value has wrong type. needed %s for %v ",
+						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
 						name,
+						value,
 						entryAttribute.Type,
-						entryAttribute))
+						entryAttribute,
+					))
 			}
 		case "string":
-			continue
+			if _, ok := value.(string); !ok {
+				errs = append(
+					errs,
+					fmt.Errorf(
+						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
+						name,
+						value,
+						entryAttribute.Type,
+						entryAttribute,
+					))
+			}
 		case "enumeration":
-			var ok bool
+			if _, ok := value.(string); !ok {
+				errs = append(
+					errs,
+					fmt.Errorf(
+						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
+						name,
+						value,
+						entryAttribute.Type,
+						entryAttribute,
+					))
+				break
+			}
+			var validEnum bool
 			for _, attrValue := range entryAttribute.Value {
-				if attrValue.ValueName == value {
-					ok = true
+				if attrValue.ValueName == value.(string) {
+					validEnum = true
 					break
 				}
 			}
-			if !ok {
+			if !validEnum {
 				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
 			}
-			continue
 		default:
 			errs = append(
 				errs,
-				fmt.Errorf("attribute %s value has wrong type. needed %s for %v ",
+				fmt.Errorf(
+					"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
 					name,
+					value,
 					entryAttribute.Type,
 					entryAttribute,
 				))

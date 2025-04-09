@@ -26,7 +26,7 @@ type BIOSSettingsSpec struct {
 	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 

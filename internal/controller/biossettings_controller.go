@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -290,7 +292,7 @@ func (r *BiosSettingsReconciler) checkAndRequestMaintenance(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
-	settingsDiff map[string]string,
+	settingsDiff redfish.SettingsAttributes,
 ) (bool, error) {
 	// check if we need to request maintenance if we dont have it already
 	// note: having this check will reduce the call made to BMC.
@@ -319,7 +321,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
-	settingsDiff map[string]string,
+	settingsDiff redfish.SettingsAttributes,
 ) (ctrl.Result, error) {
 	switch biosSettings.Status.UpdateSettingState {
 	case "":
@@ -327,10 +329,19 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingUpdateStateIssue)
 			return ctrl.Result{}, err
 		}
+		// we need to request maintenance to get the server to power-On to apply the BIOS settings
+		if biosSettings.Spec.ServerMaintenanceRef == nil {
+			log.V(1).Info("server powered off, request maintenance to turn the server On")
+			if requeue, err := r.requestMaintenanceOnServer(ctx, log, biosSettings, server); err != nil || requeue {
+				return ctrl.Result{}, err
+			}
+		}
+
 		err := r.patchServerMaintenancePowerState(ctx, log, biosSettings, metalv1alpha1.PowerOn)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to turn on server %w", err)
 		}
+		log.V(1).Info("Reconciled biosSettings at Pending state")
 		return ctrl.Result{}, err
 	case metalv1alpha1.BIOSSettingUpdateStateIssue:
 		// todo: make it idepotent
@@ -352,6 +363,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 		}
 
 		err = r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, nextState)
+		log.V(1).Info("Reconciled biosSettings at update Settings state")
 		return ctrl.Result{}, err
 	case metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff:
 		// expected state it to be off and initial state is to be on.
@@ -366,7 +378,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn)
 			return ctrl.Result{}, err
 		}
-
+		log.V(1).Info("Reconciled biosSettings at reboot wait for power off")
 		return ctrl.Result{}, nil
 	case metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn:
 		// expected power state it to be on and initial state is to be off.
@@ -381,6 +393,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingUpdateStateVerification)
 			return ctrl.Result{}, err
 		}
+		log.V(1).Info("Reconciled biosSettings at reboot wait for power on")
 		return ctrl.Result{}, nil
 	case metalv1alpha1.BIOSSettingUpdateStateVerification:
 		// make sure the setting has actually applied.
@@ -395,6 +408,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied)
 			return ctrl.Result{}, err
 		}
+		log.V(1).Info("Reconciled biosSettings at wait for verification")
 		return ctrl.Result{}, fmt.Errorf("waiting on the BIOS setting to take place")
 	}
 	log.V(1).Info("Unknown State found", "biosSettings UpdateSetting state", biosSettings.Status.UpdateSettingState)
@@ -445,7 +459,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
-) (currentbiosVersion string, diff map[string]string, err error) {
+) (currentbiosVersion string, diff redfish.SettingsAttributes, err error) {
 	// todo: need to also account for future pending changes reported for bios
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
@@ -461,16 +475,44 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 		return "", diff, fmt.Errorf("failed to get BIOS settings: %w", err)
 	}
 
-	diff = map[string]string{}
+	diff = redfish.SettingsAttributes{}
+	var errs []error
 	for key, value := range biosSettings.Spec.BIOSSettings.SettingsMap {
 		res, ok := currentSettings[key]
 		if ok {
-			if res.(string) != value {
-				diff[key] = value
+			switch data := res.(type) {
+			case int:
+				intvalue, err := strconv.Atoi(value)
+				if err != nil {
+					log.V(1).Info("Failed to check type for", "Setting name", key, "setting value", value, "error", err)
+					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
+					continue
+				}
+				if data != intvalue {
+					diff[key] = intvalue
+				}
+			case string:
+				if data != value {
+					diff[key] = value
+				}
+			case float64:
+				floatvalue, err := strconv.ParseFloat(value, 64)
+				if err != nil {
+					log.V(1).Info("Failed to check type for", "Setting name", key, "setting value", value, "error", err)
+					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
+				}
+				if data != floatvalue {
+					diff[key] = floatvalue
+				}
 			}
 		} else {
 			diff[key] = value
 		}
+	}
+
+	if len(errs) > 0 {
+		log.V(1).Info("Failed to get bios setting differences for some settings", "error", errs)
+		return "", diff, fmt.Errorf("failed to find diff for some bios settings: %v", errs)
 	}
 
 	// fetch the current bios version from the server bmc
@@ -578,6 +620,9 @@ func (r *BiosSettingsReconciler) getReferredServerMaintenance(
 	log logr.Logger,
 	serverMaintenanceRef *corev1.ObjectReference,
 ) (*metalv1alpha1.ServerMaintenance, error) {
+	if serverMaintenanceRef == nil {
+		return nil, fmt.Errorf("nil ServerMaintenance reference")
+	}
 	key := client.ObjectKey{Name: serverMaintenanceRef.Name, Namespace: r.ManagerNamespace}
 	serverMaintenance := &metalv1alpha1.ServerMaintenance{}
 	if err := r.Get(ctx, key, serverMaintenance); err != nil {
@@ -655,6 +700,7 @@ func (r *BiosSettingsReconciler) patchServerMaintenancePowerState(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	powerState metalv1alpha1.Power,
 ) error {
+
 	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, biosSettings.Spec.ServerMaintenanceRef)
 	if err != nil {
 		return err

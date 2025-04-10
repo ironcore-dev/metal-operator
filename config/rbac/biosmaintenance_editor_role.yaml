@@ -10,17 +10,17 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: serverbios-editor-role
+    app.kubernetes.io/instance: biosmaintenance-editor-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: metal-operator
     app.kubernetes.io/part-of: metal-operator
     app.kubernetes.io/managed-by: kustomize
-  name: serverbios-editor-role
+  name: biosmaintenance-editor-role
 rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - serverbios
+  - biosmaintenance
   verbs:
   - create
   - delete
@@ -32,6 +32,6 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - serverbios/status
+  - biosmaintenance/status
   verbs:
   - get

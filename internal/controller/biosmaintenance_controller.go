@@ -27,8 +27,8 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 )
 
-// ServerBIOSReconciler reconciles a ServerBIOS object
-type ServerBIOSReconciler struct {
+// BiosMaintenanceReconciler reconciles a BiosMaintenance object
+type BiosMaintenanceReconciler struct {
 	client.Client
 	ManagerNamespace string
 	Insecure         bool
@@ -36,13 +36,13 @@ type ServerBIOSReconciler struct {
 	BMCOptions       bmc.BMCOptions
 }
 
-const serverBIOSFinalizer = "firmware.ironcore.dev/serverbios"
+const biosMaintenanceFinalizer = "firmware.ironcore.dev/biosmaintenance"
 
-const serverBIOSCreatorLabel = "firmware.ironcore.dev/created-by"
+const biosMaintenanceCreatorLabel = "firmware.ironcore.dev/created-by"
 
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverbioses/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosmaintenances,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosmaintenances/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosmaintenances/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances/status,verbs=get;update;patch
@@ -51,122 +51,116 @@ const serverBIOSCreatorLabel = "firmware.ironcore.dev/created-by"
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *ServerBIOSReconciler) Reconcile(
+func (r *BiosMaintenanceReconciler) Reconcile(
 	ctx context.Context,
 	req ctrl.Request,
 ) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	serverBIOS := &metalv1alpha1.ServerBIOS{}
-	if err := r.Get(ctx, req.NamespacedName, serverBIOS); err != nil {
+	biosMaintenance := &metalv1alpha1.BiosMaintenance{}
+	if err := r.Get(ctx, req.NamespacedName, biosMaintenance); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.V(1).Info("Reconciling serverBIOS")
+	log.V(1).Info("Reconciling biosMaintenance")
 
-	return r.reconcileExists(ctx, log, serverBIOS)
+	return r.reconcileExists(ctx, log, biosMaintenance)
 }
 
 // Determine whether reconciliation is required. It's not required if:
 // - object is being deleted;
 // - object does not contain reference to server;
 // - object contains reference to server, but server references to another object with lower version;
-func (r *ServerBIOSReconciler) reconcileExists(
+func (r *BiosMaintenanceReconciler) reconcileExists(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if !serverBIOS.DeletionTimestamp.IsZero() {
+	if !biosMaintenance.DeletionTimestamp.IsZero() {
 		log.V(1).Info("object is being deleted")
-		return r.reconcileDeletion(ctx, log, serverBIOS)
+		return r.reconcileDeletion(ctx, log, biosMaintenance)
 	}
 
 	// if object does not refer to server object - stop reconciliation
-	if serverBIOS.Spec.ServerRef == nil {
+	if biosMaintenance.Spec.ServerRef == nil {
 		log.V(1).Info("object does not refer to server object")
 		return ctrl.Result{}, nil
 	}
 
-	// if referred server contains reference to different ServerBIOS object - stop reconciliation
-	server, err := r.getReferredServer(ctx, log, serverBIOS.Spec.ServerRef)
+	// if referred server contains reference to different BiosMaintenance object - stop reconciliation
+	server, err := r.getReferredServer(ctx, log, biosMaintenance.Spec.ServerRef)
 	if err != nil {
 		log.V(1).Info("referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}
-	// patch server with serverbios reference
+	// patch server with biosmaintenance reference
 	if server.Spec.BIOSSettingsRef == nil {
-		if err := r.patchServerBIOSRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
+		if err := r.patchBiosMaintenanceRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: biosMaintenance.Name}); err != nil {
 			return ctrl.Result{}, err
 		}
-		// because we requeue server only after serverMaintenance is created. we need to manually requeue here.
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	if server.Spec.BIOSSettingsRef.Name != serverBIOS.Name {
-		referredBIOSSetting, err := r.getReferredserverBIOS(ctx, log, server.Spec.BIOSSettingsRef)
+	} else if server.Spec.BIOSSettingsRef.Name != biosMaintenance.Name {
+		referredBIOSSetting, err := r.getReferredbiosMaintenance(ctx, log, server.Spec.BIOSSettingsRef)
 		if err != nil {
-			log.V(1).Info("referred server contains reference to different ServerBIOS object, unable to fetch the referenced bios setting")
+			log.V(1).Info("referred server contains reference to different BiosMaintenance object, unable to fetch the referenced bios setting")
 			return ctrl.Result{}, err
 		}
 		// check if the current BIOS setting version is newer and update reference if it is newer
 		// todo : handle version checks correctly
-		if referredBIOSSetting.Spec.BIOS.Version < serverBIOS.Spec.BIOS.Version {
+		if referredBIOSSetting.Spec.BiosSettings.Version < biosMaintenance.Spec.BiosSettings.Version {
 			log.V(1).Info("Updating BIOSSetting reference to the latest BIOS version")
-			if err := r.patchServerBIOSRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: serverBIOS.Name}); err != nil {
+			if err := r.patchBiosMaintenanceRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: biosMaintenance.Name}); err != nil {
 				return ctrl.Result{}, err
 			}
-			// because we requeue server only after serverMaintenance is created. we need to manually requeue here.
-			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
-	return r.reconcile(ctx, log, serverBIOS, server)
+	return r.reconcile(ctx, log, biosMaintenance, server)
 }
 
-func (r *ServerBIOSReconciler) reconcileDeletion(
+func (r *BiosMaintenanceReconciler) reconcileDeletion(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(serverBIOS, serverBIOSFinalizer) {
+	if !controllerutil.ContainsFinalizer(biosMaintenance, biosMaintenanceFinalizer) {
 		return ctrl.Result{}, nil
 	}
-	if err := r.cleanupReferences(ctx, log, serverBIOS); err != nil {
+	if err := r.cleanupReferences(ctx, log, biosMaintenance); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("ensured references were cleaned up")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, serverBIOS, serverBIOSFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosMaintenance, biosMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("serverBIOS is deleted")
+	log.V(1).Info("biosMaintenance is deleted")
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerBIOSReconciler) cleanupServerMaintenanceReferences(
+func (r *BiosMaintenanceReconciler) cleanupServerMaintenanceReferences(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 ) error {
-	if serverBIOS.Spec.ServerMaintenanceRef == nil {
+	if biosMaintenance.Spec.ServerMaintenanceRef == nil {
 		return nil
 	}
 	// try to get the serverMaintaince created
-	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, serverBIOS.Spec.ServerMaintenanceRef)
+	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, biosMaintenance.Spec.ServerMaintenanceRef)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get referred serverMaintenance obj from serverBIOS: %w", err)
+		return fmt.Errorf("failed to get referred serverMaintenance obj from biosMaintenance: %w", err)
 	}
 
 	// if we got the server ref. by and its not being deleted
 	if err == nil && serverMaintenance.DeletionTimestamp.IsZero() {
-		// if the serverMaintenace is not created by serverBIOS Controller, dont delete.
+		// if the serverMaintenace is not created by biosMaintenance Controller, dont delete.
 		labelsOnMaintenance := serverMaintenance.GetLabels()
 
 		// created by the controller
-		if key, ok := labelsOnMaintenance[serverBIOSCreatorLabel]; ok && key == serverBIOS.Name {
-			// if the serverBIOS is not being deleted, update the
+		if key, ok := labelsOnMaintenance[biosMaintenanceCreatorLabel]; ok && key == biosMaintenance.Name {
+			// if the biosMaintenance is not being deleted, update the
 			log.V(1).Info("Deleting server maintenance", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
 			if err := r.Delete(ctx, serverMaintenance); err != nil {
 				return err
@@ -177,25 +171,25 @@ func (r *ServerBIOSReconciler) cleanupServerMaintenanceReferences(
 	}
 	// if already deleted or we deleted it or its created by user, remove reference
 	if apierrors.IsNotFound(err) || err == nil {
-		err = r.patchMaintenanceRequestRefOnServerBIOS(ctx, log, serverBIOS, nil)
+		err = r.patchMaintenanceRequestRefOnBiosMaintenance(ctx, log, biosMaintenance, nil)
 		if err != nil {
-			return fmt.Errorf("failed to clean up serverMaintenance ref in serverBIOS status: %w", err)
+			return fmt.Errorf("failed to clean up serverMaintenance ref in biosMaintenance status: %w", err)
 		}
 	}
 	return nil
 }
 
-func (r *ServerBIOSReconciler) cleanupReferences(
+func (r *BiosMaintenanceReconciler) cleanupReferences(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 ) (err error) {
-	if err := r.cleanupServerMaintenanceReferences(ctx, log, serverBIOS); err != nil {
+	if err := r.cleanupServerMaintenanceReferences(ctx, log, biosMaintenance); err != nil {
 		return err
 	}
 
-	if serverBIOS.Spec.ServerRef != nil {
-		server, err := r.getReferredServer(ctx, log, serverBIOS.Spec.ServerRef)
+	if biosMaintenance.Spec.ServerRef != nil {
+		server, err := r.getReferredServer(ctx, log, biosMaintenance.Spec.ServerRef)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -206,10 +200,10 @@ func (r *ServerBIOSReconciler) cleanupReferences(
 		// if we have found the server, check if ref is this serevrBIOS and remove it
 		if err == nil {
 			if server.Spec.BIOSSettingsRef != nil {
-				if server.Spec.BIOSSettingsRef.Name != serverBIOS.Name {
+				if server.Spec.BIOSSettingsRef.Name != biosMaintenance.Name {
 					return nil
 				}
-				return r.patchServerBIOSRefOnServer(ctx, log, server, nil)
+				return r.patchBiosMaintenanceRefOnServer(ctx, log, server, nil)
 			} else {
 				// nothing else to clean up
 				return nil
@@ -220,54 +214,54 @@ func (r *ServerBIOSReconciler) cleanupReferences(
 	return err
 }
 
-func (r *ServerBIOSReconciler) reconcile(
+func (r *BiosMaintenanceReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
-	if shouldIgnoreReconciliation(serverBIOS) {
+	if shouldIgnoreReconciliation(biosMaintenance) {
 		log.V(1).Info("Skipped BIOS Setting reconciliation")
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, serverBIOS, serverBIOSFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosMaintenance, biosMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
-	return r.ensureServerMaintenanceStateTransition(ctx, log, serverBIOS, server)
+	return r.ensureServerMaintenanceStateTransition(ctx, log, biosMaintenance, server)
 }
 
-func (r *ServerBIOSReconciler) ensureServerMaintenanceStateTransition(
+func (r *BiosMaintenanceReconciler) ensureServerMaintenanceStateTransition(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
-	switch serverBIOS.Status.State {
+	switch biosMaintenance.Status.State {
 	case "":
 		//todo: check that in initial state there is no pending BIOS maintenance left behind,
 
 		// move to upgrade to check if version matches
-		err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade)
+		err := r.updateBiosMaintenanceStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosMaintenanceStateInVersionUpgrade)
 		return ctrl.Result{}, err
-	case metalv1alpha1.BIOSMaintenanceStateInVersionUpgrade:
-		return r.handleVersionUpgradeState(ctx, log, serverBIOS, server)
-	case metalv1alpha1.BIOSMaintenanceStateInSettingUpdate:
-		return r.handleSettingUpdateState(ctx, log, serverBIOS, server)
-	case metalv1alpha1.BIOSMaintenanceStateSynced:
-		return r.handleSettingSyncedState(ctx, log, serverBIOS, server)
-	case metalv1alpha1.BIOSMaintenanceStateFailed:
-		return r.handleFailedState(ctx, log, serverBIOS, server)
+	case metalv1alpha1.BiosMaintenanceStateInVersionUpgrade:
+		return r.handleVersionUpgradeState(ctx, log, biosMaintenance, server)
+	case metalv1alpha1.BiosMaintenanceStateInSettingUpdate:
+		return r.handleSettingUpdateState(ctx, log, biosMaintenance, server)
+	case metalv1alpha1.BiosMaintenanceStateSynced:
+		return r.handleSettingSyncedState(ctx, log, biosMaintenance, server)
+	case metalv1alpha1.BiosMaintenanceStateFailed:
+		return r.handleFailedState(ctx, log, biosMaintenance, server)
 	}
-	log.V(1).Info("Unknown State found", "serverBIOS state", serverBIOS.Status.State)
+	log.V(1).Info("Unknown State found", "biosMaintenance state", biosMaintenance.Status.State)
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerBIOSReconciler) handleVersionUpgradeState(
+func (r *BiosMaintenanceReconciler) handleVersionUpgradeState(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 
@@ -285,44 +279,44 @@ func (r *ServerBIOSReconciler) handleVersionUpgradeState(
 	}
 
 	// todo: handle version check correctly to detect and upgrade only to higher version
-	if currentBiosVersion == serverBIOS.Spec.BIOS.Version {
+	if currentBiosVersion == biosMaintenance.Spec.BiosSettings.Version {
 		// move status to inMaintenance to check if settings needs to be upgraded
 		log.V(1).Info("BIOS version matches")
-		err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateInSettingUpdate)
+		err := r.updateBiosMaintenanceStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosMaintenanceStateInSettingUpdate)
 		return ctrl.Result{}, err
-	} else if currentBiosVersion > serverBIOS.Spec.BIOS.Version {
-		log.V(1).Info("BIOS downgrade is not supported", "currentBiosVersion", currentBiosVersion, "requested", serverBIOS.Spec.BIOS.Version)
-		err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateFailed)
+	} else if currentBiosVersion > biosMaintenance.Spec.BiosSettings.Version {
+		log.V(1).Info("BIOS downgrade is not supported", "currentBiosVersion", currentBiosVersion, "requested", biosMaintenance.Spec.BiosSettings.Version)
+		err := r.updateBiosMaintenanceStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosMaintenanceStateFailed)
 		return ctrl.Result{}, err
 	}
 
 	// BIOS upgrade always need server reboot, Hence need maintenance request.
-	if requeue, err := r.requestMaintenanceOnServer(ctx, log, serverBIOS, server); err != nil || requeue {
+	if requeue, err := r.requestMaintenanceOnServer(ctx, log, biosMaintenance, server); err != nil || requeue {
 		return ctrl.Result{}, err
 	}
 
 	// wait for maintenance request to be granted
-	if ok := r.checkIfMaintenanceGranted(log, serverBIOS, server); !ok {
+	if ok := r.checkIfMaintenanceGranted(log, biosMaintenance, server); !ok {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with version upgrade")
 		return ctrl.Result{}, nil
 	}
 
 	// todo: do actual upgrade here.
 	//time.Sleep(1 * time.Second)
-	log.V(1).Info("Updated Server BIOS settings")
+	log.V(1).Info("Updated BiosMaintenance settings")
 
 	// reque to check version and move to setting update
 	return ctrl.Result{Requeue: true}, err
 }
 
-func (r *ServerBIOSReconciler) handleSettingUpdateState(
+func (r *BiosMaintenanceReconciler) handleSettingUpdateState(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 
-	_, settingsDiff, err := r.getBiosSettingDifference(ctx, log, serverBIOS, server)
+	_, settingsDiff, err := r.getBiosSettingDifference(ctx, log, biosMaintenance, server)
 
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BIOS settings: %w", err)
@@ -330,33 +324,33 @@ func (r *ServerBIOSReconciler) handleSettingUpdateState(
 	// if setting is not different, complete the BIOS tasks
 	if len(settingsDiff) == 0 {
 		// move status to completed
-		err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateSynced)
+		err := r.updateBiosMaintenanceStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosMaintenanceStateSynced)
 		return ctrl.Result{}, err
 	}
 
-	if req, err := r.checkAndRequestMaintenance(ctx, log, serverBIOS, server, settingsDiff); err != nil || req {
+	if req, err := r.checkAndRequestMaintenance(ctx, log, biosMaintenance, server, settingsDiff); err != nil || req {
 		return ctrl.Result{}, err
 	}
 
 	// check if the maintenance is granted
-	if ok := r.checkIfMaintenanceGranted(log, serverBIOS, server); !ok {
+	if ok := r.checkIfMaintenanceGranted(log, biosMaintenance, server); !ok {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
 		return ctrl.Result{}, nil
 	}
 
-	return r.applySettingUpdateStateTransition(ctx, log, serverBIOS, server, settingsDiff)
+	return r.applySettingUpdateStateTransition(ctx, log, biosMaintenance, server, settingsDiff)
 }
 
-func (r *ServerBIOSReconciler) checkAndRequestMaintenance(
+func (r *BiosMaintenanceReconciler) checkAndRequestMaintenance(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 	settingsDiff map[string]string,
 ) (bool, error) {
 	// check if we need to request maintenance if we dont have it already
 	// note: having this check will reduce the call made to BMC.
-	if serverBIOS.Spec.ServerMaintenanceRef == nil {
+	if biosMaintenance.Spec.ServerMaintenanceRef == nil {
 		bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 		if err != nil {
 			return false, err
@@ -366,7 +360,7 @@ func (r *ServerBIOSReconciler) checkAndRequestMaintenance(
 		resetReq, err := bmcClient.CheckBiosAttributes(settingsDiff)
 		if resetReq {
 			// request maintenance if needed, even if err was reported.
-			requeue, errMainReq := r.requestMaintenanceOnServer(ctx, log, serverBIOS, server)
+			requeue, errMainReq := r.requestMaintenanceOnServer(ctx, log, biosMaintenance, server)
 			return requeue, errors.Join(err, errMainReq)
 		}
 		if err != nil {
@@ -376,25 +370,25 @@ func (r *ServerBIOSReconciler) checkAndRequestMaintenance(
 	return false, nil
 }
 
-func (r *ServerBIOSReconciler) applySettingUpdateStateTransition(
+func (r *BiosMaintenanceReconciler) applySettingUpdateStateTransition(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 	settingsDiff map[string]string,
 ) (ctrl.Result, error) {
-	switch serverBIOS.Status.UpdateSettingState {
+	switch biosMaintenance.Status.UpdateSettingState {
 	case "":
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOnPowerState) {
-			err := r.updateBIOSSettingUpdateStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSSettingUpdateStateIssue)
+			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosSettingUpdateStateIssue)
 			return ctrl.Result{}, err
 		}
-		err := r.patchServerMaintenancePowerState(ctx, log, serverBIOS, metalv1alpha1.PowerOn)
+		err := r.patchServerMaintenancePowerState(ctx, log, biosMaintenance, metalv1alpha1.PowerOn)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to turn on server %w", err)
 		}
 		return ctrl.Result{}, err
-	case metalv1alpha1.BIOSSettingUpdateStateIssue:
+	case metalv1alpha1.BiosSettingUpdateStateIssue:
 		// todo: make it idepotent
 		bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 		if err != nil {
@@ -408,96 +402,96 @@ func (r *ServerBIOSReconciler) applySettingUpdateStateTransition(
 		}
 
 		// if we dont need (have not requested maintenance) reboot. skip reboot steps.
-		nextState := metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff
-		if serverBIOS.Spec.ServerMaintenanceRef == nil {
-			nextState = metalv1alpha1.BIOSSettingUpdateStateVerification
+		nextState := metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOff
+		if biosMaintenance.Spec.ServerMaintenanceRef == nil {
+			nextState = metalv1alpha1.BiosSettingUpdateStateVerification
 		}
 
-		err = r.updateBIOSSettingUpdateStatus(ctx, log, serverBIOS, nextState)
+		err = r.updateBIOSSettingUpdateStatus(ctx, log, biosMaintenance, nextState)
 		return ctrl.Result{}, err
-	case metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff:
+	case metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOff:
 		// expected state it to be off and initial state is to be on.
-		// todo: check that the server bios setting is actually been issued.
+		// todo: check that the BiosMaintenance setting is actually been issued.
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOnPowerState) {
-			err := r.patchServerMaintenancePowerState(ctx, log, serverBIOS, metalv1alpha1.PowerOff)
+			err := r.patchServerMaintenancePowerState(ctx, log, biosMaintenance, metalv1alpha1.PowerOff)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to reboot %w", err)
 			}
 		}
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOffPowerState) {
-			err := r.updateBIOSSettingUpdateStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn)
+			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOn)
 			return ctrl.Result{}, err
 		}
 
 		return ctrl.Result{}, nil
-	case metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn:
+	case metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOn:
 		// expected power state it to be on and initial state is to be off.
-		// todo: check that the server bios setting is actually been issued.
+		// todo: check that the BiosMaintenance setting is actually been issued.
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOffPowerState) {
-			err := r.patchServerMaintenancePowerState(ctx, log, serverBIOS, metalv1alpha1.PowerOn)
+			err := r.patchServerMaintenancePowerState(ctx, log, biosMaintenance, metalv1alpha1.PowerOn)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to reboot %w", err)
 			}
 		}
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOnPowerState) {
-			err := r.updateBIOSSettingUpdateStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSSettingUpdateStateVerification)
+			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosSettingUpdateStateVerification)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
-	case metalv1alpha1.BIOSSettingUpdateStateVerification:
+	case metalv1alpha1.BiosSettingUpdateStateVerification:
 		// make sure the setting has actually applied.
-		_, settingsDiff, err := r.getBiosSettingDifference(ctx, log, serverBIOS, server)
+		_, settingsDiff, err := r.getBiosSettingDifference(ctx, log, biosMaintenance, server)
 
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get BIOS settings: %w", err)
 		}
 		// if setting is not different, complete the BIOS tasks
 		if len(settingsDiff) == 0 {
-			// move  serverBIOS state to completed, and revert the settingUpdate state to initial
-			err := r.updateServerBIOSStatus(ctx, log, serverBIOS, metalv1alpha1.BIOSMaintenanceStateSynced)
+			// move  biosMaintenance state to completed, and revert the settingUpdate state to initial
+			err := r.updateBiosMaintenanceStatus(ctx, log, biosMaintenance, metalv1alpha1.BiosMaintenanceStateSynced)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, fmt.Errorf("waiting on the BIOS setting to take place")
 	}
-	log.V(1).Info("Unknown State found", "serverBIOS UpdateSetting state", serverBIOS.Status.UpdateSettingState)
+	log.V(1).Info("Unknown State found", "biosMaintenance UpdateSetting state", biosMaintenance.Status.UpdateSettingState)
 	// stop reconsile as we can not proceed with unknown state
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerBIOSReconciler) handleSettingSyncedState(
+func (r *BiosMaintenanceReconciler) handleSettingSyncedState(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 	// clean up maintenance crd and references.
-	if err := r.cleanupServerMaintenanceReferences(ctx, log, serverBIOS); err != nil {
+	if err := r.cleanupServerMaintenanceReferences(ctx, log, biosMaintenance); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	diffPresent, settingsDiff, err := r.getBiosSettingDifference(ctx, log, serverBIOS, server)
+	diffPresent, settingsDiff, err := r.getBiosSettingDifference(ctx, log, biosMaintenance, server)
 
 	if err != nil {
 		log.V(1).Error(err, "unable to fetch and check BIOSSettings")
 		return ctrl.Result{}, err
 	}
 	if diffPresent || len(settingsDiff) > 0 {
-		err := r.updateServerBIOSStatus(ctx, log, serverBIOS, "")
+		err := r.updateBiosMaintenanceStatus(ctx, log, biosMaintenance, "")
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("Done with bios setting update", "ctx", ctx, "serverBIOS", serverBIOS, "server", server)
+	log.V(1).Info("Done with bios setting update", "ctx", ctx, "biosMaintenance", biosMaintenance, "server", server)
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerBIOSReconciler) handleFailedState(
+func (r *BiosMaintenanceReconciler) handleFailedState(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 
-	if serverBIOS.Spec.ServerMaintenanceRef != nil {
+	if biosMaintenance.Spec.ServerMaintenanceRef != nil {
 		serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, server.Spec.ServerMaintenanceRef)
 		if err != nil {
 			log.V(1).Error(err, "unable to fetch serverMaintenance")
@@ -515,22 +509,22 @@ func (r *ServerBIOSReconciler) handleFailedState(
 		//			this would need update on servermaintenanceContoller to go handle this usecase.
 
 		// request maintenance if needed,
-		// if serverBIOS.Spec.ServerMaintenanceRef == nil {
-		// 	if err := r.requestMaintenanceOnServer(ctx, log, serverBIOS, server); err != nil {
+		// if biosMaintenance.Spec.ServerMaintenanceRef == nil {
+		// 	if err := r.requestMaintenanceOnServer(ctx, log, biosMaintenance, server); err != nil {
 		// 		return ctrl.Result{}, err
 		// 	}
 		// }
 		// move maintenance to failed state directly.
 	}
 
-	log.V(1).Info("Failed to update bios setting", "ctx", ctx, "serverBIOS", serverBIOS, "server", server)
+	log.V(1).Info("Failed to update bios setting", "ctx", ctx, "biosMaintenance", biosMaintenance, "server", server)
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerBIOSReconciler) getBiosSettingDifference(
+func (r *BiosMaintenanceReconciler) getBiosSettingDifference(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (updatedNeeded bool, diff map[string]string, err error) {
 	// todo: need to also account for future pending changes reported for bios
@@ -540,7 +534,7 @@ func (r *ServerBIOSReconciler) getBiosSettingDifference(
 	}
 	defer bmcClient.Logout()
 
-	keys := slices.Collect(maps.Keys(serverBIOS.Spec.BIOS.Settings))
+	keys := slices.Collect(maps.Keys(biosMaintenance.Spec.BiosSettings.SettingsMap))
 
 	currentSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemUUID, keys)
 	if err != nil {
@@ -549,7 +543,7 @@ func (r *ServerBIOSReconciler) getBiosSettingDifference(
 	}
 
 	diff = map[string]string{}
-	for key, value := range serverBIOS.Spec.BIOS.Settings {
+	for key, value := range biosMaintenance.Spec.BiosSettings.SettingsMap {
 		res, ok := currentSettings[key]
 		if ok {
 			if res.(string) != value {
@@ -567,34 +561,34 @@ func (r *ServerBIOSReconciler) getBiosSettingDifference(
 	}
 
 	// todo: handle version check to detect and upgrade only higher version
-	if currentBiosVersion != serverBIOS.Spec.BIOS.Version {
+	if currentBiosVersion != biosMaintenance.Spec.BiosSettings.Version {
 		return true, diff, nil
 	}
 
 	return false, diff, nil
 }
 
-func (r *ServerBIOSReconciler) checkForRequiredPowerStatus(
+func (r *BiosMaintenanceReconciler) checkForRequiredPowerStatus(
 	server *metalv1alpha1.Server,
 	powerState metalv1alpha1.ServerPowerState,
 ) bool {
 	return server.Status.PowerState == powerState
 }
 
-func (r *ServerBIOSReconciler) checkIfMaintenanceGranted(
+func (r *BiosMaintenanceReconciler) checkIfMaintenanceGranted(
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) bool {
 
-	if serverBIOS.Spec.ServerMaintenanceRef == nil {
+	if biosMaintenance.Spec.ServerMaintenanceRef == nil {
 		return true
 	}
 
 	if server.Status.State == metalv1alpha1.ServerStateMaintenance {
-		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != serverBIOS.Spec.ServerMaintenanceRef.UID {
+		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosMaintenance.Spec.ServerMaintenanceRef.UID {
 			// server in maintenance for other tasks. or
-			// server maintenance ref is wrong in either server or serverBIOS
+			// server maintenance ref is wrong in either server or biosMaintenance
 			// wait for update on the server obj
 			log.V(1).Info("Server is already in maintenance for other tasks", "Server", server.Name, "serverMaintenanceRef", server.Spec.ServerMaintenanceRef)
 			return false
@@ -609,50 +603,50 @@ func (r *ServerBIOSReconciler) checkIfMaintenanceGranted(
 	return true
 }
 
-func (r *ServerBIOSReconciler) requestMaintenanceOnServer(
+func (r *BiosMaintenanceReconciler) requestMaintenanceOnServer(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	server *metalv1alpha1.Server,
 ) (bool, error) {
 
 	// if Server maintenance ref is already given. no further action required.
-	if serverBIOS.Spec.ServerMaintenanceRef != nil {
+	if biosMaintenance.Spec.ServerMaintenanceRef != nil {
 		return false, nil
 	}
 
 	serverMaintenance := &metalv1alpha1.ServerMaintenance{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: r.ManagerNamespace,
-			Name:      serverBIOS.Name,
+			Name:      biosMaintenance.Name,
 		}}
 
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
-		serverMaintenance.SetLabels(map[string]string{serverBIOSCreatorLabel: serverBIOS.Name})
-		serverMaintenance.Spec.Policy = serverBIOS.Spec.ServerMaintenancePolicy
+		serverMaintenance.SetLabels(map[string]string{biosMaintenanceCreatorLabel: biosMaintenance.Name})
+		serverMaintenance.Spec.Policy = biosMaintenance.Spec.ServerMaintenancePolicy
 		serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOn
 		serverMaintenance.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
 		if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance && serverMaintenance.Status.State != "" {
 			serverMaintenance.Status.State = ""
 		}
-		return controllerutil.SetControllerReference(serverBIOS, serverMaintenance, r.Client.Scheme())
+		return controllerutil.SetControllerReference(biosMaintenance, serverMaintenance, r.Client.Scheme())
 	})
 	if err != nil {
 		return false, fmt.Errorf("failed to create or patch serverMaintenance: %w", err)
 	}
 	log.V(1).Info("Created serverMaintenance", "serverMaintenance", serverMaintenance.Name, "serverMaintenance label", serverMaintenance.Labels, "Operation", opResult)
 
-	err = r.patchMaintenanceRequestRefOnServerBIOS(ctx, log, serverBIOS, serverMaintenance)
+	err = r.patchMaintenanceRequestRefOnBiosMaintenance(ctx, log, biosMaintenance, serverMaintenance)
 	if err != nil {
-		return false, fmt.Errorf("failed to patch serverMaintenance ref in serverBIOS status: %w", err)
+		return false, fmt.Errorf("failed to patch serverMaintenance ref in biosMaintenance status: %w", err)
 	}
 
-	log.V(1).Info("Patched serverMaintenance on serverBIOS")
+	log.V(1).Info("Patched serverMaintenance on biosMaintenance")
 
 	return true, nil
 }
 
-func (r *ServerBIOSReconciler) getReferredServer(
+func (r *BiosMaintenanceReconciler) getReferredServer(
 	ctx context.Context,
 	log logr.Logger,
 	serverRef *corev1.LocalObjectReference,
@@ -666,7 +660,7 @@ func (r *ServerBIOSReconciler) getReferredServer(
 	return server, nil
 }
 
-func (r *ServerBIOSReconciler) getReferredServerMaintenance(
+func (r *BiosMaintenanceReconciler) getReferredServerMaintenance(
 	ctx context.Context,
 	log logr.Logger,
 	serverMaintenanceRef *corev1.ObjectReference,
@@ -681,32 +675,32 @@ func (r *ServerBIOSReconciler) getReferredServerMaintenance(
 	return serverMaintenance, nil
 }
 
-func (r *ServerBIOSReconciler) getReferredserverBIOS(
+func (r *BiosMaintenanceReconciler) getReferredbiosMaintenance(
 	ctx context.Context,
 	log logr.Logger,
 	referredBIOSSetteingRef *corev1.LocalObjectReference,
-) (*metalv1alpha1.ServerBIOS, error) {
+) (*metalv1alpha1.BiosMaintenance, error) {
 	key := client.ObjectKey{Name: referredBIOSSetteingRef.Name, Namespace: metav1.NamespaceNone}
-	serverBIOS := &metalv1alpha1.ServerBIOS{}
-	if err := r.Get(ctx, key, serverBIOS); err != nil {
+	biosMaintenance := &metalv1alpha1.BiosMaintenance{}
+	if err := r.Get(ctx, key, biosMaintenance); err != nil {
 		log.V(1).Error(err, "failed to get referred BIOSSetting")
-		return serverBIOS, err
+		return biosMaintenance, err
 	}
-	return serverBIOS, nil
+	return biosMaintenance, nil
 }
 
-func (r *ServerBIOSReconciler) patchServerBIOSRefOnServer(
+func (r *BiosMaintenanceReconciler) patchBiosMaintenanceRefOnServer(
 	ctx context.Context,
 	log logr.Logger,
 	server *metalv1alpha1.Server,
-	serverBIOSReference *corev1.LocalObjectReference,
+	biosMaintenanceReference *corev1.LocalObjectReference,
 ) (err error) {
-	if server.Spec.BIOSSettingsRef == serverBIOSReference {
+	if server.Spec.BIOSSettingsRef == biosMaintenanceReference {
 		return nil
 	}
 
 	serverBase := server.DeepCopy()
-	server.Spec.BIOSSettingsRef = serverBIOSReference
+	server.Spec.BIOSSettingsRef = biosMaintenanceReference
 	if err = r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		log.V(1).Error(err, "failed to patch bios settings ref")
 		return err
@@ -714,18 +708,18 @@ func (r *ServerBIOSReconciler) patchServerBIOSRefOnServer(
 	return err
 }
 
-func (r *ServerBIOSReconciler) patchMaintenanceRequestRefOnServerBIOS(
+func (r *BiosMaintenanceReconciler) patchMaintenanceRequestRefOnBiosMaintenance(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	serverMaintenance *metalv1alpha1.ServerMaintenance,
 ) error {
-	serverBIOSBase := serverBIOS.DeepCopy()
+	biosMaintenanceBase := biosMaintenance.DeepCopy()
 
 	if serverMaintenance == nil {
-		serverBIOS.Spec.ServerMaintenanceRef = nil
+		biosMaintenance.Spec.ServerMaintenanceRef = nil
 	} else {
-		serverBIOS.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
+		biosMaintenance.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
 			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			Kind:       "ServerMaintenance",
 			Namespace:  serverMaintenance.Namespace,
@@ -734,7 +728,7 @@ func (r *ServerBIOSReconciler) patchMaintenanceRequestRefOnServerBIOS(
 		}
 	}
 
-	if err := r.Patch(ctx, serverBIOS, client.MergeFrom(serverBIOSBase)); err != nil {
+	if err := r.Patch(ctx, biosMaintenance, client.MergeFrom(biosMaintenanceBase)); err != nil {
 		log.V(1).Error(err, "failed to patch bios settings ref")
 		return err
 	}
@@ -742,13 +736,13 @@ func (r *ServerBIOSReconciler) patchMaintenanceRequestRefOnServerBIOS(
 	return nil
 }
 
-func (r *ServerBIOSReconciler) patchServerMaintenancePowerState(
+func (r *BiosMaintenanceReconciler) patchServerMaintenancePowerState(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
 	powerState metalv1alpha1.Power,
 ) error {
-	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, serverBIOS.Spec.ServerMaintenanceRef)
+	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, biosMaintenance.Spec.ServerMaintenanceRef)
 	if err != nil {
 		return err
 	}
@@ -766,73 +760,73 @@ func (r *ServerBIOSReconciler) patchServerMaintenancePowerState(
 	return nil
 }
 
-func (r *ServerBIOSReconciler) updateServerBIOSStatus(
+func (r *BiosMaintenanceReconciler) updateBiosMaintenanceStatus(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
-	state metalv1alpha1.BIOSMaintenanceState,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
+	state metalv1alpha1.BiosMaintenanceState,
 ) error {
 
-	if serverBIOS.Status.State == state {
+	if biosMaintenance.Status.State == state {
 		return nil
 	}
 
-	serverBIOSBase := serverBIOS.DeepCopy()
-	serverBIOS.Status.State = state
+	biosMaintenanceBase := biosMaintenance.DeepCopy()
+	biosMaintenance.Status.State = state
 
-	if state == metalv1alpha1.BIOSMaintenanceStateSynced {
-		serverBIOS.Status.UpdateSettingState = ""
+	if state == metalv1alpha1.BiosMaintenanceStateSynced {
+		biosMaintenance.Status.UpdateSettingState = ""
 	}
 
-	if err := r.Status().Patch(ctx, serverBIOS, client.MergeFrom(serverBIOSBase)); err != nil {
-		return fmt.Errorf("failed to patch ServerBIOS status: %w", err)
+	if err := r.Status().Patch(ctx, biosMaintenance, client.MergeFrom(biosMaintenanceBase)); err != nil {
+		return fmt.Errorf("failed to patch BiosMaintenance status: %w", err)
 	}
 
-	log.V(1).Info("Updated serverBIOS state ", "new state", state)
+	log.V(1).Info("Updated biosMaintenance state ", "new state", state)
 
 	return nil
 }
 
-func (r *ServerBIOSReconciler) updateBIOSSettingUpdateStatus(
+func (r *BiosMaintenanceReconciler) updateBIOSSettingUpdateStatus(
 	ctx context.Context,
 	log logr.Logger,
-	serverBIOS *metalv1alpha1.ServerBIOS,
-	state metalv1alpha1.BIOSSettingUpdateState,
+	biosMaintenance *metalv1alpha1.BiosMaintenance,
+	state metalv1alpha1.BiosSettingUpdateState,
 ) error {
 
-	if serverBIOS.Status.UpdateSettingState == state {
+	if biosMaintenance.Status.UpdateSettingState == state {
 		return nil
 	}
 
-	serverBIOSBase := serverBIOS.DeepCopy()
-	serverBIOS.Status.UpdateSettingState = state
+	biosMaintenanceBase := biosMaintenance.DeepCopy()
+	biosMaintenance.Status.UpdateSettingState = state
 
-	if err := r.Status().Patch(ctx, serverBIOS, client.MergeFrom(serverBIOSBase)); err != nil {
-		return fmt.Errorf("failed to patch ServerBIOS UpdateSetting status: %w", err)
+	if err := r.Status().Patch(ctx, biosMaintenance, client.MergeFrom(biosMaintenanceBase)); err != nil {
+		return fmt.Errorf("failed to patch BiosMaintenance UpdateSetting status: %w", err)
 	}
 
-	log.V(1).Info("Updated serverBIOS UpdateSetting state ", "new state", state)
+	log.V(1).Info("Updated biosMaintenance UpdateSetting state ", "new state", state)
 
 	return nil
 }
 
-func (r *ServerBIOSReconciler) enqueueServerBIOSByRefs(
+func (r *BiosMaintenanceReconciler) enqueueBiosMaintenanceByRefs(
 	ctx context.Context,
 	obj client.Object,
 ) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 	host := obj.(*metalv1alpha1.Server)
-	serverBiosList := &metalv1alpha1.ServerBIOSList{}
-	if err := r.List(ctx, serverBiosList); err != nil {
-		log.Error(err, "failed to list serverBIOSes")
+	biosMaintenanceList := &metalv1alpha1.BiosMaintenanceList{}
+	if err := r.List(ctx, biosMaintenanceList); err != nil {
+		log.Error(err, "failed to list biosMaintenancees")
 		return nil
 	}
 	var req []ctrl.Request
 
-	for _, serverBIOS := range serverBiosList.Items {
-		if serverBIOS.Spec.ServerRef.Name == host.Name && serverBIOS.Spec.ServerMaintenanceRef != nil {
+	for _, biosMaintenance := range biosMaintenanceList.Items {
+		if biosMaintenance.Spec.ServerRef.Name == host.Name && biosMaintenance.Spec.ServerMaintenanceRef != nil {
 			req = append(req, ctrl.Request{
-				NamespacedName: types.NamespacedName{Namespace: serverBIOS.Namespace, Name: serverBIOS.Name},
+				NamespacedName: types.NamespacedName{Namespace: biosMaintenance.Namespace, Name: biosMaintenance.Name},
 			})
 		}
 	}
@@ -840,12 +834,12 @@ func (r *ServerBIOSReconciler) enqueueServerBIOSByRefs(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ServerBIOSReconciler) SetupWithManager(
+func (r *BiosMaintenanceReconciler) SetupWithManager(
 	mgr ctrl.Manager,
 ) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&metalv1alpha1.ServerBIOS{}).
+		For(&metalv1alpha1.BiosMaintenance{}).
 		Owns(&metalv1alpha1.ServerMaintenance{}).
-		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueServerBIOSByRefs)).
+		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosMaintenanceByRefs)).
 		Complete(r)
 }

@@ -31,10 +31,10 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - biosmaintenances
   - bmcs
   - bmcsecrets
   - endpoints
-  - serverbioses
   - serverbootconfigurations
   - serverclaims
   - serverconfigurations
@@ -51,10 +51,10 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - biosmaintenances/finalizers
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - endpoints/finalizers
-  - serverbioses/finalizers
   - serverbootconfigurations/finalizers
   - serverclaims/finalizers
   - servermaintenances/finalizers
@@ -64,10 +64,10 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - biosmaintenances/status
   - bmcs/status
   - bmcsecrets/status
   - endpoints/status
-  - serverbioses/status
   - serverbootconfigurations/status
   - serverclaims/status
   - servermaintenances/status

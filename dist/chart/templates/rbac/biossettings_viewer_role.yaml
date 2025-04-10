@@ -11,12 +11,12 @@ kind: ClusterRole
 metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
-  name: serverbios-viewer-role
+  name: biossettings-viewer-role
 rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - serverbios
+  - biossettings
   verbs:
   - get
   - list
@@ -24,7 +24,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - serverbios/status
+  - biossettings/status
   verbs:
   - get
 {{- end -}}

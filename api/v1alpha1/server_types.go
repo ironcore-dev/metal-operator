@@ -108,7 +108,7 @@ type ServerSpec struct {
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 
-	// BIOSSettingsRef is a reference to a ServerBIOS object that specifies
+	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 }

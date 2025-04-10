@@ -1,3 +1,4 @@
+{{- if .Values.rbac.enable }}
 # This rule is not used by the project metal-operator itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
@@ -9,18 +10,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: serverbios-editor-role
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: metal-operator
-    app.kubernetes.io/part-of: metal-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: serverbios-editor-role
+    {{- include "chart.labels" . | nindent 4 }}
+  name: biossettings-editor-role
 rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - serverbios
+  - biossettings
   verbs:
   - create
   - delete
@@ -32,6 +28,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - serverbios/status
+  - biossettings/status
   verbs:
   - get
+{{- end -}}

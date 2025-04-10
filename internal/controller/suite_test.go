@@ -92,10 +92,10 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	var bmcSecretList metalv1alpha1.BMCSecretList
 	Eventually(ObjectList(&bmcSecretList)).Should(HaveField("Items", BeEmpty()))
 
-	var serverBIOS metalv1alpha1.ServerBIOS
-	Expect(k8sClient.DeleteAllOf(ctx, &serverBIOS)).To(Succeed())
-	var serverBIOSList metalv1alpha1.ServerBIOSList
-	Eventually(ObjectList(&serverBIOSList)).Should(HaveField("Items", BeEmpty()))
+	var biosSettings metalv1alpha1.BiosSettings
+	Expect(k8sClient.DeleteAllOf(ctx, &biosSettings)).To(Succeed())
+	var biosSettingsList metalv1alpha1.BiosSettingsList
+	Eventually(ObjectList(&biosSettingsList)).Should(HaveField("Items", BeEmpty()))
 }
 
 var _ = BeforeSuite(func() {
@@ -250,7 +250,7 @@ func SetupTest() *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&ServerBIOSReconciler{
+		Expect((&BiosSettingsReconciler{
 			Client:           k8sManager.GetClient(),
 			ManagerNamespace: ns.Name,
 			Insecure:         true,

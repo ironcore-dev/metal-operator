@@ -279,7 +279,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err = (&controller.ServerBIOSReconciler{
+	if err = (&controller.BiosSettingsReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
@@ -292,7 +292,7 @@ func main() {
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServerBIOS")
+		setupLog.Error(err, "unable to create controller", "controller", "BiosSettings")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

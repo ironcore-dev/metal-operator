@@ -76,7 +76,7 @@ resources:
   controller: true
   domain: ironcore.dev
   group: metal
-  kind: ServerBIOS
+  kind: BiosSettings
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

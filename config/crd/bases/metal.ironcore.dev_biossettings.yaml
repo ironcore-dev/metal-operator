@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
-  name: serverbioses.metal.ironcore.dev
+  name: biossettings.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
   names:
-    kind: ServerBIOS
-    listKind: ServerBIOSList
-    plural: serverbioses
-    singular: serverbios
+    kind: BiosSettings
+    listKind: BiosSettingsList
+    plural: biossettings
+    singular: biossettings
   scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ServerBIOS is the Schema for the serverbios API.
+        description: BiosSettings is the Schema for the biossettings API.
         properties:
           apiVersion:
             description: |-
@@ -37,12 +37,27 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServerBIOSSpec defines the desired state of ServerBIOS.
+            description: BiosSettingsSpec defines the desired state of BiosSettings.
             properties:
               ServerMaintenancePolicyTemplate:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
                   on the server.
                 type: string
+              biosSettings:
+                description: BiosSettings specifies the BIOS settings for the selected
+                  serverRef or serverSelector.
+                properties:
+                  settings:
+                    additionalProperties:
+                      type: string
+                    description: SettingsMap contains settings as map
+                    type: object
+                  version:
+                    description: Version contains version this settings applies to
+                    type: string
+                required:
+                - version
+                type: object
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
                   object that that BIOS has requested for the referred server.
@@ -105,24 +120,9 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
-              settings:
-                description: BIOS specifies the BIOS settings for the selected serverRef
-                  or serverSelector.
-                properties:
-                  settings:
-                    additionalProperties:
-                      type: string
-                    description: Settings contains BIOS settings as map
-                    type: object
-                  version:
-                    description: Version contains BIOS version
-                    type: string
-                required:
-                - version
-                type: object
             type: object
           status:
-            description: ServerBIOSStatus defines the observed state of ServerBIOS.
+            description: BiosSettingsStatus defines the observed state of BiosSettings.
             properties:
               state:
                 description: State represents the current state of the bios configuration

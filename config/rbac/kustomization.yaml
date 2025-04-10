@@ -28,7 +28,7 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- serverbios_admin_role.yaml
-- serverbios_editor_role.yaml
-- serverbios_viewer_role.yaml
+- biossettings_admin_role.yaml
+- biossettings_editor_role.yaml
+- biossettings_viewer_role.yaml
 

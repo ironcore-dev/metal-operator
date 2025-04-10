@@ -33,6 +33,11 @@ flowchart LR
     BootOperator -- Prepares --> BootEnvironment
     BootOperator -- Updates --> ServerBootConfiguration
 
+    BiosSettingsReconcile -- Discovers --> BIOSSettings
+    BiosSettingsReconcile -- Creates/Deletes --> ServerMaintenance
+    BIOSSettings -- References --> Server
+    ServerMaintenance -- References --> BIOSSettings
+
     ServerReconciler -- Powers On --> Server
 
     classDef operator fill:#9575cd, stroke:#000, stroke-width:2px, color:#000;
@@ -54,6 +59,7 @@ flowchart LR
 - [**Server**](concepts/servers.md): Represents physical servers, managing their state, power, and configurations.
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
+- [**BIOSSettings**](concepts/biossettings.md): Handles updating the BIOS setting on the physical server BIOS.
 
 ### 2. Controllers
 
@@ -64,6 +70,8 @@ flowchart LR
 - **ServerReconciler**: Manages `Server` resources and their lifecycle states. During the **Discovery** phase, it interacts with BMCs and uses the **metalprobe** agent to collect in-band hardware information, updating the server's status. It handles power management, BIOS configurations, and transitions servers through various states (e.g., Initial, Discovery, Available, Reserved).
 
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
+
+- **BiosSettingsReconciler**: Handles [`BIOSSettings`](concepts/biossettings.md) resource. Provides ability to update the bios settings on physical server's BIOS.
 
 - **Boot Operator (External Component)**: Monitors `ServerBootConfiguration` resources to prepare the boot environment (e.g., configuring DHCP, PXE servers). Once the boot environment is ready, it updates the `ServerBootConfiguration` status to **Ready**.
 

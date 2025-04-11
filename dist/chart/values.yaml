@@ -3,12 +3,12 @@ controllerManager:
   replicas: 1
   container:
     image:
-      repository: registry/metal-operator
-      tag: "v0.1.0"
+      repository: controller
+      tag: latest
     args:
-      - --probe-image=probe-image
-      - --probe-os-image=probe-os-image
-      - --registry-url=registry-url
+      - "--leader-elect"
+      - "--metrics-bind-address=:8443"
+      - "--health-probe-bind-address=:8081"
     resources:
       limits:
         cpu: 500m
@@ -39,13 +39,6 @@ controllerManager:
       type: RuntimeDefault
   terminationGracePeriodSeconds: 10
   serviceAccountName: metal-operator-controller-manager
-  hostNetwork: false
-  nodeSelector:
-    kubernetes.io/os: linux
-    kubernetes.io/arch: arm64
-  tolerations:
-    - key: node-role.kubernetes.io/control-plane
-      effect: NoSchedule
 
 # [RBAC]: To enable RBAC (Permissions) configurations
 rbac:
@@ -62,13 +55,13 @@ crd:
   # the Helm release is uninstalled.
   # NOTE: Removing the CRDs will also remove all cert-manager CR(s)
   # (Certificates, Issuers, ...) due to garbage collection.
-  keep: false
+  keep: true
 
 # [METRICS]: Set to true to generate manifests for exporting metrics.
 # To disable metrics export set false, and ensure that the
 # ControllerManager argument "--metrics-bind-address=:8443" is removed.
 metrics:
-  enable: false
+  enable: true
 
 # [WEBHOOKS]: Webhooks configuration
 # The following configuration is automatically generated from the manifests

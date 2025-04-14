@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	// ServerMaintenanceFinalizer is the finalizer for the ServerMaintenance resource.
 	ServerMaintenanceFinalizer = "metal.ironcore.dev/servermaintenance"
 )
 
@@ -89,15 +90,13 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 		return r.handlePendingState(ctx, log, serverMaintenance)
 	case metalv1alpha1.ServerMaintenanceStateInMaintenance:
 		return r.handleInMaintenanceState(ctx, log, serverMaintenance)
-	case metalv1alpha1.ServerMaintenanceStateCompleted:
-		return r.handleCompletedState(ctx, log, serverMaintenance)
 	case metalv1alpha1.ServerMaintenanceStateFailed:
-		return r.handleFailedState(ctx, log, serverMaintenance)
+		return r.handleFailedState(log, serverMaintenance)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (result ctrl.Result, err error) {
 	server, err := r.getServerRef(ctx, serverMaintenance)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -108,6 +107,16 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 			return ctrl.Result{}, nil
 		}
 	}
+	defer func() {
+		if serverMaintenance.Status.State == metalv1alpha1.ServerMaintenanceStateInMaintenance {
+			// put server in maintenance
+			if patchErr := r.patchServerRef(ctx, log, serverMaintenance, server); patchErr != nil {
+				err = patchErr
+				log.Error(err, "failed to patch server maintenance ref")
+				return
+			}
+		}
+	}()
 	if server.Spec.ServerClaimRef == nil {
 		log.V(1).Info("Server has no claim, move to maintenance right away", "Server", server.Name)
 		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
@@ -158,10 +167,6 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	server, err := r.getServerRef(ctx, serverMaintenance)
 	if err != nil {
-		return ctrl.Result{}, err
-	}
-	// put server in maintenance
-	if err := r.patchServerRef(ctx, log, serverMaintenance, server); err != nil {
 		return ctrl.Result{}, err
 	}
 	config, err := r.applyServerBootConfiguration(ctx, log, serverMaintenance, server)
@@ -261,19 +266,8 @@ func (r *ServerMaintenanceReconciler) patchServerRef(ctx context.Context, log lo
 	return nil
 }
 
-func (r *ServerMaintenanceReconciler) handleCompletedState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
-	server, err := r.getServerRef(ctx, serverMaintenance)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	log.V(1).Info("Server maintenance completed", "Server", server.Name)
-	if err := r.cleanup(ctx, log, server); err != nil {
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{}, nil
-}
-
-func (r *ServerMaintenanceReconciler) handleFailedState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+func (r *ServerMaintenanceReconciler) handleFailedState(log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+	log.V(1).Info("ServerMaintenance failed", "ServerMaintenance", serverMaintenance.Name)
 	return ctrl.Result{}, nil
 }
 

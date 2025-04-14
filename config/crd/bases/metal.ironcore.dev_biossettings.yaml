@@ -8,16 +8,29 @@ metadata:
 spec:
   group: metal.ironcore.dev
   names:
-    kind: BiosSettings
-    listKind: BiosSettingsList
+    kind: BIOSSettings
+    listKind: BIOSSettingsList
     plural: biossettings
     singular: biossettings
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.biosSettings.version
+      name: BIOSVersion
+      type: string
+    - jsonPath: .status.state
+      name: State
+      type: string
+    - jsonPath: .spec.serverRef.name
+      name: ServerRef
+      type: string
+    - jsonPath: .spec.serverMaintenanceRef.name
+      name: ServerMaintenanceRef
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BiosSettings is the Schema for the biossettings API.
+        description: BIOSSettings is the Schema for the biossettings API.
         properties:
           apiVersion:
             description: |-
@@ -37,23 +50,24 @@ spec:
           metadata:
             type: object
           spec:
-            description: BiosSettingsSpec defines the desired state of BiosSettings.
+            description: BiosSettingsSpec defines the desired state of BIOSSettings.
             properties:
               ServerMaintenancePolicyTemplate:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
                   on the server.
                 type: string
               biosSettings:
-                description: BiosSettings specifies the BIOS settings for the selected
+                description: BIOSSettings specifies the BIOS settings for the selected
                   serverRef or serverSelector.
                 properties:
                   settings:
                     additionalProperties:
                       type: string
-                    description: SettingsMap contains settings as map
+                    description: SettingsMap contains bios settings as map
                     type: object
                   version:
-                    description: Version contains version this settings applies to
+                    description: Version contains BIOS version this settings applies
+                      to
                     type: string
                 required:
                 - version
@@ -122,7 +136,7 @@ spec:
                   rule: self == oldSelf
             type: object
           status:
-            description: BiosSettingsStatus defines the observed state of BiosSettings.
+            description: BiosSettingsStatus defines the observed state of BIOSSettings.
             properties:
               state:
                 description: State represents the current state of the bios configuration

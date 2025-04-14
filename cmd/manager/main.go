@@ -292,7 +292,7 @@ func main() {
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BiosSettings")
+		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettings")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("BiosSettings Controller", func() {
+var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest()
 	ns.Name = "default"
 
@@ -77,13 +77,13 @@ var _ = Describe("BiosSettings Controller", func() {
 		})).Should(Succeed())
 
 		By("Creating a BIOSSetting")
-		biosSettings := &metalv1alpha1.BiosSettings{
+		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BiosSettingsSpec{
-				BiosSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
+				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -96,7 +96,7 @@ var _ = Describe("BiosSettings Controller", func() {
 		))
 
 		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BiosSettingsStateSynced),
+			HaveField("Status.State", metalv1alpha1.BiosSettingsStateApplied),
 		))
 	})
 
@@ -114,13 +114,13 @@ var _ = Describe("BiosSettings Controller", func() {
 		})).Should(Succeed())
 
 		By("Creating a BIOSSetting")
-		biosSettings := &metalv1alpha1.BiosSettings{
+		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BiosSettingsSpec{
-				BiosSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
+				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -133,10 +133,10 @@ var _ = Describe("BiosSettings Controller", func() {
 		))
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BiosSettingsStateSynced),
+			HaveField("Status.State", metalv1alpha1.BiosSettingsStateApplied),
 		))
 
-		By("Deleting the BiosSettings")
+		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the bios maintenance ref is empty")
@@ -163,13 +163,13 @@ var _ = Describe("BiosSettings Controller", func() {
 	// 	})).Should(Succeed())
 
 	// 	By("Creating a BIOSSetting")
-	// 	biosSettings := &metalv1alpha1.BiosSettings{
+	// 	biosSettings := &metalv1alpha1.BIOSSettings{
 	// 		ObjectMeta: metav1.ObjectMeta{
 	// 			Namespace:    ns.Name,
 	// 			GenerateName: "test-",
 	// 		},
 	// 		Spec: metalv1alpha1.BiosSettingsSpec{
-	// 			BiosSettings:            metalv1alpha1.Settings{Version: "P79 v2.0 (12/06/2017)", SettingsMap: BIOSSetting},
+	// 			BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v2.0 (12/06/2017)", SettingsMap: BIOSSetting},
 	// 			ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 	// 			ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 	// 		},
@@ -233,7 +233,7 @@ var _ = Describe("BiosSettings Controller", func() {
 
 	// 	By("Simulate the server BIOS version update by matching the spec version")
 	// 	Eventually(Update(biosSettings, func() {
-	// 		biosSettings.Spec.BiosSettings.Version = "P79 v1.45 (12/06/2017)"
+	// 		biosSettings.Spec.BIOSSettings.Version = "P79 v1.45 (12/06/2017)"
 	// 	})).Should(Succeed())
 
 	// 	By("Ensuring that the biosSettings has completed Upgrade and setting update moved the state")
@@ -253,7 +253,7 @@ var _ = Describe("BiosSettings Controller", func() {
 	// 	By("Ensuring that the serverMaintenance is deleted")
 	// 	Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 
-	// 	By("Deleting the BiosSettings")
+	// 	By("Deleting the BIOSSettings")
 	// 	Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 
 	// 	By("Ensuring that the biosSettings is removed")

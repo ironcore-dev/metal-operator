@@ -10,6 +10,115 @@
 </div>
 Resource Types:
 <ul></ul>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
+</h3>
+<div>
+<p>BIOSSettings is the Schema for the biossettings API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BiosSettingsSpec">
+BiosSettingsSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>biosSettings</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Settings">
+Settings
+</a>
+</em>
+</td>
+<td>
+<p>BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ServerMaintenancePolicyTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BiosSettingsStatus">
+BiosSettingsStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMC">BMC
 </h3>
 <div>
@@ -604,122 +713,13 @@ BMCPowerState
 </td>
 </tr></tbody>
 </table>
-<h3 id="metal.ironcore.dev/v1alpha1.BiosSettings">BiosSettings
-</h3>
-<div>
-<p>BiosSettings is the Schema for the biossettings API.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.BiosSettingsSpec">
-BiosSettingsSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>biosSettings</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.Settings">
-Settings
-</a>
-</em>
-</td>
-<td>
-<p>BiosSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ServerMaintenancePolicyTemplate</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.BiosSettingsStatus">
-BiosSettingsStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BiosSettingsSpec">BiosSettingsSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BiosSettings">BiosSettings</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings</a>)
 </p>
 <div>
-<p>BiosSettingsSpec defines the desired state of BiosSettings.</p>
+<p>BiosSettingsSpec defines the desired state of BIOSSettings.</p>
 </div>
 <table>
 <thead>
@@ -739,7 +739,7 @@ Settings
 </em>
 </td>
 <td>
-<p>BiosSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
+<p>BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
 </td>
 </tr>
 <tr>
@@ -798,24 +798,27 @@ Kubernetes core/v1.ObjectReference
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BiosSettingsStateApplied specifies that the server bios maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>BiosSettingsStateFailed specifies that the server maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
 <td><p>BiosSettingsStateInProgress specifies that the server bios is in setting update path.</p>
 </td>
-</tr><tr><td><p>&#34;SettingsSyncCompleted&#34;</p></td>
-<td><p>BiosSettingsStateSynced specifies that the server bios maintenance has been completed.</p>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BiosSettingsStatePending specifies that the server bios is in setting update path.</p>
 </td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BiosSettingsStatus">BiosSettingsStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BiosSettings">BiosSettings</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings</a>)
 </p>
 <div>
-<p>BiosSettingsStatus defines the observed state of BiosSettings.</p>
+<p>BiosSettingsStatus defines the observed state of BIOSSettings.</p>
 </div>
 <table>
 <thead>
@@ -2877,7 +2880,7 @@ string
 </em>
 </td>
 <td>
-<p>Version contains version this settings applies to</p>
+<p>Version contains BIOS version this settings applies to</p>
 </td>
 </tr>
 <tr>
@@ -2889,7 +2892,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>SettingsMap contains settings as map</p>
+<p>SettingsMap contains bios settings as map</p>
 </td>
 </tr>
 </tbody>

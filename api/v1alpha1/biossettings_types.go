@@ -11,13 +11,13 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// BiosSettingsSpec defines the desired state of BiosSettings.
+// BiosSettingsSpec defines the desired state of BIOSSettings.
 type BiosSettingsSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// BiosSettings specifies the BIOS settings for the selected serverRef or serverSelector.
-	BiosSettings Settings `json:"biosSettings,omitempty"`
+	// BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.
+	BIOSSettings Settings `json:"biosSettings,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
@@ -31,11 +31,11 @@ type BiosSettingsSpec struct {
 }
 
 type Settings struct {
-	// Version contains version this settings applies to
+	// Version contains BIOS version this settings applies to
 	// +required
 	Version string `json:"version"`
 
-	// SettingsMap contains settings as map
+	// SettingsMap contains bios settings as map
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 }
@@ -44,10 +44,12 @@ type Settings struct {
 type BiosSettingsState string
 
 const (
+	// BiosSettingsStatePending specifies that the server bios is in setting update path.
+	BiosSettingsStatePending BiosSettingsState = "Pending"
 	// BiosSettingsStateInProgress specifies that the server bios is in setting update path.
 	BiosSettingsStateInProgress BiosSettingsState = "InProgress"
-	// BiosSettingsStateSynced specifies that the server bios maintenance has been completed.
-	BiosSettingsStateSynced BiosSettingsState = "SettingsSyncCompleted"
+	// BiosSettingsStateApplied specifies that the server bios maintenance has been completed.
+	BiosSettingsStateApplied BiosSettingsState = "Applied"
 	// BiosSettingsStateFailed specifies that the server maintenance has failed.
 	BiosSettingsStateFailed BiosSettingsState = "Failed"
 )
@@ -65,7 +67,7 @@ const (
 	BiosSettingUpdateStateVerification BiosSettingUpdateState = "VerifySettingUpdate"
 )
 
-// BiosSettingsStatus defines the observed state of BiosSettings.
+// BiosSettingsStatus defines the observed state of BIOSSettings.
 type BiosSettingsStatus struct {
 
 	// State represents the current state of the bios configuration task.
@@ -77,9 +79,12 @@ type BiosSettingsStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-
-// BiosSettings is the Schema for the biossettings API.
-type BiosSettings struct {
+// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosSettings.version`
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
+// +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
+// BIOSSettings is the Schema for the biossettings API.
+type BIOSSettings struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -89,13 +94,13 @@ type BiosSettings struct {
 
 // +kubebuilder:object:root=true
 
-// BiosSettingsList contains a list of BiosSettings.
-type BiosSettingsList struct {
+// BIOSSettingsList contains a list of BIOSSettings.
+type BIOSSettingsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []BiosSettings `json:"items"`
+	Items           []BIOSSettings `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&BiosSettings{}, &BiosSettingsList{})
+	SchemeBuilder.Register(&BIOSSettings{}, &BIOSSettingsList{})
 }

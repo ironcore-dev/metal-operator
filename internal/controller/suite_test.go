@@ -92,10 +92,10 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	var bmcSecretList metalv1alpha1.BMCSecretList
 	Eventually(ObjectList(&bmcSecretList)).Should(HaveField("Items", BeEmpty()))
 
-	var biosSettings metalv1alpha1.BiosSettings
+	var biosSettings metalv1alpha1.BIOSSettings
 	Expect(k8sClient.DeleteAllOf(ctx, &biosSettings)).To(Succeed())
-	var biosSettingsList metalv1alpha1.BiosSettingsList
-	Eventually(ObjectList(&biosSettingsList)).Should(HaveField("Items", BeEmpty()))
+	var BIOSSettingsList metalv1alpha1.BIOSSettingsList
+	Eventually(ObjectList(&BIOSSettingsList)).Should(HaveField("Items", BeEmpty()))
 }
 
 var _ = BeforeSuite(func() {

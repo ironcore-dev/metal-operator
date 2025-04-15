@@ -202,7 +202,7 @@ func (r *BiosSettingsReconciler) reconcile(
 			return ctrl.Result{}, err
 		}
 	} else if server.Spec.BIOSSettingsRef.Name != biosSettings.Name {
-		referredBIOSSetting, err := r.getReferredbiosSettings(ctx, log, server.Spec.BIOSSettingsRef)
+		referredBIOSSetting, err := r.getReferredBIOSSettings(ctx, log, server.Spec.BIOSSettingsRef)
 		if err != nil {
 			log.V(1).Info("referred server contains reference to different BIOSSettings object, unable to fetch the referenced bios setting")
 			return ctrl.Result{}, err
@@ -231,19 +231,15 @@ func (r *BiosSettingsReconciler) ensureServerMaintenanceStateTransition(
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 	switch biosSettings.Status.State {
-	case "":
+	case "", metalv1alpha1.BIOSSettingsStatePending:
 		//todo: check that in initial state there is no pending BIOS maintenance left behind
-		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingsStateInProgress)
+		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateInProgress)
 		return ctrl.Result{}, err
-	case metalv1alpha1.BiosSettingsStatePending:
-		//todo: check that in initial state there is no pending BIOS maintenance left behind
-		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingsStateInProgress)
-		return ctrl.Result{}, err
-	case metalv1alpha1.BiosSettingsStateInProgress:
+	case metalv1alpha1.BIOSSettingsStateInProgress:
 		return r.handleSettingInProgressState(ctx, log, biosSettings, server)
-	case metalv1alpha1.BiosSettingsStateApplied:
+	case metalv1alpha1.BIOSSettingsStateApplied:
 		return r.handleSettingAppliedState(ctx, log, biosSettings, server)
-	case metalv1alpha1.BiosSettingsStateFailed:
+	case metalv1alpha1.BIOSSettingsStateFailed:
 		return r.handleFailedState(ctx, log, biosSettings, server)
 	}
 	log.V(1).Info("Unknown State found", "biosSettings state", biosSettings.Status.State)
@@ -257,7 +253,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 
-	currentBiosVersion, settingsDiff, err := r.getBiosVersionAndSettingDifference(ctx, log, biosSettings, server)
+	currentBiosVersion, settingsDiff, err := r.getBIOSVersionAndSettingDifference(ctx, log, biosSettings, server)
 
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BIOS settings: %w", err)
@@ -266,7 +262,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	// if setting is not different, complete the BIOS tasks, does not matter if the bios version do not match
 	if len(settingsDiff) == 0 {
 		// move status to completed
-		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingsStateApplied)
+		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied)
 		return ctrl.Result{}, err
 	}
 
@@ -328,7 +324,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 	switch biosSettings.Status.UpdateSettingState {
 	case "":
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOnPowerState) {
-			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingUpdateStateIssue)
+			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingUpdateStateIssue)
 			return ctrl.Result{}, err
 		}
 		err := r.patchServerMaintenancePowerState(ctx, log, biosSettings, metalv1alpha1.PowerOn)
@@ -336,7 +332,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			return ctrl.Result{}, fmt.Errorf("failed to turn on server %w", err)
 		}
 		return ctrl.Result{}, err
-	case metalv1alpha1.BiosSettingUpdateStateIssue:
+	case metalv1alpha1.BIOSSettingUpdateStateIssue:
 		// todo: make it idepotent
 		bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 		if err != nil {
@@ -350,14 +346,14 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 		}
 
 		// if we dont need (have not requested maintenance) reboot. skip reboot steps.
-		nextState := metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOff
+		nextState := metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff
 		if biosSettings.Spec.ServerMaintenanceRef == nil {
-			nextState = metalv1alpha1.BiosSettingUpdateStateVerification
+			nextState = metalv1alpha1.BIOSSettingUpdateStateVerification
 		}
 
 		err = r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, nextState)
 		return ctrl.Result{}, err
-	case metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOff:
+	case metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff:
 		// expected state it to be off and initial state is to be on.
 		// todo: check that the BIOSSettings setting is actually been issued.
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOnPowerState) {
@@ -367,12 +363,12 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			}
 		}
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOffPowerState) {
-			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOn)
+			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn)
 			return ctrl.Result{}, err
 		}
 
 		return ctrl.Result{}, nil
-	case metalv1alpha1.BiosSettingUpdateWaitOnServerRebootPowerOn:
+	case metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn:
 		// expected power state it to be on and initial state is to be off.
 		// todo: check that the BIOSSettings setting is actually been issued.
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOffPowerState) {
@@ -382,13 +378,13 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			}
 		}
 		if r.checkForRequiredPowerStatus(server, metalv1alpha1.ServerOnPowerState) {
-			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingUpdateStateVerification)
+			err := r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingUpdateStateVerification)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
-	case metalv1alpha1.BiosSettingUpdateStateVerification:
+	case metalv1alpha1.BIOSSettingUpdateStateVerification:
 		// make sure the setting has actually applied.
-		_, settingsDiff, err := r.getBiosVersionAndSettingDifference(ctx, log, biosSettings, server)
+		_, settingsDiff, err := r.getBIOSVersionAndSettingDifference(ctx, log, biosSettings, server)
 
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get BIOS settings: %w", err)
@@ -396,7 +392,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 		// if setting is not different, complete the BIOS tasks
 		if len(settingsDiff) == 0 {
 			// move  biosSettings state to completed, and revert the settingUpdate state to initial
-			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingsStateApplied)
+			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, fmt.Errorf("waiting on the BIOS setting to take place")
@@ -417,14 +413,14 @@ func (r *BiosSettingsReconciler) handleSettingAppliedState(
 		return ctrl.Result{}, err
 	}
 
-	_, settingsDiff, err := r.getBiosVersionAndSettingDifference(ctx, log, biosSettings, server)
+	_, settingsDiff, err := r.getBIOSVersionAndSettingDifference(ctx, log, biosSettings, server)
 
 	if err != nil {
 		log.V(1).Error(err, "unable to fetch and check BIOSSettings")
 		return ctrl.Result{}, err
 	}
 	if len(settingsDiff) > 0 {
-		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BiosSettingsStatePending)
+		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStatePending)
 		return ctrl.Result{}, err
 	}
 
@@ -439,12 +435,12 @@ func (r *BiosSettingsReconciler) handleFailedState(
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 	log.V(1).Info("Handle failed setting update with no maintenance reference")
-	// todo: revist this logic to either create maintenance if not present, put server in Error state on failed bios settings maintenance
+	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bios settings maintenance
 	log.V(1).Info("Failed to update bios setting", "ctx", ctx, "biosSettings", biosSettings, "server", server)
 	return ctrl.Result{}, nil
 }
 
-func (r *BiosSettingsReconciler) getBiosVersionAndSettingDifference(
+func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	ctx context.Context,
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
@@ -592,7 +588,7 @@ func (r *BiosSettingsReconciler) getReferredServerMaintenance(
 	return serverMaintenance, nil
 }
 
-func (r *BiosSettingsReconciler) getReferredbiosSettings(
+func (r *BiosSettingsReconciler) getReferredBIOSSettings(
 	ctx context.Context,
 	log logr.Logger,
 	referredBIOSSetteingRef *corev1.LocalObjectReference,
@@ -681,7 +677,7 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 	ctx context.Context,
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
-	state metalv1alpha1.BiosSettingsState,
+	state metalv1alpha1.BIOSSettingsState,
 ) error {
 
 	if biosSettings.Status.State == state {
@@ -691,7 +687,7 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 	biosSettingsBase := biosSettings.DeepCopy()
 	biosSettings.Status.State = state
 
-	if state == metalv1alpha1.BiosSettingsStateApplied {
+	if state == metalv1alpha1.BIOSSettingsStateApplied {
 		biosSettings.Status.UpdateSettingState = ""
 	}
 
@@ -708,7 +704,7 @@ func (r *BiosSettingsReconciler) updateBIOSSettingUpdateStatus(
 	ctx context.Context,
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
-	state metalv1alpha1.BiosSettingUpdateState,
+	state metalv1alpha1.BIOSSettingUpdateState,
 ) error {
 
 	if biosSettings.Status.UpdateSettingState == state {
@@ -735,7 +731,7 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 	host := obj.(*metalv1alpha1.Server)
 	BIOSSettingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := r.List(ctx, BIOSSettingsList); err != nil {
-		log.Error(err, "failed to list biosSettingses")
+		log.Error(err, "failed to list biosSettings")
 		return nil
 	}
 	var req []ctrl.Request

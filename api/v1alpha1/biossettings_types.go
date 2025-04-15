@@ -11,8 +11,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// BiosSettingsSpec defines the desired state of BIOSSettings.
-type BiosSettingsSpec struct {
+// BIOSSettingsSpec defines the desired state of BIOSSettings.
+type BIOSSettingsSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -40,40 +40,40 @@ type Settings struct {
 	SettingsMap map[string]string `json:"settings,omitempty"`
 }
 
-// BiosSettingsState specifies the current state of the BIOS maintenance.
-type BiosSettingsState string
+// BIOSSettingsState specifies the current state of the BIOS maintenance.
+type BIOSSettingsState string
 
 const (
-	// BiosSettingsStatePending specifies that the server bios is in setting update path.
-	BiosSettingsStatePending BiosSettingsState = "Pending"
-	// BiosSettingsStateInProgress specifies that the server bios is in setting update path.
-	BiosSettingsStateInProgress BiosSettingsState = "InProgress"
-	// BiosSettingsStateApplied specifies that the server bios maintenance has been completed.
-	BiosSettingsStateApplied BiosSettingsState = "Applied"
-	// BiosSettingsStateFailed specifies that the server maintenance has failed.
-	BiosSettingsStateFailed BiosSettingsState = "Failed"
+	// BIOSSettingsStatePending specifies that the server bios is in setting update path.
+	BIOSSettingsStatePending BIOSSettingsState = "Pending"
+	// BIOSSettingsStateInProgress specifies that the server bios is in setting update path.
+	BIOSSettingsStateInProgress BIOSSettingsState = "InProgress"
+	// BIOSSettingsStateApplied specifies that the server bios maintenance has been completed.
+	BIOSSettingsStateApplied BIOSSettingsState = "Applied"
+	// BIOSSettingsStateFailed specifies that the server maintenance has failed.
+	BIOSSettingsStateFailed BIOSSettingsState = "Failed"
 )
 
-type BiosSettingUpdateState string
+type BIOSSettingUpdateState string
 
 const (
-	// BiosSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.
-	BiosSettingUpdateWaitOnServerRebootPowerOff BiosSettingUpdateState = "WaitOnServerRebootPowerOff"
-	// BiosSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.
-	BiosSettingUpdateWaitOnServerRebootPowerOn BiosSettingUpdateState = "WaitOnServerRebootPowerOn"
-	// BiosSettingUpdateStateIssue specifies that the bios new setting was posted to RedFish
-	BiosSettingUpdateStateIssue BiosSettingUpdateState = "IssueSettingUpdate"
-	// BiosSettingUpdateStateVerification specifies that the bios setting has been completed.
-	BiosSettingUpdateStateVerification BiosSettingUpdateState = "VerifySettingUpdate"
+	// BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.
+	BIOSSettingUpdateWaitOnServerRebootPowerOff BIOSSettingUpdateState = "WaitOnServerRebootPowerOff"
+	// BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.
+	BIOSSettingUpdateWaitOnServerRebootPowerOn BIOSSettingUpdateState = "WaitOnServerRebootPowerOn"
+	// BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to RedFish
+	BIOSSettingUpdateStateIssue BIOSSettingUpdateState = "IssueSettingUpdate"
+	// BIOSSettingUpdateStateVerification specifies that the bios setting has been completed.
+	BIOSSettingUpdateStateVerification BIOSSettingUpdateState = "VerifySettingUpdate"
 )
 
-// BiosSettingsStatus defines the observed state of BIOSSettings.
-type BiosSettingsStatus struct {
+// BIOSSettingsStatus defines the observed state of BIOSSettings.
+type BIOSSettingsStatus struct {
 
 	// State represents the current state of the bios configuration task.
-	State BiosSettingsState `json:"state,omitempty"`
+	State BIOSSettingsState `json:"state,omitempty"`
 	// UpdateSettingState represents the current state of the bios setting update task.
-	UpdateSettingState BiosSettingUpdateState `json:"updateSettingState,omitempty"`
+	UpdateSettingState BIOSSettingUpdateState `json:"updateSettingState,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -88,8 +88,8 @@ type BIOSSettings struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BiosSettingsSpec   `json:"spec,omitempty"`
-	Status BiosSettingsStatus `json:"status,omitempty"`
+	Spec   BIOSSettingsSpec   `json:"spec,omitempty"`
+	Status BIOSSettingsStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

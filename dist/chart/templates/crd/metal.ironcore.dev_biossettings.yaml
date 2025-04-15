@@ -56,7 +56,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: BiosSettingsSpec defines the desired state of BIOSSettings.
+            description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
               ServerMaintenancePolicyTemplate:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
@@ -142,7 +142,7 @@ spec:
                   rule: self == oldSelf
             type: object
           status:
-            description: BiosSettingsStatus defines the observed state of BIOSSettings.
+            description: BIOSSettingsStatus defines the observed state of BIOSSettings.
             properties:
               state:
                 description: State represents the current state of the bios configuration

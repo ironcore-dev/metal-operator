@@ -82,7 +82,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
-			Spec: metalv1alpha1.BiosSettingsSpec{
+			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -96,7 +96,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BiosSettingsStateApplied),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 	})
 
@@ -119,7 +119,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
-			Spec: metalv1alpha1.BiosSettingsSpec{
+			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -133,7 +133,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BiosSettingsStateApplied),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 
 		By("Deleting the BIOSSettings")

@@ -50,9 +50,9 @@ type BMCSpec struct {
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
 
-	// OoBMSettingRef is a reference to a OOBMSetting object that specifies
-	// the OoBM configuration for this BMC.
-	OoBMSettingRef *v1.LocalObjectReference `json:"oobmSettingsRef,omitempty"`
+	// BMCSettingRef is a reference to a BMCSettings object that specifies
+	// the BMC configuration for this BMC.
+	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.

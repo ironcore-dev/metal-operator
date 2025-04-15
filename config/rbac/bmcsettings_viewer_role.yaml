@@ -1,4 +1,3 @@
-{{- if .Values.rbac.enable }}
 # This rule is not used by the project metal-operator itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
@@ -10,13 +9,14 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    {{- include "chart.labels" . | nindent 4 }}
-  name: oobmsettings-viewer-role
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bmcsettings-viewer-role
 rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - oobmsettings
+  - bmcsettings
   verbs:
   - get
   - list
@@ -24,7 +24,6 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - oobmsettings/status
+  - bmcsettings/status
   verbs:
   - get
-{{- end -}}

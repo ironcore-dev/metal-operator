@@ -1,14 +1,14 @@
 apiVersion: metal.ironcore.dev/v1alpha1
-kind: OOBMSettings
+kind: BMCSettings
 metadata:
   labels:
     app.kubernetes.io/name: metal-operator
     app.kubernetes.io/managed-by: kustomize
-  name: oobmsettings-sample
+  name: bmcsettings-sample
 spec:
   serverRef:
     name: endpoint-sample-system-0
-  OoBM:
+  bmcSettings:
     version: 7.00.00.171
     settings:
       ThermalSettings.1.FanSpeedOffset: "3"

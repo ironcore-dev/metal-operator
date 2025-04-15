@@ -87,7 +87,7 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersion{}, &metalv1alpha1.BIOSSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))
 
-	Eventually(deleteAndList(ctx, &metalv1alpha1.OOBMSettings{}, &metalv1alpha1.OOBMSettingsList{})).Should(
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettings{}, &metalv1alpha1.BMCSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))
 }
 
@@ -276,33 +276,7 @@ func SetupTest() *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&OOBMSettingsReconciler{
-			Client:           k8sManager.GetClient(),
-			ManagerNamespace: ns.Name,
-			Insecure:         true,
-			Scheme:           k8sManager.GetScheme(),
-			ResyncInterval:   10 * time.Millisecond,
-			BMCOptions: bmc.BMCOptions{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
-			},
-		}).SetupWithManager(k8sManager)).To(Succeed())
-
-		Expect((&BIOSVersionReconciler{
-			Client:           k8sManager.GetClient(),
-			ManagerNamespace: ns.Name,
-			Insecure:         true,
-			Scheme:           k8sManager.GetScheme(),
-			ResyncInterval:   10 * time.Millisecond,
-			BMCOptions: bmc.BMCOptions{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
-			},
-		}).SetupWithManager(k8sManager)).To(Succeed())
-
-		Expect((&OOBMSettingsReconciler{
+		Expect((&BMCSettingsReconciler{
 			Client:           k8sManager.GetClient(),
 			ManagerNamespace: ns.Name,
 			Insecure:         true,

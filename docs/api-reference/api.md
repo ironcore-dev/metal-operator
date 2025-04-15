@@ -738,7 +738,7 @@ This field is optional and can be omitted if console access is not required.</p>
 </tr>
 <tr>
 <td>
-<code>oobmSettingsRef</code><br/>
+<code>bmcSettingsRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
@@ -746,8 +746,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>OoBMSettingRef is a reference to a OOBMSetting object that specifies
-the OoBM configuration for this BMC.</p>
+<p>BMCSettingRef is a reference to a BMCSettings object that specifies
+the BMC configuration for this BMC.</p>
 </td>
 </tr>
 </table>
@@ -950,6 +950,356 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/secret/#se
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingUpdateState">BMCSettingUpdateState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
+<td><p>SettingUpdateStateIssued specifies that the BMC new setting was posted to RedFish</p>
+</td>
+</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
+<td><p>SettingUpdateStateCompleted specifies that the BMC setting has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
+<td><p>SettingUpdateStateWaitOnServerReboot specifies that the BMC setting state is waiting on server to turn off during Reboot.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
+<td><p>BMCSettingUpdateWaitOnServerRebootPowerOn specifies that the BMC setting state is waiting on server to turn on during Reboot.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings
+</h3>
+<div>
+<p>BMCSettings is the Schema for the BMCSettings API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">
+BMCSettingsSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>bmcSettings</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsMap">
+BMCSettingsMap
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettings specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRefList</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.localobjectreference--">
+[]*k8s.io/api/core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server&rsquo;s Manager to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for human approval if bmc reboot is needed
+ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefList</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.objectreference--">
+map[string]*k8s.io/api/core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BMC has requested for the referred server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">
+BMCSettingsStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsMap">BMCSettingsMap
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Settings contains BMC settings as map</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
+</p>
+<div>
+<p>BMCSettingsSpec defines the desired state of BMCSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>bmcSettings</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsMap">
+BMCSettingsMap
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettings specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRefList</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.localobjectreference--">
+[]*k8s.io/api/core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server&rsquo;s Manager to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for human approval if bmc reboot is needed
+ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefList</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.objectreference--">
+map[string]*k8s.io/api/core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BMC has requested for the referred server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsState">BMCSettingsState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus</a>)
+</p>
+<div>
+<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BMCSettingsStateApplied specifies that the server BMC maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BMCSettingsStateFailed specifies that the server maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BMCSettingsStateInProgress specifies that the server BMC is in setting update path.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BMCSettingsStateInVersionUpgrade specifies that the server BMC is in version upgrade path.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
+</p>
+<div>
+<p>BMCSettingsStatus defines the observed state of BMCSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsState">
+BMCSettingsState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the BMC configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateSettingState</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingUpdateState">
+BMCSettingUpdateState
+</a>
+</em>
+</td>
+<td>
+<p>UpdateSettingState represents the current state of the BMC setting update task.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec
 </h3>
 <p>
@@ -1041,7 +1391,7 @@ This field is optional and can be omitted if console access is not required.</p>
 </tr>
 <tr>
 <td>
-<code>oobmSettingsRef</code><br/>
+<code>bmcSettingsRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
@@ -1049,8 +1399,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>OoBMSettingRef is a reference to a OOBMSetting object that specifies
-the OoBM configuration for this BMC.</p>
+<p>BMCSettingRef is a reference to a BMCSettings object that specifies
+the BMC configuration for this BMC.</p>
 </td>
 </tr>
 </tbody>
@@ -1579,43 +1929,12 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="metal.ironcore.dev/v1alpha1.IndicatorLED">IndicatorLED
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
-</p>
-<div>
-<p>IndicatorLED represents LED indicator states</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Blinking&#34;</p></td>
-<td><p>BlinkingIndicatorLED indicates the Indicator LED is blinking.</p>
-</td>
-</tr><tr><td><p>&#34;Lit&#34;</p></td>
-<td><p>LitIndicatorLED indicates the Indicator LED is lit.</p>
-</td>
-</tr><tr><td><p>&#34;Off&#34;</p></td>
-<td><p>OffIndicatorLED indicates the Indicator LED is off.</p>
-</td>
-</tr><tr><td><p>&#34;Unknown&#34;</p></td>
-<td><p>UnknownIndicatorLED indicates the state of the Indicator LED cannot be
-determined.</p>
-</td>
-</tr></tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.InlineEndpoint">InlineEndpoint
+<h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
 </p>
 <div>
-<p>InlineEndpoint defines inline network access configuration for the BMC.</p>
 </div>
 <table>
 <thead>
@@ -1627,80 +1946,38 @@ determined.</p>
 <tbody>
 <tr>
 <td>
-<code>macAddress</code><br/>
+<code>secretRef</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>MACAddress is the MAC address of the endpoint.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ip</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.IP">
-IP
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>IP is the IP address of the BMC.</p>
+<p>ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+to access the ImageURI. This secret includes sensitive information such as usernames and passwords.</p>
 </td>
 </tr>
-</tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.NetworkInterface">NetworkInterface
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
-</p>
-<div>
-<p>NetworkInterface defines the details of a network interface.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
 <tr>
 <td>
-<code>name</code><br/>
+<code>transferProtocol</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Name is the name of the network interface.</p>
+<p>The network protocol that the server&rsquo;s update service uses to retrieve &lsquo;ImageURI&rsquo;</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>ip</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.IP">
-IP
-</a>
-</em>
-</td>
-<td>
-<p>IP is the IP address assigned to the network interface.
-The type is specified as string and is schemaless.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>macAddress</code><br/>
+<code>URI</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>MACAddress is the MAC address of the network interface.</p>
+<p>The URI of the software image to update/install.&rdquo;</p>
 </td>
 </tr>
 </tbody>
@@ -3186,7 +3463,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.OOBMSettingsSpec">OOBMSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>

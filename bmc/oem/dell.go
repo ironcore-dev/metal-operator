@@ -64,7 +64,7 @@ func (r *Dell) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *h
 }
 
 type DellIdracManager struct {
-	OoBM *redfish.Manager
+	BMC *redfish.Manager
 }
 
 type DellAttributes struct {
@@ -83,7 +83,7 @@ func (d *DellIdracManager) GetObjFromUri(
 	uri string,
 	respObj any,
 ) ([]string, error) {
-	resp, err := d.OoBM.GetClient().Get(uri)
+	resp, err := d.BMC.GetClient().Get(uri)
 	if err != nil {
 		return nil, err
 	}
@@ -108,29 +108,29 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute() ([]DellAttributes, error)
 	}
 
 	tempData := &temp{}
-	err := json.Unmarshal(d.OoBM.OemLinks, tempData)
+	err := json.Unmarshal(d.BMC.OemLinks, tempData)
 	if err != nil {
 		return nil, err
 	}
 
-	OoBMDellAttributes := []DellAttributes{}
+	BMCDellAttributes := []DellAttributes{}
 	err = nil
 	for _, data := range tempData.DellOEMData.DellLinkAttributes {
-		OoBMDellAttribute := &DellAttributes{}
-		eTag, errAttr := d.GetObjFromUri(data.String(), OoBMDellAttribute)
+		BMCDellAttribute := &DellAttributes{}
+		eTag, errAttr := d.GetObjFromUri(data.String(), BMCDellAttribute)
 		if errAttr != nil {
 			err = errors.Join(err, errAttr)
 		}
 		if eTag != nil {
-			OoBMDellAttribute.Etag = eTag[0]
+			BMCDellAttribute.Etag = eTag[0]
 		}
-		OoBMDellAttributes = append(OoBMDellAttributes, *OoBMDellAttribute)
+		BMCDellAttributes = append(BMCDellAttributes, *BMCDellAttribute)
 	}
 	if err != nil {
-		return OoBMDellAttributes, err
+		return BMCDellAttributes, err
 	}
 
-	return OoBMDellAttributes, nil
+	return BMCDellAttributes, nil
 }
 
 func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
@@ -167,7 +167,7 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 		for settingPath, payload := range payloads {
 			// fetch the etag required for settingPath
 			etag, err := func(uri string) ([]string, error) {
-				resp, err := d.OoBM.GetClient().Get(uri)
+				resp, err := d.BMC.GetClient().Get(uri)
 				if err != nil {
 					return nil, err
 				}
@@ -190,7 +190,7 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 			}
 
 			err = func(uri string, data map[string]any, header map[string]string) error {
-				resp, err := d.OoBM.GetClient().PatchWithHeaders(uri, data, header)
+				resp, err := d.BMC.GetClient().PatchWithHeaders(uri, data, header)
 				if err != nil {
 					return err
 				}

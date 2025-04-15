@@ -300,7 +300,7 @@ func NewOEMManager(ooem *redfish.Manager) (*OEMManager, error) {
 	case string(DellServers):
 		return &OEMManager{
 			OEMManagerInterface: &oem.DellIdracManager{
-				OoBM: ooem,
+				BMC: ooem,
 			}}, nil
 	default:
 		return &OEMManager{}, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)

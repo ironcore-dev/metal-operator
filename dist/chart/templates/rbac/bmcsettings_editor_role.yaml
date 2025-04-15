@@ -11,12 +11,12 @@ kind: ClusterRole
 metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
-  name: oobmsettings-editor-role
+  name: bmcsettings-editor-role
 rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - oobmsettings
+  - bmcsettings
   verbs:
   - create
   - delete
@@ -28,7 +28,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - oobmsettings/status
+  - bmcsettings/status
   verbs:
   - get
 {{- end -}}

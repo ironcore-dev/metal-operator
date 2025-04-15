@@ -11,18 +11,18 @@ kind: ClusterRole
 metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
-  name: oobmsettings-admin-role
+  name: bmcsettings-admin-role
 rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - oobmsettings
+  - bmcsettings
   verbs:
   - '*'
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - oobmsettings/status
+  - bmcsettings/status
   verbs:
   - get
 {{- end -}}

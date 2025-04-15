@@ -229,12 +229,12 @@ func (r *RedfishBMC) GetManagerBySystemUUID(ctx context.Context, systemUUID stri
 		return nil, err
 	}
 
-	OoBM, err := system.ManagedBy()
+	BMC, err := system.ManagedBy()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, m := range OoBM {
+	for _, m := range BMC {
 		// TODO: dont always take the first
 		return &Manager{
 			UUID:            m.UUID,
@@ -396,7 +396,7 @@ func (r *RedfishBMC) GetBMCAttributeValues(
 			if _, ok := mergedBMCAttributes[k]; !ok {
 				mergedBMCAttributes[k] = v
 			} else {
-				return nil, fmt.Errorf("duplicate attributes in OoBM settings are not supported %v", k)
+				return nil, fmt.Errorf("duplicate attributes in BMC settings are not supported %v", k)
 			}
 		}
 	}

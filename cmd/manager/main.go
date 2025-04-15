@@ -410,7 +410,7 @@ func main() { // nolint: gocyclo
 			os.Exit(1)
 		}
 	}
-	if err = (&controller.OOBMSettingsReconciler{
+	if err = (&controller.BMCSettingsReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
@@ -423,7 +423,7 @@ func main() { // nolint: gocyclo
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "OOBMSettings")
+		setupLog.Error(err, "unable to create controller", "controller", "BMCSettings")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

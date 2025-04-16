@@ -1,5 +1,5 @@
 apiVersion: metal.ironcore.dev/v1alpha1
-kind: biossettings
+kind: BIOSSettings
 metadata:
   labels:
     app.kubernetes.io/name: metal-operator
@@ -9,7 +9,7 @@ spec:
   serverRef:
     name: endpoint-sample-system-0
   biosSettings:
-    version: 2.10.3
+    version: 2.10.2
     settings:
-      PxeDev1EnDis: Disable
+      PxeDev1EnDis: Enabled
   ServerMaintenancePolicyTemplate: OwnerApproval

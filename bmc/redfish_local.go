@@ -13,7 +13,7 @@ import (
 var _ BMC = (*RedfishLocalBMC)(nil)
 
 var defaultMockedBIOSSetting = map[string]map[string]any{
-	"abc":       {"type": "string", "reboot": false, "value": "blah"},
+	"abc":       {"type": "string", "reboot": false, "value": "bar"},
 	"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 }
 

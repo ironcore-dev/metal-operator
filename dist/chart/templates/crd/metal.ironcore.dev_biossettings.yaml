@@ -58,7 +58,7 @@ spec:
           spec:
             description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
-              ServerMaintenancePolicyTemplate:
+              ServerMaintenancePolicy:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
                   on the server.
                 type: string

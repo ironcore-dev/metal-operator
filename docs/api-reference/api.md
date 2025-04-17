@@ -106,7 +106,7 @@ Kubernetes core/v1.LocalObjectReference
 </tr>
 <tr>
 <td>
-<code>ServerMaintenancePolicyTemplate</code><br/>
+<code>serverMaintenancePolicy</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy
@@ -191,7 +191,7 @@ Kubernetes core/v1.LocalObjectReference
 </tr>
 <tr>
 <td>
-<code>ServerMaintenancePolicyTemplate</code><br/>
+<code>serverMaintenancePolicy</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy

@@ -58,10 +58,6 @@ spec:
           spec:
             description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
-              ServerMaintenancePolicyTemplate:
-                description: ServerMaintenancePolicy is maintenance policy to be enforced
-                  on the server.
-                type: string
               biosSettings:
                 description: BIOSSettings specifies the BIOS settings for the selected
                   serverRef or serverSelector.
@@ -78,6 +74,10 @@ spec:
                 required:
                 - version
                 type: object
+              serverMaintenancePolicy:
+                description: ServerMaintenancePolicy is maintenance policy to be enforced
+                  on the server.
+                type: string
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
                   object that that BIOS has requested for the referred server.

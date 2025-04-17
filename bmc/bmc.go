@@ -42,9 +42,11 @@ type BMC interface {
 
 	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
 
-	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]string, error)
+	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error)
 
-	SetBiosAttributes(ctx context.Context, systemUUID string, attributes map[string]string) (reset bool, err error)
+	CheckBiosAttributes(attrs map[string]string) (reset bool, err error)
+
+	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes map[string]string) (err error)
 
 	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
 
@@ -62,9 +64,9 @@ type Entity struct {
 	Name string `json:"name"`
 }
 
-type Bios struct {
-	Version    string
-	Attributes map[string]string
+type AllowedValues struct {
+	ValueDisplayName string
+	ValueName        string
 }
 
 type RegistryEntryAttributes struct {
@@ -82,6 +84,7 @@ type RegistryEntryAttributes struct {
 	ResetRequired bool
 	Type          string
 	WriteOnly     bool
+	Value         []AllowedValues
 }
 
 type RegistryEntry struct {

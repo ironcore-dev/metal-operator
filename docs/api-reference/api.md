@@ -10,13 +10,38 @@
 </div>
 Resource Types:
 <ul></ul>
-<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
-</h3>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">BIOSSettingUpdateState
+(<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
 </p>
 <div>
-<p>BIOSSettings represents the BIOS settings for a server.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
+<td><p>BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to RedFish</p>
+</td>
+</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
+<td><p>BIOSSettingUpdateStateVerification specifies that the bios setting has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
+<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
+<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
+</h3>
+<div>
+<p>BIOSSettings is the Schema for the biossettings API.</p>
 </div>
 <table>
 <thead>
@@ -28,24 +53,239 @@ Resource Types:
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>metadata</code><br/>
 <em>
-string
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
 </em>
 </td>
 <td>
-<p>Version specifies the version of the server BIOS for which the settings are defined.</p>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
 </td>
 </tr>
 <tr>
 <td>
-<code>settings</code><br/>
+<code>spec</code><br/>
 <em>
-map[string]string
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">
+BIOSSettingsSpec
+</a>
 </em>
 </td>
 <td>
-<p>Settings is a map of key-value pairs representing the BIOS settings.</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>biosSettings</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Settings">
+Settings
+</a>
+</em>
+</td>
+<td>
+<p>BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">
+BIOSSettingsStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings</a>)
+</p>
+<div>
+<p>BIOSSettingsSpec defines the desired state of BIOSSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>biosSettings</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Settings">
+Settings
+</a>
+</em>
+</td>
+<td>
+<p>BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsState">BIOSSettingsState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
+</p>
+<div>
+<p>BIOSSettingsState specifies the current state of the BIOS maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BIOSSettingsStateApplied specifies that the server bios maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BIOSSettingsStateFailed specifies that the server maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BIOSSettingsStateInProgress specifies that the server bios is in setting update path.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BIOSSettingsStatePending specifies that the server bios is in setting update path.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings</a>)
+</p>
+<div>
+<p>BIOSSettingsStatus defines the observed state of BIOSSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsState">
+BIOSSettingsState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the bios configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateSettingState</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">
+BIOSSettingUpdateState
+</a>
+</em>
+</td>
+<td>
+<p>UpdateSettingState represents the current state of the bios setting update task.</p>
 </td>
 </tr>
 </tbody>
@@ -1391,15 +1631,16 @@ the boot configuration for this server during maintenance. This field is optiona
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biosSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a biossettings object that specifies
+the BIOS configuration for this server.</p>
 </td>
 </tr>
 </table>
@@ -2064,7 +2305,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -2413,15 +2654,16 @@ the boot configuration for this server during maintenance. This field is optiona
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biosSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a biossettings object that specifies
+the BIOS configuration for this server.</p>
 </td>
 </tr>
 </tbody>
@@ -2601,18 +2843,6 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-BIOSSettings
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
 <code>conditions</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#condition-v1-meta">
@@ -2623,6 +2853,46 @@ BIOSSettings
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the server&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.Settings">Settings
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BIOS version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains bios settings as map</p>
 </td>
 </tr>
 </tbody>

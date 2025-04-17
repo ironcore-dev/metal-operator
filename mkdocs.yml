@@ -57,6 +57,7 @@ nav:
     - ServerBootConfigurations: concepts/serverbootconfigurations.md
     - ServerClaims: concepts/serverclaims.md
     - ServerMaintenance: concepts/servermaintenance.md
+    - BIOSSettings: concepts/biossettings.md
 - Usage:
   - metalctl: usage/metalctl.md
 - Development Guide:

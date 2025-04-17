@@ -163,6 +163,11 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
+	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
+		log.V(1).Info("Skipped Server reconciliation as its in maintenance")
+		return ctrl.Result{}, nil
+	}
+
 	if modified, err := r.patchServerRef(ctx, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -494,6 +499,10 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 		log := ctrl.LoggerFrom(ctx)
 
 		host := object.(*metalv1alpha1.Server)
+
+		if host.Status.State == metalv1alpha1.ServerStateMaintenance || host.Spec.ServerMaintenanceRef != nil {
+			return nil
+		}
 		var req []reconcile.Request
 		claimList := &metalv1alpha1.ServerClaimList{}
 		if err := r.List(ctx, claimList); err != nil {

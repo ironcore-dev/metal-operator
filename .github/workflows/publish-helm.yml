@@ -1,0 +1,52 @@
+name: Build and Publish Helm Chart
+
+permissions:
+  contents: read
+
+on:
+  release:
+    types:
+    - published
+  push:
+    branches:
+    - main
+    tags:
+    - v*
+    paths-ignore:
+    - 'docs/**'
+    - '**/*.md'
+  pull_request:
+    paths-ignore:
+    - 'docs/**'
+    - '**/*.md'
+    types: [labeled, unlabeled, opened, synchronize, reopened]
+
+jobs:
+  publish-charts:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'ok-to-chart')
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+    - uses: azure/setup-helm@v4.3.0
+      with:
+        version: v3.16.2
+    - name: Login to GHCR
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Push Helm Chart to OCI Registry
+      timeout-minutes: 40
+      uses: appany/helm-oci-chart-releaser@v0.4.2
+      with:
+        name: metal-operator-core
+        repository: ${{ github.repository_owner }}
+        tag: 0.1.0
+        path: dist/chart # Default charts/{name}
+        registry: ghcr.io
+        registry_username: ${{ github.actor }}
+        registry_password: ${{ secrets.GITHUB_TOKEN }}
+        update_dependencies: 'true'

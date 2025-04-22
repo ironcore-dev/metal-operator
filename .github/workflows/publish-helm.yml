@@ -37,10 +37,11 @@ jobs:
         git config user.name "$GITHUB_ACTOR"
         git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
     - name: Run chart-releaser
-      uses: afritzler/helm-oci-charts-releaser@enh/skip-gh-release
+      uses: bitdeps/helm-oci-charts-releaser@v0.1.4
       with:
-        oci_registry: ghcr.io/${{ github.repository_owner }}/charts
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        oci_password: ${{ secrets.GITHUB_TOKEN }}
-        oci_username: ${{ github.actor }}
+        charts_dir: dist/chart
         skip_gh_release: true
+        oci_registry: ghcr.io/${{ github.repository_owner }}/charts
+        oci_username: ${{ github.actor }}
+        oci_password: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}

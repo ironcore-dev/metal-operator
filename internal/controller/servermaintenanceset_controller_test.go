@@ -10,7 +10,6 @@ import (
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
@@ -111,28 +110,30 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, servermaintenanceset)).To(Succeed())
 
-		By("Checking if the resource has been reconciled")
-
-		maintenance01 := &metalv1alpha1.ServerMaintenance{}
-
-		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
-			Name:      servermaintenanceset.Name + "-0",
-			Namespace: servermaintenanceset.Namespace,
-		}, maintenance01).Should(Succeed())
-
-		maintenance02 := &metalv1alpha1.ServerMaintenance{}
-
-		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
-			Name:      servermaintenanceset.Name + "-1",
-			Namespace: servermaintenanceset.Namespace,
-		}, maintenance02).Should(Succeed())
-
+		By("Checking if the maintenance has been created")
+		maintenance01 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      servermaintenanceset.Name + "-0",
+				Namespace: servermaintenanceset.Namespace,
+			},
+		}
 		Eventually(Object(maintenance01)).Should(SatisfyAll(
 			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
-		))
-
+			HaveField("Spec.ServerRef.Name", Equal(server01.Name)),
+			HaveField("Spec.Policy", Equal(metalv1alpha1.ServerMaintenancePolicyEnforced)),
+		),
+		)
+		By("Checking if the 2nd maintenance has been created")
+		maintenance02 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      servermaintenanceset.Name + "-1",
+				Namespace: servermaintenanceset.Namespace,
+			},
+		}
 		Eventually(Object(maintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
+			HaveField("Spec.ServerRef.Name", Equal(server02.Name)),
+			HaveField("Spec.Policy", Equal(metalv1alpha1.ServerMaintenancePolicyEnforced)),
 		))
 
 		By("Checking if the status has been updated")

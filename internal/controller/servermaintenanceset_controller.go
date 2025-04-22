@@ -178,11 +178,7 @@ func (r *ServerMaintenanceSetReconciler) patchStatus(ctx context.Context, replic
 
 func (r *ServerMaintenanceSetReconciler) getOwnedMaintenances(ctx context.Context, replica *metalv1alpha1.ServerMaintenanceSet) (*metalv1alpha1.ServerMaintenanceList, error) {
 	maintenancelist := &metalv1alpha1.ServerMaintenanceList{}
-	opts := []client.ListOption{
-		client.InNamespace(replica.Namespace),
-		client.MatchingLabels{ServerMaintenanceSetFinalizer: replica.Name},
-	}
-	if err := r.List(ctx, maintenancelist, opts...); err != nil {
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, replica, maintenancelist); err != nil {
 		return nil, err
 	}
 	log := log.FromContext(ctx)

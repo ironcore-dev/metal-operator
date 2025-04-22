@@ -1,5 +1,5 @@
 apiVersion: v2
-name: metal-operator-core
+name: metal-operator
 description: A Helm chart to distribute the project metal-operator
 type: application
 version: 0.1.0

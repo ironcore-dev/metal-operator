@@ -28,25 +28,19 @@ jobs:
     steps:
     - name: Check out repository
       uses: actions/checkout@v4
-    - uses: azure/setup-helm@v4.3.0
+    - name: Set up Helm
+      uses: azure/setup-helm@v4.3.0
       with:
         version: v3.16.2
-    - name: Login to GHCR
-      if: github.event_name != 'pull_request'
-      uses: docker/login-action@v3
+    - name: Configure Git
+      run: |
+        git config user.name "$GITHUB_ACTOR"
+        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+    - name: Run chart-releaser
+      uses: afritzler/helm-oci-charts-releaser@enh/skip-gh-release
       with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Push Helm Chart to OCI Registry
-      timeout-minutes: 40
-      uses: appany/helm-oci-chart-releaser@v0.4.2
-      with:
-        name: metal-operator-core
-        repository: ${{ github.repository_owner }}
-        tag: 0.1.0
-        path: dist/chart # Default charts/{name}
-        registry: ghcr.io
-        registry_username: ${{ github.actor }}
-        registry_password: ${{ secrets.GITHUB_TOKEN }}
-        update_dependencies: 'true'
+        oci_registry: ghcr.io/${{ github.repository_owner }}/charts
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        oci_password: ${{ secrets.GITHUB_TOKEN }}
+        oci_username: ${{ github.actor }}
+        skip_gh_release: true

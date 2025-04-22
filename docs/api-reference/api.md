@@ -2111,6 +2111,7 @@ ServerMaintenanceSpec
 </em>
 </td>
 <td>
+<p>Template specifies the template for the server maintenance.</p>
 </td>
 </tr>
 </table>
@@ -2169,6 +2170,7 @@ ServerMaintenanceSpec
 </em>
 </td>
 <td>
+<p>Template specifies the template for the server maintenance.</p>
 </td>
 </tr>
 </tbody>
@@ -2197,8 +2199,7 @@ int32
 </em>
 </td>
 <td>
-<p>INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-Important: Run &ldquo;make&rdquo; to regenerate code after modifying this file</p>
+<p>Maintenances is the number of server maintenances in the set.</p>
 </td>
 </tr>
 <tr>
@@ -2209,6 +2210,7 @@ int32
 </em>
 </td>
 <td>
+<p>Pending is the total number of pending server maintenances in the set.</p>
 </td>
 </tr>
 <tr>
@@ -2219,6 +2221,7 @@ int32
 </em>
 </td>
 <td>
+<p>InMaintenance is the total number of server maintenances in the set that are currently in maintenance.</p>
 </td>
 </tr>
 <tr>
@@ -2229,6 +2232,7 @@ int32
 </em>
 </td>
 <td>
+<p>Completed is the total number of completed server maintenances in the set.</p>
 </td>
 </tr>
 <tr>
@@ -2239,6 +2243,7 @@ int32
 </em>
 </td>
 <td>
+<p>Failed is the total number of failed server maintenances in the set.</p>
 </td>
 </tr>
 </tbody>

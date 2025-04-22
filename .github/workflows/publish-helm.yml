@@ -4,18 +4,14 @@ permissions:
   contents: read
 
 on:
-  release:
-    types:
-    - published
   push:
     branches:
     - main
     tags:
-    - v*
-    paths-ignore:
-    - 'docs/**'
-    - '**/*.md'
+    - v*.*.*
   pull_request:
+    branches:
+    - main
     paths-ignore:
     - 'docs/**'
     - '**/*.md'
@@ -36,6 +32,10 @@ jobs:
       run: |
         git config user.name "$GITHUB_ACTOR"
         git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+    - name: Set charts version
+      if: github.event_name == 'push'
+      run: |
+        sed -i "s/version: .*/version: ${GITHUB_REF_NAME#v}/" dist/chart/Chart.yaml
     - name: Run chart-releaser
       uses: bitdeps/helm-oci-charts-releaser@v0.1.4
       with:

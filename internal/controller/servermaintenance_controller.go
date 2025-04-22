@@ -107,18 +107,12 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 			return ctrl.Result{}, nil
 		}
 	}
-	defer func() {
-		if serverMaintenance.Status.State == metalv1alpha1.ServerMaintenanceStateInMaintenance {
-			// put server in maintenance
-			if patchErr := r.patchServerRef(ctx, log, serverMaintenance, server); patchErr != nil {
-				err = patchErr
-				log.Error(err, "failed to patch server maintenance ref")
-				return
-			}
-		}
-	}()
 	if server.Spec.ServerClaimRef == nil {
 		log.V(1).Info("Server has no claim, move to maintenance right away", "Server", server.Name)
+		if err = r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
+			log.Error(err, "failed to patch server maintenance ref")
+			return ctrl.Result{}, err
+		}
 		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
@@ -151,12 +145,20 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 			return ctrl.Result{}, nil
 		}
 		log.V(1).Info("Server approved for maintenance", "Server", server.Name, "Maintenance", serverMaintenance.Name)
+		if err = r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
+			log.Error(err, "failed to patch server maintenance ref")
+			return ctrl.Result{}, err
+		}
 		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
 	}
 	if serverMaintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced {
 		log.V(1).Info("Enforcing maintenance", "Server", server.Name, "Maintenance", serverMaintenance.Name)
+		if err = r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
+			log.Error(err, "failed to patch server maintenance ref")
+			return ctrl.Result{}, err
+		}
 		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
@@ -244,25 +246,24 @@ func (r *ServerMaintenanceReconciler) setAndPatchServerPowerState(ctx context.Co
 	return nil
 }
 
-func (r *ServerMaintenanceReconciler) patchServerRef(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) error {
+func (r *ServerMaintenanceReconciler) updateServerRef(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) error {
 	if server.Spec.ServerMaintenanceRef != nil {
 		log.V(1).Info("Server is already in Maintenance", "Server", server.Name, "Maintenance", server.Spec.ServerMaintenanceRef.Name)
 		return nil
 	}
-	if server.Spec.ServerMaintenanceRef == nil {
-		serverBase := server.DeepCopy()
-		server.Spec.ServerMaintenanceRef = &v1.ObjectReference{
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerMaintenance",
-			Namespace:  maintenance.Namespace,
-			Name:       maintenance.Name,
-			UID:        maintenance.UID,
-		}
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return fmt.Errorf("failed to patch maintenance ref for server: %w", err)
-		}
-		log.V(1).Info("Patched ServerMaintenance reference on Server", "Server", server.Name, "ServerMaintenanceeRef", maintenance.Name)
+	server.Spec.ServerMaintenanceRef = &v1.ObjectReference{
+		APIVersion: "metal.ironcore.dev/v1alpha1",
+		Kind:       "ServerMaintenance",
+		Namespace:  maintenance.Namespace,
+		Name:       maintenance.Name,
+		UID:        maintenance.UID,
 	}
+	// use update to not overwrite ServerMaintenanceRef if another maintenance was quicker
+	if err := r.Update(ctx, server); err != nil {
+		return fmt.Errorf("failed to patch maintenance ref for server: %w", err)
+	}
+	log.V(1).Info("Updated ServerMaintenance reference on Server", "Server", server.Name, "ServerMaintenanceeRef", maintenance.Name)
+
 	return nil
 }
 

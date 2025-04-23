@@ -57,25 +57,10 @@ const (
 	BMCSettingsStateFailed BMCSettingsState = "Failed"
 )
 
-type BMCSettingUpdateState string
-
-const (
-	// SettingUpdateStateWaitOnServerReboot specifies that the BMC setting state is waiting on server to turn off during Reboot.
-	BMCSettingUpdateWaitOnServerRebootPowerOff BMCSettingUpdateState = "WaitOnServerRebootPowerOff"
-	// BMCSettingUpdateWaitOnServerRebootPowerOn specifies that the BMC setting state is waiting on server to turn on during Reboot.
-	BMCSettingUpdateWaitOnServerRebootPowerOn BMCSettingUpdateState = "WaitOnServerRebootPowerOn"
-	// SettingUpdateStateIssued specifies that the BMC new setting was posted to RedFish
-	BMCSettingUpdateStateIssue BMCSettingUpdateState = "IssueSettingUpdate"
-	// SettingUpdateStateCompleted specifies that the BMC setting has been completed.
-	BMCSettingUpdateStateVerification BMCSettingUpdateState = "VerifySettingUpdate"
-)
-
 // BMCSettingsStatus defines the observed state of BMCSettings.
 type BMCSettingsStatus struct {
 	// State represents the current state of the BMC configuration task.
 	State BMCSettingsState `json:"state,omitempty"`
-	// UpdateSettingState represents the current state of the BMC setting update task.
-	UpdateSettingState BMCSettingUpdateState `json:"updateSettingState,omitempty"`
 }
 
 // +kubebuilder:object:root=true

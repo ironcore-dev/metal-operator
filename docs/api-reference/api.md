@@ -127,7 +127,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.</p>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </table>
@@ -212,7 +212,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BIOS has requested for the referred server.</p>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>

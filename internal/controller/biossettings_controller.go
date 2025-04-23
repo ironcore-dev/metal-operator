@@ -498,7 +498,7 @@ func (r *BiosSettingsReconciler) checkforPendingSettingsOnBIOS(
 	}
 	defer bmcClient.Logout()
 
-	pendingSettingsDiff, err = bmcClient.GetPendingAttributeValues(ctx, server.Spec.SystemUUID)
+	pendingSettingsDiff, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemUUID)
 	if err != nil {
 		return pendingSettingPresent, pendingSettingsDiff, err
 	}
@@ -528,7 +528,6 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) (currentbiosVersion string, diff redfish.SettingsAttributes, err error) {
-	// todo: need to also account for future pending changes reported for bios
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return "", diff, fmt.Errorf("failed to create BMC client: %w", err)

@@ -44,7 +44,7 @@ type BMC interface {
 
 	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error)
 
-	GetPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error)
+	GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error)
 
 	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
 

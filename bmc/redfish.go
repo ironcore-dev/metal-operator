@@ -291,7 +291,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	return result, err
 }
 
-func (r *RedfishBMC) GetPendingAttributeValues(
+func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	ctx context.Context,
 	systemUUID string,
 ) (
@@ -423,10 +423,10 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (rese
 	if err != nil {
 		return reset, err
 	}
-	return r.checkBiosAttribues(attrs, filtered)
+	return r.checkAttribues(attrs, filtered)
 }
 
-func (r *RedfishBMC) checkBiosAttribues(
+func (r *RedfishBMC) checkAttribues(
 	attrs redfish.SettingsAttributes,
 	filtered map[string]RegistryEntryAttributes,
 ) (reset bool, err error) {

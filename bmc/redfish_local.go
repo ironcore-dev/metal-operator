@@ -58,7 +58,7 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 			}
 		}
 		pendingMockedBIOSSetting = map[string]map[string]any{}
-		r.StoredBMCSettingData = defaultMockedBIOSSetting
+		r.StoredBIOSSettingData = defaultMockedBIOSSetting
 	}
 	return nil
 }
@@ -76,15 +76,13 @@ func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error 
 	return nil
 }
 
-func (r *RedfishLocalBMC) GetPendingAttributeValues(
+func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(
 	ctx context.Context,
 	systemUUID string,
 ) (
 	redfish.SettingsAttributes,
 	error,
 ) {
-	// can not unit test this ATM.
-	// todo: find a way to enchance refish_local.go to give ability to test this
 	if len(pendingMockedBIOSSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
@@ -123,7 +121,7 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 			}
 		}
 	}
-	r.StoredBMCSettingData = defaultMockedBIOSSetting
+	r.StoredBIOSSettingData = defaultMockedBIOSSetting
 
 	return nil
 }
@@ -204,5 +202,5 @@ func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) 
 	if len(filtered) == 0 {
 		return reset, err
 	}
-	return r.checkBiosAttribues(attrs, filtered)
+	return r.checkAttribues(attrs, filtered)
 }

@@ -5,9 +5,7 @@ package bmc
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/stmcginnis/gofish/redfish"
@@ -16,10 +14,12 @@ import (
 
 var _ BMC = (*RedfishLocalBMC)(nil)
 
-var defaultMockedBMCSetting = []map[string]any{
-	{"name": "abc", "type": string(TypeString), "reboot": false, "value": "blah"},
-	{"name": "fooreboot", "type": string(TypeInteger), "reboot": true, "value": 123},
+var defaultMockedBMCSetting = map[string]map[string]any{
+	"abc":       {"type": "string", "reboot": false, "value": "bar"},
+	"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 }
+
+var pendingMockedBMCSetting = map[string]map[string]any{}
 
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishLocalBMC struct {
@@ -251,9 +251,30 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(
 	return &UnitTestMockUps.BIOSUpgradeTaskStatus[UnitTestMockUps.BIOSUpgradeTaskIndex], nil
 }
 
+func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
+
+	// mock the bmc update here with timed delay
+	go func() {
+		if len(pendingMockedBMCSetting) > 0 {
+			time.Sleep(1 * time.Second)
+			for key, data := range pendingMockedBMCSetting {
+				if _, ok := defaultMockedBMCSetting[key]; ok {
+					defaultMockedBMCSetting[key] = data
+				}
+			}
+			pendingMockedBMCSetting = map[string]map[string]any{}
+			r.StoredBMCSettingData = defaultMockedBMCSetting
+		}
+	}()
+
+	return nil
+
+}
+
 // mock SetBiosAttributesOnReset sets given bios attributes for unit testing.
 func (r *RedfishLocalBMC) SetBMCAttributesImediately(
 	ctx context.Context,
+	UUID string,
 	attributes redfish.SettingsAttributes,
 ) (err error) {
 	attrs := make(map[string]interface{}, len(attributes))
@@ -261,30 +282,30 @@ func (r *RedfishLocalBMC) SetBMCAttributesImediately(
 		attrs[name] = value
 	}
 	if len(defaultMockedBMCSetting) == 0 {
-		defaultMockedBMCSetting = []map[string]any{}
+		defaultMockedBMCSetting = map[string]map[string]any{}
 	}
 
-	for key, attr := range attributes {
-		for _, eachMock := range defaultMockedBMCSetting {
-			if value, ok := eachMock["name"]; ok && value == key {
-				eachMock["value"] = attr
+	for key, attrData := range attributes {
+		if AttributesData, ok := defaultMockedBMCSetting[key]; ok {
+			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {
+				// if reboot not needed, set the attribute immediately.
+				AttributesData["value"] = attrData
+			} else {
+				// if reboot needed, set the attribute at next power on.
+				pendingMockedBMCSetting[key] = map[string]any{
+					"type":   AttributesData["type"],
+					"reboot": AttributesData["reboot"],
+					"value":  attrData,
+				}
 			}
 		}
 	}
 	r.StoredBMCSettingData = defaultMockedBMCSetting
+
 	return nil
 }
 
-// func (r *RedfishLocalBMC) getMockedBIOSSettingData() map[string]any {
-
-// 	if len(r.StoredBIOSSettingData) > 0 {
-// 		return r.StoredBIOSSettingData
-// 	}
-// 	return map[string]any{"abc": "blah", "fooreboot": 123}
-
-// }
-
-func (r *RedfishLocalBMC) getMockedBMCSettingData() []map[string]any {
+func (r *RedfishLocalBMC) getMockedBMCSettingData() map[string]map[string]any {
 
 	if len(r.StoredBMCSettingData) > 0 {
 		return r.StoredBMCSettingData
@@ -295,6 +316,7 @@ func (r *RedfishLocalBMC) getMockedBMCSettingData() []map[string]any {
 
 func (r *RedfishLocalBMC) GetBMCAttributeValues(
 	ctx context.Context,
+	UUID string,
 	attributes []string,
 ) (
 	result redfish.SettingsAttributes,
@@ -311,18 +333,35 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(
 	if err != nil {
 		return
 	}
-	result = make(map[string]interface{}, len(attributes))
+	result = make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if _, ok := filteredAttr[name]; ok {
-			for _, eachMock := range mockedAttributes {
-				if value, ok := eachMock["name"]; ok && value == name {
-					result[name] = eachMock["value"]
-					break
-				}
+			if AttributesData, ok := mockedAttributes[name]; ok {
+				result[name] = AttributesData["value"]
 			}
 		}
 	}
-	return
+	return result, nil
+}
+
+func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(
+	ctx context.Context,
+	systemUUID string,
+) (
+	redfish.SettingsAttributes,
+	error,
+) {
+	if len(pendingMockedBMCSetting) == 0 {
+		return redfish.SettingsAttributes{}, nil
+	}
+
+	result := make(redfish.SettingsAttributes, len(pendingMockedBMCSetting))
+
+	for key, data := range pendingMockedBMCSetting {
+		result[key] = data["value"]
+	}
+
+	return result, nil
 }
 
 func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(
@@ -337,15 +376,16 @@ func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(
 	if len(mockedAttributes) == 0 {
 		return filtered, fmt.Errorf("no bmc setting attributes found")
 	}
-	for _, eachMock := range mockedAttributes {
+	for name, AttributesData := range mockedAttributes {
 		data := RegistryEntryAttributes{}
-		data.AttributeName = eachMock["name"].(string)
+		data.AttributeName = name
 		data.Immutable = immutable
 		data.ReadOnly = readOnly
-		data.Type = eachMock["type"].(string)
-		data.ResetRequired = eachMock["reboot"].(bool)
-		filtered[eachMock["name"].(string)] = data
+		data.Type = AttributesData["type"].(string)
+		data.ResetRequired = AttributesData["reboot"].(bool)
+		filtered[name] = data
 	}
+
 	return filtered, err
 }
 
@@ -362,73 +402,5 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(attrs redfish.SettingsAttributes) (
 	if len(filtered) == 0 {
 		return reset, err
 	}
-	//TODO: add more types like maps etc
-	for name, value := range attrs {
-		entryAttribute, ok := filtered[name]
-		if !ok {
-			err = errors.Join(err, fmt.Errorf("attribute %s not found or immutable/hidden. attr present %v", name, filtered))
-			continue
-		}
-		if entryAttribute.ResetRequired {
-			reset = true
-		}
-		switch strings.ToLower(entryAttribute.Type) {
-		case string(TypeInteger):
-			if _, ok := value.(int); !ok {
-				err = errors.Join(
-					err,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
-						entryAttribute.Type,
-						entryAttribute,
-					))
-			}
-		case string(TypeString):
-			if _, ok := value.(string); !ok {
-				err = errors.Join(
-					err,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
-						entryAttribute.Type,
-						entryAttribute,
-					))
-			}
-		case string(TypeEnumerations):
-			if _, ok := value.(string); !ok {
-				err = errors.Join(
-					err,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
-						entryAttribute.Type,
-						entryAttribute,
-					))
-			}
-			var invalidEnum bool
-			for _, attrValue := range entryAttribute.Value {
-				if attrValue.ValueName == value.(string) {
-					invalidEnum = true
-					break
-				}
-			}
-			if !invalidEnum {
-				err = errors.Join(err, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
-			}
-			continue
-		default:
-			err = errors.Join(
-				err,
-				fmt.Errorf("attribute %s value has wrong type. needed %s for %v ",
-					name,
-					entryAttribute.Type,
-					entryAttribute,
-				))
-		}
-	}
-	return reset, err
+	return r.checkAttribues(attrs, filtered)
 }

@@ -52,7 +52,10 @@ type BMC interface {
 	GetSystems(ctx context.Context) ([]Server, error)
 
 	// GetManager returns the manager
-	GetManager() (*Manager, error)
+	GetManager(UUID string) (*redfish.Manager, error)
+
+	// Reset performs a reset on the Manager.
+	ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error
 
 	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
 
@@ -68,11 +71,11 @@ type BMC interface {
 
 	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) (err error)
 
-	SetBMCAttributesImediately(ctx context.Context, attributes redfish.SettingsAttributes) (err error)
+	SetBMCAttributesImediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error)
 
 	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
 
-	GetBMCVersion(ctx context.Context) (string, error)
+	GetBMCVersion(ctx context.Context, UUID string) (string, error)
 
 	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
 

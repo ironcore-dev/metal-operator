@@ -145,7 +145,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 	It("should update the setting if BMCSettings changes requested", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
-		bmcSetting["abc"] = "blahblah"
+		bmcSetting["abc"] = "changed-bmc-setting"
 
 		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{
@@ -192,7 +192,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 	It("should successfully reconcile if BMCRef is provided instead of serverRefList", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
-		bmcSetting["abc"] = "blahblah"
+		bmcSetting["abc"] = "change-with-BMCRef"
 
 		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{
@@ -262,19 +262,28 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: bmcSettings.Name}),
 		))
 
+		By("Ensuring that the Maintenance resource has not been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+
+		By("Ensuring that the Maintenance resource has not been referenced by BMCSettings resource")
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRefMap", BeNil()),
+		))
+
 		By("Ensuring that the state refects updating settings state")
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
+		By("Ensuring that the Maintenance resource has not been created")
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+
 		By("Ensuring that the Maintenance resource has not been referenced by BMCSettings resource")
-		Eventually(Object(bmcSettings)).Should(SatisfyAll(
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRefMap", BeNil()),
 		))
-
-		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 
 		Eventually(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
@@ -292,30 +301,11 @@ var _ = Describe("BMCSettings Controller", func() {
 	It("should create maintenance if policy is Ownerapproved", func(ctx SpecContext) {
 
 		bmcSetting := make(map[string]string)
-		bmcSetting["fooreboot"] = "1445"
+		bmcSetting["abc"] = "changed-to-req-server-maintenance-through-Ownerapproved"
 
 		// put server in reserved state. and create a bmc setting in Ownerapproved which needs reboot.
 		// this is needed to check the states traversed.
-		serverClaim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-claim",
-				Namespace: ns.Name,
-			},
-			Spec: metalv1alpha1.ServerClaimSpec{
-				ServerRef: &v1.LocalObjectReference{Name: server.Name},
-			},
-		}
-		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
-		By("Patching the Server to reserved state")
-		Eventually(Update(server, func() {
-			server.Spec.ServerClaimRef = &v1.ObjectReference{
-				Name:      serverClaim.Name,
-				Namespace: serverClaim.Namespace,
-			}
-		})).Should(Succeed())
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateReserved
-		})).Should(Succeed())
+		serverClaim := transitionServerToReserved(ctx, ns, server, metalv1alpha1.PowerOff)
 
 		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{
@@ -366,11 +356,6 @@ var _ = Describe("BMCSettings Controller", func() {
 				}}),
 		))
 
-		By("Ensuring that the Maintenance resource has been referenced by BMCSettings resource")
-		Eventually(Object(bmcSettings)).Should(SatisfyAll(
-			HaveField("Spec.ServerMaintenanceRefMap", Not(BeNil())),
-		))
-
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: bmcSettings.Name}),
@@ -385,13 +370,23 @@ var _ = Describe("BMCSettings Controller", func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
 
-		By("Checking the Server is in maintenance")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-		))
-
 		Eventually(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
+		By("Ensuring that the Maintenance resource has been deleted")
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRefMap", BeNil()),
+		))
+
+		By("Deleting the BMCSettings")
+		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
+
+		By("Ensuring that the BMCSettings ref is empty on BMC")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", BeNil()),
 		))
 	})
 
@@ -461,3 +456,66 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 	})
 })
+
+func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metalv1alpha1.Server, powerState metalv1alpha1.Power) *metalv1alpha1.ServerClaim {
+
+	By("Creating an Ignition secret")
+	ignitionSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    ns.Name,
+			GenerateName: "test-",
+		},
+		Data: map[string][]byte{
+			"foo": []byte("bar"),
+		},
+	}
+	Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+	By("Creating a ServerClaim")
+	serverClaim := &metalv1alpha1.ServerClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    ns.Name,
+			GenerateName: "test-",
+		},
+		Spec: metalv1alpha1.ServerClaimSpec{
+			Power:             powerState,
+			ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+			IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+			Image:             "foo:bar",
+		},
+	}
+	Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+	By("Patching the Server to available state")
+	Eventually(UpdateStatus(server, func() {
+		server.Status.State = metalv1alpha1.ServerStateAvailable
+	})).Should(Succeed())
+
+	// unfortunately, ServerClaim force creates the bootconfig and that does not transition to completed state.
+	// in reserved state, Hence, manually move bootconfig to completed to be able to put server in powerOn state.
+	bootConfig := &metalv1alpha1.ServerBootConfiguration{}
+	bootConfig.Name = serverClaim.Name
+	bootConfig.Namespace = serverClaim.Namespace
+
+	Eventually(Get(bootConfig)).Should(Succeed())
+
+	By("Patching the bootConfig to ready state")
+	Eventually(UpdateStatus(bootConfig, func() {
+		bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+	})).Should(Succeed())
+
+	Eventually(Get(server)).Should(Succeed())
+
+	By("Ensuring that the Server has the spec and state")
+	Eventually(Object(server)).Should(SatisfyAll(
+		HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
+		HaveField("Spec.Power", powerState),
+		HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+	))
+	By("Ensuring that the Server has the correct power state")
+	Eventually(Object(server)).Should(SatisfyAll(
+		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(powerState)),
+	))
+
+	return serverClaim
+}

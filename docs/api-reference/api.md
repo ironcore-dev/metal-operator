@@ -665,6 +665,17 @@ BMCSpec
 <table>
 <tr>
 <td>
+<code>uuid</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>UUID is the unique identifier for the BMC as defined in REDFISH API.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>endpointRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
@@ -949,34 +960,6 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/secret/#se
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingUpdateState">BMCSettingUpdateState
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
-<td><p>SettingUpdateStateIssued specifies that the BMC new setting was posted to RedFish</p>
-</td>
-</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
-<td><p>SettingUpdateStateCompleted specifies that the BMC setting has been completed.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
-<td><p>SettingUpdateStateWaitOnServerReboot specifies that the BMC setting state is waiting on server to turn off during Reboot.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
-<td><p>BMCSettingUpdateWaitOnServerRebootPowerOn specifies that the BMC setting state is waiting on server to turn on during Reboot.</p>
-</td>
-</tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings
 </h3>
@@ -1285,19 +1268,6 @@ BMCSettingsState
 <p>State represents the current state of the BMC configuration task.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>updateSettingState</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.BMCSettingUpdateState">
-BMCSettingUpdateState
-</a>
-</em>
-</td>
-<td>
-<p>UpdateSettingState represents the current state of the BMC setting update task.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec
@@ -1316,6 +1286,17 @@ BMCSettingUpdateState
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>uuid</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>UUID is the unique identifier for the BMC as defined in REDFISH API.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>endpointRef</code><br/>

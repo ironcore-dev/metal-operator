@@ -163,10 +163,6 @@ spec:
                 description: State represents the current state of the BMC configuration
                   task.
                 type: string
-              updateSettingState:
-                description: UpdateSettingState represents the current state of the
-                  BMC setting update task.
-                type: string
             type: object
         type: object
     served: true

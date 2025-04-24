@@ -812,8 +812,8 @@ func (r *RedfishBMC) CheckBMCAttributes(attrs redfish.SettingsAttributes) (reset
 	return r.checkAttribues(attrs, filtered)
 }
 
-// todo: merge with checkBiosAttribues
-func (r *RedfishBMC) checkAttribues(
+// todo: merge with checkBiosAttribues after #298
+func (r *RedfishBMC) checkAttribues( // nolint: dupl
 	attrs redfish.SettingsAttributes,
 	filtered map[string]RegistryEntryAttributes,
 ) (reset bool, err error) {

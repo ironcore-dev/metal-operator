@@ -56,6 +56,17 @@ type BMC interface {
 
 	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
 
+	UpgradeBiosVersion(
+		ctx context.Context,
+		UUID string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, error, bool)
+
+	GetBiosUpgradeTask(
+		ctx context.Context,
+		taskURI string,
+	) (*redfish.Task, error)
+
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 }
 

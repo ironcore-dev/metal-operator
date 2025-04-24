@@ -6,6 +6,7 @@ package bmc
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/stmcginnis/gofish/redfish"
 )
@@ -18,6 +19,41 @@ var defaultMockedBIOSSetting = map[string]map[string]any{
 }
 
 var pendingMockedBIOSSetting = map[string]map[string]any{}
+
+var MockedBIOSVersion = "123.5"
+var mockedBIOSUpgradingVersion = "123.5"
+
+var mockedBIOSUpgradeTaskIndex = 0
+var mockedBIOSUpgradeTaskStatus = []redfish.Task{
+	{
+		TaskState:       redfish.NewTaskState,
+		PercentComplete: 0,
+	},
+	{
+		TaskState:       redfish.PendingTaskState,
+		PercentComplete: 0,
+	},
+	{
+		TaskState:       redfish.StartingTaskState,
+		PercentComplete: 0,
+	},
+	{
+		TaskState:       redfish.RunningTaskState,
+		PercentComplete: 10,
+	},
+	{
+		TaskState:       redfish.RunningTaskState,
+		PercentComplete: 20,
+	},
+	{
+		TaskState:       redfish.RunningTaskState,
+		PercentComplete: 100,
+	},
+	{
+		TaskState:       redfish.CompletedTaskState,
+		PercentComplete: 100,
+	},
+}
 
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishLocalBMC struct {
@@ -204,4 +240,40 @@ func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) 
 		return reset, err
 	}
 	return r.checkAttribues(attrs, filtered)
+}
+
+func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
+	return MockedBIOSVersion, nil
+}
+
+func (r *RedfishLocalBMC) UpgradeBiosVersion(
+	ctx context.Context,
+	UUID string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, error, bool) {
+	mockedBIOSUpgradeTaskIndex = 0
+	// note, ImageURI is mocked for testing upgrading to version
+	mockedBIOSUpgradingVersion = parameters.ImageURI
+	// this go routine mocks the upgrade progress
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		for mockedBIOSUpgradeTaskIndex < len(mockedBIOSUpgradeTaskStatus)-1 {
+			time.Sleep(5 * time.Millisecond)
+			mockedBIOSUpgradeTaskIndex = mockedBIOSUpgradeTaskIndex + 1
+		}
+	}()
+	return "dummyTask", nil, false
+}
+
+func (r *RedfishLocalBMC) GetBiosUpgradeTask(
+	ctx context.Context,
+	taskURI string,
+) (*redfish.Task, error) {
+	if mockedBIOSUpgradeTaskIndex > len(mockedBIOSUpgradeTaskStatus)-1 {
+		mockedBIOSUpgradeTaskIndex = len(mockedBIOSUpgradeTaskStatus) - 1
+	}
+	if mockedBIOSUpgradeTaskStatus[mockedBIOSUpgradeTaskIndex].TaskState == redfish.CompletedTaskState {
+		MockedBIOSVersion = mockedBIOSUpgradingVersion
+	}
+	return &mockedBIOSUpgradeTaskStatus[mockedBIOSUpgradeTaskIndex], nil
 }

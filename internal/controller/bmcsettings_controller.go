@@ -227,7 +227,7 @@ func (r *BMCSettingsReconciler) reconcile(
 		}
 		// check if the current BMCSettings version is newer and update reference if it is newer
 		// todo : handle version checks correctly
-		if referredBMCSettings.Spec.BMCSettings.Version < bmcSetting.Spec.BMCSettings.Version {
+		if referredBMCSettings.Spec.BMCSettingsSpec.Version < bmcSetting.Spec.BMCSettingsSpec.Version {
 			log.V(1).Info("Updating BMCSettings reference to the latest BMC version")
 			if err := r.patchBMCSettingsRefOnBMC(ctx, log, BMC, &corev1.LocalObjectReference{Name: bmcSetting.Name}); err != nil {
 				return ctrl.Result{}, err
@@ -285,8 +285,8 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	}
 
 	// todo:wait on the result from the resource which does upgrade to requeue.
-	if currentBMCVersion != bmcSetting.Spec.BMCSettings.Version {
-		log.V(1).Info("Pending BMC version upgrade.", "current bmc Version", currentBMCVersion, "required version", bmcSetting.Spec.BMCSettings.Version)
+	if currentBMCVersion != bmcSetting.Spec.BMCSettingsSpec.Version {
+		log.V(1).Info("Pending BMC version upgrade.", "current bmc Version", currentBMCVersion, "required version", bmcSetting.Spec.BMCSettingsSpec.Version)
 		return ctrl.Result{}, nil
 	}
 
@@ -309,7 +309,7 @@ func (r *BMCSettingsReconciler) checkAndRequestMaintenance(
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (bool, error) {
 
-	if bmcSetting.Spec.ServerMaintenancePolicy == metalv1alpha1.ServerMaintenancePolicyEnforced {
+	if bmcSetting.Spec.ServerMaintenancePolicyType == metalv1alpha1.ServerMaintenancePolicyEnforced {
 		return false, nil
 	}
 
@@ -321,7 +321,7 @@ func (r *BMCSettingsReconciler) checkAndRequestMaintenance(
 
 	if bmcSetting.Spec.ServerMaintenanceRefMap == nil || len(bmcSetting.Spec.ServerMaintenanceRefMap) != len(servers) {
 		// if owner approval is requested. request maintenance irrespective of we need it or not.
-		if bmcSetting.Spec.ServerMaintenancePolicy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
+		if bmcSetting.Spec.ServerMaintenancePolicyType == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
 			// request maintenance on server if needed, even if err was reported.
 			requeue, errMainReq := r.requestMaintenanceOnServers(ctx, log, bmcSetting)
 			return requeue, errors.Join(err, errMainReq)
@@ -443,7 +443,7 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 	}
 	defer bmcClient.Logout()
 
-	keys := slices.Collect(maps.Keys(bmcSetting.Spec.BMCSettings.Settings))
+	keys := slices.Collect(maps.Keys(bmcSetting.Spec.BMCSettingsSpec.SettingsMap))
 
 	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.UUID, keys)
 	if err != nil {
@@ -453,7 +453,7 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 
 	diff = redfish.SettingsAttributes{}
 	var errs []error
-	for key, value := range bmcSetting.Spec.BMCSettings.Settings {
+	for key, value := range bmcSetting.Spec.BMCSettingsSpec.SettingsMap {
 		res, ok := currentSettings[key]
 		if ok {
 			switch data := res.(type) {
@@ -490,7 +490,7 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 		return currentBMCVersion, diff, fmt.Errorf("failed to find diff for some BMC settings: %v", errs)
 	}
 
-	log.V(1).Info("TEMP BMC setting", "current", currentSettings, "diff", diff, "required", bmcSetting.Spec.BMCSettings.Settings)
+	log.V(1).Info("TEMP BMC setting", "current", currentSettings, "diff", diff, "required", bmcSetting.Spec.BMCSettingsSpec.SettingsMap)
 
 	// fetch the current BMC version from the server bmc
 	currentBMCVersion, err = bmcClient.GetBMCVersion(ctx, BMC.Spec.UUID)
@@ -575,7 +575,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	// if Server maintenance ref is already given. no further action required.
 	// if policy is not OwnerApproval, no further action
 	if (bmcSetting.Spec.ServerMaintenanceRefMap != nil && len(bmcSetting.Spec.ServerMaintenanceRefMap) == len(servers)) ||
-		bmcSetting.Spec.ServerMaintenancePolicy == metalv1alpha1.ServerMaintenancePolicyEnforced {
+		bmcSetting.Spec.ServerMaintenancePolicyType == metalv1alpha1.ServerMaintenancePolicyEnforced {
 		return false, nil
 	}
 
@@ -590,7 +590,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			}}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
-			serverMaintenance.Spec.Policy = bmcSetting.Spec.ServerMaintenancePolicy
+			serverMaintenance.Spec.Policy = bmcSetting.Spec.ServerMaintenancePolicyType
 			serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOn
 			serverMaintenance.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
 			if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance && serverMaintenance.Status.State != "" {

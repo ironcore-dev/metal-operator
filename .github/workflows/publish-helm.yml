@@ -4,6 +4,9 @@ permissions:
   contents: read
 
 on:
+  release:
+    types:
+    - published
   push:
     branches:
     - main
@@ -20,7 +23,7 @@ on:
 jobs:
   publish-charts:
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'ok-to-chart')
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ok-to-chart')
     steps:
     - name: Check out repository
       uses: actions/checkout@v4

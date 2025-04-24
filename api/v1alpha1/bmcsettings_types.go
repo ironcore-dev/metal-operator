@@ -13,47 +13,39 @@ import (
 // BMCSettingsSpec defines the desired state of BMCSettings.
 type BMCSettingsSpec struct {
 
-	// BMCSettings specifies the BMC settings for the selected serverRef's Out-of-Band-Management
-	BMCSettings BMCSettingsMap `json:"bmcSettings,omitempty"`
+	// BMCSettingsSpec specifies the BMC settings for the selected serverRef's Out-of-Band-Management
+	BMCSettingsSpec Settings `json:"bmcSettingsSpec,omitempty"`
 
 	// ServerRef is a reference to a specific server's Manager to apply setting to.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRefList []*corev1.LocalObjectReference `json:"serverRefList,omitempty"`
 
 	// BMCRef is a reference to a specific BMC to apply setting to.
+	// ServerRef is ignored if BMCRef is set
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
 
 	// ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
-	// ServerMaintenancePolicyOwnerApproval is asking for human approval if bmc reboot is needed
+	// ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
+	//	note: User approval is only enforced for server's which are reserved state
 	// ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+	ServerMaintenancePolicyType ServerMaintenancePolicy `json:"serverMaintenancePolicyType,omitempty"`
 
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that BMC has requested for the referred server.
-	ServerMaintenanceRefMap map[string]*corev1.ObjectReference `json:"serverMaintenanceRefList,omitempty"`
-}
-
-type BMCSettingsMap struct {
-	// Version contains BMC version
-	// +required
-	Version string `json:"version"`
-
-	// Settings contains BMC settings as map
-	// +optional
-	Settings map[string]string `json:"settings,omitempty"`
+	// ServerMaintenanceRefMap are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
+	ServerMaintenanceRefMap map[string]*corev1.ObjectReference `json:"serverMaintenanceRefMap,omitempty"`
 }
 
 // ServerMaintenanceState specifies the current state of the server maintenance.
 type BMCSettingsState string
 
 const (
-	// BMCSettingsStateInVersionUpgrade specifies that the server BMC is in version upgrade path.
+	// BMCSettingsStatePending specifies that the BMC maintenance is waiting
 	BMCSettingsStatePending BMCSettingsState = "Pending"
-	// BMCSettingsStateInProgress specifies that the server BMC is in setting update path.
+	// BMCSettingsStateInProgress specifies that the BMC setting changes are in progress
 	BMCSettingsStateInProgress BMCSettingsState = "InProgress"
-	// BMCSettingsStateApplied specifies that the server BMC maintenance has been completed.
+	// BMCSettingsStateApplied specifies that the BMC maintenance has been completed.
 	BMCSettingsStateApplied BMCSettingsState = "Applied"
-	// BMCSettingsStateFailed specifies that the server maintenance has failed.
+	// BMCSettingsStateFailed specifies that the BMC maintenance has failed.
 	BMCSettingsStateFailed BMCSettingsState = "Failed"
 )
 
@@ -66,6 +58,10 @@ type BMCSettingsStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.bmcSettings.version`
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="BMCRef",type=string,JSONPath=`.spec.BMCRef.name`
+// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 
 // BMCSettings is the Schema for the BMCSettings API.
 type BMCSettings struct {

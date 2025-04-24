@@ -91,9 +91,9 @@ var _ = Describe("BMCSettings Controller", func() {
 				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCSettings:             metalv1alpha1.BMCSettingsMap{Version: "1.45.455b66-rev4", Settings: bmcSetting},
-				ServerRefList:           []*v1.LocalObjectReference{{Name: server.Name}},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCSettingsSpec:             metalv1alpha1.Settings{Version: "1.45.455b66-rev4", SettingsMap: bmcSetting},
+				ServerRefList:               []*v1.LocalObjectReference{{Name: server.Name}},
+				ServerMaintenancePolicyType: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -118,9 +118,9 @@ var _ = Describe("BMCSettings Controller", func() {
 				GenerateName: "test-bmc-nochange",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCSettings:             metalv1alpha1.BMCSettingsMap{Version: "1.45.455b66-rev4", Settings: bmcSetting},
-				ServerRefList:           []*v1.LocalObjectReference{{Name: server.Name}},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCSettingsSpec:             metalv1alpha1.Settings{Version: "1.45.455b66-rev4", SettingsMap: bmcSetting},
+				ServerRefList:               []*v1.LocalObjectReference{{Name: server.Name}},
+				ServerMaintenancePolicyType: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -154,9 +154,9 @@ var _ = Describe("BMCSettings Controller", func() {
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCSettings:             metalv1alpha1.BMCSettingsMap{Version: "1.45.455b66-rev4", Settings: bmcSetting},
-				ServerRefList:           []*v1.LocalObjectReference{{Name: server.Name}},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCSettingsSpec:             metalv1alpha1.Settings{Version: "1.45.455b66-rev4", SettingsMap: bmcSetting},
+				ServerRefList:               []*v1.LocalObjectReference{{Name: server.Name}},
+				ServerMaintenancePolicyType: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -201,9 +201,9 @@ var _ = Describe("BMCSettings Controller", func() {
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCSettings:             metalv1alpha1.BMCSettingsMap{Version: "1.45.455b66-rev4", Settings: bmcSetting},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmc.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCSettingsSpec:             metalv1alpha1.Settings{Version: "1.45.455b66-rev4", SettingsMap: bmcSetting},
+				BMCRef:                      &v1.LocalObjectReference{Name: bmc.Name},
+				ServerMaintenancePolicyType: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -250,9 +250,9 @@ var _ = Describe("BMCSettings Controller", func() {
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCSettings:             metalv1alpha1.BMCSettingsMap{Version: "1.45.455b66-rev4", Settings: bmcSetting},
-				ServerRefList:           []*v1.LocalObjectReference{{Name: server.Name}},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCSettingsSpec:             metalv1alpha1.Settings{Version: "1.45.455b66-rev4", SettingsMap: bmcSetting},
+				ServerRefList:               []*v1.LocalObjectReference{{Name: server.Name}},
+				ServerMaintenancePolicyType: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -314,9 +314,9 @@ var _ = Describe("BMCSettings Controller", func() {
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCSettings:             metalv1alpha1.BMCSettingsMap{Version: "1.45.455b66-rev4", Settings: bmcSetting},
-				ServerRefList:           []*v1.LocalObjectReference{{Name: server.Name}},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				BMCSettingsSpec:             metalv1alpha1.Settings{Version: "1.45.455b66-rev4", SettingsMap: bmcSetting},
+				ServerRefList:               []*v1.LocalObjectReference{{Name: server.Name}},
+				ServerMaintenancePolicyType: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -401,9 +401,9 @@ var _ = Describe("BMCSettings Controller", func() {
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCSettings:             metalv1alpha1.BMCSettingsMap{Version: "2.45.455b66-rev4", Settings: bmcSetting},
-				ServerRefList:           []*v1.LocalObjectReference{{Name: server.Name}},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCSettingsSpec:             metalv1alpha1.Settings{Version: "2.45.455b66-rev4", SettingsMap: bmcSetting},
+				ServerRefList:               []*v1.LocalObjectReference{{Name: server.Name}},
+				ServerMaintenancePolicyType: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
 		}
 		Expect(k8sClient.Create(ctx, BMCSettings)).To(Succeed())
@@ -426,7 +426,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Simulate the server BMCSettings version update by matching the spec version")
 		Eventually(Update(BMCSettings, func() {
-			BMCSettings.Spec.BMCSettings.Version = "1.45.455b66-rev4"
+			BMCSettings.Spec.BMCSettingsSpec.Version = "1.45.455b66-rev4"
 		})).Should(Succeed())
 
 		By("Ensuring that the BMCSettings resource has completed Upgrade and setting update, and moved the state")

@@ -20,7 +20,20 @@ spec:
     singular: bmcsettings
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.bmcSettings.version
+      name: BMCVersion
+      type: string
+    - jsonPath: .status.state
+      name: State
+      type: string
+    - jsonPath: .spec.BMCRef.name
+      name: BMCRef
+      type: string
+    - jsonPath: .spec.serverRef.name
+      name: ServerRef
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: BMCSettings is the Schema for the BMCSettings API.
@@ -46,8 +59,9 @@ spec:
             description: BMCSettingsSpec defines the desired state of BMCSettings.
             properties:
               BMCRef:
-                description: BMCRef is a reference to a specific BMC to apply setting
-                  to.
+                description: |-
+                  BMCRef is a reference to a specific BMC to apply setting to.
+                  ServerRef is ignored if BMCRef is set
                 properties:
                   name:
                     default: ""
@@ -63,28 +77,30 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
-              bmcSettings:
-                description: BMCSettings specifies the BMC settings for the selected
+              bmcSettingsSpec:
+                description: BMCSettingsSpec specifies the BMC settings for the selected
                   serverRef's Out-of-Band-Management
                 properties:
                   settings:
                     additionalProperties:
                       type: string
-                    description: Settings contains BMC settings as map
+                    description: SettingsMap contains bios settings as map
                     type: object
                   version:
-                    description: Version contains BMC version
+                    description: Version contains BIOS version this settings applies
+                      to
                     type: string
                 required:
                 - version
                 type: object
-              serverMaintenancePolicy:
-                description: |-
-                  ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
-                  ServerMaintenancePolicyOwnerApproval is asking for human approval if bmc reboot is needed
-                  ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.
+              serverMaintenancePolicyType:
+                description: "ServerMaintenancePolicy is maintenance policy to be
+                  enforced on the server when applying setting.\nServerMaintenancePolicyOwnerApproval
+                  is asking for User approval for changing BMC settings\n\tnote: User
+                  approval is only enforced for server's which are reserved state\nServerMaintenancePolicyEnforced
+                  will not create a maintenance request even if bmc reboot is needed."
                 type: string
-              serverMaintenanceRefList:
+              serverMaintenanceRefMap:
                 additionalProperties:
                   description: ObjectReference contains enough information to let
                     you inspect or modify the referred object.
@@ -129,8 +145,9 @@ spec:
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
-                description: ServerMaintenanceRef is a reference to a ServerMaintenance
-                  object that that BMC has requested for the referred server.
+                description: ServerMaintenanceRefMap are references to a ServerMaintenance
+                  objects that Controller has requested for the each of the related
+                  server.
                 type: object
               serverRefList:
                 description: ServerRef is a reference to a specific server's Manager

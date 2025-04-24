@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishBMC)(nil)
@@ -652,4 +655,170 @@ func (r *RedfishBMC) WaitForServerPowerState(
 		return fmt.Errorf("failed to wait for for server power state: %w", err)
 	}
 	return nil
+}
+
+// UpgradeBiosVersion upgrade given bios versions.
+func (r *RedfishBMC) UpgradeBiosVersion(
+	ctx context.Context,
+	UUID string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, error, bool) {
+	log := ctrl.LoggerFrom(ctx)
+	fatal := false
+	service := r.client.GetService()
+
+	upgradeServices, err := service.UpdateService()
+	if err != nil {
+		return "", err, fatal
+	}
+
+	type tActions struct {
+		SimpleUpdate struct {
+			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
+			Target          string
+		} `json:"#UpdateService.SimpleUpdate"`
+		StartUpdate common.ActionTarget `json:"#UpdateService.StartUpdate"`
+	}
+
+	var tUS struct {
+		Actions tActions
+	}
+
+	err = json.Unmarshal(upgradeServices.RawData, &tUS)
+	if err != nil {
+		return "", err, fatal
+	}
+
+	var RequestBody struct {
+		redfish.SimpleUpdateParameters
+		RedfishOperationApplyTime redfish.OperationApplyTime `json:"@Redfish.OperationApplyTime,omitempty"`
+	}
+
+	// RequestBody.RedfishOperationApplyTime = redfish.ImmediateOperationApplyTime
+	RequestBody.ForceUpdate = parameters.ForceUpdate
+	RequestBody.ImageURI = parameters.ImageURI
+	RequestBody.Passord = parameters.Passord
+	RequestBody.Username = parameters.Username
+	RequestBody.Targets = parameters.Targets
+	RequestBody.TransferProtocol = parameters.TransferProtocol
+
+	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
+	if err != nil {
+		return "", err, fatal
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	// any error post this point is fatal, as we can not issue multiple upgrade requests.
+	// expectation is to move to failed state, and manually check the status before retrying
+	fatal = true
+
+	log.V(1).Info("update has been issued", "Response status code", resp.StatusCode)
+
+	if resp.StatusCode != http.StatusAccepted {
+		biosRawBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "",
+				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
+					err,
+					resp.StatusCode,
+				),
+				fatal
+		}
+		return "",
+			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
+				string(biosRawBody),
+				resp.StatusCode,
+			),
+			fatal
+	}
+
+	biosRawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read the response body %v %v", err, biosRawBody), fatal
+	}
+
+	// extract tasks ID to monitor it
+	var tResp struct {
+		TaskMonitor string
+	}
+	// "TaskMonitor" seems to be consistent across all vendors
+	// dell: "https://developer.dell.com/apis/2978/versions/7.xx/openapi.yaml/
+	// 			paths/~1redfish~1v1~1UpdateService~1Actions~1UpdateService.SimpleUpdate/post"
+
+	// hpe: https://developer.hpe.com/blog/hpe-firmware-updates-part-3-the-redfish-update-service/
+	// lenova: https://pubs.lenovo.com/xcc2-restapi/simple_update_firmware_post
+	err = json.Unmarshal(biosRawBody, &tResp)
+	if err != nil {
+		return tResp.TaskMonitor, err, fatal
+	}
+
+	log.V(1).Info("update has been accepted.", "Response", tResp)
+
+	return tResp.TaskMonitor, nil, false
+}
+
+func (r *RedfishBMC) GetBiosUpgradeTask(
+	ctx context.Context,
+	taskURI string,
+) (*redfish.Task, error) {
+
+	log := ctrl.LoggerFrom(ctx)
+	taskData := &redfish.Task{}
+
+	// todo: merge this login in common place after PR #298
+	respTask, err := r.client.GetService().GetClient().Get(taskURI)
+	if err != nil {
+		return taskData, err
+	}
+	defer respTask.Body.Close() // nolint: errcheck
+
+	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
+		respTaskRawBody, err := io.ReadAll(respTask.Body)
+		if err != nil {
+			return taskData,
+				fmt.Errorf("failed to get the upgrade Task dedails. and read the response body %v, statusCode %v",
+					err,
+					respTask.StatusCode)
+		}
+		return taskData,
+			fmt.Errorf("failed to get the upgrade Task dedails. %v, statusCode %v",
+				string(respTaskRawBody),
+				respTask.StatusCode)
+	}
+
+	respTaskRawBody, err := io.ReadAll(respTask.Body)
+	if err != nil {
+		return taskData, err
+	}
+
+	err = json.Unmarshal(respTaskRawBody, &taskData)
+	if err != nil {
+		return taskData, err
+	}
+
+	if taskData.TaskState == "" && taskData.ODataID == "" {
+		// hpe givees error after completion of data, exptract it
+		// todo: create oem specific functions after we have PR #303
+		type errTask struct {
+			Code         string              `json:"code"`
+			Message      string              `json:"message"`
+			ExtendedInfo []map[string]string `json:"@Message.ExtendedInfo"`
+		}
+		var tTask struct {
+			Error errTask `json:"error"`
+		}
+		err = json.Unmarshal(respTaskRawBody, &tTask)
+		if err != nil {
+			return taskData, fmt.Errorf("enable to extract the completed task details %v", err)
+		}
+		if strings.Contains(tTask.Error.ExtendedInfo[0]["MessageId"], "Success") {
+			taskData.TaskState = redfish.CompletedTaskState
+			taskData.PercentComplete = 100
+			return taskData, nil
+		}
+
+		log.V(1).Info("update task in unknown state.", "TaskResponse", string(respTaskRawBody))
+		return taskData, fmt.Errorf("unable to find the state of the Task %v", string(respTaskRawBody))
+	}
+	return taskData, nil
 }

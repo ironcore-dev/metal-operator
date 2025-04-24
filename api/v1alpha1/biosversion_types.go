@@ -1,0 +1,118 @@
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
+package v1alpha1
+
+import (
+	"github.com/stmcginnis/gofish/redfish"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type BIOSVersionState string
+
+const (
+	// BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting
+	BIOSVersionStatePending BIOSVersionState = "Pending"
+	// BIOSVersionStateInProgress specifies that upgrading bios is in progress.
+	BIOSVersionStateInProgress BIOSVersionState = "Processing"
+	// BIOSVersionStateApplied specifies that the bios upgrade maintenance has been completed.
+	BIOSVersionStateCompleted BIOSVersionState = "Completed"
+	// BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.
+	BIOSVersionStateFailed BIOSVersionState = "Failed"
+)
+
+// BIOSVersionSpec defines the desired state of BIOSVersion.
+type BIOSVersionSpec struct {
+	// Spec specifies the spec for upgrading BIOS for specific serverRef.
+	BIOSVersionSpec VersionSpec `json:"biosVersionSpec,omitempty"`
+
+	// BiosSettingsRef is a reference to a specific BIOSSettings object which holds settings for this version
+	// we use this to avoid multiple BIOS related ref on Server resources.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BiosSettingsRef is immutable"
+	BiosSettingsRef *corev1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
+
+	// ServerRef is a reference to a specific server to apply bios upgrade on.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
+	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
+
+	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
+	ServerMaintenancePolicyType ServerMaintenancePolicy `json:"serverMaintenancePolicyType,omitempty"`
+
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
+	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+}
+
+type VersionSpec struct {
+	// Version contains BIOS version to upgrade
+	// +required
+	Version string `json:"version"`
+	// An indication of whether the server's upgrade service should bypass vendor update policies
+	ForceUpdate bool `json:"forceUpdate,omitempty"`
+	// details regarding the image to use to upgrade to given bios version
+	Image ImageSpec `json:"image,omitempty"`
+}
+
+type ImageSpec struct {
+	// ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+	// to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+	// The network protocol that the server's update service uses to retrieve 'ImageURI'
+	TransferProtocol string `json:"transferProtocol,omitempty"`
+	// The URI of the software image to update/install."
+	// +required
+	URI string `json:"URI,omitempty"`
+}
+
+// BIOSVersionStatus defines the observed state of BIOSVersion.
+type BIOSVersionStatus struct {
+	// State represents the current state of the bios configuration task.
+	State BIOSVersionState `json:"state,omitempty"`
+
+	// UpgradeTaskStatus contains the state of the Upgrade Task created by the BMC
+	UpgradeTaskStatus *TaskStatus `json:"upgradeTaskStatus,omitempty"`
+	// Conditions represents the latest available observations of the Bios version upgrade state.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+type TaskStatus struct {
+	TaskURI         string            `json:"taskURI,omitempty"`
+	State           redfish.TaskState `json:"taskState,omitempty"`
+	PercentComplete int               `json:"percentageComplete,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosVersionSpec.version`
+// +kubebuilder:printcolumn:name="ForceUpdate",type=string,JSONPath=`.spec.biosVersionSpec.forceUpdate`
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="UpgradeStatus",type=string,JSONPath=`.status.upgradeTaskStatus.taskState`
+// +kubebuilder:printcolumn:name="UpgradeProgress",type=integer,JSONPath=`.status.upgradeTaskStatus.percentageComplete`
+// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
+// +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
+
+// BIOSVersion is the Schema for the biosversions API.
+type BIOSVersion struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   BIOSVersionSpec   `json:"spec,omitempty"`
+	Status BIOSVersionStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// BIOSVersionList contains a list of BIOSVersion.
+type BIOSVersionList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []BIOSVersion `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&BIOSVersion{}, &BIOSVersionList{})
+}

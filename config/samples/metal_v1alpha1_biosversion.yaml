@@ -1,0 +1,17 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BIOSVersion
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: biosversion-sample
+spec:
+  biosVersionSpec:
+    version: "U59 v2.34 (10/04/2024)"
+    image:
+      URI: "repo.eu-de-1.cloud.sap/hw-firmware/hpe/proliant-dl560-gen11/U59_2.34_10_04_2024.signed.flash"
+      transferProtocol: "HTTPS"
+    forceUpdate: false
+  serverRef:
+    name: endpoint-sample-hpe-system-0
+  serverMaintenancePolicyType: OwnerApproval

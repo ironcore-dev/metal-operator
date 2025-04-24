@@ -115,7 +115,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v2.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -155,7 +155,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -199,7 +199,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change-noreboot-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -263,7 +263,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -374,7 +374,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -601,7 +601,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Simulate the server biosSettings version update by matching the spec version")
 		Eventually(Update(biosSettings, func() {
-			biosSettings.Spec.Version = "P79 v1.45 (12/06/2017)"
+			biosSettings.Spec.Version = bmc.MockedBIOSVersion
 		})).Should(Succeed())
 
 		By("Ensuring that the biosSettings resource has setting updated, and moved the state")

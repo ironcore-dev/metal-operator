@@ -869,6 +869,7 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 				return nil
 			}
 			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
+
 		}
 	}
 	return nil
@@ -882,5 +883,6 @@ func (r *BiosSettingsReconciler) SetupWithManager(
 		For(&metalv1alpha1.BIOSSettings{}).
 		Owns(&metalv1alpha1.ServerMaintenance{}).
 		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByRefs)).
+		Watches(&metalv1alpha1.BIOSVersion{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByBiosVersion)).
 		Complete(r)
 }

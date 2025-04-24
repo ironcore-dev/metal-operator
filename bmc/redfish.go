@@ -343,12 +343,7 @@ func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity a
 	if err != nil {
 		return err
 	}
-
-	err = json.Unmarshal(RespRawBody, &entity)
-	if err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(RespRawBody, &entity)
 }
 
 // SetBiosAttributesOnReset sets given bios attributes.

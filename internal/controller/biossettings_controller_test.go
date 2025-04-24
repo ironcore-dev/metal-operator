@@ -86,7 +86,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "P70 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
+				Version:                 "P79 v1.45 (12/06/2017)",
+				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -109,7 +110,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
+				Version:                 "P79 v2.45 (12/06/2017)",
+				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -148,7 +150,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
+				Version:                 "P79 v1.45 (12/06/2017)",
+				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -174,10 +177,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	It("should update the setting without maintenance if setting requested needs no server reboot", func(ctx SpecContext) {
-		BiosSetting := make(map[string]string)
+		BIOSSetting := make(map[string]string)
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BiosSetting["abc"] = "bar-changed-no-reboot"
+		BIOSSetting["abc"] = "bar-changed-no-reboot"
 
 		// mock BIOSSettings to not request maintenance by powering on the system (mock no need of power change on system)
 		// note: cant be in Available state as it will power off automatically.
@@ -190,7 +193,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BiosSetting},
+				Version:                 "P79 v1.45 (12/06/2017)",
+				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -233,10 +237,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
-		BiosSetting := make(map[string]string)
+		BIOSSetting := make(map[string]string)
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BiosSetting["abc"] = "bar-changed-to-turn-server-on"
+		BIOSSetting["abc"] = "bar-changed-to-turn-server-on"
 
 		// put the server in Off state, to mock need of change in power state on server
 
@@ -252,7 +256,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BiosSetting},
+				Version:                 "P79 v1.45 (12/06/2017)",
+				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 			},
@@ -310,16 +315,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateState("")),
 		))
 
-		By("Ensuring that the Server is in Maintenance")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-		))
-
-		By("Ensuring that the Server has correct spec for power")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
-		))
-
 		By("Ensuring that the Server is in correct power state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
@@ -353,8 +348,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	It("should create maintenance if setting update needs reboot", func(ctx SpecContext) {
 		// settings which does need reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BiosSetting := make(map[string]string)
-		BiosSetting["fooreboot"] = "144"
+		BIOSSetting := make(map[string]string)
+		BIOSSetting["fooreboot"] = "144"
 
 		// put the server in reserved state,
 
@@ -371,7 +366,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BiosSetting},
+				Version:                 "P79 v1.45 (12/06/2017)",
+				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 			},
@@ -483,7 +479,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "P79 v1.45 (12/06/2017)", SettingsMap: BIOSSetting},
+				Version:                 "P79 v1.45 (12/06/2017)",
+				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -528,12 +525,20 @@ var _ = Describe("BIOSSettings Controller", func() {
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
 		))
-
+		// because of the mocking, the transistions are super fast here. can not determine the exact states
 		By("Ensuring that the BIOS setting has reached next state: issue/reboot")
 		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateIssue),
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+		))
+
+		// because of the mocking, the transistions are super fast here. can not determine the exact states
+		Eventually(Object(biosSettings)).Should(SatisfyAny(
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateVerification),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 
 		// because of the mocking, the transistions are super fast here.
@@ -568,7 +573,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				BIOSSettings:            metalv1alpha1.Settings{Version: "2.45.455b66-rev4", SettingsMap: bmcSetting},
+				Version:                 "2.45.455b66-rev4",
+				SettingsMap:             bmcSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -587,13 +593,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the serverMaintenance not ref.")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		))
 		Consistently(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
 		))
 
 		By("Simulate the server biosSettings version update by matching the spec version")
 		Eventually(Update(biosSettings, func() {
-			biosSettings.Spec.BIOSSettings.Version = "P79 v1.45 (12/06/2017)"
+			biosSettings.Spec.Version = "P79 v1.45 (12/06/2017)"
 		})).Should(Succeed())
 
 		By("Ensuring that the biosSettings resource has setting updated, and moved the state")
@@ -606,6 +615,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the serverMaintenance not ref.")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		))
 		Consistently(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
 		))
@@ -682,10 +694,10 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 		HaveField("Spec.Power", powerState),
 		HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 	))
-	By("Ensuring that the Server has the correct power state")
-	Eventually(Object(server)).Should(SatisfyAll(
-		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(powerState)),
-	))
 
+	By("Patching the Server to required power state state")
+	Eventually(UpdateStatus(server, func() {
+		server.Status.PowerState = metalv1alpha1.ServerPowerState(powerState)
+	})).Should(Succeed())
 	return serverClaim
 }

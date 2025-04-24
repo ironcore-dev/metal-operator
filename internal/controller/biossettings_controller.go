@@ -211,7 +211,7 @@ func (r *BiosSettingsReconciler) reconcile(
 		}
 		// check if the current BIOS setting version is newer and update reference if it is newer
 		// todo : handle version checks correctly
-		if referredBIOSSetting.Spec.BIOSSettings.Version < biosSettings.Spec.BIOSSettings.Version {
+		if referredBIOSSetting.Spec.Version < biosSettings.Spec.Version {
 			log.V(1).Info("Updating BIOSSetting reference to the latest BIOS version")
 			if err := r.patchBiosSettingsRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: biosSettings.Name}); err != nil {
 				return ctrl.Result{}, err
@@ -223,10 +223,10 @@ func (r *BiosSettingsReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	return r.ensureServerMaintenanceStateTransition(ctx, log, biosSettings, server)
+	return r.ensureBIOSSettingsStateTransition(ctx, log, biosSettings, server)
 }
 
-func (r *BiosSettingsReconciler) ensureServerMaintenanceStateTransition(
+func (r *BiosSettingsReconciler) ensureBIOSSettingsStateTransition(
 	ctx context.Context,
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
@@ -234,11 +234,11 @@ func (r *BiosSettingsReconciler) ensureServerMaintenanceStateTransition(
 ) (ctrl.Result, error) {
 	switch biosSettings.Status.State {
 	case "", metalv1alpha1.BIOSSettingsStatePending:
-		pendingPresent, pendingSettings, err := r.checkforPendingSettingsOnBIOS(ctx, log, server, nil)
+		pendingSettings, err := r.getPendingSettingsOnBIOS(ctx, log, server)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get pending settings on bios: %w", err)
 		}
-		if len(pendingSettings) > 0 || pendingPresent {
+		if len(pendingSettings) > 0 {
 			log.V(1).Info("Pending bios setting tasks found", "biosSettings pending tasks", pendingSettings)
 			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed)
 			return ctrl.Result{}, err
@@ -275,8 +275,8 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	}
 
 	// todo:wait on the result from the resource which does upgrade to requeue.
-	if currentBiosVersion != biosSettings.Spec.BIOSSettings.Version {
-		log.V(1).Info("Pending BIOS version upgrade.", "current bios Version", currentBiosVersion, "required version", biosSettings.Spec.BIOSSettings.Version)
+	if currentBiosVersion != biosSettings.Spec.Version {
+		log.V(1).Info("Pending BIOS version upgrade.", "current bios Version", currentBiosVersion, "required version", biosSettings.Spec.Version)
 		return ctrl.Result{}, nil
 	}
 
@@ -357,12 +357,12 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 		defer bmcClient.Logout()
 
 		// check if the pending tasks not present on the bios settings
-		pendingPresent, _, err := r.checkforPendingSettingsOnBIOS(ctx, log, server, nil)
+		pendingSettings, err := r.getPendingSettingsOnBIOS(ctx, log, server)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get pending BIOS settings: %w", err)
 		}
 		var pendingSettingsDiff redfish.SettingsAttributes
-		if !pendingPresent {
+		if len(pendingSettings) == 0 {
 			err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemUUID, settingsDiff)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
@@ -370,19 +370,21 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 		}
 
 		// get latest pending settings, and expect it to be zero different from the required settings.
-		pendingPresent, pendingSettingsDiff, err = r.checkforPendingSettingsOnBIOS(ctx, log, server, settingsDiff)
+		pendingSettings, err = r.getPendingSettingsOnBIOS(ctx, log, server)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get pending BIOS settings: %w", err)
 		}
 
 		// at this point the bios setting update needs to be already issued.
-		if !pendingPresent {
+		if len(pendingSettings) == 0 {
 			// todo: fail after X amount of time
 			log.V(1).Info("bios Setting update issued to bmc not accepted. retrying....")
 			return ctrl.Result{}, errors.Join(err, fmt.Errorf("bios setting issued to bmc not accepted"))
 		}
 
-		// latest pending settings to be zero different from the required settings.
+		pendingSettingsDiff = r.checkPendingSettingsDiff(log, pendingSettings, settingsDiff)
+
+		// all required settings should in pending settings.
 		if len(pendingSettingsDiff) > 0 {
 			log.V(1).Info("Unknown pending BIOS settings found", "Unknown pending settings", pendingSettingsDiff)
 			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed)
@@ -486,40 +488,42 @@ func (r *BiosSettingsReconciler) handleFailedState(
 	return ctrl.Result{}, nil
 }
 
-func (r *BiosSettingsReconciler) checkforPendingSettingsOnBIOS(
+func (r *BiosSettingsReconciler) checkPendingSettingsDiff(
+	log logr.Logger,
+	pendingSettings redfish.SettingsAttributes,
+	settingsDiff redfish.SettingsAttributes,
+) redfish.SettingsAttributes {
+
+	// if settingsDiff is provided find the difference between settingsDiff and pending
+	log.V(1).Info("checking for the difference in the pending settings than that of required")
+	unknownpendingSettings := make(redfish.SettingsAttributes, len(settingsDiff))
+	for name, value := range settingsDiff {
+		if pendingValue, ok := pendingSettings[name]; ok && value != pendingValue {
+			unknownpendingSettings[name] = pendingValue
+		}
+	}
+	return unknownpendingSettings
+}
+
+func (r *BiosSettingsReconciler) getPendingSettingsOnBIOS(
 	ctx context.Context,
 	log logr.Logger,
 	server *metalv1alpha1.Server,
-	settingsDiff redfish.SettingsAttributes,
-) (pendingSettingPresent bool, pendingSettingsDiff redfish.SettingsAttributes, err error) {
+) (pendingSettings redfish.SettingsAttributes, err error) {
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
-		return pendingSettingPresent, pendingSettingsDiff, fmt.Errorf("failed to create BMC client: %w", err)
+		return pendingSettings, fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 
-	pendingSettingsDiff, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemUUID)
+	log.V(1).Info("fetching for the pending settings on bios")
+
+	pendingSettings, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemUUID)
 	if err != nil {
-		return pendingSettingPresent, pendingSettingsDiff, err
-	}
-	pendingSettingPresent = len(pendingSettingsDiff) > 0
-
-	// if settingsDiff is provided find the difference between settingsDiff and pending
-	if len(settingsDiff) > 0 {
-		log.V(1).Info("checking for the difference in the pending settings than that of required")
-		if !pendingSettingPresent {
-			return pendingSettingPresent, settingsDiff, nil
-		}
-		unknownpendingSettings := make(redfish.SettingsAttributes, len(settingsDiff))
-		for name, value := range settingsDiff {
-			if pendingValue, ok := pendingSettingsDiff[name]; ok && value != pendingValue {
-				unknownpendingSettings[name] = pendingValue
-			}
-		}
-		return pendingSettingPresent, unknownpendingSettings, nil
+		return pendingSettings, err
 	}
 
-	return pendingSettingPresent, pendingSettingsDiff, nil
+	return pendingSettings, nil
 }
 
 func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
@@ -534,7 +538,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	}
 	defer bmcClient.Logout()
 
-	keys := slices.Collect(maps.Keys(biosSettings.Spec.BIOSSettings.SettingsMap))
+	keys := slices.Collect(maps.Keys(biosSettings.Spec.SettingsMap))
 
 	currentSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemUUID, keys)
 	if err != nil {
@@ -544,7 +548,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 
 	diff = redfish.SettingsAttributes{}
 	var errs []error
-	for key, value := range biosSettings.Spec.BIOSSettings.SettingsMap {
+	for key, value := range biosSettings.Spec.SettingsMap {
 		res, ok := currentSettings[key]
 		if ok {
 			switch data := res.(type) {
@@ -842,21 +846,32 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 ) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 	host := obj.(*metalv1alpha1.Server)
+
+	// return early if hosts are not required states
+	if host.Status.State == metalv1alpha1.ServerStateDiscovery ||
+		host.Status.State == metalv1alpha1.ServerStateError ||
+		host.Status.State == metalv1alpha1.ServerStateInitial {
+		return nil
+	}
+
 	BIOSSettingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := r.List(ctx, BIOSSettingsList); err != nil {
 		log.Error(err, "failed to list biosSettings")
 		return nil
 	}
-	var req []ctrl.Request
 
 	for _, biosSettings := range BIOSSettingsList.Items {
-		if biosSettings.Spec.ServerRef.Name == host.Name && biosSettings.Spec.ServerMaintenanceRef != nil {
-			req = append(req, ctrl.Request{
-				NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name},
-			})
+		if biosSettings.Spec.ServerRef.Name == host.Name {
+			// states where we do not want to requeue for host changes
+			if biosSettings.Spec.ServerMaintenanceRef == nil ||
+				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+				return nil
+			}
+			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
 		}
 	}
-	return req
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

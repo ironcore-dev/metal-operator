@@ -106,6 +106,7 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 		defaultMockedBIOSSetting = map[string]map[string]any{}
 	}
 
+	pendingMockedBIOSSetting = map[string]map[string]any{}
 	for key, attrData := range attributes {
 		if AttributesData, ok := defaultMockedBIOSSetting[key]; ok {
 			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {

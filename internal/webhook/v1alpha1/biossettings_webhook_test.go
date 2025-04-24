@@ -43,7 +43,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P70 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -58,7 +59,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P71 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -74,7 +76,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P70 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -89,7 +92,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P71 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -106,7 +110,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P70 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -121,7 +126,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P71 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -143,7 +149,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P70 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -158,7 +165,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P71 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P71 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -168,7 +176,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 
 			By("Updating an biosSettingsV2 to conflicting Spec.BIOSSettings")
 			biosSettingsV2Updated := biosSettingsV2.DeepCopy()
-			biosSettingsV2Updated.Spec.BIOSSettings = biosSettingsV1.Spec.BIOSSettings
+			biosSettingsV2Updated.Spec.Version = biosSettingsV1.Spec.Version
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
 		})
 
@@ -180,7 +188,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P70 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -195,7 +204,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					BIOSSettings:            metalv1alpha1.Settings{Version: "P71 v1.45 (12/06/2017)", SettingsMap: map[string]string{}},
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},

@@ -8,8 +8,8 @@ metadata:
 spec:
   serverRef:
     name: endpoint-sample-system-0
-  bmcSettings:
+  bmcSettingsSpec:
     version: 7.00.00.171
     settings:
       ThermalSettings.1.FanSpeedOffset: "3"
-  ServerMaintenancePolicyTemplate: Enforced
+  serverMaintenancePolicyType: Enforced

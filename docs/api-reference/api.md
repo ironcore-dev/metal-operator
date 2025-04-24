@@ -1003,15 +1003,15 @@ BMCSettingsSpec
 <table>
 <tr>
 <td>
-<code>bmcSettings</code><br/>
+<code>bmcSettingsSpec</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsMap">
-BMCSettingsMap
+<a href="#metal.ironcore.dev/v1alpha1.Settings">
+Settings
 </a>
 </em>
 </td>
 <td>
-<p>BMCSettings specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+<p>BMCSettingsSpec specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
 </td>
 </tr>
 <tr>
@@ -1037,12 +1037,13 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+<p>BMCRef is a reference to a specific BMC to apply setting to.
+ServerRef is ignored if BMCRef is set</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>serverMaintenancePolicy</code><br/>
+<code>serverMaintenancePolicyType</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy
@@ -1051,13 +1052,14 @@ ServerMaintenancePolicy
 </td>
 <td>
 <p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
-ServerMaintenancePolicyOwnerApproval is asking for human approval if bmc reboot is needed
+ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
+note: User approval is only enforced for server&rsquo;s which are reserved state
 ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefList</code><br/>
+<code>serverMaintenanceRefMap</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.objectreference--">
 map[string]*k8s.io/api/core/v1.ObjectReference
@@ -1065,7 +1067,7 @@ map[string]*k8s.io/api/core/v1.ObjectReference
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BMC has requested for the referred server.</p>
+<p>ServerMaintenanceRefMap are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </table>
@@ -1081,46 +1083,6 @@ BMCSettingsStatus
 </em>
 </td>
 <td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsMap">BMCSettingsMap
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Version contains BMC version</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settings</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Settings contains BMC settings as map</p>
 </td>
 </tr>
 </tbody>
@@ -1143,15 +1105,15 @@ map[string]string
 <tbody>
 <tr>
 <td>
-<code>bmcSettings</code><br/>
+<code>bmcSettingsSpec</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsMap">
-BMCSettingsMap
+<a href="#metal.ironcore.dev/v1alpha1.Settings">
+Settings
 </a>
 </em>
 </td>
 <td>
-<p>BMCSettings specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+<p>BMCSettingsSpec specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
 </td>
 </tr>
 <tr>
@@ -1177,12 +1139,13 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+<p>BMCRef is a reference to a specific BMC to apply setting to.
+ServerRef is ignored if BMCRef is set</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>serverMaintenancePolicy</code><br/>
+<code>serverMaintenancePolicyType</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy
@@ -1191,13 +1154,14 @@ ServerMaintenancePolicy
 </td>
 <td>
 <p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
-ServerMaintenancePolicyOwnerApproval is asking for human approval if bmc reboot is needed
+ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
+note: User approval is only enforced for server&rsquo;s which are reserved state
 ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefList</code><br/>
+<code>serverMaintenanceRefMap</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.objectreference--">
 map[string]*k8s.io/api/core/v1.ObjectReference
@@ -1205,7 +1169,7 @@ map[string]*k8s.io/api/core/v1.ObjectReference
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that BMC has requested for the referred server.</p>
+<p>ServerMaintenanceRefMap are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </tbody>
@@ -1226,16 +1190,16 @@ map[string]*k8s.io/api/core/v1.ObjectReference
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Applied&#34;</p></td>
-<td><p>BMCSettingsStateApplied specifies that the server BMC maintenance has been completed.</p>
+<td><p>BMCSettingsStateApplied specifies that the BMC maintenance has been completed.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>BMCSettingsStateFailed specifies that the server maintenance has failed.</p>
+<td><p>BMCSettingsStateFailed specifies that the BMC maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
-<td><p>BMCSettingsStateInProgress specifies that the server BMC is in setting update path.</p>
+<td><p>BMCSettingsStateInProgress specifies that the BMC setting changes are in progress</p>
 </td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td><p>BMCSettingsStateInVersionUpgrade specifies that the server BMC is in version upgrade path.</p>
+<td><p>BMCSettingsStatePending specifies that the BMC maintenance is waiting</p>
 </td>
 </tr></tbody>
 </table>

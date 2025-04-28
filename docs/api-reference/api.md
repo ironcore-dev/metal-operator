@@ -671,7 +671,9 @@ string
 </em>
 </td>
 <td>
-<p>UUID is the unique identifier for the BMC as defined in REDFISH API.</p>
+<em>(Optional)</em>
+<p>UUID is the unique identifier for the BMC as defined in REDFISH API.
+This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
 </td>
 </tr>
 <tr>
@@ -1003,28 +1005,25 @@ BMCSettingsSpec
 <table>
 <tr>
 <td>
-<code>bmcSettingsSpec</code><br/>
+<code>version</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.Settings">
-Settings
-</a>
+string
 </em>
 </td>
 <td>
-<p>BMCSettingsSpec specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+<p>Version contains BMC version this settings applies to</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>serverRefList</code><br/>
+<code>settings</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.localobjectreference--">
-[]*k8s.io/api/core/v1.LocalObjectReference
-</a>
+map[string]string
 </em>
 </td>
 <td>
-<p>ServerRef is a reference to a specific server&rsquo;s Manager to apply setting to.</p>
+<em>(Optional)</em>
+<p>SettingsMap contains bmc settings as map</p>
 </td>
 </tr>
 <tr>
@@ -1043,7 +1042,7 @@ ServerRef is ignored if BMCRef is set</p>
 </tr>
 <tr>
 <td>
-<code>serverMaintenancePolicyType</code><br/>
+<code>serverMaintenancePolicy</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy
@@ -1059,15 +1058,15 @@ ServerMaintenancePolicyEnforced will not create a maintenance request even if bm
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefMap</code><br/>
+<code>serverMaintenanceRefList</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.objectreference--">
-map[string]*k8s.io/api/core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
+[]ServerMaintenanceRefList
 </a>
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefMap are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </table>
@@ -1105,28 +1104,25 @@ BMCSettingsStatus
 <tbody>
 <tr>
 <td>
-<code>bmcSettingsSpec</code><br/>
+<code>version</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.Settings">
-Settings
-</a>
+string
 </em>
 </td>
 <td>
-<p>BMCSettingsSpec specifies the BMC settings for the selected serverRef&rsquo;s Out-of-Band-Management</p>
+<p>Version contains BMC version this settings applies to</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>serverRefList</code><br/>
+<code>settings</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.localobjectreference--">
-[]*k8s.io/api/core/v1.LocalObjectReference
-</a>
+map[string]string
 </em>
 </td>
 <td>
-<p>ServerRef is a reference to a specific server&rsquo;s Manager to apply setting to.</p>
+<em>(Optional)</em>
+<p>SettingsMap contains bmc settings as map</p>
 </td>
 </tr>
 <tr>
@@ -1145,7 +1141,7 @@ ServerRef is ignored if BMCRef is set</p>
 </tr>
 <tr>
 <td>
-<code>serverMaintenancePolicyType</code><br/>
+<code>serverMaintenancePolicy</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy
@@ -1161,15 +1157,15 @@ ServerMaintenancePolicyEnforced will not create a maintenance request even if bm
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefMap</code><br/>
+<code>serverMaintenanceRefList</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#*k8s.io/api/core/v1.objectreference--">
-map[string]*k8s.io/api/core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
+[]ServerMaintenanceRefList
 </a>
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefMap are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </tbody>
@@ -1258,7 +1254,9 @@ string
 </em>
 </td>
 <td>
-<p>UUID is the unique identifier for the BMC as defined in REDFISH API.</p>
+<em>(Optional)</em>
+<p>UUID is the unique identifier for the BMC as defined in REDFISH API.
+This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
 </td>
 </tr>
 <tr>

@@ -203,8 +203,9 @@ spec:
                 - port
                 type: object
               uuid:
-                description: UUID is the unique identifier for the BMC as defined
-                  in REDFISH API.
+                description: |-
+                  UUID is the unique identifier for the BMC as defined in REDFISH API.
+                  This field is optional and can be omitted, controller will choose the first avaialbe Manager
                 type: string
             required:
             - bmcSecretRef

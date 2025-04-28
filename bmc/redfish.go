@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -378,72 +377,12 @@ func (r *RedfishBMC) GetBMCAttributeValues(
 	}
 
 	// togo: improve. as of now use first one similar to r.GetManager()
-	oemManager, err := NewOEMManager(manager)
-	if err != nil {
-		return nil, err
-	}
-	BMCattributeValues, err := oemManager.GetOEMBMCSettingAttribute()
+	oemManager, err := NewOEMManager(manager, r.client.Service)
 	if err != nil {
 		return nil, err
 	}
 
-	var mergedBMCAttributes = make(redfish.SettingsAttributes)
-
-	for _, BMCattributeValue := range BMCattributeValues {
-		for k, v := range BMCattributeValue.Attributes {
-			if _, ok := mergedBMCAttributes[k]; !ok {
-				mergedBMCAttributes[k] = v
-			} else {
-				return nil, fmt.Errorf("duplicate attributes in BMC settings are not supported %v", k)
-			}
-		}
-	}
-
-	filteredAttr, err := r.getFilteredBMCRegistryAttributes(false, false)
-	if err != nil {
-		return result, err
-	}
-	result = make(redfish.SettingsAttributes, len(attributes))
-	var errs []error
-	for _, name := range attributes {
-		if entry, ok := filteredAttr[name]; ok {
-			// enumerations current setting comtains display name.
-			// need to be checked with the actual value rather than the display value
-			// as the settings provided will have actual values.
-			// replace display values with actual values
-			if strings.ToLower(entry.Type) == string(TypeEnumerations) {
-				for _, attrValue := range entry.Value {
-					if attrValue.ValueDisplayName == mergedBMCAttributes[name] {
-						result[name] = attrValue.ValueName
-						break
-					}
-				}
-				if _, ok := result[name]; !ok {
-					errs = append(
-						errs,
-						fmt.Errorf(
-							"current setting '%v' for key '%v' not found in possible values for it (%v)",
-							mergedBMCAttributes[name],
-							name,
-							entry.Value,
-						))
-				}
-			} else {
-				result[name] = mergedBMCAttributes[name]
-			}
-		} else {
-			// possible error in settings key
-			errs = append(errs, fmt.Errorf("setting key '%v' not found in possible settings", name))
-		}
-	}
-	if len(errs) > 0 {
-		return result, fmt.Errorf(
-			"some errors found in the settings '%v'.\nPossible settings %v",
-			errs,
-			maps.Keys(filteredAttr),
-		)
-	}
-	return result, nil
+	return oemManager.GetOEMBMCSettingAttribute(attributes)
 }
 
 func (r *RedfishBMC) GetBIOSPendingAttributeValues(
@@ -534,34 +473,12 @@ func (r *RedfishBMC) GetBMCPendingAttributeValues(
 		manager.Manufacturer = systems[0].Manufacturer
 	}
 
-	oemManager, err := NewOEMManager(manager)
-	if err != nil {
-		return nil, err
-	}
-	BMCattributeValues, err := oemManager.GetOEMBMCSettingAttribute()
+	oemManager, err := NewOEMManager(manager, r.client.Service)
 	if err != nil {
 		return nil, err
 	}
 
-	var mergedPendingBMCAttributes = make(redfish.SettingsAttributes)
-	var tBiosSetting struct {
-		Attributes redfish.SettingsAttributes `json:"Attributes"`
-	}
-	for _, BMCattributeValue := range BMCattributeValues {
-		err := r.GetEntityFromUri(BMCattributeValue.Settings.SettingsObject.String(), manager.GetClient(), &tBiosSetting)
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range tBiosSetting.Attributes {
-			if _, ok := mergedPendingBMCAttributes[k]; !ok {
-				mergedPendingBMCAttributes[k] = v
-			} else {
-				return nil, fmt.Errorf("duplicate pending attributes in Idrac settings are not supported %v", k)
-			}
-		}
-	}
-
-	return mergedPendingBMCAttributes, nil
+	return oemManager.GetBMCPendingAttributeValues()
 }
 
 func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
@@ -626,16 +543,11 @@ func (r *RedfishBMC) SetBMCAttributesImediately(
 		manager.Manufacturer = systems[0].Manufacturer
 	}
 
-	oemManager, err := NewOEMManager(manager)
+	oemManager, err := NewOEMManager(manager, r.client.Service)
 	if err != nil {
 		return err
 	}
-
-	attrs := make(redfish.SettingsAttributes, len(attributes))
-	for name, value := range attributes {
-		attrs[name] = value
-	}
-	return oemManager.UpdateBMCAttributesApplyAt(attrs, common.ImmediateApplyTime)
+	return oemManager.UpdateBMCAttributesApplyAt(attributes, common.ImmediateApplyTime)
 }
 
 // SetBootOrder sets bios boot order
@@ -664,33 +576,6 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 	biosRegistry := &Registry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "BiosAttributeRegistry") {
-			err = registry.Get(r.client, registry.Location[0].URI, biosRegistry)
-			if err != nil {
-				return
-			}
-		}
-	}
-	// filter out immutable, readonly and hidden attributes
-	filtered = make(map[string]RegistryEntryAttributes)
-	for _, entry := range biosRegistry.RegistryEntries.Attributes {
-		if entry.Immutable == immutable && entry.ReadOnly == readOnly && !entry.Hidden {
-			filtered[entry.AttributeName] = entry
-		}
-	}
-	return
-}
-
-func (r *RedfishBMC) getFilteredBMCRegistryAttributes(
-	readOnly bool,
-	immutable bool,
-) (
-	filtered map[string]RegistryEntryAttributes,
-	err error,
-) {
-	registries, err := r.client.Service.Registries()
-	biosRegistry := &Registry{}
-	for _, registry := range registries {
-		if strings.Contains(registry.ID, "ManagerAttributeRegistry") {
 			err = registry.Get(r.client, registry.Location[0].URI, biosRegistry)
 			if err != nil {
 				return
@@ -798,98 +683,27 @@ func (r *RedfishBMC) checkAttribues(
 
 // check if the arrtibutes need to reboot when changed, and are correct type.
 // supported attrType, bmc and bios
-func (r *RedfishBMC) CheckBMCAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
-	reset = false
-	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
+func (r *RedfishBMC) CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
 
+	manager, err := r.GetManager(UUID)
 	if err != nil {
-		return reset, err
+		return false, err
 	}
 
-	if len(filtered) == 0 {
-		return reset, err
+	if manager.Manufacturer == "" {
+		systems, err := r.client.Service.Systems()
+		if err != nil {
+			return false, err
+		}
+		manager.Manufacturer = systems[0].Manufacturer
 	}
-	return r.checkAttribues(attrs, filtered)
-}
 
-// todo: merge with checkBiosAttribues after #298
-func (r *RedfishBMC) checkAttribues( // nolint: dupl
-	attrs redfish.SettingsAttributes,
-	filtered map[string]RegistryEntryAttributes,
-) (reset bool, err error) {
-	reset = false
-	var errs []error
-	//TODO: add more types like maps and Enumerations
-	for name, value := range attrs {
-		entryAttribute, ok := filtered[name]
-		if !ok {
-			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
-			continue
-		}
-		if entryAttribute.ResetRequired {
-			reset = true
-		}
-		switch strings.ToLower(entryAttribute.Type) {
-		case "integer":
-			if _, ok := value.(int); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
-						entryAttribute.Type,
-						entryAttribute,
-					))
-			}
-		case "string":
-			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
-						entryAttribute.Type,
-						entryAttribute,
-					))
-			}
-		case "enumeration":
-			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
-						entryAttribute.Type,
-						entryAttribute,
-					))
-				break
-			}
-			var validEnum bool
-			for _, attrValue := range entryAttribute.Value {
-				if attrValue.ValueName == value.(string) {
-					validEnum = true
-					break
-				}
-			}
-			if !validEnum {
-				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
-			}
-		default:
-			errs = append(
-				errs,
-				fmt.Errorf(
-					"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-					name,
-					value,
-					entryAttribute.Type,
-					entryAttribute,
-				))
-		}
+	oemManager, err := NewOEMManager(manager, r.client.Service)
+	if err != nil {
+		return false, err
 	}
-	return reset, errors.Join(errs...)
+
+	return oemManager.CheckBMCAttributes(attrs)
 }
 
 func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {

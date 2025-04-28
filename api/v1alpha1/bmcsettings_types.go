@@ -13,12 +13,13 @@ import (
 // BMCSettingsSpec defines the desired state of BMCSettings.
 type BMCSettingsSpec struct {
 
-	// BMCSettingsSpec specifies the BMC settings for the selected serverRef's Out-of-Band-Management
-	BMCSettingsSpec Settings `json:"bmcSettingsSpec,omitempty"`
+	// Version contains BMC version this settings applies to
+	// +required
+	Version string `json:"version"`
 
-	// ServerRef is a reference to a specific server's Manager to apply setting to.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	ServerRefList []*corev1.LocalObjectReference `json:"serverRefList,omitempty"`
+	// SettingsMap contains bmc settings as map
+	// +optional
+	SettingsMap map[string]string `json:"settings,omitempty"`
 
 	// BMCRef is a reference to a specific BMC to apply setting to.
 	// ServerRef is ignored if BMCRef is set
@@ -29,10 +30,15 @@ type BMCSettingsSpec struct {
 	// ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
 	//	note: User approval is only enforced for server's which are reserved state
 	// ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.
-	ServerMaintenancePolicyType ServerMaintenancePolicy `json:"serverMaintenancePolicyType,omitempty"`
+	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
-	// ServerMaintenanceRefMap are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
-	ServerMaintenanceRefMap map[string]*corev1.ObjectReference `json:"serverMaintenanceRefMap,omitempty"`
+	// ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
+	ServerMaintenanceRefList []ServerMaintenanceRefList `json:"serverMaintenanceRefList,omitempty"`
+}
+
+type ServerMaintenanceRefList struct {
+	ServerName           string                  `json:"serverName,omitempty"`
+	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 // ServerMaintenanceState specifies the current state of the server maintenance.

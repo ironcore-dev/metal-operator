@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/bmc/common"
 	"github.com/stmcginnis/gofish/redfish"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -15,8 +16,8 @@ import (
 var _ BMC = (*RedfishLocalBMC)(nil)
 
 var defaultMockedBMCSetting = map[string]map[string]any{
-	"abc":       {"type": "string", "reboot": false, "value": "bar"},
-	"fooreboot": {"type": "integer", "reboot": true, "value": 123},
+	"abc":       {"type": redfish.StringAttributeType, "reboot": false, "value": "bar"},
+	"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
 }
 
 var pendingMockedBMCSetting = map[string]map[string]any{}
@@ -368,20 +369,20 @@ func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(
 	readOnly bool,
 	immutable bool,
 ) (
-	filtered map[string]RegistryEntryAttributes,
+	filtered map[string]redfish.Attribute,
 	err error,
 ) {
 	mockedAttributes := r.getMockedBMCSettingData()
-	filtered = make(map[string]RegistryEntryAttributes)
+	filtered = make(map[string]redfish.Attribute)
 	if len(mockedAttributes) == 0 {
 		return filtered, fmt.Errorf("no bmc setting attributes found")
 	}
 	for name, AttributesData := range mockedAttributes {
-		data := RegistryEntryAttributes{}
+		data := redfish.Attribute{}
 		data.AttributeName = name
 		data.Immutable = immutable
 		data.ReadOnly = readOnly
-		data.Type = AttributesData["type"].(string)
+		data.Type = AttributesData["type"].(redfish.AttributeType)
 		data.ResetRequired = AttributesData["reboot"].(bool)
 		filtered[name] = data
 	}
@@ -391,7 +392,7 @@ func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(
 
 // check if the arrtibutes need to reboot when changed, and are correct type.
 // supported attrType, bmc and bios
-func (r *RedfishLocalBMC) CheckBMCAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
+func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
 	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
 
@@ -402,5 +403,5 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(attrs redfish.SettingsAttributes) (
 	if len(filtered) == 0 {
 		return reset, err
 	}
-	return r.checkAttribues(attrs, filtered)
+	return common.CheckAttribues(attrs, filtered)
 }

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -57,7 +58,7 @@ type BMC interface {
 
 	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
 
-	CheckBMCAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
+	CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
 
 	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) (err error)
 
@@ -91,7 +92,9 @@ const (
 )
 
 type OEMManagerInterface interface {
-	GetOEMBMCSettingAttribute() ([]oem.DellAttributes, error)
+	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
+	GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error)
+	CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error)
 	GetObjFromUri(uri string, respObj any) ([]string, error)
 	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
 }
@@ -276,12 +279,13 @@ type OEMManager struct {
 	OEMManagerInterface
 }
 
-func NewOEMManager(ooem *redfish.Manager) (*OEMManager, error) {
+func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (*OEMManager, error) {
 	switch ooem.Manufacturer {
 	case string(DellServers):
 		return &OEMManager{
 			OEMManagerInterface: &oem.DellIdracManager{
-				BMC: ooem,
+				BMC:     ooem,
+				Service: service,
 			}}, nil
 	default:
 		return &OEMManager{}, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)

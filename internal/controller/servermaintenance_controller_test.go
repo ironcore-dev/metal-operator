@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -162,12 +161,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance.Name),
 			HaveField("Spec.MaintenanceBootConfigurationRef", Not(BeNil())),
 		))
-		bootConfig := &metalv1alpha1.ServerBootConfiguration{}
-
-		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
-			Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
-			Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
-		}, bootConfig).Should(Succeed())
+		bootConfig := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
+				Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
+			},
+		}
+		Eventually(Object(bootConfig)).Should(SatisfyAll(
+			HaveField("Spec.ServerRef.Name", server.Name),
+			HaveField("Spec.Image", "some_image"),
+		))
 
 		By("Patching the boot configuration to a Ready state")
 		Eventually(UpdateStatus(bootConfig, func() {

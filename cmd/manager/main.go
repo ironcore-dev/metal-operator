@@ -49,7 +49,7 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func main() {
+func main() { // nolint: gocyclo
 	var (
 		metricsAddr                        string
 		metricsCertPath                    string

@@ -1,7 +1,9 @@
 # [MANAGER]: Manager Deployment Configurations
 controllerManager:
   replicas: 1
-  container:
+  strategy:
+    type: Recreate
+  manager:
     image:
       repository: controller
       tag: latest
@@ -11,11 +13,11 @@ controllerManager:
       - "--health-probe-bind-address=:8081"
     resources:
       limits:
-        cpu: 500m
-        memory: 128Mi
+        cpu: 300m
+        memory: 200Mi
       requests:
-        cpu: 10m
-        memory: 64Mi
+        cpu: 300m
+        memory: 50Mi
     livenessProbe:
       initialDelaySeconds: 15
       periodSeconds: 20
@@ -33,12 +35,13 @@ controllerManager:
       capabilities:
         drop:
           - "ALL"
-  securityContext:
+  podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault
   terminationGracePeriodSeconds: 10
   serviceAccountName: metal-operator-controller-manager
+  hostNetwork: true
 
 # [RBAC]: To enable RBAC (Permissions) configurations
 rbac:

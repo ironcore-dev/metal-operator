@@ -31,7 +31,7 @@ type ServerClaimSpec struct {
 	// the ignition configuration for the server. This field is optional and can be omitted if not specified.
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
 
-	// Image specifies the boot image to be used for the server.
+	// Image specifies the boot image to be utilized for the server.
 	Image string `json:"image"`
 }
 

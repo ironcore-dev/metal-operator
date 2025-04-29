@@ -39,12 +39,15 @@ jobs:
       if: github.event_name == 'push'
       run: |
         sed -i "s/version: .*/version: ${GITHUB_REF_NAME#v}/" dist/chart/Chart.yaml
+    - name: Move crds folder out of templates
+      run: mv dist/chart/templates/crd dist/chart/crds
     - name: Run chart-releaser
-      uses: bitdeps/helm-oci-charts-releaser@v0.1.4
+      uses: afritzler/helm-oci-charts-releaser@enh/skip-gh-release
+#     uses: bitdeps/helm-oci-charts-releaser@v0.1.3
       with:
         charts_dir: dist/chart
-        skip_gh_release: true
         oci_registry: ghcr.io/${{ github.repository_owner }}/charts
-        oci_username: ${{ github.actor }}
-        oci_password: ${{ secrets.GITHUB_TOKEN }}
         github_token: ${{ secrets.GITHUB_TOKEN }}
+        oci_password: ${{ secrets.GITHUB_TOKEN }}
+        oci_username: ${{ github.actor }}
+        skip_gh_release: true

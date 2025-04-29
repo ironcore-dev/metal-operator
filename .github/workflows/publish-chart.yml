@@ -42,8 +42,7 @@ jobs:
     - name: Move crds folder out of templates
       run: mv dist/chart/templates/crd dist/chart/crds
     - name: Run chart-releaser
-      uses: afritzler/helm-oci-charts-releaser@enh/skip-gh-release
-#     uses: bitdeps/helm-oci-charts-releaser@v0.1.3
+      uses: bitdeps/helm-oci-charts-releaser@v0.1.4
       with:
         charts_dir: dist/chart
         oci_registry: ghcr.io/${{ github.repository_owner }}/charts

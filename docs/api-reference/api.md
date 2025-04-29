@@ -2058,7 +2058,7 @@ string
 </em>
 </td>
 <td>
-<p>Image specifies the boot image to be utilized for the server.</p>
+<p>Image specifies the boot image to be used for the server.</p>
 </td>
 </tr>
 </table>
@@ -2157,7 +2157,7 @@ string
 </em>
 </td>
 <td>
-<p>Image specifies the boot image to be utilized for the server.</p>
+<p>Image specifies the boot image to be used for the server.</p>
 </td>
 </tr>
 </tbody>

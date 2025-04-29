@@ -93,8 +93,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               image:
-                description: Image specifies the boot image to be utilized for the
-                  server.
+                description: Image specifies the boot image to be used for the server.
                 type: string
               power:
                 description: Power specifies the desired power state of the server.

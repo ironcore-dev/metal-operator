@@ -70,20 +70,6 @@ spec:
               mountPath: /tmp/k8s-metrics-server/metrics-certs
               readOnly: true
             {{- end }}
-        - name: kube-rbac-proxy
-          args: {{- toYaml .Values.controllerManager.kubeRbacProxy.args | nindent 10 }}
-          env:
-          - name: KUBERNETES_CLUSTER_DOMAIN
-            value: {{ quote .Values.kubernetesClusterDomain }}
-          image: {{ .Values.controllerManager.kubeRbacProxy.image.repository }}:{{ default .Chart.AppVersion .Values.controllerManager.kubeRbacProxy.image.tag }}
-          ports:
-          - containerPort: 8443
-            name: https
-            protocol: TCP
-          resources: {{- toYaml .Values.controllerManager.kubeRbacProxy.resources | nindent
-            12 }}
-          securityContext: {{- toYaml .Values.controllerManager.kubeRbacProxy.containerSecurityContext
-            | nindent 12 }}
       securityContext:
         {{- toYaml .Values.controllerManager.podSecurityContext | nindent 8 }}
       serviceAccountName: {{ .Values.controllerManager.serviceAccountName }}

@@ -35,27 +35,6 @@ controllerManager:
       capabilities:
         drop:
           - "ALL"
-  kubeRbacProxy:
-    args:
-      - --secure-listen-address=0.0.0.0:8443
-      - --upstream=http://127.0.0.1:8080/
-      - --logtostderr=true
-      - --v=0
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-          - ALL
-    image:
-      repository: gcr.io/kubebuilder/kube-rbac-proxy
-      tag: v0.15.0
-    resources:
-      limits:
-        cpu: 500m
-        memory: 128Mi
-      requests:
-        cpu: 5m
-        memory: 64Mi
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:

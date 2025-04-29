@@ -1,52 +1,54 @@
-name: Build and Publish Helm Chart
-
-permissions:
-  contents: read
+name: Release Helm Chart
 
 on:
-  release:
-    types:
-    - published
   push:
     branches:
-    - main
+      - main
     tags:
-    - v*.*.*
+      - 'v*.*.*'
   pull_request:
     branches:
-    - main
-    paths-ignore:
-    - 'docs/**'
-    - '**/*.md'
-    types: [labeled, unlabeled, opened, synchronize, reopened]
+      - main
 
 jobs:
-  publish-charts:
+  helm-chart:
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ok-to-chart')
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v4
-    - name: Set up Helm
-      uses: azure/setup-helm@v4.3.0
-      with:
-        version: v3.16.2
-    - name: Configure Git
-      run: |
-        git config user.name "$GITHUB_ACTOR"
-        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-    - name: Set charts version
-      if: github.event_name == 'push'
-      run: |
-        sed -i "s/version: .*/version: ${GITHUB_REF_NAME#v}/" dist/chart/Chart.yaml
-    - name: Move crds folder out of templates
-      run: mv dist/chart/templates/crd dist/chart/crds
-    - name: Run chart-releaser
-      uses: bitdeps/helm-oci-charts-releaser@v0.1.4
-      with:
-        charts_dir: dist/chart
-        oci_registry: ghcr.io/${{ github.repository_owner }}/charts
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        oci_password: ${{ secrets.GITHUB_TOKEN }}
-        oci_username: ${{ github.actor }}
-        skip_gh_release: true
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Determine chart version
+        id: chart_version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Use SHA for main branch
+            CHART_VERSION="0.0.0-$(echo ${{ github.sha }} | cut -c1-7)"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            # Use tag version (strip 'v' prefix)
+            CHART_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            # Use PR SHA for dry run
+            CHART_VERSION="0.0.0-$(echo ${{ github.sha }} | cut -c1-7)"
+          fi
+          echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package Helm chart
+        run: |
+          helm package dist/chart --version ${{ steps.chart_version.outputs.version }}
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push Helm chart to GHCR
+        run: |
+          helm push metal-operator-${{ steps.chart_version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

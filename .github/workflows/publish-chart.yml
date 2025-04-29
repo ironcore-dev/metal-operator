@@ -41,6 +41,9 @@ jobs:
           fi
           echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Move crds folder out of templates
+        run: mv dist/chart/templates/crd dist/chart/crds
+
       - name: Package Helm chart
         run: |
           helm package dist/chart --version ${{ steps.chart_version.outputs.version }}

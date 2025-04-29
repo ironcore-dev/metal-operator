@@ -1,8 +1,11 @@
 name: E2E Tests
 
 on:
-  push:
   pull_request:
+    types: [ assigned, opened, synchronize, reopened ]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 jobs:
   test-e2e:

@@ -1,52 +1,45 @@
-name: Build and Publish Helm Chart
-
-permissions:
-  contents: read
+name: Publish Helm Chart
 
 on:
-  release:
-    types:
-    - published
   push:
     branches:
-    - main
-    tags:
-    - v*.*.*
-  pull_request:
-    branches:
-    - main
-    paths-ignore:
-    - 'docs/**'
-    - '**/*.md'
-    types: [labeled, unlabeled, opened, synchronize, reopened]
+      - main
 
 jobs:
-  publish-charts:
+  release:
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ok-to-chart')
+    permissions:
+      contents: write
+      packages: write
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v4
-    - name: Set up Helm
-      uses: azure/setup-helm@v4.3.0
-      with:
-        version: v3.16.2
-    - name: Configure Git
-      run: |
-        git config user.name "$GITHUB_ACTOR"
-        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-    - name: Set charts version
-      if: github.event_name == 'push'
-      run: |
-        sed -i "s/version: .*/version: ${GITHUB_REF_NAME#v}/" dist/chart/Chart.yaml
-    - name: Move crds folder out of templates
-      run: mv dist/chart/templates/crd dist/chart/crds
-    - name: Run chart-releaser
-      uses: bitdeps/helm-oci-charts-releaser@v0.1.4
-      with:
-        charts_dir: dist/chart
-        oci_registry: ghcr.io/${{ github.repository_owner }}/charts
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        oci_password: ${{ secrets.GITHUB_TOKEN }}
-        oci_username: ${{ github.actor }}
-        skip_gh_release: true
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Set charts version
+        run: |
+          sed -i "s/version: .*/version: ${GITHUB_REF_NAME#v}/" dist/chart/Chart.yaml
+
+      - name: Move crds folder out of templates
+        run: mv dist/chart/templates/crd dist/chart/crds
+
+      - name: Run chart-releaser
+        uses: bitdeps/helm-oci-charts-releaser@v0.1.4
+        with:
+          charts_dir: dist/chart
+          oci_registry: ghcr.io/${{ github.repository_owner }}/charts
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          oci_password: ${{ secrets.GITHUB_TOKEN }}
+          oci_username: ${{ github.actor }}
+          skip_gh_release: true

@@ -2410,11 +2410,8 @@ ServerBootConfigurationTemplate
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.</p>
-</td>
-</tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>ServerMaintenanceStateFailed specifies that the server maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InMaintenance&#34;</p></td>
 <td><p>ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.</p>

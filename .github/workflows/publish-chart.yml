@@ -41,8 +41,16 @@ jobs:
           fi
           echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Move crds folder out of templates
-        run: mv dist/chart/templates/crd dist/chart/crds
+      - name: Install Kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          mv kustomize /usr/local/bin
+
+      - name: Prepare CRDs folder
+        run: |
+          mkdir -p dist/chart/crds
+          kustomize build config/default | yq ea 'select(.kind == "CustomResourceDefinition")' > dist/chart/crds/crds.yaml
+          rm -rf dist/chart/templates/crd
 
       - name: Package Helm chart
         run: |

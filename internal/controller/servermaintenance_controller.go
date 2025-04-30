@@ -130,10 +130,10 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 		return ctrl.Result{}, nil
 	}
 	claimAnnotations := map[string]string{
-		metalv1alpha1.ServerMaintenanceNeededLabelKey: "true",
+		metalv1alpha1.ServerMaintenanceNeededKey: "true",
 	}
-	if serverMaintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] != "" {
-		claimAnnotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] = serverMaintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey]
+	if serverMaintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonKey] != "" {
+		claimAnnotations[metalv1alpha1.ServerMaintenanceReasonKey] = serverMaintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonKey]
 	}
 	if err := r.patchServerClaimAnnotation(ctx, log, serverClaim, claimAnnotations); err != nil {
 		return ctrl.Result{}, err
@@ -334,8 +334,8 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logg
 	serverClaimBase := serverClaim.DeepCopy()
 	metautils.DeleteAnnotations(serverClaim, []string{
 		metalv1alpha1.ServerMaintenanceApprovalKey,
-		metalv1alpha1.ServerMaintenanceNeededLabelKey,
-		metalv1alpha1.ServerMaintenanceReasonAnnotationKey,
+		metalv1alpha1.ServerMaintenanceNeededKey,
+		metalv1alpha1.ServerMaintenanceReasonKey,
 	})
 	if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {
 		return fmt.Errorf("failed to patch server claim annotations: %w", err)
@@ -444,7 +444,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 		claim := object.(*metalv1alpha1.ServerClaim)
 		var req []reconcile.Request
 		annotations := claim.GetAnnotations()
-		if _, ok := annotations[metalv1alpha1.ServerMaintenanceNeededLabelKey]; !ok {
+		if _, ok := annotations[metalv1alpha1.ServerMaintenanceNeededKey]; !ok {
 			return req
 		}
 

@@ -9,11 +9,9 @@ import (
 )
 
 const (
-	// ServerMaintenanceNeededLabelKey is a label key that is used to indicate that a server requires maintenance.
-	ServerMaintenanceNeededLabelKey = "metal.ironcore.dev/maintenance-needed"
-	// ServerMaintenanceReasonAnnotationKey is an annotation key that is used to store the reason for a server maintenance.
-	ServerMaintenanceReasonAnnotationKey = "metal.ironcore.dev/maintenance-reason"
-	// ServerMaintenanceApprovalKey is an annotation key that is used to store the approval status for a server maintenance.
+	// ServerMaintenanceReasonKey is used to store the reason for a server maintenance.
+	ServerMaintenanceReasonKey = "metal.ironcore.dev/maintenance-reason"
+	// ServerMaintenanceApprovalKey is used to store the approval status for a server maintenance.
 	ServerMaintenanceApprovalKey = "metal.ironcore.dev/maintenance-approval"
 )
 
@@ -21,7 +19,7 @@ const (
 type ServerBootConfigurationTemplate struct {
 	// Name specifies the name of the boot configuration.
 	Name string `json:"name"`
-	// Parameters specifies the parameters to be used for rendering the boot configuration.
+	// Parameters specify the parameters to be used for rendering the boot configuration.
 	Spec ServerBootConfigurationSpec `json:"spec"`
 }
 

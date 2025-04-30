@@ -1907,7 +1907,7 @@ ServerBootConfigurationSpec
 </em>
 </td>
 <td>
-<p>Parameters specifies the parameters to be used for rendering the boot configuration.</p>
+<p>Parameters specify the parameters to be used for rendering the boot configuration.</p>
 <br/>
 <br/>
 <table>

@@ -119,6 +119,9 @@ var _ = BeforeSuite(func() {
 	err = SetupEndpointWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = SetupBIOSSettingsWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:webhook
 
 	go func() {

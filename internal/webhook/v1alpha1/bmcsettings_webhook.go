@@ -54,64 +54,11 @@ func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj run
 	}
 	bmcsettingslog.Info("Validation for BMCSettings upon creation", "name", bmcSettings.GetName())
 
-	if bmcSettings.Spec.BMCRef == nil && bmcSettings.Spec.ServerRefList == nil {
-		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
-			bmcSettings.GetName(), field.ErrorList{field.Required(field.NewPath("spec"), "Spec.BMCRef or Spec.ServerRefList is required")})
-	}
-
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list bmcSettingsList: %w", err)
 	}
-
-	// this make one API call rather than multiple when trying to find duplicates
-	serversList := &metalv1alpha1.ServerList{}
-	if err := v.Client.List(ctx, serversList); err != nil {
-		return nil, fmt.Errorf("failed to list serversList: %w", err)
-	}
-	serversMap := make(map[string]*metalv1alpha1.Server, len(serversList.Items))
-	for _, server := range serversList.Items {
-		serversMap[server.Name] = &server
-	}
-
-	var bmcSettingsBMCName string
-	var path string
-	var bsBMCName string
-	var err error
-	// get the intended BMC
-	if bmcSettings.Spec.BMCRef != nil {
-		bmcSettingsBMCName = bmcSettings.Spec.BMCRef.Name
-		path = "Spec.BMCRef"
-	} else {
-		bmcSettingsBMCName, err = getBMCNameFromServerRef(serversMap, bmcSettings)
-		if err != nil {
-			return nil, err
-		}
-		path = "Spec.ServerRefList"
-	}
-
-	bmcsettingslog.Info("TEMP:bmcSettings", "bmcSettings name", bmcSettings.Name, "bmcSettings BMCRef", bmcSettings.Spec.BMCRef, "bmcSettings ServerList", bmcSettings.Spec.ServerRefList)
-
-	for _, bs := range bmcSettingsList.Items {
-		bmcsettingslog.Info("TEMP:bs ", "bs name", bs.Name, "bs BMCRef", bs.Spec.BMCRef, "bs ServerList", bs.Spec.ServerRefList)
-		if bs.Spec.BMCRef != nil {
-			bsBMCName = bs.Spec.BMCRef.Name
-		} else {
-			bsBMCName, err = getBMCNameFromServerRef(serversMap, &bs)
-			if err != nil {
-				bmcsettingslog.Info("Skipping as no referred BMC was found", "BMCSettings", bs.Name, "error", err)
-				continue
-			}
-		}
-		if bsBMCName == bmcSettingsBMCName {
-			err = fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v", bmcSettingsBMCName, bmcSettings.Name, bsBMCName, bs.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
-				bmcSettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", path), err)})
-		}
-	}
-	return nil, nil
+	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, bmcSettings)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -122,68 +69,11 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	}
 	bmcsettingslog.Info("Validation for BMCSettings upon update", "name", bmcSettings.GetName())
 
-	if bmcSettings.Spec.BMCRef == nil && bmcSettings.Spec.ServerRefList == nil {
-		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
-			bmcSettings.GetName(), field.ErrorList{field.Required(field.NewPath("spec"), "Spec.BMCRef or Spec.ServerRefList is required")})
-	}
-
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list bmcSettingsList: %w", err)
 	}
-
-	// this make one API call rather than multiple when trying to find duplicates
-	serversList := &metalv1alpha1.ServerList{}
-	if err := v.Client.List(ctx, serversList); err != nil {
-		return nil, fmt.Errorf("failed to list serversList: %w", err)
-	}
-	serversMap := make(map[string]*metalv1alpha1.Server, len(serversList.Items))
-	for _, server := range serversList.Items {
-		serversMap[server.Name] = &server
-	}
-
-	var bmcSettingsBMCName string
-	var path string
-	var bsBMCName string
-	var err error
-
-	// get the intended BMC
-	if bmcSettings.Spec.BMCRef != nil {
-		bmcSettingsBMCName = bmcSettings.Spec.BMCRef.Name
-		path = "Spec.BMCRef"
-	} else {
-		bmcSettingsBMCName, err = getBMCNameFromServerRef(serversMap, bmcSettings)
-		if err != nil {
-			return nil, err
-		}
-		path = "Spec.ServerRefList"
-	}
-
-	bmcsettingslog.Info("TEMP:bmcSettings", "bmcSettings name", bmcSettings.Name, "bmcSettings BMCRef", bmcSettings.Spec.BMCRef, "bmcSettings ServerList", bmcSettings.Spec.ServerRefList)
-
-	for _, bs := range bmcSettingsList.Items {
-		if bmcSettings.Name == bs.Name {
-			continue
-		}
-		bmcsettingslog.Info("TEMP: bs", "bs name", bs.Name, "bs BMCRef", bs.Spec.BMCRef, "bs ServerList", bs.Spec.ServerRefList)
-		if bs.Spec.BMCRef != nil {
-			bsBMCName = bs.Spec.BMCRef.Name
-		} else {
-			bsBMCName, err = getBMCNameFromServerRef(serversMap, &bs)
-			if err != nil {
-				bmcsettingslog.Info("Skipping as no referred BMC was found", "BMCSettings", bs.Name, "error", err)
-				continue
-			}
-		}
-		if bsBMCName == bmcSettingsBMCName {
-			err = fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v", bmcSettingsBMCName, bmcSettings.Name, bsBMCName, bs.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
-				bmcSettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", path), err)})
-		}
-	}
-	return nil, nil
+	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, bmcSettings)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -197,12 +87,24 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj run
 	return nil, nil
 }
 
-func getBMCNameFromServerRef(serversMap map[string]*metalv1alpha1.Server, bmcSettings *metalv1alpha1.BMCSettings) (string, error) {
-	for _, serverRef := range bmcSettings.Spec.ServerRefList {
-		bmcsettingslog.Info("TEMP: Validation ", "serverRef", serverRef, "serversMap[serverRef.Name]", serversMap)
-		if server, ok := serversMap[serverRef.Name]; ok && server != nil && server.Spec.BMCRef != nil {
-			return server.Spec.BMCRef.Name, nil
+func checkForDuplicateBMCSettingsRefToBMC(
+	bmcSettingsList *metalv1alpha1.BMCSettingsList,
+	bmcSettings *metalv1alpha1.BMCSettings,
+) (admission.Warnings, error) {
+	for _, bs := range bmcSettingsList.Items {
+		if bmcSettings.Name == bs.Name {
+			continue
+		}
+		if bs.Spec.BMCRef.Name == bmcSettings.Spec.BMCRef.Name && bmcSettings.Name != bs.Name {
+			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
+				bmcSettings.Spec.BMCRef.Name,
+				bmcSettings.Name,
+				bs.Spec.BMCRef.Name,
+				bs.Name)
+			return nil, apierrors.NewInvalid(
+				schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
+				bmcSettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", "BMCRef"), err)})
 		}
 	}
-	return "", fmt.Errorf("no servers found with reference to BMC in given 'ServerRefList' %v", bmcSettings.Spec.ServerRefList)
+	return nil, nil
 }

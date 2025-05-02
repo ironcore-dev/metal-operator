@@ -401,6 +401,13 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "unable to create controller", "controller", "BIOSVersion")
 		os.Exit(1)
 	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhookmetalv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "BIOSVersion")
+			os.Exit(1)
+		}
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

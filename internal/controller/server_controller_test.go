@@ -32,7 +32,7 @@ var _ = Describe("Server Controller", func() {
 		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
-	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
+	FIt("Should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{

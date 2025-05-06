@@ -13,18 +13,18 @@ import (
 
 var _ BMC = (*RedfishLocalBMC)(nil)
 
-var defaultMockedBIOSSetting = map[string]map[string]any{
+var DefaultMockedBIOSSetting = map[string]map[string]any{
 	"abc":       {"type": "string", "reboot": false, "value": "bar"},
 	"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 }
 
-var pendingMockedBIOSSetting = map[string]map[string]any{}
+var PendingMockedBIOSSetting = map[string]map[string]any{}
 
 var MockedBIOSVersion = "123.5"
-var mockedBIOSUpgradingVersion = "123.5"
+var MockedBIOSUpgradingVersion = "123.5"
 
-var mockedBIOSUpgradeTaskIndex = 0
-var mockedBIOSUpgradeTaskStatus = []redfish.Task{
+var MockedBIOSUpgradeTaskIndex = 0
+var MockedBIOSUpgradeTaskStatus = []redfish.Task{
 	{
 		TaskState:       redfish.NewTaskState,
 		PercentComplete: 0,
@@ -86,15 +86,15 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 	}
 
 	// mock the bmc update here
-	if len(pendingMockedBIOSSetting) > 0 {
+	if len(PendingMockedBIOSSetting) > 0 {
 
-		for key, data := range pendingMockedBIOSSetting {
-			if _, ok := defaultMockedBIOSSetting[key]; ok {
-				defaultMockedBIOSSetting[key] = data
+		for key, data := range PendingMockedBIOSSetting {
+			if _, ok := DefaultMockedBIOSSetting[key]; ok {
+				DefaultMockedBIOSSetting[key] = data
 			}
 		}
-		pendingMockedBIOSSetting = map[string]map[string]any{}
-		r.StoredBIOSSettingData = defaultMockedBIOSSetting
+		PendingMockedBIOSSetting = map[string]map[string]any{}
+		r.StoredBIOSSettingData = DefaultMockedBIOSSetting
 	}
 	return nil
 }
@@ -119,13 +119,13 @@ func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(
 	redfish.SettingsAttributes,
 	error,
 ) {
-	if len(pendingMockedBIOSSetting) == 0 {
+	if len(PendingMockedBIOSSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pendingMockedBIOSSetting))
+	result := make(redfish.SettingsAttributes, len(PendingMockedBIOSSetting))
 
-	for key, data := range pendingMockedBIOSSetting {
+	for key, data := range PendingMockedBIOSSetting {
 		result[key] = data["value"]
 	}
 
@@ -138,19 +138,19 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 	systemUUID string,
 	attributes redfish.SettingsAttributes,
 ) error {
-	if len(defaultMockedBIOSSetting) == 0 {
-		defaultMockedBIOSSetting = map[string]map[string]any{}
+	if len(DefaultMockedBIOSSetting) == 0 {
+		DefaultMockedBIOSSetting = map[string]map[string]any{}
 	}
 
-	pendingMockedBIOSSetting = map[string]map[string]any{}
+	PendingMockedBIOSSetting = map[string]map[string]any{}
 	for key, attrData := range attributes {
-		if AttributesData, ok := defaultMockedBIOSSetting[key]; ok {
+		if AttributesData, ok := DefaultMockedBIOSSetting[key]; ok {
 			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {
 				// if reboot not needed, set the attribute immediately.
 				AttributesData["value"] = attrData
 			} else {
 				// if reboot needed, set the attribute at next power on.
-				pendingMockedBIOSSetting[key] = map[string]any{
+				PendingMockedBIOSSetting[key] = map[string]any{
 					"type":   AttributesData["type"],
 					"reboot": AttributesData["reboot"],
 					"value":  attrData,
@@ -158,7 +158,7 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 			}
 		}
 	}
-	r.StoredBIOSSettingData = defaultMockedBIOSSetting
+	r.StoredBIOSSettingData = DefaultMockedBIOSSetting
 
 	return nil
 }
@@ -168,7 +168,7 @@ func (r *RedfishLocalBMC) getMockedBIOSSettingData() map[string]map[string]any {
 	if len(r.StoredBIOSSettingData) > 0 {
 		return r.StoredBIOSSettingData
 	}
-	return defaultMockedBIOSSetting
+	return DefaultMockedBIOSSetting
 
 }
 
@@ -248,32 +248,33 @@ func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string)
 
 func (r *RedfishLocalBMC) UpgradeBiosVersion(
 	ctx context.Context,
-	UUID string,
+	manufacturer string,
 	parameters *redfish.SimpleUpdateParameters,
-) (string, error, bool) {
-	mockedBIOSUpgradeTaskIndex = 0
+) (string, bool, error) {
+	MockedBIOSUpgradeTaskIndex = 0
 	// note, ImageURI is mocked for testing upgrading to version
-	mockedBIOSUpgradingVersion = parameters.ImageURI
+	MockedBIOSUpgradingVersion = parameters.ImageURI
 	// this go routine mocks the upgrade progress
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		for mockedBIOSUpgradeTaskIndex < len(mockedBIOSUpgradeTaskStatus)-1 {
+		for MockedBIOSUpgradeTaskIndex < len(MockedBIOSUpgradeTaskStatus)-1 {
 			time.Sleep(5 * time.Millisecond)
-			mockedBIOSUpgradeTaskIndex = mockedBIOSUpgradeTaskIndex + 1
+			MockedBIOSUpgradeTaskIndex = MockedBIOSUpgradeTaskIndex + 1
 		}
 	}()
-	return "dummyTask", nil, false
+	return "dummyTask", false, nil
 }
 
 func (r *RedfishLocalBMC) GetBiosUpgradeTask(
 	ctx context.Context,
+	manufacturer string,
 	taskURI string,
 ) (*redfish.Task, error) {
-	if mockedBIOSUpgradeTaskIndex > len(mockedBIOSUpgradeTaskStatus)-1 {
-		mockedBIOSUpgradeTaskIndex = len(mockedBIOSUpgradeTaskStatus) - 1
+	if MockedBIOSUpgradeTaskIndex > len(MockedBIOSUpgradeTaskStatus)-1 {
+		MockedBIOSUpgradeTaskIndex = len(MockedBIOSUpgradeTaskStatus) - 1
 	}
-	if mockedBIOSUpgradeTaskStatus[mockedBIOSUpgradeTaskIndex].TaskState == redfish.CompletedTaskState {
-		MockedBIOSVersion = mockedBIOSUpgradingVersion
+	if MockedBIOSUpgradeTaskStatus[MockedBIOSUpgradeTaskIndex].TaskState == redfish.CompletedTaskState {
+		MockedBIOSVersion = MockedBIOSUpgradingVersion
 	}
-	return &mockedBIOSUpgradeTaskStatus[mockedBIOSUpgradeTaskIndex], nil
+	return &MockedBIOSUpgradeTaskStatus[MockedBIOSUpgradeTaskIndex], nil
 }

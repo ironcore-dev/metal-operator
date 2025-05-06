@@ -30,11 +30,14 @@ spec:
     - jsonPath: .status.state
       name: State
       type: string
-    - jsonPath: .status.upgradeTaskStatus.taskState
-      name: UpgradeStatus
+    - jsonPath: .status.upgradeTask.taskState
+      name: TaskState
       type: string
-    - jsonPath: .status.upgradeTaskStatus.percentageComplete
-      name: UpgradeProgress
+    - jsonPath: .status.upgradeTask.taskStatus
+      name: TaskStatus
+      type: string
+    - jsonPath: .status.upgradeTask.percentageComplete
+      name: TaskProgress
       type: integer
     - jsonPath: .spec.serverRef.name
       name: ServerRef
@@ -67,70 +70,41 @@ spec:
           spec:
             description: BIOSVersionSpec defines the desired state of BIOSVersion.
             properties:
-              biosSettingsRef:
-                description: |-
-                  BiosSettingsRef is a reference to a specific BIOSSettings object which holds settings for this version
-                  we use this to avoid multiple BIOS related ref on Server resources.
+              forceUpdate:
+                description: An indication of whether the server's upgrade service
+                  should bypass vendor update policies
+                type: boolean
+              image:
+                description: details regarding the image to use to upgrade to given
+                  BIOS version
                 properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                  URI:
+                    description: The URI of the software image to update/install."
                     type: string
-                type: object
-                x-kubernetes-map-type: atomic
-                x-kubernetes-validations:
-                - message: BiosSettingsRef is immutable
-                  rule: self == oldSelf
-              biosVersionSpec:
-                description: Spec specifies the spec for upgrading BIOS for specific
-                  serverRef.
-                properties:
-                  forceUpdate:
-                    description: An indication of whether the server's upgrade service
-                      should bypass vendor update policies
-                    type: boolean
-                  image:
-                    description: details regarding the image to use to upgrade to
-                      given bios version
+                  secretRef:
+                    description: |-
+                      ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+                      to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
                     properties:
-                      URI:
-                        description: The URI of the software image to update/install."
-                        type: string
-                      secretRef:
+                      name:
+                        default: ""
                         description: |-
-                          ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-                          to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
-                        properties:
-                          name:
-                            default: ""
-                            description: |-
-                              Name of the referent.
-                              This field is effectively required, but due to backwards compatibility is
-                              allowed to be empty. Instances of this type with an empty value here are
-                              almost certainly wrong.
-                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            type: string
-                        type: object
-                        x-kubernetes-map-type: atomic
-                      transferProtocol:
-                        description: The network protocol that the server's update
-                          service uses to retrieve 'ImageURI'
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         type: string
-                    required:
-                    - URI
                     type: object
-                  version:
-                    description: Version contains BIOS version to upgrade
+                    x-kubernetes-map-type: atomic
+                  transferProtocol:
+                    description: The network protocol that the server's update service
+                      uses to retrieve 'ImageURI'
                     type: string
                 required:
-                - version
+                - URI
                 type: object
-              serverMaintenancePolicyType:
+              serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
                   on the server.
                 type: string
@@ -196,6 +170,11 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
+              version:
+                description: Version contains BIOS version to upgrade to
+                type: string
+            required:
+            - version
             type: object
           status:
             description: BIOSVersionStatus defines the observed state of BIOSVersion.
@@ -262,14 +241,17 @@ spec:
                 description: State represents the current state of the bios configuration
                   task.
                 type: string
-              upgradeTaskStatus:
-                description: UpgradeTaskStatus contains the state of the Upgrade Task
-                  created by the BMC
+              upgradeTask:
+                description: UpgradeTask contains the state of the Upgrade Task created
+                  by the BMC
                 properties:
                   percentageComplete:
                     type: integer
                   taskState:
                     description: TaskState indicates the state of a task.
+                    type: string
+                  taskStatus:
+                    description: Health indicates the health of a resource.
                     type: string
                   taskURI:
                     type: string

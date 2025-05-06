@@ -22,9 +22,13 @@ var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest()
 	ns.Name = "default"
 
-	var server *metalv1alpha1.Server
+	var (
+		defaultBiosVersion string
+		server             *metalv1alpha1.Server
+	)
 
 	BeforeEach(func(ctx SpecContext) {
+		defaultBiosVersion = bmc.MockedBIOSVersion
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -45,7 +49,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
@@ -64,11 +67,14 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("update the server state to Available  state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 		})).Should(Succeed())
 	})
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
+		bmc.MockedBIOSVersion = defaultBiosVersion
+		bmc.PendingMockedBIOSSetting = map[string]map[string]any{}
 	})
 
 	It("should successfully patch its reference to referred server", func(ctx SpecContext) {
@@ -76,10 +82,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
 		BIOSSetting := make(map[string]string) // no setting to apply
 
-		By("Ensuring that the server has Available state")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-		))
 		By("Creating a BIOSSetting V1")
 		biosSettingsV1 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -87,7 +89,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -111,7 +113,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 bmc.MockedBIOSVersion + "2",
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -309,24 +311,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
 
-		// because of how we mock the setting update, we can not determine the next state, Hence check for multiple
-		By("Ensuring that the BIOS setting has reached next state")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateState("")),
-		))
-
-		By("Ensuring that the Server is in correct power state")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-		))
-
-		// because of how we mock the setting update, it applied immediately and hence will not go through reboots to apply setting
-		// this is the eventual state we would need to reach
-		By("Ensuring that the BIOS setting has reached next state: Completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		checkTransistionToAppliedState(biosSettings)
 
 		By("Ensuring that the BIOS setting has not referenced serverMaintenance anymore")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
@@ -419,37 +404,13 @@ var _ = Describe("BIOSSettings Controller", func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
 
-		// because of how we mock the setting update, we can not determine the next state, Hence check for multiple
-		By("Ensuring that the BIOS setting has reached next state")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateState("")),
-		))
-
 		By("Ensuring that the Server is in Maintenance")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 		))
 
-		// due to issue with serverClaim, which forces the power state on the server even during maintenance we need this
-		By("Ensuring that the Server is in correct power state")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-		))
-
-		By("Ensuring that the BIOS setting has reached next state: issue/reboot")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateIssue),
-		))
-
-		// because of how we mock the setting update, it applied immediately and hence will not go through reboots to apply setting
-		// this is the eventual state we would need to reach
-		By("Ensuring that the BIOS setting has reached next state: Completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		// because of how we mock the setting update, we can not determine the next state, Hence check for multiple
+		checkTransistionToAppliedState(biosSettings)
 
 		By("Ensuring that the BIOS setting has not referenced serverMaintenance anymore")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
@@ -467,6 +428,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		BIOSSetting := make(map[string]string)
 		BIOSSetting["fooreboot"] = "10"
 
+		// just to double confirm the starting state here for easy readability
 		By("Ensuring that the Server has available")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
@@ -480,7 +442,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -526,26 +488,21 @@ var _ = Describe("BIOSSettings Controller", func() {
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
 		))
-		// because of the mocking, the transistions are super fast here. can not determine the exact states
-		By("Ensuring that the BIOS setting has reached next state: issue/reboot")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateIssue),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+
+		By("Ensuring that the Maintenance resource is inMaintenance")
+		Eventually(Object(serverMaintenance)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		))
+		By("Ensuring that the server resource has entered maintenance")
+		Eventually(Object(server)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
+		))
+		By("Ensuring that the server resource has entered required PowerState")
+		Eventually(Object(server)).Should(SatisfyAny(
+			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
 		))
 
-		// because of the mocking, the transistions are super fast here. can not determine the exact states
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateVerification),
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
-
-		// because of the mocking, the transistions are super fast here.
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		checkTransistionToAppliedState(biosSettings)
 
 		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
@@ -557,8 +514,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	It("should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
-		bmcSetting := make(map[string]string)
-		bmcSetting["abc"] = "bar-wait-on-version-upgrade"
+		biosSetting := make(map[string]string)
+		biosSetting["abc"] = "bar-wait-on-version-upgrade"
 
 		// put the server in PowerOn state,
 
@@ -571,11 +528,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-bmc-upgrade",
+				GenerateName: "test-bios-upgrade",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version:                 "2.45.455b66-rev4",
-				SettingsMap:             bmcSetting,
+				SettingsMap:             biosSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -588,7 +545,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
 		))
 
-		By("Ensuring that the biosSettings resource state is correct State inVersionUpgrade")
+		By("Ensuring that the biosSettings resource state is correct State BIOSSettingsStateInProgress")
 		Eventually(Object(biosSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 		))
@@ -606,14 +563,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			biosSettings.Spec.Version = bmc.MockedBIOSVersion
 		})).Should(Succeed())
 
-		By("Ensuring that the biosSettings resource has setting updated, and moved the state")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		checkTransistionToAppliedState(biosSettings)
 
 		By("Ensuring that the serverMaintenance not ref.")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
@@ -672,7 +622,12 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 	By("Patching the Server to available state")
 	Eventually(UpdateStatus(server, func() {
 		server.Status.State = metalv1alpha1.ServerStateAvailable
+		server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 	})).Should(Succeed())
+
+	Eventually(Object(server)).Should(SatisfyAll(
+		HaveField("Spec.ServerClaimRef", Not(BeNil())),
+	))
 
 	// unfortunately, ServerClaim force creates the bootconfig and that does not transition to completed state.
 	// in reserved state, Hence, manually move bootconfig to completed to be able to put server in powerOn state.
@@ -689,6 +644,11 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 
 	Eventually(Get(server)).Should(Succeed())
 
+	By("Patching the Server to required state")
+	Eventually(UpdateStatus(server, func() {
+		server.Status.State = metalv1alpha1.ServerStateReserved
+	})).Should(Succeed())
+
 	By("Ensuring that the Server has the spec and state")
 	Eventually(Object(server)).Should(SatisfyAll(
 		HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
@@ -696,9 +656,43 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 		HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 	))
 
-	By("Patching the Server to required power state state")
+	By("Patching the Server to required powerState")
 	Eventually(UpdateStatus(server, func() {
 		server.Status.PowerState = metalv1alpha1.ServerPowerState(powerState)
 	})).Should(Succeed())
+	By("Ensuring that the Server has right power status")
+	Eventually(Object(server)).Should(SatisfyAll(
+		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(powerState)),
+	))
 	return serverClaim
+}
+
+func checkTransistionToAppliedState(biosSettings *metalv1alpha1.BIOSSettings) {
+
+	// because of the mocking, the transistions are super fast here. can not determine the exact states
+	By("Ensuring that the BIOS setting has reached next state: issue/reboot")
+	Eventually(Object(biosSettings)).Should(SatisfyAny(
+		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateIssue),
+		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
+		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
+		HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+	))
+
+	// because of the mocking, the transistions are super fast here. can not determine the exact states
+	Eventually(Object(biosSettings)).Should(SatisfyAny(
+		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
+		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateVerification),
+		HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+	))
+
+	// because of the mocking, the transistions are super fast here. can not determine the exact states
+	Eventually(Object(biosSettings)).Should(SatisfyAny(
+		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateVerification),
+		HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+	))
+
+	// because of the mocking, the transistions are super fast here.
+	Eventually(Object(biosSettings)).Should(SatisfyAll(
+		HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+	))
 }

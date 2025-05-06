@@ -339,22 +339,35 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	}
 
 	var tBios struct {
-		Settings common.Settings `json:"@Redfish.Settings"`
+		Attributes redfish.SettingsAttributes `json:"Attributes"`
+		Settings   common.Settings            `json:"@Redfish.Settings"`
 	}
 	err = r.GetEntityFromUri(tSys.Bios.String(), system.GetClient(), &tBios)
 	if err != nil {
 		return result, err
 	}
 
-	var tBiosSetting struct {
+	var tBiosPendingSetting struct {
 		Attributes redfish.SettingsAttributes `json:"Attributes"`
 	}
-	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosSetting)
+	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosPendingSetting)
 	if err != nil {
 		return result, err
 	}
 
-	return tBiosSetting.Attributes, nil
+	// unfortunately, some vendors fill the pending attribute with copy of actual bios attribute
+	// remove if there are same
+	if len(tBios.Attributes) == len(tBiosPendingSetting.Attributes) {
+		pendingAttr := redfish.SettingsAttributes{}
+		for key, attr := range tBiosPendingSetting.Attributes {
+			if value, ok := tBios.Attributes[key]; !ok || value != attr {
+				pendingAttr[key] = attr
+			}
+		}
+		return pendingAttr, nil
+	}
+
+	return tBiosPendingSetting.Attributes, nil
 }
 
 func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
@@ -660,16 +673,16 @@ func (r *RedfishBMC) WaitForServerPowerState(
 // UpgradeBiosVersion upgrade given bios versions.
 func (r *RedfishBMC) UpgradeBiosVersion(
 	ctx context.Context,
-	UUID string,
+	manufacturer string,
 	parameters *redfish.SimpleUpdateParameters,
-) (string, error, bool) {
+) (string, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	fatal := false
 	service := r.client.GetService()
 
 	upgradeServices, err := service.UpdateService()
 	if err != nil {
-		return "", err, fatal
+		return "", fatal, err
 	}
 
 	type tActions struct {
@@ -686,25 +699,20 @@ func (r *RedfishBMC) UpgradeBiosVersion(
 
 	err = json.Unmarshal(upgradeServices.RawData, &tUS)
 	if err != nil {
-		return "", err, fatal
+		return "", fatal, err
 	}
 
-	var RequestBody struct {
-		redfish.SimpleUpdateParameters
-		RedfishOperationApplyTime redfish.OperationApplyTime `json:"@Redfish.OperationApplyTime,omitempty"`
+	oem, err := NewOEM(manufacturer, service)
+	if err != nil {
+		return "", fatal, err
 	}
 
-	// RequestBody.RedfishOperationApplyTime = redfish.ImmediateOperationApplyTime
-	RequestBody.ForceUpdate = parameters.ForceUpdate
-	RequestBody.ImageURI = parameters.ImageURI
-	RequestBody.Passord = parameters.Passord
-	RequestBody.Username = parameters.Username
-	RequestBody.Targets = parameters.Targets
-	RequestBody.TransferProtocol = parameters.TransferProtocol
+	RequestBody := oem.GetUpdateBIOSRequestBody(parameters)
 
 	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
+
 	if err != nil {
-		return "", err, fatal
+		return "", fatal, err
 	}
 	defer resp.Body.Close() // nolint: errcheck
 
@@ -718,107 +726,61 @@ func (r *RedfishBMC) UpgradeBiosVersion(
 		biosRawBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return "",
+				fatal,
 				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
 					err,
 					resp.StatusCode,
-				),
-				fatal
+				)
 		}
 		return "",
+			fatal,
 			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
 				string(biosRawBody),
 				resp.StatusCode,
-			),
-			fatal
+			)
 	}
 
-	biosRawBody, err := io.ReadAll(resp.Body)
+	taskMonitorURI, err := oem.GetUpdateBIOSTaskMonitorURI(resp)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the response body %v %v", err, biosRawBody), fatal
+		log.V(1).Error(err,
+			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
+		return "", fatal, fmt.Errorf("failed to read task monitor URI. %v", err)
 	}
 
-	// extract tasks ID to monitor it
-	var tResp struct {
-		TaskMonitor string
-	}
-	// "TaskMonitor" seems to be consistent across all vendors
-	// dell: "https://developer.dell.com/apis/2978/versions/7.xx/openapi.yaml/
-	// 			paths/~1redfish~1v1~1UpdateService~1Actions~1UpdateService.SimpleUpdate/post"
+	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
 
-	// hpe: https://developer.hpe.com/blog/hpe-firmware-updates-part-3-the-redfish-update-service/
-	// lenova: https://pubs.lenovo.com/xcc2-restapi/simple_update_firmware_post
-	err = json.Unmarshal(biosRawBody, &tResp)
-	if err != nil {
-		return tResp.TaskMonitor, err, fatal
-	}
-
-	log.V(1).Info("update has been accepted.", "Response", tResp)
-
-	return tResp.TaskMonitor, nil, false
+	return taskMonitorURI, false, nil
 }
 
 func (r *RedfishBMC) GetBiosUpgradeTask(
 	ctx context.Context,
+	manufacturer string,
 	taskURI string,
 ) (*redfish.Task, error) {
-
-	log := ctrl.LoggerFrom(ctx)
-	taskData := &redfish.Task{}
-
-	// todo: merge this login in common place after PR #298
 	respTask, err := r.client.GetService().GetClient().Get(taskURI)
 	if err != nil {
-		return taskData, err
+		return nil, err
 	}
 	defer respTask.Body.Close() // nolint: errcheck
 
 	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
 		respTaskRawBody, err := io.ReadAll(respTask.Body)
 		if err != nil {
-			return taskData,
-				fmt.Errorf("failed to get the upgrade Task dedails. and read the response body %v, statusCode %v",
+			return nil,
+				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
 					err,
 					respTask.StatusCode)
 		}
-		return taskData,
-			fmt.Errorf("failed to get the upgrade Task dedails. %v, statusCode %v",
+		return nil,
+			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
 				string(respTaskRawBody),
 				respTask.StatusCode)
 	}
 
-	respTaskRawBody, err := io.ReadAll(respTask.Body)
+	oem, err := NewOEM(manufacturer, r.client.GetService())
 	if err != nil {
-		return taskData, err
+		return nil, fmt.Errorf("failed to get oem object, %v", err)
 	}
 
-	err = json.Unmarshal(respTaskRawBody, &taskData)
-	if err != nil {
-		return taskData, err
-	}
-
-	if taskData.TaskState == "" && taskData.ODataID == "" {
-		// hpe givees error after completion of data, exptract it
-		// todo: create oem specific functions after we have PR #303
-		type errTask struct {
-			Code         string              `json:"code"`
-			Message      string              `json:"message"`
-			ExtendedInfo []map[string]string `json:"@Message.ExtendedInfo"`
-		}
-		var tTask struct {
-			Error errTask `json:"error"`
-		}
-		err = json.Unmarshal(respTaskRawBody, &tTask)
-		if err != nil {
-			return taskData, fmt.Errorf("enable to extract the completed task details %v", err)
-		}
-		if strings.Contains(tTask.Error.ExtendedInfo[0]["MessageId"], "Success") {
-			taskData.TaskState = redfish.CompletedTaskState
-			taskData.PercentComplete = 100
-			return taskData, nil
-		}
-
-		log.V(1).Info("update task in unknown state.", "TaskResponse", string(respTaskRawBody))
-		return taskData, fmt.Errorf("unable to find the state of the Task %v", string(respTaskRawBody))
-	}
-	return taskData, nil
+	return oem.GetTaskMonitorDetails(ctx, respTask)
 }

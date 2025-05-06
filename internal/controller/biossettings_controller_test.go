@@ -22,7 +22,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest()
 	ns.Name = "default"
 
-	var server *metalv1alpha1.Server
+	var (
+		defaultBiosVersion string
+		server             *metalv1alpha1.Server
+	)
 
 	BeforeEach(func(ctx SpecContext) {
 
@@ -53,7 +56,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
@@ -91,7 +93,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -115,7 +117,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 bmc.MockedBIOSVersion + "2",
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -425,13 +427,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
 
-		// because of how we mock the setting update, we can not determine the next state, Hence check for multiple
-		By("Ensuring that the BIOS setting has reached next state")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateState("")),
-		))
-
 		By("Ensuring that the Server is in Maintenance")
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
@@ -467,6 +462,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		BIOSSetting := make(map[string]string)
 		BIOSSetting["fooreboot"] = "10"
 
+		// just to double confirm the starting state here for easy readability
 		By("Ensuring that the Server has available")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
@@ -480,7 +476,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -554,8 +550,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	It("should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
-		bmcSetting := make(map[string]string)
-		bmcSetting["abc"] = "bar-wait-on-version-upgrade"
+		biosSetting := make(map[string]string)
+		biosSetting["abc"] = "bar-wait-on-version-upgrade"
 
 		// put the server in PowerOn state,
 
@@ -573,7 +569,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version:                 "2.45.455b66-rev4",
-				SettingsMap:             bmcSetting,
+				SettingsMap:             biosSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},

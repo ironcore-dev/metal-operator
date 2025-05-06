@@ -352,29 +352,37 @@ BIOSVersionSpec
 <table>
 <tr>
 <td>
-<code>biosVersionSpec</code><br/>
+<code>version</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.VersionSpec">
-VersionSpec
-</a>
+string
 </em>
 </td>
 <td>
-<p>Spec specifies the spec for upgrading BIOS for specific serverRef.</p>
+<p>Version contains BIOS version to upgrade to</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>biosSettingsRef</code><br/>
+<code>forceUpdate</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
+bool
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
 </a>
 </em>
 </td>
 <td>
-<p>BiosSettingsRef is a reference to a specific BIOSSettings object which holds settings for this version
-we use this to avoid multiple BIOS related ref on Server resources.</p>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
 </td>
 </tr>
 <tr>
@@ -392,7 +400,7 @@ Kubernetes core/v1.LocalObjectReference
 </tr>
 <tr>
 <td>
-<code>serverMaintenancePolicyType</code><br/>
+<code>serverMaintenancePolicy</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy
@@ -451,29 +459,37 @@ BIOSVersionStatus
 <tbody>
 <tr>
 <td>
-<code>biosVersionSpec</code><br/>
+<code>version</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.VersionSpec">
-VersionSpec
-</a>
+string
 </em>
 </td>
 <td>
-<p>Spec specifies the spec for upgrading BIOS for specific serverRef.</p>
+<p>Version contains BIOS version to upgrade to</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>biosSettingsRef</code><br/>
+<code>forceUpdate</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
+bool
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
 </a>
 </em>
 </td>
 <td>
-<p>BiosSettingsRef is a reference to a specific BIOSSettings object which holds settings for this version
-we use this to avoid multiple BIOS related ref on Server resources.</p>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
 </td>
 </tr>
 <tr>
@@ -491,7 +507,7 @@ Kubernetes core/v1.LocalObjectReference
 </tr>
 <tr>
 <td>
-<code>serverMaintenancePolicyType</code><br/>
+<code>serverMaintenancePolicy</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
 ServerMaintenancePolicy
@@ -532,7 +548,7 @@ Kubernetes core/v1.ObjectReference
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Completed&#34;</p></td>
-<td><p>BIOSVersionStateApplied specifies that the bios upgrade maintenance has been completed.</p>
+<td><p>BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.</p>
@@ -576,7 +592,7 @@ BIOSVersionState
 </tr>
 <tr>
 <td>
-<code>upgradeTaskStatus</code><br/>
+<code>upgradeTask</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.TaskStatus">
 TaskStatus
@@ -584,7 +600,7 @@ TaskStatus
 </em>
 </td>
 <td>
-<p>UpgradeTaskStatus contains the state of the Upgrade Task created by the BMC</p>
+<p>UpgradeTask contains the state of the Upgrade Task created by the BMC</p>
 </td>
 </tr>
 <tr>
@@ -1481,7 +1497,7 @@ net/netip.Prefix
 <h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.VersionSpec">VersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
 </p>
 <div>
 </div>
@@ -3657,64 +3673,22 @@ github.com/stmcginnis/gofish/redfish.TaskState
 </tr>
 <tr>
 <td>
+<code>taskStatus</code><br/>
+<em>
+github.com/stmcginnis/gofish/common.Health
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
 <code>percentageComplete</code><br/>
 <em>
 int
 </em>
 </td>
 <td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.VersionSpec">VersionSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Version contains BIOS version to upgrade</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>forceUpdate</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given bios version</p>
 </td>
 </tr>
 </tbody>

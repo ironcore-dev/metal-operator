@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +17,7 @@ const (
 	BIOSVersionStatePending BIOSVersionState = "Pending"
 	// BIOSVersionStateInProgress specifies that upgrading bios is in progress.
 	BIOSVersionStateInProgress BIOSVersionState = "Processing"
-	// BIOSVersionStateApplied specifies that the bios upgrade maintenance has been completed.
+	// BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.
 	BIOSVersionStateCompleted BIOSVersionState = "Completed"
 	// BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.
 	BIOSVersionStateFailed BIOSVersionState = "Failed"
@@ -24,33 +25,23 @@ const (
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
 type BIOSVersionSpec struct {
-	// Spec specifies the spec for upgrading BIOS for specific serverRef.
-	BIOSVersionSpec VersionSpec `json:"biosVersionSpec,omitempty"`
-
-	// BiosSettingsRef is a reference to a specific BIOSSettings object which holds settings for this version
-	// we use this to avoid multiple BIOS related ref on Server resources.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BiosSettingsRef is immutable"
-	BiosSettingsRef *corev1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
+	// Version contains BIOS version to upgrade to
+	// +required
+	Version string `json:"version"`
+	// An indication of whether the server's upgrade service should bypass vendor update policies
+	ForceUpdate bool `json:"forceUpdate,omitempty"`
+	// details regarding the image to use to upgrade to given BIOS version
+	Image ImageSpec `json:"image,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
 	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
-	ServerMaintenancePolicyType ServerMaintenancePolicy `json:"serverMaintenancePolicyType,omitempty"`
+	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
-}
-
-type VersionSpec struct {
-	// Version contains BIOS version to upgrade
-	// +required
-	Version string `json:"version"`
-	// An indication of whether the server's upgrade service should bypass vendor update policies
-	ForceUpdate bool `json:"forceUpdate,omitempty"`
-	// details regarding the image to use to upgrade to given bios version
-	Image ImageSpec `json:"image,omitempty"`
 }
 
 type ImageSpec struct {
@@ -69,8 +60,8 @@ type BIOSVersionStatus struct {
 	// State represents the current state of the bios configuration task.
 	State BIOSVersionState `json:"state,omitempty"`
 
-	// UpgradeTaskStatus contains the state of the Upgrade Task created by the BMC
-	UpgradeTaskStatus *TaskStatus `json:"upgradeTaskStatus,omitempty"`
+	// UpgradeTask contains the state of the Upgrade Task created by the BMC
+	UpgradeTask *TaskStatus `json:"upgradeTask,omitempty"`
 	// Conditions represents the latest available observations of the Bios version upgrade state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
@@ -81,6 +72,7 @@ type BIOSVersionStatus struct {
 type TaskStatus struct {
 	TaskURI         string            `json:"taskURI,omitempty"`
 	State           redfish.TaskState `json:"taskState,omitempty"`
+	Status          common.Health     `json:"taskStatus,omitempty"`
 	PercentComplete int               `json:"percentageComplete,omitempty"`
 }
 
@@ -90,8 +82,9 @@ type TaskStatus struct {
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosVersionSpec.version`
 // +kubebuilder:printcolumn:name="ForceUpdate",type=string,JSONPath=`.spec.biosVersionSpec.forceUpdate`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
-// +kubebuilder:printcolumn:name="UpgradeStatus",type=string,JSONPath=`.status.upgradeTaskStatus.taskState`
-// +kubebuilder:printcolumn:name="UpgradeProgress",type=integer,JSONPath=`.status.upgradeTaskStatus.percentageComplete`
+// +kubebuilder:printcolumn:name="TaskState",type=string,JSONPath=`.status.upgradeTask.taskState`
+// +kubebuilder:printcolumn:name="TaskStatus",type=string,JSONPath=`.status.upgradeTask.taskStatus`
+// +kubebuilder:printcolumn:name="TaskProgress",type=integer,JSONPath=`.status.upgradeTask.percentageComplete`
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 

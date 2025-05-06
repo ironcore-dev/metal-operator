@@ -516,7 +516,7 @@ func (r *BiosSettingsReconciler) getPendingSettingsOnBIOS(
 	}
 	defer bmcClient.Logout()
 
-	log.V(1).Info("fetching for the pending settings on bios")
+	log.V(1).Info("fetching the pending settings on bios")
 
 	pendingSettings, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemUUID)
 	if err != nil {
@@ -854,6 +854,12 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 		return nil
 	}
 
+	// no need to queue if the server is not yet in maintenance
+	// hence return early
+	if host.Spec.ServerMaintenanceRef == nil {
+		return nil
+	}
+
 	BIOSSettingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := r.List(ctx, BIOSSettingsList); err != nil {
 		log.Error(err, "failed to list biosSettings")
@@ -868,8 +874,37 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 				return nil
 			}
+			if biosSettings.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
+				return nil
+			}
 			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
+		}
+	}
+	return nil
+}
 
+func (r *BiosSettingsReconciler) enqueueBiosSettingsByBiosVersion(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	BIOSVersion := obj.(*metalv1alpha1.BIOSVersion)
+	if BIOSVersion.Status.State != metalv1alpha1.BIOSVersionStateCompleted {
+		return nil
+	}
+
+	BIOSSettingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := r.List(ctx, BIOSSettingsList); err != nil {
+		log.Error(err, "failed to list biosSettings")
+		return nil
+	}
+
+	for _, biosSettings := range BIOSSettingsList.Items {
+		if biosSettings.Spec.ServerRef.Name == BIOSVersion.Spec.ServerRef.Name {
+			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied || biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+				return nil
+			}
+			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
 		}
 	}
 	return nil

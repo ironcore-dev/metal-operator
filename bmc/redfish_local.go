@@ -248,7 +248,7 @@ func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string)
 
 func (r *RedfishLocalBMC) UpgradeBiosVersion(
 	ctx context.Context,
-	UUID string,
+	manufacturer string,
 	parameters *redfish.SimpleUpdateParameters,
 ) (string, error, bool) {
 	mockedBIOSUpgradeTaskIndex = 0
@@ -267,6 +267,7 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(
 
 func (r *RedfishLocalBMC) GetBiosUpgradeTask(
 	ctx context.Context,
+	manufacturer string,
 	taskURI string,
 ) (*redfish.Task, error) {
 	if mockedBIOSUpgradeTaskIndex > len(mockedBIOSUpgradeTaskStatus)-1 {

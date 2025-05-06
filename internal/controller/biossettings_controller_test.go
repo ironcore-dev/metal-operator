@@ -87,7 +87,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -111,7 +111,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 bmc.MockedBIOSVersion + "2",
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -480,7 +480,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P79 v1.45 (12/06/2017)",
+				Version:                 bmc.MockedBIOSVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -557,8 +557,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	It("should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
-		bmcSetting := make(map[string]string)
-		bmcSetting["abc"] = "bar-wait-on-version-upgrade"
+		biosSetting := make(map[string]string)
+		biosSetting["abc"] = "bar-wait-on-version-upgrade"
 
 		// put the server in PowerOn state,
 
@@ -571,11 +571,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-bmc-upgrade",
+				GenerateName: "test-bios-upgrade",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version:                 "2.45.455b66-rev4",
-				SettingsMap:             bmcSetting,
+				SettingsMap:             biosSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -588,7 +588,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
 		))
 
-		By("Ensuring that the biosSettings resource state is correct State inVersionUpgrade")
+		By("Ensuring that the biosSettings resource state is correct State BIOSSettingsStateInProgress")
 		Eventually(Object(biosSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 		))
@@ -672,6 +672,7 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 	By("Patching the Server to available state")
 	Eventually(UpdateStatus(server, func() {
 		server.Status.State = metalv1alpha1.ServerStateAvailable
+		server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 	})).Should(Succeed())
 
 	// unfortunately, ServerClaim force creates the bootconfig and that does not transition to completed state.
@@ -689,6 +690,11 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 
 	Eventually(Get(server)).Should(Succeed())
 
+	By("Patching the Server to required state")
+	Eventually(UpdateStatus(server, func() {
+		server.Status.State = metalv1alpha1.ServerStateReserved
+	})).Should(Succeed())
+
 	By("Ensuring that the Server has the spec and state")
 	Eventually(Object(server)).Should(SatisfyAll(
 		HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
@@ -696,9 +702,13 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 		HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 	))
 
-	By("Patching the Server to required power state state")
+	By("Patching the Server to required powerState")
 	Eventually(UpdateStatus(server, func() {
 		server.Status.PowerState = metalv1alpha1.ServerPowerState(powerState)
 	})).Should(Succeed())
+	By("Ensuring that the Server has right power status")
+	Eventually(Object(server)).Should(SatisfyAll(
+		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(powerState)),
+	))
 	return serverClaim
 }

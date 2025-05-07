@@ -25,10 +25,10 @@ Resource Types:
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to RedFish</p>
+<td><p>BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server&rsquo;s RedFish API</p>
 </td>
 </tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateVerification specifies that the bios setting has been completed.</p>
+<td><p>BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.</p>
 </td>
 </tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
 <td><p>BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.</p>
@@ -80,15 +80,25 @@ BIOSSettingsSpec
 <table>
 <tr>
 <td>
-<code>biosSettings</code><br/>
+<code>version</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.Settings">
-Settings
-</a>
+string
 </em>
 </td>
 <td>
-<p>BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
 </td>
 </tr>
 <tr>
@@ -165,15 +175,25 @@ BIOSSettingsStatus
 <tbody>
 <tr>
 <td>
-<code>biosSettings</code><br/>
+<code>version</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.Settings">
-Settings
-</a>
+string
 </em>
 </td>
 <td>
-<p>BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.</p>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
 </td>
 </tr>
 <tr>
@@ -233,16 +253,16 @@ Kubernetes core/v1.ObjectReference
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Applied&#34;</p></td>
-<td><p>BIOSSettingsStateApplied specifies that the server bios maintenance has been completed.</p>
+<td><p>BIOSSettingsStateApplied specifies that the bios setting maintenance has been completed.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>BIOSSettingsStateFailed specifies that the server maintenance has failed.</p>
+<td><p>BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
-<td><p>BIOSSettingsStateInProgress specifies that the server bios is in setting update path.</p>
+<td><p>BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings</p>
 </td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td><p>BIOSSettingsStatePending specifies that the server bios is in setting update path.</p>
+<td><p>BIOSSettingsStatePending specifies that the bios setting maintenance is waiting</p>
 </td>
 </tr></tbody>
 </table>
@@ -2850,46 +2870,6 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the server&rsquo;s current state.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.Settings">Settings
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Version contains BIOS version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settings</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SettingsMap contains bios settings as map</p>
 </td>
 </tr>
 </tbody>

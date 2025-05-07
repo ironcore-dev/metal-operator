@@ -291,10 +291,9 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	return result, err
 }
 
-func (r *RedfishBMC) GetPendingAttributeValues(
+func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	ctx context.Context,
 	systemUUID string,
-	attributes []string,
 ) (
 	result redfish.SettingsAttributes,
 	err error,
@@ -305,8 +304,8 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 	}
 
 	var tSys struct {
-		redfish.ComputerSystem
-		Bios common.Link
+		Bios        common.Link
+		BiosVersion string
 	}
 
 	err = json.Unmarshal(system.RawData, &tSys)
@@ -317,35 +316,7 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 	var tBios struct {
 		Settings common.Settings `json:"@Redfish.Settings"`
 	}
-
-	biosResp, err := system.GetClient().Get(tSys.Bios.String())
-	if err != nil {
-		return result, err
-	}
-	defer biosResp.Body.Close() // nolint: errcheck
-
-	biosRawBody, err := io.ReadAll(biosResp.Body)
-	if err != nil {
-		return result, err
-	}
-
-	err = json.Unmarshal(biosRawBody, &tBios)
-	if err != nil {
-		return result, err
-	}
-
-	// todo: might need to use bios here rather that system
-	// bios, err := system.Bios()
-	// if err != nil {
-	// 	return
-	// }
-	respBiosSetting, err := system.GetClient().Get(tBios.Settings.SettingsObject.String())
-	if err != nil {
-		return result, err
-	}
-	defer respBiosSetting.Body.Close() // nolint: errcheck
-
-	biosSettingRawBody, err := io.ReadAll(respBiosSetting.Body)
+	err = r.GetEntityFromUri(tSys.Bios.String(), system.GetClient(), &tBios)
 	if err != nil {
 		return result, err
 	}
@@ -353,13 +324,26 @@ func (r *RedfishBMC) GetPendingAttributeValues(
 	var tBiosSetting struct {
 		Attributes redfish.SettingsAttributes `json:"Attributes"`
 	}
-
-	err = json.Unmarshal(biosSettingRawBody, &tBiosSetting)
+	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosSetting)
 	if err != nil {
 		return result, err
 	}
 
 	return tBiosSetting.Attributes, nil
+}
+
+func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
+	Resp, err := client.Get(uri)
+	if err != nil {
+		return err
+	}
+	defer Resp.Body.Close() // nolint: errcheck
+
+	RespRawBody, err := io.ReadAll(Resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(RespRawBody, &entity)
 }
 
 // SetBiosAttributesOnReset sets given bios attributes.
@@ -434,10 +418,10 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (rese
 	if err != nil {
 		return reset, err
 	}
-	return r.checkBiosAttribues(attrs, filtered)
+	return r.checkAttribues(attrs, filtered)
 }
 
-func (r *RedfishBMC) checkBiosAttribues(
+func (r *RedfishBMC) checkAttribues(
 	attrs redfish.SettingsAttributes,
 	filtered map[string]RegistryEntryAttributes,
 ) (reset bool, err error) {

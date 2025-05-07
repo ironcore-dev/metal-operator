@@ -17,6 +17,8 @@ var defaultMockedBIOSSetting = map[string]map[string]any{
 	"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 }
 
+var pendingMockedBIOSSetting = map[string]map[string]any{}
+
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishLocalBMC struct {
 	*RedfishBMC
@@ -46,6 +48,18 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 	if err := system.Patch(systemURI, system); err != nil {
 		return fmt.Errorf("failed to set power state %s for system %s: %w", redfish.OnPowerState, systemUUID, err)
 	}
+
+	// mock the bmc update here
+	if len(pendingMockedBIOSSetting) > 0 {
+
+		for key, data := range pendingMockedBIOSSetting {
+			if _, ok := defaultMockedBIOSSetting[key]; ok {
+				defaultMockedBIOSSetting[key] = data
+			}
+		}
+		pendingMockedBIOSSetting = map[string]map[string]any{}
+		r.StoredBIOSSettingData = defaultMockedBIOSSetting
+	}
 	return nil
 }
 
@@ -62,6 +76,26 @@ func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error 
 	return nil
 }
 
+func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(
+	ctx context.Context,
+	systemUUID string,
+) (
+	redfish.SettingsAttributes,
+	error,
+) {
+	if len(pendingMockedBIOSSetting) == 0 {
+		return redfish.SettingsAttributes{}, nil
+	}
+
+	result := make(redfish.SettingsAttributes, len(pendingMockedBIOSSetting))
+
+	for key, data := range pendingMockedBIOSSetting {
+		result[key] = data["value"]
+	}
+
+	return result, nil
+}
+
 // mock SetBiosAttributesOnReset sets given bios attributes for unit testing.
 func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 	ctx context.Context,
@@ -72,12 +106,24 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 		defaultMockedBIOSSetting = map[string]map[string]any{}
 	}
 
+	pendingMockedBIOSSetting = map[string]map[string]any{}
 	for key, attrData := range attributes {
 		if AttributesData, ok := defaultMockedBIOSSetting[key]; ok {
-			AttributesData["value"] = attrData
+			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {
+				// if reboot not needed, set the attribute immediately.
+				AttributesData["value"] = attrData
+			} else {
+				// if reboot needed, set the attribute at next power on.
+				pendingMockedBIOSSetting[key] = map[string]any{
+					"type":   AttributesData["type"],
+					"reboot": AttributesData["reboot"],
+					"value":  attrData,
+				}
+			}
 		}
 	}
-	r.StoredBMCSettingData = defaultMockedBIOSSetting
+	r.StoredBIOSSettingData = defaultMockedBIOSSetting
+
 	return nil
 }
 
@@ -89,6 +135,7 @@ func (r *RedfishLocalBMC) getMockedBIOSSettingData() map[string]map[string]any {
 	return defaultMockedBIOSSetting
 
 }
+
 func (r *RedfishLocalBMC) GetBiosAttributeValues(
 	ctx context.Context,
 	systemUUID string,
@@ -156,5 +203,5 @@ func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) 
 	if len(filtered) == 0 {
 		return reset, err
 	}
-	return r.checkBiosAttribues(attrs, filtered)
+	return r.checkAttribues(attrs, filtered)
 }

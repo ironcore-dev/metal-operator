@@ -8,16 +8,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // BIOSSettingsSpec defines the desired state of BIOSSettings.
 type BIOSSettingsSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Version contains software (eg: BIOS, BMC) version this settings applies to
+	// +required
+	Version string `json:"version"`
 
-	// BIOSSettings specifies the BIOS settings for the selected serverRef or serverSelector.
-	BIOSSettings Settings `json:"biosSettings,omitempty"`
+	// SettingsMap contains software (eg: BIOS, BMC) settings as map
+	// +optional
+	SettingsMap map[string]string `json:"settings,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
@@ -30,27 +29,17 @@ type BIOSSettingsSpec struct {
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
-type Settings struct {
-	// Version contains BIOS version this settings applies to
-	// +required
-	Version string `json:"version"`
-
-	// SettingsMap contains bios settings as map
-	// +optional
-	SettingsMap map[string]string `json:"settings,omitempty"`
-}
-
 // BIOSSettingsState specifies the current state of the BIOS maintenance.
 type BIOSSettingsState string
 
 const (
-	// BIOSSettingsStatePending specifies that the server bios is in setting update path.
+	// BIOSSettingsStatePending specifies that the bios setting maintenance is waiting
 	BIOSSettingsStatePending BIOSSettingsState = "Pending"
-	// BIOSSettingsStateInProgress specifies that the server bios is in setting update path.
+	// BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings
 	BIOSSettingsStateInProgress BIOSSettingsState = "InProgress"
-	// BIOSSettingsStateApplied specifies that the server bios maintenance has been completed.
+	// BIOSSettingsStateApplied specifies that the bios setting maintenance has been completed.
 	BIOSSettingsStateApplied BIOSSettingsState = "Applied"
-	// BIOSSettingsStateFailed specifies that the server maintenance has failed.
+	// BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.
 	BIOSSettingsStateFailed BIOSSettingsState = "Failed"
 )
 
@@ -61,9 +50,9 @@ const (
 	BIOSSettingUpdateWaitOnServerRebootPowerOff BIOSSettingUpdateState = "WaitOnServerRebootPowerOff"
 	// BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.
 	BIOSSettingUpdateWaitOnServerRebootPowerOn BIOSSettingUpdateState = "WaitOnServerRebootPowerOn"
-	// BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to RedFish
+	// BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server's RedFish API
 	BIOSSettingUpdateStateIssue BIOSSettingUpdateState = "IssueSettingUpdate"
-	// BIOSSettingUpdateStateVerification specifies that the bios setting has been completed.
+	// BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.
 	BIOSSettingUpdateStateVerification BIOSSettingUpdateState = "VerifySettingUpdate"
 )
 

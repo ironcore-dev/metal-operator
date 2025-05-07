@@ -224,12 +224,33 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
 	}
+
 	memoryString := fmt.Sprintf("%.fGi", system.MemorySummary.TotalSystemMemoryGiB)
 	quantity, err := resource.ParseQuantity(memoryString)
-
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
+
+	systemProcessors, err := system.Processors()
+	if err != nil {
+		return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
+	}
+
+	processors := make([]Processor, 0, len(systemProcessors))
+	for _, p := range systemProcessors {
+		processors = append(processors, Processor{
+			ID:             p.ID,
+			Type:           string(p.ProcessorType),
+			Architecture:   string(p.ProcessorArchitecture),
+			InstructionSet: string(p.InstructionSet),
+			Manufacturer:   p.Manufacturer,
+			Model:          p.Model,
+			MaxSpeedMHz:    int32(p.MaxSpeedMHz),
+			TotalCores:     int32(p.TotalCores),
+			TotalThreads:   int32(p.TotalThreads),
+		})
+	}
+
 	return SystemInfo{
 		SystemUUID:        system.UUID,
 		Manufacturer:      system.Manufacturer,
@@ -240,6 +261,7 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 		SKU:               system.SKU,
 		IndicatorLED:      string(system.IndicatorLED),
 		TotalSystemMemory: quantity,
+		Processors:        processors,
 	}, nil
 }
 

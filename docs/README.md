@@ -39,7 +39,7 @@ The `metal-operator` relies on **BMCs and the Redfish API** to handle bare metal
 - **Controllers**: Automate lifecycle management through Redfish-enabled interactions, from provisioning to decommissioning.
 - **Reconcilers**: Ensure the desired state matches the actual state by continuously monitoring hardware via BMC integrations.
 
-### Architecture Overview
+### [Architecture Overview](architecture.md)
 
 1. **Discovery**: Register new bare metal servers through BMCs and Redfish API, creating CRDs for streamlined management.
 2. **Provisioning**: Apply software images and configurations using Redfish API, based on templates or custom configurations.

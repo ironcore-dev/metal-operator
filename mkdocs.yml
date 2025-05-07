@@ -58,6 +58,9 @@ nav:
     - ServerClaims: concepts/serverclaims.md
     - ServerMaintenance: concepts/servermaintenance.md
     - BIOSSettings: concepts/biossettings.md
+    - BIOSVersion: concepts/biosversion.md
+    - BMCSettings: concepts/bmcsettings.md
+    - BMCVersion: concepts/bmcversion.md
 - Usage:
   - metalctl: usage/metalctl.md
 - Development Guide:

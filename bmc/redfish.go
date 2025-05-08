@@ -385,7 +385,7 @@ func (r *RedfishBMC) GetBMCAttributeValues(
 	return oemManager.GetOEMBMCSettingAttribute(attributes)
 }
 
-func (r *RedfishBMC) GetBIOSPendingAttributeValues(
+func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	ctx context.Context,
 	systemUUID string,
 ) (
@@ -479,25 +479,6 @@ func (r *RedfishBMC) GetBMCPendingAttributeValues(
 	}
 
 	return oemManager.GetBMCPendingAttributeValues()
-}
-
-func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
-	Resp, err := client.Get(uri)
-	if err != nil {
-		return err
-	}
-	defer Resp.Body.Close() // nolint: errcheck
-
-	RespRawBody, err := io.ReadAll(Resp.Body)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(RespRawBody, &entity)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // SetBiosAttributesOnReset sets given bios attributes.

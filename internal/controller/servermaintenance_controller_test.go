@@ -68,7 +68,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				Name:      "test-server-maintenance",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
+					metalv1alpha1.ServerMaintenanceReasonKey: "test-maintenance",
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
@@ -102,7 +102,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				Name:      "test-server-maintenance",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
+					metalv1alpha1.ServerMaintenanceReasonKey: "test-maintenance",
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
@@ -154,9 +154,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		})).Should(Succeed())
 
 		maintenanceLabels := map[string]string{
-			metalv1alpha1.ServerMaintenanceNeededLabelKey:      "true",
-			metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
-			metalv1alpha1.ServerMaintenanceApprovalKey:         "true",
+			metalv1alpha1.ServerMaintenanceNeededKey:   "true",
+			metalv1alpha1.ServerMaintenanceReasonKey:   "test-maintenance",
+			metalv1alpha1.ServerMaintenanceApprovalKey: "true",
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance.Name),
@@ -198,7 +198,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		))
 		By("Checking the ServerClaim is cleaned up")
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
-			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededLabelKey))),
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededKey))),
 		))
 	})
 
@@ -210,7 +210,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				Name:      "test-server-maintenance01",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
+					metalv1alpha1.ServerMaintenanceReasonKey: "test-maintenance",
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
@@ -231,7 +231,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				Name:      "test-server-maintenance02",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
+					metalv1alpha1.ServerMaintenanceReasonKey: "test-maintenance",
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{

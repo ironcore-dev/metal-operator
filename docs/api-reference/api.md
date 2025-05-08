@@ -1357,6 +1357,123 @@ string
 </td>
 </tr></tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.Processor">Processor
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
+</p>
+<div>
+<p>Processor defines the details of a Processor.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>id</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ID is the name of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Type is the type of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>architecture</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Architecture is the architecture of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instructionSet</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>InstructionSet is the instruction set of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>manufacturer</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Manufacturer is the manufacturer of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>model</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Model is the model of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxSpeedMHz</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>MaxSpeedMHz is the maximum speed of the Processor in MHz.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>totalCores</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>TotalCores is the total number of cores in the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>totalThreads</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>TotalThreads is the total number of threads in the Processor.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.Protocol">Protocol
 </h3>
 <p>
@@ -2843,6 +2960,19 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </td>
 <td>
 <p>TotalSystemMemory is the total amount of memory in bytes available on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>processors</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Processor">
+[]Processor
+</a>
+</em>
+</td>
+<td>
+<p>Processors is a list of Processors associated with the server.</p>
 </td>
 </tr>
 <tr>

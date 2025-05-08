@@ -504,6 +504,21 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
 
+	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
+	for _, processor := range systemInfo.Processors {
+		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
+			ID:             processor.ID,
+			Type:           processor.Type,
+			Architecture:   processor.Architecture,
+			InstructionSet: processor.InstructionSet,
+			Manufacturer:   processor.Manufacturer,
+			Model:          processor.Model,
+			MaxSpeedMHz:    processor.MaxSpeedMHz,
+			TotalCores:     processor.TotalCores,
+			TotalThreads:   processor.TotalThreads,
+		})
+	}
+
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
 	}

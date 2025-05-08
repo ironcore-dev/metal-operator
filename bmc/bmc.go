@@ -184,16 +184,26 @@ const (
 	PoweringOffPowerState PowerState = "PoweringOff"
 )
 
+// Processor represents a processor in the system.
 type Processor struct {
-	ID                    string
-	ProcessorType         string
-	ProcessorArchitecture string
-	InstructionSet        string
-	Manufacturer          string
-	Model                 string
-	MaxSpeedMHz           int32
-	TotalCores            int32
-	TotalThreads          int32
+	// ID uniquely identifies the resource.
+	ID string
+	// Type specifies the type of processor.
+	Type string
+	// Architecture specifies the architecture of the processor.
+	Architecture string
+	// InstructionSet specifies the instruction set of the processor.
+	InstructionSet string
+	// Manufacturer specifies the manufacturer of the processor.
+	Manufacturer string
+	// Model specifies the model of the processor.
+	Model string
+	// MaxSpeedMHz specifies the maximum speed of the processor in MHz.
+	MaxSpeedMHz int32
+	// TotalCores specifies the total number of cores in the processor.
+	TotalCores int32
+	// TotalThreads specifies the total number of threads in the processor.
+	TotalThreads int32
 }
 
 // SystemInfo represents basic information about the system.

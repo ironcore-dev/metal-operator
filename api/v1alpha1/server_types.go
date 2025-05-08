@@ -194,6 +194,9 @@ type ServerStatus struct {
 	// TotalSystemMemory is the total amount of memory in bytes available on the server.
 	TotalSystemMemory *resource.Quantity `json:"totalSystemMemory,omitempty"`
 
+	// Processors is a list of Processors associated with the server.
+	Processors []Processor `json:"processors,omitempty"`
+
 	// Storages is a list of storages associated with the server.
 	Storages []Storage `json:"storages,omitempty"`
 
@@ -202,6 +205,28 @@ type ServerStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// Processor defines the details of a Processor.
+type Processor struct {
+	// ID is the name of the Processor.
+	ID string `json:"id"`
+	// Type is the type of the Processor.
+	Type string `json:"type,omitempty"`
+	// Architecture is the architecture of the Processor.
+	Architecture string `json:"architecture,omitempty"`
+	// InstructionSet is the instruction set of the Processor.
+	InstructionSet string `json:"instructionSet,omitempty"`
+	// Manufacturer is the manufacturer of the Processor.
+	Manufacturer string `json:"manufacturer,omitempty"`
+	// Model is the model of the Processor.
+	Model string `json:"model,omitempty"`
+	// MaxSpeedMHz is the maximum speed of the Processor in MHz.
+	MaxSpeedMHz int32 `json:"maxSpeedMHz,omitempty"`
+	// TotalCores is the total number of cores in the Processor.
+	TotalCores int32 `json:"totalCores,omitempty"`
+	// TotalThreads is the total number of threads in the Processor.
+	TotalThreads int32 `json:"totalThreads,omitempty"`
 }
 
 // NetworkInterface defines the details of a network interface.

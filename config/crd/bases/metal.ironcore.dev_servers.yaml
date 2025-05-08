@@ -469,6 +469,49 @@ spec:
                 description: PowerState represents the current power state of the
                   server.
                 type: string
+              processors:
+                description: Processors is a list of Processors associated with the
+                  server.
+                items:
+                  description: Processor defines the details of a Processor.
+                  properties:
+                    architecture:
+                      description: Architecture is the architecture of the Processor.
+                      type: string
+                    id:
+                      description: ID is the name of the Processor.
+                      type: string
+                    instructionSet:
+                      description: InstructionSet is the instruction set of the Processor.
+                      type: string
+                    manufacturer:
+                      description: Manufacturer is the manufacturer of the Processor.
+                      type: string
+                    maxSpeedMHz:
+                      description: MaxSpeedMHz is the maximum speed of the Processor
+                        in MHz.
+                      format: int32
+                      type: integer
+                    model:
+                      description: Model is the model of the Processor.
+                      type: string
+                    totalCores:
+                      description: TotalCores is the total number of cores in the
+                        Processor.
+                      format: int32
+                      type: integer
+                    totalThreads:
+                      description: TotalThreads is the total number of threads in
+                        the Processor.
+                      format: int32
+                      type: integer
+                    type:
+                      description: Type is the type of the Processor.
+                      type: string
+                  required:
+                  - id
+                  type: object
+                type: array
               serialNumber:
                 description: SerialNumber is the serial number of the server.
                 type: string

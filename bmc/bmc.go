@@ -302,17 +302,18 @@ type OEMManager struct {
 	OEMManagerInterface
 }
 
-func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (*OEMManager, error) {
+func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerInterface, error) {
+	var OEMManager OEMManagerInterface
 	switch ooem.Manufacturer {
 	case string(DellServers):
-		return &OEMManager{
-			OEMManagerInterface: &oem.DellIdracManager{
-				BMC:     ooem,
-				Service: service,
-			}}, nil
+		OEMManager = &oem.DellIdracManager{
+			BMC:     ooem,
+			Service: service,
+		}
 	default:
-		return &OEMManager{}, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
+		return nil, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
 	}
+	return OEMManager, nil
 }
 
 type OEMInterface interface {

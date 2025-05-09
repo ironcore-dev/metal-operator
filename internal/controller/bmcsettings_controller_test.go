@@ -18,6 +18,8 @@ import (
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+
+	bmcPkg "github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BMCSettings Controller", func() {
@@ -79,6 +81,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
+		bmcPkg.PendingMockedBMCSetting = map[string]map[string]any{}
 	})
 
 	It("should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
@@ -145,9 +148,15 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 	})
 
-	It("should update the setting if BMCSettings changes requested", func(ctx SpecContext) {
+	It("should update the setting if BMCSettings changes requested in Available State", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 		bmcSetting["abc"] = "changed-bmc-setting"
+
+		By("update the server state to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
 
 		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{
@@ -167,12 +176,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: bmcSettings.Name}),
-		))
-
-		By("Ensuring that the BMCSettings has reached next state")
-		Eventually(Object(bmcSettings)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
 		By("Ensuring that the Maintenance resource has been referenced by BMCSettings resource")
@@ -180,67 +183,11 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
 		))
 
-		Eventually(Object(bmcSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
-		))
-
-		By("Deleting the BMCSettings")
-		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
-
-		By("Ensuring that the BMCSettings ref is empty on BMC")
-		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
-		))
-	})
-
-	It("should not create maintenance if policy is enforced", func(ctx SpecContext) {
-		bmcSetting := make(map[string]string)
-		bmcSetting["fooreboot"] = "214"
-
-		By("Creating a BMCSetting")
-		bmcSettings := &metalv1alpha1.BMCSettings{
-
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-bmc-change",
-			},
-			Spec: metalv1alpha1.BMCSettingsSpec{
-				Version:                 "1.45.455b66-rev4",
-				SettingsMap:             bmcSetting,
-				BMCRef:                  &v1.LocalObjectReference{Name: bmc.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-			},
-		}
-		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
-
-		By("Ensuring that the BMC has the BMCSettings ref")
-		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: bmcSettings.Name}),
-		))
-
-		By("Ensuring that the Maintenance resource has not been created")
-		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
-
-		By("Ensuring that the Maintenance resource has not been referenced by BMCSettings resource")
-		Consistently(Object(bmcSettings)).Should(SatisfyAll(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
-		))
-
-		By("Ensuring that the state refects updating settings state")
+		By("Ensuring that the BMCSettings has reached next state")
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
-
-		By("Ensuring that the Maintenance resource has not been created")
-		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
-
-		By("Ensuring that the Maintenance resource has not been referenced by BMCSettings resource")
-		Consistently(Object(bmcSettings)).Should(SatisfyAll(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
-		))
-
 		Eventually(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
@@ -254,7 +201,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 	})
 
-	It("should create maintenance if policy is Ownerapproved", func(ctx SpecContext) {
+	It("should create maintenance and wait for its approval before applying settings", func(ctx SpecContext) {
 
 		bmcSetting := make(map[string]string)
 		bmcSetting["abc"] = "changed-to-req-server-maintenance-through-Ownerapproved"
@@ -331,6 +278,11 @@ var _ = Describe("BMCSettings Controller", func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
 
+		Eventually(Object(bmcSettings)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
 		Eventually(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
@@ -354,6 +306,12 @@ var _ = Describe("BMCSettings Controller", func() {
 	It("should wait for upgrade and reconcile BMCSettings version is correct", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"
+
+		By("update the server state to Available  state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
 
 		By("Creating a BMCSetting")
 		BMCSettings := &metalv1alpha1.BMCSettings{
@@ -381,7 +339,7 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 		))
 
-		By("Ensuring that the serverMaintenance not ref.")
+		By("Ensuring that the serverMaintenance not ref. while waiting for upgrade")
 		Consistently(Object(BMCSettings)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
 		))
@@ -394,13 +352,29 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Ensuring that the BMCSettings resource has completed Upgrade and setting update, and moved the state")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+		))
+
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      fmt.Sprintf("%s-%s", BMCSettings.Name, server.Name),
+			},
+		}
+		checkServerMaintenanceGranted(serverMaintenance, server)
+
+		By("Ensuring that the BMCSettings resource hasmoved to next state")
+		Eventually(Object(BMCSettings)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 		Eventually(Object(BMCSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
-		By("Ensuring that the serverMaintenance not ref.")
+		By("Ensuring that the Maintenance resource has been deleted")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(Object(BMCSettings)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
 		))

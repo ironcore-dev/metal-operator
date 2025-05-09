@@ -1053,7 +1053,7 @@ ServerMaintenancePolicy
 <p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
 ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
 note: User approval is only enforced for server&rsquo;s which are reserved state
-ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.</p>
+ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
 </td>
 </tr>
 <tr>
@@ -1152,7 +1152,7 @@ ServerMaintenancePolicy
 <p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
 ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
 note: User approval is only enforced for server&rsquo;s which are reserved state
-ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.</p>
+ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
 </td>
 </tr>
 <tr>

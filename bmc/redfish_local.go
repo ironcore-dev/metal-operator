@@ -20,7 +20,7 @@ var defaultMockedBMCSetting = map[string]map[string]any{
 	"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
 }
 
-var pendingMockedBMCSetting = map[string]map[string]any{}
+var PendingMockedBMCSetting = map[string]map[string]any{}
 
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishLocalBMC struct {
@@ -256,14 +256,14 @@ func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetTy
 
 	// mock the bmc update here with timed delay
 	go func() {
-		if len(pendingMockedBMCSetting) > 0 {
+		if len(PendingMockedBMCSetting) > 0 {
 			time.Sleep(1 * time.Second)
-			for key, data := range pendingMockedBMCSetting {
+			for key, data := range PendingMockedBMCSetting {
 				if _, ok := defaultMockedBMCSetting[key]; ok {
 					defaultMockedBMCSetting[key] = data
 				}
 			}
-			pendingMockedBMCSetting = map[string]map[string]any{}
+			PendingMockedBMCSetting = map[string]map[string]any{}
 			r.StoredBMCSettingData = defaultMockedBMCSetting
 		}
 	}()
@@ -293,7 +293,7 @@ func (r *RedfishLocalBMC) SetBMCAttributesImediately(
 				AttributesData["value"] = attrData
 			} else {
 				// if reboot needed, set the attribute at next power on.
-				pendingMockedBMCSetting[key] = map[string]any{
+				PendingMockedBMCSetting[key] = map[string]any{
 					"type":   AttributesData["type"],
 					"reboot": AttributesData["reboot"],
 					"value":  attrData,
@@ -352,13 +352,13 @@ func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(
 	redfish.SettingsAttributes,
 	error,
 ) {
-	if len(pendingMockedBMCSetting) == 0 {
+	if len(PendingMockedBMCSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pendingMockedBMCSetting))
+	result := make(redfish.SettingsAttributes, len(PendingMockedBMCSetting))
 
-	for key, data := range pendingMockedBMCSetting {
+	for key, data := range PendingMockedBMCSetting {
 		result[key] = data["value"]
 	}
 

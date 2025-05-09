@@ -289,7 +289,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 		return ctrl.Result{}, nil
 	}
 
-	if req, err := r.checkAndRequestMaintenance(ctx, log, bmcSetting); err != nil || req {
+	if req, err := r.requestMaintenanceOnServers(ctx, log, bmcSetting); err != nil || req {
 		return ctrl.Result{}, err
 	}
 
@@ -300,33 +300,6 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	}
 
 	return r.updateSettingsAndVerify(ctx, log, bmcSetting, BMC, settingsDiff)
-}
-
-func (r *BMCSettingsReconciler) checkAndRequestMaintenance(
-	ctx context.Context,
-	log logr.Logger,
-	bmcSetting *metalv1alpha1.BMCSettings,
-) (bool, error) {
-
-	if bmcSetting.Spec.ServerMaintenancePolicy == metalv1alpha1.ServerMaintenancePolicyEnforced {
-		return false, nil
-	}
-
-	// check if we need to request maintenance if we dont have it already
-	servers, err := r.getServers(ctx, log, bmcSetting)
-	if err != nil {
-		return false, err
-	}
-
-	if bmcSetting.Spec.ServerMaintenanceRefList == nil || len(bmcSetting.Spec.ServerMaintenanceRefList) != len(servers) {
-		// if owner approval is requested. request maintenance irrespective of we need it or not.
-		if bmcSetting.Spec.ServerMaintenancePolicy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
-			// request maintenance on server if needed, even if err was reported.
-			requeue, errMainReq := r.requestMaintenanceOnServers(ctx, log, bmcSetting)
-			return requeue, errors.Join(err, errMainReq)
-		}
-	}
-	return false, nil
 }
 
 func (r *BMCSettingsReconciler) updateSettingsAndVerify(
@@ -571,16 +544,13 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	}
 
 	// if Server maintenance ref is already given. no further action required.
-	// if policy is not OwnerApproval, no further action
-	if (bmcSetting.Spec.ServerMaintenanceRefList != nil && len(bmcSetting.Spec.ServerMaintenanceRefList) == len(servers)) ||
-		bmcSetting.Spec.ServerMaintenancePolicy == metalv1alpha1.ServerMaintenancePolicyEnforced {
+	if bmcSetting.Spec.ServerMaintenanceRefList != nil && len(bmcSetting.Spec.ServerMaintenanceRefList) == len(servers) {
 		return false, nil
 	}
 
 	var errs []error
 	serverMaintenanceRefList := make([]metalv1alpha1.ServerMaintenanceRefList, 0, len(servers))
 	for _, server := range servers {
-
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: r.ManagerNamespace,

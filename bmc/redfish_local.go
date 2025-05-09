@@ -24,9 +24,9 @@ var defaultMockedBIOSSetting = map[string]map[string]any{
 	"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 }
 
-var pendingMockedBIOSSetting = map[string]map[string]any{}
+var PendingMockedBIOSSetting = map[string]map[string]any{}
 
-var pendingMockedBMCSetting = map[string]map[string]any{}
+var PendingMockedBMCSetting = map[string]map[string]any{}
 
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishLocalBMC struct {
@@ -59,14 +59,14 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 	}
 
 	// mock the bmc update here
-	if len(pendingMockedBIOSSetting) > 0 {
+	if len(PendingMockedBIOSSetting) > 0 {
 
-		for key, data := range pendingMockedBIOSSetting {
+		for key, data := range PendingMockedBIOSSetting {
 			if _, ok := defaultMockedBIOSSetting[key]; ok {
 				defaultMockedBIOSSetting[key] = data
 			}
 		}
-		pendingMockedBIOSSetting = map[string]map[string]any{}
+		PendingMockedBIOSSetting = map[string]map[string]any{}
 		r.StoredBIOSSettingData = defaultMockedBIOSSetting
 	}
 	return nil
@@ -92,13 +92,13 @@ func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(
 	redfish.SettingsAttributes,
 	error,
 ) {
-	if len(pendingMockedBIOSSetting) == 0 {
+	if len(PendingMockedBIOSSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pendingMockedBIOSSetting))
+	result := make(redfish.SettingsAttributes, len(PendingMockedBIOSSetting))
 
-	for key, data := range pendingMockedBIOSSetting {
+	for key, data := range PendingMockedBIOSSetting {
 		result[key] = data["value"]
 	}
 
@@ -115,7 +115,7 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 		defaultMockedBIOSSetting = map[string]map[string]any{}
 	}
 
-	pendingMockedBIOSSetting = map[string]map[string]any{}
+	PendingMockedBIOSSetting = map[string]map[string]any{}
 	for key, attrData := range attributes {
 		if AttributesData, ok := defaultMockedBIOSSetting[key]; ok {
 			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {
@@ -123,7 +123,7 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 				AttributesData["value"] = attrData
 			} else {
 				// if reboot needed, set the attribute at next power on.
-				pendingMockedBIOSSetting[key] = map[string]any{
+				PendingMockedBIOSSetting[key] = map[string]any{
 					"type":   AttributesData["type"],
 					"reboot": AttributesData["reboot"],
 					"value":  attrData,
@@ -219,14 +219,14 @@ func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetTy
 
 	// mock the bmc update here with timed delay
 	go func() {
-		if len(pendingMockedBMCSetting) > 0 {
+		if len(PendingMockedBMCSetting) > 0 {
 			time.Sleep(1 * time.Second)
-			for key, data := range pendingMockedBMCSetting {
+			for key, data := range PendingMockedBMCSetting {
 				if _, ok := defaultMockedBMCSetting[key]; ok {
 					defaultMockedBMCSetting[key] = data
 				}
 			}
-			pendingMockedBMCSetting = map[string]map[string]any{}
+			PendingMockedBMCSetting = map[string]map[string]any{}
 			r.StoredBMCSettingData = defaultMockedBMCSetting
 		}
 	}()
@@ -256,7 +256,7 @@ func (r *RedfishLocalBMC) SetBMCAttributesImediately(
 				AttributesData["value"] = attrData
 			} else {
 				// if reboot needed, set the attribute at next power on.
-				pendingMockedBMCSetting[key] = map[string]any{
+				PendingMockedBMCSetting[key] = map[string]any{
 					"type":   AttributesData["type"],
 					"reboot": AttributesData["reboot"],
 					"value":  attrData,
@@ -315,13 +315,13 @@ func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(
 	redfish.SettingsAttributes,
 	error,
 ) {
-	if len(pendingMockedBMCSetting) == 0 {
+	if len(PendingMockedBMCSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pendingMockedBMCSetting))
+	result := make(redfish.SettingsAttributes, len(PendingMockedBMCSetting))
 
-	for key, data := range pendingMockedBMCSetting {
+	for key, data := range PendingMockedBMCSetting {
 		result[key] = data["value"]
 	}
 

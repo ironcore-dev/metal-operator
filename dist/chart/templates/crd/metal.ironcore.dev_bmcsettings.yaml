@@ -82,7 +82,7 @@ spec:
                   enforced on the server when applying setting.\nServerMaintenancePolicyOwnerApproval
                   is asking for User approval for changing BMC settings\n\tnote: User
                   approval is only enforced for server's which are reserved state\nServerMaintenancePolicyEnforced
-                  will not create a maintenance request even if bmc reboot is needed."
+                  will will bypass user approval and apply setting directly"
                 type: string
               serverMaintenanceRefList:
                 description: ServerMaintenanceRefList are references to a ServerMaintenance

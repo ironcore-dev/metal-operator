@@ -280,7 +280,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 		return ctrl.Result{}, nil
 	}
 
-	if req, err := r.checkAndRequestMaintenance(ctx, log, biosSettings, server, settingsDiff); err != nil || req {
+	if req, err := r.requestMaintenanceOnServer(ctx, log, biosSettings, server); err != nil || req {
 		return ctrl.Result{}, err
 	}
 
@@ -291,35 +291,6 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	}
 
 	return r.applySettingUpdateStateTransition(ctx, log, biosSettings, server, settingsDiff)
-}
-
-func (r *BiosSettingsReconciler) checkAndRequestMaintenance(
-	ctx context.Context,
-	log logr.Logger,
-	biosSettings *metalv1alpha1.BIOSSettings,
-	server *metalv1alpha1.Server,
-	settingsDiff redfish.SettingsAttributes,
-) (bool, error) {
-	// check if we need to request maintenance if we dont have it already
-	// note: having this check will reduce the call made to BMC.
-	if biosSettings.Spec.ServerMaintenanceRef == nil {
-		bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-		if err != nil {
-			return false, err
-		}
-		defer bmcClient.Logout()
-
-		resetReq, err := bmcClient.CheckBiosAttributes(settingsDiff)
-		if resetReq {
-			// request maintenance if needed, even if err was reported.
-			requeue, errMainReq := r.requestMaintenanceOnServer(ctx, log, biosSettings, server)
-			return requeue, errors.Join(err, errMainReq)
-		}
-		if err != nil {
-			return false, fmt.Errorf("failed to check BMC settings provided: %w", err)
-		}
-	}
-	return false, nil
 }
 
 func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
@@ -391,12 +362,17 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			return ctrl.Result{}, err
 		}
 
-		// if we dont need (have not requested maintenance) reboot. skip reboot steps.
-		nextState := metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff
-		if biosSettings.Spec.ServerMaintenanceRef == nil {
-			nextState = metalv1alpha1.BIOSSettingUpdateStateVerification
+		resetReq, err := bmcClient.CheckBiosAttributes(settingsDiff)
+		if err != nil {
+			log.V(1).Error(err, "could not determine if reboot needed")
+			return ctrl.Result{}, err
 		}
 
+		// if we dont need reboot. skip reboot steps.
+		nextState := metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff
+		if !resetReq {
+			nextState = metalv1alpha1.BIOSSettingUpdateStateVerification
+		}
 		err = r.updateBIOSSettingUpdateStatus(ctx, log, biosSettings, nextState)
 		log.V(1).Info("Reconciled biosSettings at update Settings state")
 		return ctrl.Result{}, err

@@ -29,7 +29,7 @@ type BMCSettingsSpec struct {
 	// ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
 	// ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
 	//	note: User approval is only enforced for server's which are reserved state
-	// ServerMaintenancePolicyEnforced will not create a maintenance request even if bmc reboot is needed.
+	// ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.

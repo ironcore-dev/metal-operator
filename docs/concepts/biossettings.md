@@ -17,9 +17,9 @@
 2. Provided settings are checked against the current BIOS setting.
 3. If settings are same as on the server, the state is moved to `Applied` (even if the version does not match)
 4. If the settings needs update, `BIOSSettings` check the version of BIOS and if required version does not match, it waits for the bios version to reach the spec version.
-5. `BIOSSettings` checks if the required setting update needs physical server reboot. 
-6. If reboot is needed and `ServerMaintenance` is not provided already. it requests for one and waits for the `server` to enter `Maintenance` state.
-    - `policy` used by `ServerMaintenance` is to be provided through Spec `ServerMaintenancePolicyType` in `BIOSSettings`
+5. If `ServerMaintenance` is not provided already. it requests for one and waits for the `server` to enter `Maintenance` state.
+    - `policy` used by `ServerMaintenance` is to be provided through Spec `ServerMaintenancePolicy` in `BIOSSettings`
+6. `BIOSSettings` checks if the required setting update needs physical server reboot. 
 7. Setting update process is started and the server is rebooted if required. 
 8. `BIOSSettings` verfiy the setting has been applied and trasistions the state to `Applied`. removes the `ServerMaintenance` resource if created by self.
 9. Any further update to the `BIOSSettings` Spec will restart the process. 

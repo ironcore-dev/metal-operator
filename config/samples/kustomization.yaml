@@ -8,4 +8,5 @@ resources:
 - metal_v1alpha1_serverclaim.yaml
 - metal_v1alpha1_servermaintenance.yaml
 - metal_v1alpha1_biossettings.yaml
+- metal_v1alpha1_biosversion.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

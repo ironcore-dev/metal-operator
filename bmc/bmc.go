@@ -5,10 +5,23 @@ package bmc
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
+	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	"github.com/ironcore-dev/metal-operator/bmc/oem"
+)
+
+type Manufaturer string
+
+const (
+	DellServers   Manufaturer = "Dell Inc."
+	LenovoServers Manufaturer = "Lenovo"
+	HPEServers    Manufaturer = "HPE"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -55,6 +68,18 @@ type BMC interface {
 	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
 
 	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
+
+	UpgradeBiosVersion(
+		ctx context.Context,
+		manufacturer string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, bool, error)
+
+	GetBiosUpgradeTask(
+		ctx context.Context,
+		manufacturer string,
+		taskURI string,
+	) (*redfish.Task, error)
 
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 }
@@ -232,4 +257,43 @@ type Manager struct {
 	PowerState      string
 	State           string
 	MACAddress      string
+}
+
+type OEMInterface interface {
+	GetUpdateBIOSRequestBody(
+		parameters *redfish.SimpleUpdateParameters,
+	) *oem.SimpleUpdateRequestBody
+	GetUpdateBIOSTaskMonitorURI(
+		response *http.Response,
+	) (string, error)
+	GetTaskMonitorDetails(
+		ctx context.Context,
+		taskMonitorResponse *http.Response,
+	) (*redfish.Task, error)
+}
+
+type OEM struct {
+	OEMInterface
+}
+
+func NewOEM(manufacturer string, service *gofish.Service) (*OEM, error) {
+	switch manufacturer {
+	case string(DellServers):
+		return &OEM{
+			OEMInterface: &oem.Dell{
+				Service: service,
+			}}, nil
+	case string(HPEServers):
+		return &OEM{
+			OEMInterface: &oem.HPE{
+				Service: service,
+			}}, nil
+	case string(LenovoServers):
+		return &OEM{
+			OEMInterface: &oem.Lenovo{
+				Service: service,
+			}}, nil
+	default:
+		return &OEM{}, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
+	}
 }

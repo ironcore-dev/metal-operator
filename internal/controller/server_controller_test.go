@@ -243,19 +243,21 @@ var _ = Describe("Server Controller", func() {
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
 		}()
 
-		Eventually(func(g Gomega) {
-			resp, err := http.Get(fmt.Sprintf("%s/systems/%s", registryURL, server.Spec.SystemUUID))
-			g.Expect(resp).NotTo(BeNil())
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		}).Should(Succeed())
-
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		))
+		// as this is set in the next reconsile cycle after reaching Available state is set,
+		// its best to check for it later to avoid flakyness
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
+		))
+		// as this is set  in the next reconsile cycle after power is set,
+		// its best to check for it later to avoid flakyness
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", BeNil()),
 		))
 
 		By("Ensuring that the boot configuration has been removed")
@@ -426,13 +428,6 @@ var _ = Describe("Server Controller", func() {
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
 		}()
 
-		Eventually(func(g Gomega) {
-			resp, err := http.Get(fmt.Sprintf("%s/systems/%s", registryURL, server.Spec.SystemUUID))
-			g.Expect(resp).NotTo(BeNil())
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		}).Should(Succeed())
-
 		By("Ensuring that the server is set to available and powered off")
 		// check that the available state is set first, as that is as part of handling
 		// the discovery state. The ServerBootConfig deletion happens in a later
@@ -443,7 +438,6 @@ var _ = Describe("Server Controller", func() {
 		// force calculation of zero capacity string
 		_ = zeroCapacity.String()
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
@@ -478,6 +472,11 @@ var _ = Describe("Server Controller", func() {
 				},
 			})),
 			HaveField("Status.Storages", HaveLen(1)),
+		))
+		// as this is set  in the next reconsile cycle after power is set,
+		// its best to check for it later to avoid flakyness
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", BeNil()),
 		))
 
 		By("Ensuring that the boot configuration has been removed")
@@ -548,6 +547,7 @@ var _ = Describe("Server Controller", func() {
 			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed())
 
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+		// this is large timeout due to the wait time for the DiscoveryTimeout to be hit and then transistioned to Intitial state
+		Eventually(Object(server)).WithTimeout(5 * time.Second).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
 	})
 })

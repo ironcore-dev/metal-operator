@@ -133,6 +133,16 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.IgnitionSecretRef.Name", ignitionSecret.Name),
 		))
 
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(config, func() {
+			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
+		By("Ensuring that the Server has the correct power state ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
+		))
+
 		By("Ensuring that the server has a correct boot configuration ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{

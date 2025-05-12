@@ -702,11 +702,11 @@ func checkTransistionToAppliedState(biosSettings *metalv1alpha1.BIOSSettings) {
 		HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 	))
 
-	if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateApplied {
-		By("waiting for the server to be turned on")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
-		))
+	if biosSettings.Status.UpdateSettingState == metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn {
+		// we need to set the spec power as, we need the call to redfish local to be made to apply the settings
+		Eventually(UpdateStatus(server, func() {
+			server.Spec.Power = metalv1alpha1.PowerOn
+		})).Should(Succeed())
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
 		))

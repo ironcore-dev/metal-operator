@@ -243,6 +243,13 @@ var _ = Describe("Server Controller", func() {
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
 		}()
 
+		Eventually(func(g Gomega) {
+			resp, err := http.Get(fmt.Sprintf("%s/systems/%s", registryURL, server.Spec.SystemUUID))
+			g.Expect(resp).NotTo(BeNil())
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		}).Should(Succeed())
+
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", BeNil()),
@@ -418,6 +425,13 @@ var _ = Describe("Server Controller", func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
 		}()
+
+		Eventually(func(g Gomega) {
+			resp, err := http.Get(fmt.Sprintf("%s/systems/%s", registryURL, server.Spec.SystemUUID))
+			g.Expect(resp).NotTo(BeNil())
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		}).Should(Succeed())
 
 		By("Ensuring that the server is set to available and powered off")
 		// check that the available state is set first, as that is as part of handling

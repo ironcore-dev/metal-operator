@@ -635,6 +635,14 @@ func transitionServerToReserved(ctx SpecContext, ns *v1.Namespace, server *metal
 	bootConfig.Name = serverClaim.Name
 	bootConfig.Namespace = serverClaim.Namespace
 
+	err := Get(bootConfig)()
+
+	if apierrors.IsNotFound(err) {
+		Expect(k8sClient.Create(ctx, bootConfig)).Should(SatisfyAny(
+			Satisfy(apierrors.IsAlreadyExists),
+			BeNil(),
+		))
+	}
 	Eventually(Get(bootConfig)).Should(Succeed())
 
 	By("Patching the Server to available state")
@@ -678,12 +686,31 @@ func checkTransistionToAppliedState(biosSettings *metalv1alpha1.BIOSSettings) {
 		HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 	))
 
+	server := &metalv1alpha1.Server{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      biosSettings.Spec.ServerRef.Name,
+			Namespace: biosSettings.Namespace,
+		},
+	}
+
+	Eventually(Get(server)).Should(Succeed())
+
 	// because of the mocking, the transistions are super fast here. can not determine the exact states
 	Eventually(Object(biosSettings)).Should(SatisfyAny(
 		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
 		HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateVerification),
 		HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 	))
+
+	if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateApplied {
+		By("waiting for the server to be turned on")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
+		))
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
+		))
+	}
 
 	// because of the mocking, the transistions are super fast here. can not determine the exact states
 	Eventually(Object(biosSettings)).Should(SatisfyAny(

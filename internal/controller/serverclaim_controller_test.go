@@ -94,6 +94,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Patching the Server to available state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 		})).Should(Succeed())
 
 		By("Ensuring that the Server has the correct claim ref")

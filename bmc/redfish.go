@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -193,7 +194,7 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) erro
 	return nil
 }
 
-func (r *RedfishBMC) GetManager() (*Manager, error) {
+func (r *RedfishBMC) GetManager(UUID string) (*redfish.Manager, error) {
 	if r.client == nil {
 		return nil, fmt.Errorf("no client found")
 	}
@@ -201,21 +202,47 @@ func (r *RedfishBMC) GetManager() (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get managers: %w", err)
 	}
-	for _, m := range managers {
-		// TODO: always take the first for now.
-		return &Manager{
-			UUID:            m.UUID,
-			Manufacturer:    m.Manufacturer,
-			State:           string(m.Status.State),
-			PowerState:      string(m.PowerState),
-			SerialNumber:    m.SerialNumber,
-			FirmwareVersion: m.FirmwareVersion,
-			SKU:             m.PartNumber,
-			Model:           m.Model,
-		}, nil
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("zero managers found")
 	}
 
-	return nil, err
+	if len(UUID) == 0 {
+		// take the first one available
+		return managers[0], nil
+	}
+
+	for _, m := range managers {
+		if UUID == m.UUID {
+			return m, nil
+		}
+	}
+	return nil, fmt.Errorf("matching managers not found for UUID %v", UUID)
+}
+
+func (r *RedfishBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
+
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("zero managers found")
+	}
+
+	for _, m := range managers {
+		if UUID == m.UUID {
+			if len(m.SupportedResetTypes) > 0 && !slices.Contains(m.SupportedResetTypes, resetType) {
+				return fmt.Errorf("reset type of %v is not supported for manager %v", resetType, m.UUID)
+			}
+			err := m.Reset(resetType)
+			if err != nil {
+				return fmt.Errorf("failed to reset managers %v with error: %w", m.UUID, err)
+			}
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no manger found with UUID %v", UUID)
 }
 
 // GetSystemInfo retrieves information about the system using Redfish.
@@ -281,6 +308,14 @@ func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemUUID string) (str
 	return system.BIOSVersion, nil
 }
 
+func (r *RedfishBMC) GetBMCVersion(ctx context.Context, UUID string) (string, error) {
+	manager, err := r.GetManager(UUID)
+	if err != nil {
+		return "", err
+	}
+	return manager.FirmwareVersion, nil
+}
+
 func (r *RedfishBMC) GetBiosAttributeValues(
 	ctx context.Context,
 	systemUUID string,
@@ -311,6 +346,40 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 		}
 	}
 	return result, err
+}
+
+func (r *RedfishBMC) GetBMCAttributeValues(
+	ctx context.Context,
+	UUID string,
+	attributes []string,
+) (
+	result redfish.SettingsAttributes,
+	err error,
+) {
+	if len(attributes) == 0 {
+		return nil, nil
+	}
+	manager, err := r.GetManager(UUID)
+	if err != nil {
+		return nil, err
+	}
+
+	// some vendors (like Dell) does not publich this. get through the system
+	if manager.Manufacturer == "" {
+		systems, err := r.client.Service.Systems()
+		if err != nil {
+			return nil, err
+		}
+		manager.Manufacturer = systems[0].Manufacturer
+	}
+
+	// togo: improve. as of now use first one similar to r.GetManager()
+	oemManager, err := NewOEMManager(manager, r.client.Service)
+	if err != nil {
+		return nil, err
+	}
+
+	return oemManager.GetOEMBMCSettingAttribute(attributes)
 }
 
 func (r *RedfishBMC) GetBiosPendingAttributeValues(
@@ -368,6 +437,34 @@ func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity a
 	return json.Unmarshal(RespRawBody, &entity)
 }
 
+func (r *RedfishBMC) GetBMCPendingAttributeValues(
+	ctx context.Context,
+	UUID string,
+) (
+	result redfish.SettingsAttributes,
+	err error,
+) {
+	manager, err := r.GetManager(UUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager: %w", err)
+	}
+
+	if manager.Manufacturer == "" {
+		systems, err := r.client.Service.Systems()
+		if err != nil {
+			return nil, err
+		}
+		manager.Manufacturer = systems[0].Manufacturer
+	}
+
+	oemManager, err := NewOEMManager(manager, r.client.Service)
+	if err != nil {
+		return nil, err
+	}
+
+	return oemManager.GetBMCPendingAttributeValues()
+}
+
 // SetBiosAttributesOnReset sets given bios attributes.
 func (r *RedfishBMC) SetBiosAttributesOnReset(
 	ctx context.Context,
@@ -388,6 +485,34 @@ func (r *RedfishBMC) SetBiosAttributesOnReset(
 		attrs[name] = value
 	}
 	return bios.UpdateBiosAttributesApplyAt(attrs, common.OnResetApplyTime)
+}
+
+func (r *RedfishBMC) SetBMCAttributesImediately(
+	ctx context.Context,
+	UUID string,
+	attributes redfish.SettingsAttributes,
+) (err error) {
+	if len(attributes) == 0 {
+		return nil
+	}
+	manager, err := r.GetManager(UUID)
+	if err != nil {
+		return err
+	}
+
+	if manager.Manufacturer == "" {
+		systems, err := r.client.Service.Systems()
+		if err != nil {
+			return err
+		}
+		manager.Manufacturer = systems[0].Manufacturer
+	}
+
+	oemManager, err := NewOEMManager(manager, r.client.Service)
+	if err != nil {
+		return err
+	}
+	return oemManager.UpdateBMCAttributesApplyAt(attributes, common.ImmediateApplyTime)
 }
 
 // SetBootOrder sets bios boot order
@@ -413,7 +538,7 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 	err error,
 ) {
 	registries, err := r.client.Service.Registries()
-	biosRegistry := &BiosRegistry{}
+	biosRegistry := &Registry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "BiosAttributeRegistry") {
 			err = registry.Get(r.client, registry.Location[0].URI, biosRegistry)
@@ -435,7 +560,6 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 // check if the arrtibutes need to reboot when changed, and are correct type.
 func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
-	// filter out immutable, readonly and hidden attributes
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil {
 		return reset, err
@@ -520,6 +644,31 @@ func (r *RedfishBMC) checkAttribues(
 		}
 	}
 	return reset, errors.Join(errs...)
+}
+
+// check if the arrtibutes need to reboot when changed, and are correct type.
+// supported attrType, bmc and bios
+func (r *RedfishBMC) CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
+
+	manager, err := r.GetManager(UUID)
+	if err != nil {
+		return false, err
+	}
+
+	if manager.Manufacturer == "" {
+		systems, err := r.client.Service.Systems()
+		if err != nil {
+			return false, err
+		}
+		manager.Manufacturer = systems[0].Manufacturer
+	}
+
+	oemManager, err := NewOEMManager(manager, r.client.Service)
+	if err != nil {
+		return false, err
+	}
+
+	return oemManager.CheckBMCAttributes(attrs)
 }
 
 func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {

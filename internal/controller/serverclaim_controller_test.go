@@ -94,12 +94,12 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Patching the Server to available state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 		})).Should(Succeed())
 
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
 
@@ -130,6 +130,16 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.ServerRef.Name", server.Name),
 			HaveField("Spec.Image", "foo:bar"),
 			HaveField("Spec.IgnitionSecretRef.Name", ignitionSecret.Name),
+		))
+
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(config, func() {
+			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
+		By("Ensuring that the Server has the correct power state ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 		))
 
 		By("Ensuring that the server has a correct boot configuration ref")

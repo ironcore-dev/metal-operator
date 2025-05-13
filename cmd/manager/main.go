@@ -113,7 +113,7 @@ func main() { // nolint: gocyclo
 		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
 		"Enforce the power off of a Server when graceful shutdown fails.")
-	flag.IntVar(&webhookPort, "webhook-port", 9445, "The port to use for webhook server.")
+	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")

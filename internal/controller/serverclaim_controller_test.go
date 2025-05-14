@@ -5,6 +5,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -56,7 +58,7 @@ var _ = Describe("ServerClaim Controller", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, server)).Should(Succeed())
+		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
 	})
 
 	AfterEach(func(ctx SpecContext) {
@@ -91,15 +93,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
 
@@ -141,6 +137,15 @@ var _ = Describe("ServerClaim Controller", func() {
 				Name:       config.Name,
 				UID:        config.UID,
 			}),
+		))
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(config, func() {
+			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", config))
+
+		By("Ensuring that the Server has the correct PowerStatus")
+		Eventually(Object(server)).WithTimeout(LongTimeoutForChecks).Should(SatisfyAll(
+			HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(claim.Spec.Power)),
 		))
 
 		By("Deleting the ServerClaim")
@@ -186,11 +191,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
@@ -226,16 +226,6 @@ var _ = Describe("ServerClaim Controller", func() {
 				"env":  "prod",
 			}
 		})).Should(Succeed())
-
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", BeNil()),
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-		))
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
@@ -293,7 +283,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	})
 
 	It("should not claim a server in a non-available state", func(ctx SpecContext) {
-		By("Patching the Server to available state")
+		By("Patching the Server to Initial state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateInitial
 		})).Should(Succeed())
@@ -630,7 +620,9 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for range 4 {
 			makeClaim(ctx, nil)
 		}
-		Eventually(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
+		// claiming 4 servers, with 1 CPU is going to be serial operation.
+		// we need to accomadate the timeout for it.
+		Eventually(countUniqueBoundServers(ctx, 10)).WithTimeout(6 * time.Second).Should(Equal(4))
 		Consistently(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
 		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(4))
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
@@ -643,7 +635,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for range 4 {
 			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))
 		}
-		Eventually(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
+		Eventually(countUniqueBoundServers(ctx, 10)).WithTimeout(6 * time.Second).Should(Equal(4))
 		Consistently(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
 		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(4))
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))

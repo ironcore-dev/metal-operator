@@ -189,7 +189,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status", "Status", server.Status.State)
+	log.V(1).Info("Updated Server status", "Status", server.Status)
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
@@ -208,7 +208,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status after transistions", "Status", server.Status.State)
+	log.V(1).Info("Updated Server status after transistions", "Status", server.Status)
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{}, nil
@@ -695,6 +695,9 @@ func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, log 
 	}
 	if op == controllerutil.OperationResultUpdated {
 		log.V(1).Info("Server updated to power off state.")
+		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+			log.V(1).Info("ensuring power state failed.")
+		}
 		return true, nil
 	}
 	return false, nil

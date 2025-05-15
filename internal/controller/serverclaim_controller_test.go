@@ -26,6 +26,12 @@ var _ = Describe("ServerClaim Controller", func() {
 	var server *metalv1alpha1.Server
 
 	BeforeEach(func(ctx SpecContext) {
+		By("Ensuring clean state")
+		var serverList metalv1alpha1.ServerList
+		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
+		var claimList metalv1alpha1.ServerClaimList
+		Eventually(ObjectList(&claimList)).Should(HaveField("Items", (BeEmpty())))
+
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -144,7 +150,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", config))
 
 		By("Ensuring that the Server has the correct PowerStatus")
-		Eventually(Object(server)).WithTimeout(LongTimeoutForChecks).Should(SatisfyAll(
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(claim.Spec.Power)),
 		))
 

@@ -21,6 +21,12 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	var server *metalv1alpha1.Server
 
 	BeforeEach(func(ctx SpecContext) {
+		By("Ensuring clean state")
+		var serverList metalv1alpha1.ServerList
+		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
+		var MaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&MaintenanceList)).Should(HaveField("Items", (BeEmpty())))
+
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{

@@ -183,13 +183,15 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 				return ctrl.Result{}, err
 			}
 		}
-
 	}
 
-	if err := r.updateServerStatus(ctx, log, server); err != nil {
+	if modified, err := r.updateServerStatus(ctx, log, server); err != nil || modified {
+		if modified {
+			log.V(1).Info("Updated Server status", "Status", server.Status)
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status", "Status", server.Status)
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
@@ -198,6 +200,13 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
+		if modified, err := r.updateServerStatus(ctx, log, server); err != nil || modified {
+			if modified {
+				log.V(1).Info("Updated Server status after transistions", "Status", server.Status)
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
+		}
 		return ctrl.Result{Requeue: requeue, RequeueAfter: r.ResyncInterval}, nil
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -205,10 +214,13 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 
 	// we need to update the ServerStatus after state transition to make sure it reflects the changes done
-	if err := r.updateServerStatus(ctx, log, server); err != nil {
+	if modified, err := r.updateServerStatus(ctx, log, server); err != nil || modified {
+		if modified {
+			log.V(1).Info("Updated Server status after transistions", "Status", server.Status)
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status after transistions", "Status", server.Status)
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{}, nil
@@ -479,51 +491,57 @@ func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
-func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
 		log.V(1).Info("Server has no BMC connection configured")
-		return nil
+		return false, nil
 	}
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
+		return false, fmt.Errorf("failed to update server status: could not create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 
 	systemInfo, err := bmcClient.GetSystemInfo(ctx, server.Spec.SystemUUID)
 	if err != nil {
-		return fmt.Errorf("failed to get system info for Server: %w", err)
+		return false, fmt.Errorf("failed to update server status: failed to get system info for Server: %w", err)
 	}
 
-	serverBase := server.DeepCopy()
-	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
-	server.Status.SerialNumber = systemInfo.SerialNumber
-	server.Status.SKU = systemInfo.SKU
-	server.Status.Manufacturer = systemInfo.Manufacturer
-	server.Status.Model = systemInfo.Model
-	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
-	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
+	op, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
+		server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
+		server.Status.SerialNumber = systemInfo.SerialNumber
+		server.Status.SKU = systemInfo.SKU
+		server.Status.Manufacturer = systemInfo.Manufacturer
+		server.Status.Model = systemInfo.Model
+		server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
+		server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
 
-	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
-	for _, processor := range systemInfo.Processors {
-		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
-			ID:             processor.ID,
-			Type:           processor.Type,
-			Architecture:   processor.Architecture,
-			InstructionSet: processor.InstructionSet,
-			Manufacturer:   processor.Manufacturer,
-			Model:          processor.Model,
-			MaxSpeedMHz:    processor.MaxSpeedMHz,
-			TotalCores:     processor.TotalCores,
-			TotalThreads:   processor.TotalThreads,
-		})
+		server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
+		for _, processor := range systemInfo.Processors {
+			server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
+				ID:             processor.ID,
+				Type:           processor.Type,
+				Architecture:   processor.Architecture,
+				InstructionSet: processor.InstructionSet,
+				Manufacturer:   processor.Manufacturer,
+				Model:          processor.Model,
+				MaxSpeedMHz:    processor.MaxSpeedMHz,
+				TotalCores:     processor.TotalCores,
+				TotalThreads:   processor.TotalThreads,
+			})
+		}
+		return nil
+	})
+
+	if err != nil {
+		return false, fmt.Errorf("failed to patch Server status with Updates: %w", err)
+	}
+	// as we are only updating the status field here
+	if op == controllerutil.OperationResultUpdatedStatusOnly {
+		return true, nil
 	}
 
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return fmt.Errorf("failed to patch Server status: %w", err)
-	}
-
-	return nil
+	return false, nil
 }
 
 func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -678,6 +696,9 @@ func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, log logr
 		if err != nil {
 			return false, fmt.Errorf("failed to set server power state: %w", err)
 		}
+		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+			log.V(1).Info("failed to ensure server power state: %w", err)
+		}
 		if requeue {
 			return requeue, nil
 		}
@@ -694,10 +715,7 @@ func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, log 
 		return false, fmt.Errorf("failed to patch Server: %w", err)
 	}
 	if op == controllerutil.OperationResultUpdated {
-		log.V(1).Info("Server updated to power off state.")
-		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
-			log.V(1).Info("ensuring power state failed.")
-		}
+		log.V(1).Info("Server updated to power state.", "new power state", powerState)
 		return true, nil
 	}
 	return false, nil
@@ -811,7 +829,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 
 	if powerOp == powerOpNoOP {
-		log.V(1).Info("Server already in target power state")
+		log.V(1).Info("Server already in target power state", "powerState", server.Status.PowerState)
 		return nil
 	}
 
@@ -827,6 +845,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 	switch powerOp {
 	case powerOpOn:
+		log.V(1).Info("Server Powering On")
 		if err := bmcClient.PowerOn(ctx, server.Spec.SystemUUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
@@ -834,6 +853,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
 	case powerOpOff:
+		log.V(1).Info("Server Powering Off")
 		powerOffType := bmcClient.PowerOff
 
 		if err := powerOffType(ctx, server.Spec.SystemUUID); err != nil {

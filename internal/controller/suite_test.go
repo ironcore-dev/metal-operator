@@ -210,8 +210,8 @@ func SetupTest() *corev1.Namespace {
 			ProbeImage:              "foo:latest",
 			ProbeOSImage:            "fooOS:latest",
 			RegistryURL:             registryURL,
-			RegistryResyncInterval:  10 * time.Millisecond,
-			ResyncInterval:          10 * time.Millisecond,
+			RegistryResyncInterval:  50 * time.Millisecond,
+			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
 			BMCOptions: bmc.BMCOptions{
@@ -219,7 +219,7 @@ func SetupTest() *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout: 2 * time.Second, // Force timeout to be quick for tests
+			DiscoveryTimeout: 500 * time.Millisecond, // Force timeout to be quick for tests
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

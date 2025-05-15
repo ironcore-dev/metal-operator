@@ -626,7 +626,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 		// due to nature of mocking, we cant not determine few steps here. hence need a longer wait time
-		Eventually(Object(biosSettings)).WithTimeout(LongTimeoutForChecks).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 

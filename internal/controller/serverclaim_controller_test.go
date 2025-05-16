@@ -626,9 +626,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for range 4 {
 			makeClaim(ctx, nil)
 		}
-		// claiming 4 servers, with 1 CPU is going to be serial operation.
-		// we need to accomadate the timeout for it.
-		Eventually(countUniqueBoundServers(ctx, 10)).WithTimeout(6 * time.Second).Should(Equal(4))
+		Eventually(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
 		Consistently(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
 		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(4))
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))

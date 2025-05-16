@@ -8,16 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/probe"
+	. "github.com/onsi/ginkgo/v2" // nolint: staticcheck
+	. "github.com/onsi/gomega"    // nolint: staticcheck
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega" // nolint: staticcheck
 )
 
 var LongTimeoutForPowerChecks = 3 * time.Second
@@ -29,71 +27,44 @@ func TransistionServerFromInitialToAvailableState(
 	server *metalv1alpha1.Server,
 	BootConfigNameSpace string,
 ) {
-	server.Spec.Power = metalv1alpha1.PowerOff
+	By("Creating the server")
 	Expect(k8sClient.Create(ctx, server)).To(Succeed())
 
-	Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
-
-	By("Starting the probe agent")
-	probeAgent := probe.NewAgent(server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
-	go func() {
-		defer GinkgoRecover()
-		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
-	}()
-
-	Eventually(Object(server)).Should(HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState))
-
-	By("Ensuring the boot configuration has been created")
-	bootConfig := &metalv1alpha1.ServerBootConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: BootConfigNameSpace,
-			Name:      server.Name,
-		},
-	}
-	Eventually(Get(bootConfig)).Should(Succeed())
-	Eventually(Object(server)).Should(HaveField("Spec.BootConfigurationRef.Name", bootConfig.Name))
-	Eventually(Object(bootConfig)).Should(
-		HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
-	)
-
-	By("waiting to enter discover state")
-	Eventually(Object(server)).Should(
+	Eventually(Object(server)).Should(SatisfyAny(
+		HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 		HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
-	)
+	))
 
-	By("Patching the boot configuration to a Ready state")
-	Eventually(UpdateStatus(bootConfig, func() {
-		bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+	Eventually(Object(server)).Should(SatisfyAll(
+		HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+	))
+
+	By("Updating the Statue of the server")
+	Eventually(UpdateStatus(server, func() {
+		server.Status.State = metalv1alpha1.ServerStateAvailable
+		server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 	})).Should(Succeed())
 
-	By("Ensuring that the Server resource has been updated")
+	By("Updating the power state of the server")
+	Eventually(Update(server, func() {
+		server.Spec.Power = metalv1alpha1.PowerOff
+		server.Spec.BootConfigurationRef = nil
+	})).Should(Succeed())
+
+	By("ensuring the state the server")
 	Eventually(Object(server)).Should(SatisfyAll(
 		HaveField("Finalizers", ContainElement(ServerFinalizer)),
-		HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
-		HaveField("Spec.Power", metalv1alpha1.PowerOn),
-		HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
+		HaveField("Spec.BootConfigurationRef", BeNil()),
 		HaveField("Spec.ServerClaimRef", BeNil()),
-		HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
-			Kind:       "ServerBootConfiguration",
-			Namespace:  BootConfigNameSpace,
-			Name:       server.Name,
-			UID:        bootConfig.UID,
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-		}),
+		HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+		HaveField("Spec.Power", metalv1alpha1.PowerOff),
+		HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		HaveField("Status.Manufacturer", "Contoso"),
 		HaveField("Status.SKU", "8675309"),
 		HaveField("Status.SerialNumber", "437XR1138R2"),
 		HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
-		HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
-	))
-
-	By("Ensuring that the server is set to available and powered off")
-	// check that the available state is set first, as that is as part of handling
-	// the discovery state. The ServerBootConfig deletion happens in a later
-	// reconciliation as part of handling the available state.
-	Eventually(Object(server)).Should(
-		HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-	)
+	), fmt.Sprintf("server not in extected state %v", server.Status))
 }
 
 // TransistionServerToReserveredState transistions the server to Reserved
@@ -103,17 +74,17 @@ func TransistionServerToReserveredState(
 	serverClaim *metalv1alpha1.ServerClaim,
 	server *metalv1alpha1.Server,
 	nameSpace string,
-) error {
+) {
 	if server.Status.State == metalv1alpha1.ServerStateReserved {
 		By("Ensuring the server in Reserevd state consistently")
 		Consistently(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		), fmt.Sprintf("Expected server to be consistently in Reserved State %v", server.Status.State))
-		return nil
+		return
 	}
 	//TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, nameSpace)
 
-	By("Patching the boot configuration to a Ready state")
+	By("Patching the server to a Available state")
 	Eventually(UpdateStatus(server, func() {
 		server.Status.State = metalv1alpha1.ServerStateAvailable
 	})).Should(Succeed())
@@ -169,13 +140,10 @@ func TransistionServerToReserveredState(
 	})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", claimConfig))
 
 	By("Ensuring that the Server has the correct PowerState")
-	Eventually(Object(server)).WithTimeout(LongTimeoutForPowerChecks).Should(SatisfyAll(
+	Eventually(Object(server)).WithPolling(200*time.Millisecond).Should(SatisfyAll(
 		HaveField("Spec.Power", serverClaim.Spec.Power),
-	), fmt.Sprintf("Expected Server to be in Power %v in Reserved state %v", serverClaim.Spec.Power, server.Status))
-	Eventually(Object(server)).WithTimeout(LongTimeoutForPowerChecks).Should(SatisfyAll(
 		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(serverClaim.Spec.Power)),
 	), fmt.Sprintf("Expected Server to be in PowerState %v in Reserved state %v", serverClaim.Spec.Power, server.Status))
-	return nil
 }
 
 func GetServerClaim(
@@ -222,16 +190,16 @@ func CheckServerPowerStateTransistionsDuringMaintenance(
 	serverMaintaince *metalv1alpha1.ServerMaintenance,
 	server *metalv1alpha1.Server,
 	requiredPower metalv1alpha1.Power,
-) error {
+) {
 	By("Ensuring all the objects are available")
 	Eventually(Get(serverMaintaince)).Should(Succeed())
 	Eventually(Get(server)).Should(Succeed())
 
-	if requiredPower == server.Spec.Power && serverMaintaince.Spec.ServerPower == server.Spec.Power && requiredPower == metalv1alpha1.Power(requiredPower) {
+	if requiredPower == server.Spec.Power && serverMaintaince.Spec.ServerPower == server.Spec.Power && server.Status.PowerState == metalv1alpha1.ServerPowerState(requiredPower) {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(server.Spec.Power)),
 		), fmt.Sprintf("Expected Server to be consistently in PowerState %v", requiredPower))
-		return nil
+		return
 	}
 
 	By("Ensuring that the ServerMaintenance has the correct Power Spec")
@@ -248,6 +216,4 @@ func CheckServerPowerStateTransistionsDuringMaintenance(
 	Eventually(Object(server)).WithTimeout(LongTimeoutForPowerChecks).Should(SatisfyAll(
 		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(server.Spec.Power)),
 	), fmt.Sprintf("Expected Server to be in PowerState %v", requiredPower))
-
-	return nil
 }

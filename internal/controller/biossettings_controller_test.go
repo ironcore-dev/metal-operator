@@ -17,6 +17,8 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BIOSSettings Controller", func() {
@@ -24,8 +26,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 	ns.Name = "default"
 
 	var server *metalv1alpha1.Server
+	var defaultPendingMockedBIOSSetting map[string]map[string]any
 
 	BeforeEach(func(ctx SpecContext) {
+
+		defaultPendingMockedBIOSSetting = bmc.DefaultMockedBIOSSetting
 
 		By("Ensuring clean state")
 		var serverList metalv1alpha1.ServerList
@@ -51,7 +56,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-maintenance-",
+				GenerateName: "test-biossetting-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       "38947555-7742-3448-3784-823347823834",
@@ -73,6 +78,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
+		bmc.PendingMockedBIOSSetting = map[string]map[string]any{}
+		bmc.DefaultMockedBIOSSetting = defaultPendingMockedBIOSSetting
 	})
 
 	It("should successfully patch its reference to referred server", func(ctx SpecContext) {
@@ -450,10 +457,13 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 		CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOff)
 		By("Ensuring that the BIOS setting has reached next state: issue/reboot power on")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(SatisfyAny(
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
-		CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOn)
+		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+			CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOn)
+		}
 
 		// because of how we mock the setting update, it applied immediately and hence will not go through reboots to apply setting
 		// this is the eventual state we would need to reach
@@ -550,11 +560,13 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 		CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOff)
 		By("Ensuring that the BIOS setting has reached next state: issue/reboot power on")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(SatisfyAny(
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
-		CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOn)
-
+		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+			CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOn)
+		}
 		// because of the mocking, the transistions are super fast here.
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),

@@ -6,9 +6,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2" // nolint: staticcheck
 	. "github.com/onsi/gomega"    // nolint: staticcheck
 	v1 "k8s.io/api/core/v1"
@@ -18,8 +20,6 @@ import (
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega" // nolint: staticcheck
 )
 
-var LongTimeoutForPowerChecks = 3 * time.Second
-
 // TransistionServerFromInitialToAvailableState transistions the server to AvailableState
 func TransistionServerFromInitialToAvailableState(
 	ctx context.Context,
@@ -28,6 +28,7 @@ func TransistionServerFromInitialToAvailableState(
 	BootConfigNameSpace string,
 ) {
 	By("Creating the server")
+	server.Spec.Power = metalv1alpha1.PowerOff
 	Expect(k8sClient.Create(ctx, server)).To(Succeed())
 
 	Eventually(Object(server)).Should(SatisfyAny(
@@ -35,26 +36,49 @@ func TransistionServerFromInitialToAvailableState(
 		HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 	))
 
-	Eventually(Object(server)).Should(SatisfyAll(
+	Eventually(Object(server)).WithPolling(100 * time.Millisecond).Should(
 		HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+	)
+
+	By("Ensuring the boot configuration has been created")
+	bootConfig := &metalv1alpha1.ServerBootConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: BootConfigNameSpace,
+			Name:      server.Name,
+		},
+	}
+	Eventually(Object(bootConfig)).WithPolling(100 * time.Millisecond).Should(SatisfyAll(
+		HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
+		HaveField("Annotations", HaveKeyWithValue(IsDefaultServerBootConfigOSImageKeyName, "true")),
+		HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
+		HaveField("Spec.Image", "fooOS:latest"),
+		HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
+		HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
 	))
 
-	By("Updating the Statue of the server")
-	Eventually(UpdateStatus(server, func() {
-		server.Status.State = metalv1alpha1.ServerStateAvailable
-		server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+	By("Patching the boot configuration to a Ready state")
+	Eventually(UpdateStatus(bootConfig, func() {
+		bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 	})).Should(Succeed())
 
-	By("Updating the power state of the server")
-	Eventually(Update(server, func() {
-		server.Spec.Power = metalv1alpha1.PowerOff
-		server.Spec.BootConfigurationRef = nil
-	})).Should(Succeed())
+	By("Starting the probe agent")
+	registryURL := "http://localhost:30000"
 
-	By("ensuring the state the server")
-	Eventually(Object(server)).Should(SatisfyAll(
+	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", registryURL, server.Spec.SystemUUID))
+	if err != nil || resp.StatusCode != 200 {
+		probeAgent := probe.NewAgent(server.Spec.SystemUUID, registryURL, 50*time.Millisecond)
+		go func() {
+			defer GinkgoRecover()
+			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
+		}()
+	}
+
+	// give enough time to transistion to availalbe and then to power off.
+	// sometime the transition happen from
+	// discovery -> initial -> discovery -> available timeout needs to accomadate this as well
+	By("ensuring the status of the server")
+	Eventually(Object(server)).WithTimeout(9*time.Second).WithPolling(100*time.Millisecond).Should(SatisfyAll(
 		HaveField("Finalizers", ContainElement(ServerFinalizer)),
-		HaveField("Spec.BootConfigurationRef", BeNil()),
 		HaveField("Spec.ServerClaimRef", BeNil()),
 		HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 		HaveField("Spec.Power", metalv1alpha1.PowerOff),
@@ -64,7 +88,7 @@ func TransistionServerFromInitialToAvailableState(
 		HaveField("Status.SKU", "8675309"),
 		HaveField("Status.SerialNumber", "437XR1138R2"),
 		HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
-	), fmt.Sprintf("server not in extected state %v", server.Status))
+	), fmt.Sprintf("server not in extected status %v and spec %v", server.Status, server.Spec))
 }
 
 // TransistionServerToReserveredState transistions the server to Reserved
@@ -140,7 +164,7 @@ func TransistionServerToReserveredState(
 	})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", claimConfig))
 
 	By("Ensuring that the Server has the correct PowerState")
-	Eventually(Object(server)).WithPolling(200*time.Millisecond).Should(SatisfyAll(
+	Eventually(Object(server)).WithPolling(150*time.Millisecond).Should(SatisfyAll(
 		HaveField("Spec.Power", serverClaim.Spec.Power),
 		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(serverClaim.Spec.Power)),
 	), fmt.Sprintf("Expected Server to be in PowerState %v in Reserved state %v", serverClaim.Spec.Power, server.Status))
@@ -207,13 +231,9 @@ func CheckServerPowerStateTransistionsDuringMaintenance(
 		HaveField("Spec.ServerPower", requiredPower),
 	), fmt.Sprintf("Expected ServerMaintenance to have ServerPower %v", requiredPower))
 
-	By("Ensuring that the Server has the correct Power Spec")
-	Eventually(Object(server)).WithTimeout(LongTimeoutForPowerChecks).Should(SatisfyAll(
-		HaveField("Spec.Power", serverMaintaince.Spec.ServerPower),
-	), fmt.Sprintf("Expected server to have power Spec %v", requiredPower))
-
 	By("Ensuring that the Server has the correct PowerState")
-	Eventually(Object(server)).WithTimeout(LongTimeoutForPowerChecks).Should(SatisfyAll(
+	Eventually(Object(server)).WithPolling(150*time.Millisecond).Should(SatisfyAll(
+		HaveField("Spec.Power", serverMaintaince.Spec.ServerPower),
 		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(server.Spec.Power)),
 	), fmt.Sprintf("Expected Server to be in PowerState %v", requiredPower))
 }

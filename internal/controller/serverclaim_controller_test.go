@@ -554,7 +554,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 	makeServer := func(ctx context.Context) {
 		server := metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
+				GenerateName: "server-claims-",
 				Annotations: map[string]string{
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 				},

@@ -220,9 +220,14 @@ func (r *RedfishBMC) GetManager() (*Manager, error) {
 
 // GetSystemInfo retrieves information about the system using Redfish.
 func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
+	var system *redfish.ComputerSystem
+	var ok bool
+	if system, ok = ComputeSystemMock[systemUUID]; !ok {
+		var err error
+		system, err = r.getSystemByUUID(ctx, systemUUID)
+		if err != nil {
+			return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
+		}
 	}
 
 	memoryString := fmt.Sprintf("%.fGi", system.MemorySummary.TotalSystemMemoryGiB)
@@ -230,10 +235,12 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
-
-	systemProcessors, err := system.Processors()
-	if err != nil {
-		return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
+	var systemProcessors []*redfish.Processor
+	if systemProcessors, ok = SystemProcessorMock[systemUUID]; !ok {
+		systemProcessors, err = system.Processors()
+		if err != nil {
+			return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
+		}
 	}
 
 	processors := make([]Processor, 0, len(systemProcessors))

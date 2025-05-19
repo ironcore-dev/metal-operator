@@ -42,7 +42,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-maintenance-",
+				GenerateName: "test-server-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       "38947555-7742-3448-3784-823347823834",

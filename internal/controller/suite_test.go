@@ -17,6 +17,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -54,6 +55,67 @@ func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
+}
+
+func CleanAllMetalResources(ctx context.Context, namespace string) {
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.ServerClaim{}, &metalv1alpha1.ServerClaimList{}, client.InNamespace(namespace))
+	}()
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.Endpoint{}, &metalv1alpha1.EndpointList{})
+	}()
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.BMC{}, &metalv1alpha1.BMCList{})
+	}()
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))
+	}()
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))
+	}()
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})
+	}()
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.BMCSecret{}, &metalv1alpha1.BMCSecretList{})
+	}()
+
+	go func() {
+		defer GinkgoRecover()
+		deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})
+	}()
+
+	Eventually(ObjectList(&metalv1alpha1.ServerClaimList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(ObjectList(&metalv1alpha1.EndpointList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(ObjectList(&metalv1alpha1.BMCList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(ObjectList(&metalv1alpha1.ServerMaintenanceList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(ObjectList(&metalv1alpha1.ServerBootConfigurationList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(ObjectList(&metalv1alpha1.BMCSecretList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(ObjectList(&metalv1alpha1.BIOSSettingsList{})).Should(
+		HaveField("Items", BeEmpty()))
+
 }
 
 func DeleteAllMetalResources(ctx context.Context, namespace string) {
@@ -141,6 +203,9 @@ func SetupTest() *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
+		bmc.ComputeSystemMock = map[string]*redfish.ComputerSystem{}
+		bmc.SystemProcessorMock = map[string][]*redfish.Processor{}
+
 		var mgrCtx context.Context
 		mgrCtx, cancel := context.WithCancel(context.Background())
 		DeferCleanup(cancel)
@@ -216,7 +281,7 @@ func SetupTest() *corev1.Namespace {
 			MaxConcurrentReconciles: 5,
 			BMCOptions: bmc.BMCOptions{
 				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Second,
 				BasicAuth:            true,
 			},
 			DiscoveryTimeout: 500 * time.Millisecond, // Force timeout to be quick for tests
@@ -255,6 +320,7 @@ func SetupTest() *corev1.Namespace {
 			defer GinkgoRecover()
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
 		}()
+
 	})
 
 	return ns

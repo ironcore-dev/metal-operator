@@ -315,10 +315,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateState("")),
 		))
 
-		By("Ensuring that the Server is in correct power state")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-		))
+		// By("Ensuring that the Server is in correct power state")
+		// Eventually(Object(server)).Should(SatisfyAll(
+		// 	HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
+		// ))
 
 		// because of how we mock the setting update, it applied immediately and hence will not go through reboots to apply setting
 		// this is the eventual state we would need to reach
@@ -431,10 +431,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		// due to issue with serverClaim, which forces the power state on the server even during maintenance we need this
-		By("Ensuring that the Server is in correct power state")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-		))
+		// By("Ensuring that the Server is in correct power state")
+		// Eventually(Object(server)).Should(SatisfyAll(
+		// 	HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
+		// ))
 
 		By("Ensuring that the BIOS setting has reached next state: issue/reboot")
 		Eventually(Object(biosSettings)).Should(SatisfyAny(

@@ -73,9 +73,9 @@ func TransistionServerFromInitialToAvailableState(
 		}()
 	}
 
-	// give enough time to transistion to availalbe and then to power off.
+	// give enough time to transition to availalbe and then to power off.
 	// sometime the transition happen from
-	// discovery -> initial -> discovery -> available timeout needs to accomadate this as well
+	// discovery -> initial -> discovery -> available timeout needs to accommodate this as well
 	By("ensuring the status of the server")
 	Eventually(Object(server)).WithTimeout(9*time.Second).WithPolling(100*time.Millisecond).Should(SatisfyAll(
 		HaveField("Finalizers", ContainElement(ServerFinalizer)),
@@ -91,8 +91,8 @@ func TransistionServerFromInitialToAvailableState(
 	), fmt.Sprintf("server not in extected status %v and spec %v", server.Status, server.Spec))
 }
 
-// TransistionServerToReserveredState transistions the server to Reserved
-func TransistionServerToReserveredState(
+// TransitionServerToReserveredState transition the server to Reserved
+func TransitionServerToReserveredState(
 	ctx context.Context,
 	k8sClient client.Client,
 	serverClaim *metalv1alpha1.ServerClaim,
@@ -232,7 +232,7 @@ func CheckServerPowerStateTransistionsDuringMaintenance(
 	), fmt.Sprintf("Expected ServerMaintenance to have ServerPower %v", requiredPower))
 
 	By("Ensuring that the Server has the correct PowerState")
-	Eventually(Object(server)).WithPolling(150*time.Millisecond).Should(SatisfyAll(
+	Eventually(Object(server)).Should(SatisfyAll(
 		HaveField("Spec.Power", serverMaintaince.Spec.ServerPower),
 		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(server.Spec.Power)),
 	), fmt.Sprintf("Expected Server to be in PowerState %v", requiredPower))

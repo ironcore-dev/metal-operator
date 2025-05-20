@@ -220,29 +220,28 @@ func (r *RedfishBMC) GetManager() (*Manager, error) {
 
 // GetSystemInfo retrieves information about the system using Redfish.
 func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error) {
-	var system *redfish.ComputerSystem
-	var ok bool
-	if system, ok = ComputeSystemMock[systemUUID]; !ok {
-		var err error
-		system, err = r.getSystemByUUID(ctx, systemUUID)
-		if err != nil {
-			return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
-		}
+	system, err := r.getSystemByUUID(ctx, systemUUID)
+	if err != nil {
+		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
 	}
 
+	systemProcessors, err := system.Processors()
+	if err != nil {
+		return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
+	}
+
+	return r.getSystemInfo(system, systemProcessors)
+}
+
+func (r *RedfishBMC) getSystemInfo(
+	system *redfish.ComputerSystem,
+	systemProcessors []*redfish.Processor,
+) (SystemInfo, error) {
 	memoryString := fmt.Sprintf("%.fGi", system.MemorySummary.TotalSystemMemoryGiB)
 	quantity, err := resource.ParseQuantity(memoryString)
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
-	var systemProcessors []*redfish.Processor
-	if systemProcessors, ok = SystemProcessorMock[systemUUID]; !ok {
-		systemProcessors, err = system.Processors()
-		if err != nil {
-			return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
-		}
-	}
-
 	processors := make([]Processor, 0, len(systemProcessors))
 	for _, p := range systemProcessors {
 		processors = append(processors, Processor{
@@ -277,6 +276,10 @@ func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemUUID string) ([]str
 	if err != nil {
 		return []string{}, err
 	}
+	return r.getBootOrder(system)
+}
+
+func (r *RedfishBMC) getBootOrder(system *redfish.ComputerSystem) ([]string, error) {
 	return system.Boot.BootOrder, nil
 }
 
@@ -285,6 +288,10 @@ func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemUUID string) (str
 	if err != nil {
 		return "", err
 	}
+	return r.getBiosVersion(system)
+}
+
+func (r *RedfishBMC) getBiosVersion(system *redfish.ComputerSystem) (string, error) {
 	return system.BIOSVersion, nil
 }
 
@@ -550,6 +557,44 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for for server storages to be ready: %w", err)
 	}
+	storage, err := r.getStorages(systemStorage)
+
+	if len(storage) == 0 {
+		// if no storage is found, fall back to simpleStorage (outdated storage API)
+		simpleStorages, err := system.SimpleStorages()
+		if err != nil {
+			return nil, fmt.Errorf("failed to wait for for server Simplestorages to be ready: %w", err)
+		}
+		return r.getSimpleStorages(simpleStorages)
+	}
+	return storage, nil
+}
+
+func (r *RedfishBMC) getSimpleStorages(
+	systemSimpleStorage []*redfish.SimpleStorage,
+) ([]Storage, error) {
+	result := make([]Storage, 0, len(systemSimpleStorage))
+	for _, s := range systemSimpleStorage {
+		storage := Storage{
+			Entity: Entity{ID: s.ID, Name: s.Name},
+		}
+
+		storage.Drives = make([]Drive, 0, len(s.Devices))
+		for _, d := range s.Devices {
+			storage.Drives = append(storage.Drives, Drive{
+				Entity:    Entity{Name: d.Name},
+				SizeBytes: d.CapacityBytes,
+				Vendor:    d.Manufacturer,
+				Model:     d.Model,
+				State:     d.Status.State,
+			})
+		}
+		result = append(result, storage)
+	}
+	return result, nil
+}
+
+func (r *RedfishBMC) getStorages(systemStorage []*redfish.Storage) ([]Storage, error) {
 	result := make([]Storage, 0, len(systemStorage))
 	for _, s := range systemStorage {
 		storage := Storage{
@@ -585,32 +630,6 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 			})
 		}
 		result = append(result, storage)
-	}
-	if len(result) == 0 {
-		// if no storage is found, fall back to simpleStorage (outdated storage API)
-		simpleStorages, err := system.SimpleStorages()
-		result = make([]Storage, 0, len(systemStorage))
-		if err != nil {
-			return nil, err
-		}
-		for _, s := range simpleStorages {
-			storage := Storage{
-				Entity: Entity{ID: s.ID, Name: s.Name},
-			}
-
-			storage.Drives = make([]Drive, 0, len(s.Devices))
-			for _, d := range s.Devices {
-				storage.Drives = append(storage.Drives, Drive{
-					Entity:    Entity{Name: d.Name},
-					SizeBytes: d.CapacityBytes,
-					Vendor:    d.Manufacturer,
-					Model:     d.Model,
-					State:     d.Status.State,
-				})
-			}
-			result = append(result, storage)
-		}
-		return result, nil
 	}
 	return result, nil
 }

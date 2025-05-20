@@ -434,6 +434,9 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
+		))
+		// check for storage as it take another cycle to get the details
+		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
 				Name: "Simple Storage Controller",
 				Drives: []metalv1alpha1.StorageDrive{

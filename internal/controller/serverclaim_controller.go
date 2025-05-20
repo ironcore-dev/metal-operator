@@ -382,7 +382,7 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	for {
 		select {
 		case cachedVersion := <-versions:
-			if cachedVersion == server.ResourceVersion {
+			if cachedVersion >= server.ResourceVersion {
 				return server, modified, nil
 			}
 		case <-time.After(cacheUpdateTimeout):

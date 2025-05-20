@@ -17,7 +17,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -61,42 +60,37 @@ func CleanAllMetalResources(ctx context.Context, namespace string) {
 
 	go func() {
 		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.ServerClaim{}, &metalv1alpha1.ServerClaimList{}, client.InNamespace(namespace))
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerClaim{}, client.InNamespace(namespace))).To(Succeed())
 	}()
 
 	go func() {
 		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.Endpoint{}, &metalv1alpha1.EndpointList{})
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Endpoint{})).To(Succeed())
 	}()
 
 	go func() {
 		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.BMC{}, &metalv1alpha1.BMCList{})
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMC{})).To(Succeed())
 	}()
 
 	go func() {
 		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerMaintenance{}, client.InNamespace(namespace))).To(Succeed())
 	}()
 
 	go func() {
 		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerBootConfiguration{}, client.InNamespace(namespace))).To(Succeed())
 	}()
 
 	go func() {
 		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{})).To(Succeed())
 	}()
 
 	go func() {
 		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.BMCSecret{}, &metalv1alpha1.BMCSecretList{})
-	}()
-
-	go func() {
-		defer GinkgoRecover()
-		deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSecret{})).To(Succeed())
 	}()
 
 	Eventually(ObjectList(&metalv1alpha1.ServerClaimList{})).Should(
@@ -197,14 +191,14 @@ var _ = BeforeSuite(func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
 	}()
+	bmc.CreateMockUp()
 })
 
 func SetupTest() *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
-		bmc.ComputeSystemMock = map[string]*redfish.ComputerSystem{}
-		bmc.SystemProcessorMock = map[string][]*redfish.Processor{}
+		bmc.UnitTestMockUps.InitializeDefaults()
 
 		var mgrCtx context.Context
 		mgrCtx, cancel := context.WithCancel(context.Background())
@@ -321,6 +315,7 @@ func SetupTest() *corev1.Namespace {
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
 		}()
 
+		CleanAllMetalResources(ctx, ns.Name)
 	})
 
 	return ns

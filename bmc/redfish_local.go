@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stmcginnis/gofish/redfish"
-	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -35,24 +34,25 @@ func NewRedfishLocalBMCClient(
 func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 
 	go func() {
-		time.Sleep(100 * time.Microsecond)
-		if system, ok := UnitTestMockUps.ComputeSystemMock[systemUUID]; ok {
-			system.PowerState = redfish.OnPowerState
-			UnitTestMockUps.ComputeSystemMock[systemUUID] = system
-		} else {
-			system, _ := r.getSystemByUUID(ctx, systemUUID)
-			system.PowerState = redfish.OnPowerState
-			systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
-			if err := system.Patch(systemURI, system); err != nil {
-				log := ctrl.LoggerFrom(ctx)
-				log.V(1).Error(err, "failed to set power state On", "systemUUID", systemUUID)
-			}
-			UnitTestMockUps.ComputeSystemMock[systemUUID] = system
+		time.Sleep(250 * time.Millisecond)
+		system, err := r.getSystemByUUID(ctx, systemUUID)
+		if err != nil {
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Error(err, "failed to get system")
+			return
+		}
+		system.PowerState = redfish.OnPowerState
+		system.RawData = nil
+		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+		if err := system.Patch(systemURI, system); err != nil {
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Error(err, "failed to Patch system to power on", "systemUUID", systemUUID)
+			return
 		}
 
 		// mock the bmc update here
 		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(150 * time.Millisecond)
 			for key, data := range UnitTestMockUps.PendingBIOSSetting {
 				if _, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
 					UnitTestMockUps.BIOSSettingAttr[key] = data
@@ -67,19 +67,21 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error {
 
 	go func() {
-		time.Sleep(100 * time.Microsecond)
-		if system, ok := UnitTestMockUps.ComputeSystemMock[systemUUID]; ok {
-			system.PowerState = redfish.OffPowerState
-			UnitTestMockUps.ComputeSystemMock[systemUUID] = system
+		time.Sleep(250 * time.Millisecond)
+		system, err := r.getSystemByUUID(ctx, systemUUID)
+		if err != nil {
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Error(err, "failed to get system")
+			return
 		}
-		system, _ := r.getSystemByUUID(ctx, systemUUID)
 		system.PowerState = redfish.OffPowerState
+		system.RawData = nil
 		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
 		if err := system.Patch(systemURI, system); err != nil {
 			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to set power state Off", "systemUUID", systemUUID)
+			log.V(1).Error(err, "failed to Patch system to power off", "systemUUID", systemUUID)
+			return
 		}
-		UnitTestMockUps.ComputeSystemMock[systemUUID] = system
 	}()
 	return nil
 }
@@ -195,123 +197,4 @@ func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) 
 		return reset, err
 	}
 	return r.checkAttribues(attrs, filtered)
-}
-
-func (r *RedfishLocalBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*redfish.ComputerSystem, error) {
-	if system, ok := UnitTestMockUps.ComputeSystemMock[systemUUID]; ok {
-		return system, nil
-	}
-	system, err := r.RedfishBMC.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return nil, err
-	}
-	UnitTestMockUps.ComputeSystemMock[systemUUID] = system
-	return system, nil
-}
-
-func (r *RedfishLocalBMC) WaitForServerPowerState(
-	ctx context.Context,
-	systemUUID string,
-	powerState redfish.PowerState,
-) error {
-	if err := wait.PollUntilContextTimeout(
-		ctx,
-		r.options.PowerPollingInterval,
-		r.options.PowerPollingTimeout,
-		true,
-		func(ctx context.Context) (done bool, err error) {
-			sysInfo, err := r.getSystemByUUID(ctx, systemUUID)
-			if err != nil {
-				return false, fmt.Errorf("failed to get system info: %w", err)
-			}
-			return sysInfo.PowerState == powerState, nil
-		}); err != nil {
-		return fmt.Errorf("failed to wait for for server power state: %w", err)
-	}
-	return nil
-}
-
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishLocalBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to get systems: %w", err)
-	}
-	var setBoot redfish.Boot
-
-	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	if system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
-		setBoot = pxeBootWithSettingUEFIBootMode
-	} else {
-		setBoot = pxeBootWithoutSettingUEFIBootMode
-	}
-	system.Boot = setBoot
-	UnitTestMockUps.ComputeSystemMock[systemUUID] = system
-	return nil
-}
-
-func (r *RedfishLocalBMC) GetBootOrder(ctx context.Context, systemUUID string) ([]string, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return []string{}, err
-	}
-	return r.getBootOrder(system)
-}
-
-func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return "", err
-	}
-	return r.getBiosVersion(system)
-}
-
-func (r *RedfishLocalBMC) SetBootOrder(ctx context.Context, systemUUID string, bootOrder []string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return err
-	}
-
-	system.Boot = redfish.Boot{
-		BootSourceOverrideEnabled: redfish.ContinuousBootSourceOverrideEnabled,
-		BootSourceOverrideTarget:  redfish.NoneBootSourceOverrideTarget,
-		BootOrder:                 bootOrder,
-	}
-	UnitTestMockUps.ComputeSystemMock[systemUUID] = system
-	return nil
-}
-
-func (r *RedfishLocalBMC) GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
-	}
-	var systemProcessors []*redfish.Processor
-	var ok bool
-	if systemProcessors, ok = UnitTestMockUps.SystemProcessorMock[systemUUID]; !ok || systemProcessors == nil {
-		systemProcessors, err = system.Processors()
-		if err != nil {
-			return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
-		}
-	}
-	return r.getSystemInfo(system, systemProcessors)
-}
-
-func (r *RedfishLocalBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {
-
-	var systemStorage []*redfish.SimpleStorage
-	var ok bool
-	if systemStorage, ok = UnitTestMockUps.SystemStorageMock[systemUUID]; !ok || systemStorage == nil {
-		system, err := r.RedfishBMC.getSystemByUUID(ctx, systemUUID)
-		if err != nil {
-			return nil, err
-		}
-		// if no storage is found, fall back to simpleStorage (outdated storage API)
-		systemStorage, err = system.SimpleStorages()
-		if err != nil {
-			return nil, fmt.Errorf("failed to wait for for server Simplestorages to be ready: %w", err)
-		}
-		UnitTestMockUps.SystemStorageMock[systemUUID] = systemStorage
-	}
-	return r.getSimpleStorages(systemStorage)
 }

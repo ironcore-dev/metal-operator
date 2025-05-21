@@ -276,7 +276,7 @@ var _ = Describe("Server Controller", func() {
 		By("Creating a Server with inline BMC configuration")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-controller-inline-bmc-",
+				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       "38947555-7742-3448-3784-823347823834",
@@ -434,9 +434,6 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
-		))
-		// check for storage as it take another cycle to get the details
-		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
 				Name: "Simple Storage Controller",
 				Drives: []metalv1alpha1.StorageDrive{
@@ -494,7 +491,7 @@ var _ = Describe("Server Controller", func() {
 		By("Creating a Server with inline BMC configuration")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-controller-discovery-failure-",
+				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       "38947555-7742-3448-3784-823347823834",

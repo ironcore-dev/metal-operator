@@ -3,15 +3,10 @@
 
 package bmc
 
-import "github.com/stmcginnis/gofish/redfish"
-
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishMockUps struct {
-	BIOSSettingAttr     map[string]map[string]any
-	PendingBIOSSetting  map[string]map[string]any
-	ComputeSystemMock   map[string]*redfish.ComputerSystem
-	SystemProcessorMock map[string][]*redfish.Processor
-	SystemStorageMock   map[string][]*redfish.SimpleStorage
+	BIOSSettingAttr    map[string]map[string]any
+	PendingBIOSSetting map[string]map[string]any
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -20,9 +15,6 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 	}
 	r.PendingBIOSSetting = map[string]map[string]any{}
-	r.ComputeSystemMock = map[string]*redfish.ComputerSystem{}
-	r.SystemProcessorMock = map[string][]*redfish.Processor{}
-	r.SystemStorageMock = map[string][]*redfish.SimpleStorage{}
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {

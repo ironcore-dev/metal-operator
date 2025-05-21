@@ -56,62 +56,6 @@ func TestControllers(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
-func CleanAllMetalResources(ctx context.Context, namespace string) {
-
-	go func() {
-		defer GinkgoRecover()
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerClaim{}, client.InNamespace(namespace))).To(Succeed())
-	}()
-
-	go func() {
-		defer GinkgoRecover()
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Endpoint{})).To(Succeed())
-	}()
-
-	go func() {
-		defer GinkgoRecover()
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMC{})).To(Succeed())
-	}()
-
-	go func() {
-		defer GinkgoRecover()
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerMaintenance{}, client.InNamespace(namespace))).To(Succeed())
-	}()
-
-	go func() {
-		defer GinkgoRecover()
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerBootConfiguration{}, client.InNamespace(namespace))).To(Succeed())
-	}()
-
-	go func() {
-		defer GinkgoRecover()
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{})).To(Succeed())
-	}()
-
-	go func() {
-		defer GinkgoRecover()
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSecret{})).To(Succeed())
-	}()
-
-	Eventually(ObjectList(&metalv1alpha1.ServerClaimList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(ObjectList(&metalv1alpha1.EndpointList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(ObjectList(&metalv1alpha1.BMCList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(ObjectList(&metalv1alpha1.ServerMaintenanceList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(ObjectList(&metalv1alpha1.ServerBootConfigurationList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(ObjectList(&metalv1alpha1.BMCSecretList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(ObjectList(&metalv1alpha1.BIOSSettingsList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-}
-
 func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerClaim{}, &metalv1alpha1.ServerClaimList{}, client.InNamespace(namespace))).Should(
 		HaveField("Items", BeEmpty()))
@@ -191,6 +135,7 @@ var _ = BeforeSuite(func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
 	}()
+
 	bmc.CreateMockUp()
 })
 
@@ -198,8 +143,6 @@ func SetupTest() *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.InitializeDefaults()
-
 		var mgrCtx context.Context
 		mgrCtx, cancel := context.WithCancel(context.Background())
 		DeferCleanup(cancel)
@@ -275,10 +218,10 @@ func SetupTest() *corev1.Namespace {
 			MaxConcurrentReconciles: 5,
 			BMCOptions: bmc.BMCOptions{
 				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Second,
+				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout: 500 * time.Millisecond, // Force timeout to be quick for tests
+			DiscoveryTimeout: time.Second, // Force timeout to be quick for tests
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{
@@ -314,8 +257,6 @@ func SetupTest() *corev1.Namespace {
 			defer GinkgoRecover()
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
 		}()
-
-		CleanAllMetalResources(ctx, ns.Name)
 	})
 
 	return ns

@@ -31,7 +31,7 @@ var _ = Describe("Console Access", func() {
 		By("Creating a Server object")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-console",
+				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				BMC: &metalv1alpha1.BMCAccess{
@@ -89,7 +89,7 @@ var _ = Describe("Console Access", func() {
 		By("Creating a Server object")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-console",
+				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				BMCRef: &corev1.LocalObjectReference{

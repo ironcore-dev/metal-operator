@@ -189,7 +189,9 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status", "Status", server.Status.State)
+	log.V(1).Info("Updated Server status",
+		"Status", server.Status.State,
+		"powerState", server.Status.PowerState)
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
@@ -198,6 +200,13 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
+		// we need to update the ServerStatus after state transition to make sure it reflects the changes done
+		if err := r.updateServerStatus(ctx, log, server); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
+		}
+		log.V(1).Info("Updated Server status after state transition",
+			"Status", server.Status.State,
+			"powerState", server.Status.PowerState)
 		return ctrl.Result{Requeue: requeue, RequeueAfter: r.ResyncInterval}, nil
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -208,7 +217,9 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status after transistions", "Status", server.Status.State)
+	log.V(1).Info("Updated Server status after State transition",
+		"Status", server.Status.State,
+		"powerState", server.Status.PowerState)
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{}, nil
@@ -695,6 +706,9 @@ func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, log 
 	}
 	if op == controllerutil.OperationResultUpdated {
 		log.V(1).Info("Server updated to power off state.")
+		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+			log.V(1).Info("ensuring power state failed.")
+		}
 		return true, nil
 	}
 	return false, nil
@@ -808,7 +822,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 
 	if powerOp == powerOpNoOP {
-		log.V(1).Info("Server already in target power state")
+		log.V(1).Info("Server already in target power state", "powerState", server.Status.PowerState)
 		return nil
 	}
 
@@ -824,6 +838,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 	switch powerOp {
 	case powerOpOn:
+		log.V(1).Info("Server Power On")
 		if err := bmcClient.PowerOn(ctx, server.Spec.SystemUUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
@@ -831,6 +846,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
 	case powerOpOff:
+		log.V(1).Info("Server Power Off")
 		powerOffType := bmcClient.PowerOff
 
 		if err := powerOffType(ctx, server.Spec.SystemUUID); err != nil {

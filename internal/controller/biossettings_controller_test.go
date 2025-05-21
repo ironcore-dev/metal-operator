@@ -4,10 +4,9 @@
 package controller
 
 import (
-	"time"
-
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
 
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
@@ -17,8 +16,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BIOSSettings Controller", func() {
@@ -53,7 +50,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-biossetting-maintenance-",
+				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       "38947555-7742-3448-3784-823347823834",
@@ -84,9 +81,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		BIOSSetting := make(map[string]string) // no setting to apply
 
 		By("Ensuring that the server has Available state")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-		))
+		)
 		By("Creating a BIOSSetting V1")
 		biosSettingsV1 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -103,13 +100,13 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettingsV1)).To(Succeed())
 
 		By("Ensuring that the Server has the correct server bios setting ref")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", &v1.LocalObjectReference{Name: biosSettingsV1.Name}),
-		))
+		)
 
-		Eventually(Object(biosSettingsV1)).Should(SatisfyAny(
+		Eventually(Object(biosSettingsV1)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Creating a BIOSSetting V2")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
@@ -127,21 +124,21 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
 
 		By("Ensuring that the Server has the correct server bios setting ref")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", &v1.LocalObjectReference{Name: biosSettingsV2.Name}),
-		))
+		)
 
-		Eventually(Object(biosSettingsV2)).Should(SatisfyAny(
+		Eventually(Object(biosSettingsV2)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Deleting the BIOSSettings V1 (old)")
 		Expect(k8sClient.Delete(ctx, biosSettingsV1)).To(Succeed())
 
 		By("Ensuring that the Server has the correct server bios setting ref")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", &v1.LocalObjectReference{Name: biosSettingsV2.Name}),
-		))
+		)
 
 	})
 
@@ -167,21 +164,21 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the Server has the bios setting ref")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", &v1.LocalObjectReference{Name: biosSettings.Name}),
-		))
+		)
 
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the bios ref is empty")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
-		))
+		)
 	})
 
 	It("should update the setting without maintenance if setting requested needs no server reboot", func(ctx SpecContext) {
@@ -193,7 +190,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// mock BIOSSettings to not request maintenance by powering on the system (mock no need of power change on system)
 		// note: cant be in Available state as it will power off automatically.
 		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
-		TransitionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -227,22 +224,22 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the Maintenance resource has not been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
-		Consistently(Object(biosSettings)).Should(SatisfyAll(
+		Consistently(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		))
+		)
 
 		By("Ensuring that the BIOS setting has reached next state: stateSynced")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the Server BIOSSettings ref is empty")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
-		))
+		)
 	})
 
 	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
@@ -257,7 +254,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// else, unit test finishes the state very fast without being able to check the transition
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
 		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransitionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -275,9 +272,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the BIOS setting has reached next state: inProgress")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-		))
+		)
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
@@ -309,9 +306,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the BIOS setting has state: inProgress")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-		))
+		)
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
@@ -326,21 +323,21 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the Server is in correct power state")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-		))
+		)
 
 		// because of how we mock the setting update, it applied immediately and hence will not go through reboots to apply setting
 		// this is the eventual state we would need to reach
 		By("Ensuring that the BIOS setting has reached next state: Completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Ensuring that the BIOS setting has not referenced serverMaintenance anymore")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		))
+		)
 
 		By("Ensuring that the Maintenance resource has been deleted")
 		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
@@ -350,9 +347,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the Server BIOSSettings ref is empty")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
-		))
+		)
 	})
 
 	It("should create maintenance if setting update needs reboot", func(ctx SpecContext) {
@@ -368,7 +365,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
 		By("update the server powerstate to Off and reserved state")
 		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransitionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -386,10 +383,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the BIOS setting has reached next state: inProgress")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-		))
-
+		)
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
@@ -420,9 +416,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the BIOS setting has state: inProgress")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-		))
+		)
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
@@ -437,41 +433,28 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the Server is in Maintenance")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-		))
+		)
 
-		// due to issue with serverClaim, which forces the power state on the server even during maintenance we need this
-		By("Ensuring that the Server is in correct power state")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-		))
-
-		By("Ensuring that the BIOS setting has reached next state: issue/reboot power off")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
-		))
-		CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOff)
-		By("Ensuring that the BIOS setting has reached next state: issue/reboot power on")
+		By("Ensuring that the BIOS setting has reached next state: issue/reboot or verification state")
 		Eventually(Object(biosSettings)).Should(SatisfyAny(
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateVerification),
 		))
-		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-			CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOn)
-		}
 
 		// because of how we mock the setting update, it applied immediately and hence will not go through reboots to apply setting
 		// this is the eventual state we would need to reach
 		By("Ensuring that the BIOS setting has reached next state: Completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Ensuring that the BIOS setting has not referenced serverMaintenance anymore")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		))
+		)
 
 		By("Ensuring that the Maintenance resource has been deleted")
 		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
@@ -506,14 +489,14 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the BIOS setting has reached next state: inProgress")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-		))
+		)
 
 		By("Ensuring that the Server has the bios setting ref")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", &v1.LocalObjectReference{Name: biosSettings.Name}),
-		))
+		)
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
@@ -545,36 +528,29 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the Server is in Maintenance")
-		Eventually(Object(server)).WithTimeout(6 * time.Second).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-		))
+		)
 
-		By("Ensuring that the BIOS setting has reached next state: issue/reboot power off")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
-		))
-		CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOff)
-		By("Ensuring that the BIOS setting has reached next state: issue/reboot power on")
+		By("Ensuring that the BIOS setting has reached next state: issue/reboot or verification state")
 		Eventually(Object(biosSettings)).Should(SatisfyAny(
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOn),
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateWaitOnServerRebootPowerOff),
+			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateStateVerification),
 		))
-		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-			CheckServerPowerStateTransistionsDuringMaintenance(ctx, k8sClient, serverMaintenance, server, metalv1alpha1.PowerOn)
-		}
+
 		// because of the mocking, the transistions are super fast here.
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the bios ref is empty")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
-		))
+		)
 	})
 
 	It("should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
@@ -587,7 +563,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// powerOn is needed to skip the change in power on system, Hence skip maintenance.
 		By("update the server powerstate to On and reserved state")
 		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
-		TransitionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BMCSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -611,17 +587,17 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 
 		By("Ensuring that the biosSettings resource state is correct State inVersionUpgrade")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-		))
+		)
 
 		By("Ensuring that the serverMaintenance not ref.")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		))
-		Consistently(Object(biosSettings)).Should(SatisfyAll(
+		)
+		Consistently(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		))
+		)
 
 		By("Simulate the server biosSettings version update by matching the spec version")
 		Eventually(Update(biosSettings, func() {
@@ -634,17 +610,17 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 		// due to nature of mocking, we cant not determine few steps here. hence need a longer wait time
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 
 		By("Ensuring that the serverMaintenance not ref.")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		))
-		Consistently(Object(biosSettings)).Should(SatisfyAll(
+		)
+		Consistently(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		))
+		)
 
 		By("Deleting the BMCSetting resource")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
@@ -654,11 +630,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Consistently(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the Server biosSettings ref is empty on BMC")
-		Eventually(Object(server)).Should(SatisfyAll(
+		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
-		))
-		Consistently(Object(server)).Should(SatisfyAll(
+		)
+		Consistently(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
-		))
+		)
 	})
 })

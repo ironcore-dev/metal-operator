@@ -554,7 +554,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 	makeServer := func(ctx context.Context) {
 		server := metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-claims-",
+				GenerateName: "server-",
 				Annotations: map[string]string{
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 				},
@@ -626,7 +626,9 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for range 4 {
 			makeClaim(ctx, nil)
 		}
-		Eventually(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
+		// claiming 4 servers, with 1 CPU is going to be serial operation.
+		// we need to accommodate the timeout for it.
+		Eventually(countUniqueBoundServers(ctx, 10)).WithTimeout(6 * time.Second).Should(Equal(4))
 		Consistently(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
 		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(4))
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
@@ -639,7 +641,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for range 4 {
 			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))
 		}
-		Eventually(countUniqueBoundServers(ctx, 10)).WithTimeout(6 * time.Second).Should(Equal(4))
+		Eventually(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
 		Consistently(countUniqueBoundServers(ctx, 10)).Should(Equal(4))
 		Eventually(countUniqueBoundClaims(ctx)).Should(Equal(4))
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))

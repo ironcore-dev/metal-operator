@@ -24,8 +24,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Ensuring clean state")
 		var serverList metalv1alpha1.ServerList
 		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
-		var MaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&MaintenanceList)).Should(HaveField("Items", (BeEmpty())))
+		var maintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&maintenanceList)).Should(HaveField("Items", (BeEmpty())))
 
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
@@ -42,7 +42,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-maintenance-",
+				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				UUID:       "38947555-7742-3448-3784-823347823834",
@@ -109,7 +109,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	It("Should wait to put a Server into maintenance until approval", func(ctx SpecContext) {
 
 		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "abc:abc")
-		TransitionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating an ServerMaintenance object")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{

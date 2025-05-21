@@ -57,8 +57,8 @@ func NewRedfishKubeBMCClient(
 }
 
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string, systemUUID string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}

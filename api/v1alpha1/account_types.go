@@ -8,15 +8,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// AccountState is the state of an account.
 type AccountState string
 
 const (
-	AccountStateActive   AccountState = "Active"
+	// AccountStateActive is the state of an account that is active and can be used.
+	AccountStateActive AccountState = "Active"
+	// AccountStateInactive is the state of an account that is inactive and cannot be used.
 	AccountStateInactive AccountState = "Inactive"
-	AccountStateLocked   AccountState = "Locked"
-	AccountStateUnknown  AccountState = "Unknown"
+	// AccountStateLocked is the state of an account that is locked and cannot be used.
+	AccountStateLocked AccountState = "Locked"
+	// AccountStateUnknown is the state of an account that is unknown and cannot be used.
+	AccountStateUnknown AccountState = "Unknown"
+	// AccountStateDisabled is the state of an account that is disabled and cannot be used.
 	AccountStateDisabled AccountState = "Disabled"
-	AccountStateEnabled  AccountState = "Enabled"
+	// AccountStateEnabled is the state of an account that is enabled and can be used.
+	AccountStateEnabled AccountState = "Enabled"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -28,10 +35,12 @@ type AccountSpec struct {
 	RoleID             string
 	Description        string
 	PasswordExpiration metav1.Time
-	SecretRef          v1.LocalObjectReference
+	BMCSecretRef       v1.LocalObjectReference
 	BMCSelector        *metav1.LabelSelector
+	Enabled            bool
+	GeneratePassword   bool
+	MetalUser          bool
 	//"PasswordChangeRequired": false,
-	//"PasswordExpiration": null,
 }
 
 // AccountStatus defines the observed state of Account

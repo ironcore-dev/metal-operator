@@ -6,10 +6,12 @@ package controller
 import (
 	"context"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -63,24 +65,57 @@ func (r *AccountReconciler) reconcile(ctx context.Context, log logr.Logger, accO
 		return ctrl.Result{}, err
 	}
 	accSecret := &metalv1alpha1.BMCSecret{}
-	if err = r.Get(ctx, client.ObjectKey{
-		Namespace: accObj.Namespace,
-		Name:      accObj.Spec.SecretRef.Name,
-	}, accSecret); err != nil {
-		return ctrl.Result{}, err
+	if accObj.Spec.BMCSecretRef.Name == "" {
+		password, err := GenerateRandomPassword(16)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		accSecret = &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: accObj.Namespace,
+				Name:      accObj.Name,
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte(accObj.Spec.Name),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte(password),
+			},
+		}
+		if err := controllerutil.SetControllerReference(accObj, accSecret, r.Scheme); err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Create(ctx, accSecret); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		// if the secret already exists, get it
+		if err := r.Get(ctx, client.ObjectKey{
+			Namespace: accObj.Namespace,
+			Name:      accObj.Spec.BMCSecretRef.Name,
+		}, accSecret); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
+
 	username, pasword, err := bmcutils.GetBMCCredentialsFromSecret(accSecret)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	for _, b := range bmcList.Items {
+		if accObj.Spec.MetalUser {
+			b.Spec.BMCSecretRef = v1.LocalObjectReference{
+				Name: accSecret.Name,
+			}
+			if err := r.Update(ctx, &b); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 		bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, &b, false, bmc.BMCOptions{})
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		bmcClient.CreateOrUpdateAccount(ctx, accObj.Spec.Name, username, accObj.Spec.RoleID, pasword, accObj.Spec.Enabled)
 		// set the active user for the bmc client
-		if accObj.Spec.Active {
+		if accObj.Status.State == metalv1alpha1.AccountStateActive {
 			bmcSecret := &metalv1alpha1.BMCSecret{}
 			if err = r.Get(ctx, client.ObjectKey{
 				Namespace: b.Namespace,

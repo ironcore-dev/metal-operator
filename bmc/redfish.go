@@ -65,11 +65,12 @@ func NewRedfishBMCClient(
 	options BMCOptions,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
-		Endpoint:  options.Endpoint,
-		Username:  options.Username,
-		Password:  options.Password,
-		Insecure:  true,
-		BasicAuth: options.BasicAuth,
+		Endpoint:         options.Endpoint,
+		Username:         options.Username,
+		Password:         options.Password,
+		Insecure:         true,
+		ReuseConnections: true,
+		BasicAuth:        options.BasicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {

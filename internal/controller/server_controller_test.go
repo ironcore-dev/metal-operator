@@ -545,7 +545,14 @@ var _ = Describe("Server Controller", func() {
 			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed())
 
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+		Eventually(Object(server)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+		))
+		Consistently(Object(server)).WithTimeout(6 * time.Second).WithPolling(2 * time.Second).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+		))
 	})
 
 	It("Should reset a Server into initial state after maintenance is removed", func(ctx SpecContext) {

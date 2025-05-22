@@ -351,8 +351,8 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	if err != nil {
 		return nil, false, err
 	}
-	versions := make(chan string)
-	defer close(versions)
+	ServerRef := make(chan *v1.ObjectReference)
+	defer close(ServerRef)
 
 	handler := toolscache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj any) {
@@ -360,7 +360,10 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 			if newServer.Name != server.Name || newServer.Namespace != server.Namespace {
 				return
 			}
-			versions <- newServer.ResourceVersion
+			if newServer.Spec.ServerClaimRef == nil {
+				return
+			}
+			ServerRef <- newServer.Spec.ServerClaimRef
 		},
 	}
 	// The watch is initialized before calling ensureObjectRefForServer to ensure that the
@@ -381,8 +384,9 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	}
 	for {
 		select {
-		case cachedVersion := <-versions:
-			if cachedVersion >= server.ResourceVersion {
+		case cachedServerRef := <-ServerRef:
+			if cachedServerRef.Name == server.Spec.ServerClaimRef.Name &&
+				cachedServerRef.Namespace == server.Spec.ServerClaimRef.Namespace {
 				return server, modified, nil
 			}
 		case <-time.After(cacheUpdateTimeout):

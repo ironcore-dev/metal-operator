@@ -245,19 +245,10 @@ var _ = Describe("Server Controller", func() {
 
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-		))
-		// as this is set in the next reconsile cycle after reaching Available state is set,
-		// its best to check for it later to avoid flakyness
-		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
-		))
-		// as this is set  in the next reconsile cycle after power is set,
-		// its best to check for it later to avoid flakyness
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", BeNil()),
 		))
 
 		By("Ensuring that the boot configuration has been removed")
@@ -438,6 +429,7 @@ var _ = Describe("Server Controller", func() {
 		// force calculation of zero capacity string
 		_ = zeroCapacity.String()
 		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
@@ -472,11 +464,6 @@ var _ = Describe("Server Controller", func() {
 				},
 			})),
 			HaveField("Status.Storages", HaveLen(1)),
-		))
-		// as this is set  in the next reconsile cycle after power is set,
-		// its best to check for it later to avoid flakyness
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", BeNil()),
 		))
 
 		By("Ensuring that the boot configuration has been removed")
@@ -547,7 +534,6 @@ var _ = Describe("Server Controller", func() {
 			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed())
 
-		// this is large timeout due to the wait time for the DiscoveryTimeout to be hit and then transistioned to Intitial state
-		Eventually(Object(server)).WithTimeout(5 * time.Second).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
 	})
 })

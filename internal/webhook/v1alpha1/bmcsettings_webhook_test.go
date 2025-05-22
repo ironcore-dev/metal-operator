@@ -4,12 +4,15 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("BMCSettings Webhook", func() {
@@ -35,6 +38,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 		Expect(k8sClient.Create(ctx, BMCSettingsV1)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, BMCSettingsV1)
 		validator = BMCSettingsCustomValidator{Client: k8sClient}
+		SetClient(k8sClient)
 
 	})
 
@@ -62,7 +66,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 		})
 
 		It("Should create if a referenced BMC is NOT duplicate", func() {
-			By("Creating another BIOSSetting for different BMCRef")
+			By("Creating another BMCSetting for different BMCRef")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:    "ns.Name",
@@ -80,7 +84,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 		})
 
 		It("Should deny Update if a BMC referred is already referred by another", func() {
-			By("Creating another BIOSSetting with different BMCRef")
+			By("Creating another BMCSetting with different BMCRef")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:    "ns.Name",
@@ -103,7 +107,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 		})
 
 		It("Should Update if a BMC referred is NOT referred by another", func() {
-			By("Creating another BIOSSetting with different BMCref")
+			By("Creating another BMCSetting with different BMCref")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:    "ns.Name",
@@ -123,6 +127,22 @@ var _ = Describe("BMCSettings Webhook", func() {
 			BMCSettingsV2Updated := BMCSettingsV2.DeepCopy()
 			BMCSettingsV2Updated.Spec.BMCRef = &v1.LocalObjectReference{Name: "new-bmc2"}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().NotTo(HaveOccurred())
+		})
+
+		It("Should refuse to delete if InProgress", func() {
+			By("Patching the boot configuration to a Inprogress state")
+			Eventually(UpdateStatus(BMCSettingsV1, func() {
+				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
+			})).Should(Succeed())
+
+			By("Deleting the BMCSettings should fail")
+			Expect(k8sClient.Delete(ctx, BMCSettingsV1)).To(Not(Succeed()), fmt.Sprintf("BMCSettings state %v", BMCSettingsV1.Status.State))
+
+			Eventually(UpdateStatus(BMCSettingsV1, func() {
+				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateApplied
+			})).Should(Succeed())
+
+			By("Deleting the BMCSettings should pass: by DeferCleanup")
 		})
 	})
 })

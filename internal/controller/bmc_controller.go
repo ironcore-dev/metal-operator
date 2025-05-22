@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -177,11 +178,88 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 			continue
 		}
 		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
+		if err := r.writeServerDetails(ctx, log, server, bmcClient); err != nil {
+			errs = append(errs, fmt.Errorf("failed to write server details for %s: %w", server.Name, err))
+			continue
+		}
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("errors occurred during server discovery: %v", errs)
 	}
 
+	return nil
+}
+
+func (r *BMCReconciler) writeServerDetails(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
+	serverBase := server.DeepCopy()
+	systemInfo, err := bmcClient.GetSystemInfo(ctx, server.Spec.SystemUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get system info for Server: %w", err)
+	}
+	server.Status.SerialNumber = systemInfo.SerialNumber
+	server.Status.SKU = systemInfo.SKU
+	server.Status.Manufacturer = systemInfo.Manufacturer
+	server.Status.Model = systemInfo.Model
+	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
+	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
+
+	processors, err := bmcClient.GetProcessors(ctx, server.Spec.SystemUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get processors for Server: %w", err)
+	}
+
+	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(processors))
+	for _, processor := range processors {
+		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
+			ID:             processor.ID,
+			Type:           processor.Type,
+			Architecture:   processor.Architecture,
+			InstructionSet: processor.InstructionSet,
+			Manufacturer:   processor.Manufacturer,
+			Model:          processor.Model,
+			MaxSpeedMHz:    processor.MaxSpeedMHz,
+			TotalCores:     processor.TotalCores,
+			TotalThreads:   processor.TotalThreads,
+		})
+	}
+	storages, err := bmcClient.GetStorages(ctx, server.Spec.SystemUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get storages for Server: %w", err)
+	}
+	server.Status.Storages = nil
+	for _, storage := range storages {
+		metalStorage := metalv1alpha1.Storage{
+			Name:  storage.Name,
+			State: metalv1alpha1.StorageState(storage.State),
+		}
+		metalStorage.Drives = make([]metalv1alpha1.StorageDrive, 0, len(storage.Drives))
+		for _, drive := range storage.Drives {
+			metalStorage.Drives = append(metalStorage.Drives, metalv1alpha1.StorageDrive{
+				Name:      drive.Name,
+				Model:     drive.Model,
+				Vendor:    drive.Vendor,
+				Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
+				Type:      string(drive.Type),
+				State:     metalv1alpha1.StorageState(drive.State),
+				MediaType: drive.MediaType,
+			})
+		}
+		metalStorage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))
+		for _, volume := range storage.Volumes {
+			metalStorage.Volumes = append(metalStorage.Volumes, metalv1alpha1.StorageVolume{
+				Name:        volume.Name,
+				Capacity:    resource.NewQuantity(volume.SizeBytes, resource.BinarySI),
+				State:       metalv1alpha1.StorageState(volume.State),
+				RAIDType:    string(volume.RAIDType),
+				VolumeUsage: volume.VolumeUsage,
+			})
+		}
+		server.Status.Storages = append(server.Status.Storages, metalStorage)
+	}
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return fmt.Errorf("failed to patch server status: %w", err)
+	}
+	log.V(1).Info("Updated server status====", "Server", server.Name)
 	return nil
 }
 
@@ -201,11 +279,29 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 	}
 }
 
+func (r *BMCReconciler) enqueueBMCByServer(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	server := obj.(*metalv1alpha1.Server)
+	if server.Spec.BMCRef != nil {
+		// Check if the server is being deleted or if the operation is to update server details
+		if server.Annotations[InternalAnnotationOperationKeyName] == InternalAnnotationOperationValueUpdateServerDetails ||
+			server.DeletionTimestamp != nil {
+			log.V(1).Info("Enqueueing BMC by server", "Server", server.Name)
+			return []ctrl.Request{
+				{
+					NamespacedName: types.NamespacedName{Name: server.Spec.BMCRef.Name},
+				},
+			}
+		}
+	}
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
-		Owns(&metalv1alpha1.Server{}).
+		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByServer)).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
 		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
 		Complete(r)

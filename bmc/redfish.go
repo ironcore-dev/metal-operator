@@ -231,14 +231,32 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
 
-	systemProcessors, err := system.Processors()
-	if err != nil {
-		return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
-	}
+	return SystemInfo{
+		SystemUUID:        system.UUID,
+		Manufacturer:      system.Manufacturer,
+		Model:             system.Model,
+		Status:            system.Status,
+		PowerState:        system.PowerState,
+		SerialNumber:      system.SerialNumber,
+		SKU:               system.SKU,
+		IndicatorLED:      string(system.IndicatorLED),
+		TotalSystemMemory: quantity,
+	}, nil
+}
 
-	processors := make([]Processor, 0, len(systemProcessors))
-	for _, p := range systemProcessors {
-		processors = append(processors, Processor{
+// GetProcessors retrieves information about the processors using Redfish.
+func (r *RedfishBMC) GetProcessors(ctx context.Context, systemUUID string) ([]Processor, error) {
+	system, err := r.getSystemByUUID(ctx, systemUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get systems: %w", err)
+	}
+	processors, err := system.Processors()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get processors: %w", err)
+	}
+	result := make([]Processor, 0, len(processors))
+	for _, p := range processors {
+		result = append(result, Processor{
 			ID:             p.ID,
 			Type:           string(p.ProcessorType),
 			Architecture:   string(p.ProcessorArchitecture),
@@ -250,21 +268,10 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 			TotalThreads:   int32(p.TotalThreads),
 		})
 	}
-
-	return SystemInfo{
-		SystemUUID:        system.UUID,
-		Manufacturer:      system.Manufacturer,
-		Model:             system.Model,
-		Status:            system.Status,
-		PowerState:        system.PowerState,
-		SerialNumber:      system.SerialNumber,
-		SKU:               system.SKU,
-		IndicatorLED:      string(system.IndicatorLED),
-		TotalSystemMemory: quantity,
-		Processors:        processors,
-	}, nil
+	return result, nil
 }
 
+// GetBootOrder retrieves the boot order of the system using Redfish.
 func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemUUID string) ([]string, error) {
 	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
@@ -273,6 +280,7 @@ func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemUUID string) ([]str
 	return system.Boot.BootOrder, nil
 }
 
+// GetBiosVersion retrieves the BIOS version of the system using Redfish.
 func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
 	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
@@ -281,6 +289,7 @@ func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemUUID string) (str
 	return system.BIOSVersion, nil
 }
 
+// GetBiosAttributeValues retrieves the BIOS attributes of the system using Redfish.
 func (r *RedfishBMC) GetBiosAttributeValues(
 	ctx context.Context,
 	systemUUID string,

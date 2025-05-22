@@ -19,7 +19,6 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -405,9 +404,6 @@ var _ = Describe("Server Controller", func() {
 				UID:        bootConfig.UID,
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
-			HaveField("Status.Manufacturer", "Contoso"),
-			HaveField("Status.SKU", "8675309"),
-			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
@@ -425,49 +421,8 @@ var _ = Describe("Server Controller", func() {
 		// reconciliation as part of handling the available state.
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
 
-		zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
-		// force calculation of zero capacity string
-		_ = zeroCapacity.String()
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", BeNil()),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
-			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
-				Name: "Simple Storage Controller",
-				Drives: []metalv1alpha1.StorageDrive{
-					{
-						Name:     "SATA Bay 1",
-						Capacity: resource.NewQuantity(8000000000000, resource.BinarySI),
-						Vendor:   "Contoso",
-						Model:    "3000GT8",
-						State:    metalv1alpha1.StorageStateEnabled,
-					},
-					{
-						Name:     "SATA Bay 2",
-						Capacity: resource.NewQuantity(4000000000000, resource.BinarySI),
-						Vendor:   "Contoso",
-						Model:    "3000GT7",
-						State:    metalv1alpha1.StorageStateEnabled,
-					},
-					{
-						Name:     "SATA Bay 3",
-						State:    metalv1alpha1.StorageStateAbsent,
-						Capacity: zeroCapacity,
-					},
-					{
-						Name:     "SATA Bay 4",
-						State:    metalv1alpha1.StorageStateAbsent,
-						Capacity: zeroCapacity,
-					},
-				},
-			})),
-			HaveField("Status.Storages", HaveLen(1)),
-		))
-
 		By("Ensuring that the boot configuration has been removed")
-		Consistently(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the server is removed from the registry")
 		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)

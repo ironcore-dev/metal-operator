@@ -16,12 +16,12 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc/oem"
 )
 
-type Manufaturer string
+type Manufacturer string
 
 const (
-	DellServers   Manufaturer = "Dell Inc."
-	LenovoServers Manufaturer = "Lenovo"
-	HPEServers    Manufaturer = "HPE"
+	DellServers   Manufacturer = "Dell Inc."
+	LenovoServers Manufacturer = "Lenovo"
+	HPEServers    Manufacturer = "HPE"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.

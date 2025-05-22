@@ -40,11 +40,11 @@ type BIOSVersionReconciler struct {
 
 const (
 	biosVersionFinalizer                   = "firmware.ironcore.dev/biosversion"
-	biosVersionUpgradeIssued               = "biosversionUpgradeIssued"
-	biosVersionUpgradeCompleted            = "biosVersionUpgradeCompleted"
-	biosVersionUpgradeRebootServerPowerOn  = "biosVersionUpgradePowerOn"
-	biosVersionUpgradeRebootServerPowerOff = "biosVersionUpgradePowerOff"
-	biosVersionUpgradeVerficationCondition = "biosVersionUpgradeVerification"
+	biosVersionUpgradeIssued               = "BIOSVersionUpgradeIssued"
+	biosVersionUpgradeCompleted            = "BIOSVersionUpgradeCompleted"
+	biosVersionUpgradeRebootServerPowerOn  = "BIOSVersionUpgradePowerOn"
+	biosVersionUpgradeRebootServerPowerOff = "BIOSVersionUpgradePowerOff"
+	biosVersionUpgradeVerficationCondition = "BIOSVersionUpgradeVerification"
 )
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversions,verbs=get;list;watch;create;update;patch;delete
@@ -97,6 +97,11 @@ func (r *BIOSVersionReconciler) delete(
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(biosVersion, biosVersionFinalizer) {
 		return ctrl.Result{}, nil
+	}
+
+	if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+		log.V(1).Info("postponing delete as version update is in progress")
+		return r.reconcile(ctx, log, biosVersion)
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
@@ -758,8 +763,15 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 		log.V(1).Error(err, "failed to get secret ref for", "secretRef", biosVersion.Spec.Image.SecretRef.Name)
 		return ctrl.Result{}, err
 	}
+	var forceUpdate bool
+	switch biosVersion.Spec.UpdateType {
+	case metalv1alpha1.ForceUpdatBIOS:
+		forceUpdate = true
+	default:
+		forceUpdate = false
+	}
 	parameters := &redfish.SimpleUpdateParameters{
-		ForceUpdate:      biosVersion.Spec.ForceUpdate,
+		ForceUpdate:      forceUpdate,
 		ImageURI:         biosVersion.Spec.Image.URI,
 		Passord:          password,
 		Username:         username,

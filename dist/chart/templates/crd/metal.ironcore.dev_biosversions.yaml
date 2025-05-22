@@ -70,10 +70,10 @@ spec:
           spec:
             description: BIOSVersionSpec defines the desired state of BIOSVersion.
             properties:
-              forceUpdate:
+              UpdateType:
                 description: An indication of whether the server's upgrade service
                   should bypass vendor update policies
-                type: boolean
+                type: string
               image:
                 description: details regarding the image to use to upgrade to given
                   BIOS version

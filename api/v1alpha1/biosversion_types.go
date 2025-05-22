@@ -23,13 +23,21 @@ const (
 	BIOSVersionStateFailed BIOSVersionState = "Failed"
 )
 
+type BIOSUpdateType string
+
+const (
+	// BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting
+	ForceUpdatBIOS  BIOSUpdateType = "ForceUpdate"
+	NormalUpdatBIOS BIOSUpdateType = "NormalUpdate"
+)
+
 // BIOSVersionSpec defines the desired state of BIOSVersion.
 type BIOSVersionSpec struct {
 	// Version contains BIOS version to upgrade to
 	// +required
 	Version string `json:"version"`
 	// An indication of whether the server's upgrade service should bypass vendor update policies
-	ForceUpdate bool `json:"forceUpdate,omitempty"`
+	UpdateType BIOSUpdateType `json:"UpdateType,omitempty"`
 	// details regarding the image to use to upgrade to given BIOS version
 	Image ImageSpec `json:"image,omitempty"`
 

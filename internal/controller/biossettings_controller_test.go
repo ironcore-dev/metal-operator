@@ -189,7 +189,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		// mock BIOSSettings to not request maintenance by powering on the system (mock no need of power change on system)
 		// note: cant be in Available state as it will power off automatically.
-		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
 		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
@@ -253,7 +253,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// Reserved state is needed to transition through the unit test step by step
 		// else, unit test finishes the state very fast without being able to check the transition
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
-		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
 		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
@@ -364,7 +364,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// else, unit test finishes the state very fast without being able to check the transition
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
 		By("update the server powerstate to Off and reserved state")
-		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
 		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
@@ -562,7 +562,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// Reserved state is needed to as Available state will turn off the power automatically.
 		// powerOn is needed to skip the change in power on system, Hence skip maintenance.
 		By("update the server powerstate to On and reserved state")
-		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
 		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BMCSetting")

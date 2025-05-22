@@ -29,7 +29,7 @@ func (r *RedfishMockUps) ResetPendingBIOSSetting() {
 	r.PendingBIOSSetting = map[string]map[string]any{}
 }
 
-func CreateMockUp() {
+func InitMockUp() {
 	UnitTestMockUps = &RedfishMockUps{}
 	UnitTestMockUps.InitializeDefaults()
 }

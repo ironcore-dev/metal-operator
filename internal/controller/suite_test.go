@@ -136,7 +136,7 @@ var _ = BeforeSuite(func() {
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
 	}()
 
-	bmc.CreateMockUp()
+	bmc.InitMockUp()
 })
 
 func SetupTest() *corev1.Namespace {

@@ -38,12 +38,12 @@ func TransistionServerFromInitialToAvailableState(
 
 	if server.Status.State == metalv1alpha1.ServerStateAvailable {
 		By("Ensuring the server in Available state consistently")
-		Consistently(Object(server)).Should(SatisfyAll(
+		Consistently(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-		), fmt.Sprintf("Expected server to be consistently in Available State %v", server.Status.State))
-		Eventually(Object(server)).Should(SatisfyAll(
+			fmt.Sprintf("Expected server to be consistently in Available State %v", server.Status.State))
+		Eventually(Object(server)).Should(
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-		), fmt.Sprintf("Expected Server to be in PowerState 'off' in Available state %v", server))
+			fmt.Sprintf("Expected Server to be in PowerState 'off' in Available state %v", server))
 		return
 	}
 
@@ -60,9 +60,9 @@ func TransistionServerFromInitialToAvailableState(
 	}
 
 	By("Ensuring the server's bootconfig is ref")
-	Eventually(Object(server)).Should(SatisfyAll(
+	Eventually(Object(server)).Should(
 		HaveField("Spec.BootConfigurationRef", Not(BeNil())),
-	))
+	)
 
 	// need long time to create boot config
 	// as we go through multiple reconcile before creating the boot config
@@ -77,9 +77,9 @@ func TransistionServerFromInitialToAvailableState(
 		Succeed(),
 		fmt.Sprintf("Expected to get the bootConfig %v, created by Server %v", bootConfig, server.Name),
 	)
-	Eventually(Object(bootConfig)).Should(SatisfyAll(
+	Eventually(Object(bootConfig)).Should(
 		HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
-	), "Expected to get the bootConfig to reach pending state")
+		"Expected to get the bootConfig to reach pending state")
 
 	By("Patching the boot configuration to a Ready state")
 	Eventually(UpdateStatus(bootConfig, func() {
@@ -92,9 +92,9 @@ func TransistionServerFromInitialToAvailableState(
 	), "Expected the bootConfig to reach ready state")
 
 	By("Ensuring that the Server is set to discovery and powered on")
-	Eventually(Object(server)).Should(SatisfyAll(
+	Eventually(Object(server)).Should(
 		HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
-	), fmt.Sprintf("Expected Server to be in Discovery state %v", server))
+		fmt.Sprintf("Expected Server to be in Discovery state %v", server))
 	Eventually(Object(server)).Should(SatisfyAll(
 		HaveField("Spec.Power", metalv1alpha1.PowerOn),
 		HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
@@ -122,9 +122,9 @@ func TransistionServerFromInitialToAvailableState(
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 		), fmt.Sprintf("Expected Server to be in Available or Discovery State %v", server))
 	}
-	Eventually(Object(server)).Should(SatisfyAll(
+	Eventually(Object(server)).Should(
 		HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-	), fmt.Sprintf("Expected Server to be in Available State %v", server))
+		fmt.Sprintf("Expected Server to be in Available State %v", server))
 	Eventually(Object(server)).Should(SatisfyAll(
 		HaveField("Spec.Power", metalv1alpha1.PowerOff),
 		HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
@@ -141,9 +141,9 @@ func TransistionServerToReserveredState(
 ) {
 	if server.Status.State == metalv1alpha1.ServerStateReserved {
 		By("Ensuring the server in Reserevd state consistently")
-		Consistently(Object(server)).Should(SatisfyAll(
+		Consistently(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
-		), fmt.Sprintf("Expected server to be consistently in Reserved State %v", server.Status.State))
+			fmt.Sprintf("Expected server to be consistently in Reserved State %v", server.Status.State))
 		return
 	}
 	TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, nameSpace)
@@ -161,9 +161,9 @@ func TransistionServerToReserveredState(
 		HaveField("Spec.ServerClaimRef", Not(BeNil())),
 		HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
 	), fmt.Sprintf("Expected Server %v to be referenced by serverClaim %v", server, serverClaim))
-	Eventually(Object(server)).Should(SatisfyAll(
+	Eventually(Object(server)).Should(
 		HaveField("Status.State", metalv1alpha1.ServerStateReserved),
-	), fmt.Sprintf("Expected Server to be in Reserved state %v", server))
+		fmt.Sprintf("Expected Server to be in Reserved state %v", server))
 
 	By("Ensuring that the ServerClaim is bound")
 	Eventually(Object(serverClaim)).Should(SatisfyAll(
@@ -183,7 +183,7 @@ func TransistionServerToReserveredState(
 	Eventually(Get(claimConfig)).Should(Succeed())
 
 	By("Ensuring that the server has a correct boot configuration ref")
-	Eventually(Object(server)).Should(SatisfyAll(
+	Eventually(Object(server)).Should(
 		HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
 			APIVersion: "metal.ironcore.dev/v1alpha1",
 			Kind:       "ServerBootConfiguration",
@@ -191,7 +191,10 @@ func TransistionServerToReserveredState(
 			Name:       claimConfig.Name,
 			UID:        claimConfig.UID,
 		}),
-	), fmt.Sprintf("Expected Server to have ref for BootConfig %v created by serverClaim %v", claimConfig, serverClaim))
+		fmt.Sprintf("Expected Server to have ref for BootConfig %v created by serverClaim %v",
+			claimConfig,
+			serverClaim),
+	)
 
 	By("Patching the boot configuration to a Ready state")
 	Eventually(UpdateStatus(claimConfig, func() {
@@ -199,15 +202,19 @@ func TransistionServerToReserveredState(
 	})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", claimConfig))
 
 	By("Ensuring that the Server has the correct PowerState")
-	Eventually(Object(server)).Should(SatisfyAll(
+	Eventually(Object(server)).Should(
 		HaveField("Spec.Power", serverClaim.Spec.Power),
-	), fmt.Sprintf("Expected Server to be in Power %v in Reserved state %v", serverClaim.Spec.Power, server.Status))
-	Eventually(Object(server)).Should(SatisfyAll(
+		fmt.Sprintf("Expected Server to be in Power %v in Reserved state %v", serverClaim.Spec.Power, server.Status),
+	)
+	Eventually(Object(server)).Should(
 		HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(serverClaim.Spec.Power)),
-	), fmt.Sprintf("Expected Server to be in PowerState %v in Reserved state %v", serverClaim.Spec.Power, server.Status))
+		fmt.Sprintf("Expected Server to be in PowerState %v in Reserved state %v",
+			serverClaim.Spec.Power,
+			server.Status),
+	)
 }
 
-func GetServerClaim(
+func BuildServerClaim(
 	ctx context.Context,
 	k8sClient client.Client,
 	server metalv1alpha1.Server,

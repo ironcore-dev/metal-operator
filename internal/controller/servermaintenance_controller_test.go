@@ -108,7 +108,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 	It("Should wait to put a Server into maintenance until approval", func(ctx SpecContext) {
 
-		serverClaim := GetServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "abc:abc")
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "abc:abc")
 		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating an ServerMaintenance object")

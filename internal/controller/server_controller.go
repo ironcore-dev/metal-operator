@@ -189,9 +189,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status",
-		"Status", server.Status.State,
-		"powerState", server.Status.PowerState)
+	log.V(1).Info("Updated Server status")
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
@@ -204,9 +202,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		if err := r.updateServerStatus(ctx, log, server); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 		}
-		log.V(1).Info("Updated Server status after state transition",
-			"Status", server.Status.State,
-			"powerState", server.Status.PowerState)
+		log.V(1).Info("Updated Server status after state transition")
 		return ctrl.Result{Requeue: requeue, RequeueAfter: r.ResyncInterval}, nil
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -217,9 +213,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status after State transition",
-		"Status", server.Status.State,
-		"powerState", server.Status.PowerState)
+	log.V(1).Info("Updated Server status after state transition")
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{}, nil
@@ -533,6 +527,10 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
 	}
+
+	log.V(1).Info("Updated Server status",
+		"Status", server.Status.State,
+		"powerState", server.Status.PowerState)
 
 	return nil
 }

@@ -259,7 +259,7 @@ func (r *BMCReconciler) writeServerDetails(ctx context.Context, log logr.Logger,
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch server status: %w", err)
 	}
-	log.V(1).Info("Updated server status====", "Server", server.Name)
+	log.V(1).Info("Updated server status", "Server", server.Name)
 	return nil
 }
 

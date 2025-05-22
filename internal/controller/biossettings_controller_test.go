@@ -569,7 +569,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-bios-upgrade",
+				GenerateName: "test-bios-upgrade-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version:                 "2.45.455b66-rev4",

@@ -23,6 +23,10 @@ var _ = Describe("BMC Controller", func() {
 		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
+	zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
+	// force calculation of zero capacity string
+	_ = zeroCapacity.String()
+
 	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
 		endpoint := &metalv1alpha1.Endpoint{
@@ -85,12 +89,31 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
-		))
-
-		zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
-		// force calculation of zero capacity string
-		_ = zeroCapacity.String()
-		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.Processors", ConsistOf(
+				metalv1alpha1.Processor{
+					ID:             "CPU1",
+					Type:           "CPU",
+					Architecture:   "x86",
+					InstructionSet: "x86-64",
+					Manufacturer:   "Intel(R) Corporation",
+					Model:          "Multi-Core Intel(R) Xeon(R) processor 7xxx Series",
+					MaxSpeedMHz:    3700,
+					TotalCores:     8,
+					TotalThreads:   16,
+				},
+				metalv1alpha1.Processor{
+					ID:   "CPU2",
+					Type: "CPU",
+				},
+				metalv1alpha1.Processor{
+					ID:             "FPGA1",
+					Type:           "FPGA",
+					Architecture:   "OEM",
+					InstructionSet: "OEM",
+					Manufacturer:   "Intel(R) Corporation",
+					Model:          "Stratix 10",
+				},
+			)),
 			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
 				Name: "Simple Storage Controller",
 				Drives: []metalv1alpha1.StorageDrive{

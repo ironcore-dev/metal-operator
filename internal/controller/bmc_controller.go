@@ -178,7 +178,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 			continue
 		}
 		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
-		if err := r.writeServerDetails(ctx, log, server, bmcClient); err != nil {
+		if err := r.updateServerDetails(ctx, log, server, bmcClient); err != nil {
 			errs = append(errs, fmt.Errorf("failed to write server details for %s: %w", server.Name, err))
 			continue
 		}
@@ -190,7 +190,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	return nil
 }
 
-func (r *BMCReconciler) writeServerDetails(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
+func (r *BMCReconciler) updateServerDetails(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
 	serverBase := server.DeepCopy()
 	systemInfo, err := bmcClient.GetSystemInfo(ctx, server.Spec.SystemUUID)
 	if err != nil {

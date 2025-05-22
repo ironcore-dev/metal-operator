@@ -89,31 +89,6 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-			HaveField("Status.Processors", ConsistOf(
-				metalv1alpha1.Processor{
-					ID:             "CPU1",
-					Type:           "CPU",
-					Architecture:   "x86",
-					InstructionSet: "x86-64",
-					Manufacturer:   "Intel(R) Corporation",
-					Model:          "Multi-Core Intel(R) Xeon(R) processor 7xxx Series",
-					MaxSpeedMHz:    3700,
-					TotalCores:     8,
-					TotalThreads:   16,
-				},
-				metalv1alpha1.Processor{
-					ID:   "CPU2",
-					Type: "CPU",
-				},
-				metalv1alpha1.Processor{
-					ID:             "FPGA1",
-					Type:           "FPGA",
-					Architecture:   "OEM",
-					InstructionSet: "OEM",
-					Manufacturer:   "Intel(R) Corporation",
-					Model:          "Stratix 10",
-				},
-			)),
 		))
 
 		By("Ensuring the boot configuration has been created")

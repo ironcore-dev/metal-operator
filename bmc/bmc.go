@@ -56,6 +56,8 @@ type BMC interface {
 
 	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
 
+	GetProcessors(ctx context.Context, systemUUID string) ([]Processor, error)
+
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 }
 
@@ -213,7 +215,6 @@ type SystemInfo struct {
 	Status            common.Status
 	PowerState        redfish.PowerState
 	NetworkInterfaces []NetworkInterface
-	Processors        []Processor
 	TotalSystemMemory resource.Quantity
 	SystemUUID        string
 	SerialNumber      string

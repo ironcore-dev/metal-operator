@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -21,6 +22,10 @@ var _ = Describe("BMC Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
 	})
+
+	zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
+	// force calculation of zero capacity string
+	_ = zeroCapacity.String()
 
 	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
@@ -81,6 +86,64 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.BMCRef.Name", endpoint.Name),
+			HaveField("Status.Manufacturer", "Contoso"),
+			HaveField("Status.SKU", "8675309"),
+			HaveField("Status.SerialNumber", "437XR1138R2"),
+			HaveField("Status.Processors", ConsistOf(
+				metalv1alpha1.Processor{
+					ID:             "CPU1",
+					Type:           "CPU",
+					Architecture:   "x86",
+					InstructionSet: "x86-64",
+					Manufacturer:   "Intel(R) Corporation",
+					Model:          "Multi-Core Intel(R) Xeon(R) processor 7xxx Series",
+					MaxSpeedMHz:    3700,
+					TotalCores:     8,
+					TotalThreads:   16,
+				},
+				metalv1alpha1.Processor{
+					ID:   "CPU2",
+					Type: "CPU",
+				},
+				metalv1alpha1.Processor{
+					ID:             "FPGA1",
+					Type:           "FPGA",
+					Architecture:   "OEM",
+					InstructionSet: "OEM",
+					Manufacturer:   "Intel(R) Corporation",
+					Model:          "Stratix 10",
+				},
+			)),
+			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
+				Name: "Simple Storage Controller",
+				Drives: []metalv1alpha1.StorageDrive{
+					{
+						Name:     "SATA Bay 1",
+						Capacity: resource.NewQuantity(8000000000000, resource.BinarySI),
+						Vendor:   "Contoso",
+						Model:    "3000GT8",
+						State:    metalv1alpha1.StorageStateEnabled,
+					},
+					{
+						Name:     "SATA Bay 2",
+						Capacity: resource.NewQuantity(4000000000000, resource.BinarySI),
+						Vendor:   "Contoso",
+						Model:    "3000GT7",
+						State:    metalv1alpha1.StorageStateEnabled,
+					},
+					{
+						Name:     "SATA Bay 3",
+						State:    metalv1alpha1.StorageStateAbsent,
+						Capacity: zeroCapacity,
+					},
+					{
+						Name:     "SATA Bay 4",
+						State:    metalv1alpha1.StorageStateAbsent,
+						Capacity: zeroCapacity,
+					},
+				},
+			})),
+			HaveField("Status.Storages", HaveLen(1)),
 		))
 	})
 

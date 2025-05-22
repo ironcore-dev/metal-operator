@@ -27,7 +27,6 @@ import (
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,6 +60,10 @@ const (
 	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
 	// InternalAnnotationTypeValue is the value for the internal annotation type
 	InternalAnnotationTypeValue = "Internal"
+	// InternalAnnotationOperationKeyName is the key name for the internal annotation operation
+	InternalAnnotationOperationKeyName = "metal.ironcore.dev/operation"
+	// InternalAnnotationOperationValueUpdateServerDetails is the value for the update server details operation
+	InternalAnnotationOperationValueUpdateServerDetails = "update-server-details"
 )
 
 const (
@@ -305,47 +308,6 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Server state set to power on")
 
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-	if err != nil {
-		return false, fmt.Errorf("failed to create BMC client: %w", err)
-	}
-	storages, err := bmcClient.GetStorages(ctx, server.Spec.SystemUUID)
-	if err != nil {
-		return false, fmt.Errorf("failed to get storages for Server: %w", err)
-	}
-	server.Status.Storages = nil
-	for _, storage := range storages {
-		metalStorage := metalv1alpha1.Storage{
-			Name:  storage.Name,
-			State: metalv1alpha1.StorageState(storage.State),
-		}
-		for _, drive := range storage.Drives {
-			metalStorage.Drives = append(metalStorage.Drives, metalv1alpha1.StorageDrive{
-				Name:      drive.Name,
-				Model:     drive.Model,
-				Vendor:    drive.Vendor,
-				Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
-				Type:      string(drive.Type),
-				State:     metalv1alpha1.StorageState(drive.State),
-				MediaType: drive.MediaType,
-			})
-		}
-		metalStorage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))
-		for _, volume := range storage.Volumes {
-			metalStorage.Volumes = append(metalStorage.Volumes, metalv1alpha1.StorageVolume{
-				Name:        volume.Name,
-				Capacity:    resource.NewQuantity(volume.SizeBytes, resource.BinarySI),
-				State:       metalv1alpha1.StorageState(volume.State),
-				RAIDType:    string(volume.RAIDType),
-				VolumeUsage: volume.VolumeUsage,
-			})
-		}
-		server.Status.Storages = append(server.Status.Storages, metalStorage)
-	}
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch Server status: %w", err)
-	}
-
 	if r.checkLastStatusUpdateAfter(r.DiscoveryTimeout, server) {
 		log.V(1).Info("Server did not post info to registry in time, back to initial state")
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
@@ -497,27 +459,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 
 	serverBase := server.DeepCopy()
 	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
-	server.Status.SerialNumber = systemInfo.SerialNumber
-	server.Status.SKU = systemInfo.SKU
-	server.Status.Manufacturer = systemInfo.Manufacturer
-	server.Status.Model = systemInfo.Model
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
-	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
-
-	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
-	for _, processor := range systemInfo.Processors {
-		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
-			ID:             processor.ID,
-			Type:           processor.Type,
-			Architecture:   processor.Architecture,
-			InstructionSet: processor.InstructionSet,
-			Manufacturer:   processor.Manufacturer,
-			Model:          processor.Model,
-			MaxSpeedMHz:    processor.MaxSpeedMHz,
-			TotalCores:     processor.TotalCores,
-			TotalThreads:   processor.TotalThreads,
-		})
-	}
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)

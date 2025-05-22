@@ -27,12 +27,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 	ns.Name = "default"
 
 	var (
-		server             *metalv1alpha1.Server
-		defaultBiosVersion string
+		server                   *metalv1alpha1.Server
+		upgradeServerBiosVersion string
 	)
 
 	BeforeEach(func(ctx SpecContext) {
-		defaultBiosVersion = bmc.MockedBIOSVersion
+		upgradeServerBiosVersion = "P80 v1.45 (12/06/2017)"
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -77,8 +77,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
-		bmc.MockedBIOSVersion = defaultBiosVersion
-		bmc.MockedBIOSUpgradeTaskIndex = 0
+		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
 	})
 
 	It("should successfully mark completed if no BIOS version change", func(ctx SpecContext) {
@@ -94,8 +93,8 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 "123.5",
-				Image:                   metalv1alpha1.ImageSpec{URI: "123.5"},
+				Version:                 defaultMockUpServerBiosVersion,
+				Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -111,49 +110,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Consistently(Object(biosVersion)).Should(
 			HaveField("Status.Conditions", BeNil()),
 		)
-
-		By("Ensuring that the Maintenance resource has NOT been created")
-		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
-
-		By("Deleting the BIOSVersion")
-		Expect(k8sClient.Delete(ctx, biosVersion)).To(Succeed())
-
-		By("Ensuring that the BiosVersion has been removed")
-		Eventually(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
-		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
-	})
-
-	It("should mark Failed if BIOS version is lower", func(ctx SpecContext) {
-
-		By("Ensuring that the server has Available state")
-		Eventually(Object(server)).Should(
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-		)
-		By("Creating a BIOSVersion")
-		biosVersion := &metalv1alpha1.BIOSVersion{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
-			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 "123.4",
-				Image:                   metalv1alpha1.ImageSpec{URI: "123.5"},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-			},
-		}
-		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
-
-		By("Ensuring that BIOS upgrade has completed")
-		Eventually(Object(biosVersion)).Should(
-			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-		)
-
-		By("Ensuring that BIOS upgrade Conditions has not created")
-		Consistently(Object(biosVersion)).Should(SatisfyAny(
-			HaveField("Status.Conditions", BeNil()),
-		))
 
 		By("Ensuring that the Maintenance resource has NOT been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
@@ -185,8 +141,8 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 "123.7",
-				Image:                   metalv1alpha1.ImageSpec{URI: "123.7"},
+				Version:                 upgradeServerBiosVersion,
+				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -271,8 +227,8 @@ var _ = Describe("BIOSVersion Controller", func() {
 		// note: ImageURI need to have the version string.
 
 		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-
-		serverClaim := transitionServerToReserved(ctx, ns, server, metalv1alpha1.PowerOn)
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
@@ -281,8 +237,8 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 "123.8",
-				Image:                   metalv1alpha1.ImageSpec{URI: "123.8"},
+				Version:                 upgradeServerBiosVersion,
+				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},

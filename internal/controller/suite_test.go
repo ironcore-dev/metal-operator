@@ -40,10 +40,11 @@ const (
 )
 
 var (
-	cfg         *rest.Config
-	k8sClient   client.Client
-	testEnv     *envtest.Environment
-	registryURL = "http://localhost:30000"
+	cfg                            *rest.Config
+	k8sClient                      client.Client
+	testEnv                        *envtest.Environment
+	registryURL                    = "http://localhost:30000"
+	defaultMockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
 )
 
 func TestControllers(t *testing.T) {

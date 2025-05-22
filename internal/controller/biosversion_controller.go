@@ -403,14 +403,6 @@ func (r *BIOSVersionReconciler) checkVersionAndTransistionState(
 		err := r.updateBiosVersionStatus(ctx, log, biosVersion, metalv1alpha1.BIOSVersionStateCompleted, nil, nil, nil)
 		return ctrl.Result{}, err
 	}
-	if currentBiosVersion > biosVersion.Spec.Version {
-		log.V(1).Info("Can not downgrade BIOS version",
-			"current version", currentBiosVersion,
-			"requested version", biosVersion.Spec.Version,
-			"for server", server.Name)
-		err := r.updateBiosVersionStatus(ctx, log, biosVersion, metalv1alpha1.BIOSVersionStateFailed, nil, nil, nil)
-		return ctrl.Result{}, err
-	}
 	err = r.updateBiosVersionStatus(ctx, log, biosVersion, metalv1alpha1.BIOSVersionStateInProgress, nil, nil, nil)
 	return ctrl.Result{}, err
 }

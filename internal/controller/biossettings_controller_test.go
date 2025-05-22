@@ -23,12 +23,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 	ns.Name = "default"
 
 	var (
-		defaultBiosVersion string
-		server             *metalv1alpha1.Server
+		server *metalv1alpha1.Server
 	)
 
 	BeforeEach(func(ctx SpecContext) {
-
 		By("Ensuring clean state")
 		var serverList metalv1alpha1.ServerList
 		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
@@ -93,7 +91,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 defaultMockUpServerBiosVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -117,7 +115,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion + "2",
+				Version:                 defaultMockUpServerBiosVersion + "2",
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -157,7 +155,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 defaultMockUpServerBiosVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -201,7 +199,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change-noreboot-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 defaultMockUpServerBiosVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -265,7 +263,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 defaultMockUpServerBiosVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -376,7 +374,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 defaultMockUpServerBiosVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -476,7 +474,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 bmc.MockedBIOSVersion,
+				Version:                 defaultMockUpServerBiosVersion,
 				SettingsMap:             BIOSSetting,
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -597,7 +595,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Simulate the server biosSettings version update by matching the spec version")
 		Eventually(Update(biosSettings, func() {
-			biosSettings.Spec.Version = bmc.MockedBIOSVersion
+			biosSettings.Spec.Version = defaultMockUpServerBiosVersion
 		})).Should(Succeed())
 
 		By("Ensuring that the biosSettings resource has setting updated, and moved the state")

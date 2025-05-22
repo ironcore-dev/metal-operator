@@ -21,6 +21,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 	}
 	r.PendingBIOSSetting = map[string]map[string]any{}
+	r.BIOSVersion = ""
 	r.BIOSUpgradingVersion = ""
 
 	r.BIOSUpgradeTaskIndex = 0
@@ -72,6 +73,7 @@ func (r *RedfishMockUps) ResetBIOSVersionUpdate() {
 	r.ResetBIOSSettings()
 	r.BIOSUpgradeTaskIndex = 0
 	r.BIOSUpgradingVersion = ""
+	r.BIOSVersion = ""
 }
 
 func InitMockUp() {

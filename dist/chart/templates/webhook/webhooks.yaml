@@ -25,6 +25,7 @@ webhooks:
       - operations:
           - CREATE
           - UPDATE
+          - DELETE
         apiGroups:
           - metal.ironcore.dev
         apiVersions:
@@ -45,6 +46,7 @@ webhooks:
       - operations:
           - CREATE
           - UPDATE
+          - DELETE
         apiGroups:
           - metal.ironcore.dev
         apiVersions:

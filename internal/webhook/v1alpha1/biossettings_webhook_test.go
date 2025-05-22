@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	// TODO (user): Add any additional imports if needed
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("BIOSSettings Webhook", func() {
@@ -20,8 +20,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 	)
 
 	BeforeEach(func() {
-
 		validator = BIOSSettingsCustomValidator{Client: k8sClient}
+		SetClient(k8sClient)
 		By("Creating an BIOSSetttings")
 		biosSettingsV1 = &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -147,6 +147,22 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			biosSettingsV2Updated := biosSettingsV2.DeepCopy()
 			biosSettingsV2Updated.Spec.ServerRef = &v1.LocalObjectReference{Name: "foobar"}
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
+		})
+
+		It("Should refuse to delete if InProgress", func() {
+			By("Patching the boot configuration to a Inprogress state")
+			Eventually(UpdateStatus(biosSettingsV1, func() {
+				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
+			})).Should(Succeed())
+
+			By("Deleting the BIOSSettings should fail")
+			Expect(k8sClient.Delete(ctx, biosSettingsV1)).To(Not(Succeed()))
+
+			Eventually(UpdateStatus(biosSettingsV1, func() {
+				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateApplied
+			})).Should(Succeed())
+
+			By("Deleting the BIOSSettings should pass: by DeferCleanup")
 		})
 	})
 

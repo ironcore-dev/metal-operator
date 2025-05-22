@@ -4,12 +4,15 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("BMCSettings Webhook", func() {
@@ -35,6 +38,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 		Expect(k8sClient.Create(ctx, BMCSettingsV1)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, BMCSettingsV1)
 		validator = BMCSettingsCustomValidator{Client: k8sClient}
+		SetClient(k8sClient)
 
 	})
 
@@ -123,6 +127,22 @@ var _ = Describe("BMCSettings Webhook", func() {
 			BMCSettingsV2Updated := BMCSettingsV2.DeepCopy()
 			BMCSettingsV2Updated.Spec.BMCRef = &v1.LocalObjectReference{Name: "new-bmc2"}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().NotTo(HaveOccurred())
+		})
+
+		It("Should refuse to delete if InProgress", func() {
+			By("Patching the boot configuration to a Inprogress state")
+			Eventually(UpdateStatus(BMCSettingsV1, func() {
+				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
+			})).Should(Succeed())
+
+			By("Deleting the BIOSSettings should fail")
+			Expect(k8sClient.Delete(ctx, BMCSettingsV1)).To(Not(Succeed()), fmt.Sprintf("server bmc setting %v", BMCSettingsV1.Status.State))
+
+			Eventually(UpdateStatus(BMCSettingsV1, func() {
+				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateApplied
+			})).Should(Succeed())
+
+			By("Deleting the BIOSSettings should pass: by DeferCleanup")
 		})
 	})
 })

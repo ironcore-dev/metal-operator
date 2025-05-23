@@ -75,6 +75,9 @@ type ServerSpec struct {
 	// SystemUUID is the unique identifier for the server.
 	SystemUUID string `json:"systemUUID,omitempty"`
 
+	// SystemURI is the unique URI for the server resource in REDFISH API.
+	SystemURI string `json:"systemURI,omitempty"`
+
 	// Power specifies the desired power state of the server.
 	Power Power `json:"power,omitempty"`
 

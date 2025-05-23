@@ -81,7 +81,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
-		bmcPkg.PendingMockedBMCSetting = map[string]map[string]any{}
+		bmcPkg.UnitTestMockUps.ResetBMCSettings()
 	})
 
 	It("should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
@@ -208,7 +208,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		// put server in reserved state. and create a bmc setting in Ownerapproved which needs reboot.
 		// this is needed to check the states traversed.
-		serverClaim := transitionServerToReserved(ctx, ns, server, metalv1alpha1.PowerOff)
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{
@@ -360,7 +361,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				Name:      fmt.Sprintf("%s-%s", BMCSettings.Name, server.Name),
 			},
 		}
-		checkServerMaintenanceGranted(serverMaintenance, server)
+		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the BMCSettings resource hasmoved to next state")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(

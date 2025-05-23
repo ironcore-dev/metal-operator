@@ -440,8 +440,8 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			return ctrl.Result{}, err
 		}
 		// todo: can take some time to setting to take place. might need to fail after certain time.
-		log.V(1).Info("Reconciled biosSettings at wait for verification")
-		return ctrl.Result{}, fmt.Errorf("waiting on the BIOS setting to take place")
+		log.V(1).Info("waiting on the BIOS setting to take place")
+		return ctrl.Result{Requeue: true}, nil
 	}
 	log.V(1).Info("Unknown State found", "biosSettings UpdateSetting state", biosSettings.Status.UpdateSettingState)
 	// stop reconsile as we can not proceed with unknown state

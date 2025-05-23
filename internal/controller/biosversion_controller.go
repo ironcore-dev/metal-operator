@@ -336,7 +336,8 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 					return ctrl.Result{}, err
 				}
 			}
-			return ctrl.Result{}, fmt.Errorf("waiting for bios version to reflect the new version")
+			log.V(1).Info("waiting for bios version to reflect the new version")
+			return ctrl.Result{Requeue: true}, nil
 		}
 
 		if err := acc.Update(

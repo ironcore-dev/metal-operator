@@ -25,12 +25,34 @@ webhooks:
       - operations:
           - CREATE
           - UPDATE
+          - DELETE
         apiGroups:
           - metal.ironcore.dev
         apiVersions:
           - v1alpha1
         resources:
           - biossettings
+  - name: vbmcsettings-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: metal-operator-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-metal-ironcore-dev-v1alpha1-bmcsettings
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        apiGroups:
+          - metal.ironcore.dev
+        apiVersions:
+          - v1alpha1
+        resources:
+          - bmcsettings
   - name: vendpoint-v1alpha1.kb.io
     clientConfig:
       service:

@@ -135,6 +135,8 @@ var _ = BeforeSuite(func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
 	}()
+
+	bmc.InitMockUp()
 })
 
 func SetupTest() *corev1.Namespace {
@@ -219,7 +221,7 @@ func SetupTest() *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout: 500 * time.Millisecond, // Force timeout to be quick for tests
+			DiscoveryTimeout: time.Second, // Force timeout to be quick for tests
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,6 +25,12 @@ var _ = Describe("ServerClaim Controller", func() {
 	var server *metalv1alpha1.Server
 
 	BeforeEach(func(ctx SpecContext) {
+		By("Ensuring clean state")
+		var serverList metalv1alpha1.ServerList
+		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
+		var claimList metalv1alpha1.ServerClaimList
+		Eventually(ObjectList(&claimList)).Should(HaveField("Items", (BeEmpty())))
+
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -56,7 +63,7 @@ var _ = Describe("ServerClaim Controller", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, server)).Should(Succeed())
+		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
 	})
 
 	AfterEach(func(ctx SpecContext) {
@@ -91,15 +98,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
 
@@ -141,6 +142,15 @@ var _ = Describe("ServerClaim Controller", func() {
 				Name:       config.Name,
 				UID:        config.UID,
 			}),
+		))
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(config, func() {
+			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", config))
+
+		By("Ensuring that the Server has the correct PowerStatus")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(claim.Spec.Power)),
 		))
 
 		By("Deleting the ServerClaim")
@@ -186,11 +196,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
@@ -226,16 +231,6 @@ var _ = Describe("ServerClaim Controller", func() {
 				"env":  "prod",
 			}
 		})).Should(Succeed())
-
-		By("Patching the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", BeNil()),
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-		))
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
@@ -293,7 +288,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	})
 
 	It("should not claim a server in a non-available state", func(ctx SpecContext) {
-		By("Patching the Server to available state")
+		By("Patching the Server to Initial state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateInitial
 		})).Should(Succeed())

@@ -31,6 +31,27 @@ webhooks:
           - v1alpha1
         resources:
           - biossettings
+  - name: vbiosversion-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: metal-operator-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-metal-ironcore-dev-v1alpha1-biosversion
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        apiGroups:
+          - metal.ironcore.dev
+        apiVersions:
+          - v1alpha1
+        resources:
+          - biosversions
   - name: vendpoint-v1alpha1.kb.io
     clientConfig:
       service:

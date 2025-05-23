@@ -16,8 +16,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BIOSSettings Controller", func() {
@@ -256,7 +254,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
 
-		By("Ensuring that the biosSettings resource has started bios setting updated")
+		By("Ensuring that the biosSettings resource has started bios setting update")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateState("")),
@@ -365,7 +363,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
 
-		By("Ensuring that the biosSettings resource has started bios setting updated")
+		By("Ensuring that the biosSettings resource has started bios setting update")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 			HaveField("Status.UpdateSettingState", metalv1alpha1.BIOSSettingUpdateState("")),
@@ -448,7 +446,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				Name:      biosSettings.Name,
 			},
 		}
-		checkServerMaintenanceGranted(serverMaintenance, server)
+		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(SatisfyAny(

@@ -15,13 +15,6 @@ import (
 
 var _ BMC = (*RedfishLocalBMC)(nil)
 
-var defaultMockedBMCSetting = map[string]map[string]any{
-	"abc":       {"type": redfish.StringAttributeType, "reboot": false, "value": "bar"},
-	"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
-}
-
-var PendingMockedBMCSetting = map[string]map[string]any{}
-
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishLocalBMC struct {
 	*RedfishBMC
@@ -256,20 +249,18 @@ func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetTy
 
 	// mock the bmc update here with timed delay
 	go func() {
-		if len(PendingMockedBMCSetting) > 0 {
-			time.Sleep(1 * time.Second)
-			for key, data := range PendingMockedBMCSetting {
-				if _, ok := defaultMockedBMCSetting[key]; ok {
-					defaultMockedBMCSetting[key] = data
+		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
+			time.Sleep(150 * time.Millisecond)
+			for key, data := range UnitTestMockUps.PendingBMCSetting {
+				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
+					UnitTestMockUps.BMCSettingAttr[key] = data
 				}
 			}
-			PendingMockedBMCSetting = map[string]map[string]any{}
-			r.StoredBMCSettingData = defaultMockedBMCSetting
+			UnitTestMockUps.ResetPendingBMCSetting()
 		}
 	}()
 
 	return nil
-
 }
 
 // mock SetBiosAttributesOnReset sets given bios attributes for unit testing.
@@ -282,18 +273,15 @@ func (r *RedfishLocalBMC) SetBMCAttributesImediately(
 	for name, value := range attributes {
 		attrs[name] = value
 	}
-	if len(defaultMockedBMCSetting) == 0 {
-		defaultMockedBMCSetting = map[string]map[string]any{}
-	}
 
 	for key, attrData := range attributes {
-		if AttributesData, ok := defaultMockedBMCSetting[key]; ok {
+		if AttributesData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
 			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {
 				// if reboot not needed, set the attribute immediately.
 				AttributesData["value"] = attrData
 			} else {
 				// if reboot needed, set the attribute at next power on.
-				PendingMockedBMCSetting[key] = map[string]any{
+				UnitTestMockUps.PendingBMCSetting[key] = map[string]any{
 					"type":   AttributesData["type"],
 					"reboot": AttributesData["reboot"],
 					"value":  attrData,
@@ -301,18 +289,7 @@ func (r *RedfishLocalBMC) SetBMCAttributesImediately(
 			}
 		}
 	}
-	r.StoredBMCSettingData = defaultMockedBMCSetting
-
 	return nil
-}
-
-func (r *RedfishLocalBMC) getMockedBMCSettingData() map[string]map[string]any {
-
-	if len(r.StoredBMCSettingData) > 0 {
-		return r.StoredBMCSettingData
-	}
-	return defaultMockedBMCSetting
-
 }
 
 func (r *RedfishLocalBMC) GetBMCAttributeValues(
@@ -323,13 +300,9 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(
 	result redfish.SettingsAttributes,
 	err error,
 ) {
-
 	if len(attributes) == 0 {
 		return
 	}
-
-	mockedAttributes := r.getMockedBMCSettingData()
-
 	filteredAttr, err := r.getFilteredBMCRegistryAttributes(false, false)
 	if err != nil {
 		return
@@ -337,7 +310,7 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(
 	result = make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if _, ok := filteredAttr[name]; ok {
-			if AttributesData, ok := mockedAttributes[name]; ok {
+			if AttributesData, ok := UnitTestMockUps.BMCSettingAttr[name]; ok {
 				result[name] = AttributesData["value"]
 			}
 		}
@@ -352,13 +325,13 @@ func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(
 	redfish.SettingsAttributes,
 	error,
 ) {
-	if len(PendingMockedBMCSetting) == 0 {
+	if len(UnitTestMockUps.PendingBMCSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(PendingMockedBMCSetting))
+	result := make(redfish.SettingsAttributes, len(UnitTestMockUps.PendingBMCSetting))
 
-	for key, data := range PendingMockedBMCSetting {
+	for key, data := range UnitTestMockUps.PendingBMCSetting {
 		result[key] = data["value"]
 	}
 
@@ -372,12 +345,11 @@ func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(
 	filtered map[string]redfish.Attribute,
 	err error,
 ) {
-	mockedAttributes := r.getMockedBMCSettingData()
 	filtered = make(map[string]redfish.Attribute)
-	if len(mockedAttributes) == 0 {
+	if len(UnitTestMockUps.BMCSettingAttr) == 0 {
 		return filtered, fmt.Errorf("no bmc setting attributes found")
 	}
-	for name, AttributesData := range mockedAttributes {
+	for name, AttributesData := range UnitTestMockUps.BMCSettingAttr {
 		data := redfish.Attribute{}
 		data.AttributeName = name
 		data.Immutable = immutable

@@ -31,11 +31,11 @@ func NewRedfishLocalBMCClient(
 	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
 }
 
-func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
+func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
 
 	go func() {
 		time.Sleep(250 * time.Millisecond)
-		system, err := r.getSystemByUUID(ctx, systemUUID)
+		system, err := r.getSystemFromUri(ctx, systemURI)
 		if err != nil {
 			log := ctrl.LoggerFrom(ctx)
 			log.V(1).Error(err, "failed to get system")
@@ -46,7 +46,7 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
 		if err := system.Patch(systemURI, system); err != nil {
 			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to Patch system to power on", "systemUUID", systemUUID)
+			log.V(1).Error(err, "failed to Patch system to power on", "systemUUID", systemURI)
 			return
 		}
 
@@ -64,11 +64,11 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 	return nil
 }
 
-func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error {
+func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemURI string) error {
 
 	go func() {
 		time.Sleep(250 * time.Millisecond)
-		system, err := r.getSystemByUUID(ctx, systemUUID)
+		system, err := r.getSystemFromUri(ctx, systemURI)
 		if err != nil {
 			log := ctrl.LoggerFrom(ctx)
 			log.V(1).Error(err, "failed to get system")
@@ -79,7 +79,7 @@ func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error 
 		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
 		if err := system.Patch(systemURI, system); err != nil {
 			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to Patch system to power off", "systemUUID", systemUUID)
+			log.V(1).Error(err, "failed to Patch system to power off", "systemURI", systemURI)
 			return
 		}
 	}()

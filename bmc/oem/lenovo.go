@@ -20,7 +20,7 @@ type Lenovo struct {
 	Service *gofish.Service
 }
 
-func (r *Lenovo) GetUpdateBIOSRequestBody(
+func (r *Lenovo) GetUpdateRequestBody(
 	parameters *redfish.SimpleUpdateParameters,
 ) *SimpleUpdateRequestBody {
 	RequestBody := &SimpleUpdateRequestBody{}
@@ -33,7 +33,7 @@ func (r *Lenovo) GetUpdateBIOSRequestBody(
 	return RequestBody
 }
 
-func (r *Lenovo) GetUpdateBIOSTaskMonitorURI(response *http.Response) (string, error) {
+func (r *Lenovo) GetUpdateTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)

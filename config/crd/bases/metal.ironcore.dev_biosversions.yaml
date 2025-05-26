@@ -15,10 +15,10 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.biosVersionSpec.version
+    - jsonPath: .spec.version
       name: BIOSVersion
       type: string
-    - jsonPath: .spec.biosVersionSpec.forceUpdate
+    - jsonPath: .spec.updateType
       name: ForceUpdate
       type: string
     - jsonPath: .status.state
@@ -64,10 +64,6 @@ spec:
           spec:
             description: BIOSVersionSpec defines the desired state of BIOSVersion.
             properties:
-              UpdateType:
-                description: An indication of whether the server's upgrade service
-                  should bypass vendor update policies
-                type: string
               image:
                 description: details regarding the image to use to upgrade to given
                   BIOS version
@@ -164,6 +160,10 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
+              updateType:
+                description: An indication of whether the server's upgrade service
+                  should bypass vendor update policies
+                type: string
               version:
                 description: Version contains BIOS version to upgrade to
                 type: string

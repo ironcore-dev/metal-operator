@@ -384,7 +384,7 @@ string
 </tr>
 <tr>
 <td>
-<code>UpdateType</code><br/>
+<code>updateType</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BIOSUpdateType">
 BIOSUpdateType
@@ -493,7 +493,7 @@ string
 </tr>
 <tr>
 <td>
-<code>UpdateType</code><br/>
+<code>updateType</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BIOSUpdateType">
 BIOSUpdateType

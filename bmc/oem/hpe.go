@@ -20,7 +20,7 @@ type HPE struct {
 	Service *gofish.Service
 }
 
-func (r *HPE) GetUpdateBIOSRequestBody(
+func (r *HPE) GetUpdateRequestBody(
 	parameters *redfish.SimpleUpdateParameters,
 ) *SimpleUpdateRequestBody {
 	RequestBody := &SimpleUpdateRequestBody{}
@@ -34,7 +34,7 @@ func (r *HPE) GetUpdateBIOSRequestBody(
 	return RequestBody
 }
 
-func (r *HPE) GetUpdateBIOSTaskMonitorURI(response *http.Response) (string, error) {
+func (r *HPE) GetUpdateTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)

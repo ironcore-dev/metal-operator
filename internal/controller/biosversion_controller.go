@@ -758,7 +758,7 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 	}
 	var forceUpdate bool
 	switch biosVersion.Spec.UpdateType {
-	case metalv1alpha1.ForceUpdatBIOS:
+	case metalv1alpha1.ForceUpdateBIOS:
 		forceUpdate = true
 	default:
 		forceUpdate = false

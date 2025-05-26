@@ -27,8 +27,8 @@ type BIOSUpdateType string
 
 const (
 	// BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting
-	ForceUpdatBIOS  BIOSUpdateType = "ForceUpdate"
-	NormalUpdatBIOS BIOSUpdateType = "NormalUpdate"
+	ForceUpdateBIOS  BIOSUpdateType = "ForceUpdate"
+	NormalUpdateBIOS BIOSUpdateType = "NormalUpdate"
 )
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
@@ -37,7 +37,7 @@ type BIOSVersionSpec struct {
 	// +required
 	Version string `json:"version"`
 	// An indication of whether the server's upgrade service should bypass vendor update policies
-	UpdateType BIOSUpdateType `json:"UpdateType,omitempty"`
+	UpdateType BIOSUpdateType `json:"updateType,omitempty"`
 	// details regarding the image to use to upgrade to given BIOS version
 	Image ImageSpec `json:"image,omitempty"`
 
@@ -87,8 +87,8 @@ type TaskStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosVersionSpec.version`
-// +kubebuilder:printcolumn:name="ForceUpdate",type=string,JSONPath=`.spec.biosVersionSpec.forceUpdate`
+// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
+// +kubebuilder:printcolumn:name="ForceUpdate",type=string,JSONPath=`.spec.updateType`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="TaskState",type=string,JSONPath=`.status.upgradeTask.taskState`
 // +kubebuilder:printcolumn:name="TaskStatus",type=string,JSONPath=`.status.upgradeTask.taskStatus`

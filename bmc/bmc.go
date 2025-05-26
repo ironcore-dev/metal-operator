@@ -260,10 +260,10 @@ type Manager struct {
 }
 
 type OEMInterface interface {
-	GetUpdateBIOSRequestBody(
+	GetUpdateRequestBody(
 		parameters *redfish.SimpleUpdateParameters,
 	) *oem.SimpleUpdateRequestBody
-	GetUpdateBIOSTaskMonitorURI(
+	GetUpdateTaskMonitorURI(
 		response *http.Response,
 	) (string, error)
 	GetTaskMonitorDetails(
@@ -272,28 +272,22 @@ type OEMInterface interface {
 	) (*redfish.Task, error)
 }
 
-type OEM struct {
-	OEMInterface
-}
-
-func NewOEM(manufacturer string, service *gofish.Service) (*OEM, error) {
+func NewOEM(manufacturer string, service *gofish.Service) (OEMInterface, error) {
+	var oemintf OEMInterface
 	switch manufacturer {
 	case string(DellServers):
-		return &OEM{
-			OEMInterface: &oem.Dell{
-				Service: service,
-			}}, nil
+		return &oem.Dell{
+			Service: service,
+		}, nil
 	case string(HPEServers):
-		return &OEM{
-			OEMInterface: &oem.HPE{
-				Service: service,
-			}}, nil
+		return &oem.HPE{
+			Service: service,
+		}, nil
 	case string(LenovoServers):
-		return &OEM{
-			OEMInterface: &oem.Lenovo{
-				Service: service,
-			}}, nil
+		return &oem.Lenovo{
+			Service: service,
+		}, nil
 	default:
-		return &OEM{}, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
+		return oemintf, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
 	}
 }

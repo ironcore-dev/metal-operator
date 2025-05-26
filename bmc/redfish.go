@@ -707,7 +707,7 @@ func (r *RedfishBMC) UpgradeBiosVersion(
 		return "", fatal, err
 	}
 
-	RequestBody := oem.GetUpdateBIOSRequestBody(parameters)
+	RequestBody := oem.GetUpdateRequestBody(parameters)
 
 	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
 
@@ -740,7 +740,7 @@ func (r *RedfishBMC) UpgradeBiosVersion(
 			)
 	}
 
-	taskMonitorURI, err := oem.GetUpdateBIOSTaskMonitorURI(resp)
+	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
 		log.V(1).Error(err,
 			"failed to extract Task created for upgrade. However, upgrade might be running on server.")

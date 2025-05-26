@@ -18,7 +18,7 @@ type Dell struct {
 	Service *gofish.Service
 }
 
-func (r *Dell) GetUpdateBIOSRequestBody(
+func (r *Dell) GetUpdateRequestBody(
 	parameters *redfish.SimpleUpdateParameters,
 ) *SimpleUpdateRequestBody {
 	RequestBody := &SimpleUpdateRequestBody{}
@@ -33,7 +33,7 @@ func (r *Dell) GetUpdateBIOSRequestBody(
 	return RequestBody
 }
 
-func (r *Dell) GetUpdateBIOSTaskMonitorURI(response *http.Response) (string, error) {
+func (r *Dell) GetUpdateTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)

@@ -37,14 +37,12 @@ kind: BIOSVersion
 metadata:
   name: biosversion-sample
 spec:
-  version: 2.10.3
+  version: "U59 v2.34 (10/04/2024)"
   image:
-    URI:  "http://foo.com/dell-bios-2.10.3.bin"
-    transferProtocol: "http"
-    imageSecretRef:
-      name: sample-secret
-  forceUpdate: false
+    URI: "https://foo-2.34_10_04_2024.signed.flash"
+    transferProtocol: "HTTPS"
+  updateType: NormalUpdate
   serverRef:
-    name: endpoint-sample-system-0
+    name: endpoint-sample-hpe-system-0
   serverMaintenancePolicy: OwnerApproval
 ```

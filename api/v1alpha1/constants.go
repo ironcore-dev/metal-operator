@@ -8,7 +8,7 @@ const (
 	OperationAnnotation = "metal.ironcore.dev/operation"
 	// OperationAnnotationIgnore skips the reconciliation of a resource if set to true.
 	OperationAnnotationIgnore = "ignore"
-	// OperationAnnotationUpdateServerDetails is used to triggers bmc controller to update server details like cpu, memory, and disk.
+	// OperationAnnotationUpdateServerDetails is used to trigger bmc controller to update server details like cpu, memory, and disk.
 	OperationAnnotationUpdateServerDetails = "update-server-details"
 	// InstanceTypeAnnotation is used to specify the type of Server.
 	InstanceTypeAnnotation = "metal.ironcore.dev/instance-type"

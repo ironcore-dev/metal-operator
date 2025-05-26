@@ -367,6 +367,7 @@ func main() { // nolint: gocyclo
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
+		ResyncInterval:   serverResyncInterval,
 		BMCOptions: bmc.BMCOptions{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -390,6 +391,7 @@ func main() { // nolint: gocyclo
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
+		ResyncInterval:   serverResyncInterval,
 		BMCOptions: bmc.BMCOptions{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

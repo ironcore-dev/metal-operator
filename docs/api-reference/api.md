@@ -3713,8 +3713,6 @@ int
 </thead>
 <tbody><tr><td><p>&#34;Force&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;Normal&#34;</p></td>
-<td></td>
 </tr></tbody>
 </table>
 <hr/>

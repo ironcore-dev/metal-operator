@@ -26,8 +26,7 @@ const (
 type UpdatePolicy string
 
 const (
-	UpdatePolicyForce  UpdatePolicy = "Force"
-	UpdatePolicyNormal UpdatePolicy = "Normal"
+	UpdatePolicyForce UpdatePolicy = "Force"
 )
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.

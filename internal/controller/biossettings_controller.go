@@ -10,6 +10,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/stmcginnis/gofish/redfish"
@@ -36,6 +37,7 @@ type BiosSettingsReconciler struct {
 	Insecure         bool
 	Scheme           *runtime.Scheme
 	BMCOptions       bmc.BMCOptions
+	ResyncInterval   time.Duration
 }
 
 const biosSettingsFinalizer = "metal.ironcore.dev/biossettings"
@@ -441,7 +443,7 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 		}
 		// todo: can take some time to setting to take place. might need to fail after certain time.
 		log.V(1).Info("waiting on the BIOS setting to take place")
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 	log.V(1).Info("Unknown State found", "biosSettings UpdateSetting state", biosSettings.Status.UpdateSettingState)
 	// stop reconsile as we can not proceed with unknown state

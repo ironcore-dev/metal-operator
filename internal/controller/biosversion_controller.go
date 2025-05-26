@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,7 @@ type BIOSVersionReconciler struct {
 	Insecure         bool
 	Scheme           *runtime.Scheme
 	BMCOptions       bmc.BMCOptions
+	ResyncInterval   time.Duration
 }
 
 const (
@@ -331,7 +333,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 				}
 			}
 			log.V(1).Info("waiting for bios version to reflect the new version")
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 		}
 
 		if err := acc.Update(
@@ -722,7 +724,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	if !ok && err == nil {
 		log.V(1).Info("bios upgrade task has not progressed. retrying....")
 		// the job has stalled or slow, we need to requeue with exponential backoff
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 	// todo: Fail the state after certain timeout
 	err = r.updateBiosVersionStatus(

@@ -1508,6 +1508,319 @@ BMCPowerState
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersion">BMCVersion
+</h3>
+<div>
+<p>BMCVersion is the Schema for the bmcversions API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">
+BMCVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BMC version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply BMC upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server managed by referred BMC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefList</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
+[]ServerMaintenanceRefList
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">
+BMCVersionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersion">BMCVersion</a>)
+</p>
+<div>
+<p>BMCVersionSpec defines the desired state of BMCVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BMC version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply BMC upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server managed by referred BMC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefList</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
+[]ServerMaintenanceRefList
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionState">BMCVersionState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<td><p>BMCVersionStateCompleted specifies that the BMC upgrade maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BMCVersionStateFailed specifies that the BMC upgrade maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;Processing&#34;</p></td>
+<td><p>BMCVersionStateInProgress specifies that upgrading BMC is in progress.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BMCVersionStatePending specifies that the BMC upgrade maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersion">BMCVersion</a>)
+</p>
+<div>
+<p>BMCVersionStatus defines the observed state of BMCVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionState">
+BMCVersionState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the BMC configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upgradeTask</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.TaskStatus">
+TaskStatus
+</a>
+</em>
+</td>
+<td>
+<p>UpgradeTask contains the state of the Upgrade Task created by the BMC</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the BMC version upgrade state.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BootOrder">BootOrder
 </h3>
 <p>
@@ -1837,6 +2150,60 @@ net/netip.Prefix
 <code>secretRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+to access the ImageURI. This secret includes sensitive information such as usernames and passwords.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>transferProtocol</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The network protocol that the server&rsquo;s update service uses to retrieve &lsquo;ImageURI&rsquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>URI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The URI of the software image to update/install.&rdquo;</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+</p>
+<div>
+<p>todo: remove once the BIOSVersion is merged</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -3127,7 +3494,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4051,6 +4418,83 @@ int
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
 </p>
 <div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Force&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.TaskStatus">TaskStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus</a>)
+</p>
+<div>
+<p>todo: remove once the BIOSVersion is merged</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>taskURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>taskState</code><br/>
+<em>
+github.com/stmcginnis/gofish/redfish.TaskState
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>taskStatus</code><br/>
+<em>
+github.com/stmcginnis/gofish/common.Health
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>percentageComplete</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+</p>
+<div>
+<p>todo: remove once the BIOSVersion is merged</p>
 </div>
 <table>
 <thead>

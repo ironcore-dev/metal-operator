@@ -98,7 +98,18 @@ resources:
   kind: BMCSettings
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+<<<<<<< HEAD
   webhooks:
     validation: true
     webhookVersion: v1
+=======
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: BMCVersion
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+>>>>>>> 59904a9 (Introduce BMCVersion resource and Controller)
 version: "3"

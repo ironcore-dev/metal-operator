@@ -720,9 +720,9 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	}
 	ok, err := checkpoint.Transitioned(acc, *completedCondition)
 	if !ok && err == nil {
-		log.V(1).Info("bios upgrade task has not changed. retrying....")
+		log.V(1).Info("bios upgrade task has not progressed. retrying....")
 		// the job has stalled or slow, we need to requeue with exponential backoff
-		return ctrl.Result{}, fmt.Errorf("the job has not yet progressed")
+		return ctrl.Result{Requeue: true}, nil
 	}
 	// todo: Fail the state after certain timeout
 	err = r.updateBiosVersionStatus(

@@ -63,13 +63,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, server)).Should(Succeed())
-
-		By("update the server state to Available  state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
-		})).Should(Succeed())
+		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
 	})
 
 	AfterEach(func(ctx SpecContext) {

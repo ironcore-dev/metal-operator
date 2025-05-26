@@ -60,10 +60,6 @@ const (
 	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
 	// InternalAnnotationTypeValue is the value for the internal annotation type
 	InternalAnnotationTypeValue = "Internal"
-	// InternalAnnotationOperationKeyName is the key name for the internal annotation operation
-	InternalAnnotationOperationKeyName = "metal.ironcore.dev/operation"
-	// InternalAnnotationOperationValueUpdateServerDetails is the value for the update server details operation
-	InternalAnnotationOperationValueUpdateServerDetails = "update-server-details"
 )
 
 const (

@@ -284,7 +284,7 @@ func (r *BMCReconciler) enqueueBMCByServer(ctx context.Context, obj client.Objec
 	server := obj.(*metalv1alpha1.Server)
 	if server.Spec.BMCRef != nil {
 		// Check if the server is being deleted or if the operation is to update server details
-		if server.Annotations[InternalAnnotationOperationKeyName] == InternalAnnotationOperationValueUpdateServerDetails ||
+		if server.Annotations[metalv1alpha1.OperationAnnotation] == metalv1alpha1.OperationAnnotationUpdateServerDetails ||
 			server.DeletionTimestamp != nil {
 			log.V(1).Info("Enqueueing BMC by server", "Server", server.Name)
 			return []ctrl.Request{

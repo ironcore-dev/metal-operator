@@ -23,12 +23,11 @@ const (
 	BIOSVersionStateFailed BIOSVersionState = "Failed"
 )
 
-type BIOSUpdateType string
+type UpdatePolicy string
 
 const (
-	// BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting
-	ForceUpdateBIOS  BIOSUpdateType = "ForceUpdate"
-	NormalUpdateBIOS BIOSUpdateType = "NormalUpdate"
+	UpdatePolicyForce  UpdatePolicy = "Force"
+	UpdatePolicyNormal UpdatePolicy = "Normal"
 )
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
@@ -37,7 +36,7 @@ type BIOSVersionSpec struct {
 	// +required
 	Version string `json:"version"`
 	// An indication of whether the server's upgrade service should bypass vendor update policies
-	UpdateType BIOSUpdateType `json:"updateType,omitempty"`
+	UpdatePolicy UpdatePolicy `json:"updatePolicy,omitempty"`
 	// details regarding the image to use to upgrade to given BIOS version
 	Image ImageSpec `json:"image,omitempty"`
 
@@ -89,12 +88,13 @@ type TaskStatus struct {
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="ForceUpdate",type=string,JSONPath=`.spec.updateType`
-// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
+// +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 // +kubebuilder:printcolumn:name="TaskState",type=string,JSONPath=`.status.upgradeTask.taskState`
 // +kubebuilder:printcolumn:name="TaskStatus",type=string,JSONPath=`.status.upgradeTask.taskStatus`
 // +kubebuilder:printcolumn:name="TaskProgress",type=integer,JSONPath=`.status.upgradeTask.percentageComplete`
-// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
-// +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BIOSVersion is the Schema for the biosversions API.
 type BIOSVersion struct {

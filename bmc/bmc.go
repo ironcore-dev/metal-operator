@@ -19,9 +19,9 @@ import (
 type Manufacturer string
 
 const (
-	DellServers   Manufacturer = "Dell Inc."
-	LenovoServers Manufacturer = "Lenovo"
-	HPEServers    Manufacturer = "HPE"
+	ManufacturerDell   Manufacturer = "Dell Inc."
+	ManufacturerLenovo Manufacturer = "Lenovo"
+	ManufacturerHPE    Manufacturer = "HPE"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -275,15 +275,15 @@ type OEMInterface interface {
 func NewOEM(manufacturer string, service *gofish.Service) (OEMInterface, error) {
 	var oemintf OEMInterface
 	switch manufacturer {
-	case string(DellServers):
+	case string(ManufacturerDell):
 		return &oem.Dell{
 			Service: service,
 		}, nil
-	case string(HPEServers):
+	case string(ManufacturerHPE):
 		return &oem.HPE{
 			Service: service,
 		}, nil
-	case string(LenovoServers):
+	case string(ManufacturerLenovo):
 		return &oem.Lenovo{
 			Service: service,
 		}, nil

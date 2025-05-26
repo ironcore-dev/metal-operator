@@ -27,8 +27,11 @@ spec:
     - jsonPath: .spec.updateType
       name: ForceUpdate
       type: string
-    - jsonPath: .status.state
-      name: State
+    - jsonPath: .spec.serverRef.name
+      name: ServerRef
+      type: string
+    - jsonPath: .spec.serverMaintenanceRef.name
+      name: ServerMaintenanceRef
       type: string
     - jsonPath: .status.upgradeTask.taskState
       name: TaskState
@@ -39,12 +42,12 @@ spec:
     - jsonPath: .status.upgradeTask.percentageComplete
       name: TaskProgress
       type: integer
-    - jsonPath: .spec.serverRef.name
-      name: ServerRef
+    - jsonPath: .status.state
+      name: State
       type: string
-    - jsonPath: .spec.serverMaintenanceRef.name
-      name: ServerMaintenanceRef
-      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -166,7 +169,7 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
-              updateType:
+              updatePolicy:
                 description: An indication of whether the server's upgrade service
                   should bypass vendor update policies
                 type: string

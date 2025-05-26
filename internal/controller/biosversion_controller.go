@@ -39,7 +39,7 @@ type BIOSVersionReconciler struct {
 }
 
 const (
-	biosVersionFinalizer                   = "firmware.ironcore.dev/biosversion"
+	biosVersionFinalizer                   = "metal.ironcore.dev/biosversion"
 	biosVersionUpgradeIssued               = "BIOSVersionUpgradeIssued"
 	biosVersionUpgradeCompleted            = "BIOSVersionUpgradeCompleted"
 	biosVersionUpgradeRebootServerPowerOn  = "BIOSVersionUpgradePowerOn"
@@ -56,12 +56,6 @@ const (
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.2/pkg/reconcile
 func (r *BIOSVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	log := ctrl.LoggerFrom(ctx)
@@ -757,8 +751,8 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 		return ctrl.Result{}, err
 	}
 	var forceUpdate bool
-	switch biosVersion.Spec.UpdateType {
-	case metalv1alpha1.ForceUpdateBIOS:
+	switch biosVersion.Spec.UpdatePolicy {
+	case metalv1alpha1.UpdatePolicyForce:
 		forceUpdate = true
 	default:
 		forceUpdate = false

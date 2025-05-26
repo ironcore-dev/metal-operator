@@ -4,14 +4,11 @@
 package controller
 
 import (
-	"context"
-
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -196,7 +193,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 			}),
 		))
 
-		ensureBiosVersionConditionTransisition(ctx, acc, biosVersion, server)
+		ensureBiosVersionConditionTransisition(acc, biosVersion, server)
 
 		By("Ensuring that BIOS upgrade has completed")
 		Eventually(Object(biosVersion)).Should(
@@ -302,7 +299,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 			}),
 		))
 
-		ensureBiosVersionConditionTransisition(ctx, acc, biosVersion, server)
+		ensureBiosVersionConditionTransisition(acc, biosVersion, server)
 
 		By("Ensuring that BIOS upgrade has completed")
 		Eventually(Object(biosVersion)).Should(
@@ -329,7 +326,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 })
 
 func ensureBiosVersionConditionTransisition(
-	ctx context.Context,
 	acc *conditionutils.Accessor,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
@@ -338,12 +334,12 @@ func ensureBiosVersionConditionTransisition(
 	condIssue := &metav1.Condition{}
 	Eventually(
 		func(g Gomega) int {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			return len(biosVersion.Status.Conditions)
 		}).Should(BeNumerically(">=", 1))
 	Eventually(
 		func(g Gomega) bool {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeIssued, condIssue)).To(BeTrue())
 			return condIssue.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
@@ -357,17 +353,17 @@ func ensureBiosVersionConditionTransisition(
 	condComplete := &metav1.Condition{}
 	Eventually(
 		func(g Gomega) int {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			return len(biosVersion.Status.Conditions)
 		}).Should(BeNumerically(">=", 2))
 	Eventually(
 		func(g Gomega) bool {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, condComplete)).To(BeTrue())
 			return condComplete.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
-	// waiting for serverMaintenance and server to evetually update the power state is making it flaky.
+	// waiting for serverMaintenance and server to eventually update the power state is making it flaky.
 	// force turn on the server already for testing
 	By("update the server state to PoweredOff state")
 	Eventually(UpdateStatus(server, func() {
@@ -378,17 +374,17 @@ func ensureBiosVersionConditionTransisition(
 	rebootStart := &metav1.Condition{}
 	Eventually(
 		func(g Gomega) int {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			return len(biosVersion.Status.Conditions)
 		}).Should(BeNumerically(">=", 3))
 	Eventually(
 		func(g Gomega) bool {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, rebootStart)).To(BeTrue())
 			return rebootStart.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
-	// waiting for serverMaintenance and server to evetually update the power state is making it flaky.
+	// waiting for serverMaintenance and server to eventually update the power state is making it flaky.
 	// force turn on the server already for testing
 	By("update the server state to PoweredOn state")
 	Eventually(UpdateStatus(server, func() {
@@ -399,12 +395,12 @@ func ensureBiosVersionConditionTransisition(
 	rebootComplete := &metav1.Condition{}
 	Eventually(
 		func(g Gomega) int {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			return len(biosVersion.Status.Conditions)
 		}).Should(BeNumerically(">=", 4))
 	Eventually(
 		func(g Gomega) bool {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, rebootComplete)).To(BeTrue())
 			return rebootComplete.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
@@ -413,12 +409,12 @@ func ensureBiosVersionConditionTransisition(
 	verficationComplete := &metav1.Condition{}
 	Eventually(
 		func(g Gomega) int {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			return len(biosVersion.Status.Conditions)
 		}).Should(BeNumerically(">=", 5))
 	Eventually(
 		func(g Gomega) bool {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: biosVersion.Name}, biosVersion)).To(Succeed())
+			g.Expect(Get(biosVersion)()).To(Succeed())
 			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeVerficationCondition, verficationComplete)).To(BeTrue())
 			return verficationComplete.Status == metav1.ConditionTrue
 		}).Should(BeTrue())

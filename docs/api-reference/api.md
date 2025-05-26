@@ -310,27 +310,6 @@ BIOSSettingUpdateState
 </tr>
 </tbody>
 </table>
-<h3 id="metal.ironcore.dev/v1alpha1.BIOSUpdateType">BIOSUpdateType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;ForceUpdate&#34;</p></td>
-<td><p>BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting</p>
-</td>
-</tr><tr><td><p>&#34;NormalUpdate&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion
 </h3>
 <div>
@@ -384,10 +363,10 @@ string
 </tr>
 <tr>
 <td>
-<code>updateType</code><br/>
+<code>updatePolicy</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSUpdateType">
-BIOSUpdateType
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
 </a>
 </em>
 </td>
@@ -493,10 +472,10 @@ string
 </tr>
 <tr>
 <td>
-<code>updateType</code><br/>
+<code>updatePolicy</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSUpdateType">
-BIOSUpdateType
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
 </a>
 </em>
 </td>
@@ -3717,6 +3696,26 @@ int
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Force&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Normal&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <hr/>
 <p><em>

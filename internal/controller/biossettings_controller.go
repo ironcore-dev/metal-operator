@@ -38,7 +38,7 @@ type BiosSettingsReconciler struct {
 	BMCOptions       bmc.BMCOptions
 }
 
-const biosSettingsFinalizer = "firmware.ironcore.dev/biossettings"
+const biosSettingsFinalizer = "metal.ironcore.dev/biossettings"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings/status,verbs=get;update;patch

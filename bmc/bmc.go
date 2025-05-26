@@ -104,7 +104,35 @@ type BMC interface {
 	) (*redfish.Task, error)
 
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
+
+	UpgradeBMCVersion(
+		ctx context.Context,
+		manufacturer string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, bool, error)
+
+	GetBMCUpgradeTask(
+		ctx context.Context,
+		manufacturer string,
+		taskURI string,
+	) (*redfish.Task, error)
 }
+
+type Manufacturer string
+
+const (
+	ManufacturerDell   Manufacturer = "Dell Inc."
+	ManufacturerLenovo Manufacturer = "Lenovo"
+	ManufacturerHPE    Manufacturer = "HPE"
+)
+
+type SettingAttributeValueTypes string
+
+const (
+	TypeInteger      SettingAttributeValueTypes = "integer"
+	TypeString       SettingAttributeValueTypes = "string"
+	TypeEnumerations SettingAttributeValueTypes = "enumeration"
+)
 
 type OEMManagerInterface interface {
 	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
@@ -303,6 +331,20 @@ type Manager struct {
 	OemLinks        json.RawMessage
 }
 
+type OEMInterface interface {
+	GetUpdateRequestBody(
+		parameters *redfish.SimpleUpdateParameters,
+	) *oem.SimpleUpdateRequestBody
+	GetUpdateTaskMonitorURI(
+		response *http.Response,
+	) (string, error)
+	GetTaskMonitorDetails(
+		ctx context.Context,
+		taskMonitorResponse *http.Response,
+	) (*redfish.Task, error)
+}
+
+// todo: remove once the BMCSettings is merged
 func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerInterface, error) {
 	var OEMManager OEMManagerInterface
 	switch ooem.Manufacturer {

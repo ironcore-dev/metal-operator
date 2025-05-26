@@ -368,67 +368,49 @@ func (d *DellIdracManager) CheckBMCAttributes(attributes redfish.SettingsAttribu
 	return helpers.CheckAttribues(attributes, filteredAttr)
 }
 
-// "Dell": {
-// 	"@odata.type": "#DellOem.v1_3_0.DellOemLinks",
-// 	"DellAttributes": [
-// 	  {
-// 		"@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellAttributes/iDRAC.Embedded.1"
-// 	  },
-// 	  {
-// 		"@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellAttributes/System.Embedded.1"
-// 	  },
-// 	  {
-// 		"@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellAttributes/LifecycleController.Embedded.1"
-// 	  }
-// 	],
-// 	"DellAttributes@odata.count": 3,
-// 	"DellJobService": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService"
-// 	},
-// 	"DellLCService": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLCService"
-// 	},
-// 	"DellLicensableDeviceCollection": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLicensableDevices"
-// 	},
-// 	"DellLicenseCollection": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLicenses"
-// 	},
-// 	"DellLicenseManagementService": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLicenseManagementService"
-// 	},
-// 	"DellOpaqueManagementDataCollection": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellOpaqueManagementData"
-// 	},
-// 	"DellPersistentStorageService": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellPersistentStorageService"
-// 	},
-// 	"DellSwitchConnectionCollection": {
-// 	  "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections"
-// 	},
-// 	"DellSwitchConnectionService": {
-// 	  "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Oem/Dell/DellSwitchConnectionService"
-// 	},
-// 	"DellSystemManagementService": {
-// 	  "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Oem/Dell/DellSystemManagementService"
-// 	},
-// 	"DellSystemQuickSyncCollection": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellSystemQuickSync"
-// 	},
-// 	"DellTimeService": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellTimeService"
-// 	},
-// 	"DellUSBDeviceCollection": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellUSBDevices"
-// 	},
-// 	"DelliDRACCardService": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DelliDRACCardService"
-// 	},
-// 	"DellvFlashCollection": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellvFlash"
-// 	},
-// 	"Jobs": {
-// 	  "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/Jobs"
-// 	}
-//   }
-// },
+type Dell struct {
+	Service *gofish.Service
+}
+
+func (r *Dell) GetUpdateRequestBody(
+	parameters *redfish.SimpleUpdateParameters,
+) *SimpleUpdateRequestBody {
+	RequestBody := &SimpleUpdateRequestBody{}
+	RequestBody.RedfishOperationApplyTime = redfish.ImmediateOperationApplyTime
+	RequestBody.ForceUpdate = parameters.ForceUpdate
+	RequestBody.ImageURI = parameters.ImageURI
+	RequestBody.Passord = parameters.Passord
+	RequestBody.Username = parameters.Username
+	RequestBody.Targets = parameters.Targets
+	RequestBody.TransferProtocol = parameters.TransferProtocol
+
+	return RequestBody
+}
+
+func (r *Dell) GetUpdateTaskMonitorURI(response *http.Response) (string, error) {
+	rawBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)
+	}
+
+	if taskMonitor, ok := response.Header["Location"]; ok && len(rawBody) == 0 {
+		return taskMonitor[0], nil
+	}
+
+	return "", fmt.Errorf("unexpected response body %v %v", err, rawBody)
+}
+
+func (r *Dell) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error) {
+	task := &redfish.Task{}
+	respTaskRawBody, err := io.ReadAll(taskMonitorResponse.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(respTaskRawBody, &task)
+	if err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}

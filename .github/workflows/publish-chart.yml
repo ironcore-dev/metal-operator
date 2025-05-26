@@ -1,14 +1,24 @@
 name: Release Helm Chart
 
 on:
+  release:
+    types:
+      - published
   push:
     branches:
       - main
     tags:
       - 'v*.*.*'
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+    types: [labeled, opened, synchronize, reopened]
 
 jobs:
   helm-chart:
@@ -17,6 +27,10 @@ jobs:
       contents: read
       packages: write
 
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ok-to-charts')) ||
+      (github.event_name == 'release' && github.event.action == 'published')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

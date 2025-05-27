@@ -281,6 +281,7 @@ func SetupTest() *corev1.Namespace {
 			ManagerNamespace: ns.Name,
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
+			ResyncInterval:   10 * time.Millisecond,
 			BMCOptions: bmc.BMCOptions{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

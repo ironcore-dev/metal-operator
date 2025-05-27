@@ -414,6 +414,7 @@ func main() { // nolint: gocyclo
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
+		ResyncInterval:   serverResyncInterval,
 		Insecure:         insecure,
 		BMCOptions: bmc.BMCOptions{
 			BasicAuth:               true,

@@ -10,6 +10,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +34,7 @@ import (
 type BMCSettingsReconciler struct {
 	client.Client
 	ManagerNamespace string
+	ResyncInterval   time.Duration
 	Insecure         bool
 	Scheme           *runtime.Scheme
 	BMCOptions       bmc.BMCOptions
@@ -360,7 +362,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateApplied)
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, fmt.Errorf("waiting on the BMC setting to take place")
+	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 
 }
 

@@ -30,6 +30,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-metal-ironcore-dev-v1alpha1-biosversion
+  failurePolicy: Fail
+  name: vbiosversion-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - metal.ironcore.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - biosversions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-metal-ironcore-dev-v1alpha1-endpoint
   failurePolicy: Fail
   name: vendpoint-v1alpha1.kb.io

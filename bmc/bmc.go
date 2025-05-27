@@ -98,12 +98,12 @@ type BMC interface {
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 }
 
-type ServerManagerManufacturer string
+type Manufacturer string
 
 const (
-	DellServers   ServerManagerManufacturer = "Dell Inc."
-	LenovoServers ServerManagerManufacturer = "Lenovo"
-	HPEServers    ServerManagerManufacturer = "HPE"
+	ManufacturerDell   Manufacturer = "Dell Inc."
+	ManufacturerLenovo Manufacturer = "Lenovo"
+	ManufacturerHPE    Manufacturer = "HPE"
 )
 
 type SettingAttributeValueTypes string
@@ -305,7 +305,7 @@ type OEMManager struct {
 func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerInterface, error) {
 	var OEMManager OEMManagerInterface
 	switch ooem.Manufacturer {
-	case string(DellServers):
+	case string(ManufacturerDell):
 		OEMManager = &oem.DellIdracManager{
 			BMC:     ooem,
 			Service: service,

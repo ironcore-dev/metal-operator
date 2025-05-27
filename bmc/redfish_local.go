@@ -6,24 +6,17 @@ package bmc
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/stmcginnis/gofish/redfish"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
 
-var defaultMockedBIOSSetting = map[string]map[string]any{
-	"abc":       {"type": "string", "reboot": false, "value": "bar"},
-	"fooreboot": {"type": "integer", "reboot": true, "value": 123},
-}
-
-var pendingMockedBIOSSetting = map[string]map[string]any{}
-
 // RedfishLocalBMC is an implementation of the BMC interface for Redfish.
 type RedfishLocalBMC struct {
 	*RedfishBMC
-	StoredBIOSSettingData map[string]map[string]any
-	StoredBMCSettingData  map[string]map[string]any
 }
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
@@ -39,40 +32,57 @@ func NewRedfishLocalBMCClient(
 }
 
 func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to get system: %w", err)
-	}
-	system.PowerState = redfish.OnPowerState
-	systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
-	if err := system.Patch(systemURI, system); err != nil {
-		return fmt.Errorf("failed to set power state %s for system %s: %w", redfish.OnPowerState, systemUUID, err)
-	}
 
-	// mock the bmc update here
-	if len(pendingMockedBIOSSetting) > 0 {
-
-		for key, data := range pendingMockedBIOSSetting {
-			if _, ok := defaultMockedBIOSSetting[key]; ok {
-				defaultMockedBIOSSetting[key] = data
-			}
+	go func() {
+		time.Sleep(250 * time.Millisecond)
+		system, err := r.getSystemByUUID(ctx, systemUUID)
+		if err != nil {
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Error(err, "failed to get system")
+			return
 		}
-		pendingMockedBIOSSetting = map[string]map[string]any{}
-		r.StoredBIOSSettingData = defaultMockedBIOSSetting
-	}
+		system.PowerState = redfish.OnPowerState
+		system.RawData = nil
+		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+		if err := system.Patch(systemURI, system); err != nil {
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Error(err, "failed to Patch system to power on", "systemUUID", systemUUID)
+			return
+		}
+
+		// mock the bmc update here
+		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
+			time.Sleep(150 * time.Millisecond)
+			for key, data := range UnitTestMockUps.PendingBIOSSetting {
+				if _, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
+					UnitTestMockUps.BIOSSettingAttr[key] = data
+				}
+			}
+			UnitTestMockUps.ResetPendingBIOSSetting()
+		}
+	}()
 	return nil
 }
 
 func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to get system: %w", err)
-	}
-	system.PowerState = redfish.OffPowerState
-	systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
-	if err := system.Patch(systemURI, system); err != nil {
-		return fmt.Errorf("failed to set power state %s for system %s: %w", redfish.OffPowerState, systemUUID, err)
-	}
+
+	go func() {
+		time.Sleep(250 * time.Millisecond)
+		system, err := r.getSystemByUUID(ctx, systemUUID)
+		if err != nil {
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Error(err, "failed to get system")
+			return
+		}
+		system.PowerState = redfish.OffPowerState
+		system.RawData = nil
+		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+		if err := system.Patch(systemURI, system); err != nil {
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Error(err, "failed to Patch system to power off", "systemUUID", systemUUID)
+			return
+		}
+	}()
 	return nil
 }
 
@@ -83,13 +93,13 @@ func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(
 	redfish.SettingsAttributes,
 	error,
 ) {
-	if len(pendingMockedBIOSSetting) == 0 {
+	if len(UnitTestMockUps.PendingBIOSSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pendingMockedBIOSSetting))
+	result := make(redfish.SettingsAttributes, len(UnitTestMockUps.PendingBIOSSetting))
 
-	for key, data := range pendingMockedBIOSSetting {
+	for key, data := range UnitTestMockUps.PendingBIOSSetting {
 		result[key] = data["value"]
 	}
 
@@ -102,19 +112,16 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 	systemUUID string,
 	attributes redfish.SettingsAttributes,
 ) error {
-	if len(defaultMockedBIOSSetting) == 0 {
-		defaultMockedBIOSSetting = map[string]map[string]any{}
-	}
 
-	pendingMockedBIOSSetting = map[string]map[string]any{}
+	UnitTestMockUps.ResetPendingBIOSSetting()
 	for key, attrData := range attributes {
-		if AttributesData, ok := defaultMockedBIOSSetting[key]; ok {
+		if AttributesData, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
 			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {
 				// if reboot not needed, set the attribute immediately.
 				AttributesData["value"] = attrData
 			} else {
 				// if reboot needed, set the attribute at next power on.
-				pendingMockedBIOSSetting[key] = map[string]any{
+				UnitTestMockUps.PendingBIOSSetting[key] = map[string]any{
 					"type":   AttributesData["type"],
 					"reboot": AttributesData["reboot"],
 					"value":  attrData,
@@ -122,18 +129,7 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 			}
 		}
 	}
-	r.StoredBIOSSettingData = defaultMockedBIOSSetting
-
 	return nil
-}
-
-func (r *RedfishLocalBMC) getMockedBIOSSettingData() map[string]map[string]any {
-
-	if len(r.StoredBIOSSettingData) > 0 {
-		return r.StoredBIOSSettingData
-	}
-	return defaultMockedBIOSSetting
-
 }
 
 func (r *RedfishLocalBMC) GetBiosAttributeValues(
@@ -149,8 +145,6 @@ func (r *RedfishLocalBMC) GetBiosAttributeValues(
 		return nil, nil
 	}
 
-	mockedAttributes := r.getMockedBIOSSettingData()
-
 	filteredAttr, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil {
 		return nil, err
@@ -158,7 +152,7 @@ func (r *RedfishLocalBMC) GetBiosAttributeValues(
 	result := make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if _, ok := filteredAttr[name]; ok {
-			if AttributesData, ok := mockedAttributes[name]; ok {
+			if AttributesData, ok := UnitTestMockUps.BIOSSettingAttr[name]; ok {
 				result[name] = AttributesData["value"]
 			}
 		}
@@ -173,12 +167,11 @@ func (r *RedfishLocalBMC) getFilteredBiosRegistryAttributes(
 	map[string]RegistryEntryAttributes,
 	error,
 ) {
-	mockedAttributes := r.getMockedBIOSSettingData()
 	filtered := make(map[string]RegistryEntryAttributes)
-	if len(mockedAttributes) == 0 {
+	if len(UnitTestMockUps.BIOSSettingAttr) == 0 {
 		return filtered, fmt.Errorf("no bmc setting attributes found")
 	}
-	for name, AttributesData := range mockedAttributes {
+	for name, AttributesData := range UnitTestMockUps.BIOSSettingAttr {
 		data := RegistryEntryAttributes{}
 		data.AttributeName = name
 		data.Immutable = immutable

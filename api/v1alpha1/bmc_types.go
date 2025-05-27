@@ -24,11 +24,11 @@ const (
 // +kubebuilder:validation:XValidation:rule="has(self.access) != has(self.endpointRef)",message="exactly one of access or endpointRef needs to be set"
 type BMCSpec struct {
 
-	// UUID is the unique identifier for the BMC as defined in REDFISH API.
+	// bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
 	// +kubebuilder:validation:Optional
 	// +optional
 	// This field is optional and can be omitted, controller will choose the first avaialbe Manager
-	UUID string `json:"uuid,omitempty"`
+	BMCUUID string `json:"bmcUUID,omitempty"`
 
 	// EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
 	// This reference is typically used to locate the BMC endpoint within the cluster.

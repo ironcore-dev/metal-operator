@@ -298,10 +298,6 @@ type Manager struct {
 	OemLinks        json.RawMessage
 }
 
-type OEMManager struct {
-	OEMManagerInterface
-}
-
 func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerInterface, error) {
 	var OEMManager OEMManagerInterface
 	switch ooem.Manufacturer {

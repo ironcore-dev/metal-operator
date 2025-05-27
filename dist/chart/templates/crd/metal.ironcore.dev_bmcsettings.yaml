@@ -59,9 +59,8 @@ spec:
             description: BMCSettingsSpec defines the desired state of BMCSettings.
             properties:
               BMCRef:
-                description: |-
-                  BMCRef is a reference to a specific BMC to apply setting to.
-                  ServerRef is ignored if BMCRef is set
+                description: BMCRef is a reference to a specific BMC to apply setting
+                  to.
                 properties:
                   name:
                     default: ""

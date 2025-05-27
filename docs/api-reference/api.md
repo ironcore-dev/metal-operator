@@ -665,14 +665,14 @@ BMCSpec
 <table>
 <tr>
 <td>
-<code>uuid</code><br/>
+<code>bmcUUID</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>UUID is the unique identifier for the BMC as defined in REDFISH API.
+<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
 This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
 </td>
 </tr>
@@ -1036,8 +1036,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>BMCRef is a reference to a specific BMC to apply setting to.
-ServerRef is ignored if BMCRef is set</p>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
 </td>
 </tr>
 <tr>
@@ -1135,8 +1134,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
-<p>BMCRef is a reference to a specific BMC to apply setting to.
-ServerRef is ignored if BMCRef is set</p>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
 </td>
 </tr>
 <tr>
@@ -1248,14 +1246,14 @@ BMCSettingsState
 <tbody>
 <tr>
 <td>
-<code>uuid</code><br/>
+<code>bmcUUID</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>UUID is the unique identifier for the BMC as defined in REDFISH API.
+<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
 This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
 </td>
 </tr>

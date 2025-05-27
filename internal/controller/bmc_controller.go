@@ -131,7 +131,7 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 
 	// TODO: Secret rotation/User management
 
-	manager, err := bmcClient.GetManager(bmcObj.Spec.UUID)
+	manager, err := bmcClient.GetManager(bmcObj.Spec.BMCUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get manager details for BMC %s: %w", bmcObj.Name, err)
 	}

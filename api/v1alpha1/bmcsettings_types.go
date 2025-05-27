@@ -22,7 +22,6 @@ type BMCSettingsSpec struct {
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
 	// BMCRef is a reference to a specific BMC to apply setting to.
-	// ServerRef is ignored if BMCRef is set
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
 

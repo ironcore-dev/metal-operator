@@ -310,6 +310,319 @@ BIOSSettingUpdateState
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion
+</h3>
+<div>
+<p>BIOSVersion is the Schema for the biosversions API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">
+BIOSVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BIOS version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">
+BIOSVersionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion</a>)
+</p>
+<div>
+<p>BIOSVersionSpec defines the desired state of BIOSVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BIOS version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionState">BIOSVersionState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<td><p>BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;Processing&#34;</p></td>
+<td><p>BIOSVersionStateInProgress specifies that upgrading bios is in progress.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion</a>)
+</p>
+<div>
+<p>BIOSVersionStatus defines the observed state of BIOSVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionState">
+BIOSVersionState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the bios configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upgradeTask</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.TaskStatus">
+TaskStatus
+</a>
+</em>
+</td>
+<td>
+<p>UpgradeTask contains the state of the Upgrade Task created by the BMC</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the Bios version upgrade state.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMC">BMC
 </h3>
 <div>
@@ -1181,6 +1494,59 @@ net/netip.Prefix
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+to access the ImageURI. This secret includes sensitive information such as usernames and passwords.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>transferProtocol</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The network protocol that the server&rsquo;s update service uses to retrieve &lsquo;ImageURI&rsquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>URI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The URI of the software image to update/install.&rdquo;</p>
 </td>
 </tr>
 </tbody>
@@ -2442,7 +2808,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -3273,6 +3639,81 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.TaskStatus">TaskStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>taskURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>taskState</code><br/>
+<em>
+github.com/stmcginnis/gofish/redfish.TaskState
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>taskStatus</code><br/>
+<em>
+github.com/stmcginnis/gofish/common.Health
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>percentageComplete</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Force&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <hr/>
 <p><em>

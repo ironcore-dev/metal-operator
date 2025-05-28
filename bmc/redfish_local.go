@@ -198,3 +198,48 @@ func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) 
 	}
 	return r.checkAttribues(attrs, filtered)
 }
+
+func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
+	if UnitTestMockUps.BIOSVersion == "" {
+		var err error
+		UnitTestMockUps.BIOSVersion, err = r.RedfishBMC.GetBiosVersion(ctx, systemUUID)
+		if err != nil {
+			return "", err
+		}
+	}
+	return UnitTestMockUps.BIOSVersion, nil
+}
+
+func (r *RedfishLocalBMC) UpgradeBiosVersion(
+	ctx context.Context,
+	manufacturer string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, bool, error) {
+	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
+	// note, ImageURI is mocked for testing upgrading to version
+	UnitTestMockUps.BIOSUpgradingVersion = parameters.ImageURI
+	// this go routine mocks the upgrade progress
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
+			time.Sleep(5 * time.Millisecond)
+			UnitTestMockUps.BIOSUpgradeTaskIndex = UnitTestMockUps.BIOSUpgradeTaskIndex + 1
+		}
+	}()
+	return "dummyTask", false, nil
+}
+
+func (r *RedfishLocalBMC) GetBiosUpgradeTask(
+	ctx context.Context,
+	manufacturer string,
+	taskURI string,
+) (*redfish.Task, error) {
+	if UnitTestMockUps.BIOSUpgradeTaskIndex > len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
+		UnitTestMockUps.BIOSUpgradeTaskIndex = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
+	}
+	task := UnitTestMockUps.BIOSUpgradeTaskStatus[UnitTestMockUps.BIOSUpgradeTaskIndex].TaskState
+	if task == redfish.CompletedTaskState {
+		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
+	}
+	return &UnitTestMockUps.BIOSUpgradeTaskStatus[UnitTestMockUps.BIOSUpgradeTaskIndex], nil
+}

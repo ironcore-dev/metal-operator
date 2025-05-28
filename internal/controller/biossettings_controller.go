@@ -10,6 +10,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/stmcginnis/gofish/redfish"
@@ -36,9 +37,10 @@ type BiosSettingsReconciler struct {
 	Insecure         bool
 	Scheme           *runtime.Scheme
 	BMCOptions       bmc.BMCOptions
+	ResyncInterval   time.Duration
 }
 
-const biosSettingsFinalizer = "firmware.ironcore.dev/biossettings"
+const biosSettingsFinalizer = "metal.ironcore.dev/biossettings"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings/status,verbs=get;update;patch
@@ -148,7 +150,6 @@ func (r *BiosSettingsReconciler) cleanupReferences(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (err error) {
-
 	if biosSettings.Spec.ServerRef != nil {
 		server, err := r.getReferredServer(ctx, log, biosSettings.Spec.ServerRef)
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -262,7 +263,6 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
-
 	currentBiosVersion, settingsDiff, err := r.getBIOSVersionAndSettingDifference(ctx, log, biosSettings, server)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BIOS settings: %w", err)
@@ -442,8 +442,8 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 			return ctrl.Result{}, err
 		}
 		// todo: can take some time to setting to take place. might need to fail after certain time.
-		log.V(1).Info("Reconciled biosSettings at wait for verification")
-		return ctrl.Result{}, fmt.Errorf("waiting on the BIOS setting to take place")
+		log.V(1).Info("waiting on the BIOS setting to take place")
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 	log.V(1).Info("Unknown State found", "biosSettings UpdateSetting state", biosSettings.Status.UpdateSettingState)
 	// stop reconsile as we can not proceed with unknown state
@@ -493,7 +493,6 @@ func (r *BiosSettingsReconciler) checkPendingSettingsDiff(
 	pendingSettings redfish.SettingsAttributes,
 	settingsDiff redfish.SettingsAttributes,
 ) redfish.SettingsAttributes {
-
 	// if settingsDiff is provided find the difference between settingsDiff and pending
 	log.V(1).Info("checking for the difference in the pending settings than that of required")
 	unknownpendingSettings := make(redfish.SettingsAttributes, len(settingsDiff))
@@ -516,7 +515,7 @@ func (r *BiosSettingsReconciler) getPendingSettingsOnBIOS(
 	}
 	defer bmcClient.Logout()
 
-	log.V(1).Info("fetching for the pending settings on bios")
+	log.V(1).Info("fetching the pending settings on bios")
 
 	pendingSettings, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemUUID)
 	if err != nil {
@@ -607,7 +606,6 @@ func (r *BiosSettingsReconciler) checkIfMaintenanceGranted(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) bool {
-
 	if biosSettings.Spec.ServerMaintenanceRef == nil {
 		return true
 	}
@@ -636,7 +634,6 @@ func (r *BiosSettingsReconciler) requestMaintenanceOnServer(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) (bool, error) {
-
 	// if Server maintenance ref is already given. no further action required.
 	if biosSettings.Spec.ServerMaintenanceRef != nil {
 		return false, nil
@@ -771,7 +768,6 @@ func (r *BiosSettingsReconciler) patchServerMaintenancePowerState(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	powerState metalv1alpha1.Power,
 ) error {
-
 	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, biosSettings.Spec.ServerMaintenanceRef)
 	if err != nil {
 		return err
@@ -796,7 +792,6 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	state metalv1alpha1.BIOSSettingsState,
 ) error {
-
 	if biosSettings.Status.State == state {
 		return nil
 	}
@@ -823,7 +818,6 @@ func (r *BiosSettingsReconciler) updateBIOSSettingUpdateStatus(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	state metalv1alpha1.BIOSSettingUpdateState,
 ) error {
-
 	if biosSettings.Status.UpdateSettingState == state {
 		return nil
 	}
@@ -854,6 +848,12 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 		return nil
 	}
 
+	// no need to queue if the server is not yet in maintenance
+	// hence return early
+	if host.Spec.ServerMaintenanceRef == nil {
+		return nil
+	}
+
 	BIOSSettingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := r.List(ctx, BIOSSettingsList); err != nil {
 		log.Error(err, "failed to list biosSettings")
@@ -866,6 +866,36 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 			if biosSettings.Spec.ServerMaintenanceRef == nil ||
 				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
 				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+				return nil
+			}
+			if biosSettings.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
+				return nil
+			}
+			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
+		}
+	}
+	return nil
+}
+
+func (r *BiosSettingsReconciler) enqueueBiosSettingsByBiosVersion(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	BIOSVersion := obj.(*metalv1alpha1.BIOSVersion)
+	if BIOSVersion.Status.State != metalv1alpha1.BIOSVersionStateCompleted {
+		return nil
+	}
+
+	BIOSSettingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := r.List(ctx, BIOSSettingsList); err != nil {
+		log.Error(err, "failed to list biosSettings")
+		return nil
+	}
+
+	for _, biosSettings := range BIOSSettingsList.Items {
+		if biosSettings.Spec.ServerRef.Name == BIOSVersion.Spec.ServerRef.Name {
+			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied || biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 				return nil
 			}
 			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
@@ -882,5 +912,6 @@ func (r *BiosSettingsReconciler) SetupWithManager(
 		For(&metalv1alpha1.BIOSSettings{}).
 		Owns(&metalv1alpha1.ServerMaintenance{}).
 		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByRefs)).
+		Watches(&metalv1alpha1.BIOSVersion{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByBiosVersion)).
 		Complete(r)
 }

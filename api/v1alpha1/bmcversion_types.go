@@ -4,8 +4,6 @@
 package v1alpha1
 
 import (
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -22,33 +20,6 @@ const (
 	// BMCVersionStateFailed specifies that the BMC upgrade maintenance has failed.
 	BMCVersionStateFailed BMCVersionState = "Failed"
 )
-
-// todo: remove once the BIOSVersion is merged
-type UpdatePolicy string
-
-const (
-	UpdatePolicyForce UpdatePolicy = "Force"
-)
-
-// todo: remove once the BIOSVersion is merged
-type ImageSpec struct {
-	// ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-	// to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
-	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
-	// The network protocol that the server's update service uses to retrieve 'ImageURI'
-	TransferProtocol string `json:"transferProtocol,omitempty"`
-	// The URI of the software image to update/install."
-	// +required
-	URI string `json:"URI"`
-}
-
-// todo: remove once the BIOSVersion is merged
-type TaskStatus struct {
-	TaskURI         string            `json:"taskURI,omitempty"`
-	State           redfish.TaskState `json:"taskState,omitempty"`
-	Status          common.Health     `json:"taskStatus,omitempty"`
-	PercentComplete int               `json:"percentageComplete,omitempty"`
-}
 
 // BMCVersionSpec defines the desired state of BMCVersion.
 type BMCVersionSpec struct {

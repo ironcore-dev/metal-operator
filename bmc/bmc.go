@@ -25,6 +25,14 @@ const (
 	ManufacturerHPE    Manufacturer = "HPE"
 )
 
+type SettingAttributeValueTypes string
+
+const (
+	TypeInteger      SettingAttributeValueTypes = "integer"
+	TypeString       SettingAttributeValueTypes = "string"
+	TypeEnumerations SettingAttributeValueTypes = "enumeration"
+)
+
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
@@ -98,28 +106,25 @@ type BMC interface {
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 }
 
-type Manufacturer string
-
-const (
-	ManufacturerDell   Manufacturer = "Dell Inc."
-	ManufacturerLenovo Manufacturer = "Lenovo"
-	ManufacturerHPE    Manufacturer = "HPE"
-)
-
-type SettingAttributeValueTypes string
-
-const (
-	TypeInteger      SettingAttributeValueTypes = "integer"
-	TypeString       SettingAttributeValueTypes = "string"
-	TypeEnumerations SettingAttributeValueTypes = "enumeration"
-)
-
 type OEMManagerInterface interface {
 	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
 	GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error)
 	CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error)
 	GetObjFromUri(uri string, respObj any) ([]string, error)
 	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
+}
+
+type OEMInterface interface {
+	GetUpdateRequestBody(
+		parameters *redfish.SimpleUpdateParameters,
+	) *oem.SimpleUpdateRequestBody
+	GetUpdateTaskMonitorURI(
+		response *http.Response,
+	) (string, error)
+	GetTaskMonitorDetails(
+		ctx context.Context,
+		taskMonitorResponse *http.Response,
+	) (*redfish.Task, error)
 }
 
 type Entity struct {
@@ -310,19 +315,6 @@ func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerIn
 		return nil, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
 	}
 	return OEMManager, nil
-}
-
-type OEMInterface interface {
-	GetUpdateRequestBody(
-		parameters *redfish.SimpleUpdateParameters,
-	) *oem.SimpleUpdateRequestBody
-	GetUpdateTaskMonitorURI(
-		response *http.Response,
-	) (string, error)
-	GetTaskMonitorDetails(
-		ctx context.Context,
-		taskMonitorResponse *http.Response,
-	) (*redfish.Task, error)
 }
 
 func NewOEM(manufacturer string, service *gofish.Service) (OEMInterface, error) {

@@ -2133,63 +2133,9 @@ net/netip.Prefix
 <h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>secretRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-to access the ImageURI. This secret includes sensitive information such as usernames and passwords.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>transferProtocol</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The network protocol that the server&rsquo;s update service uses to retrieve &lsquo;ImageURI&rsquo;</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>URI</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The URI of the software image to update/install.&rdquo;</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
-</p>
-<div>
-<p>todo: remove once the BIOSVersion is merged</p>
 </div>
 <table>
 <thead>
@@ -4329,7 +4275,7 @@ string
 <h3 id="metal.ironcore.dev/v1alpha1.TaskStatus">TaskStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus</a>)
 </p>
 <div>
 </div>
@@ -4386,86 +4332,9 @@ int
 <h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Force&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.TaskStatus">TaskStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus</a>)
-</p>
-<div>
-<p>todo: remove once the BIOSVersion is merged</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>taskURI</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>taskState</code><br/>
-<em>
-github.com/stmcginnis/gofish/redfish.TaskState
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>taskStatus</code><br/>
-<em>
-github.com/stmcginnis/gofish/common.Health
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>percentageComplete</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
-</p>
-<div>
-<p>todo: remove once the BIOSVersion is merged</p>
 </div>
 <table>
 <thead>

@@ -32,10 +32,10 @@ type BMCSettingsSpec struct {
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
-	ServerMaintenanceRefList []ServerMaintenanceRefList `json:"serverMaintenanceRefList,omitempty"`
+	ServerMaintenanceRefList []ServerMaintenanceRefItem `json:"serverMaintenanceRefList,omitempty"`
 }
 
-type ServerMaintenanceRefList struct {
+type ServerMaintenanceRefItem struct {
 	ServerName           string                  `json:"serverName,omitempty"`
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }

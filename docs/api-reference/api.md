@@ -1059,8 +1059,8 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 <td>
 <code>serverMaintenanceRefList</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
-[]ServerMaintenanceRefList
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
 </a>
 </em>
 </td>
@@ -1157,8 +1157,8 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 <td>
 <code>serverMaintenanceRefList</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
-[]ServerMaintenanceRefList
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
 </a>
 </em>
 </td>
@@ -3146,6 +3146,45 @@ ServerMaintenanceStatus
 <td><p>ServerMaintenancePolicyOwnerApproval specifies that the maintenance policy requires owner approval.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serverName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec
 </h3>

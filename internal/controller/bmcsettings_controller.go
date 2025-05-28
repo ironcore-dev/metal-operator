@@ -549,7 +549,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	}
 
 	var errs []error
-	serverMaintenanceRefList := make([]metalv1alpha1.ServerMaintenanceRefList, 0, len(servers))
+	serverMaintenanceRefList := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
@@ -575,7 +575,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 
 		serverMaintenanceRefList = append(
 			serverMaintenanceRefList,
-			metalv1alpha1.ServerMaintenanceRefList{
+			metalv1alpha1.ServerMaintenanceRefItem{
 				ServerName: server.Name,
 				ServerMaintenanceRef: &corev1.ObjectReference{
 					APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
@@ -681,7 +681,7 @@ func (r *BMCSettingsReconciler) getReferredServers(
 func (r *BMCSettingsReconciler) getReferredServerMaintenances(
 	ctx context.Context,
 	log logr.Logger,
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefList,
+	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
 ) ([]*metalv1alpha1.ServerMaintenance, []error) {
 
 	serverMaintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(serverMaintenanceRefList))
@@ -721,7 +721,7 @@ func (r *BMCSettingsReconciler) getReferredBMCSettings(
 }
 
 func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefList,
+	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
 	serverName string,
 ) *corev1.ObjectReference {
 	for _, serverMaintenanceRef := range serverMaintenanceRefList {
@@ -756,7 +756,7 @@ func (r *BMCSettingsReconciler) patchMaintenanceRequestRefOnBMCSettings(
 	ctx context.Context,
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefList,
+	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
 ) error {
 	BMCSettingsBase := bmcSetting.DeepCopy()
 

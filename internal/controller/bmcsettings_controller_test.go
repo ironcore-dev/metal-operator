@@ -24,7 +24,6 @@ import (
 
 var _ = Describe("BMCSettings Controller", func() {
 	ns := SetupTest()
-	ns.Name = "default"
 
 	var server *metalv1alpha1.Server
 	var bmc *metalv1alpha1.BMC
@@ -244,7 +243,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by BMCSettings resource")
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Spec.ServerMaintenanceRefList",
-				[]metalv1alpha1.ServerMaintenanceRefList{{
+				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerName: server.Name,
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",
@@ -254,7 +253,7 @@ var _ = Describe("BMCSettings Controller", func() {
 						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 					}}}),
 			HaveField("Spec.ServerMaintenanceRefList",
-				[]metalv1alpha1.ServerMaintenanceRefList{{
+				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerName: server.Name,
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",

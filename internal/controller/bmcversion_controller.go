@@ -480,7 +480,7 @@ func (r *BMCVersionReconciler) getCondition(acc *conditionutils.Accessor, condit
 func (r *BMCVersionReconciler) getReferredServerMaintenances(
 	ctx context.Context,
 	log logr.Logger,
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefList,
+	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
 ) ([]*metalv1alpha1.ServerMaintenance, []error) {
 	serverMaintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(serverMaintenanceRefList))
 	var errs []error
@@ -601,7 +601,7 @@ func (r *BMCVersionReconciler) getBMC(
 }
 
 func (r *BMCVersionReconciler) getServerMaintenanceRefForServer(
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefList,
+	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
 	serverName string,
 ) (*corev1.ObjectReference, bool) {
 	for _, serverMaintenanceRef := range serverMaintenanceRefList {
@@ -661,7 +661,7 @@ func (r *BMCVersionReconciler) patchMaintenanceRequestRefOnBMCVersion(
 	ctx context.Context,
 	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefList,
+	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
 ) error {
 	bmcVersionsBase := bmcVersion.DeepCopy()
 
@@ -697,7 +697,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 	}
 
 	var errs []error
-	serverMaintenanceRefList := make([]metalv1alpha1.ServerMaintenanceRefList, 0, len(servers))
+	serverMaintenanceRefList := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
@@ -723,7 +723,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 
 		serverMaintenanceRefList = append(
 			serverMaintenanceRefList,
-			metalv1alpha1.ServerMaintenanceRefList{
+			metalv1alpha1.ServerMaintenanceRefItem{
 				ServerName: server.Name,
 				ServerMaintenanceRef: &corev1.ObjectReference{
 					APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),

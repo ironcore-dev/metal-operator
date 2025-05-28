@@ -40,7 +40,7 @@ type BMCVersionSpec struct {
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
-	ServerMaintenanceRefList []ServerMaintenanceRefList `json:"serverMaintenanceRefList,omitempty"`
+	ServerMaintenanceRefList []ServerMaintenanceRefItem `json:"serverMaintenanceRefList,omitempty"`
 }
 
 // BMCVersionStatus defines the observed state of BMCVersion.

@@ -171,6 +171,7 @@ spec:
                 description: Version contains BIOS version to upgrade to
                 type: string
             required:
+            - image
             - version
             type: object
           status:

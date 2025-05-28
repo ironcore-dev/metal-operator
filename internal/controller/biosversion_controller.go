@@ -753,12 +753,15 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 		return ctrl.Result{}, err
 	}
 	var forceUpdate bool
-	switch biosVersion.Spec.UpdatePolicy {
-	case metalv1alpha1.UpdatePolicyForce:
-		forceUpdate = true
-	default:
-		forceUpdate = false
+	if biosVersion.Spec.UpdatePolicy != nil {
+		switch *biosVersion.Spec.UpdatePolicy {
+		case metalv1alpha1.UpdatePolicyForce:
+			forceUpdate = true
+		default:
+			forceUpdate = false
+		}
 	}
+
 	parameters := &redfish.SimpleUpdateParameters{
 		ForceUpdate:      forceUpdate,
 		ImageURI:         biosVersion.Spec.Image.URI,

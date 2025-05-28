@@ -35,9 +35,10 @@ type BIOSVersionSpec struct {
 	// +required
 	Version string `json:"version"`
 	// An indication of whether the server's upgrade service should bypass vendor update policies
-	UpdatePolicy UpdatePolicy `json:"updatePolicy,omitempty"`
+	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
 	// details regarding the image to use to upgrade to given BIOS version
-	Image ImageSpec `json:"image,omitempty"`
+	// +required
+	Image ImageSpec `json:"image"`
 
 	// ServerRef is a reference to a specific server to apply bios upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
@@ -58,7 +59,7 @@ type ImageSpec struct {
 	TransferProtocol string `json:"transferProtocol,omitempty"`
 	// The URI of the software image to update/install."
 	// +required
-	URI string `json:"URI,omitempty"`
+	URI string `json:"URI"`
 }
 
 // BIOSVersionStatus defines the observed state of BIOSVersion.

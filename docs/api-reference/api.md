@@ -1061,6 +1061,8 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
 []ServerMaintenanceRefItem
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
 </a>
 </em>
 </td>

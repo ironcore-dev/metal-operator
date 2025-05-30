@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 	"time"
@@ -93,6 +94,12 @@ func (r *BiosSettingsReconciler) delete(
 	if !controllerutil.ContainsFinalizer(biosSettings, biosSettingsFinalizer) {
 		return ctrl.Result{}, nil
 	}
+	if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateFailed &&
+		biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateApplied {
+		log.V(1).Info("postponing delete as Setting update is in progress")
+		return r.reconcile(ctx, log, biosSettings)
+	}
+
 	if err := r.cleanupReferences(ctx, log, biosSettings); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
@@ -248,6 +255,8 @@ func (r *BiosSettingsReconciler) ensureBIOSSettingsStateTransition(
 		return ctrl.Result{}, err
 	case metalv1alpha1.BIOSSettingsStateInProgress:
 		return r.handleSettingInProgressState(ctx, log, biosSettings, server)
+	case metalv1alpha1.BIOSSettingsStateInWaiting:
+		return r.handleSettingInWaitingState(ctx, log, biosSettings)
 	case metalv1alpha1.BIOSSettingsStateApplied:
 		return r.handleSettingAppliedState(ctx, log, biosSettings, server)
 	case metalv1alpha1.BIOSSettingsStateFailed:
@@ -270,7 +279,8 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	// if setting is not different, complete the BIOS tasks, does not matter if the bios version do not match
 	if len(settingsDiff) == 0 {
 		// move status to completed
-		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied)
+		state := r.getCurrentCompletedState(biosSettings)
+		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, state)
 		return ctrl.Result{}, err
 	}
 
@@ -438,7 +448,8 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 		// if setting is not different, complete the BIOS tasks
 		if len(settingsDiff) == 0 {
 			// move  biosSettings state to completed, and revert the settingUpdate state to initial
-			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied)
+			state := r.getCurrentCompletedState(biosSettings)
+			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, state)
 			return ctrl.Result{}, err
 		}
 		// todo: can take some time to setting to take place. might need to fail after certain time.
@@ -447,6 +458,22 @@ func (r *BiosSettingsReconciler) applySettingUpdateStateTransition(
 	}
 	log.V(1).Info("Unknown State found", "biosSettings UpdateSetting state", biosSettings.Status.UpdateSettingState)
 	// stop reconsile as we can not proceed with unknown state
+	return ctrl.Result{}, nil
+}
+
+func (r *BiosSettingsReconciler) handleSettingInWaitingState(
+	ctx context.Context,
+	log logr.Logger,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) (ctrl.Result, error) {
+	// if the settingPriority has changed, move to pending.
+	if biosSettings.Spec.CurrentSettingPriority != biosSettings.Status.AppliedSettingPriority {
+		// if the settings difference is present and not moved from completed state
+		// (ie: first set of settings are patched). go ahead and apply it
+		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStatePending)
+		return ctrl.Result{}, err
+	}
+	log.V(1).Info("Done with current sequence of bios setting update. waiting on next", "biosSettings", biosSettings)
 	return ctrl.Result{}, nil
 }
 
@@ -468,6 +495,10 @@ func (r *BiosSettingsReconciler) handleSettingAppliedState(
 		return ctrl.Result{}, err
 	}
 	if len(settingsDiff) > 0 {
+		if biosSettings.Spec.SettingUpdatePolicy == metalv1alpha1.SequencialUpdate {
+			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateInWaiting)
+			return ctrl.Result{}, err
+		}
 		err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStatePending)
 		return ctrl.Result{}, err
 	}
@@ -715,6 +746,16 @@ func (r *BiosSettingsReconciler) getReferredBIOSSettings(
 	return biosSettings, nil
 }
 
+func (r *BiosSettingsReconciler) getCurrentCompletedState(biosSetting *metalv1alpha1.BIOSSettings) metalv1alpha1.BIOSSettingsState {
+
+	if biosSetting.Spec.CurrentSettingPriority != math.MaxInt32 &&
+		biosSetting.Spec.SettingUpdatePolicy == metalv1alpha1.SequencialUpdate {
+		return metalv1alpha1.BIOSSettingsStateInWaiting
+	}
+
+	return metalv1alpha1.BIOSSettingsStateApplied
+}
+
 func (r *BiosSettingsReconciler) patchBiosSettingsRefOnServer(
 	ctx context.Context,
 	log logr.Logger,
@@ -799,8 +840,9 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 	biosSettingsBase := biosSettings.DeepCopy()
 	biosSettings.Status.State = state
 
-	if state == metalv1alpha1.BIOSSettingsStateApplied {
+	if state == metalv1alpha1.BIOSSettingsStateApplied || state == metalv1alpha1.BIOSSettingsStateInWaiting {
 		biosSettings.Status.UpdateSettingState = ""
+		biosSettings.Status.AppliedSettingPriority = biosSettings.Spec.CurrentSettingPriority
 	}
 
 	if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
@@ -865,6 +907,7 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 			// states where we do not want to requeue for host changes
 			if biosSettings.Spec.ServerMaintenanceRef == nil ||
 				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInWaiting ||
 				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 				return nil
 			}
@@ -895,7 +938,9 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByBiosVersion(
 
 	for _, biosSettings := range BIOSSettingsList.Items {
 		if biosSettings.Spec.ServerRef.Name == BIOSVersion.Spec.ServerRef.Name {
-			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied || biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInWaiting ||
+				biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 				return nil
 			}
 			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}

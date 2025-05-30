@@ -103,6 +103,33 @@ map[string]string
 </tr>
 <tr>
 <td>
+<code>settingUpdatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingUpdatePolicy">
+SettingUpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>SettingUpdatePolicy dictates how the settings are applied.
+if &lsquo;Sequence&rsquo;, the BIOSSettings resource will enter &lsquo;Waiting&rsquo; state after applying the settings
+if &lsquo;OneShotUpdate&rsquo; the BIOSSettings resource will enter &lsquo;Completed&rsquo; state after applying the settings</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentSettingPriority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
+used in conjunction with SettingUpdatePolicy and BIOSSettingFlow</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serverRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
@@ -157,6 +184,243 @@ BIOSSettingsStatus
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsFlow">BIOSSettingsFlow
+</h3>
+<div>
+<p>BIOSSettingsFlow is the Schema for the biossettingsflows API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowSpec">
+BIOSSettingsFlowSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settingsFlow</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowStatus">
+BIOSSettingsFlowStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsFlowSpec">BIOSSettingsFlowSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlow">BIOSSettingsFlow</a>)
+</p>
+<div>
+<p>BIOSSettingsFlowSpec defines the desired state of BIOSSettingsFlow.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settingsFlow</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsFlowState">BIOSSettingsFlowState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowStatus">BIOSSettingsFlowStatus</a>)
+</p>
+<div>
+<p>BIOSSettingsState specifies the current state of the BIOS maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BIOSSettingsFlowStateApplied specifies that the bios setting maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BIOSSettingsFlowStateFailed specifies that the bios setting maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BIOSSettingsFlowStatePending specifies that the bios setting maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsFlowStatus">BIOSSettingsFlowStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlow">BIOSSettingsFlow</a>)
+</p>
+<div>
+<p>BIOSSettingsFlowStatus defines the observed state of BIOSSettingsFlow.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowState">
+BIOSSettingsFlowState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the bios configuration task.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec
 </h3>
 <p>
@@ -194,6 +458,33 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settingUpdatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingUpdatePolicy">
+SettingUpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>SettingUpdatePolicy dictates how the settings are applied.
+if &lsquo;Sequence&rsquo;, the BIOSSettings resource will enter &lsquo;Waiting&rsquo; state after applying the settings
+if &lsquo;OneShotUpdate&rsquo; the BIOSSettings resource will enter &lsquo;Completed&rsquo; state after applying the settings</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentSettingPriority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
+used in conjunction with SettingUpdatePolicy and BIOSSettingFlow</p>
 </td>
 </tr>
 <tr>
@@ -261,6 +552,9 @@ Kubernetes core/v1.ObjectReference
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
 <td><p>BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings</p>
 </td>
+</tr><tr><td><p>&#34;Waiting&#34;</p></td>
+<td><p>BIOSSettingsStateInWaiting specifies that the BIOSSetting Controller is updating the settings</p>
+</td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
 <td><p>BIOSSettingsStatePending specifies that the bios setting maintenance is waiting</p>
 </td>
@@ -306,6 +600,18 @@ BIOSSettingUpdateState
 </td>
 <td>
 <p>UpdateSettingState represents the current state of the bios setting update task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>appliedSettingPriority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>AppliedSettingPriority specifies the number of sequence left to complete the settings workflow
+used in conjunction with SettingUpdatePolicy and BIOSSettingFlow Resource</p>
 </td>
 </tr>
 </tbody>
@@ -2808,7 +3114,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowSpec">BIOSSettingsFlowSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -3366,6 +3672,65 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the server&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.SettingUpdatePolicy">SettingUpdatePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OneShotUpdate&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Sequence&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.SettingsFlowItem">SettingsFlowItem
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowSpec">BIOSSettingsFlowSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>priority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Priority defines the order of applying the settings
+any int greater than 0. lower number have higher Priority (ie; lower number is applied first)</p>
 </td>
 </tr>
 </tbody>

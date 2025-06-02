@@ -33,7 +33,7 @@ type BMCReconciler struct {
 	client.Client
 	Scheme            *runtime.Scheme
 	Insecure          bool
-	BMCPollingOptions bmc.BMCOptions
+	BMCPollingOptions bmc.Options
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch

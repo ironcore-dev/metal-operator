@@ -327,7 +327,7 @@ BIOSSettingUpdateState
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -391,7 +391,7 @@ ImageSpec
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -417,7 +417,7 @@ ServerMaintenancePolicy
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -500,7 +500,7 @@ ImageSpec
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -526,7 +526,7 @@ ServerMaintenancePolicy
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -611,7 +611,7 @@ TaskStatus
 <td>
 <code>conditions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#condition-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
 []Kubernetes meta/v1.Condition
 </a>
 </em>
@@ -1517,7 +1517,7 @@ net/netip.Prefix
 <td>
 <code>secretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>

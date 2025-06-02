@@ -136,7 +136,7 @@ func (r *BIOSVersionReconciler) cleanupServerMaintenanceReferences(
 			log.V(1).Info("server maintenance status not updated as its provided by user", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
 		}
 	}
-	// if already deleted or we deleted it or its created by user, remove reference
+	// if already deleted, or we deleted it, or it's created by a user, remove reference
 	if apierrors.IsNotFound(err) || err == nil {
 		err = r.patchMaintenanceRequestRefOnBiosVersion(ctx, log, biosVersion, nil)
 		if err != nil {
@@ -146,11 +146,7 @@ func (r *BIOSVersionReconciler) cleanupServerMaintenanceReferences(
 	return nil
 }
 
-func (r *BIOSVersionReconciler) reconcile(
-	ctx context.Context,
-	log logr.Logger,
-	biosVersion *metalv1alpha1.BIOSVersion,
-) (ctrl.Result, error) {
+func (r *BIOSVersionReconciler) reconcile(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
 	if shouldIgnoreReconciliation(biosVersion) {
 		log.V(1).Info("Skipped BIOSVersion reconciliation")
 		return ctrl.Result{}, nil
@@ -161,7 +157,6 @@ func (r *BIOSVersionReconciler) reconcile(
 	}
 
 	return r.ensureBiosVersionStateTransition(ctx, log, biosVersion)
-
 }
 
 func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
@@ -175,9 +170,15 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 		return ctrl.Result{}, err
 	}
 
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
+	}
+	defer bmcClient.Logout()
+
 	switch biosVersion.Status.State {
 	case "", metalv1alpha1.BIOSVersionStatePending:
-		return r.checkVersionAndTransistionState(ctx, log, biosVersion, server)
+		return r.checkVersionAndTransistionState(ctx, log, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateInProgress:
 		if biosVersion.Spec.ServerMaintenanceRef == nil {
 			if requeue, err := r.requestMaintenanceOnServer(ctx, log, biosVersion, server); err != nil || requeue {
@@ -198,10 +199,10 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 			return ctrl.Result{}, nil
 		}
 
-		return r.handleUpgradeInProgressState(ctx, log, biosVersion, server)
+		return r.handleUpgradeInProgressState(ctx, log, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateCompleted:
 		// clean up maintenance crd and references and mark completed if version matches.
-		return r.checkVersionAndTransistionState(ctx, log, biosVersion, server)
+		return r.checkVersionAndTransistionState(ctx, log, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateFailed:
 		log.V(1).Info("Failed to upgrade BIOSVersion", "ctx", ctx, "BIOSVersion", biosVersion, "server", server)
 		return ctrl.Result{}, nil
@@ -213,6 +214,7 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 	ctx context.Context,
 	log logr.Logger,
+	bmcClient bmc.BMC,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
@@ -228,7 +230,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 			log.V(1).Info("Server is still powered off. waiting", "Server", server.Name, "server power state", server.Status.PowerState)
 			return ctrl.Result{}, nil
 		}
-		return r.issueBiosUpgrade(ctx, log, biosVersion, server, issuedCondition, acc)
+		return r.issueBiosUpgrade(ctx, log, bmcClient, biosVersion, server, issuedCondition, acc)
 	}
 
 	completedCondition, err := r.getCondition(acc, biosVersion.Status.Conditions, biosVersionUpgradeCompleted)
@@ -238,7 +240,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 
 	if completedCondition.Status != metav1.ConditionTrue {
 		log.V(1).Info("check Upgrade task of Bios")
-		return r.checkUpdateBiosUpgradeStatus(ctx, log, biosVersion, server, biosVersion.Status.UpgradeTask.TaskURI, completedCondition, acc)
+		return r.checkUpdateBiosUpgradeStatus(ctx, log, bmcClient, biosVersion, server, completedCondition, acc)
 	}
 
 	rebootPowerOffCondition, err := r.getCondition(acc, biosVersion.Status.Conditions, biosVersionUpgradeRebootServerPowerOff)
@@ -314,7 +316,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 	if VerificationCondition.Status != metav1.ConditionTrue {
 		log.V(1).Info("verify Bios Version update")
 
-		currentBiosVersion, err := r.getBiosVersionFromBMC(ctx, log, server)
+		currentBiosVersion, err := r.getBiosVersionFromBMC(ctx, log, bmcClient, server)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -364,15 +366,9 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 func (r *BIOSVersionReconciler) getBiosVersionFromBMC(
 	ctx context.Context,
 	log logr.Logger,
+	bmcClient bmc.BMC,
 	server *metalv1alpha1.Server,
 ) (string, error) {
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-	if err != nil {
-		log.V(1).Info("failed to create BMC client for %v: %w", server.Name, err)
-		return "", err
-	}
-	defer bmcClient.Logout()
-
 	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemUUID)
 	if err != nil {
 		log.V(1).Error(err, "failed to get current BIOS version", "server", server.Name)
@@ -385,10 +381,11 @@ func (r *BIOSVersionReconciler) getBiosVersionFromBMC(
 func (r *BIOSVersionReconciler) checkVersionAndTransistionState(
 	ctx context.Context,
 	log logr.Logger,
+	bmcClient bmc.BMC,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
-	currentBiosVersion, err := r.getBiosVersionFromBMC(ctx, log, server)
+	currentBiosVersion, err := r.getBiosVersionFromBMC(ctx, log, bmcClient, server)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -612,26 +609,21 @@ func (r *BIOSVersionReconciler) requestMaintenanceOnServer(
 func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	ctx context.Context,
 	log logr.Logger,
+	bmcClient bmc.BMC,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
-	biosUpgradeTaskUri string,
 	completedCondition *metav1.Condition,
 	acc *conditionutils.Accessor,
 ) (ctrl.Result, error) {
+	taskURI := biosVersion.Status.UpgradeTask.TaskURI
 	taskCurrentStatus, err := func() (*redfish.Task, error) {
-		if biosUpgradeTaskUri == "" {
-			return nil, fmt.Errorf("invalid task URI. uri provided: '%v'", biosUpgradeTaskUri)
+		if taskURI == "" {
+			return nil, fmt.Errorf("invalid task URI. uri provided: '%v'", taskURI)
 		}
-		bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-		if err != nil {
-			log.V(1).Info("failed to create BMC client for %v: %w", server.Name, err)
-			return nil, err
-		}
-		defer bmcClient.Logout()
-		return bmcClient.GetBiosUpgradeTask(ctx, server.Status.Manufacturer, biosUpgradeTaskUri)
+		return bmcClient.GetBiosUpgradeTask(ctx, server.Status.Manufacturer, taskURI)
 	}()
 	if err != nil {
-		log.V(1).Error(err, "failed to get the task details of bios upgrade task", "task uri", biosUpgradeTaskUri)
+		log.V(1).Error(err, "failed to get the task details of bios upgrade task", "task uri", taskURI)
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("bios upgrade task current status", "Task status", taskCurrentStatus)
@@ -661,7 +653,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		message := fmt.Sprintf(
 			"Upgrade Bios task has failed. with message %v check '%v' for details",
 			taskCurrentStatus.Messages,
-			biosUpgradeTaskUri,
+			taskURI,
 		)
 		if err := acc.Update(
 			completedCondition,
@@ -742,6 +734,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 func (r *BIOSVersionReconciler) issueBiosUpgrade(
 	ctx context.Context,
 	log logr.Logger,
+	bmcClient bmc.BMC,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
 	issuedCondition *metav1.Condition,
@@ -771,13 +764,6 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {
-		bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-		if err != nil {
-			log.V(1).Info("failed to create BMC client for %v: %w", server.Name, err)
-			return "", false, err
-		}
-		defer bmcClient.Logout()
-
 		return bmcClient.UpgradeBiosVersion(ctx, server.Status.Manufacturer, parameters)
 	}()
 

@@ -220,7 +220,7 @@ func SetupTest() *corev1.Namespace {
 			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
@@ -251,7 +251,7 @@ func SetupTest() *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
@@ -264,7 +264,7 @@ func SetupTest() *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,

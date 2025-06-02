@@ -85,7 +85,7 @@ type ServerReconciler struct {
 	EnforceFirstBoot        bool
 	EnforcePowerOff         bool
 	ResyncInterval          time.Duration
-	BMCOptions              bmc.BMCOptions
+	BMCOptions              bmc.Options
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
 }

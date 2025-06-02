@@ -32,7 +32,7 @@ type EndpointReconciler struct {
 	Scheme      *runtime.Scheme
 	MACPrefixes *macdb.MacPrefixes
 	Insecure    bool
-	BMCOptions  bmc.BMCOptions
+	BMCOptions  bmc.Options
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
@@ -83,7 +83,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
 
-			bmcOptions := bmc.BMCOptions{
+			bmcOptions := bmc.Options{
 				BasicAuth: true,
 				Username:  m.DefaultCredentials[0].Username,
 				Password:  m.DefaultCredentials[0].Password,

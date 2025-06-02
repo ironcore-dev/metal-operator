@@ -35,8 +35,8 @@ const (
 	DefaultPowerPollingTimeout = 5 * time.Minute
 )
 
-// BMCOptions contains the options for the BMC redfish client.
-type BMCOptions struct {
+// Options BMCOptions contains the options for the BMC redfish client.
+type Options struct {
 	Endpoint  string
 	Username  string
 	Password  string
@@ -51,7 +51,7 @@ type BMCOptions struct {
 // RedfishBMC is an implementation of the BMC interface for Redfish.
 type RedfishBMC struct {
 	client  *gofish.APIClient
-	options BMCOptions
+	options Options
 }
 
 var pxeBootWithSettingUEFIBootMode = redfish.Boot{
@@ -67,7 +67,7 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(
 	ctx context.Context,
-	options BMCOptions,
+	options Options,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
 		Endpoint:  options.Endpoint,

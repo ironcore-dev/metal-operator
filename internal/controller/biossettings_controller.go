@@ -36,7 +36,7 @@ type BiosSettingsReconciler struct {
 	ManagerNamespace string
 	Insecure         bool
 	Scheme           *runtime.Scheme
-	BMCOptions       bmc.BMCOptions
+	BMCOptions       bmc.Options
 	ResyncInterval   time.Duration
 }
 

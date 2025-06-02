@@ -35,7 +35,7 @@ const (
 	DefaultPowerPollingTimeout = 5 * time.Minute
 )
 
-// Options BMCOptions contains the options for the BMC redfish client.
+// Options contain the options for the BMC redfish client.
 type Options struct {
 	Endpoint  string
 	Username  string
@@ -356,7 +356,7 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	}
 
 	// unfortunately, some vendors fill the pending attribute with copy of actual bios attribute
-	// remove if there are same
+	// remove if there are the same
 	if len(tBios.Attributes) == len(tBiosPendingSetting.Attributes) {
 		pendingAttr := redfish.SettingsAttributes{}
 		for key, attr := range tBiosPendingSetting.Attributes {
@@ -448,7 +448,7 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 	return
 }
 
-// check if the arrtibutes need to reboot when changed, and are correct type.
+// CheckBiosAttributes checks if the attributes need to reboot when changed and are the correct type.
 func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
 	// filter out immutable, readonly and hidden attributes

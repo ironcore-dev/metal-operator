@@ -257,7 +257,7 @@ func (r *BiosSettingsReconciler) ensureBIOSSettingsStateTransition(
 		err = r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateInProgress)
 		return ctrl.Result{}, err
 	case metalv1alpha1.BIOSSettingsStateInProgress:
-		return r.handleSettingInProgressState(ctx, log, biosSettings, server)
+		return r.handleSettingInProgressState(ctx, log, bmcClient, biosSettings, server)
 	case metalv1alpha1.BIOSSettingsStateInWaiting:
 		return r.handleSettingInWaitingState(ctx, log, biosSettings)
 	case metalv1alpha1.BIOSSettingsStateApplied:

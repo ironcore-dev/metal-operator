@@ -23,6 +23,13 @@ const (
 // BMCSpec defines the desired state of BMC
 // +kubebuilder:validation:XValidation:rule="has(self.access) != has(self.endpointRef)",message="exactly one of access or endpointRef needs to be set"
 type BMCSpec struct {
+
+	// bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
+	// +kubebuilder:validation:Optional
+	// +optional
+	// This field is optional and can be omitted, controller will choose the first avaialbe Manager
+	BMCUUID string `json:"bmcUUID,omitempty"`
+
 	// EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
 	// This reference is typically used to locate the BMC endpoint within the cluster.
 	// +optional
@@ -49,6 +56,10 @@ type BMCSpec struct {
 	// This field is optional and can be omitted if console access is not required.
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
+
+	// BMCSettingRef is a reference to a BMCSettings object that specifies
+	// the BMC configuration for this BMC.
+	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.

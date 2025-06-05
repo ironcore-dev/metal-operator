@@ -23,7 +23,7 @@ type RedfishLocalBMC struct {
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
 func NewRedfishLocalBMCClient(
 	ctx context.Context,
-	options BMCOptions,
+	options Options,
 ) (BMC, error) {
 	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {

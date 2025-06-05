@@ -36,8 +36,8 @@ const (
 	DefaultPowerPollingTimeout = 5 * time.Minute
 )
 
-// BMCOptions contains the options for the BMC redfish client.
-type BMCOptions struct {
+// Options contain the options for the BMC redfish client.
+type Options struct {
 	Endpoint  string
 	Username  string
 	Password  string
@@ -52,7 +52,7 @@ type BMCOptions struct {
 // RedfishBMC is an implementation of the BMC interface for Redfish.
 type RedfishBMC struct {
 	client  *gofish.APIClient
-	options BMCOptions
+	options Options
 }
 
 var pxeBootWithSettingUEFIBootMode = redfish.Boot{
@@ -68,7 +68,7 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(
 	ctx context.Context,
-	options BMCOptions,
+	options Options,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
 		Endpoint:  options.Endpoint,
@@ -425,7 +425,7 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	}
 
 	// unfortunately, some vendors fill the pending attribute with copy of actual bios attribute
-	// remove if there are same
+	// remove if there are the same
 	if len(tBios.Attributes) == len(tBiosPendingSetting.Attributes) {
 		pendingAttr := redfish.SettingsAttributes{}
 		for key, attr := range tBiosPendingSetting.Attributes {
@@ -547,7 +547,7 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 	return
 }
 
-// check if the arrtibutes need to reboot when changed, and are correct type.
+// CheckBiosAttributes checks if the attributes need to reboot when changed and are the correct type.
 func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)

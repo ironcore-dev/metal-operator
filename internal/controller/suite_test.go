@@ -108,7 +108,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.33.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error
@@ -223,7 +223,7 @@ func SetupTest() *corev1.Namespace {
 			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
@@ -254,7 +254,7 @@ func SetupTest() *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
@@ -267,7 +267,7 @@ func SetupTest() *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,

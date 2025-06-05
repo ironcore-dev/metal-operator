@@ -319,7 +319,7 @@ func main() { // nolint: gocyclo
 		EnforceFirstBoot:        enforceFirstBoot,
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
-		BMCOptions: bmc.BMCOptions{
+		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
@@ -368,7 +368,7 @@ func main() { // nolint: gocyclo
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
 		ResyncInterval:   serverResyncInterval,
-		BMCOptions: bmc.BMCOptions{
+		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
@@ -392,7 +392,7 @@ func main() { // nolint: gocyclo
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
 		ResyncInterval:   serverResyncInterval,
-		BMCOptions: bmc.BMCOptions{
+		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,

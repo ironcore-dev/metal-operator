@@ -27,13 +27,13 @@ var _ = Describe("Account Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		account := &metalv1alpha1.Account{}
+		account := &metalv1alpha1.User{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind Account")
 			err := k8sClient.Get(ctx, typeNamespacedName, account)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &metalv1alpha1.Account{
+				resource := &metalv1alpha1.User{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -46,7 +46,7 @@ var _ = Describe("Account Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &metalv1alpha1.Account{}
+			resource := &metalv1alpha1.User{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -55,7 +55,7 @@ var _ = Describe("Account Controller", func() {
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &AccountReconciler{
+			controllerReconciler := &UserReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

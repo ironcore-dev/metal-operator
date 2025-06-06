@@ -29,47 +29,47 @@ const (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// AccountSpec defines the desired state of Account
-type AccountSpec struct {
-	Name               string
-	RoleID             string
-	Description        string
-	PasswordExpiration metav1.Time
-	BMCSecretRef       v1.LocalObjectReference
-	BMCSelector        *metav1.LabelSelector
-	Enabled            bool
-	GeneratePassword   bool
-	MetalUser          bool
-	//"PasswordChangeRequired": false,
+// UserSpec defines the desired state of User
+type UserSpec struct {
+	UserName       string                   `json:"userName"`
+	RoleID         string                   `json:"roleID"`
+	Description    string                   `json:"description,omitempty"`
+	RotationPeriod *metav1.Duration         `json:"rotationPeriod,omitempty"`
+	BMCSecretRef   *v1.LocalObjectReference `json:"bmcSecretRef,omitempty"`
+	BMCRef         *v1.LocalObjectReference `json:"bmcRef,omitempty"`
+	Enabled        bool                     `json:"enabled"`
+	IsAdmin        bool                     `json:"isAdmin"`
 }
 
-// AccountStatus defines the observed state of Account
-type AccountStatus struct {
-	State AccountState
-	ID    string
+// UserStatus defines the observed state of User
+type UserStatus struct {
+	EffectiveBMCSecretRef *v1.LocalObjectReference `json:"effectiveBMCSecretRef,omitempty"`
+	LastRotation          *metav1.Time             `json:"lastRotation,omitempty"`
+	State                 AccountState
+	ID                    string
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// Account is the Schema for the accounts API
-type Account struct {
+// User is the Schema for the users API
+type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AccountSpec   `json:"spec,omitempty"`
-	Status AccountStatus `json:"status,omitempty"`
+	Spec   UserSpec   `json:"spec,omitempty"`
+	Status UserStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AccountList contains a list of Account
-type AccountList struct {
+// UserList contains a list of User
+type UserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Account `json:"items"`
+	Items           []User `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Account{}, &AccountList{})
+	SchemeBuilder.Register(&User{}, &UserList{})
 }

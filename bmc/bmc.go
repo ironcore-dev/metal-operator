@@ -54,7 +54,7 @@ type BMC interface {
 
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 
-	CreateOrUpdateAccount(ctx context.Context, accountName, userName, role, password string, enabled bool) error
+	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 }
 
 type Entity struct {

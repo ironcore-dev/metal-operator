@@ -27,6 +27,9 @@ resources:
   kind: BMCSecret
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -66,7 +69,7 @@ resources:
   controller: true
   domain: ironcore.dev
   group: metal
-  kind: Account
+  kind: User
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

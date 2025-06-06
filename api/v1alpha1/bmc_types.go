@@ -15,6 +15,15 @@ const (
 	ProtocolRedfishKube  = "RedfishKube"
 )
 
+type PasswordPolicy string
+
+const (
+	// PasswordPolicyExternal indicates that the password policy is managed externally, such as by an external identity provider.
+	PasswordPolicyExternal PasswordPolicy = "External"
+	// PasswordPolicyInternal indicates that the password policy is managed internally, such as by the BMC itself.
+	PasswordPolicyInternal PasswordPolicy = "Internal"
+)
+
 // BMCSpec defines the desired state of BMC
 // +kubebuilder:validation:XValidation:rule="has(self.access) != has(self.endpointRef)",message="exactly one of access or endpointRef needs to be set"
 type BMCSpec struct {
@@ -34,7 +43,10 @@ type BMCSpec struct {
 
 	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
 	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.
+	// BMCSecretRef is deprecated and will be removed in a future release.
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
+
+	AdminUserRef *v1.LocalObjectReference `json:"adminUserRef,omitempty"`
 
 	// Protocol specifies the protocol to be used for communicating with the BMC.
 	// It could be a standard protocol such as IPMI or Redfish.
@@ -44,6 +56,11 @@ type BMCSpec struct {
 	// This field is optional and can be omitted if console access is not required.
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
+
+	// UserAccounts is a list of user accounts that can be used to access the BMC.
+	// Each account includes a name, role ID, description, and other relevant details.
+	// +optional
+	UserRefs []UserSpec `json:"userRefs,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.

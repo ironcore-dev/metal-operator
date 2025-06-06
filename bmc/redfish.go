@@ -479,7 +479,7 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 	return result, nil
 }
 
-func (r *RedfishBMC) CreateOrUpdateAccount(ctx context.Context, accountName, userName, role, password string, enabled bool) error {
+func (r *RedfishBMC) CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error {
 	service, err := r.client.GetService().AccountService()
 	if err != nil {
 		return fmt.Errorf("failed to get account service: %w", err)
@@ -489,7 +489,7 @@ func (r *RedfishBMC) CreateOrUpdateAccount(ctx context.Context, accountName, use
 		return errors.New("no account found")
 	}
 	for _, a := range accounts {
-		if a.Name == accountName {
+		if a.Name == userName {
 			a.RoleID = role
 			a.Name = userName
 			a.Enabled = enabled

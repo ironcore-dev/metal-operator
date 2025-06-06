@@ -5,13 +5,15 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -223,12 +225,33 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
 	}
+
 	memoryString := fmt.Sprintf("%.fGi", system.MemorySummary.TotalSystemMemoryGiB)
 	quantity, err := resource.ParseQuantity(memoryString)
-
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
+
+	systemProcessors, err := system.Processors()
+	if err != nil {
+		return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
+	}
+
+	processors := make([]Processor, 0, len(systemProcessors))
+	for _, p := range systemProcessors {
+		processors = append(processors, Processor{
+			ID:             p.ID,
+			Type:           string(p.ProcessorType),
+			Architecture:   string(p.ProcessorArchitecture),
+			InstructionSet: string(p.InstructionSet),
+			Manufacturer:   p.Manufacturer,
+			Model:          p.Model,
+			MaxSpeedMHz:    int32(p.MaxSpeedMHz),
+			TotalCores:     int32(p.TotalCores),
+			TotalThreads:   int32(p.TotalThreads),
+		})
+	}
+
 	return SystemInfo{
 		SystemUUID:        system.UUID,
 		Manufacturer:      system.Manufacturer,
@@ -239,6 +262,7 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 		SKU:               system.SKU,
 		IndicatorLED:      string(system.IndicatorLED),
 		TotalSystemMemory: quantity,
+		Processors:        processors,
 	}, nil
 }
 
@@ -263,43 +287,94 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	systemUUID string,
 	attributes []string,
 ) (
-	result map[string]string,
+	result redfish.SettingsAttributes,
 	err error,
 ) {
 	if len(attributes) == 0 {
-		return
+		return result, err
 	}
 	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
-		return
+		return result, err
 	}
 	bios, err := system.Bios()
 	if err != nil {
-		return
+		return result, err
 	}
 	filteredAttr, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil {
-		return
+		return result, err
 	}
-	result = make(map[string]string, len(attributes))
+	result = make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if _, ok := filteredAttr[name]; ok {
-			result[name] = bios.Attributes.String(name)
+			result[name] = bios.Attributes[name]
 		}
 	}
-	return
+	return result, err
 }
 
-// SetBiosAttributes sets given bios attributes. Returns true if bios reset is required
-func (r *RedfishBMC) SetBiosAttributes(
+func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	ctx context.Context,
 	systemUUID string,
-	attributes map[string]string,
 ) (
-	reset bool,
+	result redfish.SettingsAttributes,
 	err error,
 ) {
-	reset = false
+	system, err := r.getSystemByUUID(ctx, systemUUID)
+	if err != nil {
+		return result, err
+	}
+
+	var tSys struct {
+		Bios        common.Link
+		BiosVersion string
+	}
+
+	err = json.Unmarshal(system.RawData, &tSys)
+	if err != nil {
+		return result, err
+	}
+
+	var tBios struct {
+		Settings common.Settings `json:"@Redfish.Settings"`
+	}
+	err = r.GetEntityFromUri(tSys.Bios.String(), system.GetClient(), &tBios)
+	if err != nil {
+		return result, err
+	}
+
+	var tBiosSetting struct {
+		Attributes redfish.SettingsAttributes `json:"Attributes"`
+	}
+	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosSetting)
+	if err != nil {
+		return result, err
+	}
+
+	return tBiosSetting.Attributes, nil
+}
+
+func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
+	Resp, err := client.Get(uri)
+	if err != nil {
+		return err
+	}
+	defer Resp.Body.Close() // nolint: errcheck
+
+	RespRawBody, err := io.ReadAll(Resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(RespRawBody, &entity)
+}
+
+// SetBiosAttributesOnReset sets given bios attributes.
+func (r *RedfishBMC) SetBiosAttributesOnReset(
+	ctx context.Context,
+	systemUUID string,
+	attributes redfish.SettingsAttributes,
+) (err error) {
 	system, err := r.getSystemByUUID(ctx, systemUUID)
 	if err != nil {
 		return
@@ -308,15 +383,12 @@ func (r *RedfishBMC) SetBiosAttributes(
 	if err != nil {
 		return
 	}
-	reset, err = r.checkBiosAttributes(attributes)
-	if err != nil {
-		return
-	}
-	attrs := make(map[string]interface{}, len(attributes))
+
+	attrs := make(redfish.SettingsAttributes, len(attributes))
 	for name, value := range attributes {
 		attrs[name] = value
 	}
-	return reset, bios.UpdateBiosAttributes(attrs)
+	return bios.UpdateBiosAttributesApplyAt(attrs, common.OnResetApplyTime)
 }
 
 // SetBootOrder sets bios boot order
@@ -361,18 +433,28 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 	return
 }
 
-func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, err error) {
+// check if the arrtibutes need to reboot when changed, and are correct type.
+func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
 	// filter out immutable, readonly and hidden attributes
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil {
-		return
+		return reset, err
 	}
+	return r.checkAttribues(attrs, filtered)
+}
+
+func (r *RedfishBMC) checkAttribues(
+	attrs redfish.SettingsAttributes,
+	filtered map[string]RegistryEntryAttributes,
+) (reset bool, err error) {
+	reset = false
+	var errs []error
 	//TODO: add more types like maps and Enumerations
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
-			err = errors.Join(err, fmt.Errorf("attribute %s not found or immutable/hidden", name))
+			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
 			continue
 		}
 		if entryAttribute.ResetRequired {
@@ -380,17 +462,65 @@ func (r *RedfishBMC) checkBiosAttributes(attrs map[string]string) (reset bool, e
 		}
 		switch strings.ToLower(entryAttribute.Type) {
 		case "integer":
-			_, Aerr := strconv.Atoi(value)
-			if Aerr != nil {
-				err = errors.Join(err, fmt.Errorf("attribute %s value has wrong type", name))
+			if _, ok := value.(int); !ok {
+				errs = append(
+					errs,
+					fmt.Errorf(
+						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
+						name,
+						value,
+						entryAttribute.Type,
+						entryAttribute,
+					))
 			}
 		case "string":
-			continue
+			if _, ok := value.(string); !ok {
+				errs = append(
+					errs,
+					fmt.Errorf(
+						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
+						name,
+						value,
+						entryAttribute.Type,
+						entryAttribute,
+					))
+			}
+		case "enumeration":
+			if _, ok := value.(string); !ok {
+				errs = append(
+					errs,
+					fmt.Errorf(
+						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
+						name,
+						value,
+						entryAttribute.Type,
+						entryAttribute,
+					))
+				break
+			}
+			var validEnum bool
+			for _, attrValue := range entryAttribute.Value {
+				if attrValue.ValueName == value.(string) {
+					validEnum = true
+					break
+				}
+			}
+			if !validEnum {
+				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
+			}
 		default:
-			err = errors.Join(err, fmt.Errorf("attribute %s value has wrong type", name))
+			errs = append(
+				errs,
+				fmt.Errorf(
+					"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
+					name,
+					value,
+					entryAttribute.Type,
+					entryAttribute,
+				))
 		}
 	}
-	return
+	return reset, errors.Join(errs...)
 }
 
 func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {
@@ -542,7 +672,7 @@ func (r *RedfishBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*r
 			return system, nil
 		}
 	}
-	return nil, errors.New("no system found")
+	return nil, fmt.Errorf("no system found for %v", systemUUID)
 }
 
 func (r *RedfishBMC) WaitForServerPowerState(

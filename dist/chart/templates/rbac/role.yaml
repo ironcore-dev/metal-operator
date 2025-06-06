@@ -1,0 +1,82 @@
+{{- if .Values.rbac.enable }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  name: metal-operator-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - biossettings
+  - bmcs
+  - bmcsecrets
+  - endpoints
+  - serverbootconfigurations
+  - serverclaims
+  - serverconfigurations
+  - servermaintenances
+  - servers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - biossettings/finalizers
+  - bmcs/finalizers
+  - bmcsecrets/finalizers
+  - endpoints/finalizers
+  - serverbootconfigurations/finalizers
+  - serverclaims/finalizers
+  - servermaintenances/finalizers
+  - servers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - biossettings/status
+  - bmcs/status
+  - bmcsecrets/status
+  - endpoints/status
+  - serverbootconfigurations/status
+  - serverclaims/status
+  - servermaintenances/status
+  - servers/status
+  verbs:
+  - get
+  - patch
+  - update
+{{- end -}}

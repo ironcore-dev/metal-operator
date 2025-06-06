@@ -15,28 +15,25 @@ import (
 	"sort"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
-	"golang.org/x/crypto/ssh"
-
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/stmcginnis/gofish/redfish"
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -44,39 +41,53 @@ import (
 )
 
 const (
-	DefaultIgnitionSecretKeyName    = "ignition"
-	DefaultIgnitionFormatKey        = "format"
-	DefaultIgnitionFormatValue      = "fcos"
-	SSHKeyPairSecretPrivateKeyName  = "pem"
-	SSHKeyPairSecretPublicKeyName   = "pub"
-	SShKeyPairSecretPasswordKeyName = "password"
-
-	ServerFinalizer               = "metal.ironcore.dev/server"
+	// DefaultIgnitionSecretKeyName is the default key name for the ignition secret
+	DefaultIgnitionSecretKeyName = "ignition"
+	// DefaultIgnitionFormatKey is the key for the ignition format annotation
+	DefaultIgnitionFormatKey = "format"
+	// DefaultIgnitionFormatValue is the value for the ignition format annotation
+	DefaultIgnitionFormatValue = "fcos"
+	// SSHKeyPairSecretPrivateKeyName is the key name for the private key in the SSH key pair secret
+	SSHKeyPairSecretPrivateKeyName = "pem"
+	// SSHKeyPairSecretPublicKeyName is the key name for the public key in the SSH key pair secret
+	SSHKeyPairSecretPublicKeyName = "pub"
+	// SSHKeyPairSecretPasswordKeyName is the key name for the password in the SSH key pair secret
+	SSHKeyPairSecretPasswordKeyName = "password"
+	// ServerFinalizer is the finalizer for the server
+	ServerFinalizer = "metal.ironcore.dev/server"
+	// InternalAnnotationTypeKeyName is the key name for the internal annotation type
 	InternalAnnotationTypeKeyName = "metal.ironcore.dev/type"
-	InternalAnnotationTypeValue   = "Internal"
+	// IsDefaultServerBootConfigOSImageKeyName is the key name for the is default OS image annotation
+	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
+	// InternalAnnotationTypeValue is the value for the internal annotation type
+	InternalAnnotationTypeValue = "Internal"
 )
 
 const (
-	powerOpOn   = "PowerOn"
-	powerOpOff  = "PowerOff"
+	// powerOpOn is the power on operation
+	powerOpOn = "PowerOn"
+	// powerOpOff is the power off operation
+	powerOpOff = "PowerOff"
+	// powerOpNoOP is the no operation
 	powerOpNoOP = "NoOp"
 )
 
 // ServerReconciler reconciles a Server object
 type ServerReconciler struct {
 	client.Client
-	Scheme                 *runtime.Scheme
-	Insecure               bool
-	ManagerNamespace       string
-	ProbeImage             string
-	RegistryURL            string
-	ProbeOSImage           string
-	RegistryResyncInterval time.Duration
-	EnforceFirstBoot       bool
-	EnforcePowerOff        bool
-	ResyncInterval         time.Duration
-	BMCOptions             bmc.BMCOptions
-	DiscoveryTimeout       time.Duration
+	Scheme                  *runtime.Scheme
+	Insecure                bool
+	ManagerNamespace        string
+	ProbeImage              string
+	RegistryURL             string
+	ProbeOSImage            string
+	RegistryResyncInterval  time.Duration
+	EnforceFirstBoot        bool
+	EnforcePowerOff         bool
+	ResyncInterval          time.Duration
+	BMCOptions              bmc.BMCOptions
+	DiscoveryTimeout        time.Duration
+	MaxConcurrentReconciles int
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -155,29 +166,30 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	if server.Spec.ServerClaimRef != nil {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
+	if server.Spec.ServerMaintenanceRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
-	}
+	} else {
+		if server.Spec.ServerClaimRef != nil {
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
+				return ctrl.Result{}, err
+			}
+		}
+		// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
+		// 		 back to available state.
+		if server.Spec.ServerClaimRef == nil && server.Status.State == metalv1alpha1.ServerStateReserved {
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+				return ctrl.Result{}, err
+			}
+		}
 
-	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
-	// 		 back to available state.
-	if server.Spec.ServerClaimRef == nil && server.Status.State == metalv1alpha1.ServerStateReserved {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-			return ctrl.Result{}, err
-		}
 	}
 
 	if err := r.updateServerStatus(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status", "Status", server.Status.State)
-
-	if err := r.applyBiosSettings(ctx, log, server); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update server bios settings: %w", err)
-	}
-	log.V(1).Info("Updated Server BIOS settings")
+	log.V(1).Info("Updated Server status")
 
 	if err := r.applyBootOrder(ctx, log, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
@@ -186,11 +198,22 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, server)
 	if requeue && err == nil {
+		// we need to update the ServerStatus after state transition to make sure it reflects the changes done
+		if err := r.updateServerStatus(ctx, log, server); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
+		}
+		log.V(1).Info("Updated Server status after state transition")
 		return ctrl.Result{Requeue: requeue, RequeueAfter: r.ResyncInterval}, nil
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
 	}
+
+	// we need to update the ServerStatus after state transition to make sure it reflects the changes done
+	if err := r.updateServerStatus(ctx, log, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
+	}
+	log.V(1).Info("Updated Server status after state transition")
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{}, nil
@@ -234,6 +257,8 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		return r.handleAvailableState(ctx, log, server)
 	case metalv1alpha1.ServerStateReserved:
 		return r.handleReservedState(ctx, log, server)
+	case metalv1alpha1.ServerStateMaintenance:
+		return r.handleMaintenanceState(ctx, log, server)
 	default:
 		return false, nil
 	}
@@ -431,6 +456,22 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 	return true, nil
 }
 
+func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef == nil {
+		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
+	}
+	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef != nil {
+		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
+	}
+
+	if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	}
+
+	log.V(1).Info("Reconciled maintenance state")
+	return false, nil
+}
+
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = &v1.ObjectReference{
@@ -468,30 +509,28 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
 
-	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to load bios version: %w", err)
-	}
-
-	for _, bios := range server.Spec.BIOS {
-		if bios.Version == currentBiosVersion {
-			// with go 1.23: switch to maps.Keys(bios.Settings)
-			keys := make([]string, 0, len(bios.Settings))
-			for k := range bios.Settings {
-				keys = append(keys, k)
-			}
-			attributes, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemUUID, keys)
-			if err != nil {
-				return fmt.Errorf("failed load bios settings: %w", err)
-			}
-			server.Status.BIOS.Version = currentBiosVersion
-			server.Status.BIOS.Settings = attributes
-		}
+	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
+	for _, processor := range systemInfo.Processors {
+		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
+			ID:             processor.ID,
+			Type:           processor.Type,
+			Architecture:   processor.Architecture,
+			InstructionSet: processor.InstructionSet,
+			Manufacturer:   processor.Manufacturer,
+			Model:          processor.Model,
+			MaxSpeedMHz:    processor.MaxSpeedMHz,
+			TotalCores:     processor.TotalCores,
+			TotalThreads:   processor.TotalThreads,
+		})
 	}
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
 	}
+
+	log.V(1).Info("Updated Server status",
+		"Status", server.Status.State,
+		"powerState", server.Status.PowerState)
 
 	return nil
 }
@@ -505,6 +544,7 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 			bootConfig.Annotations = make(map[string]string)
 		}
 		bootConfig.Annotations[InternalAnnotationTypeKeyName] = InternalAnnotationTypeValue
+		bootConfig.Annotations[IsDefaultServerBootConfigOSImageKeyName] = "true"
 		bootConfig.Spec.ServerRef = v1.LocalObjectReference{Name: server.Name}
 		bootConfig.Spec.IgnitionSecretRef = &v1.LocalObjectReference{Name: server.Name}
 		bootConfig.Spec.Image = r.ProbeOSImage
@@ -539,7 +579,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 		Data: map[string][]byte{
 			SSHKeyPairSecretPublicKeyName:   sshPublicKey,
 			SSHKeyPairSecretPrivateKeyName:  sshPrivateKey,
-			SShKeyPairSecretPasswordKeyName: password,
+			SSHKeyPairSecretPasswordKeyName: password,
 		},
 	}
 	if err := controllerutil.SetControllerReference(bootConfig, sshSecret, r.Scheme); err != nil {
@@ -664,6 +704,9 @@ func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, log 
 	}
 	if op == controllerutil.OperationResultUpdated {
 		log.V(1).Info("Server updated to power off state.")
+		if err := r.ensureServerPowerState(ctx, log, server); err != nil {
+			log.V(1).Info("ensuring power state failed.")
+		}
 		return true, nil
 	}
 	return false, nil
@@ -777,7 +820,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 
 	if powerOp == powerOpNoOP {
-		log.V(1).Info("Server already in target power state")
+		log.V(1).Info("Server already in target power state", "powerState", server.Status.PowerState)
 		return nil
 	}
 
@@ -793,16 +836,15 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 	switch powerOp {
 	case powerOpOn:
+		log.V(1).Info("Server Power On")
 		if err := bmcClient.PowerOn(ctx, server.Spec.SystemUUID); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
-		if err := bmcClient.WaitForServerPowerState(
-			ctx, server.Spec.SystemUUID,
-			redfish.OnPowerState,
-		); err != nil {
+		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemUUID, redfish.OnPowerState); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
 	case powerOpOff:
+		log.V(1).Info("Server Power Off")
 		powerOffType := bmcClient.PowerOff
 
 		if err := powerOffType(ctx, server.Spec.SystemUUID); err != nil {
@@ -919,58 +961,6 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, 
 	return nil
 }
 
-func (r *ServerReconciler) applyBiosSettings(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
-	serverBase := server.DeepCopy()
-	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
-		log.V(1).Info("Server has no BMC connection configured")
-		return nil
-	}
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
-	}
-	defer bmcClient.Logout()
-
-	version, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
-	}
-
-	versionMatch := false
-	diff := map[string]string{}
-	for _, bios := range server.Spec.BIOS {
-		if bios.Version == version {
-			versionMatch = true
-			for key, value := range bios.Settings {
-				if res, ok := server.Status.BIOS.Settings[key]; !ok {
-					if !ok || res != value {
-						diff[key] = value
-					}
-				}
-			}
-			reset, err := bmcClient.SetBiosAttributes(ctx, server.Spec.SystemUUID, diff)
-			if err != nil {
-				return err
-			}
-			if reset {
-				if changed := meta.SetStatusCondition(&server.Status.Conditions, metav1.Condition{
-					Type: "Reboot needed",
-				}); changed {
-					if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-						return fmt.Errorf("failed to patch Server status: %w", err)
-					}
-				}
-			}
-			break
-		}
-	}
-	if !versionMatch {
-		log.V(1).Info("None of the Bios versions match")
-		return nil
-	}
-	return nil
-}
-
 func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
 	annotations := server.GetAnnotations()
 	operation, ok := annotations[metalv1alpha1.OperationAnnotation]
@@ -1036,6 +1026,9 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
+		}).
 		For(&metalv1alpha1.Server{}).
 		Watches(
 			&metalv1alpha1.ServerBootConfiguration{},

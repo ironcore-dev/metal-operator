@@ -8,7 +8,8 @@ resources:
 - bases/metal.ironcore.dev_servers.yaml
 - bases/metal.ironcore.dev_serverbootconfigurations.yaml
 - bases/metal.ironcore.dev_serverclaims.yaml
-- bases/metal.ironcore.dev_accounts.yaml
+- bases/metal.ironcore.dev_servermaintenances.yaml
+- bases/metal.ironcore.dev_biossettings.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:

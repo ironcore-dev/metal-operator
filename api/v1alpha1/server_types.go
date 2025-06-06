@@ -66,14 +66,6 @@ type BootOrder struct {
 	Device string `json:"device"`
 }
 
-// BIOSSettings represents the BIOS settings for a server.
-type BIOSSettings struct {
-	// Version specifies the version of the server BIOS for which the settings are defined.
-	Version string `json:"version"`
-	// Settings is a map of key-value pairs representing the BIOS settings.
-	Settings map[string]string `json:"settings,omitempty"`
-}
-
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
@@ -93,6 +85,9 @@ type ServerSpec struct {
 	// This field is optional and can be omitted if no claim is associated with this server.
 	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
 
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
+	ServerMaintenanceRef *v1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+
 	// BMCRef is a reference to the BMC object associated with this server.
 	// This field is optional and can be omitted if no BMC is associated with this server.
 	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
@@ -106,10 +101,16 @@ type ServerSpec struct {
 	// if no boot configuration is specified.
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
 
+	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
+	// the boot configuration for this server during maintenance. This field is optional and can be omitted
+	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
+
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
-	// BIOS specifies the BIOS settings for the server.
-	BIOS []BIOSSettings `json:"BIOS,omitempty"`
+
+	// BIOSSettingsRef is a reference to a biossettings object that specifies
+	// the BIOS configuration for this server.
+	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -130,6 +131,9 @@ const (
 
 	// ServerStateError indicates that there is an error with the server.
 	ServerStateError ServerState = "Error"
+
+	// ServerStateMaintenance indicates that the server is in maintenance.
+	ServerStateMaintenance ServerState = "Maintenance"
 )
 
 // IndicatorLED represents LED indicator states
@@ -190,16 +194,39 @@ type ServerStatus struct {
 	// TotalSystemMemory is the total amount of memory in bytes available on the server.
 	TotalSystemMemory *resource.Quantity `json:"totalSystemMemory,omitempty"`
 
+	// Processors is a list of Processors associated with the server.
+	Processors []Processor `json:"processors,omitempty"`
+
 	// Storages is a list of storages associated with the server.
 	Storages []Storage `json:"storages,omitempty"`
-
-	BIOS BIOSSettings `json:"BIOS,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// Processor defines the details of a Processor.
+type Processor struct {
+	// ID is the name of the Processor.
+	ID string `json:"id"`
+	// Type is the type of the Processor.
+	Type string `json:"type,omitempty"`
+	// Architecture is the architecture of the Processor.
+	Architecture string `json:"architecture,omitempty"`
+	// InstructionSet is the instruction set of the Processor.
+	InstructionSet string `json:"instructionSet,omitempty"`
+	// Manufacturer is the manufacturer of the Processor.
+	Manufacturer string `json:"manufacturer,omitempty"`
+	// Model is the model of the Processor.
+	Model string `json:"model,omitempty"`
+	// MaxSpeedMHz is the maximum speed of the Processor in MHz.
+	MaxSpeedMHz int32 `json:"maxSpeedMHz,omitempty"`
+	// TotalCores is the total number of cores in the Processor.
+	TotalCores int32 `json:"totalCores,omitempty"`
+	// TotalThreads is the total number of threads in the Processor.
+	TotalThreads int32 `json:"totalThreads,omitempty"`
 }
 
 // NetworkInterface defines the details of a network interface.

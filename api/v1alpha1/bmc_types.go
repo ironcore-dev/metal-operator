@@ -9,10 +9,15 @@ import (
 )
 
 const (
-	BMCType              = "bmc"
-	ProtocolRedfish      = "Redfish"
+	// BMCType is the type of the BMC resource.
+	BMCType = "bmc"
+
+	// ProtocolRedfish is the Redfish protocol.
+	ProtocolRedfish = "Redfish"
+	// ProtocolRedfishLocal is the RedfishLocal protocol.
 	ProtocolRedfishLocal = "RedfishLocal"
-	ProtocolRedfishKube  = "RedfishKube"
+	// ProtocolRedfishKube is the RedfishKube protocol.
+	ProtocolRedfishKube = "RedfishKube"
 )
 
 type PasswordPolicy string
@@ -98,6 +103,16 @@ const (
 	ConsoleProtocolNameSSHLenovo ConsoleProtocolName = "SSHLenovo"
 )
 
+// ProtocolScheme is a string that contains the protocol scheme
+type ProtocolScheme string
+
+const (
+	// HTTPProtocolScheme is the http protocol scheme
+	HTTPProtocolScheme ProtocolScheme = "http"
+	// HTTPSProtocolScheme is the https protocol scheme
+	HTTPSProtocolScheme ProtocolScheme = "https"
+)
+
 // Protocol defines the protocol and port used for communicating with the BMC.
 type Protocol struct {
 	// Name specifies the name of the protocol.
@@ -107,6 +122,9 @@ type Protocol struct {
 	// Port specifies the port number used for communication.
 	// This port is used by the specified protocol to establish connections.
 	Port int32 `json:"port"`
+
+	// Scheme specifies the scheme used for communication.
+	Scheme ProtocolScheme `json:"scheme,omitempty"`
 }
 
 // ProtocolName defines the possible names for protocols used for communicating with the BMC.

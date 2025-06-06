@@ -17,9 +17,16 @@ flowchart LR
     BMCReconciler -- Uses --> BMCSecret
     BMCReconciler -- Discovers Servers --> Server
 
-    ServerReconciler -- Manages --> Server
+    ServerReconciler -- Manages state/Power --> Server
     ServerReconciler -- Uses --> metalprobe
     ServerReconciler -- Waits for --> ServerBootConfiguration
+    
+    ServerMaintenanceReconciler -- Manages --> ServerMaintenance
+    ServerMaintenanceReconciler -- Creates/Deletes --> ServerBootConfiguration
+    ServerMaintenanceReconciler -- Ensures Power --> Server
+    ServerMaintenanceReconciler -- Patches Maintenace on --> Server
+
+    ServerMaintenance -- References <--> Server
 
     ServerClaimReconciler -- Manages --> ServerClaim
     ServerClaim -- References --> Server
@@ -29,14 +36,30 @@ flowchart LR
     BootOperator -- Prepares --> BootEnvironment
     BootOperator -- Updates --> ServerBootConfiguration
 
-    ServerReconciler -- Powers On --> Server
+    BiosSettingsReconciler -- Discovers --> BIOSSettings
+    BiosSettingsReconciler -- Creates/Deletes --> ServerMaintenance
+    BIOSSettings -- References <--> Server
 
-    classDef operator fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef crd fill:#9f9,stroke:#333,stroke-width:2px;
-    classDef external fill:#ff9,stroke:#333,stroke-width:2px;
+    BiosVersionReconciler -- Discovers --> BIOSVersion
+    BiosVersionReconciler -- Creates/Deletes --> ServerMaintenance
+    BIOSVersion -- References --> Server
 
-    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler operator;
-    class Endpoint,BMC,Server,ServerClaim,ServerBootConfiguration crd;
+    BMCSettingsReconciler -- Discovers --> BMCSettings
+    BMCSettingsReconciler -- Creates/Deletes --> ServerMaintenance
+    BMCSettings -- References --> Server
+    BMCSettings -- References <--> BMC
+
+    BMCVersionReconciler -- Discovers --> BMCVersion
+    BMCVersionReconciler -- Creates/Deletes --> ServerMaintenance
+    BMCVersion -- References --> Server
+    BMCVersion -- References --> BMC
+
+    classDef operator fill:#9575cd, stroke:#000, stroke-width:2px, color:#000;
+    classDef crd fill:#4db6ac, stroke:#000, stroke-width:2px, color:#000;
+    classDef external fill:#f48fb1, stroke:#000, stroke-width:2px, color:#000;
+
+    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler,BiosSettingsReconciler,BiosVersionReconciler,BMCSettingsReconciler,BMCVersionReconciler operator;
+    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCSettings,BMCVersion,BIOSVersion,BIOSSettings crd;
     class BootOperator external;
 ```
 
@@ -50,6 +73,10 @@ flowchart LR
 - [**Server**](concepts/servers.md): Represents physical servers, managing their state, power, and configurations.
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
+- [**BIOSSettings**](concepts/biossettings.md): Handles updating the BIOS setting on the physical server's BIOS.
+- [**BIOSVersion**](concepts/biosversion.md): Handles upgrading the BIOS Version on the physical server's BIOS.
+- [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
+- [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
 
 ### 2. Controllers
 
@@ -60,6 +87,11 @@ flowchart LR
 - **ServerReconciler**: Manages `Server` resources and their lifecycle states. During the **Discovery** phase, it interacts with BMCs and uses the **metalprobe** agent to collect in-band hardware information, updating the server's status. It handles power management, BIOS configurations, and transitions servers through various states (e.g., Initial, Discovery, Available, Reserved).
 
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
+
+- **BIOSSettingsReconciler**: Handles [`BIOSSettings`](concepts/biossettings.md) resource. Provides ability to update the bios settings on physical server's BIOS.
+- **BiosVersionReconciler**: Handles [`BIOSVersion`](concepts/biosversion.md) resource. Provides ability to upgrade the bios version on physical server's BIOS.
+- **BMCSettingsReconciler**: Handles [`BMCSettings`](concepts/bmcsettings.md) resource. Provides ability to update the bmc settings on physical server's Manager.
+- **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.
 
 - **Boot Operator (External Component)**: Monitors `ServerBootConfiguration` resources to prepare the boot environment (e.g., configuring DHCP, PXE servers). Once the boot environment is ready, it updates the `ServerBootConfiguration` status to **Ready**.
 

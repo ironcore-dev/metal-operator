@@ -42,9 +42,13 @@ type BMC interface {
 
 	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
 
-	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]string, error)
+	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error)
 
-	SetBiosAttributes(ctx context.Context, systemUUID string, attributes map[string]string) (reset bool, err error)
+	GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error)
+
+	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
+
+	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) (err error)
 
 	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
 
@@ -64,9 +68,9 @@ type Entity struct {
 	Name string `json:"name"`
 }
 
-type Bios struct {
-	Version    string
-	Attributes map[string]string
+type AllowedValues struct {
+	ValueDisplayName string
+	ValueName        string
 }
 
 type RegistryEntryAttributes struct {
@@ -84,6 +88,7 @@ type RegistryEntryAttributes struct {
 	ResetRequired bool
 	Type          string
 	WriteOnly     bool
+	Value         []AllowedValues
 }
 
 type RegistryEntry struct {
@@ -181,16 +186,26 @@ const (
 	PoweringOffPowerState PowerState = "PoweringOff"
 )
 
+// Processor represents a processor in the system.
 type Processor struct {
-	ID                    string
-	ProcessorType         string
-	ProcessorArchitecture string
-	InstructionSet        string
-	Manufacturer          string
-	Model                 string
-	MaxSpeedMHz           int32
-	TotalCores            int32
-	TotalThreads          int32
+	// ID uniquely identifies the resource.
+	ID string
+	// Type specifies the type of processor.
+	Type string
+	// Architecture specifies the architecture of the processor.
+	Architecture string
+	// InstructionSet specifies the instruction set of the processor.
+	InstructionSet string
+	// Manufacturer specifies the manufacturer of the processor.
+	Manufacturer string
+	// Model specifies the model of the processor.
+	Model string
+	// MaxSpeedMHz specifies the maximum speed of the processor in MHz.
+	MaxSpeedMHz int32
+	// TotalCores specifies the total number of cores in the processor.
+	TotalCores int32
+	// TotalThreads specifies the total number of threads in the processor.
+	TotalThreads int32
 }
 
 // SystemInfo represents basic information about the system.

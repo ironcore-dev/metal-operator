@@ -57,35 +57,34 @@ func TestControllers(t *testing.T) {
 }
 
 func DeleteAllMetalResources(ctx context.Context, namespace string) {
-	var serverClaim metalv1alpha1.ServerClaim
-	Expect(k8sClient.DeleteAllOf(ctx, &serverClaim, client.InNamespace(namespace))).To(Succeed())
-	var serverClaimList metalv1alpha1.ServerClaimList
-	Eventually(ObjectList(&serverClaimList)).Should(HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerClaim{}, &metalv1alpha1.ServerClaimList{}, client.InNamespace(namespace))).Should(
+		HaveField("Items", BeEmpty()))
 
-	var endpoint metalv1alpha1.Endpoint
-	Expect(k8sClient.DeleteAllOf(ctx, &endpoint)).To(Succeed())
-	var endpointList metalv1alpha1.EndpointList
-	Eventually(ObjectList(&endpointList)).Should(HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.Endpoint{}, &metalv1alpha1.EndpointList{})).Should(
+		HaveField("Items", BeEmpty()))
 
-	var bmc metalv1alpha1.BMC
-	Expect(k8sClient.DeleteAllOf(ctx, &bmc)).To(Succeed())
-	var bmcList metalv1alpha1.BMCList
-	Eventually(ObjectList(&bmcList)).Should(HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMC{}, &metalv1alpha1.BMCList{})).Should(
+		HaveField("Items", BeEmpty()))
 
-	var serverBootConfiguration metalv1alpha1.ServerBootConfiguration
-	Expect(k8sClient.DeleteAllOf(ctx, &serverBootConfiguration, client.InNamespace(namespace))).To(Succeed())
-	var serverBootConfigurationList metalv1alpha1.ServerBootConfigurationList
-	Eventually(ObjectList(&serverBootConfigurationList)).Should(HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))).Should(
+		HaveField("Items", BeEmpty()))
 
-	var server metalv1alpha1.Server
-	Expect(k8sClient.DeleteAllOf(ctx, &server)).To(Succeed())
-	var serverList metalv1alpha1.ServerList
-	Eventually(ObjectList(&serverList)).Should(HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))).Should(
+		HaveField("Items", BeEmpty()))
 
-	var bmcSecret metalv1alpha1.BMCSecret
-	Expect(k8sClient.DeleteAllOf(ctx, &bmcSecret)).To(Succeed())
-	var bmcSecretList metalv1alpha1.BMCSecretList
-	Eventually(ObjectList(&bmcSecretList)).Should(HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})).Should(
+		HaveField("Items", BeEmpty()))
+
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSecret{}, &metalv1alpha1.BMCSecretList{})).Should(
+		HaveField("Items", BeEmpty()))
+
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
+		HaveField("Items", BeEmpty()))
+}
+
+func deleteAndList(ctx context.Context, obj client.Object, objList client.ObjectList, namespaceOpt ...client.DeleteAllOfOption) func() (client.ObjectList, error) {
+	Expect(k8sClient.DeleteAllOf(ctx, obj, namespaceOpt...)).To(Succeed())
+	return ObjectList(objList)
 }
 
 var _ = BeforeSuite(func() {
@@ -136,6 +135,8 @@ var _ = BeforeSuite(func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
 	}()
+
+	bmc.InitMockUp()
 })
 
 func SetupTest() *corev1.Namespace {
@@ -204,32 +205,52 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
-			Client:                 k8sManager.GetClient(),
-			Scheme:                 k8sManager.GetScheme(),
-			Insecure:               true,
-			ManagerNamespace:       ns.Name,
-			ProbeImage:             "foo:latest",
-			ProbeOSImage:           "fooOS:latest",
-			RegistryURL:            registryURL,
-			RegistryResyncInterval: 50 * time.Millisecond,
-			ResyncInterval:         50 * time.Millisecond,
-			EnforceFirstBoot:       true,
+			Client:                  k8sManager.GetClient(),
+			Scheme:                  k8sManager.GetScheme(),
+			Insecure:                true,
+			ManagerNamespace:        ns.Name,
+			ProbeImage:              "foo:latest",
+			ProbeOSImage:            "fooOS:latest",
+			RegistryURL:             registryURL,
+			RegistryResyncInterval:  50 * time.Millisecond,
+			ResyncInterval:          50 * time.Millisecond,
+			EnforceFirstBoot:        true,
+			MaxConcurrentReconciles: 5,
 			BMCOptions: bmc.BMCOptions{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout: 500 * time.Millisecond, // Force timeout to be quick for tests
+			DiscoveryTimeout: time.Second, // Force timeout to be quick for tests
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:                  k8sManager.GetClient(),
+			Cache:                   k8sManager.GetCache(),
+			Scheme:                  k8sManager.GetScheme(),
+			MaxConcurrentReconciles: 5,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerBootConfigurationReconciler{
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerMaintenanceReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&BiosSettingsReconciler{
+			Client:           k8sManager.GetClient(),
+			ManagerNamespace: ns.Name,
+			Insecure:         true,
+			Scheme:           k8sManager.GetScheme(),
+			BMCOptions: bmc.BMCOptions{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		go func() {

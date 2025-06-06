@@ -1,3 +1,4 @@
+{{- if .Values.controllerManager.enable }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,7 +41,7 @@ spec:
         env:
         {{- range $key, $value := .Values.controllerManager.manager.env }}
         - name: {{ $key }}
-          value: {{ $value }}
+          value: {{ $value | quote}}
         {{- end }}
         {{- end }}
         livenessProbe:
@@ -70,6 +71,13 @@ spec:
           mountPath: /tmp/k8s-metrics-server/metrics-certs
           readOnly: true
         {{- end }}
+        {{- range $volume := .Values.controllerManager.manager.volumes }}
+        - name: {{ $volume.name }}
+          mountPath: {{ $volume.mountPath }}
+          {{- if $volume.readOnly }}
+          readOnly: true
+          {{- end }}
+        {{- end }}
       securityContext:
         {{- toYaml .Values.controllerManager.podSecurityContext | nindent 8 }}
       serviceAccountName: {{ .Values.controllerManager.serviceAccountName }}
@@ -89,3 +97,8 @@ spec:
         secret:
           secretName: metrics-server-cert
       {{- end }}
+      {{- range $volume := .Values.controllerManager.manager.volumes }}
+      - name: {{ $volume.name }}
+        {{- toYaml $volume.source | nindent 8 }}
+      {{- end }}
+{{- end }}

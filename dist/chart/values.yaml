@@ -1,5 +1,6 @@
 # [MANAGER]: Manager Deployment Configurations
 controllerManager:
+  enable: true
   replicas: 1
   strategy:
     type: Recreate

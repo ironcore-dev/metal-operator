@@ -4,8 +4,8 @@ layout: home
 
 hero:
   name: "Metal Operator"
-  text: "Kubernetes operator to automate bare metal servers"
-  tagline: "Automate your bare metal servers with Kubernetes native API"
+  text: "Kubernetes operator to automate Bare Metal Servers"
+  tagline: "Automate your Bare Metal Servers with Kubernetes native API"
   image:
     src: https://raw.githubusercontent.com/ironcore-dev/ironcore/refs/heads/main/docs/assets/logo_borderless.svg
     alt: VitePress

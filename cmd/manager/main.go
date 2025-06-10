@@ -82,6 +82,7 @@ func main() { // nolint: gocyclo
 		discoveryTimeout                   time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
+		disableServerNameSuffix            bool
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -128,6 +129,8 @@ func main() { // nolint: gocyclo
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.BoolVar(&disableServerNameSuffix, "disable-server-name-suffix", false,
+		"If set, will drop the suffix -system-0 for servers, if there is only one system known to the BMC")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -299,9 +302,10 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Insecure: insecure,
+		Client:                  mgr.GetClient(),
+		Scheme:                  mgr.GetScheme(),
+		Insecure:                insecure,
+		DisableServerNameSuffix: disableServerNameSuffix,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BMC")
 		os.Exit(1)

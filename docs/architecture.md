@@ -1,6 +1,9 @@
 # Metal-Operator Architectural Description
 
-The **metal-operator** is a Kubernetes operator designed to manage bare metal servers within a Kubernetes environment. It automates the provisioning, configuration, and lifecycle management of physical servers by integrating them into Kubernetes using Custom Resource Definitions (CRDs) and controllers. The architecture promotes modularity, scalability, and flexibility, enabling seamless integration with various boot mechanisms and provisioning tools.
+The **metal-operator** is a Kubernetes operator designed to manage bare metal servers within a Kubernetes environment. 
+It automates the provisioning, configuration, and lifecycle management of physical servers by integrating them into 
+Kubernetes using Custom Resource Definitions (CRDs) and controllers. The architecture promotes modularity, scalability, 
+and flexibility, enabling seamless integration with various boot mechanisms and provisioning tools.
 
 ## Architectural Diagram
 
@@ -73,6 +76,7 @@ flowchart LR
 - [**Server**](concepts/servers.md): Represents physical servers, managing their state, power, and configurations.
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
+- [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 - [**BIOSSettings**](concepts/biossettings.md): Handles updating the BIOS setting on the physical server's BIOS.
 - [**BIOSVersion**](concepts/biosversion.md): Handles upgrading the BIOS Version on the physical server's BIOS.
 - [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.

@@ -125,7 +125,7 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 .PHONY: startdocs
 startdocs: ## Start the local mkdocs based development environment.
 	docker build -t $(IMAGE) -f docs/Dockerfile . --load
-	docker run -p 5173:5173 -v `pwd`/docs:/app $(IMAGE)
+	docker run -p 5173:5173 -v `pwd`/:/app $(IMAGE)
 
 .PHONY: cleandocs
 cleandocs: ## Remove all local mkdocs Docker images (cleanup).

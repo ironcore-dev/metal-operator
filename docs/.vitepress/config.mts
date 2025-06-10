@@ -4,6 +4,7 @@ import { withMermaid } from "vitepress-plugin-mermaid";
 export default withMermaid({
   title: "Metal Operator",
   description: "Kubernetes Operator to manage Bare Metal Servers",
+  base: "/metal-operator/",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [

@@ -1,14 +1,17 @@
-FROM squidfunk/mkdocs-material:latest
+FROM node:24-alpine
 
-LABEL project=metal_operator
+# Install bash (optional but useful)
+RUN apk add --no-cache bash
 
-WORKDIR /docs
+# Set working directory
+WORKDIR /app
 
-COPY docs/requirements.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install vitepress globally (optional, npx will work too)
+RUN npm install -g vitepress
+RUN npm install -g vitepress-plugin-mermaid
 
-EXPOSE 9000
+# Expose dev port
+EXPOSE 5173
 
-# Start development server by default
-ENTRYPOINT ["mkdocs"]
-CMD ["serve", "--dev-addr=0.0.0.0:9000"]
+# Default command to start VitePress dev
+CMD ["npx", "vitepress", "dev", "--host", "0.0.0.0"]

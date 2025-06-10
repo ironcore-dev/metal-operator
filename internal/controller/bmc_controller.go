@@ -31,9 +31,10 @@ const BMCFinalizer = "metal.ironcore.dev/bmc"
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	Insecure          bool
-	BMCPollingOptions bmc.Options
+	Scheme                  *runtime.Scheme
+	Insecure                bool
+	BMCPollingOptions       bmc.Options
+	DisableServerNameSuffix bool
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -161,9 +162,15 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	}
 
 	var errs []error
+	serverCount := len(servers)
+	useShortServerName := serverCount == 1 && r.DisableServerNameSuffix
 	for i, s := range servers {
 		server := &metalv1alpha1.Server{}
-		server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
+		if useShortServerName {
+			server.Name = bmcObj.Name
+		} else {
+			server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
+		}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
 			metautils.SetLabels(server, bmcObj.Labels)

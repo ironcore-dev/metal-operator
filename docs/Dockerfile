@@ -1,5 +1,7 @@
 FROM node:24-alpine
 
+LABEL project=metal_operator
+
 # Install bash (optional but useful)
 RUN apk add --no-cache bash
 

@@ -19,7 +19,9 @@ path = [
     "go.sum",
     "mkdocs.yml",
     "REUSE.toml",
-    "hack/**"
+    "hack/**",
+    "package.json",
+    "package-lock.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2024 SAP SE or an SAP affiliate company and IronCore contributors"

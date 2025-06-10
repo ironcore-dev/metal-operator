@@ -14,4 +14,4 @@ RUN npm install -g vitepress-plugin-mermaid
 EXPOSE 5173
 
 # Default command to start VitePress dev
-CMD ["npx", "vitepress", "dev", "--host", "0.0.0.0"]
+CMD ["npx", "vitepress", "dev", "docs", "--host", "0.0.0.0"]

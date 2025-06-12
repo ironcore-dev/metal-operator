@@ -28,6 +28,9 @@ resources:
 - bmcsettings_admin_role.yaml
 - bmcsettings_editor_role.yaml
 - bmcsettings_viewer_role.yaml
+- bmcversion_admin_role.yaml
+- bmcversion_editor_role.yaml
+- bmcversion_viewer_role.yaml
 - servermaintenance_admin_role.yaml
 - servermaintenance_editor_role.yaml
 - servermaintenance_viewer_role.yaml

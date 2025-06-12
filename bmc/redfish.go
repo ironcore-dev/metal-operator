@@ -609,24 +609,35 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 	return result, nil
 }
 
-func (r *RedfishBMC) CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error {
+func (r *RedfishBMC) CreateOrUpdateAccount(
+	ctx context.Context, userName,
+	role, password string, enabled bool,
+) error {
 	service, err := r.client.GetService().AccountService()
 	if err != nil {
 		return fmt.Errorf("failed to get account service: %w", err)
 	}
 	accounts, err := service.Accounts()
-	if len(accounts) == 0 {
-		return errors.New("no account found")
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
 	}
+	//log.V(1).Info("Accounts", "accounts", accounts)
 	for _, a := range accounts {
-		if a.Name == userName {
+		if a.UserName == userName {
 			a.RoleID = role
-			a.Name = userName
+			a.UserName = userName
 			a.Enabled = enabled
-			return a.Update()
+			if err := a.Update(); err != nil {
+				return fmt.Errorf("failed to update account: %w", err)
+			}
+			if password != "" {
+				if err := a.ChangePassword(password, r.options.Password); err != nil {
+					return fmt.Errorf("failed to change account password: %w", err)
+				}
+			}
 		}
 	}
-	_, err = service.CreateAccount(userName, "", role)
+	_, err = service.CreateAccount(userName, password, role)
 	if err != nil {
 		return fmt.Errorf("failed to update account: %w", err)
 	}
@@ -639,10 +650,12 @@ func (r *RedfishBMC) SetAccountPassword(ctx context.Context, accountName, passwo
 		return fmt.Errorf("failed to get account service: %w", err)
 	}
 	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
 	if len(accounts) == 0 {
 		return errors.New("no account found")
 	}
-
 	for _, a := range accounts {
 		if a.Name == accountName {
 			return a.ChangePassword(password, r.options.Password)

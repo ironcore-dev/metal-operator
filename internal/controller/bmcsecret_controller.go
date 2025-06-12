@@ -9,8 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
@@ -34,47 +34,10 @@ type BMCSecretReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.0/pkg/reconcile
 func (r *BMCSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
+	_ = log.FromContext(ctx)
 
-	secret := &metalv1alpha1.BMCSecret{}
-	if err := r.Get(ctx, req.NamespacedName, secret); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-	return r.reconcileExists(ctx, log, secret)
-}
+	// TODO(user): your logic here
 
-func (r *BMCSecretReconciler) reconcileExists(ctx context.Context, log logr.Logger, secret *metalv1alpha1.BMCSecret) (ctrl.Result, error) {
-	if !secret.DeletionTimestamp.IsZero() {
-		//return r.delete(ctx, log, server)
-	}
-	return r.reconcile(ctx, log, secret)
-}
-
-func (r *BMCSecretReconciler) reconcile(ctx context.Context, log logr.Logger, secret *metalv1alpha1.BMCSecret) (ctrl.Result, error) {
-	/*
-		if secret.PasswordPolicy == string(metalv1alpha1.PasswordPolicyExternal) {
-			return ctrl.Result{}, nil
-		}
-		selector, err := metav1.LabelSelectorAsSelector(secret.ServerSelector)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		serverList := &metalv1alpha1.ServerList{}
-		if err := r.List(ctx, serverList, client.MatchingLabelsSelector{Selector: selector}); err != nil {
-			return ctrl.Result{}, err
-		}
-		for _, server := range serverList.Items {
-			//bmcutils.SetBMCSecret(&server, secret)
-			user, pw, err := bmcutils.GetBMCCredentialsFromSecret(secret)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			bmcutils.GetBMCClientForServer(ctx, r.Client, &server, false, bmc.BMCOptions{
-				Username: user,
-				Password: pw,
-			})
-		}
-	*/
 	return ctrl.Result{}, nil
 }
 

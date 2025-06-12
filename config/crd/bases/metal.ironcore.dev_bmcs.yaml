@@ -87,10 +87,27 @@ spec:
                 x-kubernetes-validations:
                 - message: access is immutable
                   rule: self == oldSelf
+              adminUserRef:
+                description: |-
+                  LocalObjectReference contains enough information to let you locate the
+                  referenced object inside the same namespace.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               bmcSecretRef:
                 description: |-
                   BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
                   required to access the BMC. This secret includes sensitive information such as usernames and passwords.
+                  BMCSecretRef is deprecated and will be removed in a future release.
                 properties:
                   name:
                     default: ""
@@ -165,6 +182,64 @@ spec:
                 - name
                 - port
                 type: object
+              userRefs:
+                description: |-
+                  UserAccounts is a list of user accounts that can be used to access the BMC.
+                  Each account includes a name, role ID, description, and other relevant details.
+                items:
+                  description: UserSpec defines the desired state of User
+                  properties:
+                    bmcRef:
+                      description: |-
+                        LocalObjectReference contains enough information to let you locate the
+                        referenced object inside the same namespace.
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    bmcSecretRef:
+                      description: |-
+                        LocalObjectReference contains enough information to let you locate the
+                        referenced object inside the same namespace.
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    description:
+                      type: string
+                    enabled:
+                      type: boolean
+                    isAdmin:
+                      type: boolean
+                    roleID:
+                      type: string
+                    rotationPeriod:
+                      type: string
+                    userName:
+                      type: string
+                  required:
+                  - enabled
+                  - isAdmin
+                  - roleID
+                  - userName
+                  type: object
+                type: array
             required:
             - bmcSecretRef
             - protocol

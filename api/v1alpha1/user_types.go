@@ -8,24 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AccountState is the state of an account.
-type AccountState string
-
-const (
-	// AccountStateActive is the state of an account that is active and can be used.
-	AccountStateActive AccountState = "Active"
-	// AccountStateInactive is the state of an account that is inactive and cannot be used.
-	AccountStateInactive AccountState = "Inactive"
-	// AccountStateLocked is the state of an account that is locked and cannot be used.
-	AccountStateLocked AccountState = "Locked"
-	// AccountStateUnknown is the state of an account that is unknown and cannot be used.
-	AccountStateUnknown AccountState = "Unknown"
-	// AccountStateDisabled is the state of an account that is disabled and cannot be used.
-	AccountStateDisabled AccountState = "Disabled"
-	// AccountStateEnabled is the state of an account that is enabled and can be used.
-	AccountStateEnabled AccountState = "Enabled"
-)
-
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -45,11 +27,11 @@ type UserSpec struct {
 type UserStatus struct {
 	EffectiveBMCSecretRef *v1.LocalObjectReference `json:"effectiveBMCSecretRef,omitempty"`
 	LastRotation          *metav1.Time             `json:"lastRotation,omitempty"`
-	State                 AccountState
-	ID                    string
+	ID                    string                   `json:"id,omitempty"` // ID of the user in the BMC system
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
 
 // User is the Schema for the users API

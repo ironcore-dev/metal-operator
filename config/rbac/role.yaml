@@ -31,6 +31,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - accounts
   - biossettings
   - bmcs
   - bmcsecrets
@@ -51,6 +52,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - accounts/finalizers
   - biossettings/finalizers
   - bmcs/finalizers
   - bmcsecrets/finalizers
@@ -64,6 +66,7 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - accounts/status
   - biossettings/status
   - bmcs/status
   - bmcsecrets/status

@@ -19,7 +19,6 @@ const (
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
 //+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-//+kubebuilder:webhook:verbs=update,path=/validate-metal-ironcore-dev-v1alpha1-bmcsecret,mutating=false,failurePolicy=fail,groups=metal.ironcore.dev,resources=bmcsecrets,versions=v1alpha1,name=vbmcsecret.kb.io
 
 // BMCSecret is the Schema for the bmcsecrets API
 type BMCSecret struct {

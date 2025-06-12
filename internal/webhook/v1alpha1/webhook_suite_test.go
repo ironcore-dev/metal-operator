@@ -120,6 +120,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = SetupBMCSecretWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = SetupBIOSSettingsWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 

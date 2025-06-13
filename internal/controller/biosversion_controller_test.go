@@ -21,7 +21,6 @@ import (
 
 var _ = Describe("BIOSVersion Controller", func() {
 	ns := SetupTest()
-	ns.Name = "default"
 
 	var (
 		server                   *metalv1alpha1.Server

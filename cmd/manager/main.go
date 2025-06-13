@@ -83,6 +83,7 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		disableServerNameSuffix            bool
+		migrateServerNames                 bool
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -131,6 +132,8 @@ func main() { // nolint: gocyclo
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.BoolVar(&disableServerNameSuffix, "disable-server-name-suffix", false,
 		"If set, will drop the suffix -system-0 for servers, if there is only one system known to the BMC")
+	flag.BoolVar(&migrateServerNames, "migrate-server-names", false,
+		"If set, will do extra checks and allow migration of server names")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -306,6 +309,7 @@ func main() { // nolint: gocyclo
 		Scheme:                  mgr.GetScheme(),
 		Insecure:                insecure,
 		DisableServerNameSuffix: disableServerNameSuffix,
+		MigrateServerNames:      migrateServerNames,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BMC")
 		os.Exit(1)

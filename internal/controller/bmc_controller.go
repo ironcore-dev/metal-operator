@@ -35,6 +35,7 @@ type BMCReconciler struct {
 	Insecure                bool
 	BMCPollingOptions       bmc.Options
 	DisableServerNameSuffix bool
+	MigrateServerNames      bool
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -155,6 +156,14 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	return nil
 }
 
+func isServerUnused(server *metalv1alpha1.Server) bool {
+	if server == nil {
+		return false // Doesn't really matter what
+	}
+
+	return server.Spec.ServerClaimRef != nil
+}
+
 func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
 	servers, err := bmcClient.GetSystems(ctx)
 	if err != nil {
@@ -166,10 +175,33 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	useShortServerName := serverCount == 1 && r.DisableServerNameSuffix
 	for i, s := range servers {
 		server := &metalv1alpha1.Server{}
-		if useShortServerName {
-			server.Name = bmcObj.Name
+		longName := bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
+		if !useShortServerName {
+			server.Name = longName
 		} else {
-			server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
+			if r.MigrateServerNames {
+				oldServer := &metalv1alpha1.Server{}
+				err := r.Get(ctx, client.ObjectKey{Name: longName}, oldServer)
+				if err != nil {
+					if client.IgnoreNotFound(err) != nil {
+						// Real error
+						errs = append(errs, fmt.Errorf("failed to query existing BMC %v: %w", longName, err))
+						continue
+					}
+					// Nothing to migrate found, we are good
+				} else if isServerUnused(oldServer) {
+					err = r.Delete(ctx, oldServer)
+					if client.IgnoreNotFound(err) != nil {
+						// Real error
+						errs = append(errs, fmt.Errorf("failed to delete existing Server %v: %w", longName, err))
+						continue
+					}
+				} else {
+					errs = append(errs, fmt.Errorf("cannot migrate Server in use %v", longName))
+					continue
+				}
+			}
+			server.Name = bmcObj.Name
 		}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {

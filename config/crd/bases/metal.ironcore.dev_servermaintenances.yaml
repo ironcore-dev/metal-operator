@@ -70,7 +70,7 @@ spec:
                     description: Name specifies the name of the boot configuration.
                     type: string
                   spec:
-                    description: Parameters specifies the parameters to be used for
+                    description: Parameters specify the parameters to be used for
                       rendering the boot configuration.
                     properties:
                       ignitionSecretRef:

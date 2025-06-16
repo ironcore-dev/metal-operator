@@ -9,6 +9,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// ServerMaintenanceNeededKey is used to indicate that a server requires maintenance.
+	ServerMaintenanceNeededKey = "metal.ironcore.dev/maintenance-needed"
+	// ServerRebootNeededKey is used to indicate that a server requires a restart.
+	ServerRebootNeededKey = "metal.ironcore.dev/reboot-needed"
+)
+
 // Power defines the possible power states for a device.
 type Power string
 

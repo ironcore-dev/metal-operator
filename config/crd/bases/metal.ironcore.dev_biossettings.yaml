@@ -15,7 +15,7 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.biosSettings.version
+    - jsonPath: .spec.version
       name: BIOSVersion
       type: string
     - jsonPath: .spec.serverRef.name
@@ -55,6 +55,12 @@ spec:
           spec:
             description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
+              currentSettingPriority:
+                description: |-
+                  CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
+                  used in conjunction with SettingUpdatePolicy and BIOSSettingFlow
+                format: int32
+                type: integer
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
                   on the server.
@@ -121,6 +127,12 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
+              settingUpdatePolicy:
+                description: |-
+                  SettingUpdatePolicy dictates how the settings are applied.
+                  if 'Sequence', the BIOSSettings resource will enter 'Waiting' state after applying the settings
+                  if 'OneShotUpdate' the BIOSSettings resource will enter 'Completed' state after applying the settings
+                type: string
               settings:
                 additionalProperties:
                   type: string
@@ -137,6 +149,12 @@ spec:
           status:
             description: BIOSSettingsStatus defines the observed state of BIOSSettings.
             properties:
+              appliedSettingPriority:
+                description: |-
+                  AppliedSettingPriority specifies the number of sequence left to complete the settings workflow
+                  used in conjunction with SettingUpdatePolicy and BIOSSettingFlow Resource
+                format: int32
+                type: integer
               state:
                 description: State represents the current state of the bios configuration
                   task.

@@ -99,6 +99,15 @@ func (r *BiosSettingsReconciler) delete(
 	}
 	log.V(1).Info("ensured references were cleaned up")
 
+	if err, isBeingDeleted := r.deleteServerMaintenance(ctx, log, biosSettings); err != nil {
+		log.Error(err, "failed to delete server maintenance")
+		return ctrl.Result{}, err
+	} else if isBeingDeleted {
+		log.V(1).Info("server maintenance is being deleted, requeueing")
+		return ctrl.Result{}, nil // reconcile will be triggered again when server maintenance is deleted
+	}
+	log.V(1).Info("ensured server maintenance is deleted")
+
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettings, biosSettingsFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
@@ -108,40 +117,51 @@ func (r *BiosSettingsReconciler) delete(
 	return ctrl.Result{}, nil
 }
 
+func (r *BiosSettingsReconciler) deleteServerMaintenance(
+	ctx context.Context,
+	log logr.Logger,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) (err error, isBeingDeleted bool) {
+	if biosSettings.Spec.ServerMaintenanceRef == nil {
+		return nil, false
+	}
+	// try to get the serverMaintaince created
+	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, biosSettings.Spec.ServerMaintenanceRef)
+	if apierrors.IsNotFound(err) {
+		return nil, false
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get referred serverMaintenance obj from biosSettings: %w", err), false
+	}
+
+	if !metav1.IsControlledBy(serverMaintenance, biosSettings) {
+		log.V(1).Info("server maintenance is provided by user and won't be deleted", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
+		return nil, false
+	}
+
+	if !serverMaintenance.DeletionTimestamp.IsZero() {
+		log.V(1).Info("server maintenance is already being deleted", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
+		return nil, true
+	} else {
+		err := r.Delete(ctx, serverMaintenance)
+		log.V(1).Info("Deleting server maintenance", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State, "error", err)
+		return err, true
+	}
+}
+
 func (r *BiosSettingsReconciler) cleanupServerMaintenanceReferences(
 	ctx context.Context,
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) error {
-	if biosSettings.Spec.ServerMaintenanceRef == nil {
-		return nil
-	}
-	// try to get the serverMaintaince created
-	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, biosSettings.Spec.ServerMaintenanceRef)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get referred serverMaintenance obj from biosSettings: %w", err)
+	if err, _ := r.deleteServerMaintenance(ctx, log, biosSettings); err != nil {
+		return err
 	}
 
-	// if we got the server ref. by and its not being deleted
-	if err == nil && serverMaintenance.DeletionTimestamp.IsZero() {
-		// created by the controller
-		if metav1.IsControlledBy(serverMaintenance, biosSettings) {
-			// if the biosSettings is not being deleted, update the
-			log.V(1).Info("Deleting server maintenance", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
-			if err := r.Delete(ctx, serverMaintenance); err != nil {
-				return err
-			}
-		} else { // not created by controller
-			log.V(1).Info("server maintenance status not updated as its provided by user", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
-		}
+	if err := r.patchMaintenanceRequestRefOnBiosSettings(ctx, log, biosSettings, nil); err != nil {
+		return fmt.Errorf("failed to clean up serverMaintenance ref in biosSettings status: %w", err)
 	}
-	// if already deleted or we deleted it or its created by user, remove reference
-	if apierrors.IsNotFound(err) || err == nil {
-		err = r.patchMaintenanceRequestRefOnBiosSettings(ctx, log, biosSettings, nil)
-		if err != nil {
-			return fmt.Errorf("failed to clean up serverMaintenance ref in biosSettings status: %w", err)
-		}
-	}
+
 	return nil
 }
 
@@ -819,6 +839,34 @@ func (r *BiosSettingsReconciler) updateBIOSSettingUpdateStatus(
 	return nil
 }
 
+func (r *BiosSettingsReconciler) enqueueBiosSettingsByServerMaintenance(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	host := obj.(*metalv1alpha1.ServerMaintenance)
+
+	BIOSSettingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := r.List(ctx, BIOSSettingsList); err != nil {
+		log.Error(err, "failed to list biosSettings")
+		return nil
+	}
+
+	for _, biosSettings := range BIOSSettingsList.Items {
+		// states where we do not want to requeue for host changes
+		if biosSettings.Spec.ServerMaintenanceRef == nil ||
+			biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+			biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+			continue
+		}
+		if biosSettings.Spec.ServerMaintenanceRef.Name == host.Name &&
+			biosSettings.Spec.ServerMaintenanceRef.Namespace == host.Namespace {
+			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
+		}
+	}
+	return nil
+}
+
 func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 	ctx context.Context,
 	obj client.Object,
@@ -895,7 +943,7 @@ func (r *BiosSettingsReconciler) SetupWithManager(
 ) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSSettings{}).
-		Owns(&metalv1alpha1.ServerMaintenance{}).
+		Watches(&metalv1alpha1.ServerMaintenance{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByServerMaintenance)).
 		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByRefs)).
 		Watches(&metalv1alpha1.BIOSVersion{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByBiosVersion)).
 		Complete(r)

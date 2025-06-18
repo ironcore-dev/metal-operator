@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -183,7 +184,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))
 		By("Deleting ServerMaintenance to finish the maintennce on the server")
-		Eventually(k8sClient.Delete).WithArguments(ctx, serverMaintenance).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
 
 		By("Checking the Server is not in maintenance and cleaned up")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -288,5 +289,46 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))
+	})
+
+	It("Should automatically delete the maintance if the ref server is gone", func(ctx SpecContext) {
+
+		By("Creating an ServerMaintenance object")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+					Name: "test-boot",
+					Spec: metalv1alpha1.ServerBootConfigurationSpec{
+						ServerRef: v1.LocalObjectReference{Name: server.Name},
+						Image:     "some_image",
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		))
+		By("Checking the Server is in maintenance")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
+		))
+
+		By("Deleting the Server")
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Checking the ServerMaintenance is deleted")
+		Eventually(Get(serverMaintenance), "5s").Should(Satisfy(apierrors.IsNotFound))
 	})
 })

@@ -64,13 +64,18 @@ func (r *ServerMaintenanceReconciler) reconcileExists(ctx context.Context, log l
 }
 
 func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
-	server := &metalv1alpha1.Server{}
-	if err := r.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
+	_, err := r.getServerRef(ctx, serverMaintenance)
+	if err != nil {
 		if apierrors.IsNotFound(err) {
+			// Server not found, delete the ServerMaintenance CR
+			log.Info("Server no longer found, deleting ServerMaintenance", "ServerMaintenance", serverMaintenance.Name)
+			if err := r.Delete(ctx, serverMaintenance); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to delete ServerMaintenance: %w", err)
+			}
+			log.Info("Deleted ServerMaintenance", "ServerMaintenance", serverMaintenance.Name)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
-
 	}
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, serverMaintenance, ServerMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
@@ -273,15 +278,20 @@ func (r *ServerMaintenanceReconciler) handleFailedState(log logr.Logger, serverM
 }
 
 func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+	log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", serverMaintenance.Name)
 	if serverMaintenance.Spec.ServerRef == nil {
 		return ctrl.Result{}, nil
 	}
 	server, err := r.getServerRef(ctx, serverMaintenance)
 	if err != nil {
-		return ctrl.Result{}, err
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
+		}
 	}
-	if err := r.cleanup(ctx, log, server); err != nil {
-		return ctrl.Result{}, err
+	if server != nil {
+		if err := r.cleanup(ctx, log, server); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, serverMaintenance, ServerMaintenanceFinalizer); err != nil || modified {
@@ -293,10 +303,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 func (r *ServerMaintenanceReconciler) getServerRef(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get server: %w", err)
-		}
-		return nil, fmt.Errorf("server not found")
+		return nil, err
 	}
 	return server, nil
 }
@@ -422,7 +429,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 			return nil
 		}
 		for _, maintenance := range maintenanceList.Items {
-			if server.Spec.ServerMaintenanceRef != nil && maintenance.Spec.ServerRef.Name == server.Spec.ServerMaintenanceRef.Name {
+			if server.Spec.ServerMaintenanceRef != nil && maintenance.Name == server.Spec.ServerMaintenanceRef.Name {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
 				})

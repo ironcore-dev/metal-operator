@@ -291,7 +291,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		))
 	})
 
-	It("Should automatically delete the maintance if the ref server is gone", func(ctx SpecContext) {
+	It("Should automatically delete the maintenance if the ref server is gone", func(ctx SpecContext) {
 
 		By("Creating an ServerMaintenance object")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{

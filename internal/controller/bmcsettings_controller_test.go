@@ -177,11 +177,6 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: bmcSettings.Name}),
 		))
 
-		By("Ensuring that the Maintenance resource has been referenced by BMCSettings resource")
-		Eventually(Object(bmcSettings)).Should(SatisfyAll(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
-		))
-
 		By("Ensuring that the BMCSettings has reached next state")
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),

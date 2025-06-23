@@ -281,17 +281,17 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 	// return the result.
 	if len(payloads) > 0 {
 		var errs []error
-		// for wach sub type, apply the settings
+		// for each sub type, apply the settings
 		for settingPath, payload := range payloads {
 			// fetch the etag required for settingPath
-			etag, err := func(uri string) ([]string, error) {
-				resp, err := d.BMC.GetClient().Get(uri)
+			etag, err := func() ([]string, error) {
+				resp, err := d.BMC.GetClient().Get(settingPath)
 				if err != nil {
 					return nil, err
 				}
 				defer resp.Body.Close() // nolint: errcheck
 				return resp.Header["Etag"], nil
-			}(settingPath)
+			}()
 
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to get Etag for %v. error %v", settingPath, err))
@@ -307,14 +307,14 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 				header["If-Match"] = etag[0]
 			}
 
-			err = func(uri string, data map[string]any, header map[string]string) error {
-				resp, err := d.BMC.GetClient().PatchWithHeaders(uri, data, header)
+			err = func() error {
+				resp, err := d.BMC.GetClient().PatchWithHeaders(settingPath, data, header)
 				if err != nil {
 					return err
 				}
 				defer resp.Body.Close() // nolint: errcheck
 				return nil
-			}(settingPath, data, header)
+			}()
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch settings at %v. error %v", settingPath, err))
 				continue

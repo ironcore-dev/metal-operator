@@ -319,8 +319,8 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 	bmcClient bmc.BMC,
 ) (ctrl.Result, error) {
 
-	if !r.checkForRequiredPowerStatus(BMC, metalv1alpha1.OnPowerState) {
-		log.V(1).Info("BMC is turned off. Can not proceed")
+	if BMC.Status.PowerState != metalv1alpha1.OnPowerState {
+		log.V(1).Info("BMC is not turned On. Can not proceed")
 		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed)
 		return ctrl.Result{}, err
 	}
@@ -467,13 +467,6 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 	return currentBMCVersion, diff, nil
 }
 
-func (r *BMCSettingsReconciler) checkForRequiredPowerStatus(
-	BMC *metalv1alpha1.BMC,
-	powerState metalv1alpha1.BMCPowerState,
-) bool {
-	return BMC.Status.PowerState == powerState
-}
-
 func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	ctx context.Context,
 	log logr.Logger,
@@ -481,7 +474,7 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	bmcClient bmc.BMC,
 ) bool {
 	if bmcSetting.Spec.ServerMaintenanceRefList == nil {
-		return true
+		return false
 	}
 
 	servers, err := r.getServers(ctx, log, bmcSetting, bmcClient)
@@ -495,7 +488,7 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 		return false
 	}
 
-	notInMaintenanceState := make(map[string]bool, len(servers))
+	notInMaintenanceState := make([]string, 0, len(servers))
 	for _, server := range servers {
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
 			serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefList, server.Name)
@@ -508,18 +501,20 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 					"serverMaintenanceRef", server.Spec.ServerMaintenanceRef,
 					"bmcSettingMaintenaceRef", serverMaintenanceRef,
 				)
-				notInMaintenanceState[server.Name] = false
+				notInMaintenanceState = append(notInMaintenanceState, server.Name)
 			}
 		} else {
 			// we still need to wait for server to enter maintenance
 			// wait for update on the server obj
 			log.V(1).Info("Server not yet in maintenance", "Server", server.Name, "State", server.Status.State, "MaintenanceRef", server.Spec.ServerMaintenanceRef)
-			notInMaintenanceState[server.Name] = false
+			notInMaintenanceState = append(notInMaintenanceState, server.Name)
 		}
 	}
 
 	if len(notInMaintenanceState) > 0 {
-		log.V(1).Info("some servers not yet in maintenance", "req maintenances on servers", bmcSetting.Spec.ServerMaintenanceRefList)
+		log.V(1).Info("some servers not yet in maintenance",
+			"req maintenances on servers", bmcSetting.Spec.ServerMaintenanceRefList,
+			"servers not in maintence", notInMaintenanceState)
 		return false
 	}
 

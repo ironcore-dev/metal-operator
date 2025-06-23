@@ -461,7 +461,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 
 func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef == nil {
-		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
+		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial)
 	}
 	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef != nil {
 		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)

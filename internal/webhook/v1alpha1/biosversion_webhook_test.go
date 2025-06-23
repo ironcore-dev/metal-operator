@@ -150,7 +150,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		})
 
 		It("Should refuse to delete if InProgress", func() {
-			By("Patching the boot configuration to a Ready state")
+			By("Patching the biosVersionV1 to InProgress state")
 			Eventually(UpdateStatus(biosVersionV1, func() {
 				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
 			})).Should(Succeed())

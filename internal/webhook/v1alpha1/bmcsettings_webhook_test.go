@@ -42,10 +42,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 
 	})
 
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
-	})
-
 	Context("When creating or updating BMCSettings under Validating Webhook", func() {
 
 		It("Should deny creation if a BMC referred is already referred by another", func(ctx SpecContext) {
@@ -130,7 +126,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 		})
 
 		It("Should refuse to delete if InProgress", func() {
-			By("Patching the boot configuration to a Inprogress state")
+			By("Patching the BMCSettingsV1 to a InProgress state")
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
 			})).Should(Succeed())

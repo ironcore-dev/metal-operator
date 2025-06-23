@@ -99,7 +99,7 @@ func checkForDuplicateBMCSettingsRefToBMC(
 		if bmcSettings.Name == bs.Name {
 			continue
 		}
-		if bs.Spec.BMCRef.Name == bmcSettings.Spec.BMCRef.Name && bmcSettings.Name != bs.Name {
+		if bs.Spec.BMCRef.Name == bmcSettings.Spec.BMCRef.Name {
 			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
 				bmcSettings.Spec.BMCRef.Name,
 				bmcSettings.Name,

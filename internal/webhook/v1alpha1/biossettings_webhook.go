@@ -102,7 +102,7 @@ func checkForDuplicateBiosSettingsRefToServer(
 		if biosSettings.Name == bs.Name {
 			continue
 		}
-		if biosSettings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name && biosSettings.Name != bs.Name {
+		if biosSettings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
 			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
 				biosSettings.Spec.ServerRef.Name,
 				biosSettings.Name,

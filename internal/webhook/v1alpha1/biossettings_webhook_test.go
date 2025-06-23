@@ -39,10 +39,6 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		DeferCleanup(k8sClient.Delete, biosSettingsV1)
 	})
 
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
-	})
-
 	Context("When creating or updating BIOSSettings under Validating Webhook", func() {
 
 		It("Should deny creation if a Spec.ServerRef field is duplicate", func(ctx SpecContext) {
@@ -150,7 +146,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		})
 
 		It("Should refuse to delete if InProgress", func() {
-			By("Patching the boot configuration to a Inprogress state")
+			By("Patching the biosSettingsV1 to Inprogress state")
 			Eventually(UpdateStatus(biosSettingsV1, func() {
 				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
 			})).Should(Succeed())

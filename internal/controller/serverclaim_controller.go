@@ -150,7 +150,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 
 	server, modified, err := r.claimServer(ctx, log, claim)
 	if err != nil || modified {
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 	if server == nil {
 		log.V(1).Info("No server found for claim")
@@ -162,22 +162,22 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := r.patchServerRef(ctx, claim, server); err != nil || modified {
+	if modified, err = r.patchServerRef(ctx, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Patched ServerRef in Claim")
 
-	if err := r.applyBootConfiguration(ctx, log, server, claim); err != nil {
+	if err = r.applyBootConfiguration(ctx, log, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
 	log.V(1).Info("Applied BootConfiguration for ServerClaim")
 
-	if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
+	if modified, err = r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Patched ServerClaim phase", "Phase", claim.Status.Phase)
 
-	if modified, err := r.ensurePowerStateForServer(ctx, log, claim, server); err != nil || modified {
+	if modified, err = r.ensurePowerStateForServer(ctx, log, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured PowerState for Server", "Server", server.Name)
@@ -448,9 +448,9 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
 		log := ctrl.LoggerFrom(ctx)
 
-		host := object.(*metalv1alpha1.Server)
+		server := object.(*metalv1alpha1.Server)
 
-		if host.Status.State == metalv1alpha1.ServerStateMaintenance || host.Spec.ServerMaintenanceRef != nil {
+		if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
 			return nil
 		}
 		var req []reconcile.Request
@@ -460,7 +460,7 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 			return nil
 		}
 		for _, claim := range claimList.Items {
-			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == host.Name {
+			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == server.Name {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
 				})

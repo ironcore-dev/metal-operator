@@ -75,6 +75,41 @@ var _ = Describe("BIOSSettings Controller", func() {
 		bmc.UnitTestMockUps.ResetBIOSSettings()
 	})
 
+	When("biossetting is deleted", func() {
+		It("should delete server maintenance", func(ctx SpecContext) {
+			serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
+			TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+			biosSettings := &metalv1alpha1.BIOSSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-bios-change-poweron",
+				},
+				Spec: metalv1alpha1.BIOSSettingsSpec{
+					Version:                 defaultMockUpServerBiosVersion,
+					SettingsMap:             map[string]string{"abc": "bar-changed-to-turn-server-on"},
+					ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
+			}
+			Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+			Eventually(Object(biosSettings)).Should(
+				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
+			)
+			serverMaintenance := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      biosSettings.Name,
+				},
+			}
+			Eventually(Get(serverMaintenance)).Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+
+			Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
+		})
+	})
+
 	It("should successfully patch its reference to referred server", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting

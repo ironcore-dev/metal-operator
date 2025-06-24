@@ -12,7 +12,6 @@ import (
 
 // BMCSettingsSpec defines the desired state of BMCSettings.
 type BMCSettingsSpec struct {
-
 	// Version contains BMC version this settings applies to
 	// +required
 	Version string `json:"version"`

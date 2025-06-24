@@ -471,8 +471,8 @@ func (in *BMCSettingsSpec) DeepCopyInto(out *BMCSettingsSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
-	if in.ServerMaintenanceRefList != nil {
-		in, out := &in.ServerMaintenanceRefList, &out.ServerMaintenanceRefList
+	if in.ServerMaintenanceRefs != nil {
+		in, out := &in.ServerMaintenanceRefs, &out.ServerMaintenanceRefs
 		*out = make([]ServerMaintenanceRefItem, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

@@ -237,9 +237,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by BMCSettings resource")
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRefList",
+			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerName: server.Name,
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -247,9 +246,8 @@ var _ = Describe("BMCSettings Controller", func() {
 						UID:        serverMaintenance.UID,
 						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 					}}}),
-			HaveField("Spec.ServerMaintenanceRefList",
+			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerName: server.Name,
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -286,7 +284,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(Object(bmcSettings)).Should(SatisfyAll(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		))
 
 		By("Deleting the BMCSettings")
@@ -336,7 +334,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the serverMaintenance not ref. while waiting for upgrade")
 		Consistently(Object(BMCSettings)).Should(SatisfyAll(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		))
 
 		By("Simulate the server BMCSettings version update by matching the spec version")
@@ -371,7 +369,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(Object(BMCSettings)).Should(SatisfyAll(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		))
 
 		By("Deleting the BMCSetting resource")

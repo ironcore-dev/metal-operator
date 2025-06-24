@@ -111,11 +111,11 @@ func (r *BMCSettingsReconciler) cleanupServerMaintenanceReferences(
 	log logr.Logger,
 	bmcSettings *metalv1alpha1.BMCSettings,
 ) error {
-	if bmcSettings.Spec.ServerMaintenanceRefList == nil {
+	if bmcSettings.Spec.ServerMaintenanceRefs == nil {
 		return nil
 	}
 	// try to get the serverMaintenances created
-	serverMaintenances, errs := r.getReferredServerMaintenances(ctx, log, bmcSettings.Spec.ServerMaintenanceRefList)
+	serverMaintenances, errs := r.getReferredServerMaintenances(ctx, log, bmcSettings.Spec.ServerMaintenanceRefs)
 
 	var finalErr []error
 	var missingServerMaintenanceRef []error
@@ -130,7 +130,7 @@ func (r *BMCSettingsReconciler) cleanupServerMaintenanceReferences(
 		}
 	}
 
-	if len(missingServerMaintenanceRef) != len(bmcSettings.Spec.ServerMaintenanceRefList) {
+	if len(missingServerMaintenanceRef) != len(bmcSettings.Spec.ServerMaintenanceRefs) {
 		// delete the serverMaintenance if not marked for deletion already
 		for _, serverMaintenance := range serverMaintenances {
 			if serverMaintenance.DeletionTimestamp.IsZero() && metav1.IsControlledBy(serverMaintenance, bmcSettings) {
@@ -473,7 +473,7 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	bmcSetting *metalv1alpha1.BMCSettings,
 	bmcClient bmc.BMC,
 ) bool {
-	if bmcSetting.Spec.ServerMaintenanceRefList == nil {
+	if bmcSetting.Spec.ServerMaintenanceRefs == nil {
 		return false
 	}
 
@@ -483,16 +483,16 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 		return false
 	}
 
-	if len(bmcSetting.Spec.ServerMaintenanceRefList) != len(servers) {
-		log.V(1).Info("Not all servers have Maintenance", "serverMaintenanceRefList", bmcSetting.Spec.ServerMaintenanceRefList, "servers", servers)
+	if len(bmcSetting.Spec.ServerMaintenanceRefs) != len(servers) {
+		log.V(1).Info("Not all servers have Maintenance", "ServerMaintenanceRefs", bmcSetting.Spec.ServerMaintenanceRefs, "servers", servers)
 		return false
 	}
 
 	notInMaintenanceState := make([]string, 0, len(servers))
 	for _, server := range servers {
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
-			serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefList, server.Name)
-			if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != serverMaintenanceRef.UID {
+			serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.UID)
+			if server.Spec.ServerMaintenanceRef == nil || serverMaintenanceRef == nil {
 				// server in maintenance for other tasks. or
 				// server maintenance ref is wrong in either server or bmcSetting
 				// wait for update on the server obj
@@ -513,7 +513,7 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 
 	if len(notInMaintenanceState) > 0 {
 		log.V(1).Info("some servers not yet in maintenance",
-			"req maintenances on servers", bmcSetting.Spec.ServerMaintenanceRefList,
+			"req maintenances on servers", bmcSetting.Spec.ServerMaintenanceRefs,
 			"servers not in maintence", notInMaintenanceState)
 		return false
 	}
@@ -535,12 +535,12 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	}
 
 	// if Server maintenance ref is already given. no further action required.
-	if bmcSetting.Spec.ServerMaintenanceRefList != nil && len(bmcSetting.Spec.ServerMaintenanceRefList) == len(servers) {
+	if bmcSetting.Spec.ServerMaintenanceRefs != nil && len(bmcSetting.Spec.ServerMaintenanceRefs) == len(servers) {
 		return false, nil
 	}
 
 	var errs []error
-	serverMaintenanceRefList := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
+	ServerMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
@@ -564,10 +564,9 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		}
 		log.V(1).Info("Created serverMaintenance", "serverMaintenance", serverMaintenance.Name, "serverMaintenance label", serverMaintenance.Labels, "Operation", opResult)
 
-		serverMaintenanceRefList = append(
-			serverMaintenanceRefList,
+		ServerMaintenanceRefs = append(
+			ServerMaintenanceRefs,
 			metalv1alpha1.ServerMaintenanceRefItem{
-				ServerName: server.Name,
 				ServerMaintenanceRef: &corev1.ObjectReference{
 					APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 					Kind:       "ServerMaintenance",
@@ -581,7 +580,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		return false, errors.Join(errs...)
 	}
 
-	err = r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSetting, serverMaintenanceRefList)
+	err = r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSetting, ServerMaintenanceRefs)
 	if err != nil {
 		return false, fmt.Errorf("failed to patch serverMaintenance ref in bmcSetting status: %w", err)
 	}
@@ -668,13 +667,13 @@ func (r *BMCSettingsReconciler) getReferredServers(
 func (r *BMCSettingsReconciler) getReferredServerMaintenances(
 	ctx context.Context,
 	log logr.Logger,
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
+	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
 ) ([]*metalv1alpha1.ServerMaintenance, []error) {
 
-	serverMaintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(serverMaintenanceRefList))
+	serverMaintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(ServerMaintenanceRefs))
 	var errs []error
 	cnt := 0
-	for _, serverMaintenanceRef := range serverMaintenanceRefList {
+	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
 		key := client.ObjectKey{Name: serverMaintenanceRef.ServerMaintenanceRef.Name, Namespace: r.ManagerNamespace}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{}
 		if err := r.Get(ctx, key, serverMaintenance); err != nil {
@@ -708,11 +707,11 @@ func (r *BMCSettingsReconciler) getReferredBMCSettings(
 }
 
 func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
-	serverName string,
+	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
+	serverMaintenanceUID types.UID,
 ) *corev1.ObjectReference {
-	for _, serverMaintenanceRef := range serverMaintenanceRefList {
-		if serverMaintenanceRef.ServerName == serverName {
+	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
+		if serverMaintenanceRef.ServerMaintenanceRef.UID == serverMaintenanceUID {
 			return serverMaintenanceRef.ServerMaintenanceRef
 		}
 	}
@@ -743,14 +742,14 @@ func (r *BMCSettingsReconciler) patchMaintenanceRequestRefOnBMCSettings(
 	ctx context.Context,
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
-	serverMaintenanceRefList []metalv1alpha1.ServerMaintenanceRefItem,
+	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
 ) error {
 	BMCSettingsBase := bmcSetting.DeepCopy()
 
-	if serverMaintenanceRefList == nil {
-		bmcSetting.Spec.ServerMaintenanceRefList = nil
+	if ServerMaintenanceRefs == nil {
+		bmcSetting.Spec.ServerMaintenanceRefs = nil
 	} else {
-		bmcSetting.Spec.ServerMaintenanceRefList = serverMaintenanceRefList
+		bmcSetting.Spec.ServerMaintenanceRefs = ServerMaintenanceRefs
 	}
 
 	if err := r.Patch(ctx, bmcSetting, client.MergeFrom(BMCSettingsBase)); err != nil {
@@ -805,13 +804,13 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByServerRefs(
 
 	for _, bmcSetting := range bmcSettingsList.Items {
 		// if we dont have maintenance request on this bmcsetting we do not want to queue changes from servers.
-		if bmcSetting.Spec.ServerMaintenanceRefList == nil {
+		if bmcSetting.Spec.ServerMaintenanceRefs == nil {
 			continue
 		}
 		if bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateApplied || bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateFailed {
 			continue
 		}
-		serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefList, host.Name)
+		serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, host.Spec.ServerMaintenanceRef.UID)
 		if serverMaintenanceRef != nil {
 			req = append(req, ctrl.Request{
 				NamespacedName: types.NamespacedName{Namespace: bmcSetting.Namespace, Name: bmcSetting.Name},

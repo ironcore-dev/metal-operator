@@ -1057,7 +1057,7 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefList</code><br/>
+<code>serverMaintenanceRefs</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
 []ServerMaintenanceRefItem
@@ -1065,7 +1065,7 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </table>
@@ -1155,7 +1155,7 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefList</code><br/>
+<code>serverMaintenanceRefs</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
 []ServerMaintenanceRefItem
@@ -1163,7 +1163,7 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </tbody>
@@ -3162,16 +3162,6 @@ ServerMaintenanceStatus
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>serverName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
 <tr>
 <td>
 <code>serverMaintenanceRef</code><br/>

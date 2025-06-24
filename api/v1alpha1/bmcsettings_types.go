@@ -30,12 +30,11 @@ type BMCSettingsSpec struct {
 	// ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
-	// ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
-	ServerMaintenanceRefList []ServerMaintenanceRefItem `json:"serverMaintenanceRefList,omitempty"`
+	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
+	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
 }
 
 type ServerMaintenanceRefItem struct {
-	ServerName           string                  `json:"serverName,omitempty"`
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 

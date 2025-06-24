@@ -24,7 +24,7 @@ import (
 type UserReconciler struct {
 	client.Client
 	Insecure   bool
-	BMCOptions bmc.BMCOptions
+	BMCOptions bmc.Options
 	Scheme     *runtime.Scheme
 }
 

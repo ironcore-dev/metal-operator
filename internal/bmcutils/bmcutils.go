@@ -74,7 +74,7 @@ func GetBMCAddressForBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 
 const DefaultKubeNamespace = "default"
 
-func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, insecure bool, options bmc.BMCOptions) (bmc.BMC, error) {
+func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, insecure bool, options bmc.Options) (bmc.BMC, error) {
 	if server.Spec.BMCRef != nil {
 		b := &metalv1alpha1.BMC{}
 		bmcName := server.Spec.BMCRef.Name
@@ -108,7 +108,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
-func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.BMCOptions) (bmc.BMC, error) {
+func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.Options) (bmc.BMC, error) {
 	var address string
 
 	if bmcObj.Spec.EndpointRef != nil {
@@ -152,7 +152,7 @@ func CreateBMCClient(
 	address string,
 	port int32,
 	bmcSecret *metalv1alpha1.BMCSecret,
-	bmcOptions bmc.BMCOptions,
+	bmcOptions bmc.Options,
 ) (bmc.BMC, error) {
 	var bmcClient bmc.BMC
 	var err error

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishBMC)(nil)
@@ -32,8 +35,8 @@ const (
 	DefaultPowerPollingTimeout = 5 * time.Minute
 )
 
-// BMCOptions contains the options for the BMC redfish client.
-type BMCOptions struct {
+// Options contain the options for the BMC redfish client.
+type Options struct {
 	Endpoint  string
 	Username  string
 	Password  string
@@ -48,7 +51,7 @@ type BMCOptions struct {
 // RedfishBMC is an implementation of the BMC interface for Redfish.
 type RedfishBMC struct {
 	client  *gofish.APIClient
-	options BMCOptions
+	options Options
 }
 
 var pxeBootWithSettingUEFIBootMode = redfish.Boot{
@@ -64,7 +67,7 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(
 	ctx context.Context,
-	options BMCOptions,
+	options Options,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
 		Endpoint:         options.Endpoint,
@@ -337,22 +340,35 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	}
 
 	var tBios struct {
-		Settings common.Settings `json:"@Redfish.Settings"`
+		Attributes redfish.SettingsAttributes `json:"Attributes"`
+		Settings   common.Settings            `json:"@Redfish.Settings"`
 	}
 	err = r.GetEntityFromUri(tSys.Bios.String(), system.GetClient(), &tBios)
 	if err != nil {
 		return result, err
 	}
 
-	var tBiosSetting struct {
+	var tBiosPendingSetting struct {
 		Attributes redfish.SettingsAttributes `json:"Attributes"`
 	}
-	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosSetting)
+	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosPendingSetting)
 	if err != nil {
 		return result, err
 	}
 
-	return tBiosSetting.Attributes, nil
+	// unfortunately, some vendors fill the pending attribute with copy of actual bios attribute
+	// remove if there are the same
+	if len(tBios.Attributes) == len(tBiosPendingSetting.Attributes) {
+		pendingAttr := redfish.SettingsAttributes{}
+		for key, attr := range tBiosPendingSetting.Attributes {
+			if value, ok := tBios.Attributes[key]; !ok || value != attr {
+				pendingAttr[key] = attr
+			}
+		}
+		return pendingAttr, nil
+	}
+
+	return tBiosPendingSetting.Attributes, nil
 }
 
 func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
@@ -433,7 +449,7 @@ func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
 	return
 }
 
-// check if the arrtibutes need to reboot when changed, and are correct type.
+// CheckBiosAttributes checks if the attributes need to reboot when changed and are the correct type.
 func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
 	// filter out immutable, readonly and hidden attributes
@@ -708,4 +724,119 @@ func (r *RedfishBMC) WaitForServerPowerState(
 		return fmt.Errorf("failed to wait for for server power state: %w", err)
 	}
 	return nil
+}
+
+// UpgradeBiosVersion upgrade given bios versions.
+func (r *RedfishBMC) UpgradeBiosVersion(
+	ctx context.Context,
+	manufacturer string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	fatal := false
+	service := r.client.GetService()
+
+	upgradeServices, err := service.UpdateService()
+	if err != nil {
+		return "", fatal, err
+	}
+
+	type tActions struct {
+		SimpleUpdate struct {
+			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
+			Target          string
+		} `json:"#UpdateService.SimpleUpdate"`
+		StartUpdate common.ActionTarget `json:"#UpdateService.StartUpdate"`
+	}
+
+	var tUS struct {
+		Actions tActions
+	}
+
+	err = json.Unmarshal(upgradeServices.RawData, &tUS)
+	if err != nil {
+		return "", fatal, err
+	}
+
+	oem, err := NewOEM(manufacturer, service)
+	if err != nil {
+		return "", fatal, err
+	}
+
+	RequestBody := oem.GetUpdateRequestBody(parameters)
+
+	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
+
+	if err != nil {
+		return "", fatal, err
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	// any error post this point is fatal, as we can not issue multiple upgrade requests.
+	// expectation is to move to failed state, and manually check the status before retrying
+	fatal = true
+
+	log.V(1).Info("update has been issued", "Response status code", resp.StatusCode)
+
+	if resp.StatusCode != http.StatusAccepted {
+		biosRawBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "",
+				fatal,
+				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
+					err,
+					resp.StatusCode,
+				)
+		}
+		return "",
+			fatal,
+			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
+				string(biosRawBody),
+				resp.StatusCode,
+			)
+	}
+
+	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
+	if err != nil {
+		log.V(1).Error(err,
+			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
+		return "", fatal, fmt.Errorf("failed to read task monitor URI. %v", err)
+	}
+
+	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
+
+	return taskMonitorURI, false, nil
+}
+
+func (r *RedfishBMC) GetBiosUpgradeTask(
+	ctx context.Context,
+	manufacturer string,
+	taskURI string,
+) (*redfish.Task, error) {
+	respTask, err := r.client.GetService().GetClient().Get(taskURI)
+	if err != nil {
+		return nil, err
+	}
+	defer respTask.Body.Close() // nolint: errcheck
+
+	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
+		respTaskRawBody, err := io.ReadAll(respTask.Body)
+		if err != nil {
+			return nil,
+				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+					err,
+					respTask.StatusCode)
+		}
+		return nil,
+			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
+				string(respTaskRawBody),
+				respTask.StatusCode)
+	}
+
+	oem, err := NewOEM(manufacturer, r.client.GetService())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get oem object, %v", err)
+	}
+
+	return oem.GetTaskMonitorDetails(ctx, respTask)
 }

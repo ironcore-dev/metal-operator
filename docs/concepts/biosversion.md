@@ -17,16 +17,15 @@
    specific `Server`.
 2. Provided BIOS Version is checked against the current BIOS version.
 3. If version is same as on the server's BIOS, the state is moved to `Completed`.
-4. If the version needs upgrade, `BIOSVersion` checks the current version of BIOS and if required version is lower than the requested, `BIOSVersion` moves the state to `Failed`
-5. If `ServerMaintenance` is not provided already. it requests for one and waits for the `server` to enter `Maintenance` state.
+4. If `ServerMaintenance` is not provided already. it requests for one and waits for the `server` to enter `Maintenance` state.
     - `policy` used by `ServerMaintenance` is to be provided through Spec `ServerMaintenancePolicy` in `BIOSVersion`
-6. `BIOSVersion` issues the bios upgrade using redfish `SimpleUpgrade` API. and monitors the `upgrade task` created by the API.
-7. the `BIOSVersion` moves to `Failed` state:
+5. `BIOSVersion` issues the bios upgrade using redfish `SimpleUpgrade` API. and monitors the `upgrade task` created by the API.
+6. the `BIOSVersion` moves to `Failed` state:
     - If `SimpleUpgade` is issued but unable to get the task to monitor the progress of bios upgrade
     - If the `upgrade task` created by SimpleUpgade fails and does not reach completed state.
     - If the bios version requested is lower than that of the current bios version
-8. `BIOSVersion` moves to reboot the server once the `upgrade task` has been completed. 
-9. `BIOSVersion` verfiy the bios version post reboot, removes the `ServerMaintenance` resource if created by self. and transistion to `Completed` state
+7. `BIOSVersion` moves to reboot the server once the `upgrade task` has been completed. 
+8. `BIOSVersion` verfiy the bios version post reboot, removes the `ServerMaintenance` resource if created by self. and transistion to `Completed` state
 9. Any further update to the `BIOSVersion` Spec will restart the process. 
 
 ## Example
@@ -37,14 +36,12 @@ kind: BIOSVersion
 metadata:
   name: biosversion-sample
 spec:
-  version: 2.10.3
+  version: "U59 v2.34 (10/04/2024)"
   image:
-    URI:  "http://foo.com/dell-bios-2.10.3.bin"
-    transferProtocol: "http"
-    imageSecretRef:
-      name: sample-secret
-  forceUpdate: false
+    URI: "https://foo-2.34_10_04_2024.signed.flash"
+    transferProtocol: "HTTPS"
+  updatePolicy: Normal
   serverRef:
-    name: endpoint-sample-system-0
+    name: endpoint-sample-hpe-system-0
   serverMaintenancePolicy: OwnerApproval
 ```

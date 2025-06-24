@@ -40,10 +40,11 @@ const (
 )
 
 var (
-	cfg         *rest.Config
-	k8sClient   client.Client
-	testEnv     *envtest.Environment
-	registryURL = "http://localhost:30000"
+	cfg                            *rest.Config
+	k8sClient                      client.Client
+	testEnv                        *envtest.Environment
+	registryURL                    = "http://localhost:30000"
+	defaultMockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
 )
 
 func TestControllers(t *testing.T) {
@@ -83,6 +84,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.User{}, &metalv1alpha1.UserList{})).Should(
 		HaveField("Items", BeEmpty()))
+
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersion{}, &metalv1alpha1.BIOSSettingsList{})).Should(
+		HaveField("Items", BeEmpty()))
 }
 
 func deleteAndList(ctx context.Context, obj client.Object, objList client.ObjectList, namespaceOpt ...client.DeleteAllOfOption) func() (client.ObjectList, error) {
@@ -104,7 +108,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.33.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error
@@ -219,7 +223,7 @@ func SetupTest() *corev1.Namespace {
 			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
@@ -249,7 +253,21 @@ func SetupTest() *corev1.Namespace {
 			ManagerNamespace: ns.Name,
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
-			BMCOptions: bmc.BMCOptions{
+			ResyncInterval:   10 * time.Millisecond,
+			BMCOptions: bmc.Options{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&BIOSVersionReconciler{
+			Client:           k8sManager.GetClient(),
+			ManagerNamespace: ns.Name,
+			Insecure:         true,
+			Scheme:           k8sManager.GetScheme(),
+			ResyncInterval:   10 * time.Millisecond,
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
@@ -260,7 +278,7 @@ func SetupTest() *corev1.Namespace {
 			Client:   k8sManager.GetClient(),
 			Scheme:   k8sManager.GetScheme(),
 			Insecure: true,
-			BMCOptions: bmc.BMCOptions{
+			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,

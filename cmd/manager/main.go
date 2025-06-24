@@ -319,7 +319,7 @@ func main() { // nolint: gocyclo
 		EnforceFirstBoot:        enforceFirstBoot,
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
-		BMCOptions: bmc.BMCOptions{
+		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
@@ -367,7 +367,8 @@ func main() { // nolint: gocyclo
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
-		BMCOptions: bmc.BMCOptions{
+		ResyncInterval:   serverResyncInterval,
+		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
@@ -382,7 +383,7 @@ func main() { // nolint: gocyclo
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Insecure: insecure,
-		BMCOptions: bmc.BMCOptions{
+		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
@@ -397,6 +398,30 @@ func main() { // nolint: gocyclo
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = webhookmetalv1alpha1.SetupBIOSSettingsWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "BIOSSettings")
+			os.Exit(1)
+		}
+	}
+	if err = (&controller.BIOSVersionReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		ManagerNamespace: managerNamespace,
+		Insecure:         insecure,
+		ResyncInterval:   serverResyncInterval,
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BIOSVersion")
+		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhookmetalv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "BIOSVersion")
 			os.Exit(1)
 		}
 	}

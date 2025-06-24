@@ -5,10 +5,23 @@ package bmc
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
+	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	"github.com/ironcore-dev/metal-operator/bmc/oem"
+)
+
+type Manufacturer string
+
+const (
+	ManufacturerDell   Manufacturer = "Dell Inc."
+	ManufacturerLenovo Manufacturer = "Lenovo"
+	ManufacturerHPE    Manufacturer = "HPE"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -55,6 +68,18 @@ type BMC interface {
 	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
 
 	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
+
+	UpgradeBiosVersion(
+		ctx context.Context,
+		manufacturer string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, bool, error)
+
+	GetBiosUpgradeTask(
+		ctx context.Context,
+		manufacturer string,
+		taskURI string,
+	) (*redfish.Task, error)
 
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
 
@@ -234,4 +259,37 @@ type Manager struct {
 	PowerState      string
 	State           string
 	MACAddress      string
+}
+
+type OEMInterface interface {
+	GetUpdateRequestBody(
+		parameters *redfish.SimpleUpdateParameters,
+	) *oem.SimpleUpdateRequestBody
+	GetUpdateTaskMonitorURI(
+		response *http.Response,
+	) (string, error)
+	GetTaskMonitorDetails(
+		ctx context.Context,
+		taskMonitorResponse *http.Response,
+	) (*redfish.Task, error)
+}
+
+func NewOEM(manufacturer string, service *gofish.Service) (OEMInterface, error) {
+	var oemintf OEMInterface
+	switch manufacturer {
+	case string(ManufacturerDell):
+		return &oem.Dell{
+			Service: service,
+		}, nil
+	case string(ManufacturerHPE):
+		return &oem.HPE{
+			Service: service,
+		}, nil
+	case string(ManufacturerLenovo):
+		return &oem.Lenovo{
+			Service: service,
+		}, nil
+	default:
+		return oemintf, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
+	}
 }

@@ -33,6 +33,7 @@ rules:
   resources:
   - accounts
   - biossettings
+  - biosversions
   - bmcs
   - bmcsecrets
   - endpoints
@@ -54,6 +55,7 @@ rules:
   resources:
   - accounts/finalizers
   - biossettings/finalizers
+  - biosversions/finalizers
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - endpoints/finalizers
@@ -68,6 +70,7 @@ rules:
   resources:
   - accounts/status
   - biossettings/status
+  - biosversions/status
   - bmcs/status
   - bmcsecrets/status
   - endpoints/status

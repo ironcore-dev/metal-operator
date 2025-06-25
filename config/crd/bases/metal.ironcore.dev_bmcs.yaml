@@ -103,6 +103,27 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              bmcSettingsRef:
+                description: |-
+                  BMCSettingRef is a reference to a BMCSettings object that specifies
+                  the BMC configuration for this BMC.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              bmcUUID:
+                description: |-
+                  bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
+                  This field is optional and can be omitted, controller will choose the first avaialbe Manager
+                type: string
               consoleProtocol:
                 description: |-
                   ConsoleProtocol specifies the protocol to be used for console access to the BMC.

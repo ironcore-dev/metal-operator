@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: bmcversions.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -125,8 +125,8 @@ spec:
                 description: ServerMaintenancePolicy is maintenance policy to be enforced
                   on the server managed by referred BMC.
                 type: string
-              serverMaintenanceRefList:
-                description: ServerMaintenanceRefList are references to a ServerMaintenance
+              serverMaintenanceRefs:
+                description: ServerMaintenanceRefs are references to a ServerMaintenance
                   objects that Controller has requested for the each of the related
                   server.
                 items:
@@ -175,8 +175,6 @@ spec:
                           type: string
                       type: object
                       x-kubernetes-map-type: atomic
-                    serverName:
-                      type: string
                   type: object
                 type: array
               updatePolicy:

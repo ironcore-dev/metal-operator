@@ -177,9 +177,8 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRefList",
-				[]metalv1alpha1.ServerMaintenanceRefList{{
-					ServerName: server.Name,
+			HaveField("Spec.ServerMaintenanceRefs",
+				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -187,9 +186,8 @@ var _ = Describe("BMCVersion Controller", func() {
 						UID:        serverMaintenance.UID,
 						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 					}}}),
-			HaveField("Spec.ServerMaintenanceRefList",
-				[]metalv1alpha1.ServerMaintenanceRefList{{
-					ServerName: server.Name,
+			HaveField("Spec.ServerMaintenanceRefs",
+				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -220,10 +218,10 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that BMCVersion has removed Maintenance")
 		Eventually(Object(bmcVersion)).Should(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		)
 		Consistently(Object(bmcVersion)).Should(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		)
 
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
@@ -279,9 +277,8 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRefList",
-				[]metalv1alpha1.ServerMaintenanceRefList{{
-					ServerName: server.Name,
+			HaveField("Spec.ServerMaintenanceRefs",
+				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -289,9 +286,8 @@ var _ = Describe("BMCVersion Controller", func() {
 						UID:        serverMaintenance.UID,
 						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 					}}}),
-			HaveField("Spec.ServerMaintenanceRefList",
-				[]metalv1alpha1.ServerMaintenanceRefList{{
-					ServerName: server.Name,
+			HaveField("Spec.ServerMaintenanceRefs",
+				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -332,10 +328,10 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that BMCVersion has removed Maintenance")
 		Eventually(Object(bmcVersion)).Should(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		)
 		Consistently(Object(bmcVersion)).Should(
-			HaveField("Spec.ServerMaintenanceRefList", BeNil()),
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		)
 
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))

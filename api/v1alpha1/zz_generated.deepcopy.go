@@ -8,7 +8,7 @@
 package v1alpha1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -638,9 +638,9 @@ func (in *BMCVersionSpec) DeepCopyInto(out *BMCVersionSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
-	if in.ServerMaintenanceRefList != nil {
-		in, out := &in.ServerMaintenanceRefList, &out.ServerMaintenanceRefList
-		*out = make([]ServerMaintenanceRefList, len(*in))
+	if in.ServerMaintenanceRefs != nil {
+		in, out := &in.ServerMaintenanceRefs, &out.ServerMaintenanceRefs
+		*out = make([]ServerMaintenanceRefItem, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

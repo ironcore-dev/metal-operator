@@ -440,7 +440,7 @@ func main() { // nolint: gocyclo
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
 		ResyncInterval:   serverResyncInterval,
-		BMCOptions: bmc.BMCOptions{
+		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,

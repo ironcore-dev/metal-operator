@@ -1061,8 +1061,6 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
 []ServerMaintenanceRefItem
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
-[]ServerMaintenanceRefItem
 </a>
 </em>
 </td>
@@ -1527,7 +1525,7 @@ BMCPowerState
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1591,7 +1589,7 @@ ImageSpec
 <td>
 <code>BMCRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1615,15 +1613,15 @@ ServerMaintenancePolicy
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefList</code><br/>
+<code>serverMaintenanceRefs</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
-[]ServerMaintenanceRefList
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
 </a>
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </table>
@@ -1700,7 +1698,7 @@ ImageSpec
 <td>
 <code>BMCRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1724,15 +1722,15 @@ ServerMaintenancePolicy
 </tr>
 <tr>
 <td>
-<code>serverMaintenanceRefList</code><br/>
+<code>serverMaintenanceRefs</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefList">
-[]ServerMaintenanceRefList
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
 </a>
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefList are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </tbody>
@@ -1811,7 +1809,7 @@ TaskStatus
 <td>
 <code>conditions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#condition-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
 []Kubernetes meta/v1.Condition
 </a>
 </em>
@@ -3465,7 +3463,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
 </div>

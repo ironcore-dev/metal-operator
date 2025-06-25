@@ -539,7 +539,9 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		return false, nil
 	}
 
-	// if some server have been given with serverMaintenance
+	// if user gave some server with serverMaintenance but not all
+	// we want to request maintenance for the missing servers only.
+	// find the servers which has maintenance and do not create maintenance for them.
 	serverWithMaintenances := make(map[string]bool, len(servers))
 	if bmcSetting.Spec.ServerMaintenanceRefs != nil {
 		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs)

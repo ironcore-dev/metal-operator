@@ -66,10 +66,8 @@ func (r *BMCReconciler) delete(ctx context.Context, log logr.Logger, bmcObj *met
 
 	if bmcObj.Spec.BMCSettingRef != nil {
 		bmcSettings := &metalv1alpha1.BMCSettings{}
-		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSettingRef.Name}, bmcSettings); err != nil {
-			if !errors.IsNotFound(err) {
-				return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
-			}
+		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSettingRef.Name}, bmcSettings); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
 		}
 		if err := r.Delete(ctx, bmcSettings); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to deleted referred BMCSettings. %w", err)

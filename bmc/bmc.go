@@ -104,6 +104,8 @@ type BMC interface {
 	) (*redfish.Task, error)
 
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
+
+	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 }
 
 type OEMManagerInterface interface {

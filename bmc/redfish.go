@@ -71,11 +71,12 @@ func NewRedfishBMCClient(
 	options Options,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
-		Endpoint:  options.Endpoint,
-		Username:  options.Username,
-		Password:  options.Password,
-		Insecure:  true,
-		BasicAuth: options.BasicAuth,
+		Endpoint:         options.Endpoint,
+		Username:         options.Username,
+		Password:         options.Password,
+		Insecure:         true,
+		ReuseConnections: true,
+		BasicAuth:        options.BasicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
@@ -743,6 +744,61 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 		return result, nil
 	}
 	return result, nil
+}
+
+func (r *RedfishBMC) CreateOrUpdateAccount(
+	ctx context.Context, userName,
+	role, password string, enabled bool,
+) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	//log.V(1).Info("Accounts", "accounts", accounts)
+	for _, a := range accounts {
+		if a.UserName == userName {
+			a.RoleID = role
+			a.UserName = userName
+			a.Enabled = enabled
+			if err := a.Update(); err != nil {
+				return fmt.Errorf("failed to update account: %w", err)
+			}
+			if password != "" {
+				if err := a.ChangePassword(password, r.options.Password); err != nil {
+					return fmt.Errorf("failed to change account password: %w", err)
+				}
+			}
+		}
+	}
+	_, err = service.CreateAccount(userName, password, role)
+	if err != nil {
+		return fmt.Errorf("failed to update account: %w", err)
+	}
+	return nil
+}
+
+func (r *RedfishBMC) SetAccountPassword(ctx context.Context, accountName, password string) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	if len(accounts) == 0 {
+		return errors.New("no account found")
+	}
+	for _, a := range accounts {
+		if a.Name == accountName {
+			return a.ChangePassword(password, r.options.Password)
+		}
+	}
+	return errors.New("account not found")
 }
 
 func (r *RedfishBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*redfish.ComputerSystem, error) {

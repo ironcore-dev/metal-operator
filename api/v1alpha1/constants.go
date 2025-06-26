@@ -10,4 +10,6 @@ const (
 	OperationAnnotationIgnore = "ignore"
 	// InstanceTypeAnnotation is used to specify the type of Server.
 	InstanceTypeAnnotation = "metal.ironcore.dev/instance-type"
+	// OperationAnnotationRotateCredentials is used to indicate that credentials should be rotated.
+	OperationAnnotationRotateCredentials = "rotate-credentials"
 )

@@ -198,20 +198,17 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, lo
 		return false, nil
 	}
 
-	if server.Spec.ServerClaimRef == nil {
-		serverBase := server.DeepCopy()
-		server.Spec.ServerClaimRef = &v1.ObjectReference{
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerClaim",
-			Namespace:  claim.Namespace,
-			Name:       claim.Name,
-			UID:        claim.UID,
-		}
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return false, fmt.Errorf("failed to patch claim ref for server: %w", err)
-		}
-		log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
+	server.Spec.ServerClaimRef = &v1.ObjectReference{
+		APIVersion: "metal.ironcore.dev/v1alpha1",
+		Kind:       "ServerClaim",
+		Namespace:  claim.Namespace,
+		Name:       claim.Name,
+		UID:        claim.UID,
 	}
+	if err := r.Update(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to patch claim ref for server: %w", err)
+	}
+	log.V(1).Info("Updated ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
 	return true, nil
 }
 

@@ -556,7 +556,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	var errs []error
 	ServerMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
-		if _, ok := serverWithMaintenances[server.Name]; ok {
+		if serverWithMaintenances[server.Name] {
 			continue
 		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{

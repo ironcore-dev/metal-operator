@@ -435,7 +435,7 @@ func main() { // nolint: gocyclo
 			os.Exit(1)
 		}
 	}
-  
+
 	if err = (&controller.BIOSSettingsFlowReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),

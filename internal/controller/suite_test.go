@@ -291,8 +291,8 @@ func SetupTest() *corev1.Namespace {
 				BasicAuth:            true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
-    
-    Expect((&BIOSSettingsFlowReconciler{
+
+		Expect((&BIOSSettingsFlowReconciler{
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())

@@ -60,13 +60,17 @@ jobs:
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
           mv kustomize /usr/local/bin
 
+      - name: Package Helm chart with crds folder in template
+        run: |
+          helm package dist/chart --version ${{ steps.chart_version.outputs.version }}-crds
+
       - name: Prepare CRDs folder
         run: |
           mkdir -p dist/chart/crds
           kustomize build config/default | yq ea 'select(.kind == "CustomResourceDefinition")' > dist/chart/crds/crds.yaml
           rm -rf dist/chart/templates/crd
 
-      - name: Package Helm chart
+      - name: Package Helm chart with removed crds folder from template folder
         run: |
           helm package dist/chart --version ${{ steps.chart_version.outputs.version }}
 
@@ -77,3 +81,4 @@ jobs:
       - name: Push Helm chart to GHCR
         run: |
           helm push metal-operator-${{ steps.chart_version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+          helm push metal-operator-${{ steps.chart_version.outputs.version }}-crds.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

@@ -971,6 +971,19 @@ BMCSpec
 <table>
 <tr>
 <td>
+<code>bmcUUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
+This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>endpointRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
@@ -1040,6 +1053,20 @@ ConsoleProtocol
 <em>(Optional)</em>
 <p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
 This field is optional and can be omitted if console access is not required.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSettingsRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettingRef is a reference to a BMCSettings object that specifies
+the BMC configuration for this BMC.</p>
 </td>
 </tr>
 </table>
@@ -1242,6 +1269,271 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/secret/#se
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings
+</h3>
+<div>
+<p>BMCSettings is the Schema for the BMCSettings API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">
+BMCSettingsSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains bmc settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
+note: User approval is only enforced for server&rsquo;s which are reserved state
+ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">
+BMCSettingsStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
+</p>
+<div>
+<p>BMCSettingsSpec defines the desired state of BMCSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains bmc settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
+note: User approval is only enforced for server&rsquo;s which are reserved state
+ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsState">BMCSettingsState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus</a>)
+</p>
+<div>
+<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BMCSettingsStateApplied specifies that the BMC maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BMCSettingsStateFailed specifies that the BMC maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BMCSettingsStateInProgress specifies that the BMC setting changes are in progress</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BMCSettingsStatePending specifies that the BMC maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
+</p>
+<div>
+<p>BMCSettingsStatus defines the observed state of BMCSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsState">
+BMCSettingsState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the BMC configuration task.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec
 </h3>
 <p>
@@ -1258,6 +1550,19 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/secret/#se
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>bmcUUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
+This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>endpointRef</code><br/>
@@ -1329,6 +1634,20 @@ ConsoleProtocol
 <em>(Optional)</em>
 <p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
 This field is optional and can be omitted if console access is not required.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSettingsRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettingRef is a reference to a BMCSettings object that specifies
+the BMC configuration for this BMC.</p>
 </td>
 </tr>
 </tbody>
@@ -3114,7 +3433,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowSpec">BIOSSettingsFlowSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowSpec">BIOSSettingsFlowSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -3133,6 +3452,35 @@ ServerMaintenanceStatus
 <td><p>ServerMaintenancePolicyOwnerApproval specifies that the maintenance policy requires owner approval.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec
 </h3>

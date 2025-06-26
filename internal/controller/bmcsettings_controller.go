@@ -291,7 +291,6 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 		return ctrl.Result{}, err
 	}
 
-	// todo:wait on the result from the resource which does upgrade to requeue.
 	if currentBMCVersion != bmcSetting.Spec.Version {
 		log.V(1).Info("Pending BMC version upgrade.", "current bmc Version", currentBMCVersion, "required version", bmcSetting.Spec.Version)
 		return ctrl.Result{}, nil
@@ -843,6 +842,32 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCRefs(
 	}
 	return nil
 }
+func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	BMCVersion := obj.(*metalv1alpha1.BMCVersion)
+	if BMCVersion.Status.State != metalv1alpha1.BMCVersionStateCompleted {
+		return nil
+	}
+
+	BMCSettingsList := &metalv1alpha1.BMCSettingsList{}
+	if err := r.List(ctx, BMCSettingsList); err != nil {
+		log.Error(err, "failed to list BMCSettings")
+		return nil
+	}
+
+	for _, bmcSettings := range BMCSettingsList.Items {
+		if bmcSettings.Spec.BMCRef.Name == BMCVersion.Spec.BMCRef.Name {
+			if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateApplied || bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
+				return nil
+			}
+			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: bmcSettings.Namespace, Name: bmcSettings.Name}}}
+		}
+	}
+	return nil
+}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCSettingsReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -851,5 +876,6 @@ func (r *BMCSettingsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&metalv1alpha1.ServerMaintenance{}).
 		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByServerRefs)).
 		Watches(&metalv1alpha1.BMC{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByBMCRefs)).
+		Watches(&metalv1alpha1.BMCVersion{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByBMCVersion)).
 		Complete(r)
 }

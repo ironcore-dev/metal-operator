@@ -70,7 +70,7 @@ func (r *BMCReconciler) delete(ctx context.Context, log logr.Logger, bmcObj *met
 			return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
 		}
 		if err := r.Delete(ctx, bmcSettings); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to deleted referred BMCSettings. %w", err)
+			return ctrl.Result{}, fmt.Errorf("failed to delete referred BMCSettings. %w", err)
 		}
 	}
 

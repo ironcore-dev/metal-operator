@@ -195,6 +195,12 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 		log.V(1).Info("referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}
+
+	if err := r.setOwnerToServer(ctx, biosSettings, server); err != nil {
+		log.V(1).Error(err, "failed to set bios settings owner reference to server", "biosSettings", biosSettings.Name, "server", server.Name)
+		return ctrl.Result{}, fmt.Errorf("failed to set owner reference to server: %w", err)
+	}
+
 	// patch server with biossettings reference
 	if server.Spec.BIOSSettingsRef == nil {
 		if err := r.patchBiosSettingsRefOnServer(ctx, log, server, &corev1.LocalObjectReference{Name: biosSettings.Name}); err != nil {
@@ -227,6 +233,21 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 	defer bmcClient.Logout()
 
 	return r.ensureBIOSSettingsStateTransition(ctx, log, bmcClient, biosSettings, server)
+}
+
+func (r *BiosSettingsReconciler) setOwnerToServer(ctx context.Context, biosSettings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) error {
+	if controllerutil.HasControllerReference(biosSettings) {
+		return nil
+	}
+
+	biosSettingsBase := biosSettings.DeepCopy()
+	if err := controllerutil.SetControllerReference(server, biosSettings, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference for biosSettings: %w", err)
+	}
+	if err := r.Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
+		return fmt.Errorf("failed to patch server with controller reference: %w", err)
+	}
+	return nil
 }
 
 func (r *BiosSettingsReconciler) ensureBIOSSettingsStateTransition(

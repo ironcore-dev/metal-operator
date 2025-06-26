@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,7 +106,14 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 
 		Eventually(Object(biosSettingsV1)).Should(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "Server",
+				Name:               server.Name,
+				UID:                server.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
 		)
 
 		By("Creating a BIOSSetting V2")

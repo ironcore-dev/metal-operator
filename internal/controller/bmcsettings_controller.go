@@ -539,9 +539,26 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		return false, nil
 	}
 
+	// if user gave some server with serverMaintenance but not all
+	// we want to request maintenance for the missing servers only.
+	// find the servers which has maintenance and do not create maintenance for them.
+	serverWithMaintenances := make(map[string]bool, len(servers))
+	if bmcSetting.Spec.ServerMaintenanceRefs != nil {
+		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs)
+		if err != nil {
+			return false, errors.Join(err...)
+		}
+		for _, serverMaintenance := range serverMaintenances {
+			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
+		}
+	}
+
 	var errs []error
 	ServerMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
+		if serverWithMaintenances[server.Name] {
+			continue
+		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: r.ManagerNamespace,

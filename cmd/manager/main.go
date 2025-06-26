@@ -425,6 +425,30 @@ func main() { // nolint: gocyclo
 			os.Exit(1)
 		}
 	}
+	if err = (&controller.BMCSettingsReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		ManagerNamespace: managerNamespace,
+		ResyncInterval:   serverResyncInterval,
+		Insecure:         insecure,
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BMCSettings")
+		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhookmetalv1alpha1.SetupBMCSettingsWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "BMCSettings")
+			os.Exit(1)
+		}
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

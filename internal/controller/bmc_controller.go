@@ -129,18 +129,21 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}
 
-	manager, err := bmcClient.GetManager()
+	// TODO: Secret rotation/User management
+
+	manager, err := bmcClient.GetManager(bmcObj.Spec.BMCUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get manager details for BMC %s: %w", bmcObj.Name, err)
 	}
+
 	if manager != nil {
 		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.Manufacturer = manager.Manufacturer
-		bmcObj.Status.State = metalv1alpha1.BMCState(manager.State)
-		bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(manager.PowerState)
+		bmcObj.Status.State = metalv1alpha1.BMCState(string(manager.Status.State))
+		bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(string(manager.PowerState))
 		bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
 		bmcObj.Status.SerialNumber = manager.SerialNumber
-		bmcObj.Status.SKU = manager.SKU
+		bmcObj.Status.SKU = manager.PartNumber
 		bmcObj.Status.Model = manager.Model
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 			return fmt.Errorf("failed to patch manager details for BMC %s: %w", bmcObj.Name, err)

@@ -157,6 +157,269 @@ BIOSSettingsStatus
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSet">BIOSSettingsSet
+</h3>
+<div>
+<p>BIOSSettingsSet is the Schema for the biossettingssets API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">
+BIOSSettingsSetSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settingsFlow</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
+</em>
+</td>
+<td>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
+if the settingsFlow length is 1, BIOSSettings resource is created.
+if the length is more than 1, BIOSSettingsFlow resource is created.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetStatus">
+BIOSSettingsSetStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSet">BIOSSettingsSet</a>)
+</p>
+<div>
+<p>BIOSSettingsSetSpec defines the desired state of BIOSSettingsSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settingsFlow</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
+</em>
+</td>
+<td>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
+if the settingsFlow length is 1, BIOSSettings resource is created.
+if the length is more than 1, BIOSSettingsFlow resource is created.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSetStatus">BIOSSettingsSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSet">BIOSSettingsSet</a>)
+</p>
+<div>
+<p>BIOSSettingsSetStatus defines the observed state of BIOSSettingsSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>totalServers</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>TotalServers is the number of server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>totalSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>TotalSettings is the number of Settings current created by the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pending</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Pending is the total number of pending server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inProgress</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>InMaintenance is the total number of server in the set that are currently in InProgress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completed</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Completed is the total number of completed server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failed</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Failed is the total number of failed server in the set.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec
 </h3>
 <p>
@@ -3127,7 +3390,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -3714,6 +3977,45 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the server&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.SettingsFlowItem">SettingsFlowItem
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>priority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Priority defines the order of applying the settings
+any int greater than 0. lower number have higher Priority (ie; lower number is applied first)</p>
 </td>
 </tr>
 </tbody>

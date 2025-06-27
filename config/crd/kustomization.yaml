@@ -12,6 +12,7 @@ resources:
 - bases/metal.ironcore.dev_biossettings.yaml
 - bases/metal.ironcore.dev_biosversions.yaml
 - bases/metal.ironcore.dev_bmcsettings.yaml
+- bases/metal.ironcore.dev_biossettingssets.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:

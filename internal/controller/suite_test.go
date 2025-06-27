@@ -289,6 +289,10 @@ func SetupTest() *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&BIOSSettingsSetReconciler{
+			Client: k8sManager.GetClient(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		go func() {
 			defer GinkgoRecover()
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")

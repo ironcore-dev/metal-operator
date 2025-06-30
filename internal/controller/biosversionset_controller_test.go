@@ -161,8 +161,25 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
 				HaveField("Status.TotalServers", BeNumerically("==", 2)),
 				HaveField("Status.TotalVersionResource", BeNumerically("==", 2)),
-				HaveField("Status.InProgress", BeNumerically("==", 0)),
+				HaveField("Status.Failed", BeNumerically("==", 0)),
+			))
+
+			By("Checking the biosVersion01 have completed")
+			Eventually(Object(biosVersion01)).Should(
+				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+			)
+
+			By("Checking the biosVersion02 have completed")
+			Eventually(Object(biosVersion02)).Should(
+				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+			)
+
+			By("Checking if the status has been updated")
+			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+				HaveField("Status.TotalServers", BeNumerically("==", 2)),
+				HaveField("Status.TotalVersionResource", BeNumerically("==", 2)),
 				HaveField("Status.Completed", BeNumerically("==", 2)),
+				HaveField("Status.InProgress", BeNumerically("==", 0)),
 				HaveField("Status.Failed", BeNumerically("==", 0)),
 			))
 

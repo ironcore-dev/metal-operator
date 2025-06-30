@@ -81,6 +81,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	var serverList metalv1alpha1.ServerList
 	Eventually(ObjectList(&serverList)).Should(HaveField("Items", BeEmpty()))
 
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettingsSet{}, &metalv1alpha1.BIOSSettingsSetList{})).Should(
+		HaveField("Items", BeEmpty()))
+
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))
 

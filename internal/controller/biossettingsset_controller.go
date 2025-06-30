@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,21 +26,13 @@ type BIOSSettingsSetReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-const biosSettingsSetFinalizer = "metal.ironcore.dev/biossettingsSet"
+const biosSettingsSetFinalizer = "metal.ironcore.dev/biosSettingsSet"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingssets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingssets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingssets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the BIOSSettingsSet object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.2/pkg/reconcile
 func (r *BIOSSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{}
@@ -89,7 +80,7 @@ func (r *BIOSSettingsSetReconciler) delete(
 			return ctrl.Result{}, err
 		}
 		log.Info("Waiting on the created BIOSSettings to reach terminal status")
-		return ctrl.Result{RequeueAfter: 2 * time.Minute}, nil
+		return ctrl.Result{}, nil
 	}
 
 	if err := r.deleteBIOSSettings(ctx, log, &metalv1alpha1.ServerList{}, ownedBiosSettings); err != nil {
@@ -242,7 +233,7 @@ func (r *BIOSSettingsSetReconciler) deleteBIOSSettings(
 	for _, biosSettings := range biosSettingsList.Items {
 		if !serverWithSettings[biosSettings.Name] {
 			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-				log.V(1).Info("waiting for biosSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "status", biosSettings.Status)
+				log.V(1).Info("waiting for BIOSSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "status", biosSettings.Status)
 				continue
 			}
 			if err := r.Delete(ctx, &biosSettings); err != nil {
@@ -278,11 +269,11 @@ func (r *BIOSSettingsSetReconciler) getOwnedBIOSSettings(
 	ctx context.Context,
 	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
 ) (*metalv1alpha1.BIOSSettingsList, error) {
-	BiosSettingsList := &metalv1alpha1.BIOSSettingsList{}
-	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, biosSettingsSet, BiosSettingsList); err != nil {
+	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, biosSettingsSet, biosSettingsList); err != nil {
 		return nil, err
 	}
-	return BiosSettingsList, nil
+	return biosSettingsList, nil
 }
 
 func (r *BIOSSettingsSetReconciler) getServersBySelector(

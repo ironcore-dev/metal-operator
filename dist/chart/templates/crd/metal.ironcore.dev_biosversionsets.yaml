@@ -1,0 +1,204 @@
+{{- if .Values.crd.enable }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: biosversionsets.metal.ironcore.dev
+spec:
+  group: metal.ironcore.dev
+  names:
+    kind: BIOSVersionSet
+    listKind: BIOSVersionSetList
+    plural: biosversionsets
+    singular: biosversionset
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.version
+      name: BIOSVersion
+      type: string
+    - jsonPath: .spec.serverSelector
+      name: serverLabelSelector
+      type: string
+    - jsonPath: .status.totalServers
+      name: TotalServers
+      type: string
+    - jsonPath: .status.pending
+      name: Pending
+      type: string
+    - jsonPath: .status.inProgress
+      name: InProgress
+      type: string
+    - jsonPath: .status.completed
+      name: Completed
+      type: string
+    - jsonPath: .status.failed
+      name: Failed
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: BIOSVersionSet is the Schema for the biosversionsets API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BIOSVersionSetSpec defines the desired state of BIOSVersionSet.
+            properties:
+              image:
+                description: details regarding the image to use to upgrade to given
+                  BIOS version
+                properties:
+                  URI:
+                    description: The URI of the software image to update/install."
+                    type: string
+                  secretRef:
+                    description: |-
+                      ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+                      to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+                    properties:
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  transferProtocol:
+                    description: The network protocol that the server's update service
+                      uses to retrieve 'ImageURI'
+                    type: string
+                required:
+                - URI
+                type: object
+              serverMaintenancePolicy:
+                description: ServerMaintenancePolicy is maintenance policy to be enforced
+                  on the server.
+                type: string
+              serverSelector:
+                description: ServerSelector specifies a label selector to identify
+                  the servers that are to be selected.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              updatePolicy:
+                description: An indication of whether the server's upgrade service
+                  should bypass vendor update policies
+                type: string
+              version:
+                description: 'Version contains software (eg: BIOS, BMC) version this
+                  settings applies to'
+                type: string
+            required:
+            - image
+            - serverSelector
+            - version
+            type: object
+          status:
+            description: BIOSVersionSetStatus defines the observed state of BIOSVersionSet.
+            properties:
+              completed:
+                description: Completed is the total number of completed server in
+                  the set.
+                format: int32
+                type: integer
+              failed:
+                description: Failed is the total number of failed server in the set.
+                format: int32
+                type: integer
+              inProgress:
+                description: InMaintenance is the total number of server in the set
+                  that are currently in InProgress.
+                format: int32
+                type: integer
+              pending:
+                description: Pending is the total number of pending server in the
+                  set.
+                format: int32
+                type: integer
+              totalServers:
+                description: TotalServers is the number of server in the set.
+                format: int32
+                type: integer
+              totalVersionResource:
+                description: TotalVersionResource is the number of Settings current
+                  created by the set.
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end -}}

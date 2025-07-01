@@ -281,6 +281,14 @@ func (r *BiosSettingsReconciler) ensureBIOSSettingsStateTransition(
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending Settings state %v", err)
 			}
+			if err := acc.Update(
+				pendingSettingStateCheckCondition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason("PendingBIOSSettingsFound"),
+				conditionutils.UpdateMessage(fmt.Sprintf("Pending Setting found, Hence can not start with bios setting update, current pending settings: %v", pendingSettings)),
+			); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Pending BIOSVersion update condition: %w", err)
+			}
 			err = r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, pendingSettingStateCheckCondition)
 			return ctrl.Result{}, err
 		}
@@ -420,18 +428,19 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update power on server condition: %w", err)
 			}
-			key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
-			BMC := &metalv1alpha1.BMC{}
-			if err := r.Get(ctx, key, BMC); err != nil {
-				log.V(1).Error(err, "failed to get referred server's Manager")
-				return ctrl.Result{}, err
+			if server.Spec.BMCRef != nil {
+				key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
+				BMC := &metalv1alpha1.BMC{}
+				if err := r.Get(ctx, key, BMC); err != nil {
+					log.V(1).Error(err, "failed to get referred server's Manager")
+					return ctrl.Result{}, err
+				}
+				err = bmcClient.ResetManager(ctx, BMC.Spec.BMCUUID, redfish.GracefulRestartResetType)
+				if err != nil {
+					log.V(1).Error(err, "failed to reset BMC")
+					return ctrl.Result{}, err
+				}
 			}
-			err = bmcClient.ResetManager(ctx, BMC.Spec.BMCUUID, redfish.GracefulRestartResetType)
-			if err != nil {
-				log.V(1).Error(err, "failed to reset BMC")
-				return ctrl.Result{}, err
-			}
-
 			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, biosSettings.Status.State, turnOnServer)
 			return ctrl.Result{}, err
 		}
@@ -1111,7 +1120,8 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 		); err != nil {
 			return fmt.Errorf("failed to patch BIOSettings condition: %w", err)
 		}
-	} else {
+	} else if state == metalv1alpha1.BIOSSettingsStatePending {
+		// reset, when we restart the setting update
 		biosSettings.Status.Conditions = nil
 	}
 

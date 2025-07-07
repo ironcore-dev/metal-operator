@@ -27,7 +27,7 @@ spec:
     - jsonPath: .status.state
       name: State
       type: string
-    - jsonPath: .status.AppliedStateTimeStamp
+    - jsonPath: .status.appliedTimeStamp
       name: AppliedOn
       type: date
     - jsonPath: .metadata.creationTimestamp

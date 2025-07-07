@@ -78,7 +78,7 @@ type BIOSSettingsStatus struct {
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
-// +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.AppliedStateTimeStamp`
+// +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.appliedTimeStamp`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // BIOSSettings is the Schema for the biossettings API.
 type BIOSSettings struct {

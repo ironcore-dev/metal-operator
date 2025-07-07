@@ -80,7 +80,7 @@ func main() { // nolint: gocyclo
 		resourcePollingInterval            time.Duration
 		resourcePollingTimeout             time.Duration
 		discoveryTimeout                   time.Duration
-		biosSettingApplyTimeout            time.Duration
+		biosSettingsApplyTimeout           time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 	)
@@ -129,7 +129,8 @@ func main() { // nolint: gocyclo
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.DurationVar(&biosSettingApplyTimeout, "biosSetting-timeout", 2*time.Hour, "Timeout for BIOS Settings Controller")
+	flag.DurationVar(&biosSettingsApplyTimeout, "bios-setting-timeout", 2*time.Hour,
+		"Timeout for BIOS Settings Controller")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -377,7 +378,7 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		TimeoutExpiry: biosSettingApplyTimeout,
+		TimeoutExpiry: biosSettingsApplyTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettings")
 		os.Exit(1)

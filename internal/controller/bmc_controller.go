@@ -63,6 +63,17 @@ func (r *BMCReconciler) reconcileExists(ctx context.Context, log logr.Logger, bm
 
 func (r *BMCReconciler) delete(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
 	log.V(1).Info("Deleting BMC")
+
+	if bmcObj.Spec.BMCSettingRef != nil {
+		bmcSettings := &metalv1alpha1.BMCSettings{}
+		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSettingRef.Name}, bmcSettings); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
+		}
+		if err := r.Delete(ctx, bmcSettings); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to delete referred BMCSettings. %w", err)
+		}
+	}
+
 	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil {
 		return ctrl.Result{}, err
 	}

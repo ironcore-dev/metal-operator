@@ -746,7 +746,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, b
 		return fmt.Errorf("can only PXE boot server with valid BMC ref or inline BMC configuration")
 	}
 
-	if err := bmcClient.SetPXEBootOnce(ctx, server.Spec.SystemURI, server.Spec.SystemUUID); err != nil {
+	if err := bmcClient.SetPXEBootOnce(ctx, server.Spec.SystemURI); err != nil {
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
 	return nil

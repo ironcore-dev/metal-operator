@@ -180,7 +180,7 @@ func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 }
 
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string, systemUUID string) error {
+func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)

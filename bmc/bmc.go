@@ -48,7 +48,7 @@ type BMC interface {
 	Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error
 
 	// SetPXEBootOnce sets the boot device for the next system boot.
-	SetPXEBootOnce(ctx context.Context, systemURI string, systemUUID string) error
+	SetPXEBootOnce(ctx context.Context, systemURI string) error
 
 	// GetSystemInfo retrieves information about the system.
 	GetSystemInfo(ctx context.Context, systemURI string) (SystemInfo, error)

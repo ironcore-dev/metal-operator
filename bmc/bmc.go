@@ -127,27 +127,6 @@ type OEMInterface interface {
 	) (*redfish.Task, error)
 }
 
-type OEMManagerInterface interface {
-	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
-	GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error)
-	CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error)
-	GetObjFromUri(uri string, respObj any) ([]string, error)
-	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
-}
-
-type OEMInterface interface {
-	GetUpdateRequestBody(
-		parameters *redfish.SimpleUpdateParameters,
-	) *oem.SimpleUpdateRequestBody
-	GetUpdateTaskMonitorURI(
-		response *http.Response,
-	) (string, error)
-	GetTaskMonitorDetails(
-		ctx context.Context,
-		taskMonitorResponse *http.Response,
-	) (*redfish.Task, error)
-}
-
 type Entity struct {
 	// ID uniquely identifies the resource.
 	ID string `json:"Id"`

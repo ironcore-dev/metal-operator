@@ -636,18 +636,6 @@ func (r *RedfishBMC) checkAttribues(
 	return reset, errors.Join(errs...)
 }
 
-func (r *RedfishBMC) getSystemManufacturer() (string, error) {
-	systems, err := r.client.Service.Systems()
-	if err != nil {
-		return "", err
-	}
-	if len(systems) > 0 {
-		return systems[0].Manufacturer, nil
-	}
-
-	return "", fmt.Errorf("no system found to determine the Manufacturer")
-}
-
 // check if the arrtibutes need to reboot when changed, and are correct type.
 // supported attrType, bmc and bios
 func (r *RedfishBMC) CheckBMCAttributes(bmcUUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
@@ -669,17 +657,6 @@ func (r *RedfishBMC) getSystemManufacturer() (string, error) {
 	}
 
 	return "", fmt.Errorf("no system found to determine the Manufacturer")
-}
-
-// check if the arrtibutes need to reboot when changed, and are correct type.
-// supported attrType, bmc and bios
-func (r *RedfishBMC) CheckBMCAttributes(bmcUUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
-	oemManager, err := r.getOEMManager(bmcUUID)
-	if err != nil {
-		return false, err
-	}
-
-	return oemManager.CheckBMCAttributes(attrs)
 }
 
 func (r *RedfishBMC) GetStorages(ctx context.Context, systemURI string) ([]Storage, error) {

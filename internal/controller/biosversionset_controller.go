@@ -14,6 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -295,10 +296,55 @@ func (r *BIOSVersionSetReconciler) updateStatus(
 	return nil
 }
 
+func (r *BIOSVersionSetReconciler) enqueueBiosVersionSetByServersListChanges(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	host := obj.(*metalv1alpha1.Server)
+
+	// there is no change in server list (as its not deleted or created)
+	if host.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(host, ServerFinalizer) {
+		return nil
+	}
+
+	biosVersionSetList := &metalv1alpha1.BIOSVersionSetList{}
+	if err := r.List(ctx, biosVersionSetList); err != nil {
+		log.Error(err, "failed to list BIOSVersionSet")
+		return nil
+	}
+
+	for _, biosVersionSet := range biosVersionSetList.Items {
+		serverList, err := r.getServersBySelector(ctx, &biosVersionSet)
+		if err != nil {
+			log.Error(err, "failed to list BIOSVersionSet servers by selector")
+			return nil
+		}
+		for _, server := range serverList.Items {
+			if server.Name == host.Name {
+				ownedBiosVersion, err := r.getOwnedBIOSVersions(ctx, &biosVersionSet)
+				if err != nil {
+					log.Error(err, "failed to list owned BIOSVersions")
+					return nil
+				}
+				if len(ownedBiosVersion.Items) != len(serverList.Items) {
+					return []ctrl.Request{{
+						NamespacedName: client.ObjectKey{
+							Name:      biosVersionSet.Name,
+							Namespace: biosVersionSet.Namespace,
+						}}}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BIOSVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSVersionSet{}).
 		Owns(&metalv1alpha1.BIOSVersion{}).
+		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosVersionSetByServersListChanges)).
 		Complete(r)
 }

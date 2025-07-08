@@ -261,6 +261,7 @@ func SetupTest() *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
+			TimeoutExpiry: 4 * time.Second,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSVersionReconciler{

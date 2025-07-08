@@ -91,6 +91,12 @@ func (r *BMCSettingsReconciler) delete(
 	if !controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) {
 		return ctrl.Result{}, nil
 	}
+
+	if bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
+		log.V(1).Info("postponing delete as Settings update is in progress")
+		return r.reconcile(ctx, log, bmcSetting)
+	}
+
 	if err := r.cleanupReferences(ctx, log, bmcSetting); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err

@@ -41,7 +41,7 @@ type BIOSVersionReconciler struct {
 }
 
 const (
-	biosVersionFinalizer                   = "metal.ironcore.dev/biosversion"
+	BIOSVersionFinalizer                   = "metal.ironcore.dev/biosversion"
 	biosVersionUpgradeIssued               = "BIOSVersionUpgradeIssued"
 	biosVersionUpgradeCompleted            = "BIOSVersionUpgradeCompleted"
 	biosVersionUpgradeRebootServerPowerOn  = "BIOSVersionUpgradePowerOn"
@@ -91,7 +91,7 @@ func (r *BIOSVersionReconciler) delete(
 	log logr.Logger,
 	biosVersion *metalv1alpha1.BIOSVersion,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosVersion, biosVersionFinalizer) {
+	if !controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
@@ -101,7 +101,7 @@ func (r *BIOSVersionReconciler) delete(
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersion, biosVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersion, BIOSVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -152,7 +152,7 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersion, biosVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersion, BIOSVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 

@@ -13,11 +13,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -75,6 +77,10 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 		return nil, fmt.Errorf("failed to list BIOSSettingsList: %w", err)
 	}
 
+	if err := checkBiosSettingsUpdateDuringInProgress(biosSettingsList, biossettings); err != nil {
+		return nil, err
+	}
+
 	return checkForDuplicateBiosSettingsRefToServer(biosSettingsList, biossettings)
 }
 
@@ -86,8 +92,22 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj ru
 	}
 	biossettingslog.Info("Validation for BIOSSettings upon deletion", "name", biossettings.GetName())
 
-	if biossettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
+	bs := &metalv1alpha1.BIOSSettings{}
+	err := v.Client.Get(ctx, client.ObjectKey{
+		Name:      biossettings.GetName(),
+		Namespace: biossettings.GetNamespace(),
+	}, bs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
+	}
+
+	if controllerutil.ContainsFinalizer(bs, controller.BIOSSettingsFinalizer) {
+		if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+			return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
+		}
+		if bs.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+			return nil, apierrors.NewBadRequest("The BIOSsettings has Failed, unable to delete. check server status and retry")
+		}
 	}
 
 	return nil, nil
@@ -114,4 +134,24 @@ func checkForDuplicateBiosSettingsRefToServer(
 		}
 	}
 	return nil, nil
+}
+
+func checkBiosSettingsUpdateDuringInProgress(
+	biosSettingsList *metalv1alpha1.BIOSSettingsList,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) error {
+	for _, bs := range biosSettingsList.Items {
+		if biosSettings.Name == bs.Name {
+			if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && controllerutil.ContainsFinalizer(&bs, controller.BIOSSettingsFinalizer) {
+				err := fmt.Errorf("BIOSSettings (%v) is in progress, unable to update %v",
+					bs.Name,
+					biosSettings.Name)
+				return apierrors.NewInvalid(
+					schema.GroupKind{Group: biosSettings.GroupVersionKind().Group, Kind: biosSettings.Kind},
+					biosSettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+			}
+			break
+		}
+	}
+	return nil
 }

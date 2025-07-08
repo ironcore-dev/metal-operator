@@ -13,11 +13,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -76,6 +78,10 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	if err := v.Client.List(ctx, biosVersionList); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSVersionList: %w", err)
 	}
+	if err := checkBiosVersionUpdateDuringInProgress(biosVersionList, biosversion); err != nil {
+		return nil, err
+	}
+
 	return checkForDuplicateBIOSVersionRefToServer(biosVersionList, biosversion)
 }
 
@@ -87,8 +93,22 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj run
 	}
 	biosversionlog.Info("Validation for BIOSVersion upon deletion", "name", biosversion.GetName())
 
-	if biosversion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-		return nil, apierrors.NewBadRequest("The bios version in progress, unable to delete")
+	bv := &metalv1alpha1.BIOSVersion{}
+	err := v.Client.Get(ctx, client.ObjectKey{
+		Name:      biosversion.GetName(),
+		Namespace: biosversion.GetNamespace(),
+	}, bv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
+	}
+
+	if controllerutil.ContainsFinalizer(bv, controller.BIOSVersionFinalizer) {
+		if bv.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+			return nil, apierrors.NewBadRequest("The bios version in progress, unable to delete")
+		}
+		if bv.Status.State == metalv1alpha1.BIOSVersionStateFailed {
+			return nil, apierrors.NewBadRequest("The BIOSVersion has Failed, unable to delete. check server status and retry")
+		}
 	}
 	return nil, nil
 }
@@ -97,16 +117,16 @@ func checkForDuplicateBIOSVersionRefToServer(
 	biosVersionList *metalv1alpha1.BIOSVersionList,
 	biosVersion *metalv1alpha1.BIOSVersion,
 ) (admission.Warnings, error) {
-	for _, bs := range biosVersionList.Items {
-		if biosVersion.Name == bs.Name {
+	for _, bv := range biosVersionList.Items {
+		if biosVersion.Name == bv.Name {
 			continue
 		}
-		if biosVersion.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
+		if biosVersion.Spec.ServerRef.Name == bv.Spec.ServerRef.Name {
 			err := fmt.Errorf("server (%v) referred in %v is duplicate of Server (%v) referred in %v",
 				biosVersion.Spec.ServerRef,
 				biosVersion.Name,
-				bs.Spec.ServerRef,
-				bs.Name,
+				bv.Spec.ServerRef,
+				bv.Name,
 			)
 			return nil, apierrors.NewInvalid(
 				schema.GroupKind{Group: biosVersion.GroupVersionKind().Group, Kind: biosVersion.Kind},
@@ -114,4 +134,24 @@ func checkForDuplicateBIOSVersionRefToServer(
 		}
 	}
 	return nil, nil
+}
+
+func checkBiosVersionUpdateDuringInProgress(
+	biosVersionList *metalv1alpha1.BIOSVersionList,
+	biosVersion *metalv1alpha1.BIOSVersion,
+) error {
+	for _, bv := range biosVersionList.Items {
+		if biosVersion.Name == bv.Name {
+			if bv.Status.State == metalv1alpha1.BIOSVersionStateInProgress && controllerutil.ContainsFinalizer(&bv, controller.BIOSVersionFinalizer) {
+				err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
+					bv.Name,
+					biosVersion.Name)
+				return apierrors.NewInvalid(
+					schema.GroupKind{Group: biosVersion.GroupVersionKind().Group, Kind: biosVersion.Kind},
+					biosVersion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+			}
+			break
+		}
+	}
+	return nil
 }

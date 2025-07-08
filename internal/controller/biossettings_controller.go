@@ -43,7 +43,7 @@ type BiosSettingsReconciler struct {
 }
 
 const (
-	biosSettingsFinalizer = "metal.ironcore.dev/biossettings"
+	BIOSSettingsFinalizer = "metal.ironcore.dev/biossettings"
 
 	serverMaintenanceCreatedCondition = "ServerMaintenanceCreated"
 	serverMaintenanceDeletedCondition = "ServerMaintenanceDeleted"
@@ -108,9 +108,15 @@ func (r *BiosSettingsReconciler) delete(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosSettings, biosSettingsFinalizer) {
+	if !controllerutil.ContainsFinalizer(biosSettings, BIOSSettingsFinalizer) {
 		return ctrl.Result{}, nil
 	}
+
+	if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+		log.V(1).Info("postponing delete as Settings update is in progress")
+		return r.reconcile(ctx, log, biosSettings)
+	}
+
 	if err := r.cleanupReferences(ctx, log, biosSettings); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
@@ -118,7 +124,7 @@ func (r *BiosSettingsReconciler) delete(
 	log.V(1).Info("ensured references were cleaned up")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettings, biosSettingsFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettings, BIOSSettingsFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -248,7 +254,7 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 		}
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettings, biosSettingsFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettings, BIOSSettingsFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 

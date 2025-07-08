@@ -120,6 +120,14 @@ func (r *ServerReconciler) reconcileExists(ctx context.Context, log logr.Logger,
 }
 
 func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(server, ServerFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
+	if server.Status.State == metalv1alpha1.ServerStateMaintenance {
+		log.V(1).Info("postponing delete as server is in Maintenance state")
+		return r.reconcile(ctx, log, server)
+	}
 	log.V(1).Info("Deleting server")
 
 	if server.Spec.BootConfigurationRef != nil {

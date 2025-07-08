@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -126,12 +127,36 @@ var _ = Describe("BMCSettings Webhook", func() {
 		})
 
 		It("Should refuse to delete if InProgress", func() {
-			By("Patching the BMCSettingsV1 to a InProgress state")
+			By("Creating another BMCSetting with different BMCref")
+			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    "ns.Name",
+					GenerateName: "test-",
+				},
+				Spec: metalv1alpha1.BMCSettingsSpec{
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
+					BMCRef:                  &v1.LocalObjectReference{Name: "bar"},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			}
+			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
+			By("Patching the BMCSettings V2 to a InProgress state")
+			Eventually(UpdateStatus(BMCSettingsV2, func() {
+				BMCSettingsV2.Status.State = metalv1alpha1.BMCSettingsStateInProgress
+			})).Should(Succeed())
+			By("Deleting the BMCSettings V2 should pass: without the finalizer")
+			Expect(k8sClient.Delete(ctx, BMCSettingsV2)).To(Succeed())
+
+			By("Patching the BMCSettings V1 to a InProgress state and adding finalizer")
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
 			})).Should(Succeed())
+			Eventually(Update(BMCSettingsV1, func() {
+				BMCSettingsV1.Finalizers = append(BMCSettingsV1.Finalizers, controller.BMCSettingFinalizer)
+			})).Should(Succeed())
 
-			By("Deleting the BMCSettings should fail")
+			By("Deleting the BMCSettings V1 should fail")
 			Expect(k8sClient.Delete(ctx, BMCSettingsV1)).To(Not(Succeed()), fmt.Sprintf("BMCSettings state %v", BMCSettingsV1.Status.State))
 
 			Eventually(UpdateStatus(BMCSettingsV1, func() {

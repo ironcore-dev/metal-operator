@@ -294,7 +294,7 @@ BIOSSettingsState
 </tr>
 <tr>
 <td>
-<code>appliedTimeStamp</code><br/>
+<code>lastAppliedTime</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#time-v1-meta">
 Kubernetes meta/v1.Time
@@ -302,6 +302,7 @@ Kubernetes meta/v1.Time
 </em>
 </td>
 <td>
+<p>LastAppliedTime represents the timestamp when the last setting was successfully applied.</p>
 </td>
 </tr>
 <tr>
@@ -315,7 +316,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Conditions represents the latest available observations of the server&rsquo;s current state.</p>
+<p>Conditions represents the latest available observations of the BIOSSettings&rsquo;s current state.</p>
 </td>
 </tr>
 </tbody>

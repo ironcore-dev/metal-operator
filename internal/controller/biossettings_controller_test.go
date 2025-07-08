@@ -109,7 +109,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		Eventually(Object(biosSettingsV1)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.AppliedStateTimeStamp.IsZero()", false),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 		// todo: check Conditions
 
@@ -135,7 +135,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		Eventually(Object(biosSettingsV2)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.AppliedStateTimeStamp.IsZero()", false),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 		// todo: check Conditions
 
@@ -177,7 +177,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.AppliedStateTimeStamp.IsZero()", false),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 
 		// todo: check Conditions
@@ -223,7 +223,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the BIOS setting has reached next state: inProgress")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.AppliedStateTimeStamp", BeNil()),
+			HaveField("Status.LastAppliedTime", BeNil()),
 		))
 
 		By("Ensuring that the Maintenance resource has been created")
@@ -268,7 +268,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the biosSettings resource has started bios setting update")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.AppliedStateTimeStamp", BeNil()),
+			HaveField("Status.LastAppliedTime", BeNil()),
 		))
 
 		By("Ensuring that the Server is in correct power state")
@@ -281,7 +281,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the BIOS setting has reached next state: Completed")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.AppliedStateTimeStamp.IsZero()", false),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 
 		By("Ensuring that the BIOS setting has not referenced serverMaintenance anymore")
@@ -337,7 +337,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the BIOS setting has reached next state: inProgress")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.AppliedStateTimeStamp", BeNil()),
+			HaveField("Status.LastAppliedTime", BeNil()),
 		))
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
@@ -393,7 +393,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the BIOS setting has reached next state: Completed")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.AppliedStateTimeStamp.IsZero()", false),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 
 		By("Ensuring that the BIOS setting has not referenced serverMaintenance anymore")
@@ -439,7 +439,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the BIOS setting has reached next state: inProgress")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.AppliedStateTimeStamp", BeNil()),
+			HaveField("Status.LastAppliedTime", BeNil()),
 		))
 
 		By("Ensuring that the Server has the bios setting ref")
@@ -487,7 +487,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// because of the mocking, the transistions are super fast here.
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.AppliedStateTimeStamp.IsZero()", false),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 
 		By("Ensuring that the BIOS setting has right conditions")
@@ -538,7 +538,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the biosSettings resource state is correct State inVersionUpgrade")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.AppliedStateTimeStamp", BeNil()),
+			HaveField("Status.LastAppliedTime", BeNil()),
 		))
 
 		By("Ensuring that the serverMaintenance not ref.")
@@ -562,7 +562,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// due to nature of mocking, we cant not determine few steps here. hence need a longer wait time
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.AppliedStateTimeStamp.IsZero()", false),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 
 		By("Ensuring that the serverMaintenance not ref.")

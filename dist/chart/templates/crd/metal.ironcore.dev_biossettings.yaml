@@ -33,7 +33,7 @@ spec:
     - jsonPath: .status.state
       name: State
       type: string
-    - jsonPath: .status.appliedTimeStamp
+    - jsonPath: .status.lastAppliedTime
       name: AppliedOn
       type: date
     - jsonPath: .metadata.creationTimestamp
@@ -146,12 +146,9 @@ spec:
           status:
             description: BIOSSettingsStatus defines the observed state of BIOSSettings.
             properties:
-              appliedTimeStamp:
-                format: date-time
-                type: string
               conditions:
                 description: Conditions represents the latest available observations
-                  of the server's current state.
+                  of the BIOSSettings's current state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -207,6 +204,11 @@ spec:
                   - type
                   type: object
                 type: array
+              lastAppliedTime:
+                description: LastAppliedTime represents the timestamp when the last
+                  setting was successfully applied.
+                format: date-time
+                type: string
               state:
                 description: State represents the current state of the bios configuration
                   task.

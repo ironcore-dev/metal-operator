@@ -1100,9 +1100,9 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 
 	if state == metalv1alpha1.BIOSSettingsStateApplied {
 		time := metav1.Now()
-		biosSettings.Status.AppliedStateTimeStamp = &time
-	} else if !biosSettings.Status.AppliedStateTimeStamp.IsZero() {
-		biosSettings.Status.AppliedStateTimeStamp = &metav1.Time{}
+		biosSettings.Status.LastAppliedTime = &time
+	} else if !biosSettings.Status.LastAppliedTime.IsZero() {
+		biosSettings.Status.LastAppliedTime = &metav1.Time{}
 	}
 
 	if condition != nil {

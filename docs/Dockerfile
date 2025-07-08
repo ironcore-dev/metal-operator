@@ -1,14 +1,15 @@
-FROM squidfunk/mkdocs-material:latest
+FROM node:24-alpine
 
 LABEL project=metal_operator
 
-WORKDIR /docs
+# Install bash (optional but useful)
+RUN apk add --no-cache bash
 
-COPY docs/requirements.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Set working directory
+WORKDIR /app
 
-EXPOSE 9000
+# Expose dev port
+EXPOSE 5173
 
-# Start development server by default
-ENTRYPOINT ["mkdocs"]
-CMD ["serve", "--dev-addr=0.0.0.0:9000"]
+# Default command to start VitePress dev
+ENTRYPOINT ["./hack/start-docs.sh"]

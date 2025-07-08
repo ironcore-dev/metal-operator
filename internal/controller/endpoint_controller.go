@@ -32,7 +32,7 @@ type EndpointReconciler struct {
 	Scheme      *runtime.Scheme
 	MACPrefixes *macdb.MacPrefixes
 	Insecure    bool
-	BMCOptions  bmc.BMCOptions
+	BMCOptions  bmc.Options
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
@@ -82,15 +82,18 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 			if len(m.DefaultCredentials) == 0 {
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
-			bmcOptions := bmc.BMCOptions{
+
+			bmcOptions := bmc.Options{
 				BasicAuth: true,
 				Username:  m.DefaultCredentials[0].Username,
 				Password:  m.DefaultCredentials[0].Password,
 			}
+
+			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.Insecure)
+			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
-				log.V(1).Info("Creating client for BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 				log.V(1).Info("Creating client for BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcOptions)
 				if err != nil {
@@ -111,8 +114,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				}
 				log.V(1).Info("Applied BMC object for endpoint")
 			case metalv1alpha1.ProtocolRedfishLocal:
-				log.V(1).Info("Creating client for a local test BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
+				log.V(1).Info("Creating client for a local test BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
@@ -130,12 +132,8 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
 			case metalv1alpha1.ProtocolRedfishKube:
-				log.V(1).Info("Creating client for a kube test BMC")
-				bmcOptions.Endpoint = fmt.Sprintf("%s://%s", r.getProtocol(), net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
-				bmcClient, err := bmc.NewRedfishKubeBMCClient(
-					ctx,
-					bmcOptions,
-					r.Client, bmcutils.DefaultKubeNamespace)
+				log.V(1).Info("Creating client for a kube test BMC", "Address", bmcOptions.Endpoint)
+				bmcClient, err := bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, r.Client, bmcutils.DefaultKubeNamespace)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}
@@ -161,14 +159,6 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) getProtocol() string {
-	protocol := "https"
-	if r.Insecure {
-		protocol = "http"
-	}
-	return protocol
-}
-
 func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
 	bmcObj := &metalv1alpha1.BMC{}
 	bmcObj.Name = endpoint.Name
@@ -177,8 +167,9 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 		spec.EndpointRef = &corev1.LocalObjectReference{Name: endpoint.Name}
 		spec.BMCSecretRef = corev1.LocalObjectReference{Name: secret.Name}
 		spec.Protocol = metalv1alpha1.Protocol{
-			Name: metalv1alpha1.ProtocolName(m.Protocol),
-			Port: m.Port,
+			Name:   metalv1alpha1.ProtocolName(m.Protocol),
+			Port:   m.Port,
+			Scheme: m.ProtocolScheme,
 		}
 		spec.ConsoleProtocol = &metalv1alpha1.ConsoleProtocol{
 			Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),

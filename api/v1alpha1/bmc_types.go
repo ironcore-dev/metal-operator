@@ -9,15 +9,27 @@ import (
 )
 
 const (
-	BMCType              = "bmc"
-	ProtocolRedfish      = "Redfish"
+	// BMCType is the type of the BMC resource.
+	BMCType = "bmc"
+
+	// ProtocolRedfish is the Redfish protocol.
+	ProtocolRedfish = "Redfish"
+	// ProtocolRedfishLocal is the RedfishLocal protocol.
 	ProtocolRedfishLocal = "RedfishLocal"
-	ProtocolRedfishKube  = "RedfishKube"
+	// ProtocolRedfishKube is the RedfishKube protocol.
+	ProtocolRedfishKube = "RedfishKube"
 )
 
 // BMCSpec defines the desired state of BMC
 // +kubebuilder:validation:XValidation:rule="has(self.access) != has(self.endpointRef)",message="exactly one of access or endpointRef needs to be set"
 type BMCSpec struct {
+
+	// bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
+	// +kubebuilder:validation:Optional
+	// +optional
+	// This field is optional and can be omitted, controller will choose the first avaialbe Manager
+	BMCUUID string `json:"bmcUUID,omitempty"`
+
 	// EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
 	// This reference is typically used to locate the BMC endpoint within the cluster.
 	// +optional
@@ -44,6 +56,10 @@ type BMCSpec struct {
 	// This field is optional and can be omitted if console access is not required.
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
+
+	// BMCSettingRef is a reference to a BMCSettings object that specifies
+	// the BMC configuration for this BMC.
+	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.
@@ -81,6 +97,16 @@ const (
 	ConsoleProtocolNameSSHLenovo ConsoleProtocolName = "SSHLenovo"
 )
 
+// ProtocolScheme is a string that contains the protocol scheme
+type ProtocolScheme string
+
+const (
+	// HTTPProtocolScheme is the http protocol scheme
+	HTTPProtocolScheme ProtocolScheme = "http"
+	// HTTPSProtocolScheme is the https protocol scheme
+	HTTPSProtocolScheme ProtocolScheme = "https"
+)
+
 // Protocol defines the protocol and port used for communicating with the BMC.
 type Protocol struct {
 	// Name specifies the name of the protocol.
@@ -90,6 +116,9 @@ type Protocol struct {
 	// Port specifies the port number used for communication.
 	// This port is used by the specified protocol to establish connections.
 	Port int32 `json:"port"`
+
+	// Scheme specifies the scheme used for communication.
+	Scheme ProtocolScheme `json:"scheme,omitempty"`
 }
 
 // ProtocolName defines the possible names for protocols used for communicating with the BMC.

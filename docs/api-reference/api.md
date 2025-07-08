@@ -10,13 +10,160 @@
 </div>
 Resource Types:
 <ul></ul>
-<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
-</h3>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">BIOSSettingUpdateState
+(<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
 </p>
 <div>
-<p>BIOSSettings represents the BIOS settings for a server.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
+<td><p>BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server&rsquo;s RedFish API</p>
+</td>
+</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
+<td><p>BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
+<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.</p>
+</td>
+</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
+<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
+</h3>
+<div>
+<p>BIOSSettings is the Schema for the biossettings API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">
+BIOSSettingsSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">
+BIOSSettingsStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings</a>)
+</p>
+<div>
+<p>BIOSSettingsSpec defines the desired state of BIOSSettings.</p>
 </div>
 <table>
 <thead>
@@ -34,7 +181,7 @@ string
 </em>
 </td>
 <td>
-<p>Version specifies the version of the server BIOS for which the settings are defined.</p>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
 </td>
 </tr>
 <tr>
@@ -45,7 +192,433 @@ map[string]string
 </em>
 </td>
 <td>
-<p>Settings is a map of key-value pairs representing the BIOS settings.</p>
+<em>(Optional)</em>
+<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsState">BIOSSettingsState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
+</p>
+<div>
+<p>BIOSSettingsState specifies the current state of the BIOS maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BIOSSettingsStateApplied specifies that the bios setting maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BIOSSettingsStatePending specifies that the bios setting maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings</a>)
+</p>
+<div>
+<p>BIOSSettingsStatus defines the observed state of BIOSSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsState">
+BIOSSettingsState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the bios configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateSettingState</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">
+BIOSSettingUpdateState
+</a>
+</em>
+</td>
+<td>
+<p>UpdateSettingState represents the current state of the bios setting update task.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion
+</h3>
+<div>
+<p>BIOSVersion is the Schema for the biosversions API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">
+BIOSVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BIOS version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">
+BIOSVersionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion</a>)
+</p>
+<div>
+<p>BIOSVersionSpec defines the desired state of BIOSVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BIOS version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionState">BIOSVersionState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<td><p>BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;Processing&#34;</p></td>
+<td><p>BIOSVersionStateInProgress specifies that upgrading bios is in progress.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion</a>)
+</p>
+<div>
+<p>BIOSVersionStatus defines the observed state of BIOSVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionState">
+BIOSVersionState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the bios configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upgradeTask</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.TaskStatus">
+TaskStatus
+</a>
+</em>
+</td>
+<td>
+<p>UpgradeTask contains the state of the Upgrade Task created by the BMC</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the Bios version upgrade state.</p>
 </td>
 </tr>
 </tbody>
@@ -67,7 +640,7 @@ map[string]string
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -92,9 +665,22 @@ BMCSpec
 <table>
 <tr>
 <td>
+<code>bmcUUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
+This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>endpointRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -124,7 +710,7 @@ Use this field if access settings like address are to be configured directly wit
 <td>
 <code>bmcSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -161,6 +747,20 @@ ConsoleProtocol
 <em>(Optional)</em>
 <p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
 This field is optional and can be omitted if console access is not required.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSettingsRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettingRef is a reference to a BMCSettings object that specifies
+the BMC configuration for this BMC.</p>
 </td>
 </tr>
 </table>
@@ -224,7 +824,7 @@ string
 <td>
 <code>bmcSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -288,7 +888,7 @@ temporary state can be very short.</p>
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -350,7 +950,7 @@ The stringData field is never output when reading from the API.</p>
 <td>
 <code>type</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#secrettype-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#secrettype-v1-core">
 Kubernetes core/v1.SecretType
 </a>
 </em>
@@ -359,6 +959,271 @@ Kubernetes core/v1.SecretType
 <em>(Optional)</em>
 <p>Used to facilitate programmatic handling of secret data.
 More info: <a href="https://kubernetes.io/docs/concepts/configuration/secret/#secret-types">https://kubernetes.io/docs/concepts/configuration/secret/#secret-types</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings
+</h3>
+<div>
+<p>BMCSettings is the Schema for the BMCSettings API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">
+BMCSettingsSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains bmc settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
+note: User approval is only enforced for server&rsquo;s which are reserved state
+ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">
+BMCSettingsStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
+</p>
+<div>
+<p>BMCSettingsSpec defines the desired state of BMCSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains bmc settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>BMCRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply setting to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
+ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
+note: User approval is only enforced for server&rsquo;s which are reserved state
+ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsState">BMCSettingsState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus</a>)
+</p>
+<div>
+<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BMCSettingsStateApplied specifies that the BMC maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BMCSettingsStateFailed specifies that the BMC maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BMCSettingsStateInProgress specifies that the BMC setting changes are in progress</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BMCSettingsStatePending specifies that the BMC maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
+</p>
+<div>
+<p>BMCSettingsStatus defines the observed state of BMCSettings.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsState">
+BMCSettingsState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the BMC configuration task.</p>
 </td>
 </tr>
 </tbody>
@@ -381,9 +1246,22 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/secret/#se
 <tbody>
 <tr>
 <td>
+<code>bmcUUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
+This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>endpointRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -413,7 +1291,7 @@ Use this field if access settings like address are to be configured directly wit
 <td>
 <code>bmcSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -450,6 +1328,20 @@ ConsoleProtocol
 <em>(Optional)</em>
 <p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
 This field is optional and can be omitted if console access is not required.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSettingsRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettingRef is a reference to a BMCSettings object that specifies
+the BMC configuration for this BMC.</p>
 </td>
 </tr>
 </tbody>
@@ -604,7 +1496,7 @@ BMCPowerState
 <td>
 <code>conditions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#condition-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
 []Kubernetes meta/v1.Condition
 </a>
 </em>
@@ -754,7 +1646,7 @@ This port is used by the specified console protocol to establish connections.</p
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -921,6 +1813,59 @@ net/netip.Prefix
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+to access the ImageURI. This secret includes sensitive information such as usernames and passwords.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>transferProtocol</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The network protocol that the server&rsquo;s update service uses to retrieve &lsquo;ImageURI&rsquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>URI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The URI of the software image to update/install.&rdquo;</p>
 </td>
 </tr>
 </tbody>
@@ -1097,6 +2042,123 @@ string
 </td>
 </tr></tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.Processor">Processor
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerStatus">ServerStatus</a>)
+</p>
+<div>
+<p>Processor defines the details of a Processor.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>id</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ID is the name of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Type is the type of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>architecture</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Architecture is the architecture of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instructionSet</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>InstructionSet is the instruction set of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>manufacturer</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Manufacturer is the manufacturer of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>model</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Model is the model of the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxSpeedMHz</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>MaxSpeedMHz is the maximum speed of the Processor in MHz.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>totalCores</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>TotalCores is the total number of cores in the Processor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>totalThreads</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>TotalThreads is the total number of threads in the Processor.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.Protocol">Protocol
 </h3>
 <p>
@@ -1139,6 +2201,19 @@ int32
 This port is used by the specified protocol to establish connections.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>scheme</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ProtocolScheme">
+ProtocolScheme
+</a>
+</em>
+</td>
+<td>
+<p>Scheme specifies the scheme used for communication.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ProtocolName">ProtocolName
@@ -1167,6 +2242,29 @@ This port is used by the specified protocol to establish connections.</p>
 </td>
 </tr></tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.ProtocolScheme">ProtocolScheme
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.Protocol">Protocol</a>)
+</p>
+<div>
+<p>ProtocolScheme is a string that contains the protocol scheme</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;http&#34;</p></td>
+<td><p>HTTPProtocolScheme is the http protocol scheme</p>
+</td>
+</tr><tr><td><p>&#34;https&#34;</p></td>
+<td><p>HTTPSProtocolScheme is the https protocol scheme</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.Server">Server
 </h3>
 <div>
@@ -1184,7 +2282,7 @@ This port is used by the specified protocol to establish connections.</p>
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1260,7 +2358,7 @@ IndicatorLED
 <td>
 <code>serverClaimRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -1274,7 +2372,7 @@ This field is optional and can be omitted if no claim is associated with this se
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -1287,7 +2385,7 @@ Kubernetes core/v1.ObjectReference
 <td>
 <code>bmcRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1315,7 +2413,7 @@ This field is optional and can be omitted if no BMC access is specified.</p>
 <td>
 <code>bootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -1330,7 +2428,7 @@ if no boot configuration is specified.</p>
 <td>
 <code>maintenanceBootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -1355,15 +2453,16 @@ the boot configuration for this server during maintenance. This field is optiona
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biosSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a biossettings object that specifies
+the BIOS configuration for this server.</p>
 </td>
 </tr>
 </table>
@@ -1400,7 +2499,7 @@ ServerStatus
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1427,7 +2526,7 @@ ServerBootConfigurationSpec
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1452,7 +2551,7 @@ This field is optional and can be omitted if not specified.</p>
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1499,7 +2598,7 @@ ServerBootConfigurationStatus
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1524,7 +2623,7 @@ This field is optional and can be omitted if not specified.</p>
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1638,7 +2737,7 @@ ServerBootConfigurationSpec
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1663,7 +2762,7 @@ This field is optional and can be omitted if not specified.</p>
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1695,7 +2794,7 @@ the ignition configuration for the server. This field is optional and can be omi
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1735,7 +2834,7 @@ Power
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1749,7 +2848,7 @@ This field is optional and can be omitted if the server is to be selected using 
 <td>
 <code>serverSelector</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#labelselector-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
 </a>
 </em>
@@ -1763,7 +2862,7 @@ This field is optional and can be omitted if a specific server is referenced usi
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1834,7 +2933,7 @@ Power
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1848,7 +2947,7 @@ This field is optional and can be omitted if the server is to be selected using 
 <td>
 <code>serverSelector</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#labelselector-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
 </a>
 </em>
@@ -1862,7 +2961,7 @@ This field is optional and can be omitted if a specific server is referenced usi
 <td>
 <code>ignitionSecretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -1933,7 +3032,7 @@ Phase
 <td>
 <code>metadata</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
 Kubernetes meta/v1.ObjectMeta
 </a>
 </em>
@@ -1973,7 +3072,7 @@ ServerMaintenancePolicy
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -2028,7 +3127,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -2138,6 +3237,12 @@ ServerMaintenanceSetStatus
 </p>
 <div>
 <p>ServerMaintenanceSetSpec defines the desired state of ServerMaintenanceSet.</p>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
+</p>
+<div>
 </div>
 <table>
 <thead>
@@ -2153,6 +3258,10 @@ ServerMaintenanceSetStatus
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
 </a>
 </em>
 </td>
@@ -2281,7 +3390,7 @@ ServerMaintenancePolicy
 <td>
 <code>serverRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -2333,11 +3442,8 @@ ServerBootConfigurationTemplate
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.</p>
-</td>
-</tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>ServerMaintenanceStateFailed specifies that the server maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InMaintenance&#34;</p></td>
 <td><p>ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.</p>
@@ -2482,7 +3588,7 @@ IndicatorLED
 <td>
 <code>serverClaimRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -2496,7 +3602,7 @@ This field is optional and can be omitted if no claim is associated with this se
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -2509,7 +3615,7 @@ Kubernetes core/v1.ObjectReference
 <td>
 <code>bmcRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#localobjectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
@@ -2537,7 +3643,7 @@ This field is optional and can be omitted if no BMC access is specified.</p>
 <td>
 <code>bootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -2552,7 +3658,7 @@ if no boot configuration is specified.</p>
 <td>
 <code>maintenanceBootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectreference-v1-core">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
 Kubernetes core/v1.ObjectReference
 </a>
 </em>
@@ -2577,15 +3683,16 @@ the boot configuration for this server during maintenance. This field is optiona
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
+<code>biosSettingsRef</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-[]BIOSSettings
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
 </a>
 </em>
 </td>
 <td>
-<p>BIOS specifies the BIOS settings for the server.</p>
+<p>BIOSSettingsRef is a reference to a biossettings object that specifies
+the BIOS configuration for this server.</p>
 </td>
 </tr>
 </tbody>
@@ -2752,6 +3859,19 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </tr>
 <tr>
 <td>
+<code>processors</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Processor">
+[]Processor
+</a>
+</em>
+</td>
+<td>
+<p>Processors is a list of Processors associated with the server.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>storages</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.Storage">
@@ -2765,21 +3885,9 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </tr>
 <tr>
 <td>
-<code>BIOS</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettings">
-BIOSSettings
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
 <code>conditions</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#condition-v1-meta">
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
 []Kubernetes meta/v1.Condition
 </a>
 </em>
@@ -3060,6 +4168,81 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.TaskStatus">TaskStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>taskURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>taskState</code><br/>
+<em>
+github.com/stmcginnis/gofish/redfish.TaskState
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>taskStatus</code><br/>
+<em>
+github.com/stmcginnis/gofish/common.Health
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>percentageComplete</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Force&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <hr/>
 <p><em>

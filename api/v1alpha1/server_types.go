@@ -66,14 +66,6 @@ type BootOrder struct {
 	Device string `json:"device"`
 }
 
-// BIOSSettings represents the BIOS settings for a server.
-type BIOSSettings struct {
-	// Version specifies the version of the server BIOS for which the settings are defined.
-	Version string `json:"version"`
-	// Settings is a map of key-value pairs representing the BIOS settings.
-	Settings map[string]string `json:"settings,omitempty"`
-}
-
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
@@ -91,6 +83,8 @@ type ServerSpec struct {
 
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	// This field is optional and can be omitted if no claim is associated with this server.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
 	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
@@ -116,8 +110,9 @@ type ServerSpec struct {
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 
-	// BIOS specifies the BIOS settings for the server.
-	BIOS []BIOSSettings `json:"BIOS,omitempty"`
+	// BIOSSettingsRef is a reference to a biossettings object that specifies
+	// the BIOS configuration for this server.
+	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -201,16 +196,39 @@ type ServerStatus struct {
 	// TotalSystemMemory is the total amount of memory in bytes available on the server.
 	TotalSystemMemory *resource.Quantity `json:"totalSystemMemory,omitempty"`
 
+	// Processors is a list of Processors associated with the server.
+	Processors []Processor `json:"processors,omitempty"`
+
 	// Storages is a list of storages associated with the server.
 	Storages []Storage `json:"storages,omitempty"`
-
-	BIOS BIOSSettings `json:"BIOS,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// Processor defines the details of a Processor.
+type Processor struct {
+	// ID is the name of the Processor.
+	ID string `json:"id"`
+	// Type is the type of the Processor.
+	Type string `json:"type,omitempty"`
+	// Architecture is the architecture of the Processor.
+	Architecture string `json:"architecture,omitempty"`
+	// InstructionSet is the instruction set of the Processor.
+	InstructionSet string `json:"instructionSet,omitempty"`
+	// Manufacturer is the manufacturer of the Processor.
+	Manufacturer string `json:"manufacturer,omitempty"`
+	// Model is the model of the Processor.
+	Model string `json:"model,omitempty"`
+	// MaxSpeedMHz is the maximum speed of the Processor in MHz.
+	MaxSpeedMHz int32 `json:"maxSpeedMHz,omitempty"`
+	// TotalCores is the total number of cores in the Processor.
+	TotalCores int32 `json:"totalCores,omitempty"`
+	// TotalThreads is the total number of threads in the Processor.
+	TotalThreads int32 `json:"totalThreads,omitempty"`
 }
 
 // NetworkInterface defines the details of a network interface.

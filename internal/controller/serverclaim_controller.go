@@ -138,7 +138,7 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, lo
 func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	log.V(1).Info("Reconciling server claim")
 	if shouldIgnoreReconciliation(claim) {
-		log.V(1).Info("Skipped Server reconciliation")
+		log.V(1).Info("Skipped Server claim reconciliation")
 		return ctrl.Result{}, nil
 	}
 
@@ -160,6 +160,11 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	if server == nil {
 		log.V(1).Info("No server found for claim")
+		return ctrl.Result{}, nil
+	}
+
+	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
+		log.V(1).Info("Skipped ServerClaim reconciliation as its in maintenance")
 		return ctrl.Result{}, nil
 	}
 
@@ -346,8 +351,8 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	if err != nil {
 		return nil, false, err
 	}
-	versions := make(chan string)
-	defer close(versions)
+	ServerRef := make(chan *v1.ObjectReference)
+	defer close(ServerRef)
 
 	handler := toolscache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj any) {
@@ -355,7 +360,10 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 			if newServer.Name != server.Name || newServer.Namespace != server.Namespace {
 				return
 			}
-			versions <- newServer.ResourceVersion
+			if newServer.Spec.ServerClaimRef == nil {
+				return
+			}
+			ServerRef <- newServer.Spec.ServerClaimRef
 		},
 	}
 	// The watch is initialized before calling ensureObjectRefForServer to ensure that the
@@ -376,8 +384,9 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	}
 	for {
 		select {
-		case cachedVersion := <-versions:
-			if cachedVersion == server.ResourceVersion {
+		case cachedServerRef := <-ServerRef:
+			if cachedServerRef.Name == server.Spec.ServerClaimRef.Name &&
+				cachedServerRef.Namespace == server.Spec.ServerClaimRef.Namespace {
 				return server, modified, nil
 			}
 		case <-time.After(cacheUpdateTimeout):
@@ -494,6 +503,10 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 		log := ctrl.LoggerFrom(ctx)
 
 		host := object.(*metalv1alpha1.Server)
+
+		if host.Status.State == metalv1alpha1.ServerStateMaintenance || host.Spec.ServerMaintenanceRef != nil {
+			return nil
+		}
 		var req []reconcile.Request
 		claimList := &metalv1alpha1.ServerClaimList{}
 		if err := r.List(ctx, claimList); err != nil {

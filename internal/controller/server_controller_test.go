@@ -90,6 +90,31 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
+			HaveField("Status.Processors", ConsistOf(
+				metalv1alpha1.Processor{
+					ID:             "CPU1",
+					Type:           "CPU",
+					Architecture:   "x86",
+					InstructionSet: "x86-64",
+					Manufacturer:   "Intel(R) Corporation",
+					Model:          "Multi-Core Intel(R) Xeon(R) processor 7xxx Series",
+					MaxSpeedMHz:    3700,
+					TotalCores:     8,
+					TotalThreads:   16,
+				},
+				metalv1alpha1.Processor{
+					ID:   "CPU2",
+					Type: "CPU",
+				},
+				metalv1alpha1.Processor{
+					ID:             "FPGA1",
+					Type:           "FPGA",
+					Architecture:   "OEM",
+					InstructionSet: "OEM",
+					Manufacturer:   "Intel(R) Corporation",
+					Model:          "Stratix 10",
+				},
+			)),
 		))
 
 		By("Ensuring the boot configuration has been created")
@@ -126,7 +151,7 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeNil()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
-			HaveField("Data", HaveKeyWithValue(SShKeyPairSecretPasswordKeyName, Not(BeNil()))),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPasswordKeyName, Not(BeNil()))),
 		))
 		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
 		Expect(err).NotTo(HaveOccurred())
@@ -142,7 +167,7 @@ var _ = Describe("Server Controller", func() {
 		}
 		Eventually(Get(ignitionSecret)).Should(Succeed())
 
-		// Since the bycrypted password hash is not deterministic we will extract if from the actual secret and
+		// Since the bycrypted password hash is not deterministic, we will extract if from the actual secret and
 		// add it to our ignition data which we want to compare the rest with.
 		var parsedData map[string]interface{}
 		Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).ToNot(HaveOccurred())
@@ -160,7 +185,7 @@ var _ = Describe("Server Controller", func() {
 		passwordHash, ok := user["password_hash"].(string)
 		Expect(ok).To(BeTrue(), "password_hash should be a string")
 
-		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SShKeyPairSecretPasswordKeyName])
+		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
 		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
 
 		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
@@ -233,6 +258,17 @@ var _ = Describe("Server Controller", func() {
 		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
+
+		biosSettings := &metalv1alpha1.BIOSSettings{ObjectMeta: metav1.ObjectMeta{
+			Name: "bios-settings",
+		}}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+		Eventually(Update(server, func() {
+			server.Spec.BIOSSettingsRef = &v1.LocalObjectReference{Name: biosSettings.Name}
+		})).Should(Succeed())
+
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	It("Should initialize a Server with inline BMC configuration", func(ctx SpecContext) {
@@ -304,7 +340,7 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
-			HaveField("Data", HaveKeyWithValue(SShKeyPairSecretPasswordKeyName, Not(BeEmpty()))),
+			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPasswordKeyName, Not(BeEmpty()))),
 		))
 		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
 		Expect(err).NotTo(HaveOccurred())
@@ -338,7 +374,7 @@ var _ = Describe("Server Controller", func() {
 		passwordHash, ok := user["password_hash"].(string)
 		Expect(ok).To(BeTrue(), "password_hash should be a string")
 
-		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SShKeyPairSecretPasswordKeyName])).Should(Succeed())
+		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
 
 		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
 			Image:        "foo:latest",
@@ -510,5 +546,134 @@ var _ = Describe("Server Controller", func() {
 		})).Should(Succeed())
 
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+	})
+
+	It("Should reset a Server into initial state after maintenance is removed", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				UUID:       "38947555-7742-3448-3784-823347823834",
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Address: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
+		By("Ensuring the server maintenance is created and set to server")
+
+		maintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      server.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, maintenance)).To(Succeed())
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
+		By("Deleting the server maintenance")
+		Expect(k8sClient.Delete(ctx, maintenance)).To(Succeed())
+
+		By("Ensuring that the server is reset to initial state")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+	})
+
+	It("Should reset a claimed Server into Reserved state after maintenance is removed", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration and claiming it")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				UUID:       "38947555-7742-3448-3784-823347823834",
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Address: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating a ServerClaim for the server")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-claim",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				ServerRef: &v1.LocalObjectReference{
+					Name: server.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
+
+		By("Ensuring the server maintenance is created and set to server")
+		maintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      server.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, maintenance)).To(Succeed())
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
+
+		By("Deleting the server maintenance")
+		Expect(k8sClient.Delete(ctx, maintenance)).To(Succeed())
+
+		By("Ensuring that the server is reset to reserved state")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
 	})
 })

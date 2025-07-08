@@ -5,10 +5,32 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 
+	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	"github.com/ironcore-dev/metal-operator/bmc/oem"
+)
+
+type Manufacturer string
+
+const (
+	ManufacturerDell   Manufacturer = "Dell Inc."
+	ManufacturerLenovo Manufacturer = "Lenovo"
+	ManufacturerHPE    Manufacturer = "HPE"
+)
+
+type SettingAttributeValueTypes string
+
+const (
+	TypeInteger      SettingAttributeValueTypes = "integer"
+	TypeString       SettingAttributeValueTypes = "string"
+	TypeEnumerations SettingAttributeValueTypes = "enumeration"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -38,21 +60,71 @@ type BMC interface {
 	GetSystems(ctx context.Context) ([]Server, error)
 
 	// GetManager returns the manager
-	GetManager() (*Manager, error)
+	GetManager(UUID string) (*redfish.Manager, error)
+
+	// Reset performs a reset on the Manager.
+	ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error
 
 	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
 
-	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (map[string]string, error)
+	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error)
 
-	SetBiosAttributes(ctx context.Context, systemUUID string, attributes map[string]string) (reset bool, err error)
+	GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error)
+
+	GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (redfish.SettingsAttributes, error)
+
+	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result redfish.SettingsAttributes, err error)
+
+	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
+
+	CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
+
+	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) (err error)
+
+	SetBMCAttributesImediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error)
 
 	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
+
+	GetBMCVersion(ctx context.Context, UUID string) (string, error)
 
 	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
 
 	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
 
+	UpgradeBiosVersion(
+		ctx context.Context,
+		manufacturer string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, bool, error)
+
+	GetBiosUpgradeTask(
+		ctx context.Context,
+		manufacturer string,
+		taskURI string,
+	) (*redfish.Task, error)
+
 	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
+}
+
+type OEMManagerInterface interface {
+	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
+	GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error)
+	CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error)
+	GetObjFromUri(uri string, respObj any) ([]string, error)
+	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
+}
+
+type OEMInterface interface {
+	GetUpdateRequestBody(
+		parameters *redfish.SimpleUpdateParameters,
+	) *oem.SimpleUpdateRequestBody
+	GetUpdateTaskMonitorURI(
+		response *http.Response,
+	) (string, error)
+	GetTaskMonitorDetails(
+		ctx context.Context,
+		taskMonitorResponse *http.Response,
+	) (*redfish.Task, error)
 }
 
 type Entity struct {
@@ -62,9 +134,9 @@ type Entity struct {
 	Name string `json:"name"`
 }
 
-type Bios struct {
-	Version    string
-	Attributes map[string]string
+type AllowedValues struct {
+	ValueDisplayName string
+	ValueName        string
 }
 
 type RegistryEntryAttributes struct {
@@ -82,14 +154,15 @@ type RegistryEntryAttributes struct {
 	ResetRequired bool
 	Type          string
 	WriteOnly     bool
+	Value         []AllowedValues
 }
 
 type RegistryEntry struct {
 	Attributes []RegistryEntryAttributes
 }
 
-// BiosRegistry describes the Message Registry file locator Resource.
-type BiosRegistry struct {
+// Registry describes the Message Registry file locator Resource.
+type Registry struct {
 	common.Entity
 	// ODataContext is the odata context.
 	ODataContext string `json:"@odata.context"`
@@ -179,16 +252,26 @@ const (
 	PoweringOffPowerState PowerState = "PoweringOff"
 )
 
+// Processor represents a processor in the system.
 type Processor struct {
-	ID                    string
-	ProcessorType         string
-	ProcessorArchitecture string
-	InstructionSet        string
-	Manufacturer          string
-	Model                 string
-	MaxSpeedMHz           int32
-	TotalCores            int32
-	TotalThreads          int32
+	// ID uniquely identifies the resource.
+	ID string
+	// Type specifies the type of processor.
+	Type string
+	// Architecture specifies the architecture of the processor.
+	Architecture string
+	// InstructionSet specifies the instruction set of the processor.
+	InstructionSet string
+	// Manufacturer specifies the manufacturer of the processor.
+	Manufacturer string
+	// Model specifies the model of the processor.
+	Model string
+	// MaxSpeedMHz specifies the maximum speed of the processor in MHz.
+	MaxSpeedMHz int32
+	// TotalCores specifies the total number of cores in the processor.
+	TotalCores int32
+	// TotalThreads specifies the total number of threads in the processor.
+	TotalThreads int32
 }
 
 // SystemInfo represents basic information about the system.
@@ -217,4 +300,39 @@ type Manager struct {
 	PowerState      string
 	State           string
 	MACAddress      string
+	OemLinks        json.RawMessage
+}
+
+func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerInterface, error) {
+	var OEMManager OEMManagerInterface
+	switch ooem.Manufacturer {
+	case string(ManufacturerDell):
+		OEMManager = &oem.DellIdracManager{
+			BMC:     ooem,
+			Service: service,
+		}
+	default:
+		return nil, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
+	}
+	return OEMManager, nil
+}
+
+func NewOEM(manufacturer string, service *gofish.Service) (OEMInterface, error) {
+	var oemintf OEMInterface
+	switch manufacturer {
+	case string(ManufacturerDell):
+		return &oem.Dell{
+			Service: service,
+		}, nil
+	case string(ManufacturerHPE):
+		return &oem.HPE{
+			Service: service,
+		}, nil
+	case string(ManufacturerLenovo):
+		return &oem.Lenovo{
+			Service: service,
+		}, nil
+	default:
+		return oemintf, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
+	}
 }

@@ -20,6 +20,12 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	var server *metalv1alpha1.Server
 
 	BeforeEach(func(ctx SpecContext) {
+		By("Ensuring clean state")
+		var serverList metalv1alpha1.ServerList
+		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
+		var maintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&maintenanceList)).Should(HaveField("Items", (BeEmpty())))
+
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -52,16 +58,21 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, server)).Should(Succeed())
+		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
 	})
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
 	})
 
-	It("Should force a Server into maintenance", func(ctx SpecContext) {
-		By("Creating an ServerMaintenance object")
+	It("Should force a Server into maintenance from Initial State", func(ctx SpecContext) {
 
+		By("patching server to Initial State")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateInitial
+		})).Should(Succeed())
+
+		By("Creating an ServerMaintenance object")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-server-maintenance",
@@ -95,6 +106,10 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	})
 
 	It("Should wait to put a Server into maintenance until approval", func(ctx SpecContext) {
+
+		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "abc:abc")
+		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+
 		By("Creating an ServerMaintenance object")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
@@ -117,26 +132,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 		}
-		serverClaim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-claim",
-				Namespace: ns.Name,
-			},
-			Spec: metalv1alpha1.ServerClaimSpec{
-				ServerRef: &v1.LocalObjectReference{Name: server.Name},
-			},
-		}
-		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
-		By("Patching the Server to reserved state")
-		Eventually(Update(server, func() {
-			server.Spec.ServerClaimRef = &v1.ObjectReference{
-				Name:      serverClaim.Name,
-				Namespace: serverClaim.Namespace,
-			}
-		})).Should(Succeed())
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateReserved
-		})).Should(Succeed())
 		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
 		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
@@ -190,14 +185,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))
-		By("Setting ServerMaintenance to Completed")
-		Eventually(UpdateStatus(serverMaintenance, func() {
-			serverMaintenance.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
-		})).Should(Succeed())
+		By("Deleting ServerMaintenance to finish the maintennce on the server")
+		Eventually(k8sClient.Delete).WithArguments(ctx, serverMaintenance).Should(Succeed())
 
-		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateCompleted),
-		))
 		By("Checking the Server is not in maintenance and cleaned up")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
@@ -215,7 +205,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-server-maintenance",
+				Name:      "test-server-maintenance01",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
 					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
@@ -256,9 +246,26 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, serverMaintenance01)).To(Succeed())
+		By("Checking the ServerMaintenanceRef")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
+			HaveField("Spec.MaintenanceBootConfigurationRef", Not(BeNil())),
+		))
 		Eventually(Object(serverMaintenance01)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))
+		bootConfig := &metalv1alpha1.ServerBootConfiguration{}
+		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
+			Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
+			Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
+		}, bootConfig).Should(Succeed())
+
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
+		By("Creating a second ServerMaintenance object")
 		Expect(k8sClient.Create(ctx, serverMaintenance02)).To(Succeed())
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
@@ -268,21 +275,13 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 		))
-
-		By("Setting first ServerMaintenance to Completed")
-		Eventually(UpdateStatus(serverMaintenance01, func() {
-			serverMaintenance01.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
-		})).Should(Succeed())
-
-		Eventually(Object(serverMaintenance01)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateCompleted),
+		By("Checking the second ServerMaintenance is still pending")
+		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
 		))
 
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-			HaveField("Spec.MaintenanceBootConfigurationRef", BeNil()),
-		))
+		By("Deleting first ServerMaintenance to finish the maintenance on the server")
+		Eventually(k8sClient.Delete).WithArguments(ctx, serverMaintenance01).Should(Succeed())
 
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),

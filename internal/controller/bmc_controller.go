@@ -33,7 +33,7 @@ type BMCReconciler struct {
 	client.Client
 	Scheme            *runtime.Scheme
 	Insecure          bool
-	BMCPollingOptions bmc.BMCOptions
+	BMCPollingOptions bmc.Options
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -63,6 +63,17 @@ func (r *BMCReconciler) reconcileExists(ctx context.Context, log logr.Logger, bm
 
 func (r *BMCReconciler) delete(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
 	log.V(1).Info("Deleting BMC")
+
+	if bmcObj.Spec.BMCSettingRef != nil {
+		bmcSettings := &metalv1alpha1.BMCSettings{}
+		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSettingRef.Name}, bmcSettings); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
+		}
+		if err := r.Delete(ctx, bmcSettings); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to delete referred BMCSettings. %w", err)
+		}
+	}
+
 	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -131,18 +142,19 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 
 	// TODO: Secret rotation/User management
 
-	manager, err := bmcClient.GetManager()
+	manager, err := bmcClient.GetManager(bmcObj.Spec.BMCUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get manager details for BMC %s: %w", bmcObj.Name, err)
 	}
+
 	if manager != nil {
 		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.Manufacturer = manager.Manufacturer
-		bmcObj.Status.State = metalv1alpha1.BMCState(manager.State)
-		bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(manager.PowerState)
+		bmcObj.Status.State = metalv1alpha1.BMCState(string(manager.Status.State))
+		bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(string(manager.PowerState))
 		bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
 		bmcObj.Status.SerialNumber = manager.SerialNumber
-		bmcObj.Status.SKU = manager.SKU
+		bmcObj.Status.SKU = manager.PartNumber
 		bmcObj.Status.Model = manager.Model
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 			return fmt.Errorf("failed to patch manager details for BMC %s: %w", bmcObj.Name, err)

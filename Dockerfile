@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.24.1 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24.4 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -23,9 +23,12 @@ COPY bmc/ bmc/
 # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+FROM builder AS manager-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/manager/main.go
+
+FROM builder AS probe-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/metalprobe/main.go
@@ -36,7 +39,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM gcr.io/distroless/static:nonroot AS manager
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=manager-builder /workspace/manager .
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
@@ -44,7 +47,7 @@ ENTRYPOINT ["/manager"]
 FROM gcr.io/distroless/static:nonroot AS probe
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
-COPY --from=builder /workspace/metalprobe .
+COPY --from=probe-builder /workspace/metalprobe .
 USER 65532:65532
 
 ENTRYPOINT ["/metalprobe"]

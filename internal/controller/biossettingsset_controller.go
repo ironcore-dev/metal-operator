@@ -14,6 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -317,10 +318,55 @@ func (r *BIOSSettingsSetReconciler) updateStatus(
 	return nil
 }
 
+func (r *BIOSSettingsSetReconciler) enqueueBiosSettingsSetByServersListChanges(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	host := obj.(*metalv1alpha1.Server)
+
+	// there is no change in server list (as its not deleted or created)
+	if host.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(host, ServerFinalizer) {
+		return nil
+	}
+
+	biosSettingsSetList := &metalv1alpha1.BIOSSettingsSetList{}
+	if err := r.List(ctx, biosSettingsSetList); err != nil {
+		log.Error(err, "failed to list BIOSSettingsSet")
+		return nil
+	}
+
+	for _, biosSettingsSet := range biosSettingsSetList.Items {
+		serverList, err := r.getServersBySelector(ctx, &biosSettingsSet)
+		if err != nil {
+			log.Error(err, "failed to list BIOSSettingsSet servers by selector")
+			return nil
+		}
+		for _, server := range serverList.Items {
+			if server.Name == host.Name {
+				ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, &biosSettingsSet)
+				if err != nil {
+					log.Error(err, "failed to list Owned BIOSSettings")
+					return nil
+				}
+				if len(ownedBiosSettings.Items) != len(serverList.Items) {
+					return []ctrl.Request{{
+						NamespacedName: client.ObjectKey{
+							Name:      biosSettingsSet.Name,
+							Namespace: biosSettingsSet.Namespace,
+						}}}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BIOSSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSSettingsSet{}).
 		Owns(&metalv1alpha1.BIOSSettings{}).
+		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsSetByServersListChanges)).
 		Complete(r)
 }

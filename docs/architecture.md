@@ -81,6 +81,7 @@ flowchart LR
 - [**BIOSVersion**](concepts/biosversion.md): Handles upgrading the BIOS Version on the physical server's BIOS.
 - [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
+- [**ServerMaintenanceSet**](concepts/servermaintenanceset.md): Manages a set of ServerMaintenances.
 
 ### 2. Controllers
 

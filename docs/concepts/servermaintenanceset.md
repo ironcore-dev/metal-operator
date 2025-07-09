@@ -1,7 +1,7 @@
 # ServerMaintenanceSet
 
-The `ServerMaintenanceSet` represents a higher-level Kubernetes resource designed to coordinate and manage `ServerMaintenances` across a group of servers via label selection.
-It enables users to declaratively specify maintenance actions for multiple servers, and provides status tracking for all associated `ServerMaintenances`.
+The `ServerMaintenanceSet` manages and coordinates a Set of `ServerMaintenances`.
+It enables users to declaratively specify maintenance actions for multiple servers via label selectors, and provides status tracking for all associated `ServerMaintenances`.
 
 ## Key Points
 

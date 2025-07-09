@@ -13,11 +13,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -70,6 +72,11 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 	if err := v.Client.List(ctx, bmcVersionList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCVersionList: %w", err)
 	}
+
+	if err := checkBMCVersionUpdateDuringInProgress(bmcVersionList, bmcversion); err != nil {
+		return nil, err
+	}
+
 	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, bmcversion)
 }
 
@@ -81,8 +88,22 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj runt
 	}
 	bmcversionlog.Info("Validation for BMCVersion upon deletion", "name", bmcversion.GetName())
 
-	if bmcversion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-		return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
+	bv := &metalv1alpha1.BMCVersion{}
+	err := v.Client.Get(ctx, client.ObjectKey{
+		Name:      bmcversion.GetName(),
+		Namespace: bmcversion.GetNamespace(),
+	}, bv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BMCVersion: %w", err)
+	}
+
+	if controllerutil.ContainsFinalizer(bv, controller.BMCVersionFinalizer) {
+		if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+			return nil, apierrors.NewBadRequest("The BMCVersion in progress, unable to delete")
+		}
+		if bv.Status.State == metalv1alpha1.BMCVersionStateFailed {
+			return nil, apierrors.NewBadRequest("The BMCVersion has Failed, unable to delete. check server status and retry")
+		}
 	}
 
 	return nil, nil
@@ -108,4 +129,24 @@ func checkForDuplicateBMCVersionsRefToBMC(
 		}
 	}
 	return nil, nil
+}
+
+func checkBMCVersionUpdateDuringInProgress(
+	bmcVersionList *metalv1alpha1.BMCVersionList,
+	bmcVersion *metalv1alpha1.BMCVersion,
+) error {
+	for _, bv := range bmcVersionList.Items {
+		if bmcVersion.Name == bv.Name {
+			if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress && controllerutil.ContainsFinalizer(&bv, controller.BMCVersionFinalizer) {
+				err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
+					bv.Name,
+					bmcVersion.Name)
+				return apierrors.NewInvalid(
+					schema.GroupKind{Group: bmcVersion.GroupVersionKind().Group, Kind: bmcVersion.Kind},
+					bmcVersion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+			}
+			break
+		}
+	}
+	return nil
 }

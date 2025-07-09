@@ -41,7 +41,7 @@ type BMCVersionReconciler struct {
 }
 
 const (
-	bmcVersionFinalizer                   = "metal.ironcore.dev/bmcversion"
+	BMCVersionFinalizer                   = "metal.ironcore.dev/bmcversion"
 	bmcVersionUpgradeIssued               = "BMCVersionUpgradeIssued"
 	bmcVersionUpgradeCompleted            = "BMCVersionUpgradeCompleted"
 	bmcVersionUpgradeRebootBMC            = "BMCVersionUpgradeReboot"
@@ -99,7 +99,7 @@ func (r *BMCVersionReconciler) delete(
 	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) {
+	if !controllerutil.ContainsFinalizer(bmcVersion, BMCVersionFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
@@ -109,7 +109,7 @@ func (r *BMCVersionReconciler) delete(
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcVersion, bmcVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcVersion, BMCVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -182,7 +182,7 @@ func (r *BMCVersionReconciler) reconcile(
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcVersion, bmcVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcVersion, BMCVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 

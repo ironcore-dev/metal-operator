@@ -41,7 +41,7 @@ spec:
     transferProtocol: "http"
     imageSecretRef:
       name: sample-secret
-  updatePolicy: Normal
+  updatePolicy: Force
   BMCRef:
     name: BMC-sample
   serverMaintenancePolicy: Enforced

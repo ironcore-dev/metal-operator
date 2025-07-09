@@ -302,7 +302,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 
 	// check if the maintenance is granted
 	if ok := r.checkIfMaintenanceGranted(ctx, log, bmcSetting, bmcClient); !ok {
-		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings", "reason", err)
+		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
 		return ctrl.Result{}, err
 	}
 

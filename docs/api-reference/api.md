@@ -12,9 +12,6 @@ Resource Types:
 <ul></ul>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">BIOSSettingUpdateState
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
-</p>
 <div>
 </div>
 <table>
@@ -591,15 +588,29 @@ BIOSSettingsState
 </tr>
 <tr>
 <td>
-<code>updateSettingState</code><br/>
+<code>lastAppliedTime</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">
-BIOSSettingUpdateState
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#time-v1-meta">
+Kubernetes meta/v1.Time
 </a>
 </em>
 </td>
 <td>
-<p>UpdateSettingState represents the current state of the bios setting update task.</p>
+<p>LastAppliedTime represents the timestamp when the last setting was successfully applied.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the BIOSSettings&rsquo;s current state.</p>
 </td>
 </tr>
 <tr>
@@ -2636,6 +2647,17 @@ string
 </tr>
 <tr>
 <td>
+<code>systemURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemURI is the unique URI for the server resource in REDFISH API.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>power</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.Power">
@@ -3681,6 +3703,17 @@ string
 </td>
 <td>
 <p>SystemUUID is the unique identifier for the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemURI is the unique URI for the server resource in REDFISH API.</p>
 </td>
 </tr>
 <tr>

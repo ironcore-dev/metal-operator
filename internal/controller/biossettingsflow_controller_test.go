@@ -4,6 +4,7 @@
 package controller
 
 import (
+	"fmt"
 	"maps"
 	"math"
 	"time"
@@ -15,6 +16,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 )
@@ -127,6 +129,9 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings, biosSettingsFlow)
+
 		By("Ensuring that the BIOSSettingFLow Object has status applied")
 		Eventually(Object(biosSettingsFlow)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsFlowStateApplied),
@@ -194,6 +199,9 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings, biosSettingsFlow)
+
 		By("Ensuring that the BIOSSettingFLow Object has status applied")
 		Eventually(Object(biosSettingsFlow)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsFlowStateApplied),
@@ -244,6 +252,9 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 			HaveField("Spec.SettingsMap", biosSettingsFlow.Spec.SettingsFlow[0].Settings),
 			HaveField("Spec.CurrentSettingPriority", int32(math.MaxInt32)),
 		))
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings, biosSettingsFlow)
+
 		By("Ensuring that the BIOSSettingFLow Object has status applied")
 		Eventually(Object(biosSettingsFlow)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsFlowStateApplied),
@@ -354,3 +365,106 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 		Consistently(Get(biosSettings)).Should(Not(Succeed()))
 	})
 })
+
+func ensureBiosSettingsFlowCondition(
+	biosSettings *metalv1alpha1.BIOSSettings,
+	biosSettingsFlow *metalv1alpha1.BIOSSettingsFlow,
+) {
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	requiredCondition := 7
+	condMaintenanceDeleted := &metav1.Condition{}
+	condMaintenanceCreated := &metav1.Condition{}
+	condIssueSettingsUpdate := &metav1.Condition{}
+	condVerifySettingsUpdate := &metav1.Condition{}
+	condServerPoweredOn := &metav1.Condition{}
+	condSkipReboot := &metav1.Condition{}
+
+	condmoveToNextStep := &metav1.Condition{}
+
+	condTimerStarted := &metav1.Condition{}
+
+	condPendingVersionUpdate := &metav1.Condition{}
+
+	By("Ensuring right number of conditions are present")
+	Eventually(
+		func(g Gomega) int {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			return len(biosSettings.Status.Conditions)
+		}).Should(BeNumerically(">=", requiredCondition*len(biosSettingsFlow.Spec.SettingsFlow)))
+
+	By(fmt.Sprintf("Ensuring the wait for version upgrade condition has NOT been added %v", condPendingVersionUpdate.Status))
+	Eventually(
+		func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, pendingVersionUpdateCondition, condPendingVersionUpdate)).To(BeFalse())
+			return condPendingVersionUpdate.Status == ""
+		}).Should(BeTrue())
+
+	By("Ensuring the serverMaintenance condition has been created")
+	Eventually(
+		func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, serverMaintenanceCreatedCondition, condMaintenanceCreated)).To(BeTrue())
+			return condMaintenanceCreated.Status == metav1.ConditionTrue
+		}).Should(BeTrue())
+
+	for idx, settings := range biosSettingsFlow.Spec.SettingsFlow {
+		if idx == len(biosSettingsFlow.Spec.SettingsFlow)-1 {
+			settings.Priority = int32(math.MaxInt32)
+		}
+		By(fmt.Sprintf("Ensuring the BIOSSettings Object has applied following settings %v", settings.Settings))
+		By("Ensuring the timeout error start time has been recorded")
+		Eventually(
+			func(g Gomega) {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				By("Ensuring the timeout error start time has been recorded")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", timeoutStartCondition, settings.Priority),
+					condTimerStarted)).To(BeTrue())
+				g.Expect(condTimerStarted.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Ensuring the server has been powered on at the start")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", turnServerOnCondition, settings.Priority),
+					condServerPoweredOn)).To(BeTrue())
+				g.Expect(condServerPoweredOn.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Ensuring the check if reboot of server required has been completed")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
+
+				By("Ensuring the update has been issue to the server")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, settings.Priority),
+					condIssueSettingsUpdate)).To(BeTrue())
+				g.Expect(condIssueSettingsUpdate.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Ensuring the update has been applied by the server")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", verifySettingCondition, settings.Priority),
+					condVerifySettingsUpdate)).To(BeTrue())
+				g.Expect(condVerifySettingsUpdate.Status).To(Equal(metav1.ConditionTrue))
+			}).Should(Succeed())
+
+		if idx < len(biosSettingsFlow.Spec.SettingsFlow)-2 {
+			By("Ensuring the move to next step condition has been set")
+			Eventually(
+				func(g Gomega) bool {
+					g.Expect(Get(biosSettings)()).To(Succeed())
+					g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+						fmt.Sprintf("%s-%d", moveToNextStepCondition, settings.Priority),
+						condmoveToNextStep)).To(BeTrue())
+					return condmoveToNextStep.Status == metav1.ConditionTrue
+				}).Should(BeTrue())
+		}
+	}
+
+	By("Ensuring the server maintenance has been deleted")
+	Eventually(
+		func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, serverMaintenanceDeletedCondition, condMaintenanceDeleted)).To(BeTrue())
+			return condMaintenanceDeleted.Status == metav1.ConditionTrue
+		}).Should(BeTrue())
+}

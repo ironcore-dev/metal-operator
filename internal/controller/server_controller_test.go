@@ -80,6 +80,7 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -258,6 +259,17 @@ var _ = Describe("Server Controller", func() {
 		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
+
+		biosSettings := &metalv1alpha1.BIOSSettings{ObjectMeta: metav1.ObjectMeta{
+			Name: "bios-settings",
+		}}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+		Eventually(Update(server, func() {
+			server.Spec.BIOSSettingsRef = &v1.LocalObjectReference{Name: biosSettings.Name}
+		})).Should(Succeed())
+
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	It("Should initialize a Server with inline BMC configuration", func(ctx SpecContext) {
@@ -395,6 +407,8 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.Power", metalv1alpha1.Power("On")),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -534,7 +548,14 @@ var _ = Describe("Server Controller", func() {
 			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed())
 
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+		Eventually(Object(server)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+		))
+		Consistently(Object(server)).WithTimeout(6 * time.Second).WithPolling(2 * time.Second).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+		))
 	})
 
 	It("Should reset a Server into initial state after maintenance is removed", func(ctx SpecContext) {

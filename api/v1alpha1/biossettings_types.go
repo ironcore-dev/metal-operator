@@ -79,8 +79,15 @@ type BIOSSettingsStatus struct {
 
 	// State represents the current state of the bios configuration task.
 	State BIOSSettingsState `json:"state,omitempty"`
-	// UpdateSettingState represents the current state of the bios setting update task.
-	UpdateSettingState BIOSSettingUpdateState `json:"updateSettingState,omitempty"`
+
+	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
+	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
+
+	// Conditions represents the latest available observations of the BIOSSettings's current state.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 	// AppliedSettingPriority specifies the number of sequence left to complete the settings workflow
 	// used in conjunction with SettingUpdatePolicy and BIOSSettingFlow Resource
 	AppliedSettingPriority int32 `json:"appliedSettingPriority,omitempty"`
@@ -93,6 +100,7 @@ type BIOSSettingsStatus struct {
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.lastAppliedTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // BIOSSettings is the Schema for the biossettings API.
 type BIOSSettings struct {

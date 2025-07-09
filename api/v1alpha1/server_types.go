@@ -75,6 +75,9 @@ type ServerSpec struct {
 	// SystemUUID is the unique identifier for the server.
 	SystemUUID string `json:"systemUUID,omitempty"`
 
+	// SystemURI is the unique URI for the server resource in REDFISH API.
+	SystemURI string `json:"systemURI,omitempty"`
+
 	// Power specifies the desired power state of the server.
 	Power Power `json:"power,omitempty"`
 
@@ -83,6 +86,8 @@ type ServerSpec struct {
 
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	// This field is optional and can be omitted if no claim is associated with this server.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
 	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.

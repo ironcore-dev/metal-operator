@@ -146,6 +146,20 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
 		})
 
+		It("Should NOT allow update settings is in progress. but should allow to Force it", func() {
+			By("Patching the biosSettings V1 to Inprogress state")
+			Eventually(UpdateStatus(biosSettingsV1, func() {
+				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
+			})).Should(Succeed())
+			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
+			biosSettingsV1Updated := biosSettingsV1.DeepCopy()
+			biosSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}
+			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().To(HaveOccurred())
+			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
+			biosSettingsV1Updated.Finalizers = append(biosSettingsV1Updated.Finalizers, metalv1alpha1.ForceUpdateResource)
+			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().ToNot(HaveOccurred())
+		})
+
 		It("Should refuse to delete if InProgress", func() {
 			By("Creating an BIOSSetting V2 with different ServerRef")
 			biosSettingsV2 := &metalv1alpha1.BIOSSettings{
@@ -169,11 +183,11 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Expect(k8sClient.Delete(ctx, biosSettingsV2)).To(Succeed())
 
 			By("Patching the biosSettingsV1 to Inprogress state, and adding finalizer")
-			Eventually(UpdateStatus(biosSettingsV1, func() {
-				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
-			})).Should(Succeed())
 			Eventually(Update(biosSettingsV1, func() {
 				biosSettingsV1.Finalizers = append(biosSettingsV1.Finalizers, controller.BIOSSettingsFinalizer)
+			})).Should(Succeed())
+			Eventually(UpdateStatus(biosSettingsV1, func() {
+				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
 			})).Should(Succeed())
 
 			By("Deleting the BIOSSettings V1 should fail")

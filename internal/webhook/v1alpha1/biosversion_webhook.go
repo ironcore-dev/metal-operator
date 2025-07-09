@@ -142,7 +142,7 @@ func checkBiosVersionUpdateDuringInProgress(
 ) error {
 	for _, bv := range biosVersionList.Items {
 		if biosVersion.Name == bv.Name {
-			if bv.Status.State == metalv1alpha1.BIOSVersionStateInProgress && controllerutil.ContainsFinalizer(&bv, controller.BIOSVersionFinalizer) {
+			if bv.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !controllerutil.ContainsFinalizer(biosVersion, metalv1alpha1.ForceUpdateResource) {
 				err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
 					bv.Name,
 					biosVersion.Name)

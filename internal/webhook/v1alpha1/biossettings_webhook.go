@@ -142,8 +142,8 @@ func checkBiosSettingsUpdateDuringInProgress(
 ) error {
 	for _, bs := range biosSettingsList.Items {
 		if biosSettings.Name == bs.Name {
-			if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && controllerutil.ContainsFinalizer(&bs, controller.BIOSSettingsFinalizer) {
-				err := fmt.Errorf("BIOSSettings (%v) is in progress, unable to update %v",
+			if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !controllerutil.ContainsFinalizer(biosSettings, metalv1alpha1.ForceUpdateResource) {
+				err := fmt.Errorf("BIOSSettings %q is in progress, unable to update %v",
 					bs.Name,
 					biosSettings.Name)
 				return apierrors.NewInvalid(

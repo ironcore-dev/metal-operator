@@ -138,7 +138,7 @@ func checkBmcVersionUpdateDuringInProgress(
 ) error {
 	for _, bs := range bmcSettingsList.Items {
 		if bmcSettings.Name == bs.Name {
-			if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress && controllerutil.ContainsFinalizer(&bs, controller.BMCSettingFinalizer) {
+			if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !controllerutil.ContainsFinalizer(bmcSettings, metalv1alpha1.ForceUpdateResource) {
 				err := fmt.Errorf("BMCSettings (%v) is in progress, unable to update %v",
 					bs.Name,
 					bmcSettings.Name)

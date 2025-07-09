@@ -150,6 +150,20 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().ToNot(HaveOccurred())
 		})
 
+		It("Should NOT allow update Version is in progress. but should allow to Force it", func() {
+			By("Patching the biosVersion V1 to InProgress state")
+			Eventually(UpdateStatus(biosVersionV1, func() {
+				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
+			})).Should(Succeed())
+			By("Updating an biosVersion V1 spec, should fail to update when inProgress")
+			biosVersionV1Updated := biosVersionV1.DeepCopy()
+			biosVersionV1Updated.Spec.Version = "P712"
+			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().To(HaveOccurred())
+			By("Updating an biosVersion V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
+			biosVersionV1Updated.Finalizers = append(biosVersionV1Updated.Finalizers, metalv1alpha1.ForceUpdateResource)
+			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().ToNot(HaveOccurred())
+		})
+
 		It("Should refuse to delete if InProgress", func() {
 			By("Creating an BIOSVersion with different ServerRef")
 			biosVersionV2 := &metalv1alpha1.BIOSVersion{
@@ -173,11 +187,11 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			Expect(k8sClient.Delete(ctx, biosVersionV2)).To(Succeed())
 
 			By("Patching the biosVersionV1 to InProgress state, and adding finalizer")
-			Eventually(UpdateStatus(biosVersionV1, func() {
-				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
-			})).Should(Succeed())
 			Eventually(Update(biosVersionV1, func() {
 				biosVersionV1.Finalizers = append(biosVersionV1.Finalizers, controller.BIOSVersionFinalizer)
+			})).Should(Succeed())
+			Eventually(UpdateStatus(biosVersionV1, func() {
+				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
 			})).Should(Succeed())
 
 			By("Deleting the BIOSSettings V1 should fail")

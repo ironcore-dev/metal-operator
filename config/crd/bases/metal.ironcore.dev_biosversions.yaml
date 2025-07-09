@@ -98,8 +98,8 @@ spec:
                 - URI
                 type: object
               serverMaintenancePolicy:
-                description: ServerMaintenancePolicy is maintenance policy to be enforced
-                  on the server.
+                description: ServerMaintenancePolicy is a maintenance policy to be
+                  enforced on the server.
                 type: string
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
@@ -168,7 +168,7 @@ spec:
                   should bypass vendor update policies
                 type: string
               version:
-                description: Version contains BIOS version to upgrade to
+                description: Version contains a BIOS version to upgrade to
                 type: string
             required:
             - image
@@ -244,14 +244,18 @@ spec:
                   by the BMC
                 properties:
                   percentageComplete:
+                    description: PercentComplete is the percentage of completion of
+                      the task.
                     type: integer
                   taskState:
-                    description: TaskState indicates the state of a task.
+                    description: State is the current state of the task.
                     type: string
                   taskStatus:
-                    description: Health indicates the health of a resource.
+                    description: Status is the current status of the task.
                     type: string
                   taskURI:
+                    description: TaskURI is the URI of the task created by the BMC
+                      for the BIOS upgrade.
                     type: string
                 type: object
             type: object

@@ -31,32 +31,42 @@ const (
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
 type BIOSVersionSpec struct {
-	// Version contains BIOS version to upgrade to
+	// Version contains a BIOS version to upgrade to
 	// +required
 	Version string `json:"version"`
+
 	// An indication of whether the server's upgrade service should bypass vendor update policies
+	// +optional
 	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
+
 	// details regarding the image to use to upgrade to given BIOS version
 	// +required
 	Image ImageSpec `json:"image"`
 
 	// ServerRef is a reference to a specific server to apply bios upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
+	// +optional
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
-	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
+	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
+	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
+	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 type ImageSpec struct {
 	// ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
 	// to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+	// +optional
 	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+
 	// The network protocol that the server's update service uses to retrieve 'ImageURI'
+	// +optional
 	TransferProtocol string `json:"transferProtocol,omitempty"`
+
 	// The URI of the software image to update/install."
 	// +required
 	URI string `json:"URI"`
@@ -65,10 +75,13 @@ type ImageSpec struct {
 // BIOSVersionStatus defines the observed state of BIOSVersion.
 type BIOSVersionStatus struct {
 	// State represents the current state of the bios configuration task.
+	// +optional
 	State BIOSVersionState `json:"state,omitempty"`
 
 	// UpgradeTask contains the state of the Upgrade Task created by the BMC
+	// +optional
 	UpgradeTask *TaskStatus `json:"upgradeTask,omitempty"`
+
 	// Conditions represents the latest available observations of the Bios version upgrade state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
@@ -76,11 +89,23 @@ type BIOSVersionStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
+// TaskStatus contains the status of the task created by the BMC for the BIOS upgrade.
 type TaskStatus struct {
-	TaskURI         string            `json:"taskURI,omitempty"`
-	State           redfish.TaskState `json:"taskState,omitempty"`
-	Status          common.Health     `json:"taskStatus,omitempty"`
-	PercentComplete int               `json:"percentageComplete,omitempty"`
+	// TaskURI is the URI of the task created by the BMC for the BIOS upgrade.
+	// +optional
+	TaskURI string `json:"taskURI,omitempty"`
+
+	// State is the current state of the task.
+	// +optional
+	State redfish.TaskState `json:"taskState,omitempty"`
+
+	// Status is the current status of the task.
+	// +optional
+	Status common.Health `json:"taskStatus,omitempty"`
+
+	// PercentComplete is the percentage of completion of the task.
+	// +optional
+	PercentComplete int `json:"percentageComplete,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -11,14 +11,17 @@ import (
 // ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration.
 type ServerBootConfigurationSpec struct {
 	// ServerRef is a reference to the server for which this boot configuration is intended.
+	// +required
 	ServerRef v1.LocalObjectReference `json:"serverRef"`
 
 	// Image specifies the boot image to be used for the server.
 	// This field is optional and can be omitted if not specified.
+	// +optional
 	Image string `json:"image,omitempty"`
 
 	// IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
 	// the ignition configuration for the server. This field is optional and can be omitted if not specified.
+	// +optional
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
 }
 
@@ -28,10 +31,8 @@ type ServerBootConfigurationState string
 const (
 	// ServerBootConfigurationStatePending indicates that the boot configuration is pending and not yet ready.
 	ServerBootConfigurationStatePending ServerBootConfigurationState = "Pending"
-
 	// ServerBootConfigurationStateReady indicates that the boot configuration is ready for use.
 	ServerBootConfigurationStateReady ServerBootConfigurationState = "Ready"
-
 	// ServerBootConfigurationStateError indicates that there is an error with the boot configuration.
 	ServerBootConfigurationStateError ServerBootConfigurationState = "Error"
 )
@@ -39,6 +40,7 @@ const (
 // ServerBootConfigurationStatus defines the observed state of ServerBootConfiguration.
 type ServerBootConfigurationStatus struct {
 	// State represents the current state of the boot configuration.
+	// +optional
 	State ServerBootConfigurationState `json:"state,omitempty"`
 }
 

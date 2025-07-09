@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: servermaintenancesets.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -170,16 +170,14 @@ spec:
                 required:
                 - serverRef
                 type: object
+            required:
+            - serverLabelSelector
+            - template
             type: object
           status:
             description: ServerMaintenanceSetStatus defines the observed state of
               ServerMaintenanceSet.
             properties:
-              completed:
-                description: Completed is the total number of completed server maintenances
-                  in the set.
-                format: int32
-                type: integer
               failed:
                 description: Failed is the total number of failed server maintenances
                   in the set.

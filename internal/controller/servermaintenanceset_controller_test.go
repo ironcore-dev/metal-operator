@@ -141,24 +141,17 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 			HaveField("Status.Maintenances", BeNumerically("==", 2)),
 			HaveField("Status.Pending", BeNumerically("==", 0)),
 			HaveField("Status.InMaintenance", BeNumerically("==", 2)),
-			HaveField("Status.Completed", BeNumerically("==", 0)),
 			HaveField("Status.Failed", BeNumerically("==", 0)),
 		))
 
-		By("Patching the both maintenances to Completed state")
-		Eventually(UpdateStatus(maintenance01, func() {
-			maintenance01.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
-		})).Should(Succeed())
-		Eventually(UpdateStatus(maintenance02, func() {
-			maintenance02.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
-		})).Should(Succeed())
+		By("Deleting the first maintenance")
+		Expect(k8sClient.Delete(ctx, maintenance01)).To(Succeed())
 
-		By("Checking if the status has been updated")
+		By("Checking that maintenance is recreated")
 		Eventually(Object(servermaintenanceset)).Should(SatisfyAll(
 			HaveField("Status.Maintenances", BeNumerically("==", 2)),
 			HaveField("Status.Pending", BeNumerically("==", 0)),
-			HaveField("Status.InMaintenance", BeNumerically("==", 0)),
-			HaveField("Status.Completed", BeNumerically("==", 2)),
+			HaveField("Status.InMaintenance", BeNumerically("==", 2)),
 			HaveField("Status.Failed", BeNumerically("==", 0)),
 		))
 

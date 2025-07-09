@@ -70,9 +70,8 @@ func (r *ServerMaintenanceSetReconciler) delete(ctx context.Context, log logr.Lo
 	}
 
 	for _, maintenance := range maintenancelist.Items {
-		if maintenance.Status.State == metalv1alpha1.ServerMaintenanceStateInMaintenance ||
-			maintenance.Status.State == metalv1alpha1.ServerMaintenanceStateCompleted {
-			log.V(1).Info("Owned Maintenance is still inMaintenance or completed", "maintenance", maintenance.Name)
+		if maintenance.Status.State == metalv1alpha1.ServerMaintenanceStateInMaintenance {
+			log.V(1).Info("Owned Maintenance is still inMaintenance", "maintenance", maintenance.Name)
 			continue
 		}
 		if err := r.Delete(ctx, &maintenance); err != nil {
@@ -205,7 +204,6 @@ func calculateStatus(maintenances []metalv1alpha1.ServerMaintenance) metalv1alph
 	var newStatus metalv1alpha1.ServerMaintenanceSetStatus
 	pendingCount := 0
 	maintenanceCount := 0
-	completedCount := 0
 	failedCount := 0
 	for _, m := range maintenances {
 		switch m.Status.State {
@@ -213,15 +211,12 @@ func calculateStatus(maintenances []metalv1alpha1.ServerMaintenance) metalv1alph
 			pendingCount++
 		case metalv1alpha1.ServerMaintenanceStateInMaintenance:
 			maintenanceCount++
-		case metalv1alpha1.ServerMaintenanceStateCompleted:
-			completedCount++
 		case metalv1alpha1.ServerMaintenanceStateFailed:
 			failedCount++
 		}
 	}
 	newStatus.Maintenances = int32(len(maintenances))
 	newStatus.Pending = int32(pendingCount)
-	newStatus.Completed = int32(completedCount)
 	newStatus.Failed = int32(failedCount)
 	newStatus.InMaintenance = int32(maintenanceCount)
 	return newStatus

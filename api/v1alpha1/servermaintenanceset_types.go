@@ -10,9 +10,9 @@ import (
 // ServerMaintenanceSetSpec defines the desired state of ServerMaintenanceSet.
 type ServerMaintenanceSetSpec struct {
 	// ServerLabelSelector specifies a label selector to identify the servers that are to be maintained.
-	ServerSelector metav1.LabelSelector `json:"serverLabelSelector,omitempty"`
+	ServerSelector metav1.LabelSelector `json:"serverLabelSelector"`
 	// Template specifies the template for the server maintenance.
-	Template ServerMaintenanceSpec `json:"template,omitempty"`
+	Template ServerMaintenanceSpec `json:"template"`
 }
 
 // ServerMaintenanceSetStatus defines the observed state of ServerMaintenanceSet.
@@ -23,8 +23,6 @@ type ServerMaintenanceSetStatus struct {
 	Pending int32 `json:"pending,omitempty"`
 	// InMaintenance is the total number of server maintenances in the set that are currently in maintenance.
 	InMaintenance int32 `json:"inMaintenance,omitempty"`
-	// Completed is the total number of completed server maintenances in the set.
-	Completed int32 `json:"completed,omitempty"`
 	// Failed is the total number of failed server maintenances in the set.
 	Failed int32 `json:"failed,omitempty"`
 }

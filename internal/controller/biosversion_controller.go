@@ -79,7 +79,7 @@ func (r *BIOSVersionReconciler) reconcileExists(
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
 	if !biosVersion.DeletionTimestamp.IsZero() && biosVersion.Status.State != metalv1alpha1.BIOSVersionStateInProgress {
-		log.V(1).Info("object is being deleted")
+		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, biosVersion)
 	}
 
@@ -96,7 +96,7 @@ func (r *BIOSVersionReconciler) delete(
 	}
 
 	if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-		log.V(1).Info("postponing delete as version update is in progress")
+		log.V(1).Info("Skipping delete as version update is in progress")
 		return r.reconcile(ctx, log, biosVersion)
 	}
 
@@ -133,7 +133,7 @@ func (r *BIOSVersionReconciler) cleanupServerMaintenanceReferences(
 				return err
 			}
 		} else { // not created by controller
-			log.V(1).Info("server maintenance status not updated as its provided by user", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
+			log.V(1).Info("Server maintenance status not updated as its provided by user", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
 		}
 	}
 	// if already deleted, or we deleted it, or it's created by a user, remove reference
@@ -173,7 +173,7 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 ) (bool, error) {
 	server, err := r.getReferredServer(ctx, log, biosVersion.Spec.ServerRef)
 	if err != nil {
-		log.V(1).Info("referred server object could not be fetched")
+		log.V(1).Info("Referred server object could not be fetched")
 		return false, err
 	}
 
@@ -232,9 +232,9 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 	}
 
 	if issuedCondition.Status != metav1.ConditionTrue {
-		log.V(1).Info("issuing Upgrade of Bios version")
+		log.V(1).Info("Issuing Upgrade of BIOS version")
 		if server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
-			log.V(1).Info("Server is still powered off. waiting", "Server", server.Name, "server power state", server.Status.PowerState)
+			log.V(1).Info("Server is still powered off. waiting", "Server", server.Name, "Server power state", server.Status.PowerState)
 			return false, nil
 		}
 		return false, r.issueBiosUpgrade(ctx, log, bmcClient, biosVersion, server, issuedCondition, acc)
@@ -246,7 +246,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 	}
 
 	if completedCondition.Status != metav1.ConditionTrue {
-		log.V(1).Info("check Upgrade task of Bios")
+		log.V(1).Info("Check Upgrade task of Bios")
 		return r.checkUpdateBiosUpgradeStatus(ctx, log, bmcClient, biosVersion, server, completedCondition, acc)
 	}
 
@@ -317,7 +317,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 	}
 
 	if VerificationCondition.Status != metav1.ConditionTrue {
-		log.V(1).Info("verify Bios Version update")
+		log.V(1).Info("Verify Bios Version update")
 
 		currentBiosVersion, err := r.getBiosVersionFromBMC(ctx, log, bmcClient, server)
 		if err != nil {
@@ -325,7 +325,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 		}
 		if currentBiosVersion != biosVersion.Spec.Version {
 			// todo: add timeout
-			log.V(1).Info("bios version not updated", "current Bios Version", currentBiosVersion, "Required Version", biosVersion.Spec.Version)
+			log.V(1).Info("BIOS version not updated", "Current Bios Version", currentBiosVersion, "Required Version", biosVersion.Spec.Version)
 			if VerificationCondition.Reason == "" {
 				if err := acc.Update(
 					VerificationCondition,
@@ -336,7 +336,7 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 					return false, fmt.Errorf("failed to update the verification condition: %w", err)
 				}
 			}
-			log.V(1).Info("waiting for bios version to reflect the new version")
+			log.V(1).Info("Waiting for bios version to reflect the new version")
 			return true, nil
 		}
 
@@ -395,7 +395,7 @@ func (r *BIOSVersionReconciler) checkVersionAndTransistionState(
 		if err := r.cleanupServerMaintenanceReferences(ctx, log, biosVersion); err != nil {
 			return err
 		}
-		log.V(1).Info("Done with bios version upgrade", "ctx", ctx, "current BIOS Version", currentBiosVersion, "server", server.Name)
+		log.V(1).Info("Done with bios version upgrade", "ctx", ctx, "Current BIOS Version", currentBiosVersion, "Server", server.Name)
 		err := r.updateBiosVersionStatus(ctx, log, biosVersion, metalv1alpha1.BIOSVersionStateCompleted, nil, nil, nil)
 		return err
 	}
@@ -627,7 +627,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	if err != nil {
 		return false, fmt.Errorf("failed to get the task details of bios upgrade task %s: %w", taskURI, err)
 	}
-	log.V(1).Info("bios upgrade task current status", "Task status", taskCurrentStatus)
+	log.V(1).Info("BIOS upgrade task current status", "Task status", taskCurrentStatus)
 
 	upgradeCurrentTaskStatus := &metalv1alpha1.TaskStatus{
 		TaskURI:         biosVersion.Status.UpgradeTask.TaskURI,
@@ -713,7 +713,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	}
 	ok, err := checkpoint.Transitioned(acc, *completedCondition)
 	if !ok && err == nil {
-		log.V(1).Info("bios upgrade task has not progressed. retrying....")
+		log.V(1).Info("BIOS upgrade task has not progressed. retrying....")
 		// the job has stalled or slow, we need to requeue with exponential backoff
 		return true, nil
 	}

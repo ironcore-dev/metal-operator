@@ -76,7 +76,7 @@ func (r *BMCSettingsReconciler) reconcileExists(
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
 	if !bmcSetting.DeletionTimestamp.IsZero() {
-		log.V(1).Info("object is being deleted")
+		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, bmcSetting)
 	}
 
@@ -93,7 +93,7 @@ func (r *BMCSettingsReconciler) delete(
 	}
 
 	if bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
-		log.V(1).Info("postponing delete as Settings update is in progress")
+		log.V(1).Info("Skipping delete as Settings update is in progress")
 		return r.reconcile(ctx, log, bmcSetting)
 	}
 
@@ -101,14 +101,14 @@ func (r *BMCSettingsReconciler) delete(
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
 	}
-	log.V(1).Info("ensured references were cleaned up")
+	log.V(1).Info("Ensured references were cleaned up")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcSetting, BMCSettingFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("bmcSetting is deleted")
+	log.V(1).Info("BMCSetting is deleted")
 	return ctrl.Result{}, nil
 }
 
@@ -140,17 +140,17 @@ func (r *BMCSettingsReconciler) cleanupServerMaintenanceReferences(
 		// delete the serverMaintenance if not marked for deletion already
 		for _, serverMaintenance := range serverMaintenances {
 			if serverMaintenance.DeletionTimestamp.IsZero() && metav1.IsControlledBy(serverMaintenance, bmcSettings) {
-				log.V(1).Info("Deleting server maintenance", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
+				log.V(1).Info("Deleting server maintenance", "ServerMaintenance Name", serverMaintenance.Name, "State", serverMaintenance.Status.State)
 				if err := r.Delete(ctx, serverMaintenance); err != nil {
-					log.V(1).Info("Failed to delete server maintenance", "serverMaintenance Name", serverMaintenance.Name)
+					log.V(1).Info("Failed to delete server maintenance", "ServerMaintenance Name", serverMaintenance.Name)
 					finalErr = append(finalErr, err)
 				}
 			} else {
 				log.V(1).Info(
-					"server maintenance not deleted",
-					"serverMaintenance Name", serverMaintenance.Name,
-					"state", serverMaintenance.Status.State,
-					"owner", serverMaintenance.OwnerReferences,
+					"Server maintenance not deleted",
+					"ServerMaintenance Name", serverMaintenance.Name,
+					"State", serverMaintenance.Status.State,
+					"Owner", serverMaintenance.OwnerReferences,
 				)
 			}
 		}
@@ -162,7 +162,7 @@ func (r *BMCSettingsReconciler) cleanupServerMaintenanceReferences(
 		if err != nil {
 			return fmt.Errorf("failed to clean up serverMaintenance ref in bmcSetting status: %w", err)
 		}
-		log.V(1).Info("server maintenance ref all cleaned up")
+		log.V(1).Info("ServerMaintenance ref are all cleaned up")
 	}
 	return errors.Join(finalErr...)
 }
@@ -211,14 +211,14 @@ func (r *BMCSettingsReconciler) reconcile(
 	// if object does not refer to BMC object - stop reconciliation
 	// todo length
 	if bmcSetting.Spec.BMCRef == nil {
-		log.V(1).Info("object does not refer to BMC object")
+		log.V(1).Info("Object does not refer to BMC object")
 		return ctrl.Result{}, nil
 	}
 
 	// if referred BMC contains reference to different BMCSettings object - stop reconciliation
 	BMC, err := r.getBMC(ctx, log, bmcSetting)
 	if err != nil {
-		log.V(1).Info("referred server object could not be fetched")
+		log.V(1).Info("Referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}
 	// patch BMC with BMCSettings reference
@@ -229,7 +229,7 @@ func (r *BMCSettingsReconciler) reconcile(
 	} else if BMC.Spec.BMCSettingRef.Name != bmcSetting.Name {
 		referredBMCSettings, err := r.getReferredBMCSettings(ctx, log, BMC.Spec.BMCSettingRef)
 		if err != nil {
-			log.V(1).Info("referred server contains reference to different BMCSettings object, unable to fetch the referenced BMCSettings")
+			log.V(1).Info("Referred server contains reference to different BMCSettings object, unable to fetch the referenced BMCSettings")
 			return ctrl.Result{}, err
 		}
 		// check if the current BMCSettings version is newer and update reference if it is newer
@@ -299,7 +299,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 
 	// todo:wait on the result from the resource which does upgrade to requeue.
 	if currentBMCVersion != bmcSetting.Spec.Version {
-		log.V(1).Info("Pending BMC version upgrade.", "current bmc Version", currentBMCVersion, "required version", bmcSetting.Spec.Version)
+		log.V(1).Info("Pending BMC version upgrade.", "Current bmc Version", currentBMCVersion, "Required version", bmcSetting.Spec.Version)
 		return ctrl.Result{}, nil
 	}
 
@@ -309,7 +309,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 
 	// check if the maintenance is granted
 	if ok := r.checkIfMaintenanceGranted(ctx, log, bmcSetting, bmcClient); !ok {
-		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings", "reason", err)
+		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings", "Reason", err)
 		return ctrl.Result{}, err
 	}
 
@@ -395,7 +395,7 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(
 		return err
 	}
 
-	log.V(1).Info("Done with BMC setting update", "ctx", ctx, "bmcSetting", bmcSetting, "bmc", BMC)
+	log.V(1).Info("Done with BMC setting update", "ctx", ctx, "BMCSetting", bmcSetting, "BMC", BMC)
 	return nil
 }
 
@@ -421,7 +421,7 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 
 	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.BMCUUID, keys)
 	if err != nil {
-		log.V(1).Info("Failed to get with BMC setting", "error", err)
+		log.V(1).Error(err, "failed to get with BMC setting")
 		return currentBMCVersion, diff, fmt.Errorf("failed to get BMC settings: %w", err)
 	}
 
@@ -434,7 +434,7 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 			case int:
 				intvalue, err := strconv.Atoi(value)
 				if err != nil {
-					log.V(1).Info("Failed to check type for", "Setting name", key, "setting value", value, "error", err)
+					log.V(1).Error(err, "failed to check type for", "Setting name", key, "setting value", value)
 					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
 					continue
 				}
@@ -448,7 +448,7 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 			case float64:
 				floatvalue, err := strconv.ParseFloat(value, 64)
 				if err != nil {
-					log.V(1).Info("Failed to check type for", "Setting name", key, "setting value", value, "error", err)
+					log.V(1).Error(err, "failed to check type for", "Setting name", key, "Setting value", value)
 					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
 				}
 				if data != floatvalue {
@@ -490,7 +490,7 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	}
 
 	if len(bmcSetting.Spec.ServerMaintenanceRefs) != len(servers) {
-		log.V(1).Info("Not all servers have Maintenance", "ServerMaintenanceRefs", bmcSetting.Spec.ServerMaintenanceRefs, "servers", servers)
+		log.V(1).Info("Not all servers have Maintenance", "ServerMaintenanceRefs", bmcSetting.Spec.ServerMaintenanceRefs, "Servers", servers)
 		return false
 	}
 
@@ -504,8 +504,8 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 				// wait for update on the server obj
 				log.V(1).Info("Server is already in maintenance for other tasks",
 					"Server", server.Name,
-					"serverMaintenanceRef", server.Spec.ServerMaintenanceRef,
-					"bmcSettingMaintenaceRef", serverMaintenanceRef,
+					"ServerMaintenanceRef", server.Spec.ServerMaintenanceRef,
+					"BMCSettingMaintenaceRef", serverMaintenanceRef,
 				)
 				notInMaintenanceState = append(notInMaintenanceState, server.Name)
 			}
@@ -518,9 +518,9 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	}
 
 	if len(notInMaintenanceState) > 0 {
-		log.V(1).Info("some servers not yet in maintenance",
-			"req maintenances on servers", bmcSetting.Spec.ServerMaintenanceRefs,
-			"servers not in maintence", notInMaintenanceState)
+		log.V(1).Info("Some servers not yet in maintenance",
+			"Required maintenances on servers", bmcSetting.Spec.ServerMaintenanceRefs,
+			"Servers not in maintence", notInMaintenanceState)
 		return false
 	}
 
@@ -582,11 +582,11 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			return controllerutil.SetControllerReference(bmcSetting, serverMaintenance, r.Client.Scheme())
 		})
 		if err != nil {
-			log.V(1).Info("failed to create or patch serverMaintenance for server %v: \nError: %w", server.Name, err)
+			log.V(1).Error(err, "failed to create or patch serverMaintenance", "Server", server.Name)
 			errs = append(errs, err)
 			continue
 		}
-		log.V(1).Info("Created serverMaintenance", "serverMaintenance", serverMaintenance.Name, "serverMaintenance label", serverMaintenance.Labels, "Operation", opResult)
+		log.V(1).Info("Created serverMaintenance", "ServerMaintenance", serverMaintenance.Name, "ServerMaintenance label", serverMaintenance.Labels, "Operation", opResult)
 
 		ServerMaintenanceRefs = append(
 			ServerMaintenanceRefs,
@@ -802,7 +802,7 @@ func (r *BMCSettingsReconciler) updateBMCSettingsStatus(
 		return fmt.Errorf("failed to patch bmcSetting status: %w", err)
 	}
 
-	log.V(1).Info("Updated bmcSetting state ", "new state", state)
+	log.V(1).Info("Updated bmcSetting state ", "State", state)
 
 	return nil
 }

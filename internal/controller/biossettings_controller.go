@@ -644,7 +644,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	}
 	var pendingSettingsDiff redfish.SettingsAttributes
 	if len(pendingSettings) == 0 {
-		err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemUUID, settingsDiff)
+		err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemURI, settingsDiff)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
 		}
@@ -767,7 +767,7 @@ func (r *BiosSettingsReconciler) getPendingSettingsOnBIOS(
 ) (pendingSettings redfish.SettingsAttributes, err error) {
 	log.V(1).Info("Fetching the pending settings on bios")
 
-	pendingSettings, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemUUID)
+	pendingSettings, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemURI)
 	if err != nil {
 		return pendingSettings, err
 	}
@@ -784,7 +784,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 ) (currentbiosVersion string, diff redfish.SettingsAttributes, err error) {
 	keys := slices.Collect(maps.Keys(biosSettings.Spec.SettingsMap))
 
-	currentSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemUUID, keys)
+	currentSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemURI, keys)
 	if err != nil {
 		log.V(1).Info("Failed to get with bios setting", "error", err)
 		return "", diff, fmt.Errorf("failed to get BIOS settings: %w", err)
@@ -831,7 +831,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	}
 
 	// fetch the current bios version from the server bmc
-	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemUUID)
+	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemURI)
 	if err != nil {
 		return "", diff, fmt.Errorf("failed to load bios version: %w for server %v", err, server.Name)
 	}

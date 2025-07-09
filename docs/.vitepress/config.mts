@@ -5,13 +5,27 @@ export default withMermaid({
   title: "Metal Operator",
   description: "Kubernetes Operator to manage Bare Metal Servers",
   base: "/metal-operator/",
+  head: [['link', { rel: 'icon', href: 'https://raw.githubusercontent.com/ironcore-dev/ironcore/refs/heads/main/docs/assets/logo_borderless.svg' }]],
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Concepts', link: '/concepts' },
       { text: 'Usage', link: '/usage' },
+      { text: 'IronCore Documentation', link: 'https://ironcore-dev.github.io' },
     ],
+
+    editLink: {
+      pattern: 'https://github.com/ironcore-dev/metal-operator/blob/main/docs/:path',
+      text: 'Edit this page on GitHub'
+    },
+
+    footer: {
+      copyright: 'Copyright © Linux Foundation Europe. IronCore is a project of Linux Foundation Europe. For applicable' +
+          ' policies including privacy policy, terms of use and trademark usage guidelines, please see ' +
+          '<a href=https://linuxfoundation.eu>https://linuxfoundation.eu</a>. Linux is a registered trademark of ' +
+          'Linus Torvalds.'
+    },
 
     logo: { src: 'https://raw.githubusercontent.com/ironcore-dev/ironcore/refs/heads/main/docs/assets/logo_borderless.svg', width: 24, height: 24 },
 

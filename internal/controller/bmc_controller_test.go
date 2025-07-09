@@ -80,6 +80,7 @@ var _ = Describe("BMC Controller", func() {
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.BMCRef.Name", endpoint.Name),
 		))
 	})
@@ -150,6 +151,7 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("ObjectMeta.Labels", bmcLabels),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.BMCRef.Name", bmc.Name),
 		))
 	})

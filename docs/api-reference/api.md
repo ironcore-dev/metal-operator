@@ -2654,6 +2654,17 @@ string
 </tr>
 <tr>
 <td>
+<code>systemURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemURI is the unique URI for the server resource in REDFISH API.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>power</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.Power">
@@ -3699,6 +3710,17 @@ string
 </td>
 <td>
 <p>SystemUUID is the unique identifier for the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemURI is the unique URI for the server resource in REDFISH API.</p>
 </td>
 </tr>
 <tr>

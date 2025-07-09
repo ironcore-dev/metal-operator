@@ -176,11 +176,11 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	for i, s := range servers {
 		server := &metalv1alpha1.Server{}
 		server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
-
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
 			metautils.SetLabels(server, bmcObj.Labels)
 			server.Spec.UUID = strings.ToLower(s.UUID)
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
+			server.Spec.SystemURI = s.URI
 			server.Spec.BMCRef = &v1.LocalObjectReference{Name: bmcObj.Name}
 			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
 		})

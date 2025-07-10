@@ -207,7 +207,7 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, lo
 			Name:       claim.Name,
 			UID:        claim.UID,
 		}
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
 			return false, fmt.Errorf("failed to patch claim ref for server: %w", err)
 		}
 		log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)

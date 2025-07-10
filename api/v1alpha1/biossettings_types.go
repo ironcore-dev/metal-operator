@@ -81,6 +81,7 @@ type BIOSSettingsStatus struct {
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.lastAppliedTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // BIOSSettings is the Schema for the biossettings API.
 type BIOSSettings struct {
 	metav1.TypeMeta   `json:",inline"`

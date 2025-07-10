@@ -475,7 +475,7 @@ func (r *BIOSVersionReconciler) updateBiosVersionStatus(
 	log logr.Logger,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	state metalv1alpha1.BIOSVersionState,
-	upgradeTask *metalv1alpha1.TaskStatus,
+	upgradeTask *metalv1alpha1.Task,
 	condition *metav1.Condition,
 	acc *conditionutils.Accessor,
 ) error {
@@ -617,7 +617,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	completedCondition *metav1.Condition,
 	acc *conditionutils.Accessor,
 ) (bool, error) {
-	taskURI := biosVersion.Status.UpgradeTask.TaskURI
+	taskURI := biosVersion.Status.UpgradeTask.URI
 	taskCurrentStatus, err := func() (*redfish.Task, error) {
 		if taskURI == "" {
 			return nil, fmt.Errorf("invalid task URI. uri provided: '%v'", taskURI)
@@ -629,8 +629,8 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	}
 	log.V(1).Info("bios upgrade task current status", "Task status", taskCurrentStatus)
 
-	upgradeCurrentTaskStatus := &metalv1alpha1.TaskStatus{
-		TaskURI:         biosVersion.Status.UpgradeTask.TaskURI,
+	upgradeCurrentTaskStatus := &metalv1alpha1.Task{
+		URI:             biosVersion.Status.UpgradeTask.URI,
 		State:           taskCurrentStatus.TaskState,
 		Status:          taskCurrentStatus.TaskStatus,
 		PercentComplete: taskCurrentStatus.PercentComplete,
@@ -766,7 +766,7 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 		return bmcClient.UpgradeBiosVersion(ctx, server.Status.Manufacturer, parameters)
 	}()
 
-	upgradeCurrentTaskStatus := &metalv1alpha1.TaskStatus{TaskURI: taskMonitor}
+	upgradeCurrentTaskStatus := &metalv1alpha1.Task{URI: taskMonitor}
 
 	if isFatal {
 		log.V(1).Error(err, "failed to issue bios upgrade", "requested bios version", biosVersion.Spec.Version, "server", server.Name)

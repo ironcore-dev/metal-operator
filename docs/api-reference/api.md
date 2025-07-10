@@ -624,8 +624,8 @@ BIOSVersionState
 <td>
 <code>upgradeTask</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.TaskStatus">
-TaskStatus
+<a href="#metal.ironcore.dev/v1alpha1.Task">
+Task
 </a>
 </em>
 </td>
@@ -3419,7 +3419,7 @@ continue to have auxiliary power such as the management controller.</p>
 </td>
 </tr><tr><td><p>&#34;PoweringOff&#34;</p></td>
 <td><p>ServerPoweringOffPowerState indicates a temporary state between On and Off.
-The power of action can take time while the OS is in the shutdown process.</p>
+The power off action can take time while the OS is in the shutdown process.</p>
 </td>
 </tr><tr><td><p>&#34;PoweringOn&#34;</p></td>
 <td><p>ServerPoweringOnPowerState indicates a temporary state between Off and On.
@@ -4115,13 +4115,13 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="metal.ironcore.dev/v1alpha1.TaskStatus">TaskStatus
+<h3 id="metal.ironcore.dev/v1alpha1.Task">Task
 </h3>
 <p>
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>)
 </p>
 <div>
-<p>TaskStatus contains the status of the task created by the BMC for the BIOS upgrade.</p>
+<p>Task contains the status of the task created by the BMC for the BIOS upgrade.</p>
 </div>
 <table>
 <thead>
@@ -4140,12 +4140,12 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>TaskURI is the URI of the task created by the BMC for the BIOS upgrade.</p>
+<p>URI is the URI of the task created by the BMC for the BIOS upgrade.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>taskState</code><br/>
+<code>state</code><br/>
 <em>
 github.com/stmcginnis/gofish/redfish.TaskState
 </em>
@@ -4157,7 +4157,7 @@ github.com/stmcginnis/gofish/redfish.TaskState
 </tr>
 <tr>
 <td>
-<code>taskStatus</code><br/>
+<code>status</code><br/>
 <em>
 github.com/stmcginnis/gofish/common.Health
 </em>

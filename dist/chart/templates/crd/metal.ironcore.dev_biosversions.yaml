@@ -253,15 +253,15 @@ spec:
                     description: PercentComplete is the percentage of completion of
                       the task.
                     type: integer
-                  taskState:
+                  state:
                     description: State is the current state of the task.
                     type: string
-                  taskStatus:
+                  status:
                     description: Status is the current status of the task.
                     type: string
                   taskURI:
-                    description: TaskURI is the URI of the task created by the BMC
-                      for the BIOS upgrade.
+                    description: URI is the URI of the task created by the BMC for
+                      the BIOS upgrade.
                     type: string
                 type: object
             type: object

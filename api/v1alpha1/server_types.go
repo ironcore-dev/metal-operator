@@ -39,7 +39,7 @@ const (
 	ServerPoweringOnPowerState ServerPowerState = "PoweringOn"
 
 	// ServerPoweringOffPowerState indicates a temporary state between On and Off.
-	// The power of action can take time while the OS is in the shutdown process.
+	// The power off action can take time while the OS is in the shutdown process.
 	ServerPoweringOffPowerState ServerPowerState = "PoweringOff"
 )
 

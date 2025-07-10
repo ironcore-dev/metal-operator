@@ -80,7 +80,7 @@ type BIOSVersionStatus struct {
 
 	// UpgradeTask contains the state of the Upgrade Task created by the BMC
 	// +optional
-	UpgradeTask *TaskStatus `json:"upgradeTask,omitempty"`
+	UpgradeTask *Task `json:"upgradeTask,omitempty"`
 
 	// Conditions represents the latest available observations of the Bios version upgrade state.
 	// +patchStrategy=merge
@@ -89,19 +89,19 @@ type BIOSVersionStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
-// TaskStatus contains the status of the task created by the BMC for the BIOS upgrade.
-type TaskStatus struct {
-	// TaskURI is the URI of the task created by the BMC for the BIOS upgrade.
+// Task contains the status of the task created by the BMC for the BIOS upgrade.
+type Task struct {
+	// URI is the URI of the task created by the BMC for the BIOS upgrade.
 	// +optional
-	TaskURI string `json:"taskURI,omitempty"`
+	URI string `json:"taskURI,omitempty"`
 
 	// State is the current state of the task.
 	// +optional
-	State redfish.TaskState `json:"taskState,omitempty"`
+	State redfish.TaskState `json:"state,omitempty"`
 
 	// Status is the current status of the task.
 	// +optional
-	Status common.Health `json:"taskStatus,omitempty"`
+	Status common.Health `json:"status,omitempty"`
 
 	// PercentComplete is the percentage of completion of the task.
 	// +optional

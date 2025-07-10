@@ -3354,17 +3354,6 @@ int32
 </tr>
 <tr>
 <td>
-<code>completed</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>Completed is the total number of completed server maintenances in the set.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>failed</code><br/>
 <em>
 int32

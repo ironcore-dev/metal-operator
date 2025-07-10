@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: servermaintenancesets.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -94,8 +94,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               template:
-                description: ServerMaintenanceSpec defines the desired state of a
-                  ServerMaintenance
+                description: Template specifies the template for the server maintenance.
                 properties:
                   policy:
                     description: Policy specifies the maintenance policy to be enforced
@@ -177,27 +176,32 @@ spec:
                 required:
                 - serverRef
                 type: object
+            required:
+            - serverLabelSelector
+            - template
             type: object
           status:
             description: ServerMaintenanceSetStatus defines the observed state of
               ServerMaintenanceSet.
             properties:
-              completed:
-                format: int32
-                type: integer
               failed:
+                description: Failed is the total number of failed server maintenances
+                  in the set.
                 format: int32
                 type: integer
               inMaintenance:
+                description: InMaintenance is the total number of server maintenances
+                  in the set that are currently in maintenance.
                 format: int32
                 type: integer
               maintenances:
-                description: |-
-                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
+                description: Maintenances is the number of server maintenances in
+                  the set.
                 format: int32
                 type: integer
               pending:
+                description: Pending is the total number of pending server maintenances
+                  in the set.
                 format: int32
                 type: integer
             type: object

@@ -71,21 +71,21 @@ spec:
                 - message: serverRef is immutable
                   rule: self == oldSelf
               serverMaintenancePolicy:
-                description: "ServerMaintenancePolicy is maintenance policy to be
-                  enforced on the server when applying setting.\nServerMaintenancePolicyOwnerApproval
-                  is asking for User approval for changing BMC settings\n\tnote: User
-                  approval is only enforced for server's which are reserved state\nServerMaintenancePolicyEnforced
-                  will will bypass user approval and apply setting directly"
+                description: ServerMaintenancePolicy is a maintenance policy to be
+                  applied on the server.
                 type: string
               serverMaintenanceRefs:
-                description: ServerMaintenanceRefs are references to a ServerMaintenance
-                  objects that Controller has requested for the each of the related
-                  server.
+                description: |-
+                  ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
+                  server that needs to be updated with the BMC settings.
                 items:
+                  description: ServerMaintenanceRefItem is a reference to a ServerMaintenance
+                    object.
                   properties:
                     serverMaintenanceRef:
-                      description: ObjectReference contains enough information to
-                        let you inspect or modify the referred object.
+                      description: ServerMaintenanceRef is a reference to a ServerMaintenance
+                        object that the BMCSettings has requested for the referred
+                        server.
                       properties:
                         apiVersion:
                           description: API version of the referent.
@@ -135,7 +135,8 @@ spec:
                 description: SettingsMap contains bmc settings as map
                 type: object
               version:
-                description: Version contains BMC version this settings applies to
+                description: Version defines the BMC firmware for which the settings
+                  should be applied.
                 type: string
             required:
             - version

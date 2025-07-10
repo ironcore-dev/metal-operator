@@ -81,8 +81,6 @@ spec:
                   macAddress:
                     description: MACAddress is the MAC address of the endpoint.
                     type: string
-                required:
-                - ip
                 type: object
                 x-kubernetes-validations:
                 - message: access is immutable
@@ -120,9 +118,8 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               bmcUUID:
-                description: |-
-                  bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
-                  This field is optional and can be omitted, controller will choose the first avaialbe Manager
+                description: BMCUUID is the unique identifier for the BMC as defined
+                  in Redfish API.
                 type: string
               consoleProtocol:
                 description: |-
@@ -133,6 +130,10 @@ spec:
                     description: |-
                       Name specifies the name of the console protocol.
                       This could be a protocol such as "SSH", "Telnet", etc.
+                    enum:
+                    - IPMI
+                    - SSH
+                    - SSHLenovo
                     type: string
                   port:
                     description: |-

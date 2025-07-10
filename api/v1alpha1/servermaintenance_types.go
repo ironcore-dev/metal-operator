@@ -20,20 +20,30 @@ const (
 // ServerBootConfigurationTemplate defines the parameters to be used for rendering a boot configuration.
 type ServerBootConfigurationTemplate struct {
 	// Name specifies the name of the boot configuration.
+	// +required
 	Name string `json:"name"`
-	// Parameters specifies the parameters to be used for rendering the boot configuration.
+
+	// Parameters specify the parameters to be used for rendering the boot configuration.
+	// +required
 	Spec ServerBootConfigurationSpec `json:"spec"`
 }
 
 // ServerMaintenanceSpec defines the desired state of a ServerMaintenance
 type ServerMaintenanceSpec struct {
 	// Policy specifies the maintenance policy to be enforced on the server.
+	// +optional
 	Policy ServerMaintenancePolicy `json:"policy,omitempty"`
+
 	// ServerRef is a reference to the server that is to be maintained.
+	// +required
 	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
+
 	// ServerPower specifies the power state of the server during maintenance.
+	// +optional
 	ServerPower Power `json:"serverPower,omitempty"`
+
 	// ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.
+	// +optional
 	ServerBootConfigurationTemplate *ServerBootConfigurationTemplate `json:"serverBootConfigurationTemplate,omitempty"`
 }
 
@@ -61,7 +71,7 @@ const (
 	ServerMaintenanceStatePending ServerMaintenanceState = "Pending"
 	// ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
-	// ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.
+	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
 	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
 )
 

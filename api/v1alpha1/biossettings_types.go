@@ -18,6 +18,15 @@ type BIOSSettingsSpec struct {
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
+	// SettingUpdatePolicy dictates how the settings are applied.
+	// if 'Sequence', the BIOSSettings resource will enter 'Waiting' state after applying the settings
+	// if 'OneShotUpdate' the BIOSSettings resource will enter 'Completed' state after applying the settings
+	SettingUpdatePolicy SettingUpdatePolicy `json:"settingUpdatePolicy,omitempty"`
+
+	// CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
+	// used in conjunction with SettingUpdatePolicy and BIOSSettingFlow
+	CurrentSettingPriority int32 `json:"currentSettingPriority,omitempty"`
+
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
@@ -37,12 +46,21 @@ type BIOSSettingsState string
 const (
 	// BIOSSettingsStatePending specifies that the bios setting maintenance is waiting
 	BIOSSettingsStatePending BIOSSettingsState = "Pending"
+	// BIOSSettingsStateInWaiting specifies that the BIOSSetting Controller is updating the settings
+	BIOSSettingsStateInWaiting BIOSSettingsState = "Waiting"
 	// BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings
 	BIOSSettingsStateInProgress BIOSSettingsState = "InProgress"
 	// BIOSSettingsStateApplied specifies that the bios setting maintenance has been completed.
 	BIOSSettingsStateApplied BIOSSettingsState = "Applied"
 	// BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.
 	BIOSSettingsStateFailed BIOSSettingsState = "Failed"
+)
+
+type SettingUpdatePolicy string
+
+const (
+	SequencialUpdate SettingUpdatePolicy = "Sequence"
+	OneShotUpdate    SettingUpdatePolicy = "OneShotUpdate"
 )
 
 type BIOSSettingUpdateState string
@@ -73,6 +91,9 @@ type BIOSSettingsStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	// AppliedSettingPriority specifies the number of sequence left to complete the settings workflow
+	// used in conjunction with SettingUpdatePolicy and BIOSSettingFlow Resource
+	AppliedSettingPriority int32 `json:"appliedSettingPriority,omitempty"`
 }
 
 // +kubebuilder:object:root=true

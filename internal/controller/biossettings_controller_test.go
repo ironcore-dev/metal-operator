@@ -657,7 +657,9 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, timeoutStartCondition, condTimerStarted)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", timeoutStartCondition, biosSettings.Spec.CurrentSettingPriority),
+				condTimerStarted)).To(BeTrue())
 			return condTimerStarted.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -665,7 +667,9 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, turnServerOnCondition, condServerPoweredOn)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", turnServerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+				condServerPoweredOn)).To(BeTrue())
 			return condServerPoweredOn.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -674,19 +678,25 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, skipRebootCondition, condSkipReboot)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOffCondition, condRebootPowerOff)).To(BeFalse())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOff)).To(BeFalse())
 				return condRebootPowerOff.Status == ""
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOnCondition, condRebootPowerOn)).To(BeFalse())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOn)).To(BeFalse())
 				return condRebootPowerOn.Status == ""
 			}).Should(BeTrue())
 	} else {
@@ -694,19 +704,25 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, skipRebootCondition, condSkipReboot)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionFalse
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOffCondition, condRebootPowerOff)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOff)).To(BeTrue())
 				return condRebootPowerOff.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOnCondition, condRebootPowerOn)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOn)).To(BeTrue())
 				return condRebootPowerOn.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 	}
@@ -714,14 +730,18 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, issueSettingsUpdateCondition, condIssueSettingsUpdate)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, biosSettings.Spec.CurrentSettingPriority),
+				condIssueSettingsUpdate)).To(BeTrue())
 			return condIssueSettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 	By("Ensuring the update has been applied by the server")
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, verifySettingCondition, condVerifySettingsUpdate)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Spec.CurrentSettingPriority),
+				condVerifySettingsUpdate)).To(BeTrue())
 			return condVerifySettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 	By("Ensuring the server maintenance has been deleted")

@@ -758,7 +758,6 @@ func (r *RedfishBMC) CreateOrUpdateAccount(
 	if err != nil {
 		return fmt.Errorf("failed to get accounts: %w", err)
 	}
-	//log.V(1).Info("Accounts", "accounts", accounts)
 	for _, a := range accounts {
 		if a.UserName == userName {
 			a.RoleID = role
@@ -779,26 +778,6 @@ func (r *RedfishBMC) CreateOrUpdateAccount(
 		return fmt.Errorf("failed to update account: %w", err)
 	}
 	return nil
-}
-
-func (r *RedfishBMC) SetAccountPassword(ctx context.Context, accountName, password string) error {
-	service, err := r.client.GetService().AccountService()
-	if err != nil {
-		return fmt.Errorf("failed to get account service: %w", err)
-	}
-	accounts, err := service.Accounts()
-	if err != nil {
-		return fmt.Errorf("failed to get accounts: %w", err)
-	}
-	if len(accounts) == 0 {
-		return errors.New("no account found")
-	}
-	for _, a := range accounts {
-		if a.Name == accountName {
-			return a.ChangePassword(password, r.options.Password)
-		}
-	}
-	return errors.New("account not found")
 }
 
 func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*redfish.ComputerSystem, error) {

@@ -371,7 +371,7 @@ func (r *BIOSVersionReconciler) getBiosVersionFromBMC(
 	bmcClient bmc.BMC,
 	server *metalv1alpha1.Server,
 ) (string, error) {
-	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemUUID)
+	currentBiosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemURI)
 	if err != nil {
 		log.V(1).Error(err, "failed to get current BIOS version", "server", server.Name)
 		return "", err

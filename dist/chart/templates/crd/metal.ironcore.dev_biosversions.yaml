@@ -249,19 +249,20 @@ spec:
                 description: UpgradeTask contains the state of the Upgrade Task created
                   by the BMC
                 properties:
+                  URI:
+                    description: URI is the URI of the task created by the BMC for
+                      the BIOS upgrade.
+                    type: string
                   percentageComplete:
                     description: PercentComplete is the percentage of completion of
                       the task.
+                    format: int32
                     type: integer
                   state:
                     description: State is the current state of the task.
                     type: string
                   status:
                     description: Status is the current status of the task.
-                    type: string
-                  taskURI:
-                    description: URI is the URI of the task created by the BMC for
-                      the BIOS upgrade.
                     type: string
                 type: object
             type: object

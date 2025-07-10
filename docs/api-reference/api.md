@@ -4133,7 +4133,7 @@ string
 <tbody>
 <tr>
 <td>
-<code>taskURI</code><br/>
+<code>URI</code><br/>
 <em>
 string
 </em>
@@ -4171,7 +4171,7 @@ github.com/stmcginnis/gofish/common.Health
 <td>
 <code>percentageComplete</code><br/>
 <em>
-int
+int32
 </em>
 </td>
 <td>

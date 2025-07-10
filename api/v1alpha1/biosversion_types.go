@@ -93,7 +93,7 @@ type BIOSVersionStatus struct {
 type Task struct {
 	// URI is the URI of the task created by the BMC for the BIOS upgrade.
 	// +optional
-	URI string `json:"taskURI,omitempty"`
+	URI string `json:"URI,omitempty"`
 
 	// State is the current state of the task.
 	// +optional
@@ -105,7 +105,7 @@ type Task struct {
 
 	// PercentComplete is the percentage of completion of the task.
 	// +optional
-	PercentComplete int `json:"percentageComplete,omitempty"`
+	PercentComplete int32 `json:"percentageComplete,omitempty"`
 }
 
 // +kubebuilder:object:root=true

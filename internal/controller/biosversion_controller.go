@@ -633,10 +633,10 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		URI:             biosVersion.Status.UpgradeTask.URI,
 		State:           taskCurrentStatus.TaskState,
 		Status:          taskCurrentStatus.TaskStatus,
-		PercentComplete: taskCurrentStatus.PercentComplete,
+		PercentComplete: int32(taskCurrentStatus.PercentComplete),
 	}
 
-	// use checkpoint incase the job has stalled and we need to requeue
+	// use checkpoint in case the job has stalled and we need to requeue
 	transition := &conditionutils.FieldsTransition{
 		IncludeStatus:  true,
 		IncludeReason:  true,

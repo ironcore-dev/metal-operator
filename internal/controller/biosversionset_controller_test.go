@@ -128,15 +128,16 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
-					Version: defaultMockUpServerBiosVersion,
+					BiosVersionTemplate: metalv1alpha1.BIOSVersionSpec{
+						Version:                 defaultMockUpServerBiosVersion,
+						ServerMaintenancePolicy: "Enforced",
+						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					},
 					ServerSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"metal.ironcore.dev/Manufacturer": "bar",
 						},
 					},
-					ServerMaintenancePolicy: "Enforced",
-
-					Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionSet)).To(Succeed())

@@ -12,22 +12,15 @@ import (
 
 // BIOSVersionSetSpec defines the desired state of BIOSVersionSet.
 type BIOSVersionSetSpec struct {
-	// Version contains software (eg: BIOS, BMC) version this settings applies to
-	// +required
-	Version string `json:"version"`
-
-	// An indication of whether the server's upgrade service should bypass vendor update policies
-	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
-	// details regarding the image to use to upgrade to given BIOS version
-	// +required
-	Image ImageSpec `json:"image"`
 
 	// ServerSelector specifies a label selector to identify the servers that are to be selected.
 	// +required
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 
-	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+	// BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.
+	// +kubebuilder:validation:XValidation:rule="!has(self.serverRef)",message="serverRef is not allowed in BIOSVersionSet"
+	// +kubebuilder:validation:XValidation:rule="!has(self.serverMaintenanceRef)",message="serverMaintenanceRef is not allowed in BIOSVersionSet"
+	BiosVersionTemplate BIOSVersionSpec `json:"biosVersionTemplate"`
 }
 
 // BIOSVersionSetStatus defines the observed state of BIOSVersionSet.
@@ -50,12 +43,11 @@ type BIOSVersionSetStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
-// +kubebuilder:printcolumn:name="serverLabelSelector",type=string,JSONPath=`.spec.serverSelector`
-// +kubebuilder:printcolumn:name="TotalServers",type="string",JSONPath=`.status.totalServers`
-// +kubebuilder:printcolumn:name="Pending",type="string",JSONPath=`.status.pending`
-// +kubebuilder:printcolumn:name="InProgress",type="string",JSONPath=`.status.inProgress`
-// +kubebuilder:printcolumn:name="Completed",type="string",JSONPath=`.status.completed`
-// +kubebuilder:printcolumn:name="Failed",type="string",JSONPath=`.status.failed`
+// +kubebuilder:printcolumn:name="TotalServers",type="integer",JSONPath=`.status.totalServers`
+// +kubebuilder:printcolumn:name="Pending",type="integer",JSONPath=`.status.pending`
+// +kubebuilder:printcolumn:name="InProgress",type="integer",JSONPath=`.status.inProgress`
+// +kubebuilder:printcolumn:name="Completed",type="integer",JSONPath=`.status.completed`
+// +kubebuilder:printcolumn:name="Failed",type="integer",JSONPath=`.status.failed`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BIOSVersionSet is the Schema for the biosversionsets API.

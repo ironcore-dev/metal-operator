@@ -24,24 +24,21 @@ spec:
     - jsonPath: .spec.version
       name: BIOSVersion
       type: string
-    - jsonPath: .spec.serverSelector
-      name: serverLabelSelector
-      type: string
     - jsonPath: .status.totalServers
       name: TotalServers
-      type: string
+      type: integer
     - jsonPath: .status.pending
       name: Pending
-      type: string
+      type: integer
     - jsonPath: .status.inProgress
       name: InProgress
-      type: string
+      type: integer
     - jsonPath: .status.completed
       name: Completed
-      type: string
+      type: integer
     - jsonPath: .status.failed
       name: Failed
-      type: string
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -70,17 +67,91 @@ spec:
           spec:
             description: BIOSVersionSetSpec defines the desired state of BIOSVersionSet.
             properties:
-              image:
-                description: details regarding the image to use to upgrade to given
-                  BIOS version
+              biosVersionTemplate:
+                description: BiosVersionTemplate defines the template for the BIOSversion
+                  Resource to be applied to the servers.
                 properties:
-                  URI:
-                    description: The URI of the software image to update/install."
+                  image:
+                    description: details regarding the image to use to upgrade to
+                      given BIOS version
+                    properties:
+                      URI:
+                        description: The URI of the software image to update/install."
+                        type: string
+                      secretRef:
+                        description: |-
+                          ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
+                          to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      transferProtocol:
+                        description: The network protocol that the server's update
+                          service uses to retrieve 'ImageURI'
+                        type: string
+                    required:
+                    - URI
+                    type: object
+                  serverMaintenancePolicy:
+                    description: ServerMaintenancePolicy is maintenance policy to
+                      be enforced on the server.
                     type: string
-                  secretRef:
-                    description: |-
-                      ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-                      to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+                  serverMaintenanceRef:
+                    description: ServerMaintenanceRef is a reference to a ServerMaintenance
+                      object that that Controller has requested for the referred server.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  serverRef:
+                    description: ServerRef is a reference to a specific server to
+                      apply bios upgrade on.
                     properties:
                       name:
                         default: ""
@@ -93,17 +164,25 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
-                  transferProtocol:
-                    description: The network protocol that the server's update service
-                      uses to retrieve 'ImageURI'
+                    x-kubernetes-validations:
+                    - message: serverRef is immutable
+                      rule: self == oldSelf
+                  updatePolicy:
+                    description: An indication of whether the server's upgrade service
+                      should bypass vendor update policies
+                    type: string
+                  version:
+                    description: Version contains BIOS version to upgrade to
                     type: string
                 required:
-                - URI
+                - image
+                - version
                 type: object
-              serverMaintenancePolicy:
-                description: ServerMaintenancePolicy is maintenance policy to be enforced
-                  on the server.
-                type: string
+                x-kubernetes-validations:
+                - message: serverRef is not allowed in BIOSVersionSet
+                  rule: '!has(self.serverRef)'
+                - message: serverMaintenanceRef is not allowed in BIOSVersionSet
+                  rule: '!has(self.serverMaintenanceRef)'
               serverSelector:
                 description: ServerSelector specifies a label selector to identify
                   the servers that are to be selected.
@@ -151,18 +230,9 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
-              updatePolicy:
-                description: An indication of whether the server's upgrade service
-                  should bypass vendor update policies
-                type: string
-              version:
-                description: 'Version contains software (eg: BIOS, BMC) version this
-                  settings applies to'
-                type: string
             required:
-            - image
+            - biosVersionTemplate
             - serverSelector
-            - version
             type: object
           status:
             description: BIOSVersionSetStatus defines the observed state of BIOSVersionSet.

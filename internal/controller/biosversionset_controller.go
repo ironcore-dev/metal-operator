@@ -8,9 +8,12 @@ import (
 	"errors"
 	"fmt"
 
+	"crypto/rand"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -21,7 +24,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-const biosVersionSetFinalizer = "metal.ironcore.dev/biosVersionSet"
+const BIOSVersionSetFinalizer = "metal.ironcore.dev/BIOSVersionSet"
 
 // BIOSVersionSetReconciler reconciles a BIOSVersionSet object
 type BIOSVersionSetReconciler struct {
@@ -63,7 +66,7 @@ func (r *BIOSVersionSetReconciler) delete(
 	log logr.Logger,
 	biosVersionSet *metalv1alpha1.BIOSVersionSet,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosVersionSet, biosVersionSetFinalizer) {
+	if !controllerutil.ContainsFinalizer(biosVersionSet, BIOSVersionSetFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
@@ -83,14 +86,14 @@ func (r *BIOSVersionSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.deleteBIOSVersions(ctx, log, &metalv1alpha1.ServerList{}, ownedBiosVersions); err != nil {
-		log.Error(err, "failed to cleanup created resources")
+	if warnings, err := r.deleteBIOSVersions(ctx, log, &metalv1alpha1.ServerList{}, ownedBiosVersions); err != nil || len(warnings) > 0 {
+		log.Error(err, "failed to cleanup created resources", "warnings", warnings)
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("ensured cleaning up")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersionSet, biosVersionSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersionSet, BIOSVersionSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -108,7 +111,7 @@ func (r *BIOSVersionSetReconciler) reconcile(
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersionSet, biosVersionSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersionSet, BIOSVersionSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -122,27 +125,24 @@ func (r *BIOSVersionSetReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	if len(serverList.Items) > len(ownedBiosVersions.Items) {
-		log.V(1).Info("new server found creating respective BIOSVersion")
-		if err := r.createBIOSVersions(ctx, log, serverList, ownedBiosVersions, biosVersionSet); err != nil {
-			log.Error(err, "failed to create resources")
-			return ctrl.Result{}, err
-		}
-		// wait for any updates from owned resources
-		return ctrl.Result{}, nil
-	} else if len(serverList.Items) < len(ownedBiosVersions.Items) {
-		log.V(1).Info("servers deleted, deleting respective BIOSVersion")
-		if err := r.deleteBIOSVersions(ctx, log, serverList, ownedBiosVersions); err != nil {
-			log.Error(err, "failed to cleanup resources")
-			return ctrl.Result{}, err
-		}
-		// wait for any updates from owned resources
-		return ctrl.Result{}, nil
-	}
+	log.V(1).Info("Summary of servers and BIOSVersions", "Server count", len(serverList.Items),
+		"BIOSVersion count", len(ownedBiosVersions.Items))
 
 	if len(serverList.Items) == 0 {
 		log.V(1).Info("No matching Servers found reconciliation")
 		return ctrl.Result{}, nil
+	}
+
+	// create BIOSVersion for servers selected, if it does not exist
+	if err := r.createBIOSVersions(ctx, log, serverList, ownedBiosVersions, biosVersionSet); err != nil {
+		log.Error(err, "failed to create resources")
+		return ctrl.Result{}, err
+	}
+
+	// delete BIOSVersion for servers which do not exist anymore
+	if _, err := r.deleteBIOSVersions(ctx, log, serverList, ownedBiosVersions); err != nil {
+		log.Error(err, "failed to cleanup resources")
+		return ctrl.Result{}, err
 	}
 
 	log.V(1).Info("updating the status of BIOSVersionSet")
@@ -174,17 +174,25 @@ func (r *BIOSVersionSetReconciler) createBIOSVersions(
 	var errs []error
 	for _, server := range serverList.Items {
 		if !serverWithBiosVersion[server.Name] {
+			newBiosVersionName := fmt.Sprintf("%s-%s", biosVersionSet.Name, server.Name)
+			if len(newBiosVersionName) > utilvalidation.DNS1123SubdomainMaxLength {
+				log.V(1).Info("BiosVersion name is too long, it will be shortened using randan", "name", newBiosVersionName)
+				key := make([]byte, 10)
+				size, err := rand.Read(key)
+				if err != nil || size != len(key) {
+					return fmt.Errorf("failed to generate random bytes for BIOSVersion name: %w. size returned %d", err, size)
+				}
+				newBiosVersionName = fmt.Sprintf("%s-%s", biosVersionSet.Name, string(key))
+			}
+
 			newBiosVersion := &metalv1alpha1.BIOSVersion{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("%s-%s", biosVersionSet.Name, server.Name),
+					Name: newBiosVersionName,
 				}}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {
-				newBiosVersion.Spec.ServerMaintenancePolicy = biosVersionSet.Spec.ServerMaintenancePolicy
+				newBiosVersion.Spec = *biosVersionSet.Spec.BiosVersionTemplate.DeepCopy()
 				newBiosVersion.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
-				newBiosVersion.Spec.Version = biosVersionSet.Spec.Version
-				newBiosVersion.Spec.Image = biosVersionSet.Spec.Image
-				newBiosVersion.Spec.UpdatePolicy = biosVersionSet.Spec.UpdatePolicy
 				return controllerutil.SetControllerReference(biosVersionSet, newBiosVersion, r.Client.Scheme())
 			})
 			if err != nil {
@@ -201,7 +209,7 @@ func (r *BIOSVersionSetReconciler) deleteBIOSVersions(
 	log logr.Logger,
 	serverList *metalv1alpha1.ServerList,
 	biosVersionList *metalv1alpha1.BIOSVersionList,
-) error {
+) ([]string, error) {
 
 	serverMap := make(map[string]bool)
 	for _, server := range serverList.Items {
@@ -209,10 +217,12 @@ func (r *BIOSVersionSetReconciler) deleteBIOSVersions(
 	}
 
 	var errs []error
+	var warnings []string
 	for _, biosVersion := range biosVersionList.Items {
 		if !serverMap[biosVersion.Spec.ServerRef.Name] {
 			if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
 				log.V(1).Info("waiting for BIOSVersion to move out of InProgress state", "BIOSVersion", biosVersion.Name, "status", biosVersion.Status)
+				warnings = append(warnings, fmt.Sprintf("BIOSVersion %s is still in progress, skipping deletion", biosVersion.Name))
 				continue
 			}
 			if err := r.Delete(ctx, &biosVersion); err != nil {
@@ -221,7 +231,7 @@ func (r *BIOSVersionSetReconciler) deleteBIOSVersions(
 		}
 	}
 
-	return errors.Join(errs...)
+	return warnings, errors.Join(errs...)
 }
 
 func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionStatus(
@@ -280,12 +290,7 @@ func (r *BIOSVersionSetReconciler) updateStatus(
 
 	biosVersionSetBase := biosVersionSet.DeepCopy()
 
-	biosVersionSet.Status.Completed = currentStatus.Completed
-	biosVersionSet.Status.TotalServers = currentStatus.TotalServers
-	biosVersionSet.Status.TotalVersionResource = currentStatus.TotalVersionResource
-	biosVersionSet.Status.Failed = currentStatus.Failed
-	biosVersionSet.Status.InProgress = currentStatus.InProgress
-	biosVersionSet.Status.Pending = currentStatus.Pending
+	biosVersionSet.Status = *currentStatus
 
 	if err := r.Status().Patch(ctx, biosVersionSet, client.MergeFrom(biosVersionSetBase)); err != nil {
 		return fmt.Errorf("failed to patch BIOSVersionSet status: %w", err)

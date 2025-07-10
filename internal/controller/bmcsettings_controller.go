@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"maps"
@@ -17,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -542,10 +544,25 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	var errs []error
 	ServerMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
+		newServerMaintenanceName := fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name)
+		if len(newServerMaintenanceName) > utilvalidation.DNS1123SubdomainMaxLength {
+			log.V(1).Info("BMCSettings name is too long, it will be shortened using randam", "name", newServerMaintenanceName)
+			key := make([]byte, 10)
+			size, err := rand.Read(key)
+			if err != nil || size != len(key) {
+				errs = append(errs, fmt.Errorf("failed to generate random bytes for BIOSVersion name: %w. size returned %d", err, size))
+			}
+			if len(bmcSetting.Name) > utilvalidation.DNS1123SubdomainMaxLength-11 {
+				// if bmcSetting.Name is too long, we need to shorten it
+				newServerMaintenanceName = fmt.Sprintf("%s-%s", bmcSetting.Name[:utilvalidation.DNS1123SubdomainMaxLength-11], string(key))
+			} else {
+				newServerMaintenanceName = fmt.Sprintf("%s-%s", bmcSetting.Name, string(key))
+			}
+		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: r.ManagerNamespace,
-				Name:      fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name),
+				Name:      newServerMaintenanceName,
 			}}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {

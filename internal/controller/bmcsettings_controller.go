@@ -541,9 +541,27 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		return false, nil
 	}
 
+	// if the server maintenance refs are provided, but they do not match the servers we fetched from the BMC,
+	// we will only create server maintenance for the servers which do not have maintenance in the bmcSetting.Spec.ServerMaintenanceRefs.
+	// this is to avoid creating duplicate server maintenance refs for the servers which are already in maintenance
+	// if the server maintenance refs are not provided, we will create server maintenance refs for all the servers which are in the BMC.
+	serverWithMaintenances := make(map[string]bool, len(servers))
+	if bmcSetting.Spec.ServerMaintenanceRefs != nil {
+		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs)
+		if err != nil {
+			return false, errors.Join(err...)
+		}
+		for _, serverMaintenance := range serverMaintenances {
+			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
+		}
+	}
+
 	var errs []error
 	ServerMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
+		if serverWithMaintenances[server.Name] {
+			continue
+		}
 		newServerMaintenanceName := fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name)
 		if len(newServerMaintenanceName) > utilvalidation.DNS1123SubdomainMaxLength {
 			log.V(1).Info("BMCSettings name is too long, it will be shortened using randam", "name", newServerMaintenanceName)

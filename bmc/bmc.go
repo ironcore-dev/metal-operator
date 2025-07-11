@@ -36,22 +36,22 @@ const (
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
-	PowerOn(ctx context.Context, systemUUID string) error
+	PowerOn(ctx context.Context, systemURI string) error
 
 	// PowerOff gracefully shuts down the system.
-	PowerOff(ctx context.Context, systemUUID string) error
+	PowerOff(ctx context.Context, systemURI string) error
 
 	// ForcePowerOff powers off the system.
-	ForcePowerOff(ctx context.Context, systemUUID string) error
+	ForcePowerOff(ctx context.Context, systemURI string) error
 
 	// Reset performs a reset on the system.
-	Reset(ctx context.Context, systemUUID string, resetType redfish.ResetType) error
+	Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error
 
 	// SetPXEBootOnce sets the boot device for the next system boot.
-	SetPXEBootOnce(ctx context.Context, systemUUID string) error
+	SetPXEBootOnce(ctx context.Context, systemURI string) error
 
 	// GetSystemInfo retrieves information about the system.
-	GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error)
+	GetSystemInfo(ctx context.Context, systemURI string) (SystemInfo, error)
 
 	// Logout closes the BMC client connection by logging out
 	Logout()
@@ -65,11 +65,11 @@ type BMC interface {
 	// Reset performs a reset on the Manager.
 	ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error
 
-	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
+	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
 
-	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error)
+	GetBiosAttributeValues(ctx context.Context, systemURI string, attributes []string) (redfish.SettingsAttributes, error)
 
-	GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error)
+	GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (redfish.SettingsAttributes, error)
 
 	GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (redfish.SettingsAttributes, error)
 
@@ -79,17 +79,17 @@ type BMC interface {
 
 	CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
 
-	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) (err error)
+	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes redfish.SettingsAttributes) (err error)
 
 	SetBMCAttributesImediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error)
 
-	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
+	GetBiosVersion(ctx context.Context, systemURI string) (string, error)
 
 	GetBMCVersion(ctx context.Context, UUID string) (string, error)
 
-	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
+	SetBootOrder(ctx context.Context, systemURI string, order []string) error
 
-	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
+	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
 
 	UpgradeBiosVersion(
 		ctx context.Context,
@@ -103,7 +103,7 @@ type BMC interface {
 		taskURI string,
 	) (*redfish.Task, error)
 
-	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
+	WaitForServerPowerState(ctx context.Context, systemURI string, powerState redfish.PowerState) error
 }
 
 type OEMManagerInterface interface {
@@ -186,6 +186,7 @@ type NetworkInterface struct {
 
 type Server struct {
 	UUID         string
+	URI          string
 	Model        string
 	Manufacturer string
 	PowerState   PowerState
@@ -283,7 +284,9 @@ type SystemInfo struct {
 	NetworkInterfaces []NetworkInterface
 	Processors        []Processor
 	TotalSystemMemory resource.Quantity
+	SystemURI         string
 	SystemUUID        string
+	SystemInfo        string
 	SerialNumber      string
 	SKU               string
 	IndicatorLED      string

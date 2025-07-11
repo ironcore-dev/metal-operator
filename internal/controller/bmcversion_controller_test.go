@@ -125,7 +125,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Deleting the BMCVersion")
 		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
 
-		By("Ensuring that the BiosVersion has been removed")
+		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 	})

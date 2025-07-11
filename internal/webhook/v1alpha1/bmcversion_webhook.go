@@ -72,9 +72,18 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 	if err := v.Client.List(ctx, bmcVersionList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCVersionList: %w", err)
 	}
-
-	if err := checkBMCVersionUpdateDuringInProgress(bmcVersionList, bmcversion); err != nil {
-		return nil, err
+	oldBMCVersion, ok := oldObj.(*metalv1alpha1.BMCVersion)
+	if !ok {
+		return nil, fmt.Errorf("expected a BMCVersion object for the newObj but got %T", newObj)
+	}
+	if oldBMCVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress &&
+		!controllerutil.ContainsFinalizer(bmcversion, metalv1alpha1.ForceUpdateResource) {
+		err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
+			oldBMCVersion.Name,
+			bmcversion.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: bmcversion.GroupVersionKind().Group, Kind: bmcversion.Kind},
+			bmcversion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
 	}
 
 	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, bmcversion)
@@ -117,7 +126,7 @@ func checkForDuplicateBMCVersionsRefToBMC(
 		if bmcVersion.Name == bv.Name {
 			continue
 		}
-		if bv.Spec.BMCRef.Name == bmcVersion.Spec.BMCRef.Name && bmcVersion.Name != bv.Name {
+		if bv.Spec.BMCRef.Name == bmcVersion.Spec.BMCRef.Name {
 			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
 				bmcVersion.Spec.BMCRef.Name,
 				bmcVersion.Name,
@@ -129,24 +138,4 @@ func checkForDuplicateBMCVersionsRefToBMC(
 		}
 	}
 	return nil, nil
-}
-
-func checkBMCVersionUpdateDuringInProgress(
-	bmcVersionList *metalv1alpha1.BMCVersionList,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) error {
-	for _, bv := range bmcVersionList.Items {
-		if bmcVersion.Name == bv.Name {
-			if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress && controllerutil.ContainsFinalizer(&bv, controller.BMCVersionFinalizer) {
-				err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
-					bv.Name,
-					bmcVersion.Name)
-				return apierrors.NewInvalid(
-					schema.GroupKind{Group: bmcVersion.GroupVersionKind().Group, Kind: bmcVersion.Kind},
-					bmcVersion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
-			}
-			break
-		}
-	}
-	return nil
 }

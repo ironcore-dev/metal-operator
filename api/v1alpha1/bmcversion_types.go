@@ -14,7 +14,7 @@ const (
 	// BMCVersionStatePending specifies that the BMC upgrade maintenance is waiting
 	BMCVersionStatePending BMCVersionState = "Pending"
 	// BMCVersionStateInProgress specifies that upgrading BMC is in progress.
-	BMCVersionStateInProgress BMCVersionState = "Processing"
+	BMCVersionStateInProgress BMCVersionState = "InProgress"
 	// BMCVersionStateCompleted specifies that the BMC upgrade maintenance has been completed.
 	BMCVersionStateCompleted BMCVersionState = "Completed"
 	// BMCVersionStateFailed specifies that the BMC upgrade maintenance has failed.

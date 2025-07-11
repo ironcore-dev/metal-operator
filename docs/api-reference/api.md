@@ -1766,7 +1766,7 @@ ServerMaintenancePolicy
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>BMCVersionStateFailed specifies that the BMC upgrade maintenance has failed.</p>
 </td>
-</tr><tr><td><p>&#34;Processing&#34;</p></td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
 <td><p>BMCVersionStateInProgress specifies that upgrading BMC is in progress.</p>
 </td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>

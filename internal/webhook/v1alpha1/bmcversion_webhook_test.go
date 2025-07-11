@@ -125,6 +125,20 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, BMCVersionV2, BMCVersionV2Updated)).Error().NotTo(HaveOccurred())
 		})
 
+		It("Should NOT allow update settings is in progress. but should allow to Force it", func() {
+			By("Patching the biosSettings V1 to Inprogress state")
+			Eventually(UpdateStatus(BMCVersionV1, func() {
+				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateInProgress
+			})).Should(Succeed())
+			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
+			BMCVersionV1Updated := BMCVersionV1.DeepCopy()
+			BMCVersionV1Updated.Spec.Version = "P72"
+			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV1Updated)).Error().To(HaveOccurred())
+			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
+			BMCVersionV1Updated.Finalizers = append(BMCVersionV1Updated.Finalizers, metalv1alpha1.ForceUpdateResource)
+			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV1Updated)).Error().ToNot(HaveOccurred())
+		})
+
 		It("Should refuse to delete if InProgress", func() {
 			By("Creating an BMCVersion V2 with different ServerRef")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
@@ -147,11 +161,11 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(k8sClient.Delete(ctx, BMCVersionV2)).To(Succeed())
 
 			By("Patching the BMCVersionV1 to a Inprogress state and adding finalizer")
-			Eventually(UpdateStatus(BMCVersionV1, func() {
-				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateInProgress
-			})).Should(Succeed())
 			Eventually(Update(BMCVersionV1, func() {
 				BMCVersionV1.Finalizers = append(BMCVersionV1.Finalizers, controller.BMCVersionFinalizer)
+			})).Should(Succeed())
+			Eventually(UpdateStatus(BMCVersionV1, func() {
+				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateInProgress
 			})).Should(Succeed())
 
 			By("Deleting the BMCVersionV1 should fail")

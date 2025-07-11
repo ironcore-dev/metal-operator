@@ -745,13 +745,8 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 		return err
 	}
 	var forceUpdate bool
-	if biosVersion.Spec.UpdatePolicy != nil {
-		switch *biosVersion.Spec.UpdatePolicy {
-		case metalv1alpha1.UpdatePolicyForce:
-			forceUpdate = true
-		default:
-			forceUpdate = false
-		}
+	if biosVersion.Spec.Policy != nil && *biosVersion.Spec.Policy == metalv1alpha1.UpdatePolicyForce {
+		forceUpdate = true
 	}
 
 	parameters := &redfish.SimpleUpdateParameters{

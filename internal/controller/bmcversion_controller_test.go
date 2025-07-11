@@ -176,7 +176,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
-		Eventually(Object(bmcVersion)).Should(SatisfyAny(
+		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
@@ -184,18 +184,9 @@ var _ = Describe("BMCVersion Controller", func() {
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
-						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+						APIVersion: metalv1alpha1.GroupVersion.String(),
 					}}}),
-			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: "metal.ironcore.dev/v1alpha1",
-					}}}),
-		))
+		)
 
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -284,16 +275,7 @@ var _ = Describe("BMCVersion Controller", func() {
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
-						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
-					}}}),
-			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: "metal.ironcore.dev/v1alpha1",
+						APIVersion: metalv1alpha1.GroupVersion.String(),
 					}}}),
 		))
 

@@ -715,7 +715,8 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: r.ManagerNamespace,
 				Name:      fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name),
-			}}
+			},
+		}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
 			serverMaintenance.Spec.Policy = bmcVersion.Spec.ServerMaintenancePolicy
@@ -737,7 +738,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 			serverMaintenanceRefs,
 			metalv1alpha1.ServerMaintenanceRefItem{
 				ServerMaintenanceRef: &corev1.ObjectReference{
-					APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+					APIVersion: metalv1alpha1.GroupVersion.String(),
 					Kind:       "ServerMaintenance",
 					Namespace:  serverMaintenance.Namespace,
 					Name:       serverMaintenance.Name,

@@ -74,12 +74,23 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	}
 	biosversionlog.Info("Validation for BIOSVersion upon update", "name", biosversion.GetName())
 
+	oldBIOSVersion, ok := oldObj.(*metalv1alpha1.BIOSVersion)
+	if !ok {
+		return nil, fmt.Errorf("expected a BIOSVersion object for the oldObj but got %T", oldObj)
+	}
+	if oldBIOSVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress &&
+		!controllerutil.ContainsFinalizer(biosversion, metalv1alpha1.ForceUpdateResource) {
+		err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
+			oldBIOSVersion.Name,
+			biosversion.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: biosversion.GroupVersionKind().Group, Kind: biosversion.Kind},
+			biosversion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
 	biosVersionList := &metalv1alpha1.BIOSVersionList{}
 	if err := v.Client.List(ctx, biosVersionList); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSVersionList: %w", err)
-	}
-	if err := checkBiosVersionUpdateDuringInProgress(biosVersionList, biosversion); err != nil {
-		return nil, err
 	}
 
 	return checkForDuplicateBIOSVersionRefToServer(biosVersionList, biosversion)
@@ -134,24 +145,4 @@ func checkForDuplicateBIOSVersionRefToServer(
 		}
 	}
 	return nil, nil
-}
-
-func checkBiosVersionUpdateDuringInProgress(
-	biosVersionList *metalv1alpha1.BIOSVersionList,
-	biosVersion *metalv1alpha1.BIOSVersion,
-) error {
-	for _, bv := range biosVersionList.Items {
-		if biosVersion.Name == bv.Name {
-			if bv.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !controllerutil.ContainsFinalizer(biosVersion, metalv1alpha1.ForceUpdateResource) {
-				err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
-					bv.Name,
-					biosVersion.Name)
-				return apierrors.NewInvalid(
-					schema.GroupKind{Group: biosVersion.GroupVersionKind().Group, Kind: biosVersion.Kind},
-					biosVersion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
-			}
-			break
-		}
-	}
-	return nil
 }

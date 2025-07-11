@@ -72,13 +72,23 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 	}
 	biossettingslog.Info("Validation for BIOSSettings upon update", "name", biossettings.GetName())
 
+	oldBIOSSettings, ok := oldObj.(*metalv1alpha1.BIOSSettings)
+	if !ok {
+		return nil, fmt.Errorf("expected a BIOSSettings object for the oldObj but got %T", oldObj)
+	}
+	if oldBIOSSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress &&
+		!controllerutil.ContainsFinalizer(biossettings, metalv1alpha1.ForceUpdateResource) {
+		err := fmt.Errorf("BIOSSettings (%v) is in progress, unable to update %v",
+			oldBIOSSettings.Name,
+			biossettings.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: biossettings.GroupVersionKind().Group, Kind: biossettings.Kind},
+			biossettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
 	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := v.Client.List(ctx, biosSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSSettingsList: %w", err)
-	}
-
-	if err := checkBiosSettingsUpdateDuringInProgress(biosSettingsList, biossettings); err != nil {
-		return nil, err
 	}
 
 	return checkForDuplicateBiosSettingsRefToServer(biosSettingsList, biossettings)
@@ -134,24 +144,4 @@ func checkForDuplicateBiosSettingsRefToServer(
 		}
 	}
 	return nil, nil
-}
-
-func checkBiosSettingsUpdateDuringInProgress(
-	biosSettingsList *metalv1alpha1.BIOSSettingsList,
-	biosSettings *metalv1alpha1.BIOSSettings,
-) error {
-	for _, bs := range biosSettingsList.Items {
-		if biosSettings.Name == bs.Name {
-			if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !controllerutil.ContainsFinalizer(biosSettings, metalv1alpha1.ForceUpdateResource) {
-				err := fmt.Errorf("BIOSSettings %q is in progress, unable to update %v",
-					bs.Name,
-					biosSettings.Name)
-				return apierrors.NewInvalid(
-					schema.GroupKind{Group: biosSettings.GroupVersionKind().Group, Kind: biosSettings.Kind},
-					biosSettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
-			}
-			break
-		}
-	}
-	return nil
 }

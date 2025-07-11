@@ -71,12 +71,23 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	}
 	bmcsettingslog.Info("Validation for BMCSettings upon update", "name", bmcSettings.GetName())
 
+	oldBMCSettings, ok := oldObj.(*metalv1alpha1.BMCSettings)
+	if !ok {
+		return nil, fmt.Errorf("expected a BMCSettings object for the oldObj but got %T", oldObj)
+	}
+	if oldBMCSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress &&
+		!controllerutil.ContainsFinalizer(bmcSettings, metalv1alpha1.ForceUpdateResource) {
+		err := fmt.Errorf("BMCSettings (%v) is in progress, unable to update %v",
+			oldBMCSettings.Name,
+			bmcSettings.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
+			bmcSettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list bmcSettingsList: %w", err)
-	}
-	if err := checkBmcVersionUpdateDuringInProgress(bmcSettingsList, bmcSettings); err != nil {
-		return nil, err
 	}
 	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, bmcSettings)
 }
@@ -130,24 +141,4 @@ func checkForDuplicateBMCSettingsRefToBMC(
 		}
 	}
 	return nil, nil
-}
-
-func checkBmcVersionUpdateDuringInProgress(
-	bmcSettingsList *metalv1alpha1.BMCSettingsList,
-	bmcSettings *metalv1alpha1.BMCSettings,
-) error {
-	for _, bs := range bmcSettingsList.Items {
-		if bmcSettings.Name == bs.Name {
-			if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !controllerutil.ContainsFinalizer(bmcSettings, metalv1alpha1.ForceUpdateResource) {
-				err := fmt.Errorf("BMCSettings (%v) is in progress, unable to update %v",
-					bs.Name,
-					bmcSettings.Name)
-				return apierrors.NewInvalid(
-					schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
-					bmcSettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
-			}
-			break
-		}
-	}
-	return nil
 }

@@ -39,10 +39,10 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
 
-			By("Creating a Server")
+			By("Creating a Server01")
 			server01 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-",
+					GenerateName: "test-server01-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "foo",
 					},
@@ -64,10 +64,10 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, server01)).Should(Succeed())
 
-			By("Creating a second Server")
+			By("Creating a second Server02")
 			server02 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-",
+					GenerateName: "test-server02-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "bar",
 					},
@@ -89,10 +89,10 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
 
-			By("Creating a third Server")
+			By("Creating a third Server03")
 			server03 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-",
+					GenerateName: "test-server03-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "bar",
 					},
@@ -143,20 +143,20 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Expect(k8sClient.Create(ctx, biosVersionSet)).To(Succeed())
 
 			By("Checking if the BIOSVersion has been created")
-			biosVersion01 := &metalv1alpha1.BIOSVersion{
+			biosVersion02 := &metalv1alpha1.BIOSVersion{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: biosVersionSet.Name + "-" + server02.Name,
 				},
 			}
-			Eventually(Get(biosVersion01)).Should(Succeed())
+			Eventually(Get(biosVersion02)).Should(Succeed())
 
 			By("Checking if the 2nd BIOSVersion has been created")
-			biosVersion02 := &metalv1alpha1.BIOSVersion{
+			biosVersion03 := &metalv1alpha1.BIOSVersion{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: biosVersionSet.Name + "-" + server03.Name,
 				},
 			}
-			Eventually(Get(biosVersion02)).Should(Succeed())
+			Eventually(Get(biosVersion03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
 			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
@@ -166,12 +166,12 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			))
 
 			By("Checking the biosVersion01 have completed")
-			Eventually(Object(biosVersion01)).Should(
+			Eventually(Object(biosVersion02)).Should(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
 			)
 
 			By("Checking the biosVersion02 have completed")
-			Eventually(Object(biosVersion02)).Should(
+			Eventually(Object(biosVersion03)).Should(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
 			)
 
@@ -188,8 +188,146 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, biosVersionSet)).To(Succeed())
 
 			By("Checking if the BIOSVersion have been deleted")
-			Eventually(Get(biosVersion01)).ShouldNot(Succeed())
 			Eventually(Get(biosVersion02)).ShouldNot(Succeed())
+			Eventually(Get(biosVersion03)).ShouldNot(Succeed())
+		})
+
+		It("should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
+			By("Create resource")
+			biosVersionSet := &metalv1alpha1.BIOSVersionSet{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-biosversion-set-",
+					Namespace:    ns.Name,
+				},
+				Spec: metalv1alpha1.BIOSVersionSetSpec{
+					BiosVersionTemplate: metalv1alpha1.BIOSVersionSpec{
+						Version:                 defaultMockUpServerBiosVersion,
+						ServerMaintenancePolicy: "Enforced",
+						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					},
+					ServerSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"metal.ironcore.dev/Manufacturer": "bar",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, biosVersionSet)).To(Succeed())
+
+			By("Checking if the BIOSVersion has been created")
+			biosVersion02 := &metalv1alpha1.BIOSVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: biosVersionSet.Name + "-" + server02.Name,
+				},
+			}
+			Eventually(Get(biosVersion02)).Should(Succeed())
+
+			By("Checking if the 2nd BIOSVersion has been created")
+			biosVersion03 := &metalv1alpha1.BIOSVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: biosVersionSet.Name + "-" + server03.Name,
+				},
+			}
+			Eventually(Get(biosVersion03)).Should(Succeed())
+
+			By("Checking if the status has been updated")
+			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+				HaveField("Status.TotalServers", BeNumerically("==", 2)),
+				HaveField("Status.TotalVersionResource", BeNumerically("==", 2)),
+				HaveField("Status.Failed", BeNumerically("==", 0)),
+			))
+
+			By("Checking the biosVersion01 have completed")
+			Eventually(Object(biosVersion02)).Should(
+				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+			)
+
+			By("Checking the biosVersion02 have completed")
+			Eventually(Object(biosVersion03)).Should(
+				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+			)
+
+			By("Checking if the status has been updated")
+			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+				HaveField("Status.TotalServers", BeNumerically("==", 2)),
+				HaveField("Status.TotalVersionResource", BeNumerically("==", 2)),
+				HaveField("Status.Completed", BeNumerically("==", 2)),
+				HaveField("Status.InProgress", BeNumerically("==", 0)),
+				HaveField("Status.Failed", BeNumerically("==", 0)),
+			))
+
+			By("Deleting the server02")
+			Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
+
+			By("Checking if the BIOSVersion have been deleted")
+			Eventually(Get(biosVersion02)).ShouldNot(Succeed())
+			Eventually(Get(biosVersion03)).Should(Succeed())
+
+			By("Checking if the status has been updated")
+			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+				HaveField("Status.TotalServers", BeNumerically("==", 1)),
+				HaveField("Status.TotalVersionResource", BeNumerically("==", 1)),
+				HaveField("Status.Completed", BeNumerically("==", 1)),
+				HaveField("Status.InProgress", BeNumerically("==", 0)),
+				HaveField("Status.Failed", BeNumerically("==", 0)),
+			))
+
+			By("creating the server02")
+			server02.ResourceVersion = ""
+			Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
+			By("Checking if the BIOSVersion have been created")
+			Eventually(Get(biosVersion02)).Should(Succeed())
+			Eventually(Get(biosVersion03)).Should(Succeed())
+
+			By("Checking the biosVersion01 have completed")
+			Eventually(Object(biosVersion02)).Should(
+				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+			)
+
+			By("Checking if the status has been updated")
+			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+				HaveField("Status.TotalServers", BeNumerically("==", 2)),
+				HaveField("Status.TotalVersionResource", BeNumerically("==", 2)),
+				HaveField("Status.Completed", BeNumerically("==", 2)),
+				HaveField("Status.InProgress", BeNumerically("==", 0)),
+				HaveField("Status.Failed", BeNumerically("==", 0)),
+			))
+
+			By("Updating the label of server01")
+			Eventually(Update(server01, func() {
+				server01.Labels = map[string]string{
+					"metal.ironcore.dev/Manufacturer": "bar",
+				}
+			})).Should(Succeed())
+
+			By("Checking if the 3rd BIOSVersion has been created")
+			biosVersion01 := &metalv1alpha1.BIOSVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: biosVersionSet.Name + "-" + server01.Name,
+				},
+			}
+			Eventually(Get(biosVersion01)).Should(Succeed())
+
+			By("Checking if the status has been updated")
+			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+				HaveField("Status.TotalServers", BeNumerically("==", 3)),
+				HaveField("Status.TotalVersionResource", BeNumerically("==", 3)),
+				HaveField("Status.Failed", BeNumerically("==", 0)),
+			))
+
+			By("Checking the biosVersion01 have completed")
+			Eventually(Object(biosVersion01)).Should(
+				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+			)
+
+			By("Checking if the status has been updated")
+			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+				HaveField("Status.TotalServers", BeNumerically("==", 3)),
+				HaveField("Status.TotalVersionResource", BeNumerically("==", 3)),
+				HaveField("Status.Completed", BeNumerically("==", 3)),
+				HaveField("Status.InProgress", BeNumerically("==", 0)),
+				HaveField("Status.Failed", BeNumerically("==", 0)),
+			))
 		})
 	})
 })

@@ -12,12 +12,15 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -301,48 +304,34 @@ func (r *BIOSVersionSetReconciler) updateStatus(
 	return nil
 }
 
-func (r *BIOSVersionSetReconciler) enqueueBiosVersionSetByServersListChanges(
-	ctx context.Context,
-	obj client.Object,
-) []ctrl.Request {
+func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	host := obj.(*metalv1alpha1.Server)
+	log.Info("server created/deleted/updated label")
 
-	// there is no change in server list (as its not deleted or created)
-	if host.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(host, ServerFinalizer) {
-		return nil
-	}
+	host := obj.(*metalv1alpha1.Server)
 
 	biosVersionSetList := &metalv1alpha1.BIOSVersionSetList{}
 	if err := r.List(ctx, biosVersionSetList); err != nil {
 		log.Error(err, "failed to list BIOSVersionSet")
 		return nil
 	}
-
+	reqs := make([]ctrl.Request, 0)
 	for _, biosVersionSet := range biosVersionSetList.Items {
-		serverList, err := r.getServersBySelector(ctx, &biosVersionSet)
+		selector, err := metav1.LabelSelectorAsSelector(&biosVersionSet.Spec.ServerSelector)
 		if err != nil {
-			log.Error(err, "failed to list BIOSVersionSet servers by selector")
+			log.Error(err, "failed to convert label selector")
 			return nil
 		}
-		for _, server := range serverList.Items {
-			if server.Name == host.Name {
-				ownedBiosVersion, err := r.getOwnedBIOSVersions(ctx, &biosVersionSet)
-				if err != nil {
-					log.Error(err, "failed to list owned BIOSVersions")
-					return nil
-				}
-				if len(ownedBiosVersion.Items) != len(serverList.Items) {
-					return []ctrl.Request{{
-						NamespacedName: client.ObjectKey{
-							Name:      biosVersionSet.Name,
-							Namespace: biosVersionSet.Namespace,
-						}}}
-				}
-			}
+		if selector.Matches(labels.Set(host.GetLabels())) {
+			reqs = append(reqs, ctrl.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      biosVersionSet.Name,
+					Namespace: biosVersionSet.Namespace,
+				},
+			})
 		}
 	}
-	return nil
+	return reqs
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -350,6 +339,8 @@ func (r *BIOSVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSVersionSet{}).
 		Owns(&metalv1alpha1.BIOSVersion{}).
-		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosVersionSetByServersListChanges)).
+		Watches(&metalv1alpha1.Server{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
+			builder.WithPredicates(predicate.LabelChangedPredicate{})).
 		Complete(r)
 }

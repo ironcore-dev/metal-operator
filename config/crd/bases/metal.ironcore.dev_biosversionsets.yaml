@@ -96,7 +96,7 @@ spec:
                     - URI
                     type: object
                   serverMaintenancePolicy:
-                    description: ServerMaintenancePolicy is maintenance policy to
+                    description: ServerMaintenancePolicy is a maintenance policy to
                       be enforced on the server.
                     type: string
                   serverMaintenanceRef:
@@ -166,7 +166,7 @@ spec:
                       should bypass vendor update policies
                     type: string
                   version:
-                    description: Version contains BIOS version to upgrade to
+                    description: Version contains a BIOS version to upgrade to
                     type: string
                 required:
                 - image

@@ -68,22 +68,23 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 	}
 	bmcversionlog.Info("Validation for BMCVersion upon update", "name", bmcversion.GetName())
 
-	bmcVersionList := &metalv1alpha1.BMCVersionList{}
-	if err := v.Client.List(ctx, bmcVersionList); err != nil {
-		return nil, fmt.Errorf("failed to list BMCVersionList: %w", err)
-	}
 	oldBMCVersion, ok := oldObj.(*metalv1alpha1.BMCVersion)
 	if !ok {
-		return nil, fmt.Errorf("expected a BMCVersion object for the newObj but got %T", newObj)
+		return nil, fmt.Errorf("expected a BMCVersion object for the oldObj but got %T", oldObj)
 	}
 	if oldBMCVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress &&
 		!controllerutil.ContainsFinalizer(bmcversion, metalv1alpha1.ForceUpdateResource) {
-		err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
+		err := fmt.Errorf("BMCVersion (%v) is in progress, unable to update %v",
 			oldBMCVersion.Name,
 			bmcversion.Name)
 		return nil, apierrors.NewInvalid(
 			schema.GroupKind{Group: bmcversion.GroupVersionKind().Group, Kind: bmcversion.Kind},
 			bmcversion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
+	bmcVersionList := &metalv1alpha1.BMCVersionList{}
+	if err := v.Client.List(ctx, bmcVersionList); err != nil {
+		return nil, fmt.Errorf("failed to list BMCVersionList: %w", err)
 	}
 
 	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, bmcversion)

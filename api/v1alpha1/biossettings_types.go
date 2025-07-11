@@ -22,10 +22,12 @@ type BIOSSettingsSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
-	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
+	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
+	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
+	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
@@ -58,11 +60,12 @@ const (
 
 // BIOSSettingsStatus defines the observed state of BIOSSettings.
 type BIOSSettingsStatus struct {
-
 	// State represents the current state of the bios configuration task.
+	// +optional
 	State BIOSSettingsState `json:"state,omitempty"`
 
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
+	// +optional
 	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOSSettings's current state.
@@ -81,6 +84,7 @@ type BIOSSettingsStatus struct {
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.lastAppliedTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+
 // BIOSSettings is the Schema for the biossettings API.
 type BIOSSettings struct {
 	metav1.TypeMeta   `json:",inline"`

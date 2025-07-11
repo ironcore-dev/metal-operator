@@ -13,11 +13,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -69,6 +71,20 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	}
 	bmcsettingslog.Info("Validation for BMCSettings upon update", "name", bmcSettings.GetName())
 
+	oldBMCSettings, ok := oldObj.(*metalv1alpha1.BMCSettings)
+	if !ok {
+		return nil, fmt.Errorf("expected a BMCSettings object for the oldObj but got %T", oldObj)
+	}
+	if oldBMCSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress &&
+		!controllerutil.ContainsFinalizer(bmcSettings, metalv1alpha1.ForceUpdateResource) {
+		err := fmt.Errorf("BMCSettings (%v) is in progress, unable to update %v",
+			oldBMCSettings.Name,
+			bmcSettings.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
+			bmcSettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list bmcSettingsList: %w", err)
@@ -84,8 +100,22 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj run
 	}
 	bmcsettingslog.Info("Validation for BMCSettings upon deletion", "name", bmcsettings.GetName())
 
-	if bmcsettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
-		return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
+	bs := &metalv1alpha1.BMCSettings{}
+	err := v.Client.Get(ctx, client.ObjectKey{
+		Name:      bmcsettings.GetName(),
+		Namespace: bmcsettings.GetNamespace(),
+	}, bs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
+	}
+
+	if controllerutil.ContainsFinalizer(bs, controller.BMCSettingFinalizer) {
+		if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
+			return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
+		}
+		if bs.Status.State == metalv1alpha1.BMCSettingsStateFailed {
+			return nil, apierrors.NewBadRequest("The BMCSsettings has Failed, unable to delete. check server status and retry")
+		}
 	}
 
 	return nil, nil

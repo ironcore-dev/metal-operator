@@ -17,10 +17,12 @@ type BIOSVersionSetSpec struct {
 	// +required
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 
-	// BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.
-	// +kubebuilder:validation:XValidation:rule="!has(self.serverRef)",message="serverRef is not allowed in BIOSVersionSet"
-	// +kubebuilder:validation:XValidation:rule="!has(self.serverMaintenanceRef)",message="serverMaintenanceRef is not allowed in BIOSVersionSet"
-	BiosVersionTemplate BIOSVersionSpec `json:"biosVersionTemplate"`
+	// VersionUpdateSpec defines the template for the BIOSversion Resource to be applied to the servers.
+	VersionUpdateSpec `json:",inline"`
+
+	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
+	// +optional
+	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 }
 
 // BIOSVersionSetStatus defines the observed state of BIOSVersionSet.

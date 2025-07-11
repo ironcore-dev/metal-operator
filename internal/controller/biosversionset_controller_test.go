@@ -120,19 +120,18 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		})
 
 		It("should successfully reconcile the resource", func(ctx SpecContext) {
-			By("Reconciling the created resource")
-
+			By("Created resource")
 			biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-biosversion-set-",
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
-					BiosVersionTemplate: metalv1alpha1.BIOSVersionSpec{
-						Version:                 defaultMockUpServerBiosVersion,
-						ServerMaintenancePolicy: "Enforced",
-						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+						Version: defaultMockUpServerBiosVersion,
+						Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 					},
+					ServerMaintenancePolicy: "Enforced",
 					ServerSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"metal.ironcore.dev/Manufacturer": "bar",
@@ -166,14 +165,18 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			))
 
 			By("Checking the biosVersion01 have completed")
-			Eventually(Object(biosVersion02)).Should(
+			Eventually(Object(biosVersion02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
-			)
+				HaveField("Spec.Version", biosVersionSet.Spec.Version),
+				HaveField("Spec.Image.URI", biosVersionSet.Spec.Image.URI),
+			))
 
 			By("Checking the biosVersion02 have completed")
-			Eventually(Object(biosVersion03)).Should(
+			Eventually(Object(biosVersion03)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
-			)
+				HaveField("Spec.Version", biosVersionSet.Spec.Version),
+				HaveField("Spec.Image.URI", biosVersionSet.Spec.Image.URI),
+			))
 
 			By("Checking if the status has been updated")
 			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
@@ -200,11 +203,11 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
-					BiosVersionTemplate: metalv1alpha1.BIOSVersionSpec{
-						Version:                 defaultMockUpServerBiosVersion,
-						ServerMaintenancePolicy: "Enforced",
-						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+						Version: defaultMockUpServerBiosVersion,
+						Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 					},
+					ServerMaintenancePolicy: "Enforced",
 					ServerSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"metal.ironcore.dev/Manufacturer": "bar",

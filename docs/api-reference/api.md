@@ -369,40 +369,18 @@ BIOSVersionSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>VersionUpdateSpec</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains a BIOS version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">
+VersionUpdateSpec
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BIOS version</p>
+<p>
+(Members of <code>VersionUpdateSpec</code> are embedded into this type.)
+</p>
+<p>VersionUpdateSpec defines the template for Version to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -519,15 +497,32 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
-<code>biosVersionTemplate</code><br/>
+<code>VersionUpdateSpec</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">
-BIOSVersionSpec
+<a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">
+VersionUpdateSpec
 </a>
 </em>
 </td>
 <td>
-<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+<p>
+(Members of <code>VersionUpdateSpec</code> are embedded into this type.)
+</p>
+<p>VersionUpdateSpec defines the template for the BIOSversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
 </td>
 </tr>
 </table>
@@ -578,15 +573,32 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
-<code>biosVersionTemplate</code><br/>
+<code>VersionUpdateSpec</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">
-BIOSVersionSpec
+<a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">
+VersionUpdateSpec
 </a>
 </em>
 </td>
 <td>
-<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+<p>
+(Members of <code>VersionUpdateSpec</code> are embedded into this type.)
+</p>
+<p>VersionUpdateSpec defines the template for the BIOSversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
 </td>
 </tr>
 </tbody>
@@ -678,7 +690,7 @@ int32
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersion">BIOSVersion</a>)
 </p>
 <div>
 <p>BIOSVersionSpec defines the desired state of BIOSVersion.</p>
@@ -693,40 +705,18 @@ int32
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>VersionUpdateSpec</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains a BIOS version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">
+VersionUpdateSpec
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BIOS version</p>
+<p>
+(Members of <code>VersionUpdateSpec</code> are embedded into this type.)
+</p>
+<p>VersionUpdateSpec defines the template for Version to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -2074,7 +2064,7 @@ net/netip.Prefix
 <h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">VersionUpdateSpec</a>)
 </p>
 <div>
 </div>
@@ -3432,7 +3422,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4417,7 +4407,7 @@ int32
 <h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">VersionUpdateSpec</a>)
 </p>
 <div>
 </div>
@@ -4431,6 +4421,61 @@ int32
 <tbody><tr><td><p>&#34;Force&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.VersionUpdateSpec">VersionUpdateSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains a BIOS version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Policy An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+</tbody>
 </table>
 <hr/>
 <p><em>

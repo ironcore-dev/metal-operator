@@ -83,8 +83,10 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
+				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					Version: defaultMockUpServerBiosVersion,
+					Image:   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
+				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -131,8 +133,10 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 upgradeServerBiosVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					Version: upgradeServerBiosVersion,
+					Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -227,8 +231,10 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 upgradeServerBiosVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					Version: upgradeServerBiosVersion,
+					Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},

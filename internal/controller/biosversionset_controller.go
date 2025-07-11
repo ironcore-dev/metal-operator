@@ -194,7 +194,7 @@ func (r *BIOSVersionSetReconciler) createBIOSVersions(
 				}}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {
-				newBiosVersion.Spec = *biosVersionSet.Spec.BiosVersionTemplate.DeepCopy()
+				newBiosVersion.Spec.VersionUpdateSpec = *biosVersionSet.Spec.VersionUpdateSpec.DeepCopy()
 				newBiosVersion.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
 				return controllerutil.SetControllerReference(biosVersionSet, newBiosVersion, r.Client.Scheme())
 			})

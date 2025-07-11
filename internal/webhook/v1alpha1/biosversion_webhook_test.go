@@ -28,8 +28,10 @@ var _ = Describe("BIOSVersion Webhook", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 "P71 v1.45 (12/06/2017)",
-				Image:                   metalv1alpha1.ImageSpec{URI: "one"},
+				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					Version: "P71 v1.45 (12/06/2017)",
+					Image:   metalv1alpha1.ImageSpec{URI: "one"},
+				},
 				ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -52,8 +54,10 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+						Version: "P71 v1.45 (12/06/2017)",
+						Image:   metalv1alpha1.ImageSpec{URI: "two"},
+					},
 					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -69,8 +73,10 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+						Version: "P71 v1.45 (12/06/2017)",
+						Image:   metalv1alpha1.ImageSpec{URI: "asd"},
+					},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -87,8 +93,10 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+						Version: "P71 v1.45 (12/06/2017)",
+						Image:   metalv1alpha1.ImageSpec{URI: "asd"},
+					},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -110,9 +118,10 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+						Version: "P71 v1.45 (12/06/2017)",
+						Image:   metalv1alpha1.ImageSpec{URI: "two"},
+					},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
@@ -134,8 +143,10 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+						Version: "P71 v1.45 (12/06/2017)",
+						Image:   metalv1alpha1.ImageSpec{URI: "asd"},
+					},
 					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},

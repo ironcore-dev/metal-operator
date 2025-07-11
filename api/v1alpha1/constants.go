@@ -10,4 +10,6 @@ const (
 	OperationAnnotationIgnore = "ignore"
 	// InstanceTypeAnnotation is used to specify the type of Server.
 	InstanceTypeAnnotation = "metal.ironcore.dev/instance-type"
+	// ForceUpdateResource is used to indicate that the spec should be forcefully updated.
+	ForceUpdateResource = "metal.ironcore.dev/force-update"
 )

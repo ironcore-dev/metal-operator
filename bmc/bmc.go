@@ -104,6 +104,18 @@ type BMC interface {
 	) (*redfish.Task, error)
 
 	WaitForServerPowerState(ctx context.Context, systemURI string, powerState redfish.PowerState) error
+
+	UpgradeBMCVersion(
+		ctx context.Context,
+		manufacturer string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, bool, error)
+
+	GetBMCUpgradeTask(
+		ctx context.Context,
+		manufacturer string,
+		taskURI string,
+	) (*redfish.Task, error)
 }
 
 type OEMManagerInterface interface {

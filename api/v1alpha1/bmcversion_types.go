@@ -49,7 +49,7 @@ type BMCVersionStatus struct {
 	State BMCVersionState `json:"state,omitempty"`
 
 	// UpgradeTask contains the state of the Upgrade Task created by the BMC
-	UpgradeTask *TaskStatus `json:"upgradeTask,omitempty"`
+	UpgradeTask *Task `json:"upgradeTask,omitempty"`
 	// Conditions represents the latest available observations of the BMC version upgrade state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type

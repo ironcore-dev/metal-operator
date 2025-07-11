@@ -1835,8 +1835,8 @@ BMCVersionState
 <td>
 <code>upgradeTask</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.TaskStatus">
-TaskStatus
+<a href="#metal.ironcore.dev/v1alpha1.Task">
+Task
 </a>
 </em>
 </td>

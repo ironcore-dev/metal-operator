@@ -673,7 +673,7 @@ func (in *BMCVersionStatus) DeepCopyInto(out *BMCVersionStatus) {
 	*out = *in
 	if in.UpgradeTask != nil {
 		in, out := &in.UpgradeTask, &out.UpgradeTask
-		*out = new(TaskStatus)
+		*out = new(Task)
 		**out = **in
 	}
 	if in.Conditions != nil {

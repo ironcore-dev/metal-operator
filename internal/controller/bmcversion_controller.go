@@ -272,7 +272,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 
 	if completedCondition.Status != metav1.ConditionTrue {
 		log.V(1).Info("Check upgrade task of BMC")
-		return r.checkBMCUpgradeStatus(ctx, log, bmcVersion, bmcClient, BMC, bmcVersion.Status.UpgradeTask.TaskURI, completedCondition, acc)
+		return r.checkBMCUpgradeStatus(ctx, log, bmcVersion, bmcClient, BMC, bmcVersion.Status.UpgradeTask.URI, completedCondition, acc)
 	}
 
 	rebootCondition, err := r.getCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeRebootBMC)
@@ -611,7 +611,7 @@ func (r *BMCVersionReconciler) updateBMCVersionStatus(
 	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
 	state metalv1alpha1.BMCVersionState,
-	upgradeTask *metalv1alpha1.TaskStatus,
+	upgradeTask *metalv1alpha1.Task,
 	condition *metav1.Condition,
 	acc *conditionutils.Accessor,
 ) error {
@@ -781,11 +781,11 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 	}
 	log.V(1).Info("bmc upgrade task current status", "Task status", taskCurrentStatus)
 
-	upgradeCurrentTaskStatus := &metalv1alpha1.TaskStatus{
-		TaskURI:         bmcVersion.Status.UpgradeTask.TaskURI,
+	upgradeCurrentTaskStatus := &metalv1alpha1.Task{
+		URI:             bmcVersion.Status.UpgradeTask.URI,
 		State:           taskCurrentStatus.TaskState,
 		Status:          taskCurrentStatus.TaskStatus,
-		PercentComplete: taskCurrentStatus.PercentComplete,
+		PercentComplete: int32(taskCurrentStatus.PercentComplete),
 	}
 
 	// use checkpoint incase the job has stalled and we need to requeue
@@ -915,7 +915,7 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 		return bmcClient.UpgradeBMCVersion(ctx, bmc.Status.Manufacturer, parameters)
 	}()
 
-	upgradeCurrentTaskStatus := &metalv1alpha1.TaskStatus{TaskURI: taskMonitor}
+	upgradeCurrentTaskStatus := &metalv1alpha1.Task{URI: taskMonitor}
 
 	if isFatal {
 		log.V(1).Error(err, "failed to issue bmc upgrade", "requested bmc version", bmcVersion.Spec.Version, "BMC", bmc.Name)

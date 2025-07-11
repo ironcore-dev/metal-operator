@@ -364,9 +364,9 @@ func ensureBMCVersionConditionTransisition(
 			return condIssue.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
-	By("Ensuring that BMCVersion has updated the taskStatus with taskURI")
+	By("Ensuring that BMCVersion has updated the task Status with task URI")
 	Eventually(Object(bmcVersion)).Should(
-		HaveField("Status.UpgradeTask.TaskURI", "dummyTask"),
+		HaveField("Status.UpgradeTask.URI", "dummyTask"),
 	)
 
 	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeCompleted'")

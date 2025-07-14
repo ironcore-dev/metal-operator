@@ -13,13 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -111,13 +109,8 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj ru
 		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
 	}
 
-	if controllerutil.ContainsFinalizer(bs, controller.BIOSSettingsFinalizer) {
-		if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-			return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
-		}
-		if bs.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
-			return nil, apierrors.NewBadRequest("The BIOSsettings has Failed, unable to delete. check server status and retry")
-		}
+	if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
 	}
 
 	return nil, nil

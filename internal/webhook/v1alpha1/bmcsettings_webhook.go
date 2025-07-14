@@ -13,13 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -109,13 +107,8 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj run
 		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
 	}
 
-	if controllerutil.ContainsFinalizer(bs, controller.BMCSettingFinalizer) {
-		if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
-			return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
-		}
-		if bs.Status.State == metalv1alpha1.BMCSettingsStateFailed {
-			return nil, apierrors.NewBadRequest("The BMCSsettings has Failed, unable to delete. check server status and retry")
-		}
+	if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
+		return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
 	}
 
 	return nil, nil

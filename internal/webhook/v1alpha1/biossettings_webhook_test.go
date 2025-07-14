@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -158,34 +157,14 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
 			biosSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().ToNot(HaveOccurred())
+
+			Eventually(UpdateStatus(biosSettingsV1, func() {
+				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateApplied
+			})).Should(Succeed())
 		})
 
 		It("Should refuse to delete if InProgress", func() {
-			By("Creating an BIOSSetting V2 with different ServerRef")
-			biosSettingsV2 := &metalv1alpha1.BIOSSettings{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    "ns.Name",
-					GenerateName: "test-",
-				},
-				Spec: metalv1alpha1.BIOSSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				},
-			}
-			Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
-			By("Patching the biosSettings V2 to Inprogress state")
-			Eventually(UpdateStatus(biosSettingsV2, func() {
-				biosSettingsV2.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
-			})).Should(Succeed())
-			By("Deleting the BIOSSettings V2 should pass: without the finalizer")
-			Expect(k8sClient.Delete(ctx, biosSettingsV2)).To(Succeed())
-
-			By("Patching the biosSettingsV1 to Inprogress state, and adding finalizer")
-			Eventually(Update(biosSettingsV1, func() {
-				biosSettingsV1.Finalizers = append(biosSettingsV1.Finalizers, controller.BIOSSettingsFinalizer)
-			})).Should(Succeed())
+			By("Patching the biosSettingsV1 to Inprogress state")
 			Eventually(UpdateStatus(biosSettingsV1, func() {
 				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
 			})).Should(Succeed())

@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -38,10 +37,6 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		Expect(k8sClient.Create(ctx, biosVersionV1)).To(Succeed())
 		SetClient(k8sClient)
 		DeferCleanup(k8sClient.Delete, biosVersionV1)
-	})
-
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
 	})
 
 	Context("When creating or updating BIOSVersion under Validating Webhook", func() {
@@ -162,34 +157,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			By("Updating an biosVersion V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
 			biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().ToNot(HaveOccurred())
+
+			Eventually(UpdateStatus(biosVersionV1, func() {
+				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateCompleted
+			})).Should(Succeed())
 		})
 
 		It("Should refuse to delete if InProgress", func() {
-			By("Creating an BIOSVersion with different ServerRef")
-			biosVersionV2 := &metalv1alpha1.BIOSVersion{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    "ns.Name",
-					GenerateName: "test-",
-				},
-				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				},
-			}
-			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
-			By("Patching the biosVersion V2 to InProgress state")
-			Eventually(UpdateStatus(biosVersionV2, func() {
-				biosVersionV2.Status.State = metalv1alpha1.BIOSVersionStateInProgress
-			})).Should(Succeed())
-			By("Deleting the BIOSVersion V2 should pass: without the finalizer")
-			Expect(k8sClient.Delete(ctx, biosVersionV2)).To(Succeed())
-
-			By("Patching the biosVersionV1 to InProgress state, and adding finalizer")
-			Eventually(Update(biosVersionV1, func() {
-				biosVersionV1.Finalizers = append(biosVersionV1.Finalizers, controller.BIOSVersionFinalizer)
-			})).Should(Succeed())
+			By("Patching the biosVersionV1 to InProgress state")
 			Eventually(UpdateStatus(biosVersionV1, func() {
 				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
 			})).Should(Succeed())

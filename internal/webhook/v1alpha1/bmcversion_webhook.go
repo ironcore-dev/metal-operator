@@ -13,13 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -73,7 +71,7 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		return nil, fmt.Errorf("expected a BMCVersion object for the oldObj but got %T", oldObj)
 	}
 	if oldBMCVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress &&
-		!controllerutil.ContainsFinalizer(bmcversion, metalv1alpha1.ForceUpdateResource) {
+		!ShouldAllowForceUpdateInProgress(bmcversion) {
 		err := fmt.Errorf("BMCVersion (%v) is in progress, unable to update %v",
 			oldBMCVersion.Name,
 			bmcversion.Name)
@@ -107,13 +105,8 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj runt
 		return nil, fmt.Errorf("failed to get BMCVersion: %w", err)
 	}
 
-	if controllerutil.ContainsFinalizer(bv, controller.BMCVersionFinalizer) {
-		if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-			return nil, apierrors.NewBadRequest("The BMCVersion in progress, unable to delete")
-		}
-		if bv.Status.State == metalv1alpha1.BMCVersionStateFailed {
-			return nil, apierrors.NewBadRequest("The BMCVersion has Failed, unable to delete. check server status and retry")
-		}
+	if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+		return nil, apierrors.NewBadRequest("The BMCVersion in progress, unable to delete")
 	}
 
 	return nil, nil
@@ -139,4 +132,14 @@ func checkForDuplicateBMCVersionsRefToBMC(
 		}
 	}
 	return nil, nil
+}
+
+// todo: this needs to be removed once the PR: 387 is merged
+// ShouldAllowForceUpdateInProgress checks if the object should force allow update.
+func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
+	val, found := obj.GetAnnotations()[metalv1alpha1.ForceUpdateAnnotation]
+	if !found {
+		return false
+	}
+	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress
 }

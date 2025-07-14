@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -135,41 +134,22 @@ var _ = Describe("BMCVersion Webhook", func() {
 			BMCVersionV1Updated.Spec.Version = "P72"
 			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV1Updated)).Error().To(HaveOccurred())
 			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
-			BMCVersionV1Updated.Finalizers = append(BMCVersionV1Updated.Finalizers, metalv1alpha1.ForceUpdateResource)
+			BMCVersionV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV1Updated)).Error().ToNot(HaveOccurred())
+
+			Eventually(UpdateStatus(BMCVersionV1, func() {
+				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateCompleted
+			})).Should(Succeed())
 		})
 
 		It("Should refuse to delete if InProgress", func() {
-			By("Creating an BMCVersion V2 with different ServerRef")
-			BMCVersionV2 := &metalv1alpha1.BMCVersion{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    "ns.Name",
-					GenerateName: "test-bmc-ver",
-				},
-				Spec: metalv1alpha1.BMCVersionSpec{
-					Version: "P71 v1.45 (12/06/2017)",
-					Image:   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
-					BMCRef:  &v1.LocalObjectReference{Name: "bar"},
-				},
-			}
-			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
-			By("Patching the BMCVersion V2 to Inprogress state")
-			Eventually(UpdateStatus(BMCVersionV2, func() {
-				BMCVersionV2.Status.State = metalv1alpha1.BMCVersionStateInProgress
-			})).Should(Succeed())
-			By("Deleting the BMCVersion V2 should pass: without the finalizer")
-			Expect(k8sClient.Delete(ctx, BMCVersionV2)).To(Succeed())
-
-			By("Patching the BMCVersionV1 to a Inprogress state and adding finalizer")
-			Eventually(Update(BMCVersionV1, func() {
-				BMCVersionV1.Finalizers = append(BMCVersionV1.Finalizers, controller.BMCVersionFinalizer)
-			})).Should(Succeed())
+			By("Patching the BMCVersionV1 to a Inprogress state")
 			Eventually(UpdateStatus(BMCVersionV1, func() {
 				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateInProgress
 			})).Should(Succeed())
 
 			By("Deleting the BMCVersionV1 should fail")
-			Expect(k8sClient.Delete(ctx, BMCVersionV1)).To(Not(Succeed()), fmt.Sprintf("bmc version state %v", BMCVersionV1.Status.State))
+			Expect(k8sClient.Delete(ctx, BMCVersionV1)).ToNot(Succeed(), fmt.Sprintf("bmc version state %v", BMCVersionV1.Status.State))
 
 			Eventually(UpdateStatus(BMCVersionV1, func() {
 				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateCompleted

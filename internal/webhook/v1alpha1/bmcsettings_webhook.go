@@ -76,7 +76,7 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		return nil, fmt.Errorf("expected a BMCSettings object for the oldObj but got %T", oldObj)
 	}
 	if oldBMCSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress &&
-		!controllerutil.ContainsFinalizer(bmcSettings, metalv1alpha1.ForceUpdateResource) {
+		!ShouldAllowForceUpdateInProgress(bmcSettings) {
 		err := fmt.Errorf("BMCSettings (%v) is in progress, unable to update %v",
 			oldBMCSettings.Name,
 			bmcSettings.Name)

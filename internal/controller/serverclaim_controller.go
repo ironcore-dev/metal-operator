@@ -6,11 +6,8 @@ package controller
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
-	toolscache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -31,8 +28,6 @@ import (
 
 const (
 	ServerClaimFinalizer = "metal.ironcore.dev/serverclaim"
-
-	cacheUpdateTimeout time.Duration = time.Second
 )
 
 // ServerClaimReconciler reconciles a ServerClaim object
@@ -41,7 +36,6 @@ type ServerClaimReconciler struct {
 	Cache                   cache.Cache
 	Scheme                  *runtime.Scheme
 	MaxConcurrentReconciles int
-	claimMutex              sync.Mutex
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverclaims,verbs=get;list;watch;create;update;patch;delete
@@ -307,8 +301,6 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 }
 
 func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, bool, error) {
-	// fast path: check if the server already points to the current claim
-	// read-only operation, no need to lock
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
 		return nil, false, err
@@ -317,11 +309,10 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		return server, false, nil
 	}
 
-	// slow path: claim a server
-	// The claimMutex ensures that claiming operations are serialized.
-	r.claimMutex.Lock()
-	defer r.claimMutex.Unlock()
-
+	// If no server is specified, find a server.
+	// ensureObjectRefForServer() uses a patch with optimistic locking,
+	// so it will not overwrite the claim with a different server,
+	// in case controller-runtimes cached client is not up to date.
 	var (
 		server *metalv1alpha1.Server
 		err    error
@@ -342,57 +333,12 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	}
 	log.V(1).Info("Matching server found", "Server", server.Name)
 
-	// controller-runtime does use a cached client by default, which is updated asynchronously.
-	// As the next claiming operation might be performed as soon as the mutex is released
-	// it is required to ensure that the cached server object is up-to-date. Otherwise, the same
-	// server might be claimed again by another claim. This is achieved by establishing a temporary
-	// watch on server objects and waiting for an update containing the expected resource version.
-	informer, err := r.Cache.GetInformer(ctx, server)
-	if err != nil {
-		return nil, false, err
-	}
-	ServerRef := make(chan *v1.ObjectReference)
-	defer close(ServerRef)
-
-	handler := toolscache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(oldObj, newObj any) {
-			newServer := newObj.(*metalv1alpha1.Server)
-			if newServer.Name != server.Name || newServer.Namespace != server.Namespace {
-				return
-			}
-			if newServer.Spec.ServerClaimRef == nil {
-				return
-			}
-			ServerRef <- newServer.Spec.ServerClaimRef
-		},
-	}
-	// The watch is initialized before calling ensureObjectRefForServer to ensure that the
-	// issued update is not missed.
-	registration, err := informer.AddEventHandler(handler)
-	if err != nil {
-		return nil, false, err
-	}
-	defer func() { _ = informer.RemoveEventHandler(registration) }()
-
 	modified, err := r.ensureObjectRefForServer(ctx, log, claim, server)
 	if err != nil {
 		return nil, modified, err
 	}
 	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
-	if !modified {
-		return server, modified, nil
-	}
-	for {
-		select {
-		case cachedServerRef := <-ServerRef:
-			if cachedServerRef.Name == server.Spec.ServerClaimRef.Name &&
-				cachedServerRef.Namespace == server.Spec.ServerClaimRef.Namespace {
-				return server, modified, nil
-			}
-		case <-time.After(cacheUpdateTimeout):
-			return nil, modified, fmt.Errorf("timeout waiting for server update")
-		}
-	}
+	return server, modified, nil
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {

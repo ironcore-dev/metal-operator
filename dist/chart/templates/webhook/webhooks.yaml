@@ -94,4 +94,23 @@ webhooks:
           - v1alpha1
         resources:
           - endpoints
+  - name: vserver-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: metal-operator-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-metal-ironcore-dev-v1alpha1-server
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - operations:
+          - DELETE
+        apiGroups:
+          - metal.ironcore.dev
+        apiVersions:
+          - v1alpha1
+        resources:
+          - servers
 {{- end }}

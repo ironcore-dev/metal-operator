@@ -411,21 +411,6 @@ func (r *ServerMaintenanceReconciler) patchServerClaimAnnotation(ctx context.Con
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(
-		context.Background(),
-		&metalv1alpha1.ServerMaintenance{},
-		ServerMaintenanceServerRefIndex,
-		func(rawObj client.Object) []string {
-			maintenance := rawObj.(*metalv1alpha1.ServerMaintenance)
-			if maintenance.Spec.ServerRef != nil {
-				return []string{maintenance.Spec.ServerRef.Name}
-			}
-			return nil
-		},
-	); err != nil {
-		return err
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.ServerMaintenance{}).
 		Owns(&metalv1alpha1.ServerBootConfiguration{}).
@@ -477,22 +462,10 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 			log.V(1).Info("ServerClaim has no ServerRef, skipping")
 			return req
 		}
-		server := &metalv1alpha1.Server{}
-		err := r.Get(ctx, client.ObjectKey{
-			Name: claim.Spec.ServerRef.Name,
-		}, server)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				log.V(1).Info("Server not found for ServerClaim, skipping", "ServerClaim", claim.Name)
-				return req
-			}
-			log.Error(err, "failed to get server for ServerClaim", "ServerClaim", claim.Name)
-			return nil
-		}
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{
-			ServerMaintenanceServerRefIndex: server.Name,
+			ServerMaintenanceServerRefIndex: claim.Spec.ServerRef.Name,
 		}); err != nil {
 			log.Error(err, "failed to list host serverMaintenances")
 			return nil

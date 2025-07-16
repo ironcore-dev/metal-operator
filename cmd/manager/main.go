@@ -288,6 +288,12 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+	if err := controller.RegisterIndexFields(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to set up index fields")
+		os.Exit(1)
+	}
+
 	if err = (&controller.EndpointReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -428,8 +434,6 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
-
-	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting registry server", "RegistryURL", registryURL)
 	registryServer := registry.NewServer(fmt.Sprintf(":%d", registryPort))

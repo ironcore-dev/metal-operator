@@ -1,6 +1,10 @@
 apiVersion: metal.ironcore.dev/v1alpha1
 kind: BMCVersion
 metadata:
+  Annotations:
+    # ForceUpdateAnnotation is used to force update the BMCVersion even if it is in progress.
+    metal.ironcore.dev/force-update: "true"
+    metal.ironcore.dev/force-delete: "true"
   labels:
     app.kubernetes.io/name: metal-operator
     app.kubernetes.io/managed-by: kustomize
@@ -11,6 +15,6 @@ spec:
     URI: "https://fooBMC-2.34_10_04_2024.signed.flash"
     transferProtocol: "HTTPS"
   updatePolicy: Normal
-  BMCRef:
-    name: sample-hpe-bmc
+  bmcRef:
+    name: endpoint-sample
   serverMaintenancePolicy: OwnerApproval

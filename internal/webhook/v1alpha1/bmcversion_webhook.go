@@ -105,7 +105,7 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj runt
 		return nil, fmt.Errorf("failed to get BMCVersion: %w", err)
 	}
 
-	if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+	if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress && !ShouldAllowForceDeleteInProgress(bmcversion) {
 		return nil, apierrors.NewBadRequest("The BMCVersion in progress, unable to delete")
 	}
 
@@ -141,5 +141,14 @@ func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress
+	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress || val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
+}
+
+// ShouldAllowForceDeleteInProgress checks if the object should force allow Delete.
+func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
+	val, found := obj.GetAnnotations()[metalv1alpha1.ForceUpdateAnnotation]
+	if !found {
+		return false
+	}
+	return val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
 }

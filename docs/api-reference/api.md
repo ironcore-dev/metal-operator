@@ -1626,7 +1626,7 @@ ImageSpec
 </tr>
 <tr>
 <td>
-<code>BMCRef</code><br/>
+<code>bmcRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference
@@ -1735,7 +1735,7 @@ ImageSpec
 </tr>
 <tr>
 <td>
-<code>BMCRef</code><br/>
+<code>bmcRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
 Kubernetes core/v1.LocalObjectReference

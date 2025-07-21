@@ -267,7 +267,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
-		Eventually(Object(bmcVersion)).Should(SatisfyAny(
+		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
@@ -277,7 +277,7 @@ var _ = Describe("BMCVersion Controller", func() {
 						UID:        serverMaintenance.UID,
 						APIVersion: metalv1alpha1.GroupVersion.String(),
 					}}}),
-		))
+		)
 
 		By("Ensuring that the bmcVersion has Inprogress state and waiting")
 		Eventually(Object(bmcVersion)).Should(

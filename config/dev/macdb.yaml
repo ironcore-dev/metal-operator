@@ -8,5 +8,5 @@ macPrefixes:
     - username: foo
       password: bar
   console:
-    type: ssh
+    type: SSH
     port: 22

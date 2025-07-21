@@ -27,19 +27,16 @@ spec:
     - jsonPath: .spec.updateType
       name: updateType
       type: string
-    - jsonPath: .spec.serverRef.name
-      name: ServerRef
-      type: string
-    - jsonPath: .spec.serverMaintenanceRef.name
-      name: ServerMaintenanceRef
+    - jsonPath: .spec.bmcRef.name
+      name: BMCRef
       type: string
     - jsonPath: .status.upgradeTask.percentageComplete
       name: TaskProgress
       type: integer
-    - jsonPath: .status.upgradeTask.taskState
+    - jsonPath: .status.upgradeTask.state
       name: TaskState
       type: string
-    - jsonPath: .status.upgradeTask.taskStatus
+    - jsonPath: .status.upgradeTask.status
       name: TaskStatus
       type: string
     - jsonPath: .status.state
@@ -73,7 +70,7 @@ spec:
           spec:
             description: BMCVersionSpec defines the desired state of BMCVersion.
             properties:
-              BMCRef:
+              bmcRef:
                 description: BMCRef is a reference to a specific BMC to apply BMC
                   upgrade on.
                 properties:
@@ -89,7 +86,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
                 x-kubernetes-validations:
-                - message: serverRef is immutable
+                - message: bmcRef is immutable
                   rule: self == oldSelf
               image:
                 description: details regarding the image to use to upgrade to given

@@ -86,12 +86,28 @@ func (r *BMCVersionReconciler) reconcileExists(
 	bmcVersion *metalv1alpha1.BMCVersion,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if !bmcVersion.DeletionTimestamp.IsZero() && bmcVersion.Status.State != metalv1alpha1.BMCVersionStateInProgress {
+	if delete := r.shouldDelete(log, bmcVersion); delete {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, bmcVersion)
 	}
 
 	return r.reconcile(ctx, log, bmcVersion)
+}
+
+func (r *BMCVersionReconciler) shouldDelete(
+	log logr.Logger,
+	bmcVersion *metalv1alpha1.BMCVersion,
+) bool {
+	if bmcVersion.DeletionTimestamp.IsZero() {
+		return false
+	}
+
+	if controllerutil.ContainsFinalizer(bmcVersion, BMCVersionFinalizer) &&
+		bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+		log.V(1).Info("postponing delete as Version update is in progress")
+		return false
+	}
+	return true
 }
 
 func (r *BMCVersionReconciler) delete(

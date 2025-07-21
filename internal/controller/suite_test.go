@@ -84,10 +84,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))
 
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersionSet{}, &metalv1alpha1.BIOSVersionSetList{})).Should(
-		HaveField("Items", BeEmpty()))
-
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersion{}, &metalv1alpha1.BIOSVersionList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersionSet{}, &metalv1alpha1.BIOSVersionSetList{})).Should(
 		HaveField("Items", BeEmpty()))
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettings{}, &metalv1alpha1.BMCSettingsList{})).Should(

@@ -12,6 +12,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
@@ -169,6 +170,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
 				HaveField("Spec.Version", biosVersionSet.Spec.Version),
 				HaveField("Spec.Image.URI", biosVersionSet.Spec.Image.URI),
+				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+					APIVersion:         "metal.ironcore.dev/v1alpha1",
+					Kind:               "BIOSVersionSet",
+					Name:               biosVersionSet.Name,
+					UID:                biosVersionSet.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				})),
 			))
 
 			By("Checking the biosVersion02 have completed")
@@ -176,6 +185,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
 				HaveField("Spec.Version", biosVersionSet.Spec.Version),
 				HaveField("Spec.Image.URI", biosVersionSet.Spec.Image.URI),
+				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+					APIVersion:         "metal.ironcore.dev/v1alpha1",
+					Kind:               "BIOSVersionSet",
+					Name:               biosVersionSet.Name,
+					UID:                biosVersionSet.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				})),
 			))
 
 			By("Checking if the status has been updated")
@@ -189,10 +206,6 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 
 			By("Deleting the resource")
 			Expect(k8sClient.Delete(ctx, biosVersionSet)).To(Succeed())
-
-			By("Checking if the BIOSVersion have been deleted")
-			Eventually(Get(biosVersion02)).ShouldNot(Succeed())
-			Eventually(Get(biosVersion03)).ShouldNot(Succeed())
 		})
 
 		It("should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
@@ -241,14 +254,30 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			))
 
 			By("Checking the biosVersion01 have completed")
-			Eventually(Object(biosVersion02)).Should(
+			Eventually(Object(biosVersion02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
-			)
+				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+					APIVersion:         "metal.ironcore.dev/v1alpha1",
+					Kind:               "BIOSVersionSet",
+					Name:               biosVersionSet.Name,
+					UID:                biosVersionSet.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				})),
+			))
 
 			By("Checking the biosVersion02 have completed")
-			Eventually(Object(biosVersion03)).Should(
+			Eventually(Object(biosVersion03)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
-			)
+				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+					APIVersion:         "metal.ironcore.dev/v1alpha1",
+					Kind:               "BIOSVersionSet",
+					Name:               biosVersionSet.Name,
+					UID:                biosVersionSet.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				})),
+			))
 
 			By("Checking if the status has been updated")
 			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(

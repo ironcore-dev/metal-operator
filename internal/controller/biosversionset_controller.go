@@ -89,11 +89,6 @@ func (r *BIOSVersionSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
-	if warnings, err := r.deleteOrphanBIOSVersions(ctx, log, &metalv1alpha1.ServerList{}, ownedBiosVersions); err != nil || len(warnings) > 0 {
-		log.Error(err, "failed to cleanup created resources", "warnings", warnings)
-		return ctrl.Result{}, err
-	}
-
 	if biosVersionSet.Status.TotalVersionResource != 0 {
 		log.Info("Waiting on the created BIOSVersion to be deleted")
 		return ctrl.Result{}, nil

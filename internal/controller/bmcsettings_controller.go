@@ -75,12 +75,28 @@ func (r *BMCSettingsReconciler) reconcileExists(
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if !bmcSetting.DeletionTimestamp.IsZero() {
+	if delete := r.shouldDelete(log, bmcSetting); delete {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, bmcSetting)
 	}
 
 	return r.reconcile(ctx, log, bmcSetting)
+}
+
+func (r *BMCSettingsReconciler) shouldDelete(
+	log logr.Logger,
+	bmcSetting *metalv1alpha1.BMCSettings,
+) bool {
+	if bmcSetting.DeletionTimestamp.IsZero() {
+		return false
+	}
+
+	if controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) &&
+		bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
+		log.V(1).Info("postponing delete as Settings update is in progress")
+		return false
+	}
+	return true
 }
 
 func (r *BMCSettingsReconciler) delete(
@@ -90,11 +106,6 @@ func (r *BMCSettingsReconciler) delete(
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) {
 		return ctrl.Result{}, nil
-	}
-
-	if bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
-		log.V(1).Info("Skipping delete as Settings update is in progress")
-		return r.reconcile(ctx, log, bmcSetting)
 	}
 
 	if err := r.cleanupReferences(ctx, log, bmcSetting); err != nil {

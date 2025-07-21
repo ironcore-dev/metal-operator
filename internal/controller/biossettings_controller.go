@@ -95,12 +95,28 @@ func (r *BiosSettingsReconciler) reconcileExists(
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if !biosSettings.DeletionTimestamp.IsZero() {
+	if delete := r.shouldDelete(log, biosSettings); delete {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, biosSettings)
 	}
 
 	return r.reconcile(ctx, log, biosSettings)
+}
+
+func (r *BiosSettingsReconciler) shouldDelete(
+	log logr.Logger,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) bool {
+	if biosSettings.DeletionTimestamp.IsZero() {
+		return false
+	}
+
+	if controllerutil.ContainsFinalizer(biosSettings, BIOSSettingsFinalizer) &&
+		biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+		log.V(1).Info("postponing delete as Settings update is in progress")
+		return false
+	}
+	return true
 }
 
 func (r *BiosSettingsReconciler) delete(
@@ -110,11 +126,6 @@ func (r *BiosSettingsReconciler) delete(
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(biosSettings, BIOSSettingsFinalizer) {
 		return ctrl.Result{}, nil
-	}
-
-	if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-		log.V(1).Info("Skipping delete as Settings update is in progress")
-		return r.reconcile(ctx, log, biosSettings)
 	}
 
 	if err := r.cleanupReferences(ctx, log, biosSettings); err != nil {

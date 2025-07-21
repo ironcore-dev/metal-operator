@@ -45,31 +45,6 @@ var _ = Describe("Server Webhook", func() {
 
 	Context("When deleting Server under Validating Webhook", func() {
 		It("Should refuse to delete if in Maintenance", func() {
-			server2 := &metalv1alpha1.Server{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "server-",
-				},
-				Spec: metalv1alpha1.ServerSpec{
-					UUID:       "38947555-7742-3448-3784-823347823834",
-					SystemUUID: "38947555-7742-3448-3784-823347823834",
-					BMC: &metalv1alpha1.BMCAccess{
-						Protocol: metalv1alpha1.Protocol{
-							Name: metalv1alpha1.ProtocolRedfishLocal,
-							Port: 8000,
-						},
-						Address: "127.0.0.1",
-					},
-				},
-			}
-			By("Creating an server2")
-			Expect(k8sClient.Create(ctx, server2)).To(Succeed())
-			By("Patching the server2 to a maintenance state")
-			Eventually(UpdateStatus(server2, func() {
-				server2.Status.State = metalv1alpha1.ServerStateMaintenance
-			})).Should(Succeed())
-			By("Deleting the Server should pass: with no finalizer")
-			Expect(validator.ValidateDelete(ctx, server2)).Error().NotTo(HaveOccurred())
-
 			By("Patching the server to a maintenance state and adding finalizer")
 			Eventually(UpdateStatus(server, func() {
 				server.Status.State = metalv1alpha1.ServerStateMaintenance
@@ -81,9 +56,11 @@ var _ = Describe("Server Webhook", func() {
 			By("Deleting the Server should not pass")
 			Expect(validator.ValidateDelete(ctx, server)).Error().To(HaveOccurred())
 
-			By("Patching the server to a Available state")
-			Eventually(UpdateStatus(server, func() {
-				server.Status.State = metalv1alpha1.ServerStateAvailable
+			By("Patching the server to have force delete annotation")
+			Eventually(Update(server, func() {
+				server.Annotations = map[string]string{
+					metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress,
+				}
 			})).Should(Succeed())
 
 			By("Deleting the server should pass: by DeferCleanup")

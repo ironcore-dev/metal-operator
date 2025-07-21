@@ -78,12 +78,28 @@ func (r *BIOSVersionReconciler) reconcileExists(
 	biosVersion *metalv1alpha1.BIOSVersion,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if !biosVersion.DeletionTimestamp.IsZero() && biosVersion.Status.State != metalv1alpha1.BIOSVersionStateInProgress {
+	if delete := r.shouldDelete(log, biosVersion); delete {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, biosVersion)
 	}
 
 	return r.reconcile(ctx, log, biosVersion)
+}
+
+func (r *BIOSVersionReconciler) shouldDelete(
+	log logr.Logger,
+	biosVersion *metalv1alpha1.BIOSVersion,
+) bool {
+	if biosVersion.DeletionTimestamp.IsZero() {
+		return false
+	}
+
+	if controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) &&
+		biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+		log.V(1).Info("postponing delete as Version update is in progress")
+		return false
+	}
+	return true
 }
 
 func (r *BIOSVersionReconciler) delete(
@@ -93,11 +109,6 @@ func (r *BIOSVersionReconciler) delete(
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) {
 		return ctrl.Result{}, nil
-	}
-
-	if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-		log.V(1).Info("Skipping delete as version update is in progress")
-		return r.reconcile(ctx, log, biosVersion)
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")

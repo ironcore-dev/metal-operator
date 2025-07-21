@@ -113,10 +113,26 @@ func (r *ServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *ServerReconciler) reconcileExists(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (ctrl.Result, error) {
-	if !server.DeletionTimestamp.IsZero() {
+	if delete := r.shouldDelete(log, server); delete {
 		return r.delete(ctx, log, server)
 	}
 	return r.reconcile(ctx, log, server)
+}
+
+func (r *ServerReconciler) shouldDelete(
+	log logr.Logger,
+	server *metalv1alpha1.Server,
+) bool {
+	if server.DeletionTimestamp.IsZero() {
+		return false
+	}
+
+	if controllerutil.ContainsFinalizer(server, BMCSettingFinalizer) &&
+		server.Status.State == metalv1alpha1.ServerStateMaintenance {
+		log.V(1).Info("postponing delete as server is in Maintenance state")
+		return false
+	}
+	return true
 }
 
 func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (ctrl.Result, error) {
@@ -124,10 +140,6 @@ func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *
 		return ctrl.Result{}, nil
 	}
 
-	if server.Status.State == metalv1alpha1.ServerStateMaintenance {
-		log.V(1).Info("postponing delete as server is in Maintenance state")
-		return r.reconcile(ctx, log, server)
-	}
 	log.V(1).Info("Deleting server")
 
 	if server.Spec.BootConfigurationRef != nil {

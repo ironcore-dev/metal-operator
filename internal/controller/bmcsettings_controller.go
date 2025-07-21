@@ -5,7 +5,6 @@ package controller
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"maps"
@@ -563,25 +562,21 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			continue
 		}
 		newServerMaintenanceName := fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name)
+		var serverMaintenance *metalv1alpha1.ServerMaintenance
 		if len(newServerMaintenanceName) > utilvalidation.DNS1123SubdomainMaxLength {
 			log.V(1).Info("BMCSettings name is too long, it will be shortened using randam", "name", newServerMaintenanceName)
-			key := make([]byte, 10)
-			size, err := rand.Read(key)
-			if err != nil || size != len(key) {
-				errs = append(errs, fmt.Errorf("failed to generate random bytes for BIOSVersion name: %w. size returned %d", err, size))
-			}
-			if len(bmcSetting.Name) > utilvalidation.DNS1123SubdomainMaxLength-11 {
-				// if bmcSetting.Name is too long, we need to shorten it
-				newServerMaintenanceName = fmt.Sprintf("%s-%s", bmcSetting.Name[:utilvalidation.DNS1123SubdomainMaxLength-11], string(key))
-			} else {
-				newServerMaintenanceName = fmt.Sprintf("%s-%s", bmcSetting.Name, string(key))
-			}
+			serverMaintenance = &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    r.ManagerNamespace,
+					GenerateName: newServerMaintenanceName[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-",
+				}}
+		} else {
+			serverMaintenance = &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: r.ManagerNamespace,
+					Name:      newServerMaintenanceName,
+				}}
 		}
-		serverMaintenance := &metalv1alpha1.ServerMaintenance{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: r.ManagerNamespace,
-				Name:      newServerMaintenanceName,
-			}}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
 			serverMaintenance.Spec.Policy = bmcSetting.Spec.ServerMaintenancePolicy

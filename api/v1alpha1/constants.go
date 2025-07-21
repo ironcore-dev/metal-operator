@@ -15,4 +15,7 @@ const (
 
 	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
 	OperationAnnotationForceUpdateInProgress = "ForceUpdateInProgress"
+
+	// OperationAnnotationForceUpdateOrDeleteInProgress allows update/delete of a resource even if it is in progress.
+	OperationAnnotationForceUpdateOrDeleteInProgress = "ForceUpdateOrDeleteInProgress"
 )

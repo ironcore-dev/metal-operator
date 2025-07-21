@@ -107,7 +107,7 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj run
 		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
 	}
 
-	if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
+	if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(bmcsettings) {
 		return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
 	}
 

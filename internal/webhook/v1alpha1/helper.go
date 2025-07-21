@@ -14,5 +14,13 @@ func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress
+	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress || val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
+}
+
+func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
+	val, found := obj.GetAnnotations()[metalv1alpha1.ForceUpdateAnnotation]
+	if !found {
+		return false
+	}
+	return val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
 }

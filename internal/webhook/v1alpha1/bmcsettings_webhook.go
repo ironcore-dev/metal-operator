@@ -98,16 +98,7 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj run
 	}
 	bmcsettingslog.Info("Validation for BMCSettings upon deletion", "name", bmcsettings.GetName())
 
-	bs := &metalv1alpha1.BMCSettings{}
-	err := v.Client.Get(ctx, client.ObjectKey{
-		Name:      bmcsettings.GetName(),
-		Namespace: bmcsettings.GetNamespace(),
-	}, bs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
-	}
-
-	if bs.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(bmcsettings) {
+	if bmcsettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(bmcsettings) {
 		return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
 	}
 

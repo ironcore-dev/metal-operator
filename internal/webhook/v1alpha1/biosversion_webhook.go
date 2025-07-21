@@ -102,16 +102,7 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj run
 	}
 	biosversionlog.Info("Validation for BIOSVersion upon deletion", "name", biosversion.GetName())
 
-	bv := &metalv1alpha1.BIOSVersion{}
-	err := v.Client.Get(ctx, client.ObjectKey{
-		Name:      biosversion.GetName(),
-		Namespace: biosversion.GetNamespace(),
-	}, bv)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
-	}
-
-	if bv.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(biosversion) {
+	if biosversion.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(biosversion) {
 		return nil, apierrors.NewBadRequest("The bios version in progress, unable to delete")
 	}
 	return nil, nil

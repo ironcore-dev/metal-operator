@@ -10,13 +10,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 // nolint:unused
@@ -58,17 +56,8 @@ func (v *ServerCustomValidator) ValidateDelete(ctx context.Context, obj runtime.
 	}
 	serverlog.Info("Validation for Server upon deletion", "name", server.GetName())
 
-	s := &metalv1alpha1.Server{}
-	err := v.Client.Get(ctx, client.ObjectKey{
-		Name:      server.GetName(),
-		Namespace: server.GetNamespace(),
-	}, s)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
-	}
-
-	if s.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(s, controller.ServerFinalizer) {
-		return nil, fmt.Errorf("cannot delete Server %s in state %s", server.GetName(), s.Status.State)
+	if server.Status.State == metalv1alpha1.ServerStateMaintenance && !ShouldAllowForceDeleteInProgress(server) {
+		return nil, fmt.Errorf("cannot delete Server %s in state %s", server.GetName(), server.Status.State)
 	}
 
 	return nil, nil

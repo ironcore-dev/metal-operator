@@ -100,16 +100,7 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj ru
 	}
 	biossettingslog.Info("Validation for BIOSSettings upon deletion", "name", biossettings.GetName())
 
-	bs := &metalv1alpha1.BIOSSettings{}
-	err := v.Client.Get(ctx, client.ObjectKey{
-		Name:      biossettings.GetName(),
-		Namespace: biossettings.GetNamespace(),
-	}, bs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get BMCSettings: %w", err)
-	}
-
-	if bs.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(biossettings) {
+	if biossettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(biossettings) {
 		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
 	}
 

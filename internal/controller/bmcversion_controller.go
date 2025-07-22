@@ -86,7 +86,7 @@ func (r *BMCVersionReconciler) reconcileExists(
 	bmcVersion *metalv1alpha1.BMCVersion,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if delete := r.shouldDelete(log, bmcVersion); delete {
+	if r.shouldDelete(log, bmcVersion) {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, bmcVersion)
 	}

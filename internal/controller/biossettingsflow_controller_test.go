@@ -335,7 +335,7 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 					},
 					{
 						Priority: 1000,
-						Settings: map[string]string{"fooreboot": "100"},
+						Settings: map[string]string{"123": "foo-foo"},
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},

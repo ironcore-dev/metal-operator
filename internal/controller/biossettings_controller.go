@@ -95,7 +95,7 @@ func (r *BiosSettingsReconciler) reconcileExists(
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if delete := r.shouldDelete(log, biosSettings); delete {
+	if r.shouldDelete(log, biosSettings) {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, biosSettings)
 	}

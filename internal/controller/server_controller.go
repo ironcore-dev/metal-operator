@@ -114,7 +114,7 @@ func (r *ServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *ServerReconciler) reconcileExists(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (ctrl.Result, error) {
-	if delete := r.shouldDelete(log, server); delete {
+	if r.shouldDelete(log, server) {
 		return r.delete(ctx, log, server)
 	}
 	return r.reconcile(ctx, log, server)

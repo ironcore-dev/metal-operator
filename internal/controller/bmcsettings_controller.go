@@ -75,7 +75,7 @@ func (r *BMCSettingsReconciler) reconcileExists(
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if delete := r.shouldDelete(log, bmcSetting); delete {
+	if r.shouldDelete(log, bmcSetting) {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, bmcSetting)
 	}

@@ -78,7 +78,7 @@ func (r *BIOSVersionReconciler) reconcileExists(
 	biosVersion *metalv1alpha1.BIOSVersion,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if delete := r.shouldDelete(log, biosVersion); delete {
+	if r.shouldDelete(log, biosVersion) {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, biosVersion)
 	}

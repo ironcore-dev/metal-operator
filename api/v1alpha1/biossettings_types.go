@@ -18,13 +18,11 @@ type BIOSSettingsSpec struct {
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
-	// SettingUpdatePolicy dictates how the settings are applied.
-	// if 'Sequence', the BIOSSettings resource will enter 'Waiting' state after applying the settings
-	// if 'OneShotUpdate' the BIOSSettings resource will enter 'Completed' state after applying the settings
-	SettingUpdatePolicy SettingUpdatePolicy `json:"settingUpdatePolicy,omitempty"`
-
-	// CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
-	// used in conjunction with SettingUpdatePolicy and BIOSSettingFlow
+	// CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+	// This is used in conjunction with and BIOSSettingFlow.
+	// value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+	// If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.
+	// +optional
 	CurrentSettingPriority int32 `json:"currentSettingPriority,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios setting on.
@@ -88,8 +86,11 @@ type BIOSSettingsStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
-	// AppliedSettingPriority specifies the number of sequence left to complete the settings workflow
-	// used in conjunction with SettingUpdatePolicy and BIOSSettingFlow Resource
+
+	// AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
+	// used in conjunction with BIOSSettingFlow Resource
+	// value above 0 indicates that the settings was applied at one shot.
+	// +optional
 	AppliedSettingPriority int32 `json:"appliedSettingPriority,omitempty"`
 }
 

@@ -66,8 +66,10 @@ spec:
             properties:
               currentSettingPriority:
                 description: |-
-                  CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
-                  used in conjunction with SettingUpdatePolicy and BIOSSettingFlow
+                  CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+                  This is used in conjunction with and BIOSSettingFlow.
+                  value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+                  If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.
                 format: int32
                 type: integer
               serverMaintenancePolicy:
@@ -136,12 +138,6 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
-              settingUpdatePolicy:
-                description: |-
-                  SettingUpdatePolicy dictates how the settings are applied.
-                  if 'Sequence', the BIOSSettings resource will enter 'Waiting' state after applying the settings
-                  if 'OneShotUpdate' the BIOSSettings resource will enter 'Completed' state after applying the settings
-                type: string
               settings:
                 additionalProperties:
                   type: string
@@ -160,8 +156,9 @@ spec:
             properties:
               appliedSettingPriority:
                 description: |-
-                  AppliedSettingPriority specifies the number of sequence left to complete the settings workflow
-                  used in conjunction with SettingUpdatePolicy and BIOSSettingFlow Resource
+                  AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
+                  used in conjunction with BIOSSettingFlow Resource
+                  value above 0 indicates that the settings was applied at one shot.
                 format: int32
                 type: integer
               conditions:

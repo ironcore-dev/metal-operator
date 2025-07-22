@@ -820,7 +820,7 @@ func (r *BiosSettingsReconciler) handleSettingAppliedState(
 	}
 	if len(settingsDiff) > 0 {
 		// here, we would like to start from the empty condition, to not overwrite the existing conditions
-		if biosSettings.Spec.SettingUpdatePolicy == metalv1alpha1.SequencialUpdate {
+		if biosSettings.Spec.CurrentSettingPriority > 0 {
 			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateInWaiting, nil)
 			return ctrl.Result{}, err
 		}
@@ -1102,7 +1102,7 @@ func (r *BiosSettingsReconciler) getReferredBIOSSettings(
 func (r *BiosSettingsReconciler) getCurrentCompletedState(biosSetting *metalv1alpha1.BIOSSettings) metalv1alpha1.BIOSSettingsState {
 
 	if biosSetting.Spec.CurrentSettingPriority != math.MaxInt32 &&
-		biosSetting.Spec.SettingUpdatePolicy == metalv1alpha1.SequencialUpdate {
+		biosSetting.Spec.CurrentSettingPriority > 0 {
 		return metalv1alpha1.BIOSSettingsStateInWaiting
 	}
 

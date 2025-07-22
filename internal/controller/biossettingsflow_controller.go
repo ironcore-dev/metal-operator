@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -16,9 +17,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -87,11 +91,9 @@ func (r *BIOSSettingsFlowReconciler) delete(
 		return r.reconcile(ctx, log, biosSettingsFlow)
 	}
 
-	if err == nil && biosSettings.Name == biosSettingsFlow.Name && metav1.IsControlledBy(biosSettings, biosSettingsFlow) {
-		log.V(1).Info("Deleting biosSettings", "biosSettings Name", biosSettings.Name, "state", biosSettings.Status.State)
-		if err := r.Delete(ctx, biosSettings); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err == nil && metav1.IsControlledBy(biosSettings, biosSettingsFlow) {
+		log.V(1).Info("Waiting for biosSettings to be deleted", "biosSettings Name", biosSettings.Name, "state", biosSettings.Status.State)
+		return ctrl.Result{}, err
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
@@ -129,7 +131,10 @@ func (r *BIOSSettingsFlowReconciler) reconcile(
 
 	biosSettings := &metalv1alpha1.BIOSSettings{}
 	if err := r.Get(ctx, client.ObjectKey{Name: biosSettingsFlow.Name}, biosSettings); err != nil {
-		if apierrors.IsNotFound(err) {
+		// make sure the server is Available.
+		server := &metalv1alpha1.Server{}
+		serverErr := r.Get(ctx, client.ObjectKey{Name: biosSettingsFlow.Spec.ServerRef.Name}, server)
+		if apierrors.IsNotFound(err) && serverErr == nil {
 			// create the biosSettings for the first time
 			var err error
 			if err = r.createOrPatchBiosSettings(ctx, log, biosSettingsFlow, biosSettings); err != nil {
@@ -138,7 +143,7 @@ func (r *BIOSSettingsFlowReconciler) reconcile(
 			}
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Join(err, fmt.Errorf("unable to fetch the referenced server: %v", serverErr))
 	}
 
 	log.V(1).Info("Check for BIOSSettings status",
@@ -206,7 +211,6 @@ func (r *BIOSSettingsFlowReconciler) createOrPatchBiosSettings(
 	biosSettings.Namespace = biosSettingsFlow.Namespace
 
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, biosSettings, func() error {
-		biosSettings.Spec.SettingUpdatePolicy = metalv1alpha1.SequencialUpdate
 		if len(biosSettingsFlow.Spec.SettingsFlow) == 1 {
 			biosSettings.Spec.CurrentSettingPriority = math.MaxInt32
 		} else {
@@ -238,6 +242,12 @@ func (r *BIOSSettingsFlowReconciler) sortAndPatchSettingsFlow(
 	sort.Slice(biosSettingsFlow.Spec.SettingsFlow, func(i, j int) bool {
 		return biosSettingsFlow.Spec.SettingsFlow[i].Priority < biosSettingsFlow.Spec.SettingsFlow[j].Priority
 	})
+
+	if biosSettingsFlow.Spec.SettingsFlow[0].Priority <= 0 {
+		return false, fmt.Errorf(
+			"the lowest priority item in the settings flow must have a priority greater than 0"+
+				" got %d", biosSettingsFlow.Spec.SettingsFlow[0].Priority)
+	}
 
 	changed := false
 
@@ -286,7 +296,6 @@ func (r *BIOSSettingsFlowReconciler) enqueueBiosFlowByBiosSettings(
 ) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 	BIOSSettings := obj.(*metalv1alpha1.BIOSSettings)
-	log.V(1).Info("TEMP:should I reconcile?", "BIOSSettings", BIOSSettings.Spec, "BIOSSettings status", BIOSSettings.Status)
 	// state we are not interested
 	if BIOSSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress ||
 		BIOSSettings.Status.State == metalv1alpha1.BIOSSettingsStatePending {
@@ -300,16 +309,34 @@ func (r *BIOSSettingsFlowReconciler) enqueueBiosFlowByBiosSettings(
 	}
 
 	for _, biosSettingsFlow := range BIOSSettingsFlowList.Items {
-		log.V(1).Info("TEMP: should we reconcile?",
-			"BIOSSettings server name", BIOSSettings.Spec.ServerRef.Name,
-			"biosSettingsFlow server name", biosSettingsFlow.Spec.ServerRef.Name)
 		if biosSettingsFlow.Spec.ServerRef.Name == BIOSSettings.Spec.ServerRef.Name {
-			if BIOSSettings.Spec.SettingUpdatePolicy == metalv1alpha1.SequencialUpdate {
-				log.V(1).Info("TEMP: we reconciled")
+			if BIOSSettings.Spec.CurrentSettingPriority > 0 {
 				// we expect the BIOSSettings to have same namespace and name as the BIOSSettingsFlow
 				return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettingsFlow.Namespace, Name: biosSettingsFlow.Name}}}
 			}
 			return nil
+		}
+	}
+	return nil
+}
+
+func (r *BIOSSettingsFlowReconciler) enqueueByServer(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+
+	log := ctrl.LoggerFrom(ctx)
+	server := obj.(*metalv1alpha1.Server)
+
+	BIOSSettingsFlowList := &metalv1alpha1.BIOSSettingsFlowList{}
+	if err := r.List(ctx, BIOSSettingsFlowList); err != nil {
+		log.Error(err, "failed to list BIOSSettingsFlows")
+		return nil
+	}
+
+	for _, biosSettingsFlow := range BIOSSettingsFlowList.Items {
+		if biosSettingsFlow.Spec.ServerRef.Name == server.Name {
+			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettingsFlow.Namespace, Name: biosSettingsFlow.Name}}}
 		}
 	}
 	return nil
@@ -322,5 +349,19 @@ func (r *BIOSSettingsFlowReconciler) SetupWithManager(
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSSettingsFlow{}).
 		Watches(&metalv1alpha1.BIOSSettings{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosFlowByBiosSettings)).
+		Watches(&metalv1alpha1.Server{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc: func(e event.CreateEvent) bool {
+					return true
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					return false
+				},
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					return true
+				}, GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				}})).
 		Complete(r)
 }

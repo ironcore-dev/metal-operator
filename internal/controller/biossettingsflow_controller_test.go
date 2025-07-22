@@ -15,6 +15,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -118,6 +119,14 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Spec.SettingsMap", biosSettingsFlow.Spec.SettingsFlow[0].Settings),
 			HaveField("Spec.CurrentSettingPriority", biosSettingsFlow.Spec.SettingsFlow[0].Priority),
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "BIOSSettingsFlow",
+				Name:               biosSettingsFlow.Name,
+				UID:                biosSettingsFlow.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
 		))
 
 		By("Ensuring that the BIOSSetting Object has moved to next settings")
@@ -139,11 +148,6 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 
 		By("Deleting the BIOSSettingFlow")
 		Expect(k8sClient.Delete(ctx, biosSettingsFlow)).To(Succeed())
-		By("Ensuring the objects are deleted")
-		Eventually(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Consistently(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Eventually(Get(biosSettings)).Should(Not(Succeed()))
-		Consistently(Get(biosSettings)).Should(Not(Succeed()))
 	})
 
 	It("should successfully apply sequence of different settings", func(ctx SpecContext) {
@@ -193,6 +197,14 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Spec.SettingsMap", currentSettingMap),
 			HaveField("Spec.CurrentSettingPriority", int32(math.MaxInt32)),
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "BIOSSettingsFlow",
+				Name:               biosSettingsFlow.Name,
+				UID:                biosSettingsFlow.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
 		))
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
@@ -209,11 +221,6 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 
 		By("Deleting the BIOSSettingFlow")
 		Expect(k8sClient.Delete(ctx, biosSettingsFlow)).To(Succeed())
-		By("Ensuring the objects are deleted")
-		Eventually(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Consistently(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Eventually(Get(biosSettings)).Should(Not(Succeed()))
-		Consistently(Get(biosSettings)).Should(Not(Succeed()))
 	})
 
 	It("should successfully apply single settings", func(ctx SpecContext) {
@@ -251,6 +258,14 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 			HaveField("Spec.SettingsMap", biosSettingsFlow.Spec.SettingsFlow[0].Settings),
 			HaveField("Spec.CurrentSettingPriority", int32(math.MaxInt32)),
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "BIOSSettingsFlow",
+				Name:               biosSettingsFlow.Name,
+				UID:                biosSettingsFlow.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
 		))
 		By("Ensuring that the BIOSSettings conditions are updated")
 		ensureBiosSettingsFlowCondition(biosSettings, biosSettingsFlow)
@@ -262,11 +277,6 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 
 		By("Deleting the BIOSSettingFlow")
 		Expect(k8sClient.Delete(ctx, biosSettingsFlow)).To(Succeed())
-		By("Ensuring the objects are deleted")
-		Eventually(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Consistently(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Eventually(Get(biosSettings)).Should(Not(Succeed()))
-		Consistently(Get(biosSettings)).Should(Not(Succeed()))
 	})
 
 	It("should successfully Complete with no settings", func(ctx SpecContext) {
@@ -285,7 +295,7 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosSettingsFlow)).To(Succeed())
 
-		By("Ensuring that the BIOSSetting Object is created")
+		By("Ensuring that the BIOSSetting Object is not created")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: biosSettingsFlow.Name,
@@ -357,12 +367,6 @@ var _ = Describe("BIOSSettingsFlow Controller", func() {
 					HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 				)
 			}).WithPolling(1 * time.Millisecond).Should(Succeed())
-
-		By("Ensuring the objects are deleted")
-		Eventually(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Consistently(Get(biosSettingsFlow)).Should(Not(Succeed()))
-		Eventually(Get(biosSettings)).Should(Not(Succeed()))
-		Consistently(Get(biosSettings)).Should(Not(Succeed()))
 	})
 })
 

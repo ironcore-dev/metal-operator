@@ -100,29 +100,17 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>settingUpdatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.SettingUpdatePolicy">
-SettingUpdatePolicy
-</a>
-</em>
-</td>
-<td>
-<p>SettingUpdatePolicy dictates how the settings are applied.
-if &lsquo;Sequence&rsquo;, the BIOSSettings resource will enter &lsquo;Waiting&rsquo; state after applying the settings
-if &lsquo;OneShotUpdate&rsquo; the BIOSSettings resource will enter &lsquo;Completed&rsquo; state after applying the settings</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>currentSettingPriority</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
-used in conjunction with SettingUpdatePolicy and BIOSSettingFlow</p>
+<em>(Optional)</em>
+<p>CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+This is used in conjunction with and BIOSSettingFlow.
+value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.</p>
 </td>
 </tr>
 <tr>
@@ -459,29 +447,17 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>settingUpdatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.SettingUpdatePolicy">
-SettingUpdatePolicy
-</a>
-</em>
-</td>
-<td>
-<p>SettingUpdatePolicy dictates how the settings are applied.
-if &lsquo;Sequence&rsquo;, the BIOSSettings resource will enter &lsquo;Waiting&rsquo; state after applying the settings
-if &lsquo;OneShotUpdate&rsquo; the BIOSSettings resource will enter &lsquo;Completed&rsquo; state after applying the settings</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>currentSettingPriority</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>CurrentSettingPriority specifies the number of sequence left to complete the settings workflow
-used in conjunction with SettingUpdatePolicy and BIOSSettingFlow</p>
+<em>(Optional)</em>
+<p>CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+This is used in conjunction with and BIOSSettingFlow.
+value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.</p>
 </td>
 </tr>
 <tr>
@@ -621,8 +597,10 @@ int32
 </em>
 </td>
 <td>
-<p>AppliedSettingPriority specifies the number of sequence left to complete the settings workflow
-used in conjunction with SettingUpdatePolicy and BIOSSettingFlow Resource</p>
+<em>(Optional)</em>
+<p>AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
+used in conjunction with BIOSSettingFlow Resource
+value above 0 indicates that the settings was applied at one shot.</p>
 </td>
 </tr>
 </tbody>
@@ -4059,9 +4037,6 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.SettingUpdatePolicy">SettingUpdatePolicy
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
-</p>
 <div>
 </div>
 <table>

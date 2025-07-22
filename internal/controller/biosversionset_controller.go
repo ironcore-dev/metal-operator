@@ -76,7 +76,7 @@ func (r *BIOSVersionSetReconciler) delete(
 		return ctrl.Result{}, err
 	}
 
-	currentStatus := r.getOwnedBIOSVersionStatus(ownedBiosVersions)
+	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
 
 	if currentStatus.TotalVersionResource != (currentStatus.Completed+currentStatus.Failed) ||
 		biosVersionSet.Status.TotalVersionResource != currentStatus.TotalVersionResource {
@@ -132,11 +132,6 @@ func (r *BIOSVersionSetReconciler) reconcile(
 	log.V(1).Info("Summary of servers and BIOSVersions", "Server count", len(serverList.Items),
 		"BIOSVersion count", len(ownedBiosVersions.Items))
 
-	if len(serverList.Items) == 0 {
-		log.V(1).Info("No matching Servers found reconciliation")
-		return ctrl.Result{}, nil
-	}
-
 	// create BIOSVersion for servers selected, if it does not exist
 	if err := r.createMissingBIOSVersions(ctx, log, serverList, ownedBiosVersions, biosVersionSet); err != nil {
 		log.Error(err, "failed to create resources")
@@ -150,7 +145,7 @@ func (r *BIOSVersionSetReconciler) reconcile(
 	}
 
 	log.V(1).Info("updating the status of BIOSVersionSet")
-	currentStatus := r.getOwnedBIOSVersionStatus(ownedBiosVersions)
+	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
 	currentStatus.TotalServers = int32(len(serverList.Items))
 
 	err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
@@ -238,7 +233,7 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(
 	return warnings, errors.Join(errs...)
 }
 
-func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionStatus(
+func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionSetStatus(
 	biosVersionList *metalv1alpha1.BIOSVersionList,
 ) *metalv1alpha1.BIOSVersionSetStatus {
 	currentStatus := &metalv1alpha1.BIOSVersionSetStatus{}

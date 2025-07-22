@@ -12,7 +12,7 @@ import (
 
 // BMCSettingsSpec defines the desired state of BMCSettings.
 type BMCSettingsSpec struct {
-	// Version contains BMC version this settings applies to
+	// Version defines the BMC firmware for which the settings should be applied.
 	// +required
 	Version string `json:"version"`
 
@@ -22,23 +22,27 @@ type BMCSettingsSpec struct {
 
 	// BMCRef is a reference to a specific BMC to apply setting to.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
+	// +optional
 	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
 
-	// ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
-	// ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
-	//	note: User approval is only enforced for server's which are reserved state
-	// ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly
+	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
+	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
-	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
+	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
+	// server that needs to be updated with the BMC settings.
+	// +optional
 	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
 }
 
+// ServerMaintenanceRefItem is a reference to a ServerMaintenance object.
 type ServerMaintenanceRefItem struct {
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that the BMCSettings has requested for the referred server.
+	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
-// ServerMaintenanceState specifies the current state of the server maintenance.
+// BMCSettingsState specifies the current state of the server maintenance.
 type BMCSettingsState string
 
 const (
@@ -55,6 +59,7 @@ const (
 // BMCSettingsStatus defines the observed state of BMCSettings.
 type BMCSettingsStatus struct {
 	// State represents the current state of the BMC configuration task.
+	// +optional
 	State BMCSettingsState `json:"state,omitempty"`
 }
 

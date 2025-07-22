@@ -438,6 +438,30 @@ func main() { // nolint: gocyclo
 			os.Exit(1)
 		}
 	}
+	if err = (&controller.BMCVersionReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		ManagerNamespace: managerNamespace,
+		Insecure:         insecure,
+		ResyncInterval:   serverResyncInterval,
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BMCVersion")
+		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhookmetalv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "BMCVersion")
+			os.Exit(1)
+		}
+	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = webhookmetalv1alpha1.SetupServerWebhookWithManager(mgr); err != nil {

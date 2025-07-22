@@ -47,6 +47,7 @@ var (
 	testEnv                        *envtest.Environment
 	registryURL                    = "http://localhost:30000"
 	defaultMockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
+	defaultMockUpServerBMCVersion  = "1.45.455b66-rev4"
 )
 
 func TestControllers(t *testing.T) {
@@ -98,6 +99,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 		HaveField("Items", BeEmpty()))
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettings{}, &metalv1alpha1.BMCSettingsList{})).Should(
+		HaveField("Items", BeEmpty()))
+
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersion{}, &metalv1alpha1.BMCVersionList{})).Should(
 		HaveField("Items", BeEmpty()))
 }
 
@@ -288,6 +292,19 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCSettingsReconciler{
+			Client:           k8sManager.GetClient(),
+			ManagerNamespace: ns.Name,
+			Insecure:         true,
+			Scheme:           k8sManager.GetScheme(),
+			ResyncInterval:   10 * time.Millisecond,
+			BMCOptions: bmc.Options{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&BMCVersionReconciler{
 			Client:           k8sManager.GetClient(),
 			ManagerNamespace: ns.Name,
 			Insecure:         true,

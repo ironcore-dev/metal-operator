@@ -46,13 +46,16 @@ const (
 // BMCAccess defines the access details for the BMC.
 type BMCAccess struct {
 	// Protocol specifies the protocol to be used for communicating with the BMC.
+	// +required
 	Protocol Protocol `json:"protocol"`
 
 	// Address is the address of the BMC.
+	// +required
 	Address string `json:"address"`
 
 	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
 	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.
+	// +required
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
 }
 
@@ -70,48 +73,63 @@ type BootOrder struct {
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
 	// Deprecated in favor of systemUUID.
+	// +required
 	UUID string `json:"uuid"`
 
 	// SystemUUID is the unique identifier for the server.
+	// +optional
 	SystemUUID string `json:"systemUUID,omitempty"`
 
+	// SystemURI is the unique URI for the server resource in REDFISH API.
+	SystemURI string `json:"systemURI,omitempty"`
+
 	// Power specifies the desired power state of the server.
+	// +optional
 	Power Power `json:"power,omitempty"`
 
 	// IndicatorLED specifies the desired state of the server's indicator LED.
+	// +optional
 	IndicatorLED IndicatorLED `json:"indicatorLED,omitempty"`
 
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	// This field is optional and can be omitted if no claim is associated with this server.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
+	// +optional
 	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
+	// +optional
 	ServerMaintenanceRef *v1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
 	// BMCRef is a reference to the BMC object associated with this server.
 	// This field is optional and can be omitted if no BMC is associated with this server.
+	// +optional
 	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
 
 	// BMC contains the access details for the BMC.
 	// This field is optional and can be omitted if no BMC access is specified.
+	// +optional
 	BMC *BMCAccess `json:"bmc,omitempty"`
 
 	// BootConfigurationRef is a reference to a BootConfiguration object that specifies
 	// the boot configuration for this server. This field is optional and can be omitted
 	// if no boot configuration is specified.
+	// +optional
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
 
 	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
 	// the boot configuration for this server during maintenance. This field is optional and can be omitted
+	// +optional
 	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
 	// BootOrder specifies the boot order of the server.
+	// +optional
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 
 	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.
+	// +optional
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 }
 
@@ -159,10 +177,8 @@ type StorageState string
 const (
 	// StorageStateEnabled indicates that the storage device is enabled.
 	StorageStateEnabled StorageState = "Enabled"
-
 	// StorageStateDisabled indicates that the storage device is disabled.
 	StorageStateDisabled StorageState = "Disabled"
-
 	// StorageStateAbsent indicates that the storage device is absent.
 	StorageStateAbsent StorageState = "Absent"
 )
@@ -170,36 +186,47 @@ const (
 // ServerStatus defines the observed state of Server.
 type ServerStatus struct {
 	// Manufacturer is the name of the server manufacturer.
+	// +optional
 	Manufacturer string `json:"manufacturer,omitempty"`
 
 	// Model is the model of the server.
+	// +optional
 	Model string `json:"model,omitempty"`
 
 	// SKU is the stock keeping unit identifier for the server.
+	// +optional
 	SKU string `json:"sku,omitempty"`
 
 	// SerialNumber is the serial number of the server.
+	// +optional
 	SerialNumber string `json:"serialNumber,omitempty"`
 
 	// PowerState represents the current power state of the server.
+	// +optional
 	PowerState ServerPowerState `json:"powerState,omitempty"`
 
 	// IndicatorLED specifies the current state of the server's indicator LED.
+	// +optional
 	IndicatorLED IndicatorLED `json:"indicatorLED,omitempty"`
 
 	// State represents the current state of the server.
+	// +optional
 	State ServerState `json:"state,omitempty"`
 
 	// NetworkInterfaces is a list of network interfaces associated with the server.
+	// +optional
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
 
 	// TotalSystemMemory is the total amount of memory in bytes available on the server.
+	// +optional
 	TotalSystemMemory *resource.Quantity `json:"totalSystemMemory,omitempty"`
 
 	// Processors is a list of Processors associated with the server.
+	// +optional
 	Processors []Processor `json:"processors,omitempty"`
 
 	// Storages is a list of storages associated with the server.
+	// +optional
 	Storages []Storage `json:"storages,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
@@ -212,81 +239,130 @@ type ServerStatus struct {
 // Processor defines the details of a Processor.
 type Processor struct {
 	// ID is the name of the Processor.
+	// +required
 	ID string `json:"id"`
+
 	// Type is the type of the Processor.
+	// +optional
 	Type string `json:"type,omitempty"`
+
 	// Architecture is the architecture of the Processor.
+	// +optional
 	Architecture string `json:"architecture,omitempty"`
+
 	// InstructionSet is the instruction set of the Processor.
+	// +optional
 	InstructionSet string `json:"instructionSet,omitempty"`
+
 	// Manufacturer is the manufacturer of the Processor.
+	// +optional
 	Manufacturer string `json:"manufacturer,omitempty"`
+
 	// Model is the model of the Processor.
+	// +optional
 	Model string `json:"model,omitempty"`
+
 	// MaxSpeedMHz is the maximum speed of the Processor in MHz.
+	// +optional
 	MaxSpeedMHz int32 `json:"maxSpeedMHz,omitempty"`
+
 	// TotalCores is the total number of cores in the Processor.
+	// +optional
 	TotalCores int32 `json:"totalCores,omitempty"`
+
 	// TotalThreads is the total number of threads in the Processor.
+	// +optional
 	TotalThreads int32 `json:"totalThreads,omitempty"`
 }
 
 // NetworkInterface defines the details of a network interface.
 type NetworkInterface struct {
 	// Name is the name of the network interface.
+	// +required
 	Name string `json:"name"`
 
 	// IP is the IP address assigned to the network interface.
 	// The type is specified as string and is schemaless.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless
+	// +required
 	IP IP `json:"ip"`
 
 	// MACAddress is the MAC address of the network interface.
+	// +required
 	MACAddress string `json:"macAddress"`
 }
 
 // StorageDrive defines the details of one storage drive
 type StorageDrive struct {
 	// Name is the name of the storage interface.
+	// +optional
 	Name string `json:"name,omitempty"`
+
 	// MediaType specifies the media type of the storage device.
+	// +optional
 	MediaType string `json:"mediaType,omitempty"`
+
 	// Type specifies the type of the storage device.
+	// +optional
 	Type string `json:"type,omitempty"`
+
 	// Capacity specifies the size of the storage device in bytes.
+	// +optional
 	Capacity *resource.Quantity `json:"capacity,omitempty"`
+
 	// Vendor specifies the vendor of the storage device.
+	// +optional
 	Vendor string `json:"vendor,omitempty"`
+
 	// Model specifies the model of the storage device.
+	// +optional
 	Model string `json:"model,omitempty"`
+
 	// State specifies the state of the storage device.
+	// +optional
 	State StorageState `json:"state,omitempty"`
 }
 
 // StorageVolume defines the details of one storage volume
 type StorageVolume struct {
 	// Name is the name of the storage interface.
+	// +optional
 	Name string `json:"name,omitempty"`
+
 	// Capacity specifies the size of the storage device in bytes.
+	// +optional
 	Capacity *resource.Quantity `json:"capacity,omitempty"`
+
 	// Status specifies the status of the volume.
+	// +optional
 	State StorageState `json:"state,omitempty"`
+
 	// RAIDType specifies the RAID type of the associated Volume.
+	// +optional
 	RAIDType string `json:"raidType,omitempty"`
+
 	// VolumeUsage specifies the volume usage type for the Volume.
+	// +optional
 	VolumeUsage string `json:"volumeUsage,omitempty"`
 }
 
 // Storage defines the details of one storage device
 type Storage struct {
 	// Name is the name of the storage interface.
+	// +optional
 	Name string `json:"name,omitempty"`
+
 	// State specifies the state of the storage device.
+	// +optional
 	State StorageState `json:"state,omitempty"`
+
 	// Volumes is a collection of volumes associated with this storage.
+	// +optional
 	Volumes []StorageVolume `json:"volumes,omitempty"`
+
 	// Drives is a collection of drives associated with this storage.
+	// +optional
 	Drives []StorageDrive `json:"drives,omitempty"`
 }
 

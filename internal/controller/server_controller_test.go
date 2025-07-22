@@ -80,6 +80,7 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -406,6 +407,8 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
+			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.Power", metalv1alpha1.Power("On")),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -545,7 +548,14 @@ var _ = Describe("Server Controller", func() {
 			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed())
 
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+		Eventually(Object(server)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+		))
+		Consistently(Object(server)).WithTimeout(6 * time.Second).WithPolling(2 * time.Second).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+		))
 	})
 
 	It("Should reset a Server into initial state after maintenance is removed", func(ctx SpecContext) {

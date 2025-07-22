@@ -238,7 +238,6 @@ func (r *RedfishBMC) getOEMManager(bmcUUID string) (OEMManagerInterface, error) 
 		manager.Manufacturer = manufacturer
 	}
 
-	// togo: improve. as of now use first one similar to r.GetManager()
 	oemManager, err := NewOEMManager(manager, r.client.Service)
 	if err != nil {
 		return nil, fmt.Errorf("not able create oem Manager: %v", err)
@@ -896,6 +895,136 @@ func (r *RedfishBMC) GetBiosUpgradeTask(
 			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
 				string(respTaskRawBody),
 				respTask.StatusCode)
+	}
+
+	oem, err := NewOEM(manufacturer, r.client.GetService())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get oem object, %v", err)
+	}
+
+	return oem.GetTaskMonitorDetails(ctx, respTask)
+}
+
+// UpgradeBMCVersion upgrade given BMC version.
+func (r *RedfishBMC) UpgradeBMCVersion(
+	ctx context.Context,
+	manufacturer string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	fatal := false
+	service := r.client.GetService()
+
+	upgradeServices, err := service.UpdateService()
+	if err != nil {
+		return "", fatal, err
+	}
+
+	type tActions struct {
+		SimpleUpdate struct {
+			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
+			Target          string
+		} `json:"#UpdateService.SimpleUpdate"`
+		StartUpdate common.ActionTarget `json:"#UpdateService.StartUpdate"`
+	}
+
+	var tUS struct {
+		Actions tActions
+	}
+
+	err = json.Unmarshal(upgradeServices.RawData, &tUS)
+	if err != nil {
+		return "", fatal, err
+	}
+
+	if len(manufacturer) == 0 {
+		manufacturer, err = r.getSystemManufacturer()
+		if err != nil {
+			return "", fatal, fmt.Errorf("failed to determine manufacturer")
+		}
+	}
+
+	oem, err := NewOEM(manufacturer, service)
+	if err != nil {
+		return "", fatal, err
+	}
+
+	RequestBody := oem.GetUpdateRequestBody(parameters)
+
+	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
+
+	if err != nil {
+		return "", fatal, err
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	// any error post this point is fatal, as we can not issue multiple upgrade requests.
+	// expectation is to move to failed state, and manually check the status before retrying
+	fatal = true
+
+	log.V(1).Info("update has been issued", "Response status code", resp.StatusCode)
+
+	if resp.StatusCode != http.StatusAccepted {
+		bmcRawBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "",
+				fatal,
+				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
+					err,
+					resp.StatusCode,
+				)
+		}
+		return "",
+			fatal,
+			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
+				string(bmcRawBody),
+				resp.StatusCode,
+			)
+	}
+
+	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
+	if err != nil {
+		log.V(1).Error(err,
+			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
+		return "", fatal, fmt.Errorf("failed to read task monitor URI. %v", err)
+	}
+
+	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
+
+	return taskMonitorURI, false, nil
+}
+
+func (r *RedfishBMC) GetBMCUpgradeTask(
+	ctx context.Context,
+	manufacturer string,
+	taskURI string,
+) (*redfish.Task, error) {
+
+	respTask, err := r.client.GetService().GetClient().Get(taskURI)
+	if err != nil {
+		return nil, err
+	}
+	defer respTask.Body.Close() // nolint: errcheck
+
+	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
+		respTaskRawBody, err := io.ReadAll(respTask.Body)
+		if err != nil {
+			return nil,
+				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+					err,
+					respTask.StatusCode)
+		}
+		return nil,
+			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
+				string(respTaskRawBody),
+				respTask.StatusCode)
+	}
+
+	if len(manufacturer) == 0 {
+		manufacturer, err = r.getSystemManufacturer()
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine manufacturer")
+		}
 	}
 
 	oem, err := NewOEM(manufacturer, r.client.GetService())

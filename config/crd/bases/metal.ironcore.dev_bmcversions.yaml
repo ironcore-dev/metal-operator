@@ -4,38 +4,35 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: biosversions.metal.ironcore.dev
+  name: bmcversions.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
   names:
-    kind: BIOSVersion
-    listKind: BIOSVersionList
-    plural: biosversions
-    singular: biosversion
+    kind: BMCVersion
+    listKind: BMCVersionList
+    plural: bmcversions
+    singular: bmcversion
   scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .spec.version
-      name: BIOSVersion
+      name: BMCVersion
       type: string
     - jsonPath: .spec.updateType
-      name: ForceUpdate
+      name: updateType
       type: string
-    - jsonPath: .spec.serverRef.name
-      name: ServerRef
+    - jsonPath: .spec.bmcRef.name
+      name: BMCRef
       type: string
-    - jsonPath: .spec.serverMaintenanceRef.name
-      name: ServerMaintenanceRef
-      type: string
+    - jsonPath: .status.upgradeTask.percentageComplete
+      name: TaskProgress
+      type: integer
     - jsonPath: .status.upgradeTask.state
       name: TaskState
       type: string
     - jsonPath: .status.upgradeTask.status
       name: TaskStatus
       type: string
-    - jsonPath: .status.upgradeTask.percentageComplete
-      name: TaskProgress
-      type: integer
     - jsonPath: .status.state
       name: State
       type: string
@@ -45,7 +42,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BIOSVersion is the Schema for the biosversions API.
+        description: BMCVersion is the Schema for the bmcversions API.
         properties:
           apiVersion:
             description: |-
@@ -65,11 +62,29 @@ spec:
           metadata:
             type: object
           spec:
-            description: BIOSVersionSpec defines the desired state of BIOSVersion.
+            description: BMCVersionSpec defines the desired state of BMCVersion.
             properties:
+              bmcRef:
+                description: BMCRef is a reference to a specific BMC to apply BMC
+                  upgrade on.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: bmcRef is immutable
+                  rule: self == oldSelf
               image:
                 description: details regarding the image to use to upgrade to given
-                  BIOS version
+                  BMC version
                 properties:
                   URI:
                     description: The URI of the software image to update/install."
@@ -98,88 +113,81 @@ spec:
                 - URI
                 type: object
               serverMaintenancePolicy:
-                description: ServerMaintenancePolicy is a maintenance policy to be
-                  enforced on the server.
+                description: ServerMaintenancePolicy is maintenance policy to be enforced
+                  on the server managed by referred BMC.
                 type: string
-              serverMaintenanceRef:
-                description: ServerMaintenanceRef is a reference to a ServerMaintenance
-                  object that that Controller has requested for the referred server.
-                properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
-                    type: string
-                  kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                    type: string
-                  name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                  namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-                    type: string
-                  uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              serverRef:
-                description: ServerRef is a reference to a specific server to apply
-                  bios upgrade on.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-                x-kubernetes-validations:
-                - message: serverRef is immutable
-                  rule: self == oldSelf
+              serverMaintenanceRefs:
+                description: ServerMaintenanceRefs are references to a ServerMaintenance
+                  objects that Controller has requested for the each of the related
+                  server.
+                items:
+                  description: ServerMaintenanceRefItem is a reference to a ServerMaintenance
+                    object.
+                  properties:
+                    serverMaintenanceRef:
+                      description: ServerMaintenanceRef is a reference to a ServerMaintenance
+                        object that the BMCSettings has requested for the referred
+                        server.
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: |-
+                            If referring to a piece of an object instead of an entire object, this string
+                            should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container within a pod, this would take on a value like:
+                            "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                            the event) or if no container name is specified "spec.containers[2]" (container with
+                            index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                            referencing a part of an object.
+                          type: string
+                        kind:
+                          description: |-
+                            Kind of the referent.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                          type: string
+                        name:
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        namespace:
+                          description: |-
+                            Namespace of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                          type: string
+                        resourceVersion:
+                          description: |-
+                            Specific resourceVersion to which this reference is made, if any.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                          type: string
+                        uid:
+                          description: |-
+                            UID of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+                type: array
               updatePolicy:
                 description: An indication of whether the server's upgrade service
                   should bypass vendor update policies
                 type: string
               version:
-                description: Version contains a BIOS version to upgrade to
+                description: Version contains BMC version to upgrade to
                 type: string
             required:
             - image
             - version
             type: object
           status:
-            description: BIOSVersionStatus defines the observed state of BIOSVersion.
+            description: BMCVersionStatus defines the observed state of BMCVersion.
             properties:
               conditions:
                 description: Conditions represents the latest available observations
-                  of the Bios version upgrade state.
+                  of the BMC version upgrade state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -236,7 +244,7 @@ spec:
                   type: object
                 type: array
               state:
-                description: State represents the current state of the bios configuration
+                description: State represents the current state of the BMC configuration
                   task.
                 type: string
               upgradeTask:

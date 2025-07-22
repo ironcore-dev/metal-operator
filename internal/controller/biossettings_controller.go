@@ -1152,7 +1152,7 @@ func (r *BiosSettingsReconciler) patchMaintenanceRequestRefOnBiosSettings(
 		biosSettings.Spec.ServerMaintenanceRef = nil
 	} else {
 		biosSettings.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
-			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+			APIVersion: metalv1alpha1.GroupVersion.String(),
 			Kind:       "ServerMaintenance",
 			Namespace:  serverMaintenance.Namespace,
 			Name:       serverMaintenance.Name,
@@ -1291,6 +1291,7 @@ func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(
 			if biosSettings.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
 				return nil
 			}
+			log.Info("server changed", "server", host.Name, "power", host.Status.PowerState)
 			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: biosSettings.Namespace, Name: biosSettings.Name}}}
 		}
 	}

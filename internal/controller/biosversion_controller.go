@@ -538,7 +538,7 @@ func (r *BIOSVersionReconciler) patchMaintenanceRequestRefOnBiosVersion(
 		biosVersion.Spec.ServerMaintenanceRef = nil
 	} else {
 		biosVersion.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
-			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+			APIVersion: metalv1alpha1.GroupVersion.String(),
 			Kind:       "ServerMaintenance",
 			Namespace:  serverMaintenance.Namespace,
 			Name:       serverMaintenance.Name,

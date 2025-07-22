@@ -35,7 +35,7 @@ type BIOSSettingsFlowReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-const biosSettingsFlowFinalizer = "metal.ironcore.dev/biossettingsflow"
+const BIOSSettingsFlowFinalizer = "metal.ironcore.dev/biossettingsflow"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingsflows,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingsflows/status,verbs=get;update;patch
@@ -74,7 +74,7 @@ func (r *BIOSSettingsFlowReconciler) delete(
 	log logr.Logger,
 	biosSettingsFlow *metalv1alpha1.BIOSSettingsFlow,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosSettingsFlow, biosSettingsFlowFinalizer) {
+	if !controllerutil.ContainsFinalizer(biosSettingsFlow, BIOSSettingsFlowFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
@@ -97,7 +97,7 @@ func (r *BIOSSettingsFlowReconciler) delete(
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettingsFlow, biosSettingsFlowFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettingsFlow, BIOSSettingsFlowFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -115,7 +115,7 @@ func (r *BIOSSettingsFlowReconciler) reconcile(
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettingsFlow, biosSettingsFlowFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettingsFlow, BIOSSettingsFlowFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 

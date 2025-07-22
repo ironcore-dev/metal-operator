@@ -16,6 +16,11 @@ type RedfishMockUps struct {
 
 	BMCSettingAttr    map[string]map[string]any
 	PendingBMCSetting map[string]map[string]any
+
+	BMCVersion           string
+	BMCUpgradingVersion  string
+	BMCUpgradeTaskIndex  int
+	BMCUpgradeTaskStatus []redfish.Task
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -64,6 +69,41 @@ func (r *RedfishMockUps) InitializeDefaults() {
 	}
 
 	r.PendingBMCSetting = map[string]map[string]any{}
+
+	r.BMCVersion = ""
+	r.BMCUpgradingVersion = ""
+
+	r.BMCUpgradeTaskIndex = 0
+	r.BMCUpgradeTaskStatus = []redfish.Task{
+		{
+			TaskState:       redfish.NewTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.PendingTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.StartingTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 10,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 20,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 100,
+		},
+		{
+			TaskState:       redfish.CompletedTaskState,
+			PercentComplete: 100,
+		},
+	}
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {
@@ -95,6 +135,13 @@ func (r *RedfishMockUps) ResetBMCSettings() {
 		"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
 	}
 	r.PendingBMCSetting = map[string]map[string]any{}
+}
+
+func (r *RedfishMockUps) ResetBMCVersionUpdate() {
+	r.ResetBMCSettings()
+	r.BMCVersion = ""
+	r.BMCUpgradingVersion = ""
+	r.BMCUpgradeTaskIndex = 0
 }
 
 func InitMockUp() {

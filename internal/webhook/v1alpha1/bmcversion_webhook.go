@@ -133,22 +133,3 @@ func checkForDuplicateBMCVersionsRefToBMC(
 	}
 	return nil, nil
 }
-
-// todo: this needs to be removed once the PR: 387 is merged
-// ShouldAllowForceUpdateInProgress checks if the object should force allow update.
-func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
-	val, found := obj.GetAnnotations()[metalv1alpha1.ForceUpdateAnnotation]
-	if !found {
-		return false
-	}
-	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress || val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
-}
-
-// ShouldAllowForceDeleteInProgress checks if the object should force allow Delete.
-func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
-	val, found := obj.GetAnnotations()[metalv1alpha1.ForceUpdateAnnotation]
-	if !found {
-		return false
-	}
-	return val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
-}

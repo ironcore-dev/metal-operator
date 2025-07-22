@@ -43,7 +43,7 @@ type BiosSettingsReconciler struct {
 }
 
 const (
-	biosSettingsFinalizer = "metal.ironcore.dev/biossettings"
+	BIOSSettingsFinalizer = "metal.ironcore.dev/biossettings"
 
 	serverMaintenanceCreatedCondition = "ServerMaintenanceCreated"
 	serverMaintenanceDeletedCondition = "ServerMaintenanceDeleted"
@@ -95,12 +95,28 @@ func (r *BiosSettingsReconciler) reconcileExists(
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
-	if !biosSettings.DeletionTimestamp.IsZero() {
-		log.V(1).Info("object is being deleted")
+	if r.shouldDelete(log, biosSettings) {
+		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, biosSettings)
 	}
 
 	return r.reconcile(ctx, log, biosSettings)
+}
+
+func (r *BiosSettingsReconciler) shouldDelete(
+	log logr.Logger,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) bool {
+	if biosSettings.DeletionTimestamp.IsZero() {
+		return false
+	}
+
+	if controllerutil.ContainsFinalizer(biosSettings, BIOSSettingsFinalizer) &&
+		biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+		log.V(1).Info("postponing delete as Settings update is in progress")
+		return false
+	}
+	return true
 }
 
 func (r *BiosSettingsReconciler) delete(
@@ -108,21 +124,22 @@ func (r *BiosSettingsReconciler) delete(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosSettings, biosSettingsFinalizer) {
+	if !controllerutil.ContainsFinalizer(biosSettings, BIOSSettingsFinalizer) {
 		return ctrl.Result{}, nil
 	}
+
 	if err := r.cleanupReferences(ctx, log, biosSettings); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
 	}
-	log.V(1).Info("ensured references were cleaned up")
+	log.V(1).Info("Ensured references were cleaned up")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettings, biosSettingsFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettings, BIOSSettingsFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("biosSettings is deleted")
+	log.V(1).Info("BIOSSettings is deleted")
 	return ctrl.Result{}, nil
 }
 
@@ -164,7 +181,7 @@ func (r *BiosSettingsReconciler) cleanupServerMaintenanceReferences(
 				return err
 			}
 		} else { // not created by controller
-			log.V(1).Info("server maintenance status not updated as its provided by user", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
+			log.V(1).Info("Server maintenance status not updated as its provided by user", "serverMaintenance Name", serverMaintenance.Name, "state", serverMaintenance.Status.State)
 		}
 	}
 	// if already deleted or we deleted it or its created by user, remove reference
@@ -189,7 +206,7 @@ func (r *BiosSettingsReconciler) cleanupReferences(
 		}
 		// if we can not find the server, nothing else to clean up
 		if apierrors.IsNotFound(err) {
-			log.V(1).Info("referred Server is gone")
+			log.V(1).Info("Referred Server is gone")
 			return nil
 		}
 		// if we have found the server, check if ref is this serevrBIOS and remove it
@@ -217,14 +234,14 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 
 	// if object does not refer to server object - stop reconciliation
 	if biosSettings.Spec.ServerRef == nil {
-		log.V(1).Info("object does not refer to server object")
+		log.V(1).Info("Object does not refer to server object")
 		return ctrl.Result{}, nil
 	}
 
 	// if referred server contains reference to different BIOSSettings object - stop reconciliation
 	server, err := r.getReferredServer(ctx, log, biosSettings.Spec.ServerRef)
 	if err != nil {
-		log.V(1).Info("referred server object could not be fetched")
+		log.V(1).Info("Referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}
 	// patch server with biossettings reference
@@ -235,7 +252,7 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 	} else if server.Spec.BIOSSettingsRef.Name != biosSettings.Name {
 		referredBIOSSetting, err := r.getReferredBIOSSettings(ctx, log, server.Spec.BIOSSettingsRef)
 		if err != nil {
-			log.V(1).Info("referred server contains reference to different BIOSSettings object, unable to fetch the referenced bios setting")
+			log.V(1).Info("Referred server contains reference to different BIOSSettings object, unable to fetch the referenced bios setting")
 			return ctrl.Result{}, err
 		}
 		// check if the current BIOS setting version is newer and update reference if it is newer
@@ -248,7 +265,7 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 		}
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettings, biosSettingsFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettings, BIOSSettingsFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -301,7 +318,7 @@ func (r *BiosSettingsReconciler) ensureBIOSSettingsStateTransition(
 	case metalv1alpha1.BIOSSettingsStateFailed:
 		return r.handleFailedState(ctx, log, biosSettings, server)
 	}
-	log.V(1).Info("Unknown State found", "biosSettings state", biosSettings.Status.State)
+	log.V(1).Info("Unknown State found", "BIOSSettings state", biosSettings.Status.State)
 	return ctrl.Result{}, nil
 }
 
@@ -380,7 +397,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	} else {
 		startTime := timeoutCheck.LastTransitionTime.Time
 		if time.Now().After(startTime.Add(r.TimeoutExpiry)) {
-			log.V(1).Info("timedout while updating the biosSettings")
+			log.V(1).Info("Timedout while updating the biosSettings")
 			timedOut, err := r.getCondition(acc, biosSettings.Status.Conditions, timedOutCondition)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Condition for Timeout of BIOSSettings update %v", err)
@@ -442,7 +459,7 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 		}
 		// we need to request maintenance to get the server to power-On to apply the BIOS settings
 		if biosSettings.Spec.ServerMaintenanceRef == nil {
-			log.V(1).Info("server powered off, request maintenance to turn the server On")
+			log.V(1).Info("Server powered off, request maintenance to turn the server On")
 			if requeue, err := r.requestMaintenanceOnServer(ctx, log, biosSettings, server); err != nil || requeue {
 				return ctrl.Result{}, err
 			}
@@ -476,7 +493,7 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 
 		// if we dont need reboot. skip reboot steps.
 		if !resetReq {
-			log.V(1).Info("biosSettings update does not need reboot")
+			log.V(1).Info("BIOSSettings update does not need reboot")
 			if err := acc.Update(
 				skipReboot,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
@@ -552,7 +569,7 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied, verifySettingUpdate)
 			return ctrl.Result{}, err
 		}
-		log.V(1).Info("waiting on the BIOS setting to take place")
+		log.V(1).Info("Waiting on the BIOS setting to take place")
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 	log.V(1).Info("Unknown State found", "biosSettings UpdateSetting condition", biosSettings.Status.Conditions)
@@ -666,7 +683,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	// hence no pending task will be present.
 	if len(pendingSettings) == 0 && skipReboot.Status == metav1.ConditionFalse {
 		// todo: fail after X amount of time
-		log.V(1).Info("bios Setting update issued to bmc not accepted. retrying....")
+		log.V(1).Info("BIOS Setting update issued to BMC was not accepted. retrying....")
 		return ctrl.Result{}, errors.Join(err, fmt.Errorf("bios setting issued to bmc not accepted"))
 	}
 
@@ -749,7 +766,7 @@ func (r *BiosSettingsReconciler) checkPendingSettingsDiff(
 	settingsDiff redfish.SettingsAttributes,
 ) redfish.SettingsAttributes {
 	// if settingsDiff is provided find the difference between settingsDiff and pending
-	log.V(1).Info("checking for the difference in the pending settings than that of required")
+	log.V(1).Info("Checking for the difference in the pending settings than that of required")
 	unknownpendingSettings := make(redfish.SettingsAttributes, len(settingsDiff))
 	for name, value := range settingsDiff {
 		if pendingValue, ok := pendingSettings[name]; ok && value != pendingValue {

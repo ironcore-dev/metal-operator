@@ -108,3 +108,22 @@ webhooks:
     resources:
     - endpoints
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-metal-ironcore-dev-v1alpha1-server
+  failurePolicy: Fail
+  name: vserver-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - metal.ironcore.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - DELETE
+    resources:
+    - servers
+  sideEffects: None

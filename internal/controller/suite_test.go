@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
@@ -25,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -74,13 +76,21 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))).Should(
 		HaveField("Items", BeEmpty()))
 
+	// Need to delete all the finalizer on the server in Maintenance before deleting it
+	serverList := &metalv1alpha1.ServerList{}
+	Eventually(
+		func(g Gomega) {
+			err := List(serverList)()
+			g.Expect(err).ToNot(HaveOccurred())
+			for _, server := range serverList.Items {
+				if server.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&server, ServerFinalizer) {
+					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &server, ServerFinalizer)
+					g.Expect(err).ToNot(HaveOccurred())
+				}
+			}
+		}).Should(Succeed())
 	Eventually(deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})).Should(
 		HaveField("Items", BeEmpty()))
-
-	var server metalv1alpha1.Server
-	Expect(k8sClient.DeleteAllOf(ctx, &server)).To(Succeed())
-	var serverList metalv1alpha1.ServerList
-	Eventually(ObjectList(&serverList)).Should(HaveField("Items", BeEmpty()))
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))

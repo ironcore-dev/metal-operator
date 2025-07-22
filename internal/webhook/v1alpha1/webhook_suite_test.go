@@ -131,6 +131,9 @@ var _ = BeforeSuite(func() {
 	err = SetupBMCVersionWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = SetupServerWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:webhook
 
 	go func() {

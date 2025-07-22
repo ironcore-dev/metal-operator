@@ -72,10 +72,25 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	}
 	biosversionlog.Info("Validation for BIOSVersion upon update", "name", biosversion.GetName())
 
+	oldBIOSVersion, ok := oldObj.(*metalv1alpha1.BIOSVersion)
+	if !ok {
+		return nil, fmt.Errorf("expected a BIOSVersion object for the oldObj but got %T", oldObj)
+	}
+	if oldBIOSVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress &&
+		!ShouldAllowForceUpdateInProgress(biosversion) {
+		err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
+			oldBIOSVersion.Name,
+			biosversion.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: biosversion.GroupVersionKind().Group, Kind: biosversion.Kind},
+			biosversion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
 	biosVersionList := &metalv1alpha1.BIOSVersionList{}
 	if err := v.Client.List(ctx, biosVersionList); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSVersionList: %w", err)
 	}
+
 	return checkForDuplicateBIOSVersionRefToServer(biosVersionList, biosversion)
 }
 
@@ -87,7 +102,7 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj run
 	}
 	biosversionlog.Info("Validation for BIOSVersion upon deletion", "name", biosversion.GetName())
 
-	if biosversion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+	if biosversion.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(biosversion) {
 		return nil, apierrors.NewBadRequest("The bios version in progress, unable to delete")
 	}
 	return nil, nil
@@ -97,16 +112,16 @@ func checkForDuplicateBIOSVersionRefToServer(
 	biosVersionList *metalv1alpha1.BIOSVersionList,
 	biosVersion *metalv1alpha1.BIOSVersion,
 ) (admission.Warnings, error) {
-	for _, bs := range biosVersionList.Items {
-		if biosVersion.Name == bs.Name {
+	for _, bv := range biosVersionList.Items {
+		if biosVersion.Name == bv.Name {
 			continue
 		}
-		if biosVersion.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
+		if biosVersion.Spec.ServerRef.Name == bv.Spec.ServerRef.Name {
 			err := fmt.Errorf("server (%v) referred in %v is duplicate of Server (%v) referred in %v",
 				biosVersion.Spec.ServerRef,
 				biosVersion.Name,
-				bs.Spec.ServerRef,
-				bs.Name,
+				bv.Spec.ServerRef,
+				bv.Name,
 			)
 			return nil, apierrors.NewInvalid(
 				schema.GroupKind{Group: biosVersion.GroupVersionKind().Group, Kind: biosVersion.Kind},

@@ -27,10 +27,10 @@ spec:
     - jsonPath: .spec.serverMaintenanceRef.name
       name: ServerMaintenanceRef
       type: string
-    - jsonPath: .status.upgradeTask.taskState
+    - jsonPath: .status.upgradeTask.state
       name: TaskState
       type: string
-    - jsonPath: .status.upgradeTask.taskStatus
+    - jsonPath: .status.upgradeTask.status
       name: TaskStatus
       type: string
     - jsonPath: .status.upgradeTask.percentageComplete

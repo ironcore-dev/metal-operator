@@ -40,7 +40,6 @@ spec:
   image:
     URI: "https://foo-2.34_10_04_2024.signed.flash"
     transferProtocol: "HTTPS"
-  updatePolicy: Normal
   serverRef:
     name: endpoint-sample-hpe-system-0
   serverMaintenancePolicy: OwnerApproval

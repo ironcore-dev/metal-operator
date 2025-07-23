@@ -65,7 +65,6 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 fmt: goimports ## Run goimports against code.
 	$(GOIMPORTS) -w .
 
-
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...

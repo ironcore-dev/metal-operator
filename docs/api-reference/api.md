@@ -10,31 +10,6 @@
 </div>
 Resource Types:
 <ul></ul>
-<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">BIOSSettingUpdateState
-(<code>string</code> alias)</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server&rsquo;s RedFish API</p>
-</td>
-</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
-<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
-<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
 </h3>
 <div>
@@ -530,7 +505,8 @@ Kubernetes core/v1.ObjectReference
 <td><p>BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings</p>
 </td>
 </tr><tr><td><p>&#34;Waiting&#34;</p></td>
-<td><p>BIOSSettingsStateInWaiting specifies that the BIOSSetting Controller is updating the settings</p>
+<td><p>BIOSSettingsStateInWaiting specifies that the BIOSSetting Controller is waiting update of the next settings
+from the sequence of settings from BIOSSettingsFlow.</p>
 </td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
 <td><p>BIOSSettingsStatePending specifies that the bios setting maintenance is waiting</p>
@@ -4447,23 +4423,6 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="metal.ironcore.dev/v1alpha1.SettingUpdatePolicy">SettingUpdatePolicy
-(<code>string</code> alias)</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;OneShotUpdate&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Sequence&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.SettingsFlowItem">SettingsFlowItem
 </h3>

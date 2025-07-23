@@ -44,7 +44,8 @@ type BIOSSettingsState string
 const (
 	// BIOSSettingsStatePending specifies that the bios setting maintenance is waiting
 	BIOSSettingsStatePending BIOSSettingsState = "Pending"
-	// BIOSSettingsStateInWaiting specifies that the BIOSSetting Controller is updating the settings
+	// BIOSSettingsStateInWaiting specifies that the BIOSSetting Controller is waiting update of the next settings
+	// from the sequence of settings from BIOSSettingsFlow.
 	BIOSSettingsStateInWaiting BIOSSettingsState = "Waiting"
 	// BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings
 	BIOSSettingsStateInProgress BIOSSettingsState = "InProgress"
@@ -52,26 +53,6 @@ const (
 	BIOSSettingsStateApplied BIOSSettingsState = "Applied"
 	// BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.
 	BIOSSettingsStateFailed BIOSSettingsState = "Failed"
-)
-
-type SettingUpdatePolicy string
-
-const (
-	SequencialUpdate SettingUpdatePolicy = "Sequence"
-	OneShotUpdate    SettingUpdatePolicy = "OneShotUpdate"
-)
-
-type BIOSSettingUpdateState string
-
-const (
-	// BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.
-	BIOSSettingUpdateWaitOnServerRebootPowerOff BIOSSettingUpdateState = "WaitOnServerRebootPowerOff"
-	// BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.
-	BIOSSettingUpdateWaitOnServerRebootPowerOn BIOSSettingUpdateState = "WaitOnServerRebootPowerOn"
-	// BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server's RedFish API
-	BIOSSettingUpdateStateIssue BIOSSettingUpdateState = "IssueSettingUpdate"
-	// BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.
-	BIOSSettingUpdateStateVerification BIOSSettingUpdateState = "VerifySettingUpdate"
 )
 
 // BIOSSettingsStatus defines the observed state of BIOSSettings.

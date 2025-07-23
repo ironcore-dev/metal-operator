@@ -6,6 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: biossettingsflow-sample
 spec:
+  version: P79 v1.45 (12/06/2017)
   settingsFlow:
     - settings:
         PxeDev1EnDis: Enabled

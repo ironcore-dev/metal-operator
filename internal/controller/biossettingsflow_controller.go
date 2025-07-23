@@ -5,7 +5,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -13,7 +12,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -59,14 +57,32 @@ func (r *BIOSSettingsFlowReconciler) reconcileExists(
 	log logr.Logger,
 	biosSettingsFlow *metalv1alpha1.BIOSSettingsFlow,
 ) (ctrl.Result, error) {
+
 	// if object is being deleted - reconcile deletion
-	if !biosSettingsFlow.DeletionTimestamp.IsZero() {
+	if r.shouldDelete(log, biosSettingsFlow) {
 		// todo remove log
-		log.V(1).Info("object is being deleted", "biosSettingsFlow", biosSettingsFlow, "biosSettingsFlow", biosSettingsFlow.Status.State)
+		log.V(1).Info("object is being deleted", "biosSettingsFlow", biosSettingsFlow, "State", biosSettingsFlow.Status.State)
 		return r.delete(ctx, log, biosSettingsFlow)
 	}
 
 	return r.reconcile(ctx, log, biosSettingsFlow)
+}
+
+func (r *BIOSSettingsFlowReconciler) shouldDelete(
+	log logr.Logger,
+	biosSettingsFlow *metalv1alpha1.BIOSSettingsFlow,
+) bool {
+	if biosSettingsFlow.DeletionTimestamp.IsZero() {
+		return false
+	}
+
+	if controllerutil.ContainsFinalizer(biosSettingsFlow, BIOSSettingsFlowFinalizer) &&
+		biosSettingsFlow.Status.State == metalv1alpha1.BIOSSettingsFlowStateInProgress {
+		log.V(1).Info("postponing delete as Settings update is in progress")
+		return false
+	}
+	// as we are out of InProgress state (or no finalizer) we can delete the BIOSSettingsFlow
+	return true
 }
 
 func (r *BIOSSettingsFlowReconciler) delete(
@@ -76,24 +92,6 @@ func (r *BIOSSettingsFlowReconciler) delete(
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(biosSettingsFlow, BIOSSettingsFlowFinalizer) {
 		return ctrl.Result{}, nil
-	}
-
-	biosSettings := &metalv1alpha1.BIOSSettings{}
-	var err error
-	if err = r.Get(ctx, client.ObjectKey{Name: biosSettingsFlow.Name}, biosSettings); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to get BIOSSettings %s: %w", biosSettingsFlow.Name, err)
-		}
-	}
-
-	if biosSettingsFlow.Status.State == metalv1alpha1.BIOSSettingsFlowStateInProgress {
-		log.V(1).Info("waiting for biosSettings to complete", "biosSettings Name", biosSettings.Name, "state", biosSettings.Status.State)
-		return r.reconcile(ctx, log, biosSettingsFlow)
-	}
-
-	if err == nil && metav1.IsControlledBy(biosSettings, biosSettingsFlow) {
-		log.V(1).Info("Waiting for biosSettings to be deleted", "biosSettings Name", biosSettings.Name, "state", biosSettings.Status.State)
-		return ctrl.Result{}, err
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
@@ -129,12 +127,18 @@ func (r *BIOSSettingsFlowReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
+	// make sure the server is Available.
+	server := &metalv1alpha1.Server{}
+	err := r.Get(ctx, client.ObjectKey{Name: biosSettingsFlow.Spec.ServerRef.Name}, server)
+	if apierrors.IsNotFound(err) {
+		log.V(1).Info("Server not found, skipping BIOSSettingsFlow reconciliation", "serverRef", biosSettingsFlow.Spec.ServerRef.Name)
+		// the BIOSSettings will be deleted by the Server controller.
+		return ctrl.Result{}, nil
+	}
+
 	biosSettings := &metalv1alpha1.BIOSSettings{}
 	if err := r.Get(ctx, client.ObjectKey{Name: biosSettingsFlow.Name}, biosSettings); err != nil {
-		// make sure the server is Available.
-		server := &metalv1alpha1.Server{}
-		serverErr := r.Get(ctx, client.ObjectKey{Name: biosSettingsFlow.Spec.ServerRef.Name}, server)
-		if apierrors.IsNotFound(err) && serverErr == nil {
+		if apierrors.IsNotFound(err) {
 			// create the biosSettings for the first time
 			var err error
 			if err = r.createOrPatchBiosSettings(ctx, log, biosSettingsFlow, biosSettings); err != nil {
@@ -143,7 +147,7 @@ func (r *BIOSSettingsFlowReconciler) reconcile(
 			}
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, errors.Join(err, fmt.Errorf("unable to fetch the referenced server: %v", serverErr))
+		return ctrl.Result{}, err
 	}
 
 	log.V(1).Info("Check for BIOSSettings status",
@@ -166,7 +170,7 @@ func (r *BIOSSettingsFlowReconciler) reconcile(
 	}
 
 	log.V(1).Info("Reconciled biosSettingsFlow")
-	err := r.updateBiosSettingsFlowStatus(ctx, log, biosSettingsFlow, metalv1alpha1.BIOSSettingsFlowStateInProgress)
+	err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettingsFlow, metalv1alpha1.BIOSSettingsFlowStateInProgress)
 	return ctrl.Result{}, err
 }
 

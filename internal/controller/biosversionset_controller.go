@@ -311,6 +311,7 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 			log.Error(err, "failed to convert label selector")
 			return nil
 		}
+		// if the host label matches the selector, enqueue the request
 		if selector.Matches(labels.Set(host.GetLabels())) {
 			reqs = append(reqs, ctrl.Request{
 				NamespacedName: client.ObjectKey{
@@ -318,6 +319,21 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 					Namespace: biosVersionSet.Namespace,
 				},
 			})
+		} else { // if the label has been removed
+			ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, &biosVersionSet)
+			if err != nil {
+				return nil
+			}
+			for _, biosVersion := range ownedBiosVersions.Items {
+				if biosVersion.Spec.ServerRef.Name == host.Name {
+					reqs = append(reqs, ctrl.Request{
+						NamespacedName: client.ObjectKey{
+							Name:      biosVersionSet.Name,
+							Namespace: biosVersionSet.Namespace,
+						},
+					})
+				}
+			}
 		}
 	}
 	return reqs

@@ -182,7 +182,7 @@ func (r *BIOSVersionSetReconciler) createMissingBIOSVersions(
 			}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {
-				newBiosVersion.Spec.VersionUpdateSpec = *biosVersionSet.Spec.VersionUpdateSpec.DeepCopy()
+				newBiosVersion.Spec.VersionUpdateSpec = *biosVersionSet.Spec.BiosVersionTemplate.DeepCopy()
 				newBiosVersion.Spec.ServerMaintenancePolicy = biosVersionSet.Spec.ServerMaintenancePolicy
 				newBiosVersion.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
 				return controllerutil.SetControllerReference(biosVersionSet, newBiosVersion, r.Client.Scheme())
@@ -240,7 +240,7 @@ func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionSetStatus(
 		case metalv1alpha1.BIOSVersionStateInProgress:
 			currentStatus.InProgress += 1
 		case metalv1alpha1.BIOSVersionStatePending, "":
-			currentStatus.InProgress += 1
+			currentStatus.Pending += 1
 		}
 	}
 	return currentStatus

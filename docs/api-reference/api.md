@@ -497,7 +497,7 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
-<code>VersionUpdateSpec</code><br/>
+<code>biosVersionTemplate</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">
 VersionUpdateSpec
@@ -505,10 +505,7 @@ VersionUpdateSpec
 </em>
 </td>
 <td>
-<p>
-(Members of <code>VersionUpdateSpec</code> are embedded into this type.)
-</p>
-<p>VersionUpdateSpec defines the template for the BIOSversion Resource to be applied to the servers.</p>
+<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
 </td>
 </tr>
 <tr>
@@ -573,7 +570,7 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
-<code>VersionUpdateSpec</code><br/>
+<code>biosVersionTemplate</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">
 VersionUpdateSpec
@@ -581,10 +578,7 @@ VersionUpdateSpec
 </em>
 </td>
 <td>
-<p>
-(Members of <code>VersionUpdateSpec</code> are embedded into this type.)
-</p>
-<p>VersionUpdateSpec defines the template for the BIOSversion Resource to be applied to the servers.</p>
+<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
 </td>
 </tr>
 <tr>

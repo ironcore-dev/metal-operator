@@ -17,8 +17,8 @@ type BIOSVersionSetSpec struct {
 	// +required
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 
-	// VersionUpdateSpec defines the template for the BIOSversion Resource to be applied to the servers.
-	VersionUpdateSpec `json:",inline"`
+	// BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.
+	BiosVersionTemplate VersionUpdateSpec `json:"biosVersionTemplate,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
@@ -44,7 +44,7 @@ type BIOSVersionSetStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
+// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosVersionTemplate.version`
 // +kubebuilder:printcolumn:name="TotalServers",type="integer",JSONPath=`.status.totalServers`
 // +kubebuilder:printcolumn:name="Pending",type="integer",JSONPath=`.status.pending`
 // +kubebuilder:printcolumn:name="InProgress",type="integer",JSONPath=`.status.inProgress`

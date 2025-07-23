@@ -89,13 +89,6 @@ func (r *BIOSVersionSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
-	if biosVersionSet.Status.TotalVersionResource != 0 {
-		log.Info("Waiting on the created BIOSVersion to be deleted")
-		return ctrl.Result{}, nil
-	}
-
-	log.V(1).Info("ensured cleaning up of created resource")
-
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersionSet, BIOSVersionSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err

@@ -581,7 +581,7 @@ int32
 </tr>
 <tr>
 <td>
-<code>pending</code><br/>
+<code>pendingBIOSVersion</code><br/>
 <em>
 int32
 </em>
@@ -592,7 +592,7 @@ int32
 </tr>
 <tr>
 <td>
-<code>inProgress</code><br/>
+<code>inProgressBIOSVersion</code><br/>
 <em>
 int32
 </em>
@@ -603,7 +603,7 @@ int32
 </tr>
 <tr>
 <td>
-<code>completed</code><br/>
+<code>completedBIOSVersion</code><br/>
 <em>
 int32
 </em>
@@ -614,7 +614,7 @@ int32
 </tr>
 <tr>
 <td>
-<code>failed</code><br/>
+<code>failedBIOSVersion</code><br/>
 <em>
 int32
 </em>

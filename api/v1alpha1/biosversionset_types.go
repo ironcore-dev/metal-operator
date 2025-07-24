@@ -24,24 +24,25 @@ type BIOSVersionSetStatus struct {
 	// AvailableBIOSVersion is the number of BIOSVersion current created by the set.
 	AvailableBIOSVersion int32 `json:"availableBIOSVersion,omitempty"`
 	// PendingBIOSVersion is the total number of pending BIOSVersion in the set.
-	PendingBIOSVersion int32 `json:"pending,omitempty"`
+	PendingBIOSVersion int32 `json:"pendingBIOSVersion,omitempty"`
 	// InProgressBIOSVersion is the total number of BIOSVersion in the set that are currently in InProgress.
-	InProgressBIOSVersion int32 `json:"inProgress,omitempty"`
+	InProgressBIOSVersion int32 `json:"inProgressBIOSVersion,omitempty"`
 	// CompletedBIOSVersion is the total number of completed BIOSVersion in the set.
-	CompletedBIOSVersion int32 `json:"completed,omitempty"`
+	CompletedBIOSVersion int32 `json:"completedBIOSVersion,omitempty"`
 	// FailedBIOSVersion is the total number of failed BIOSVersion in the set.
-	FailedBIOSVersion int32 `json:"failed,omitempty"`
+	FailedBIOSVersion int32 `json:"failedBIOSVersion,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosVersionTemplate.version`
-// +kubebuilder:printcolumn:name="TotalServers",type="integer",JSONPath=`.status.totalServers`
-// +kubebuilder:printcolumn:name="Pending",type="integer",JSONPath=`.status.pending`
-// +kubebuilder:printcolumn:name="InProgress",type="integer",JSONPath=`.status.inProgress`
-// +kubebuilder:printcolumn:name="Completed",type="integer",JSONPath=`.status.completed`
-// +kubebuilder:printcolumn:name="Failed",type="integer",JSONPath=`.status.failed`
+// +kubebuilder:printcolumn:name="selectedServers",type="integer",JSONPath=`.status.fullyLabeledServers`
+// +kubebuilder:printcolumn:name="AvailableBIOSVersion",type="integer",JSONPath=`.status.availableBIOSVersion`
+// +kubebuilder:printcolumn:name="Pending",type="integer",JSONPath=`.status.pendingBIOSVersion`
+// +kubebuilder:printcolumn:name="InProgress",type="integer",JSONPath=`.status.inProgressBIOSVersion`
+// +kubebuilder:printcolumn:name="Completed",type="integer",JSONPath=`.status.completedBIOSVersion`
+// +kubebuilder:printcolumn:name="Failed",type="integer",JSONPath=`.status.failedBIOSVersion`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BIOSVersionSet is the Schema for the biosversionsets API.

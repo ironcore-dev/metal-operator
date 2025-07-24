@@ -24,19 +24,22 @@ spec:
     - jsonPath: .spec.biosVersionTemplate.version
       name: BIOSVersion
       type: string
-    - jsonPath: .status.totalServers
-      name: TotalServers
+    - jsonPath: .status.fullyLabeledServers
+      name: selectedServers
       type: integer
-    - jsonPath: .status.pending
+    - jsonPath: .status.availableBIOSVersion
+      name: AvailableBIOSVersion
+      type: integer
+    - jsonPath: .status.pendingBIOSVersion
       name: Pending
       type: integer
-    - jsonPath: .status.inProgress
+    - jsonPath: .status.inProgressBIOSVersion
       name: InProgress
       type: integer
-    - jsonPath: .status.completed
+    - jsonPath: .status.completedBIOSVersion
       name: Completed
       type: integer
-    - jsonPath: .status.failed
+    - jsonPath: .status.failedBIOSVersion
       name: Failed
       type: integer
     - jsonPath: .metadata.creationTimestamp
@@ -218,12 +221,12 @@ spec:
                   created by the set.
                 format: int32
                 type: integer
-              completed:
+              completedBIOSVersion:
                 description: CompletedBIOSVersion is the total number of completed
                   BIOSVersion in the set.
                 format: int32
                 type: integer
-              failed:
+              failedBIOSVersion:
                 description: FailedBIOSVersion is the total number of failed BIOSVersion
                   in the set.
                 format: int32
@@ -232,12 +235,12 @@ spec:
                 description: fullyLabeledServers is the number of server in the set.
                 format: int32
                 type: integer
-              inProgress:
+              inProgressBIOSVersion:
                 description: InProgressBIOSVersion is the total number of BIOSVersion
                   in the set that are currently in InProgress.
                 format: int32
                 type: integer
-              pending:
+              pendingBIOSVersion:
                 description: PendingBIOSVersion is the total number of pending BIOSVersion
                   in the set.
                 format: int32

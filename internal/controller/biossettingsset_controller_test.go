@@ -10,6 +10,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
@@ -140,36 +141,60 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			Expect(k8sClient.Create(ctx, biosSettingsSet)).To(Succeed())
 
 			By("Checking if the biosSettings has been created")
-			biosSettings01 := &metalv1alpha1.BIOSSettings{
+			biosSettings02 := &metalv1alpha1.BIOSSettings{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: biosSettingsSet.Name + "-" + server02.Name,
 				},
 			}
-			Eventually(Get(biosSettings01)).Should(Succeed())
+			Eventually(Get(biosSettings02)).Should(Succeed())
 
-			By("Checking if the 2nd maintenance has been created")
-			biosSettings02 := &metalv1alpha1.BIOSSettings{
+			By("Checking the biosVersion02 have completed")
+			Eventually(Object(biosSettings02)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+				HaveField("Spec.Version", biosSettingsSet.Spec.Version),
+				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+					APIVersion:         "metal.ironcore.dev/v1alpha1",
+					Kind:               "BIOSSettingsSet",
+					Name:               biosSettingsSet.Name,
+					UID:                biosSettingsSet.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				})),
+			))
+
+			By("Checking if the 2nd BIOSSettings has been created")
+			biosSettings03 := &metalv1alpha1.BIOSSettings{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: biosSettingsSet.Name + "-" + server03.Name,
 				},
 			}
-			Eventually(Get(biosSettings02)).Should(Succeed())
+			Eventually(Get(biosSettings03)).Should(Succeed())
+
+			By("Checking the biosVersion03 have completed")
+			Eventually(Object(biosSettings03)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+				HaveField("Spec.Version", biosSettingsSet.Spec.Version),
+				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+					APIVersion:         "metal.ironcore.dev/v1alpha1",
+					Kind:               "BIOSSettingsSet",
+					Name:               biosSettingsSet.Name,
+					UID:                biosSettingsSet.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				})),
+			))
 
 			By("Checking if the status has been updated")
 			Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
-				HaveField("Status.TotalServers", BeNumerically("==", 2)),
-				HaveField("Status.TotalSettings", BeNumerically("==", 2)),
-				HaveField("Status.InProgress", BeNumerically("==", 0)),
-				HaveField("Status.Completed", BeNumerically("==", 2)),
-				HaveField("Status.Failed", BeNumerically("==", 0)),
+				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+				HaveField("Status.InProgressBIOSSettings", BeNumerically("==", 0)),
+				HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 2)),
+				HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
 			))
 
 			By("Deleting the resource")
 			Expect(k8sClient.Delete(ctx, biosSettingsSet)).To(Succeed())
-
-			By("Checking if the BIOSSettings have been deleted")
-			Eventually(Get(biosSettings01)).ShouldNot(Succeed())
-			Eventually(Get(biosSettings02)).ShouldNot(Succeed())
 		})
 	})
 })

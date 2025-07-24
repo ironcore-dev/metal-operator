@@ -10,11 +10,15 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -72,9 +76,10 @@ func (r *BIOSSettingsSetReconciler) delete(
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	currentStatus := r.getOwnedBIOSSettingsStatus(ownedBiosSettings)
+	currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
 
-	if currentStatus.TotalSettings != (currentStatus.Completed + currentStatus.Failed) {
+	if currentStatus.AvailableBIOSSettings != (currentStatus.CompletedBIOSSettings+currentStatus.FailedBIOSSettings) ||
+		currentStatus.AvailableBIOSSettings != biosSettingsSet.Status.AvailableBIOSSettings {
 		err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 		if err != nil {
 			log.Error(err, "failed to update current Status")
@@ -83,12 +88,6 @@ func (r *BIOSSettingsSetReconciler) delete(
 		log.Info("Waiting on the created BIOSSettings to reach terminal status")
 		return ctrl.Result{}, nil
 	}
-
-	if err := r.deleteBIOSSettings(ctx, log, &metalv1alpha1.ServerList{}, ownedBiosSettings); err != nil {
-		log.Error(err, "failed to cleanup created resources")
-		return ctrl.Result{}, err
-	}
-	log.V(1).Info("ensured cleaning up")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettingsSet, biosSettingsSetFinalizer); err != nil || modified {
@@ -140,27 +139,22 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 		return ctrl.Result{}, err
 	}
 
-	if len(serverList.Items) > len(ownedBiosSettings.Items) {
-		log.V(1).Info("new server found creating respective BIOSSettings")
-		if err := r.createBIOSSettings(ctx, log, serverList, ownedBiosSettings, biosSettingsSet); err != nil {
-			log.Error(err, "failed to create resources")
-			return ctrl.Result{}, err
-		}
-		// wait for any updates from owned resources
-		return ctrl.Result{}, nil
-	} else if len(serverList.Items) < len(ownedBiosSettings.Items) {
-		log.V(1).Info("servers deleted, deleting respective BIOSSettings")
-		if err := r.deleteBIOSSettings(ctx, log, serverList, ownedBiosSettings); err != nil {
-			log.Error(err, "failed to cleanup resources")
-			return ctrl.Result{}, err
-		}
-		// wait for any updates from owned resources
-		return ctrl.Result{}, nil
+	if err := r.createMissingBIOSVersions(ctx, log, serverList, ownedBiosSettings, biosSettingsSet); err != nil {
+		log.Error(err, "failed to create resources")
+		return ctrl.Result{}, err
+	}
+
+	log.V(1).Info("Summary of servers and BIOSSettings", "Server count", len(serverList.Items),
+		"BIOSVersion count", len(ownedBiosSettings.Items))
+
+	if err := r.deleteOrphanBIOSVersions(ctx, log, serverList, ownedBiosSettings); err != nil {
+		log.Error(err, "failed to cleanup resources")
+		return ctrl.Result{}, err
 	}
 
 	log.V(1).Info("updating the status of BIOSSettingsSet")
-	currentStatus := r.getOwnedBIOSSettingsStatus(ownedBiosSettings)
-	currentStatus.TotalServers = int32(len(serverList.Items))
+	currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
+	currentStatus.FullyLabeledServers = int32(len(serverList.Items))
 
 	err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 	if err != nil {
@@ -177,11 +171,11 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettingsFlow(
 	serverList *metalv1alpha1.ServerList,
 	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
 ) (ctrl.Result, error) {
-	log.V(1).Info("to be implemented BIOSSettingsFlow")
+	log.V(1).Info("to be implemented with BIOSSettingsFlow")
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsSetReconciler) createBIOSSettings(
+func (r *BIOSSettingsSetReconciler) createMissingBIOSVersions(
 	ctx context.Context,
 	log logr.Logger,
 	serverList *metalv1alpha1.ServerList,
@@ -197,10 +191,21 @@ func (r *BIOSSettingsSetReconciler) createBIOSSettings(
 	var errs []error
 	for _, server := range serverList.Items {
 		if !serverWithSettings[server.Name] {
-			newBiosSetting := &metalv1alpha1.BIOSSettings{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("%s-%s", biosSettingsSet.Name, server.Name),
-				}}
+
+			newBiosSettingsName := fmt.Sprintf("%s-%s", biosSettingsSet.Name, server.Name)
+			var newBiosSetting *metalv1alpha1.BIOSSettings
+			if len(newBiosSettingsName) > utilvalidation.DNS1123SubdomainMaxLength {
+				log.V(1).Info("BiosSettings name is too long, it will be shortened using randam string", "name", newBiosSettingsName)
+				newBiosSetting = &metalv1alpha1.BIOSSettings{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: newBiosSettingsName[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-",
+					}}
+			} else {
+				newBiosSetting = &metalv1alpha1.BIOSSettings{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: newBiosSettingsName,
+					}}
+			}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosSetting, func() error {
 				newBiosSetting.Spec.ServerMaintenancePolicy = biosSettingsSet.Spec.ServerMaintenancePolicy
@@ -218,7 +223,7 @@ func (r *BIOSSettingsSetReconciler) createBIOSSettings(
 	return errors.Join(errs...)
 }
 
-func (r *BIOSSettingsSetReconciler) deleteBIOSSettings(
+func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSVersions(
 	ctx context.Context,
 	log logr.Logger,
 	serverList *metalv1alpha1.ServerList,
@@ -246,21 +251,21 @@ func (r *BIOSSettingsSetReconciler) deleteBIOSSettings(
 	return errors.Join(errs...)
 }
 
-func (r *BIOSSettingsSetReconciler) getOwnedBIOSSettingsStatus(
+func (r *BIOSSettingsSetReconciler) getOwnedBIOSSettingsSetStatus(
 	biosSettingsList *metalv1alpha1.BIOSSettingsList,
 ) *metalv1alpha1.BIOSSettingsSetStatus {
 	currentStatus := &metalv1alpha1.BIOSSettingsSetStatus{}
-	currentStatus.TotalSettings = int32(len(biosSettingsList.Items))
+	currentStatus.AvailableBIOSSettings = int32(len(biosSettingsList.Items))
 	for _, biosSettings := range biosSettingsList.Items {
 		switch biosSettings.Status.State {
 		case metalv1alpha1.BIOSSettingsStateApplied:
-			currentStatus.Completed += 1
+			currentStatus.CompletedBIOSSettings += 1
 		case metalv1alpha1.BIOSSettingsStateFailed:
-			currentStatus.Failed += 1
+			currentStatus.FailedBIOSSettings += 1
 		case metalv1alpha1.BIOSSettingsStateInProgress:
-			currentStatus.InProgress += 1
+			currentStatus.InProgressBIOSSettings += 1
 		case metalv1alpha1.BIOSSettingsStatePending, "":
-			currentStatus.InProgress += 1
+			currentStatus.PendingBIOSSettings += 1
 		}
 	}
 	return currentStatus
@@ -302,12 +307,7 @@ func (r *BIOSSettingsSetReconciler) updateStatus(
 
 	biosSettingsSetBase := biosSettingsSet.DeepCopy()
 
-	biosSettingsSet.Status.Completed = currentStatus.Completed
-	biosSettingsSet.Status.TotalServers = currentStatus.TotalServers
-	biosSettingsSet.Status.TotalSettings = currentStatus.TotalSettings
-	biosSettingsSet.Status.Failed = currentStatus.Failed
-	biosSettingsSet.Status.InProgress = currentStatus.InProgress
-	biosSettingsSet.Status.Pending = currentStatus.Pending
+	biosSettingsSet.Status = *currentStatus
 
 	if err := r.Status().Patch(ctx, biosSettingsSet, client.MergeFrom(biosSettingsSetBase)); err != nil {
 		return fmt.Errorf("failed to patch BIOSSettingsSet status: %w", err)
@@ -318,48 +318,50 @@ func (r *BIOSSettingsSetReconciler) updateStatus(
 	return nil
 }
 
-func (r *BIOSSettingsSetReconciler) enqueueBiosSettingsSetByServersListChanges(
-	ctx context.Context,
-	obj client.Object,
-) []ctrl.Request {
+func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	host := obj.(*metalv1alpha1.Server)
+	log.Info("server created/deleted/updated label")
 
-	// there is no change in server list (as its not deleted or created)
-	if host.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(host, ServerFinalizer) {
-		return nil
-	}
+	host := obj.(*metalv1alpha1.Server)
 
 	biosSettingsSetList := &metalv1alpha1.BIOSSettingsSetList{}
 	if err := r.List(ctx, biosSettingsSetList); err != nil {
-		log.Error(err, "failed to list BIOSSettingsSet")
+		log.Error(err, "failed to list BIOSVersionSet")
 		return nil
 	}
-
+	reqs := make([]ctrl.Request, 0)
 	for _, biosSettingsSet := range biosSettingsSetList.Items {
-		serverList, err := r.getServersBySelector(ctx, &biosSettingsSet)
+		selector, err := metav1.LabelSelectorAsSelector(&biosSettingsSet.Spec.ServerSelector)
 		if err != nil {
-			log.Error(err, "failed to list BIOSSettingsSet servers by selector")
+			log.Error(err, "failed to convert label selector")
 			return nil
 		}
-		for _, server := range serverList.Items {
-			if server.Name == host.Name {
-				ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, &biosSettingsSet)
-				if err != nil {
-					log.Error(err, "failed to list Owned BIOSSettings")
-					return nil
-				}
-				if len(ownedBiosSettings.Items) != len(serverList.Items) {
-					return []ctrl.Request{{
+		// if the host label matches the selector, enqueue the request
+		if selector.Matches(labels.Set(host.GetLabels())) {
+			reqs = append(reqs, ctrl.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      biosSettingsSet.Name,
+					Namespace: biosSettingsSet.Namespace,
+				},
+			})
+		} else { // if the label has been removed
+			ownedBiosVersions, err := r.getOwnedBIOSSettings(ctx, &biosSettingsSet)
+			if err != nil {
+				return nil
+			}
+			for _, biosVersion := range ownedBiosVersions.Items {
+				if biosVersion.Spec.ServerRef.Name == host.Name {
+					reqs = append(reqs, ctrl.Request{
 						NamespacedName: client.ObjectKey{
 							Name:      biosSettingsSet.Name,
 							Namespace: biosSettingsSet.Namespace,
-						}}}
+						},
+					})
 				}
 			}
 		}
 	}
-	return nil
+	return reqs
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -367,6 +369,9 @@ func (r *BIOSSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSSettingsSet{}).
 		Owns(&metalv1alpha1.BIOSSettings{}).
-		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsSetByServersListChanges)).
+		Watches(
+			&metalv1alpha1.Server{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
+			builder.WithPredicates(predicate.LabelChangedPredicate{})).
 		Complete(r)
 }

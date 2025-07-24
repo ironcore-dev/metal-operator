@@ -247,7 +247,7 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 			// to allow deletion of the resource and allow re-apply of setting if server comes back.
 			// not moving to failed state,
 			// As when in failed state we can not delete the resource, as it will be blocked through webhook
-			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStatePending)
+			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStatePending, nil)
 			return ctrl.Result{}, err
 		}
 		log.V(1).Info("Referred server object could not be fetched")

@@ -24,22 +24,22 @@ spec:
     - jsonPath: .spec.version
       name: BIOSVersion
       type: string
-    - jsonPath: .spec.serverSelector
-      name: serverLabelSelector
-      type: string
-    - jsonPath: .status.totalServers
+    - jsonPath: .status.fullyLabeledServers
       name: TotalServers
       type: string
-    - jsonPath: .status.pending
+    - jsonPath: .status.availableBIOSSettings
+      name: AvailableBIOSSettings
+      type: string
+    - jsonPath: .status.pendingBIOSSettings
       name: Pending
       type: string
-    - jsonPath: .status.inProgress
+    - jsonPath: .status.inProgressBIOSSettings
       name: InProgress
       type: string
-    - jsonPath: .status.completed
+    - jsonPath: .status.completedBIOSSettings
       name: Completed
       type: string
-    - jsonPath: .status.failed
+    - jsonPath: .status.failedBIOSSettings
       name: Failed
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -121,12 +121,16 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: ServerSelector is immutable
+                  rule: self == oldSelf
               settingsFlow:
                 description: |-
                   SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
                   if the settingsFlow length is 1, BIOSSettings resource is created.
                   if the length is more than 1, BIOSSettingsFlow resource is created.
                 items:
+                  description: 'todo: remove this when we #351 merge'
                   properties:
                     priority:
                       description: |-
@@ -143,11 +147,12 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-validations:
-                - message: serverSelector is immutable
+                - message: SettingsFlow is immutable
                   rule: self == oldSelf
               version:
-                description: 'Version contains software (eg: BIOS, BMC) version this
-                  settings applies to'
+                description: |-
+                  todo: merge this into common structure when we #351 merged
+                  Version contains software (eg: BIOS, BMC) version this settings applies to
                 type: string
             required:
             - serverSelector
@@ -156,32 +161,33 @@ spec:
           status:
             description: BIOSSettingsSetStatus defines the observed state of BIOSSettingsSet.
             properties:
-              completed:
-                description: Completed is the total number of completed server in
-                  the set.
+              availableBIOSSettings:
+                description: AvailableBIOSVersion is the number of Settings current
+                  created by the set.
                 format: int32
                 type: integer
-              failed:
-                description: Failed is the total number of failed server in the set.
+              completedBIOSSettings:
+                description: CompletedBIOSSettings is the total number of completed
+                  server in the set.
                 format: int32
                 type: integer
-              inProgress:
-                description: InMaintenance is the total number of server in the set
-                  that are currently in InProgress.
+              failedBIOSSettings:
+                description: FailedBIOSSettings is the total number of failed server
+                  in the set.
                 format: int32
                 type: integer
-              pending:
-                description: Pending is the total number of pending server in the
-                  set.
+              fullyLabeledServers:
+                description: FullyLabeledServers is the number of server in the set.
                 format: int32
                 type: integer
-              totalServers:
-                description: TotalServers is the number of server in the set.
+              inProgressBIOSSettings:
+                description: InProgressBIOSSettings is the total number of server
+                  in the set that are currently in InProgress.
                 format: int32
                 type: integer
-              totalSettings:
-                description: TotalSettings is the number of Settings current created
-                  by the set.
+              pendingBIOSSettings:
+                description: PendingBIOSSettings is the total number of pending server
+                  in the set.
                 format: int32
                 type: integer
             type: object

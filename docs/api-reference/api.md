@@ -204,20 +204,8 @@ string
 </em>
 </td>
 <td>
-<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+<p>todo: merge this into common structure when we #351 merged
+Version contains software (eg: BIOS, BMC) version this settings applies to</p>
 </td>
 </tr>
 <tr>
@@ -246,6 +234,19 @@ ServerMaintenancePolicy
 <p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
 if the settingsFlow length is 1, BIOSSettings resource is created.
 if the length is more than 1, BIOSSettingsFlow resource is created.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
 </td>
 </tr>
 </table>
@@ -289,20 +290,8 @@ string
 </em>
 </td>
 <td>
-<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+<p>todo: merge this into common structure when we #351 merged
+Version contains software (eg: BIOS, BMC) version this settings applies to</p>
 </td>
 </tr>
 <tr>
@@ -333,6 +322,19 @@ if the settingsFlow length is 1, BIOSSettings resource is created.
 if the length is more than 1, BIOSSettingsFlow resource is created.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSetStatus">BIOSSettingsSetStatus
@@ -353,68 +355,68 @@ if the length is more than 1, BIOSSettingsFlow resource is created.</p>
 <tbody>
 <tr>
 <td>
-<code>totalServers</code><br/>
+<code>fullyLabeledServers</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>TotalServers is the number of server in the set.</p>
+<p>FullyLabeledServers is the number of server in the set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>totalSettings</code><br/>
+<code>availableBIOSSettings</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>TotalSettings is the number of Settings current created by the set.</p>
+<p>AvailableBIOSVersion is the number of Settings current created by the set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>pending</code><br/>
+<code>pendingBIOSSettings</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>Pending is the total number of pending server in the set.</p>
+<p>PendingBIOSSettings is the total number of pending server in the set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>inProgress</code><br/>
+<code>inProgressBIOSSettings</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>InMaintenance is the total number of server in the set that are currently in InProgress.</p>
+<p>InProgressBIOSSettings is the total number of server in the set that are currently in InProgress.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>completed</code><br/>
+<code>completedBIOSSettings</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>Completed is the total number of completed server in the set.</p>
+<p>CompletedBIOSSettings is the total number of completed server in the set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>failed</code><br/>
+<code>failedBIOSSettings</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>Failed is the total number of failed server in the set.</p>
+<p>FailedBIOSSettings is the total number of failed server in the set.</p>
 </td>
 </tr>
 </tbody>
@@ -4433,6 +4435,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec</a>)
 </p>
 <div>
+<p>todo: remove this when we #351 merge</p>
 </div>
 <table>
 <thead>

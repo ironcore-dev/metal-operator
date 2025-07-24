@@ -756,7 +756,7 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 		return err
 	}
 	var forceUpdate bool
-	if biosVersion.Spec.Policy != nil && *biosVersion.Spec.Policy == metalv1alpha1.UpdatePolicyForce {
+	if biosVersion.Spec.UpdatePolicy != nil && *biosVersion.Spec.UpdatePolicy == metalv1alpha1.UpdatePolicyForce {
 		forceUpdate = true
 	}
 

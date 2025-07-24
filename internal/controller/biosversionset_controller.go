@@ -78,8 +78,8 @@ func (r *BIOSVersionSetReconciler) delete(
 
 	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
 
-	if currentStatus.TotalVersionResource != (currentStatus.Completed+currentStatus.Failed) ||
-		biosVersionSet.Status.TotalVersionResource != currentStatus.TotalVersionResource {
+	if currentStatus.AvailableBIOSVersion != (currentStatus.CompletedBIOSVersion+currentStatus.FailedBIOSVersion) ||
+		biosVersionSet.Status.AvailableBIOSVersion != currentStatus.AvailableBIOSVersion {
 		err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
 		if err != nil {
 			log.Error(err, "failed to update current Status")
@@ -139,7 +139,7 @@ func (r *BIOSVersionSetReconciler) reconcile(
 
 	log.V(1).Info("updating the status of BIOSVersionSet")
 	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
-	currentStatus.TotalServers = int32(len(serverList.Items))
+	currentStatus.FullyLabeledServers = int32(len(serverList.Items))
 
 	err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
 	if err != nil {
@@ -229,17 +229,17 @@ func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionSetStatus(
 	biosVersionList *metalv1alpha1.BIOSVersionList,
 ) *metalv1alpha1.BIOSVersionSetStatus {
 	currentStatus := &metalv1alpha1.BIOSVersionSetStatus{}
-	currentStatus.TotalVersionResource = int32(len(biosVersionList.Items))
+	currentStatus.AvailableBIOSVersion = int32(len(biosVersionList.Items))
 	for _, biosVersion := range biosVersionList.Items {
 		switch biosVersion.Status.State {
 		case metalv1alpha1.BIOSVersionStateCompleted:
-			currentStatus.Completed += 1
+			currentStatus.CompletedBIOSVersion += 1
 		case metalv1alpha1.BIOSVersionStateFailed:
-			currentStatus.Failed += 1
+			currentStatus.FailedBIOSVersion += 1
 		case metalv1alpha1.BIOSVersionStateInProgress:
-			currentStatus.InProgress += 1
+			currentStatus.InProgressBIOSVersion += 1
 		case metalv1alpha1.BIOSVersionStatePending, "":
-			currentStatus.Pending += 1
+			currentStatus.PendingBIOSVersion += 1
 		}
 	}
 	return currentStatus

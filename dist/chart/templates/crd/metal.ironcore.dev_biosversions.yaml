@@ -170,7 +170,7 @@ spec:
                 - message: serverRef is immutable
                   rule: self == oldSelf
               updatePolicy:
-                description: Policy An indication of whether the server's upgrade
+                description: UpdatePolicy An indication of whether the server's upgrade
                   service should bypass vendor update policies
                 type: string
               version:

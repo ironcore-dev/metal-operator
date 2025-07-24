@@ -34,9 +34,9 @@ type VersionUpdateSpec struct {
 	// +required
 	Version string `json:"version"`
 
-	// Policy An indication of whether the server's upgrade service should bypass vendor update policies
+	// UpdatePolicy An indication of whether the server's upgrade service should bypass vendor update policies
 	// +optional
-	Policy *UpdatePolicy `json:"updatePolicy,omitempty"`
+	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
 
 	// details regarding the image to use to upgrade to given BIOS version
 	// +required

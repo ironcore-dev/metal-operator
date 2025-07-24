@@ -19,18 +19,18 @@ type BIOSVersionSetSpec struct {
 
 // BIOSVersionSetStatus defines the observed state of BIOSVersionSet.
 type BIOSVersionSetStatus struct {
-	// TotalServers is the number of server in the set.
-	TotalServers int32 `json:"totalServers,omitempty"`
-	// TotalVersionResource is the number of Settings current created by the set.
-	TotalVersionResource int32 `json:"totalVersionResource,omitempty"`
-	// Pending is the total number of pending server in the set.
-	Pending int32 `json:"pending,omitempty"`
-	// InMaintenance is the total number of server in the set that are currently in InProgress.
-	InProgress int32 `json:"inProgress,omitempty"`
-	// Completed is the total number of completed server in the set.
-	Completed int32 `json:"completed,omitempty"`
-	// Failed is the total number of failed server in the set.
-	Failed int32 `json:"failed,omitempty"`
+	// fullyLabeledServers is the number of server in the set.
+	FullyLabeledServers int32 `json:"fullyLabeledServers,omitempty"`
+	// AvailableBIOSVersion is the number of BIOSVersion current created by the set.
+	AvailableBIOSVersion int32 `json:"availableBIOSVersion,omitempty"`
+	// PendingBIOSVersion is the total number of pending BIOSVersion in the set.
+	PendingBIOSVersion int32 `json:"pending,omitempty"`
+	// InProgressBIOSVersion is the total number of BIOSVersion in the set that are currently in InProgress.
+	InProgressBIOSVersion int32 `json:"inProgress,omitempty"`
+	// CompletedBIOSVersion is the total number of completed BIOSVersion in the set.
+	CompletedBIOSVersion int32 `json:"completed,omitempty"`
+	// FailedBIOSVersion is the total number of failed BIOSVersion in the set.
+	FailedBIOSVersion int32 `json:"failed,omitempty"`
 }
 
 // +kubebuilder:object:root=true

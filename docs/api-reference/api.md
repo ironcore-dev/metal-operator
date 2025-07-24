@@ -559,24 +559,24 @@ VersionUpdateSpec
 <tbody>
 <tr>
 <td>
-<code>totalServers</code><br/>
+<code>fullyLabeledServers</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>TotalServers is the number of server in the set.</p>
+<p>fullyLabeledServers is the number of server in the set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>totalVersionResource</code><br/>
+<code>availableBIOSVersion</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>TotalVersionResource is the number of Settings current created by the set.</p>
+<p>AvailableBIOSVersion is the number of BIOSVersion current created by the set.</p>
 </td>
 </tr>
 <tr>
@@ -587,7 +587,7 @@ int32
 </em>
 </td>
 <td>
-<p>Pending is the total number of pending server in the set.</p>
+<p>PendingBIOSVersion is the total number of pending BIOSVersion in the set.</p>
 </td>
 </tr>
 <tr>
@@ -598,7 +598,7 @@ int32
 </em>
 </td>
 <td>
-<p>InMaintenance is the total number of server in the set that are currently in InProgress.</p>
+<p>InProgressBIOSVersion is the total number of BIOSVersion in the set that are currently in InProgress.</p>
 </td>
 </tr>
 <tr>
@@ -609,7 +609,7 @@ int32
 </em>
 </td>
 <td>
-<p>Completed is the total number of completed server in the set.</p>
+<p>CompletedBIOSVersion is the total number of completed BIOSVersion in the set.</p>
 </td>
 </tr>
 <tr>
@@ -620,7 +620,7 @@ int32
 </em>
 </td>
 <td>
-<p>Failed is the total number of failed server in the set.</p>
+<p>FailedBIOSVersion is the total number of failed BIOSVersion in the set.</p>
 </td>
 </tr>
 </tbody>
@@ -4682,7 +4682,7 @@ UpdatePolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Policy An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+<p>UpdatePolicy An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
 </td>
 </tr>
 <tr>

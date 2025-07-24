@@ -397,34 +397,6 @@ Kubernetes core/v1.LocalObjectReference
 <p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -508,20 +480,6 @@ VersionUpdateSpec
 <p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -579,20 +537,6 @@ VersionUpdateSpec
 </td>
 <td>
 <p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
 </td>
 </tr>
 </tbody>
@@ -725,34 +669,6 @@ Kubernetes core/v1.LocalObjectReference
 <td>
 <em>(Optional)</em>
 <p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -3729,7 +3645,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.VersionUpdateSpec">VersionUpdateSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4780,6 +4696,34 @@ ImageSpec
 </td>
 <td>
 <p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>

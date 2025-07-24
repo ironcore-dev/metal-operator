@@ -7,22 +7,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // BIOSVersionSetSpec defines the desired state of BIOSVersionSet.
 type BIOSVersionSetSpec struct {
-
 	// ServerSelector specifies a label selector to identify the servers that are to be selected.
 	// +required
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 
 	// BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.
 	BiosVersionTemplate VersionUpdateSpec `json:"biosVersionTemplate,omitempty"`
-
-	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
-	// +optional
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 }
 
 // BIOSVersionSetStatus defines the observed state of BIOSVersionSet.

@@ -183,14 +183,13 @@ func (r *BIOSVersionSetReconciler) createMissingBIOSVersions(
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {
 				newBiosVersion.Spec.VersionUpdateSpec = *biosVersionSet.Spec.BiosVersionTemplate.DeepCopy()
-				newBiosVersion.Spec.ServerMaintenancePolicy = biosVersionSet.Spec.ServerMaintenancePolicy
 				newBiosVersion.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
 				return controllerutil.SetControllerReference(biosVersionSet, newBiosVersion, r.Client.Scheme())
 			})
 			if err != nil {
 				errs = append(errs, err)
 			}
-			log.V(1).Info("Created biosVersion", "BIOSVersion", newBiosVersion.Name, "server ref", server.Name, "Operation", opResult)
+			log.V(1).Info("Created BIOSVersion", "BIOSVersion", newBiosVersion.Name, "server ref", server.Name, "Operation", opResult)
 		}
 	}
 	return errors.Join(errs...)

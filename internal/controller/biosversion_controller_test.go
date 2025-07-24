@@ -84,11 +84,11 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
-					Version: defaultMockUpServerBiosVersion,
-					Image:   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
+					Version:                 defaultMockUpServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
@@ -134,11 +134,11 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
-					Version: upgradeServerBiosVersion,
-					Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version:                 upgradeServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
@@ -232,11 +232,11 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
-					Version: upgradeServerBiosVersion,
-					Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version:                 upgradeServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())

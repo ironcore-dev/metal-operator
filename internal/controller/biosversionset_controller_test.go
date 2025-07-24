@@ -129,10 +129,10 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
 					BiosVersionTemplate: metalv1alpha1.VersionUpdateSpec{
-						Version: upgradeServerBiosVersion,
-						Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+						Version:                 upgradeServerBiosVersion,
+						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
-					ServerMaintenancePolicy: "Enforced",
 					ServerSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"metal.ironcore.dev/Manufacturer": "bar",
@@ -217,10 +217,10 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
 					BiosVersionTemplate: metalv1alpha1.VersionUpdateSpec{
-						Version: upgradeServerBiosVersion,
-						Image:   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+						Version:                 upgradeServerBiosVersion,
+						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
-					ServerMaintenancePolicy: "Enforced",
 					ServerSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"metal.ironcore.dev/Manufacturer": "bar",

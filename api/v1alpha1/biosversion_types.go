@@ -41,6 +41,14 @@ type VersionUpdateSpec struct {
 	// details regarding the image to use to upgrade to given BIOS version
 	// +required
 	Image ImageSpec `json:"image"`
+
+	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
+	// +optional
+	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
+	// +optional
+	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
@@ -52,14 +60,6 @@ type BIOSVersionSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	// +optional
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
-
-	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
-	// +optional
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
-	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 type ImageSpec struct {

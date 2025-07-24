@@ -57,8 +57,8 @@ func NewRedfishKubeBMCClient(
 }
 
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -77,14 +77,14 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) 
 		`apk add curl && curl -H 'Content-Type: application/json' \
 -d '{"SystemUUID":"%s","data":%s}}' \
 -X POST %s`,
-		systemUUID, netData, registryURL)
+		system.UUID, netData, registryURL)
 	cmd := []string{
 		"/bin/sh",
 		"-c",
 		curlCmd,
 	}
-	if err := r.createJob(context.TODO(), r.KubeClient.client, cmd, r.namespace, systemUUID); err != nil {
-		return fmt.Errorf("failed to create job for system %s: %w", systemUUID, err)
+	if err := r.createJob(context.TODO(), r.KubeClient.client, cmd, r.namespace, system.UUID); err != nil {
+		return fmt.Errorf("failed to create job for system %s: %w", system.UUID, err)
 	}
 	return nil
 }

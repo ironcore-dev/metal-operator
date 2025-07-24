@@ -32,11 +32,11 @@ func NewRedfishLocalBMCClient(
 	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
 }
 
-func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
+func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
 
 	go func() {
 		time.Sleep(250 * time.Millisecond)
-		system, err := r.getSystemByUUID(ctx, systemUUID)
+		system, err := r.getSystemFromUri(ctx, systemURI)
 		if err != nil {
 			log := ctrl.LoggerFrom(ctx)
 			log.V(1).Error(err, "failed to get system")
@@ -47,7 +47,7 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
 		if err := system.Patch(systemURI, system); err != nil {
 			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to Patch system to power on", "systemUUID", systemUUID)
+			log.V(1).Error(err, "failed to Patch system to power on", "systemUUID", systemURI)
 			return
 		}
 
@@ -65,11 +65,11 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemUUID string) error {
 	return nil
 }
 
-func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error {
+func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemURI string) error {
 
 	go func() {
 		time.Sleep(250 * time.Millisecond)
-		system, err := r.getSystemByUUID(ctx, systemUUID)
+		system, err := r.getSystemFromUri(ctx, systemURI)
 		if err != nil {
 			log := ctrl.LoggerFrom(ctx)
 			log.V(1).Error(err, "failed to get system")
@@ -80,7 +80,7 @@ func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemUUID string) error 
 		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
 		if err := system.Patch(systemURI, system); err != nil {
 			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to Patch system to power off", "systemUUID", systemUUID)
+			log.V(1).Error(err, "failed to Patch system to power off", "systemURI", systemURI)
 			return
 		}
 	}()
@@ -376,4 +376,49 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.Settings
 		return reset, err
 	}
 	return common.CheckAttribues(attrs, filtered)
+}
+
+func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
+	if UnitTestMockUps.BMCVersion == "" {
+		var err error
+		UnitTestMockUps.BMCVersion, err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
+		if err != nil {
+			return "", err
+		}
+	}
+	return UnitTestMockUps.BMCVersion, nil
+}
+
+func (r *RedfishLocalBMC) UpgradeBMCVersion(
+	ctx context.Context,
+	manufacturer string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, bool, error) {
+	UnitTestMockUps.BMCUpgradeTaskIndex = 0
+	// note, ImageURI is mocked for testing upgrading to version
+	UnitTestMockUps.BMCUpgradingVersion = parameters.ImageURI
+	// this go routine mocks the upgrade progress
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+			time.Sleep(5 * time.Millisecond)
+			UnitTestMockUps.BMCUpgradeTaskIndex = UnitTestMockUps.BMCUpgradeTaskIndex + 1
+		}
+	}()
+	return "dummyTask", false, nil
+}
+
+func (r *RedfishLocalBMC) GetBMCUpgradeTask(
+	ctx context.Context,
+	manufacturer string,
+	taskURI string,
+) (*redfish.Task, error) {
+	if UnitTestMockUps.BMCUpgradeTaskIndex > len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+		UnitTestMockUps.BMCUpgradeTaskIndex = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+	}
+	task := UnitTestMockUps.BMCUpgradeTaskStatus[UnitTestMockUps.BMCUpgradeTaskIndex].TaskState
+	if task == redfish.CompletedTaskState {
+		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
+	}
+	return &UnitTestMockUps.BMCUpgradeTaskStatus[UnitTestMockUps.BMCUpgradeTaskIndex], nil
 }

@@ -125,13 +125,31 @@ var _ = Describe("BMCSettings Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().NotTo(HaveOccurred())
 		})
 
+		It("Should NOT allow update settings is in progress. but should allow to Force it", func() {
+			By("Patching the bmcSettings V1 to Inprogress state")
+			Eventually(UpdateStatus(BMCSettingsV1, func() {
+				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
+			})).Should(Succeed())
+			By("Updating an bmcSettings V1 spec, should fail to update when inProgress")
+			bmcSettingsV1Updated := BMCSettingsV1.DeepCopy()
+			bmcSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}
+			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().To(HaveOccurred())
+			By("Updating an bmcSettings V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
+			bmcSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
+			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().ToNot(HaveOccurred())
+
+			Eventually(UpdateStatus(BMCSettingsV1, func() {
+				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateApplied
+			})).Should(Succeed())
+		})
+
 		It("Should refuse to delete if InProgress", func() {
-			By("Patching the BMCSettingsV1 to a InProgress state")
+			By("Patching the BMCSettings V1 to a InProgress state")
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
 			})).Should(Succeed())
 
-			By("Deleting the BMCSettings should fail")
+			By("Deleting the BMCSettings V1 should fail")
 			Expect(k8sClient.Delete(ctx, BMCSettingsV1)).To(Not(Succeed()), fmt.Sprintf("BMCSettings state %v", BMCSettingsV1.Status.State))
 
 			Eventually(UpdateStatus(BMCSettingsV1, func() {

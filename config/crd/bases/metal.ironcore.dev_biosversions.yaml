@@ -27,10 +27,10 @@ spec:
     - jsonPath: .spec.serverMaintenanceRef.name
       name: ServerMaintenanceRef
       type: string
-    - jsonPath: .status.upgradeTask.taskState
+    - jsonPath: .status.upgradeTask.state
       name: TaskState
       type: string
-    - jsonPath: .status.upgradeTask.taskStatus
+    - jsonPath: .status.upgradeTask.status
       name: TaskStatus
       type: string
     - jsonPath: .status.upgradeTask.percentageComplete
@@ -98,8 +98,8 @@ spec:
                 - URI
                 type: object
               serverMaintenancePolicy:
-                description: ServerMaintenancePolicy is maintenance policy to be enforced
-                  on the server.
+                description: ServerMaintenancePolicy is a maintenance policy to be
+                  enforced on the server.
                 type: string
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
@@ -168,7 +168,7 @@ spec:
                   should bypass vendor update policies
                 type: string
               version:
-                description: Version contains BIOS version to upgrade to
+                description: Version contains a BIOS version to upgrade to
                 type: string
             required:
             - image
@@ -243,15 +243,20 @@ spec:
                 description: UpgradeTask contains the state of the Upgrade Task created
                   by the BMC
                 properties:
+                  URI:
+                    description: URI is the URI of the task created by the BMC for
+                      the BIOS upgrade.
+                    type: string
                   percentageComplete:
+                    description: PercentComplete is the percentage of completion of
+                      the task.
+                    format: int32
                     type: integer
-                  taskState:
-                    description: TaskState indicates the state of a task.
+                  state:
+                    description: State is the current state of the task.
                     type: string
-                  taskStatus:
-                    description: Health indicates the health of a resource.
-                    type: string
-                  taskURI:
+                  status:
+                    description: Status is the current status of the task.
                     type: string
                 type: object
             type: object

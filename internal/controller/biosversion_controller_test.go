@@ -339,7 +339,7 @@ func ensureBiosVersionConditionTransisition(
 
 	By("Ensuring that BIOSVersion has updated the taskStatus with taskURI")
 	Eventually(Object(biosVersion)).Should(
-		HaveField("Status.UpgradeTask.TaskURI", "dummyTask"),
+		HaveField("Status.UpgradeTask.URI", "dummyTask"),
 	)
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeCompleted'")

@@ -22,10 +22,12 @@ type BIOSSettingsSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
-	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
+	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
+	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
+	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
@@ -58,22 +60,31 @@ const (
 
 // BIOSSettingsStatus defines the observed state of BIOSSettings.
 type BIOSSettingsStatus struct {
-
 	// State represents the current state of the bios configuration task.
+	// +optional
 	State BIOSSettingsState `json:"state,omitempty"`
-	// UpdateSettingState represents the current state of the bios setting update task.
-	UpdateSettingState BIOSSettingUpdateState `json:"updateSettingState,omitempty"`
+
+	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
+	// +optional
+	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
+
+	// Conditions represents the latest available observations of the BIOSSettings's current state.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosSettings.version`
+// +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.lastAppliedTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+
 // BIOSSettings is the Schema for the biossettings API.
 type BIOSSettings struct {
 	metav1.TypeMeta   `json:",inline"`

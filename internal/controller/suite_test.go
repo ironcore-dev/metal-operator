@@ -212,6 +212,8 @@ func SetupTest() *corev1.Namespace {
 				},
 			},
 		}
+		err = RegisterIndexFields(ctx, k8sManager)
+		Expect(err).ToNot(HaveOccurred(), "failed to register index fields")
 
 		// register reconciler here
 		Expect((&EndpointReconciler{

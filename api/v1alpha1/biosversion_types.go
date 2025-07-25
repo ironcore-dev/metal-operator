@@ -29,24 +29,18 @@ const (
 	UpdatePolicyForce UpdatePolicy = "Force"
 )
 
-// BIOSVersionSpec defines the desired state of BIOSVersion.
-type BIOSVersionSpec struct {
+type BIOSVersionTemplate struct {
 	// Version contains a BIOS version to upgrade to
 	// +required
 	Version string `json:"version"`
 
-	// An indication of whether the server's upgrade service should bypass vendor update policies
+	// UpdatePolicy An indication of whether the server's upgrade service should bypass vendor update policies
 	// +optional
 	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
 
 	// details regarding the image to use to upgrade to given BIOS version
 	// +required
 	Image ImageSpec `json:"image"`
-
-	// ServerRef is a reference to a specific server to apply bios upgrade on.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	// +optional
-	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
@@ -55,6 +49,17 @@ type BIOSVersionSpec struct {
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
 	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+}
+
+// BIOSVersionSpec defines the desired state of BIOSVersion.
+type BIOSVersionSpec struct {
+	// BIOSVersionTemplate defines the template for Version to be applied on the servers.
+	BIOSVersionTemplate `json:",inline"`
+
+	// ServerRef is a reference to a specific server to apply bios upgrade on.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
+	// +optional
+	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 }
 
 type ImageSpec struct {

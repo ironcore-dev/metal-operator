@@ -28,10 +28,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 "P71 v1.45 (12/06/2017)",
-				Image:                   metalv1alpha1.ImageSpec{URI: "one"},
-				ServerRef:               &v1.LocalObjectReference{Name: "foo"},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 "P71 v1.45 (12/06/2017)",
+					Image:                   metalv1alpha1.ImageSpec{URI: "one"},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: "foo"},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersionV1)).To(Succeed())
@@ -48,10 +50,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
-					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "foo"},
 				},
 			}
 			Expect(validator.ValidateCreate(ctx, biosVersionV2)).Error().To(HaveOccurred())
@@ -65,10 +69,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
@@ -83,10 +89,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
@@ -106,11 +114,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
@@ -130,10 +139,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())

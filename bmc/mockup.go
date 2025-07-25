@@ -26,6 +26,7 @@ type RedfishMockUps struct {
 func (r *RedfishMockUps) InitializeDefaults() {
 	r.BIOSSettingAttr = map[string]map[string]any{
 		"abc":       {"type": "string", "reboot": false, "value": "bar"},
+		"123":       {"type": "string", "reboot": false, "value": "foo"},
 		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 	}
 	r.BMCSettingAttr = map[string]map[string]any{
@@ -109,6 +110,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 func (r *RedfishMockUps) ResetBIOSSettings() {
 	r.BIOSSettingAttr = map[string]map[string]any{
 		"abc":       {"type": "string", "reboot": false, "value": "bar"},
+		"123":       {"type": "string", "reboot": false, "value": "foo"},
 		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 	}
 	r.PendingBIOSSetting = map[string]map[string]any{}

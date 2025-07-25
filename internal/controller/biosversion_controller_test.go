@@ -157,22 +157,15 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
-		Eventually(Object(biosVersion)).Should(SatisfyAny(
+		Eventually(Object(biosVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-			}),
-		))
+		)
 
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -253,22 +246,15 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
-		Eventually(Object(biosVersion)).Should(SatisfyAny(
+		Eventually(Object(biosVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-			}),
-		))
+		)
 
 		By("Ensuring that the biosVersion has Inprogress state and waiting")
 		Eventually(Object(biosVersion)).Should(

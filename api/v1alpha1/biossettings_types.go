@@ -18,6 +18,13 @@ type BIOSSettingsSpec struct {
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
+	// CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+	// This is used in conjunction with and BIOSSettingFlow.
+	// value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+	// If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.
+	// +optional
+	CurrentSettingPriority int32 `json:"currentSettingPriority,omitempty"`
+
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
@@ -37,25 +44,15 @@ type BIOSSettingsState string
 const (
 	// BIOSSettingsStatePending specifies that the bios setting maintenance is waiting
 	BIOSSettingsStatePending BIOSSettingsState = "Pending"
+	// BIOSSettingsStateInWaiting specifies that the BIOSSetting Controller is waiting update of the next settings
+	// from the sequence of settings from BIOSSettingsFlow.
+	BIOSSettingsStateInWaiting BIOSSettingsState = "Waiting"
 	// BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings
 	BIOSSettingsStateInProgress BIOSSettingsState = "InProgress"
 	// BIOSSettingsStateApplied specifies that the bios setting maintenance has been completed.
 	BIOSSettingsStateApplied BIOSSettingsState = "Applied"
 	// BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.
 	BIOSSettingsStateFailed BIOSSettingsState = "Failed"
-)
-
-type BIOSSettingUpdateState string
-
-const (
-	// BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.
-	BIOSSettingUpdateWaitOnServerRebootPowerOff BIOSSettingUpdateState = "WaitOnServerRebootPowerOff"
-	// BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.
-	BIOSSettingUpdateWaitOnServerRebootPowerOn BIOSSettingUpdateState = "WaitOnServerRebootPowerOn"
-	// BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server's RedFish API
-	BIOSSettingUpdateStateIssue BIOSSettingUpdateState = "IssueSettingUpdate"
-	// BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.
-	BIOSSettingUpdateStateVerification BIOSSettingUpdateState = "VerifySettingUpdate"
 )
 
 // BIOSSettingsStatus defines the observed state of BIOSSettings.
@@ -73,6 +70,12 @@ type BIOSSettingsStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
+	// used in conjunction with BIOSSettingFlow Resource
+	// value above 0 indicates that the settings was applied at one shot.
+	// +optional
+	AppliedSettingPriority int32 `json:"appliedSettingPriority,omitempty"`
 }
 
 // +kubebuilder:object:root=true

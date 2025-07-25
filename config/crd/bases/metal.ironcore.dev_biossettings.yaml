@@ -58,6 +58,14 @@ spec:
           spec:
             description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
+              currentSettingPriority:
+                description: |-
+                  CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+                  This is used in conjunction with and BIOSSettingFlow.
+                  value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+                  If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.
+                format: int32
+                type: integer
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
                   enforced on the server.
@@ -140,6 +148,13 @@ spec:
           status:
             description: BIOSSettingsStatus defines the observed state of BIOSSettings.
             properties:
+              appliedSettingPriority:
+                description: |-
+                  AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
+                  used in conjunction with BIOSSettingFlow Resource
+                  value above 0 indicates that the settings was applied at one shot.
+                format: int32
+                type: integer
               conditions:
                 description: Conditions represents the latest available observations
                   of the BIOSSettings's current state.

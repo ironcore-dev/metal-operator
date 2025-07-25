@@ -414,6 +414,7 @@ func main() { // nolint: gocyclo
 			os.Exit(1)
 		}
 	}
+
 	if err = (&controller.BMCSettingsReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
@@ -468,6 +469,14 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "unable to create webhook", "webhook", "Server")
 			os.Exit(1)
 		}
+	}
+
+	if err = (&controller.BIOSSettingsFlowReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettingsFlow")
+		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 

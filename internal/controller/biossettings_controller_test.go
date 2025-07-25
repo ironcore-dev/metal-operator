@@ -238,21 +238,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:      "ServerMaintenance",
-				Name:      serverMaintenance.Name,
-				Namespace: serverMaintenance.Namespace,
-				UID:       serverMaintenance.UID,
-			}),
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-		))
+		)
 
 		By("Ensuring that the BIOS setting has state: inProgress")
 		Eventually(Object(biosSettings)).Should(
@@ -351,21 +345,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:      "ServerMaintenance",
-				Name:      serverMaintenance.Name,
-				Namespace: serverMaintenance.Namespace,
-				UID:       serverMaintenance.UID,
-			}),
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-		))
+		)
 
 		By("Ensuring that the BIOS setting has state: inProgress")
 		Eventually(Object(biosSettings)).Should(
@@ -459,21 +447,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:      "ServerMaintenance",
-				Name:      serverMaintenance.Name,
-				Namespace: serverMaintenance.Namespace,
-				UID:       serverMaintenance.UID,
-			}),
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-		))
+		)
 
 		By("Ensuring that the Server is in Maintenance")
 		Eventually(Object(server)).Should(
@@ -656,7 +638,9 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, timeoutStartCondition, condTimerStarted)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", timeoutStartCondition, biosSettings.Spec.CurrentSettingPriority),
+				condTimerStarted)).To(BeTrue())
 			return condTimerStarted.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -664,7 +648,9 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, turnServerOnCondition, condServerPoweredOn)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", turnServerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+				condServerPoweredOn)).To(BeTrue())
 			return condServerPoweredOn.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -673,19 +659,25 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, skipRebootCondition, condSkipReboot)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOffCondition, condRebootPowerOff)).To(BeFalse())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOff)).To(BeFalse())
 				return condRebootPowerOff.Status == ""
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOnCondition, condRebootPowerOn)).To(BeFalse())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOn)).To(BeFalse())
 				return condRebootPowerOn.Status == ""
 			}).Should(BeTrue())
 	} else {
@@ -693,19 +685,25 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, skipRebootCondition, condSkipReboot)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionFalse
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOffCondition, condRebootPowerOff)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOff)).To(BeTrue())
 				return condRebootPowerOff.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOnCondition, condRebootPowerOn)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOn)).To(BeTrue())
 				return condRebootPowerOn.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 	}
@@ -713,14 +711,18 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, issueSettingsUpdateCondition, condIssueSettingsUpdate)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, biosSettings.Spec.CurrentSettingPriority),
+				condIssueSettingsUpdate)).To(BeTrue())
 			return condIssueSettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 	By("Ensuring the update has been applied by the server")
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, verifySettingCondition, condVerifySettingsUpdate)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Spec.CurrentSettingPriority),
+				condVerifySettingsUpdate)).To(BeTrue())
 			return condVerifySettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 	By("Ensuring the server maintenance has been deleted")

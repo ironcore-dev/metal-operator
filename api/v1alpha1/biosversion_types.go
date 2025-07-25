@@ -29,7 +29,7 @@ const (
 	UpdatePolicyForce UpdatePolicy = "Force"
 )
 
-type VersionUpdateSpec struct {
+type BIOSVersionTemplate struct {
 	// Version contains a BIOS version to upgrade to
 	// +required
 	Version string `json:"version"`
@@ -53,8 +53,8 @@ type VersionUpdateSpec struct {
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
 type BIOSVersionSpec struct {
-	// VersionUpdateSpec defines the template for Version to be applied on the servers.
-	VersionUpdateSpec `json:",inline"`
+	// BIOSVersionTemplate defines the template for Version to be applied on the servers.
+	BIOSVersionTemplate `json:",inline"`
 
 	// ServerRef is a reference to a specific server to apply bios upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"

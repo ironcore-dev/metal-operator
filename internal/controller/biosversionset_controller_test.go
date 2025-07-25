@@ -128,7 +128,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
-					BiosVersionTemplate: metalv1alpha1.VersionUpdateSpec{
+					BiosVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 upgradeServerBiosVersion,
 						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -216,7 +216,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
-					BiosVersionTemplate: metalv1alpha1.VersionUpdateSpec{
+					BiosVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 upgradeServerBiosVersion,
 						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,

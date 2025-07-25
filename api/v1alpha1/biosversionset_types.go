@@ -14,7 +14,7 @@ type BIOSVersionSetSpec struct {
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 
 	// BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.
-	BiosVersionTemplate VersionUpdateSpec `json:"biosVersionTemplate,omitempty"`
+	BiosVersionTemplate BIOSVersionTemplate `json:"biosVersionTemplate,omitempty"`
 }
 
 // BIOSVersionSetStatus defines the observed state of BIOSVersionSet.

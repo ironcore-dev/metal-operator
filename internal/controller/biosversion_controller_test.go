@@ -83,7 +83,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 					Version:                 defaultMockUpServerBiosVersion,
 					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -133,7 +133,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 					Version:                 upgradeServerBiosVersion,
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -231,7 +231,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 					Version:                 upgradeServerBiosVersion,
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,

@@ -28,7 +28,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 					Version:                 "P71 v1.45 (12/06/2017)",
 					Image:                   metalv1alpha1.ImageSpec{URI: "one"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -50,7 +50,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 "P71 v1.45 (12/06/2017)",
 						Image:                   metalv1alpha1.ImageSpec{URI: "two"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -69,7 +69,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 "P71 v1.45 (12/06/2017)",
 						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -89,7 +89,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 "P71 v1.45 (12/06/2017)",
 						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -114,7 +114,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 "P71 v1.45 (12/06/2017)",
 						Image:                   metalv1alpha1.ImageSpec{URI: "two"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -139,7 +139,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					VersionUpdateSpec: metalv1alpha1.VersionUpdateSpec{
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 "P71 v1.45 (12/06/2017)",
 						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,

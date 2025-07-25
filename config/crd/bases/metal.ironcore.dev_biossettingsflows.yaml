@@ -84,6 +84,8 @@ spec:
                         Priority defines the order of applying the settings
                         any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
                       format: int32
+                      maximum: 2147483645
+                      minimum: 1
                       type: integer
                     settings:
                       additionalProperties:
@@ -93,6 +95,9 @@ spec:
                   - priority
                   type: object
                 type: array
+                x-kubernetes-validations:
+                - message: settingsFlow is immutable
+                  rule: self == oldSelf
               version:
                 description: 'Version contains software (eg: BIOS, BMC) version this
                   settings applies to'

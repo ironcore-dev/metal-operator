@@ -339,16 +339,16 @@ ServerMaintenancePolicy
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Applied&#34;</p></td>
-<td><p>BIOSSettingsFlowStateApplied specifies that the bios setting maintenance has been completed.</p>
+<td><p>BIOSSettingsFlowStateApplied specifies that the BIOSSettingFlow maintenance has been completed.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>BIOSSettingsFlowStateFailed specifies that the bios setting maintenance has failed.</p>
+<td><p>BIOSSettingsFlowStateFailed specifies that the BIOSSettingFlow maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
-<td><p>BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings</p>
+<td><p>BIOSSettingsFlowStateInProgress specifies that the BIOSSettingFlow with help of BIOSSetting Controller is updating the settings</p>
 </td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td><p>BIOSSettingsFlowStatePending specifies that the bios setting maintenance is waiting</p>
+<td><p>BIOSSettingsFlowStatePending specifies that the BIOSSettingFlow is waiting to start</p>
 </td>
 </tr></tbody>
 </table>

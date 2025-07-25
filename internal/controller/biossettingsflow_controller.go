@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"slices"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
@@ -57,7 +58,6 @@ func (r *BIOSSettingsFlowReconciler) reconcileExists(
 	log logr.Logger,
 	biosSettingsFlow *metalv1alpha1.BIOSSettingsFlow,
 ) (ctrl.Result, error) {
-
 	// if object is being deleted - reconcile deletion
 	if r.shouldDelete(log, biosSettingsFlow) {
 		// todo remove log
@@ -90,10 +90,6 @@ func (r *BIOSSettingsFlowReconciler) delete(
 	log logr.Logger,
 	biosSettingsFlow *metalv1alpha1.BIOSSettingsFlow,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosSettingsFlow, BIOSSettingsFlowFinalizer) {
-		return ctrl.Result{}, nil
-	}
-
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosSettingsFlow, BIOSSettingsFlowFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
@@ -141,7 +137,7 @@ func (r *BIOSSettingsFlowReconciler) reconcile(
 		if apierrors.IsNotFound(err) {
 			// create the biosSettings for the first time
 			var err error
-			if err = r.createOrPatchBiosSettings(ctx, log, biosSettingsFlow, biosSettings); err != nil {
+			if err = r.createBiosSettings(ctx, log, biosSettingsFlow, biosSettings); err != nil {
 				log.V(1).Error(err, "Failed to get biosSettings")
 				return ctrl.Result{}, err
 			}
@@ -184,28 +180,40 @@ func (r *BIOSSettingsFlowReconciler) patchBiosSettings(
 	if biosSettings.Status.AppliedSettingPriority == math.MaxInt32 {
 		return ctrl.Result{}, nil
 	}
-	// find the next setting to apply
+
+	// find the next settings to apply based on current priority applied in BIOSettings
+	priorityMatcher := func(item metalv1alpha1.SettingsFlowItem) bool {
+		return item.Priority == biosSettings.Status.AppliedSettingPriority
+	}
+	currentSettingsIdx := slices.IndexFunc(biosSettingsFlow.Spec.SettingsFlow, priorityMatcher)
 	currentSettings := map[string]string{}
-	for idx, settings := range biosSettingsFlow.Spec.SettingsFlow {
-		maps.Copy(currentSettings, settings.Settings)
-		if settings.Priority == biosSettings.Status.AppliedSettingPriority {
-			maps.Copy(currentSettings, biosSettingsFlow.Spec.SettingsFlow[idx+1].Settings)
-			biosSettingsBase := biosSettings.DeepCopy()
-			if idx+1 == len(biosSettingsFlow.Spec.SettingsFlow)-1 {
-				// set the last update as the last update
-				biosSettings.Spec.CurrentSettingPriority = math.MaxInt32
-			} else {
-				biosSettings.Spec.CurrentSettingPriority = biosSettingsFlow.Spec.SettingsFlow[idx+1].Priority
-			}
-			log.V(1).Info("patching bios state", "settings", currentSettings, "Priority", biosSettings.Spec.CurrentSettingPriority)
-			biosSettings.Spec.SettingsMap = currentSettings
-			return ctrl.Result{}, r.Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase))
+
+	// if the current settings is found
+	if currentSettingsIdx != -1 {
+		// edge condition, make sure we only apply upto last settings
+		if currentSettingsIdx == len(biosSettingsFlow.Spec.SettingsFlow)-2 {
+			currentSettingsIdx = len(biosSettingsFlow.Spec.SettingsFlow) - 2
 		}
+		// copy settings required for the next update
+		for _, settings := range biosSettingsFlow.Spec.SettingsFlow[:currentSettingsIdx+2] {
+			maps.Copy(currentSettings, settings.Settings)
+		}
+		biosSettingsBase := biosSettings.DeepCopy()
+		if currentSettingsIdx+2 == len(biosSettingsFlow.Spec.SettingsFlow) {
+			// set the last settings as the last update (MAXINT32)
+			biosSettings.Spec.CurrentSettingPriority = math.MaxInt32
+		} else {
+			biosSettings.Spec.CurrentSettingPriority = biosSettingsFlow.Spec.SettingsFlow[currentSettingsIdx+1].Priority
+		}
+
+		log.V(1).Info("patching bios state", "settings", currentSettings, "Priority", biosSettings.Spec.CurrentSettingPriority)
+		biosSettings.Spec.SettingsMap = currentSettings
+		return ctrl.Result{}, r.Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase))
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsFlowReconciler) createOrPatchBiosSettings(
+func (r *BIOSSettingsFlowReconciler) createBiosSettings(
 	ctx context.Context,
 	log logr.Logger,
 	biosSettingsFlow *metalv1alpha1.BIOSSettingsFlow,

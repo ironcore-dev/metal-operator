@@ -12,13 +12,13 @@ import (
 type BIOSSettingsFlowState string
 
 const (
-	// BIOSSettingsFlowStatePending specifies that the bios setting maintenance is waiting
+	// BIOSSettingsFlowStatePending specifies that the BIOSSettingFlow is waiting to start
 	BIOSSettingsFlowStatePending BIOSSettingsFlowState = "Pending"
-	// BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings
+	// BIOSSettingsFlowStateInProgress specifies that the BIOSSettingFlow with help of BIOSSetting Controller is updating the settings
 	BIOSSettingsFlowStateInProgress BIOSSettingsFlowState = "InProgress"
-	// BIOSSettingsFlowStateApplied specifies that the bios setting maintenance has been completed.
+	// BIOSSettingsFlowStateApplied specifies that the BIOSSettingFlow maintenance has been completed.
 	BIOSSettingsFlowStateApplied BIOSSettingsFlowState = "Applied"
-	// BIOSSettingsFlowStateFailed specifies that the bios setting maintenance has failed.
+	// BIOSSettingsFlowStateFailed specifies that the BIOSSettingFlow maintenance has failed.
 	BIOSSettingsFlowStateFailed BIOSSettingsFlowState = "Failed"
 )
 
@@ -29,6 +29,7 @@ type BIOSSettingsFlowSpec struct {
 	Version string `json:"version"`
 
 	// SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="settingsFlow is immutable"
 	// +optional
 	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
@@ -44,6 +45,8 @@ type SettingsFlowItem struct {
 	Settings map[string]string `json:"settings,omitempty"`
 	// Priority defines the order of applying the settings
 	// any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=2147483645
 	Priority int32 `json:"priority"`
 }
 

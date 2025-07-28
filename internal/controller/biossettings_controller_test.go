@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -80,7 +81,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 	It("should successfully patch its reference to referred server", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BIOSSetting := make(map[string]string) // no setting to apply
+		biosSetting := make(map[string]string) // no setting to apply
 
 		By("Ensuring that the server has Available state")
 		Eventually(Object(server)).Should(
@@ -93,8 +94,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+					SettingsMap: biosSetting,
+					Priority:    1,
+				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -110,7 +114,25 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
-		// todo: check Conditions
+
+		By("Ensuring right number of conditions are present")
+		Eventually(
+			func(g Gomega) int {
+				g.Expect(Get(biosSettingsV1)()).To(Succeed())
+				return len(biosSettingsV1.Status.Conditions)
+			}).Should(BeNumerically("==", 1))
+
+		By("Ensuring the update has been applied by the server")
+		condVerifySettingsUpdate := &metav1.Condition{}
+		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+		Eventually(
+			func(g Gomega) bool {
+				g.Expect(Get(biosSettingsV1)()).To(Succeed())
+				g.Expect(acc.FindSlice(biosSettingsV1.Status.Conditions,
+					fmt.Sprintf("%s-%d", verifySettingCondition, biosSettingsV1.Spec.CurrentSettingPriority),
+					condVerifySettingsUpdate)).To(BeTrue())
+				return condVerifySettingsUpdate.Status == metav1.ConditionTrue
+			}).Should(BeTrue())
 
 		By("Creating a BIOSSetting V2")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
@@ -119,8 +141,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion + "2",
-				SettingsMap:             BIOSSetting,
+				Version: defaultMockUpServerBiosVersion + "2",
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+					SettingsMap: biosSetting,
+					Priority:    1,
+				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -136,7 +161,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
-		// todo: check Conditions
 
 		By("Deleting the BIOSSettings V1 (old)")
 		Expect(k8sClient.Delete(ctx, biosSettingsV1)).To(Succeed())
@@ -151,8 +175,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	It("should move to completed if no bios setting changes to referred server", func(ctx SpecContext) {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BIOSSetting := make(map[string]string)
-		BIOSSetting["abc"] = "bar"
+		biosSetting := make(map[string]string)
+		biosSetting["abc"] = "bar"
 
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -161,8 +185,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+					SettingsMap: biosSetting,
+					Priority:    1,
+				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -179,7 +206,24 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 
-		// todo: check Conditions
+		By("Ensuring right number of conditions are present")
+		Eventually(
+			func(g Gomega) int {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				return len(biosSettings.Status.Conditions)
+			}).Should(BeNumerically("==", 1))
+
+		By("Ensuring the update has been applied by the server")
+		condVerifySettingsUpdate := &metav1.Condition{}
+		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+		Eventually(
+			func(g Gomega) bool {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Spec.CurrentSettingPriority),
+					condVerifySettingsUpdate)).To(BeTrue())
+				return condVerifySettingsUpdate.Status == metav1.ConditionTrue
+			}).Should(BeTrue())
 
 		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
@@ -191,10 +235,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
-		BIOSSetting := make(map[string]string)
+		biosSetting := make(map[string]string)
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BIOSSetting["abc"] = "bar-changed-to-turn-server-on"
+		biosSetting["abc"] = "bar-changed-to-turn-server-on"
 
 		// put the server in Off state, to mock need of change in power state on server
 
@@ -211,8 +255,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+					SettingsMap: biosSetting,
+					Priority:    1,
+				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 			},
@@ -238,21 +285,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:      "ServerMaintenance",
-				Name:      serverMaintenance.Name,
-				Namespace: serverMaintenance.Namespace,
-				UID:       serverMaintenance.UID,
-			}),
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-		))
+		)
 
 		By("Ensuring that the BIOS setting has state: inProgress")
 		Eventually(Object(biosSettings)).Should(
@@ -306,8 +347,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	It("should create maintenance if setting update needs reboot", func(ctx SpecContext) {
 		// settings which does need reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BIOSSetting := make(map[string]string)
-		BIOSSetting["fooreboot"] = "144"
+		biosSetting := make(map[string]string)
+		biosSetting["fooreboot"] = "144"
 
 		// put the server in reserved state,
 
@@ -325,8 +366,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+					SettingsMap: biosSetting,
+					Priority:    1,
+				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 			},
@@ -351,21 +395,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:      "ServerMaintenance",
-				Name:      serverMaintenance.Name,
-				Namespace: serverMaintenance.Namespace,
-				UID:       serverMaintenance.UID,
-			}),
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-		))
+		)
 
 		By("Ensuring that the BIOS setting has state: inProgress")
 		Eventually(Object(biosSettings)).Should(
@@ -410,8 +448,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	It("should update setting if server is in available state", func(ctx SpecContext) {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BIOSSetting := make(map[string]string)
-		BIOSSetting["fooreboot"] = "10"
+		biosSetting := make(map[string]string)
+		biosSetting["fooreboot"] = "10"
 
 		// just to double confirm the starting state here for easy readability
 		By("Ensuring that the Server has available")
@@ -427,8 +465,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+					SettingsMap: biosSetting,
+					Priority:    1,
+				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -459,21 +500,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
-				Kind:      "ServerMaintenance",
-				Name:      serverMaintenance.Name,
-				Namespace: serverMaintenance.Namespace,
-				UID:       serverMaintenance.UID,
-			}),
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				APIVersion: metalv1alpha1.GroupVersion.String(),
 			}),
-		))
+		)
 
 		By("Ensuring that the Server is in Maintenance")
 		Eventually(Object(server)).Should(
@@ -520,8 +555,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-upgrade-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "2.45.455b66-rev4",
-				SettingsMap:             biosSetting,
+				Version: "2.45.455b66-rev4",
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+					SettingsMap: biosSetting,
+					Priority:    1,
+				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
@@ -536,7 +574,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the biosSettings resource state is correct State inVersionUpgrade")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStatePending),
 			HaveField("Status.LastAppliedTime", BeNil()),
 		))
 
@@ -590,6 +628,291 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 })
+
+var _ = Describe("BIOSSettings Sequence Controller", func() {
+	ns := SetupTest()
+
+	var (
+		server *metalv1alpha1.Server
+	)
+
+	BeforeEach(func(ctx SpecContext) {
+		By("Ensuring clean state")
+		var serverList metalv1alpha1.ServerList
+		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
+		var biosList metalv1alpha1.BIOSSettingsList
+		Eventually(ObjectList(&biosList)).Should(HaveField("Items", (BeEmpty())))
+
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server")
+
+		server = &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-maintenance-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Address: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+	})
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
+		bmc.UnitTestMockUps.ResetBIOSSettings()
+	})
+
+	It("should successfully apply sequence of settings", func(ctx SpecContext) {
+
+		By("Creating a BIOSSetting with sequence of settings")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority:    100,
+						SettingsMap: map[string]string{"fooreboot": "10"},
+					},
+					{
+						Priority:    1000,
+						SettingsMap: map[string]string{"fooreboot": "100"},
+					},
+				},
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to completed")
+		Eventually(Object(biosSettings)).WithTimeout(5 * time.Second).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+		))
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings)
+
+		By("Deleting the BIOSSettingFlow")
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+	})
+
+	It("should successfully apply sequence of different settings", func(ctx SpecContext) {
+
+		By("Creating a BIOSSetting sequence of settings")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-differnet-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority:    100,
+						SettingsMap: map[string]string{"abc": "foo-bar"},
+					},
+					{
+						Priority:    1000,
+						SettingsMap: map[string]string{"fooreboot": "100"},
+					},
+				},
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to completed")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+		))
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings)
+
+		By("Deleting the BIOSSettingFlow")
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+	})
+
+	It("should successfully apply sequence of different settings", func(ctx SpecContext) {
+
+		By("Creating a BIOSSetting sequence of settings")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-differnet-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority:    100,
+						SettingsMap: map[string]string{"abc": "foo-bar"},
+					},
+					{
+						Priority:    1000,
+						SettingsMap: map[string]string{"fooreboot": "100"},
+					},
+				},
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to completed")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+		))
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings)
+
+		By("Deleting the BIOSSettingFlow")
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+	})
+
+	It("should Fail when sequence of settings has duplicate priority", func(ctx SpecContext) {
+
+		By("Creating a BIOSSetting sequence of settings")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-differnet-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority:    5,
+						SettingsMap: map[string]string{"abc": "foo-bar"},
+					},
+					{
+						Priority:    5,
+						SettingsMap: map[string]string{"fooreboot": "100"},
+					},
+				},
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to completed")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+		))
+	})
+})
+
+func ensureBiosSettingsFlowCondition(
+	biosSettings *metalv1alpha1.BIOSSettings,
+) {
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	requiredCondition := 7
+	condMaintenanceDeleted := &metav1.Condition{}
+	condMaintenanceCreated := &metav1.Condition{}
+	condIssueSettingsUpdate := &metav1.Condition{}
+	condVerifySettingsUpdate := &metav1.Condition{}
+	condServerPoweredOn := &metav1.Condition{}
+	condSkipReboot := &metav1.Condition{}
+
+	condTimerStarted := &metav1.Condition{}
+
+	condPendingVersionUpdate := &metav1.Condition{}
+
+	By("Ensuring right number of conditions are present")
+	Eventually(
+		func(g Gomega) int {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			return len(biosSettings.Status.Conditions)
+		}).Should(BeNumerically(">=", requiredCondition*len(biosSettings.Spec.SettingsFlow)))
+
+	By(fmt.Sprintf("Ensuring the wait for version upgrade condition has NOT been added %v", condPendingVersionUpdate.Status))
+	Eventually(
+		func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, pendingVersionUpdateCondition, condPendingVersionUpdate)).To(BeFalse())
+			return condPendingVersionUpdate.Status == ""
+		}).Should(BeTrue())
+
+	By("Ensuring the serverMaintenance condition has been created")
+	Eventually(
+		func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, serverMaintenanceCreatedCondition, condMaintenanceCreated)).To(BeTrue())
+			return condMaintenanceCreated.Status == metav1.ConditionTrue
+		}).Should(BeTrue())
+
+	for _, settings := range biosSettings.Spec.SettingsFlow {
+		By(fmt.Sprintf("Ensuring the BIOSSettings Object has applied following settings %v", settings.SettingsMap))
+		By("Ensuring the timeout error start time has been recorded")
+		Eventually(
+			func(g Gomega) {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				By("Ensuring the timeout error start time has been recorded")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", timeoutStartCondition, settings.Priority),
+					condTimerStarted)).To(BeTrue())
+				g.Expect(condTimerStarted.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Ensuring the server has been powered on at the start")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", turnServerOnCondition, settings.Priority),
+					condServerPoweredOn)).To(BeTrue())
+				g.Expect(condServerPoweredOn.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Ensuring the check if reboot of server required has been completed")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
+
+				By("Ensuring the update has been issue to the server")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, settings.Priority),
+					condIssueSettingsUpdate)).To(BeTrue())
+				g.Expect(condIssueSettingsUpdate.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Ensuring the update has been applied by the server")
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", verifySettingCondition, settings.Priority),
+					condVerifySettingsUpdate)).To(BeTrue())
+				g.Expect(condVerifySettingsUpdate.Status).To(Equal(metav1.ConditionTrue))
+			}).Should(Succeed())
+	}
+
+	By("Ensuring the server maintenance has been deleted")
+	Eventually(
+		func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, serverMaintenanceDeletedCondition, condMaintenanceDeleted)).To(BeTrue())
+			return condMaintenanceDeleted.Status == metav1.ConditionTrue
+		}).Should(BeTrue())
+}
 
 func ensureBiosSettingsCondition(
 	biosSettings *metalv1alpha1.BIOSSettings,
@@ -656,7 +979,9 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, timeoutStartCondition, condTimerStarted)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", timeoutStartCondition, biosSettings.Spec.CurrentSettingPriority),
+				condTimerStarted)).To(BeTrue())
 			return condTimerStarted.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -664,7 +989,9 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, turnServerOnCondition, condServerPoweredOn)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", turnServerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+				condServerPoweredOn)).To(BeTrue())
 			return condServerPoweredOn.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -673,19 +1000,25 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, skipRebootCondition, condSkipReboot)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOffCondition, condRebootPowerOff)).To(BeFalse())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOff)).To(BeFalse())
 				return condRebootPowerOff.Status == ""
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOnCondition, condRebootPowerOn)).To(BeFalse())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOn)).To(BeFalse())
 				return condRebootPowerOn.Status == ""
 			}).Should(BeTrue())
 	} else {
@@ -693,19 +1026,25 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, skipRebootCondition, condSkipReboot)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Spec.CurrentSettingPriority),
+					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionFalse
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOffCondition, condRebootPowerOff)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOff)).To(BeTrue())
 				return condRebootPowerOff.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions, rebootPowerOnCondition, condRebootPowerOn)).To(BeTrue())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Spec.CurrentSettingPriority),
+					condRebootPowerOn)).To(BeTrue())
 				return condRebootPowerOn.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 	}
@@ -713,14 +1052,18 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, issueSettingsUpdateCondition, condIssueSettingsUpdate)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, biosSettings.Spec.CurrentSettingPriority),
+				condIssueSettingsUpdate)).To(BeTrue())
 			return condIssueSettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 	By("Ensuring the update has been applied by the server")
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions, verifySettingCondition, condVerifySettingsUpdate)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+				fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Spec.CurrentSettingPriority),
+				condVerifySettingsUpdate)).To(BeTrue())
 			return condVerifySettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 	By("Ensuring the server maintenance has been deleted")

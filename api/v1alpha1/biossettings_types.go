@@ -14,13 +14,20 @@ type BIOSSettingsSpec struct {
 	// +required
 	Version string `json:"version"`
 
-	// SettingsMap contains software (eg: BIOS, BMC) settings as map
+	// SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
 	// +optional
-	SettingsMap map[string]string `json:"settings,omitempty"`
+	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
+
+	// CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+	// This is used in conjunction with and BIOSSettingFlow.
+	// value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+	// If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.
+	// +optional
+	CurrentSettingPriority int32 `json:"currentSettingPriority,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
@@ -29,6 +36,15 @@ type BIOSSettingsSpec struct {
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
 	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+}
+
+type SettingsFlowItem struct {
+	SettingsMap map[string]string `json:"settings,omitempty"`
+	// Priority defines the order of applying the settings
+	// any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=2147483645
+	Priority int32 `json:"priority"`
 }
 
 // BIOSSettingsState specifies the current state of the BIOS maintenance.
@@ -45,19 +61,6 @@ const (
 	BIOSSettingsStateFailed BIOSSettingsState = "Failed"
 )
 
-type BIOSSettingUpdateState string
-
-const (
-	// BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.
-	BIOSSettingUpdateWaitOnServerRebootPowerOff BIOSSettingUpdateState = "WaitOnServerRebootPowerOff"
-	// BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.
-	BIOSSettingUpdateWaitOnServerRebootPowerOn BIOSSettingUpdateState = "WaitOnServerRebootPowerOn"
-	// BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server's RedFish API
-	BIOSSettingUpdateStateIssue BIOSSettingUpdateState = "IssueSettingUpdate"
-	// BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.
-	BIOSSettingUpdateStateVerification BIOSSettingUpdateState = "VerifySettingUpdate"
-)
-
 // BIOSSettingsStatus defines the observed state of BIOSSettings.
 type BIOSSettingsStatus struct {
 	// State represents the current state of the bios configuration task.
@@ -67,6 +70,12 @@ type BIOSSettingsStatus struct {
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
 	// +optional
 	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
+
+	// AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
+	// used in conjunction with BIOSSettingFlow Resource
+	// value above 0 indicates that the settings was applied at one shot.
+	// +optional
+	AppliedSettingPriority int32 `json:"appliedSettingPriority,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOSSettings's current state.
 	// +patchStrategy=merge

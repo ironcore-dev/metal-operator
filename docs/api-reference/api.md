@@ -10,31 +10,6 @@
 </div>
 Resource Types:
 <ul></ul>
-<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">BIOSSettingUpdateState
-(<code>string</code> alias)</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server&rsquo;s RedFish API</p>
-</td>
-</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
-<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
-<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
 </h3>
 <div>
@@ -88,14 +63,16 @@ string
 </tr>
 <tr>
 <td>
-<code>settings</code><br/>
+<code>settingsFlow</code><br/>
 <em>
-map[string]string
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
 </td>
 </tr>
 <tr>
@@ -109,6 +86,21 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentSettingPriority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+This is used in conjunction with and BIOSSettingFlow.
+value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.</p>
 </td>
 </tr>
 <tr>
@@ -185,14 +177,16 @@ string
 </tr>
 <tr>
 <td>
-<code>settings</code><br/>
+<code>settingsFlow</code><br/>
 <em>
-map[string]string
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
 </td>
 </tr>
 <tr>
@@ -206,6 +200,21 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to a specific server to apply bios setting on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentSettingPriority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
+This is used in conjunction with and BIOSSettingFlow.
+value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
+If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.</p>
 </td>
 </tr>
 <tr>
@@ -309,6 +318,20 @@ Kubernetes meta/v1.Time
 <td>
 <em>(Optional)</em>
 <p>LastAppliedTime represents the timestamp when the last setting was successfully applied.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>appliedSettingPriority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
+used in conjunction with BIOSSettingFlow Resource
+value above 0 indicates that the settings was applied at one shot.</p>
 </td>
 </tr>
 <tr>
@@ -4160,6 +4183,45 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the server&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.SettingsFlowItem">SettingsFlowItem
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>priority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Priority defines the order of applying the settings
+any int greater than 0. lower number have higher Priority (ie; lower number is applied first)</p>
 </td>
 </tr>
 </tbody>

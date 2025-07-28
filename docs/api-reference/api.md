@@ -90,21 +90,6 @@ Kubernetes core/v1.LocalObjectReference
 </tr>
 <tr>
 <td>
-<code>currentSettingPriority</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
-This is used in conjunction with and BIOSSettingFlow.
-value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
-If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>serverMaintenancePolicy</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
@@ -200,21 +185,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to a specific server to apply bios setting on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>currentSettingPriority</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
-This is used in conjunction with and BIOSSettingFlow.
-value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
-If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.</p>
 </td>
 </tr>
 <tr>
@@ -322,16 +292,14 @@ Kubernetes meta/v1.Time
 </tr>
 <tr>
 <td>
-<code>appliedSettingPriority</code><br/>
+<code>currentSettingPriority</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
-used in conjunction with BIOSSettingFlow Resource
-value above 0 indicates that the settings was applied at one shot.</p>
+<p>CurrentSettingPriority specifies the priority of the current settings in sequence of settings which currently is being applied.</p>
 </td>
 </tr>
 <tr>

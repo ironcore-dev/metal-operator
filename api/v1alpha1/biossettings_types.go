@@ -22,13 +22,6 @@ type BIOSSettingsSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
-	// CurrentSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which currently being applied.
-	// This is used in conjunction with and BIOSSettingFlow.
-	// value above 0 indicates that the settings are part of a sequence of settings (Flow) to be applied in a specific order.
-	// If the value is 0, it means that the settings are not part of a sequence and can be applied at one shot.
-	// +optional
-	CurrentSettingPriority int32 `json:"currentSettingPriority,omitempty"`
-
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
@@ -71,11 +64,9 @@ type BIOSSettingsStatus struct {
 	// +optional
 	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
 
-	// AppliedSettingPriority specifies the priority of the current settings in sequence of settings (Flow) which has been applied.
-	// used in conjunction with BIOSSettingFlow Resource
-	// value above 0 indicates that the settings was applied at one shot.
+	// CurrentSettingPriority specifies the priority of the current settings in sequence of settings which currently is being applied.
 	// +optional
-	AppliedSettingPriority int32 `json:"appliedSettingPriority,omitempty"`
+	CurrentSettingPriority int32 `json:"currentSettingPriority,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOSSettings's current state.
 	// +patchStrategy=merge
@@ -91,6 +82,7 @@ type BIOSSettingsStatus struct {
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="CurrentPriority",type="string",JSONPath=`.status.currentSettingPriority`
 // +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.lastAppliedTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

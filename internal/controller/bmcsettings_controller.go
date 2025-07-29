@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -576,11 +577,24 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		if serverWithMaintenances[server.Name] {
 			continue
 		}
-		serverMaintenance := &metalv1alpha1.ServerMaintenance{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: r.ManagerNamespace,
-				Name:      fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name),
-			}}
+		var serverMaintenance *metalv1alpha1.ServerMaintenance
+		newServerMaintenanceName := fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name)
+		if len(newServerMaintenanceName) > utilvalidation.DNS1123SubdomainMaxLength {
+			log.V(1).Info("ServerMaintenance name is too long, it will be shortened using randam string", "name", newServerMaintenanceName)
+			serverMaintenance = &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    r.ManagerNamespace,
+					GenerateName: newServerMaintenanceName[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-",
+				},
+			}
+		} else {
+			serverMaintenance = &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: r.ManagerNamespace,
+					Name:      fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name),
+				},
+			}
+		}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
 			serverMaintenance.Spec.Policy = bmcSetting.Spec.ServerMaintenancePolicy

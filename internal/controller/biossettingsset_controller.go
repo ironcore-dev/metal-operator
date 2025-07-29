@@ -116,16 +116,7 @@ func (r *BIOSSettingsSetReconciler) reconcile(
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
-	switch len(biosSettingsSet.Spec.SettingsFlow) {
-	case 0:
-		log.V(1).Info("BIOSSettingsSet reconciliation ended")
-		return ctrl.Result{}, nil
-	case 1:
-		return r.handleBiosSettings(ctx, log, serverList, biosSettingsSet)
-	default:
-		return r.handleBiosSettingsFlow(ctx, log, serverList, biosSettingsSet)
-	}
+	return r.handleBiosSettings(ctx, log, serverList, biosSettingsSet)
 }
 
 func (r *BIOSSettingsSetReconciler) handleBiosSettings(
@@ -165,16 +156,6 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsSetReconciler) handleBiosSettingsFlow(
-	ctx context.Context,
-	log logr.Logger,
-	serverList *metalv1alpha1.ServerList,
-	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
-) (ctrl.Result, error) {
-	log.V(1).Info("to be implemented with BIOSSettingsFlow")
-	return ctrl.Result{}, nil
-}
-
 func (r *BIOSSettingsSetReconciler) createMissingBIOSVersions(
 	ctx context.Context,
 	log logr.Logger,
@@ -208,10 +189,8 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSVersions(
 			}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosSetting, func() error {
-				newBiosSetting.Spec.ServerMaintenancePolicy = biosSettingsSet.Spec.ServerMaintenancePolicy
+				newBiosSetting.Spec.BIOSSettingsTemplate = *biosSettingsSet.Spec.BIOSSettingsTemplate.DeepCopy()
 				newBiosSetting.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
-				newBiosSetting.Spec.Version = biosSettingsSet.Spec.Version
-				newBiosSetting.Spec.SettingsMap = biosSettingsSet.Spec.SettingsFlow[0].Settings
 				return controllerutil.SetControllerReference(biosSettingsSet, newBiosSetting, r.Client.Scheme())
 			})
 			if err != nil {

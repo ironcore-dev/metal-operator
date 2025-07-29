@@ -8,19 +8,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BIOSSettingsSpec defines the desired state of BIOSSettings.
-type BIOSSettingsSpec struct {
+type BIOSSettingsTemplate struct {
 	// Version contains software (eg: BIOS, BMC) version this settings applies to
 	// +required
 	Version string `json:"version"`
 
+	// TODO: remove after PR: 403 merged. This is not going to be used anymore.
 	// SettingsMap contains software (eg: BIOS, BMC) settings as map
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
-	// ServerRef is a reference to a specific server to apply bios setting on.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
+	// SettingsMap contains software (eg: BIOS, BMC) settings as map
+	// +optional
+	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
@@ -29,6 +29,28 @@ type BIOSSettingsSpec struct {
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
 	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+}
+
+// TODO: remove this when #403 is merged
+type SettingsFlowItem struct {
+	// SettingsMap contains software (eg: BIOS, BMC) settings as map
+	// +optional
+	Settings map[string]string `json:"settings,omitempty"`
+	// Priority defines the order of applying the settings
+	// any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=2147483645
+	Priority int32 `json:"priority"`
+}
+
+// BIOSSettingsSpec defines the desired state of BIOSSettings.
+type BIOSSettingsSpec struct {
+	// BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.
+	BIOSSettingsTemplate `json:",inline"`
+
+	// ServerRef is a reference to a specific server to apply bios setting on.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
+	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 }
 
 // BIOSSettingsState specifies the current state of the BIOS maintenance.

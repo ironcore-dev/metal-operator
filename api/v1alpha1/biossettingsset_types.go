@@ -9,32 +9,13 @@ import (
 
 // BIOSSettingsSetSpec defines the desired state of BIOSSettingsSet.
 type BIOSSettingsSetSpec struct {
-	// todo: merge this into common structure when we #351 merged
-	// Version contains software (eg: BIOS, BMC) version this settings applies to
-	// +required
-	Version string `json:"version"`
-	// ServerMaintenancePolicy is maintenance policy to be enforced on the server.
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-
-	// SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
-	// if the settingsFlow length is 1, BIOSSettings resource is created.
-	// if the length is more than 1, BIOSSettingsFlow resource is created.
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="SettingsFlow is immutable"
-	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
+	// BiosSettingsTemplate defines the template for the BIOSSettings Resource to be applied to the servers.
+	BIOSSettingsTemplate BIOSSettingsTemplate `json:"biosVersionTemplate,omitempty"`
 
 	// ServerSelector specifies a label selector to identify the servers that are to be selected.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="ServerSelector is immutable"
 	// +required
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
-}
-
-// todo: remove this when we #351 merge
-type SettingsFlowItem struct {
-	Settings map[string]string `json:"settings,omitempty"`
-	// Priority defines the order of applying the settings
-	// any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
-	Priority int32 `json:"priority"`
 }
 
 // BIOSSettingsSetStatus defines the observed state of BIOSSettingsSet.

@@ -77,25 +77,18 @@ BIOSSettingsSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSSettingsTemplate</code><br/>
 <em>
-string
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
+</a>
 </em>
 </td>
 <td>
-<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settings</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>
+(Members of <code>BIOSSettingsTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -109,34 +102,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to a specific server to apply bios setting on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </table>
@@ -198,42 +163,15 @@ BIOSSettingsSetSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>biosVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>todo: merge this into common structure when we #351 merged
-Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
 </a>
 </em>
 </td>
 <td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settingsFlow</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
-[]SettingsFlowItem
-</a>
-</em>
-</td>
-<td>
-<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
-if the settingsFlow length is 1, BIOSSettings resource is created.
-if the length is more than 1, BIOSSettingsFlow resource is created.</p>
+<p>BiosSettingsTemplate defines the template for the BIOSSettings Resource to be applied to the servers.</p>
 </td>
 </tr>
 <tr>
@@ -284,42 +222,15 @@ BIOSSettingsSetStatus
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>biosVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>todo: merge this into common structure when we #351 merged
-Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
 </a>
 </em>
 </td>
 <td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settingsFlow</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
-[]SettingsFlowItem
-</a>
-</em>
-</td>
-<td>
-<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
-if the settingsFlow length is 1, BIOSSettings resource is created.
-if the length is more than 1, BIOSSettingsFlow resource is created.</p>
+<p>BiosSettingsTemplate defines the template for the BIOSSettings Resource to be applied to the servers.</p>
 </td>
 </tr>
 <tr>
@@ -439,25 +350,18 @@ int32
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSSettingsTemplate</code><br/>
 <em>
-string
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
+</a>
 </em>
 </td>
 <td>
-<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settings</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>
+(Members of <code>BIOSSettingsTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -471,34 +375,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to a specific server to apply bios setting on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -588,6 +464,89 @@ Kubernetes meta/v1.Time
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the BIOSSettings&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TODO: remove after PR: 403 merged. This is not going to be used anymore.
+SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settingsFlow</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -3799,7 +3758,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4432,10 +4391,10 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 <h3 id="metal.ironcore.dev/v1alpha1.SettingsFlowItem">SettingsFlowItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>)
 </p>
 <div>
-<p>todo: remove this when we #351 merge</p>
+<p>TODO: remove this when #403 is merged</p>
 </div>
 <table>
 <thead>
@@ -4453,6 +4412,8 @@ map[string]string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
 </td>
 </tr>
 <tr>

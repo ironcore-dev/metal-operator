@@ -127,16 +127,17 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSSettingsSetSpec{
-					Version: defaultMockUpServerBiosVersion,
+					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+						Version:                 defaultMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{Settings: map[string]string{"fooreboot": "144"}, Priority: 1},
+						},
+					},
 					ServerSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"metal.ironcore.dev/Manufacturer": "bar",
 						},
-					},
-					ServerMaintenancePolicy: "Enforced",
-
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{Settings: map[string]string{"fooreboot": "144"}},
 					},
 				},
 			}
@@ -153,7 +154,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Checking the biosSettings02 have completed")
 			Eventually(Object(biosSettings02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-				HaveField("Spec.Version", biosSettingsSet.Spec.Version),
+				HaveField("Spec.Version", biosSettingsSet.Spec.BIOSSettingsTemplate.Version),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BIOSSettingsSet",
@@ -175,7 +176,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Checking the biosSettings03 have completed")
 			Eventually(Object(biosSettings03)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-				HaveField("Spec.Version", biosSettingsSet.Spec.Version),
+				HaveField("Spec.Version", biosSettingsSet.Spec.BIOSSettingsTemplate.Version),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BIOSSettingsSet",
@@ -207,10 +208,12 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSSettingsSetSpec{
-					Version:                 defaultMockUpServerBiosVersion,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{Settings: map[string]string{"abc": "foo-bar"}},
+					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+						Version:                 defaultMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{Settings: map[string]string{"abc": "foo-bar"}, Priority: 10},
+						},
 					},
 					ServerSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -302,7 +305,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			Eventually(Get(biosSettings02)).Should(Succeed())
 			Eventually(Get(biosSettings03)).Should(Succeed())
 
-			By("Checking the biosSettings01 have completed")
+			By("Checking the biosSettings02 have completed")
 			Eventually(Object(biosSettings02)).Should(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 			)

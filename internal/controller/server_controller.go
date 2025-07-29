@@ -247,7 +247,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		log.V(1).Info("Updated Server status after state transition")
 		return ctrl.Result{Requeue: requeue, RequeueAfter: r.ResyncInterval}, nil
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
 	}
 
@@ -586,7 +586,8 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 	if err != nil {
 		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
 	}
-	log.V(1).Info("Created or patched", "ServerBootConfiguration", bootConfig.Name, "Operation", opResult)
+
+	log.V(1).Info("Created or patched", "ServerBootConfiguration", bootConfig.Name, "Namespace", bootConfig.Namespace, "Operation", opResult)
 
 	if err := r.ensureServerBootConfigRef(ctx, server, bootConfig); err != nil {
 		return err

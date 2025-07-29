@@ -351,8 +351,9 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 		return ctrl.Result{}, err
 	}
 
-	for idx, setting := range biosSettings.Spec.SettingsFlow {
-		if idx+1 < len(biosSettings.Spec.SettingsFlow) && setting.Priority == biosSettings.Spec.SettingsFlow[idx+1].Priority {
+	seenPriorities := make(map[int32]bool)
+	for _, setting := range biosSettings.Spec.SettingsFlow {
+		if seenPriorities[setting.Priority] {
 			log.V(1).Info("Duplicate Priority found", "biosSettings SettingsFlow", biosSettings.Spec.SettingsFlow)
 			duplicatePriorityStateCondition, err := r.getCondition(acc, biosSettings.Status.Conditions, duplicatePriorityCheckCondition)
 			if err != nil {
@@ -369,6 +370,7 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 			err = r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, duplicatePriorityStateCondition)
 			return ctrl.Result{}, err
 		}
+		seenPriorities[setting.Priority] = true
 	}
 
 	currentBiosVersion, settingsDiff, err := r.getBIOSVersionAndSettingDifference(ctx, log, bmcClient, biosSettings, server)

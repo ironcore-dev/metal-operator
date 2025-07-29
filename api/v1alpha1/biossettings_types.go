@@ -32,6 +32,7 @@ type BIOSSettingsSpec struct {
 }
 
 type SettingsFlowItem struct {
+	// SettingsMap contains software (eg: BIOS, BMC) settings as map
 	SettingsMap map[string]string `json:"settings,omitempty"`
 	// Priority defines the order of applying the settings
 	// any int greater than 0. lower number have higher Priority (ie; lower number is applied first)

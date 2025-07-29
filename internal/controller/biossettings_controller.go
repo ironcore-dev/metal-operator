@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
-	"sort"
 	"strconv"
 	"time"
 
@@ -336,10 +336,6 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 		return ctrl.Result{}, err
 	}
 
-	if modified, err := r.sortAndPatchSettingsFlow(ctx, log, biosSettings); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-
 	for idx, setting := range biosSettings.Spec.SettingsFlow {
 		if idx+1 < len(biosSettings.Spec.SettingsFlow) && setting.Priority == biosSettings.Spec.SettingsFlow[idx+1].Priority {
 			log.V(1).Info("Duplicate Priority found", "biosSettings SettingsFlow", biosSettings.Spec.SettingsFlow)
@@ -413,10 +409,11 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 		state = metalv1alpha1.BIOSSettingsStatePending
 		condition = versionCheckCondition
 	}
-	if biosSettings.Status.CurrentSettingPriority != biosSettings.Spec.SettingsFlow[0].Priority {
+	nextPriority := r.getNextSettingPriority(log, biosSettings)
+	if nextPriority != math.MaxInt32 && biosSettings.Status.CurrentSettingPriority == 0 {
 		log.V(1).Info("Updating the current setting priority to the first one", "currentSettingPriority", biosSettings.Spec.SettingsFlow[0].Priority)
 		biosSettingsBase := biosSettings.DeepCopy()
-		biosSettings.Status.CurrentSettingPriority = biosSettings.Spec.SettingsFlow[0].Priority
+		biosSettings.Status.CurrentSettingPriority = nextPriority
 		return ctrl.Result{}, r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase))
 	}
 	return ctrl.Result{}, r.updateBiosSettingsStatus(ctx, log, biosSettings, state, condition)
@@ -657,8 +654,9 @@ func (r *BiosSettingsReconciler) VerifySettingsUpdateComplete(
 			); err != nil {
 				return false, fmt.Errorf("failed to update verify biossetting condition: %w", err)
 			}
+			nextPriority := r.getNextSettingPriority(log, biosSettings)
 			// If the current setting priority is not the last one, we want to continue setting rest of them
-			if biosSettings.Status.CurrentSettingPriority != biosSettings.Spec.SettingsFlow[len(biosSettings.Spec.SettingsFlow)-1].Priority {
+			if nextPriority != math.MaxInt32 {
 				log.V(1).Info("Need to move on to the next sequence of BIOS setting update")
 				acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 				biosSettingsBase := biosSettings.DeepCopy()
@@ -671,15 +669,11 @@ func (r *BiosSettingsReconciler) VerifySettingsUpdateComplete(
 				); err != nil {
 					return false, fmt.Errorf("failed to patch BIOSettings condition: %w", err)
 				}
-				for _, setting := range biosSettings.Spec.SettingsFlow {
-					if setting.Priority > biosSettings.Status.CurrentSettingPriority {
-						biosSettings.Status.CurrentSettingPriority = setting.Priority
-						log.V(1).Info("Updating the settings Priority", "currentSettingPriority", biosSettings.Status.CurrentSettingPriority)
-						if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
-							return false, fmt.Errorf("failed to patch BIOSSettings status: %w", err)
-						}
-						break
-					}
+
+				biosSettings.Status.CurrentSettingPriority = nextPriority
+				log.V(1).Info("Updating the settings Priority", "currentSettingPriority", biosSettings.Status.CurrentSettingPriority)
+				if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
+					return false, fmt.Errorf("failed to patch BIOSSettings status: %w", err)
 				}
 				return false, nil
 			}
@@ -929,7 +923,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	// gather all the required settings from the settings flow
 	// in all cases its complete settings,
 	// expect during InProgress when verification of issued settings is being verified
-	priority := biosSettings.Spec.SettingsFlow[len(biosSettings.Spec.SettingsFlow)-1].Priority
+	var priority int32 = math.MaxInt32
 
 	if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
 		priority = biosSettings.Status.CurrentSettingPriority
@@ -1299,42 +1293,25 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 	return nil
 }
 
-func (r *BiosSettingsReconciler) sortAndPatchSettingsFlow(
-	ctx context.Context,
+func (r *BiosSettingsReconciler) getNextSettingPriority(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
-) (bool, error) {
+) int32 {
 
-	changed := false
-	biosSettingsBase := biosSettings.DeepCopy()
+	currentSettings := biosSettings.Status.CurrentSettingPriority
+	var nextSettings int32 = math.MaxInt32
 
 	if len(biosSettings.Spec.SettingsFlow) > 1 {
-		sort.Slice(biosSettings.Spec.SettingsFlow, func(i, j int) bool {
-			return biosSettings.Spec.SettingsFlow[i].Priority < biosSettings.Spec.SettingsFlow[j].Priority
-		})
-
-		if biosSettings.Spec.SettingsFlow[0].Priority <= 0 {
-			return false, fmt.Errorf(
-				"the lowest priority item in the settings flow must have a priority greater than 0"+
-					" got %d", biosSettings.Spec.SettingsFlow[0].Priority)
-		}
-
-		for idx, settings := range biosSettingsBase.Spec.SettingsFlow {
-			if settings.Priority != biosSettings.Spec.SettingsFlow[idx].Priority {
-				changed = true
-				break
+		for _, settings := range biosSettings.Spec.SettingsFlow {
+			if settings.Priority > currentSettings && settings.Priority <= nextSettings {
+				nextSettings = settings.Priority
 			}
 		}
+	} else if currentSettings < biosSettings.Spec.SettingsFlow[0].Priority {
+		nextSettings = biosSettings.Spec.SettingsFlow[0].Priority
 	}
-
-	if !changed {
-		return false, nil
-	}
-	if err := r.Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
-		return true, fmt.Errorf("failed to patch BIOSSettings Settings: %w", err)
-	}
-	log.V(1).Info("Updated biosSettingsFlow SettingsFlow", "Updated SettingsFlow", biosSettings.Spec.SettingsFlow)
-	return true, nil
+	log.V(1).Info("Found next setting priority", "currentSettingPriority", currentSettings, "nextSettingPriority", nextSettings)
+	return nextSettings
 }
 
 func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(

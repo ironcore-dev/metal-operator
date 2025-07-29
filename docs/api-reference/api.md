@@ -360,40 +360,18 @@ BIOSVersionSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains a BIOS version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BIOS version</p>
+<p>
+(Members of <code>BIOSVersionTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSVersionTemplate defines the template for Version to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -410,34 +388,6 @@ Kubernetes core/v1.LocalObjectReference
 <p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -451,6 +401,217 @@ BIOSVersionStatus
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSet">BIOSVersionSet
+</h3>
+<div>
+<p>BIOSVersionSet is the Schema for the biosversionsets API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">
+BIOSVersionSetSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>biosVersionTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetStatus">
+BIOSVersionSetStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSet">BIOSVersionSet</a>)
+</p>
+<div>
+<p>BIOSVersionSetSpec defines the desired state of BIOSVersionSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>biosVersionTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSetStatus">BIOSVersionSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSet">BIOSVersionSet</a>)
+</p>
+<div>
+<p>BIOSVersionSetStatus defines the observed state of BIOSVersionSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>fullyLabeledServers</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>fullyLabeledServers is the number of server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>AvailableBIOSVersion is the number of BIOSVersion current created by the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pendingBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>PendingBIOSVersion is the total number of pending BIOSVersion in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inProgressBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>InProgressBIOSVersion is the total number of BIOSVersion in the set that are currently in InProgress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completedBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>CompletedBIOSVersion is the total number of completed BIOSVersion in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failedBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FailedBIOSVersion is the total number of failed BIOSVersion in the set.</p>
 </td>
 </tr>
 </tbody>
@@ -473,40 +634,18 @@ BIOSVersionStatus
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains a BIOS version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BIOS version</p>
+<p>
+(Members of <code>BIOSVersionTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSVersionTemplate defines the template for Version to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -521,34 +660,6 @@ Kubernetes core/v1.LocalObjectReference
 <td>
 <em>(Optional)</em>
 <p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -637,6 +748,89 @@ Task
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the Bios version upgrade state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains a BIOS version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatePolicy An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -2167,7 +2361,7 @@ net/netip.Prefix
 <h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
 </div>
@@ -3525,7 +3719,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4549,7 +4743,7 @@ int32
 <h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
 </div>

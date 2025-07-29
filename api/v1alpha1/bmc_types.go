@@ -206,6 +206,7 @@ type BMCStatus struct {
 	// PowerState represents the current power state of the BMC.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Enum=On;Off;Paused;PoweringOn;PoweringOff;Unmanaged
+	// +optional
 	PowerState BMCPowerState `json:"powerState,omitempty"`
 
 	// Conditions represents the latest available observations of the BMC's current state.

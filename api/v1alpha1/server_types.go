@@ -94,6 +94,7 @@ type ServerSpec struct {
 	// Power specifies the desired power state of the server.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Enum=On;Off;Unmanaged
+	// +optional
 	Power Power `json:"power,omitempty"`
 
 	// IndicatorLED specifies the desired state of the server's indicator LED.
@@ -213,6 +214,7 @@ type ServerStatus struct {
 	// PowerState represents the current power state of the server.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Enum=On;Off;Paused;PoweringOn;PoweringOff;Unmanaged
+	// +optional
 	PowerState ServerPowerState `json:"powerState,omitempty"`
 
 	// IndicatorLED specifies the current state of the server's indicator LED.

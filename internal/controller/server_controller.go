@@ -703,7 +703,8 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, ss
 }
 
 func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	if server.Spec.Power == metalv1alpha1.PowerUnmanaged && server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
+	if (server.Spec.Power == "" || server.Spec.Power == metalv1alpha1.PowerUnmanaged) &&
+		server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
 		requeue, err := r.setAndPatchServerPowerState(ctx, log, bmcClient, server, metalv1alpha1.PowerOff)
 		if err != nil {
 			return false, fmt.Errorf("failed to set server power state: %w", err)
@@ -853,7 +854,7 @@ func (r *ServerReconciler) patchServerURI(ctx context.Context, log logr.Logger, 
 }
 
 func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
-	if server.Spec.Power == metalv1alpha1.PowerUnmanaged {
+	if server.Spec.Power == "" || server.Spec.Power == metalv1alpha1.PowerUnmanaged {
 		// no desired power state set
 		return nil
 	}

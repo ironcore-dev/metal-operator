@@ -428,7 +428,7 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 	}
 	nextPriority := r.getNextSettingPriority(log, biosSettings)
 	if nextPriority != math.MaxInt32 && biosSettings.Status.CurrentSettingPriority == 0 {
-		log.V(1).Info("Updating the current setting priority to the first one", "currentSettingPriority", biosSettings.Spec.SettingsFlow[0].Priority)
+		log.V(1).Info("Updating the current setting priority to the first one", "currentSettingPriority", nextPriority)
 		biosSettingsBase := biosSettings.DeepCopy()
 		biosSettings.Status.CurrentSettingPriority = nextPriority
 		return ctrl.Result{}, r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase))

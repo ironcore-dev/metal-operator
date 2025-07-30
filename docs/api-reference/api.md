@@ -3694,7 +3694,6 @@ Power
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>ServerPower specifies the power state of the server during maintenance.</p>
 </td>
 </tr>
@@ -3837,7 +3836,6 @@ Power
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>ServerPower specifies the power state of the server during maintenance.</p>
 </td>
 </tr>

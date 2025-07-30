@@ -560,9 +560,6 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 				},
 				Labels: map[string]string{"foo": "bar"},
 			},
-			Spec: metalv1alpha1.ServerSpec{
-				Power: metalv1alpha1.PowerUnmanaged,
-			},
 		}
 		ExpectWithOffset(1, k8sClient.Create(ctx, &server)).To(Succeed())
 		server.Status.State = metalv1alpha1.ServerStateAvailable

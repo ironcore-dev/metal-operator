@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -713,6 +712,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 	// find the servers which has maintenance and do not create maintenance for them.
 	serverWithMaintenances := make(map[string]bool, len(servers))
 	if bmcVersion.Spec.ServerMaintenanceRefs != nil {
+		// we fetch all the references already in the Spec (self created/provided by user)
 		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcVersion.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return false, errors.Join(err...)
@@ -722,30 +722,28 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 		}
 	}
 
+	// we also fetch all the references owned by this Resource.
+	// This is needed in case we are reconciling before we have patched the references.
+	// possible when we reconcile after CreateOrPatch, before ref have been written
+	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmcVersion, serverMaintenancesList); err != nil {
+		return false, err
+	}
+	for _, serverMaintenance := range serverMaintenancesList.Items {
+		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
+	}
+
 	var errs []error
 	serverMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
 		if _, ok := serverWithMaintenances[server.Name]; ok {
 			continue
 		}
-
-		var serverMaintenance *metalv1alpha1.ServerMaintenance
-		newServerMaintenanceName := fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name)
-		if len(newServerMaintenanceName) > utilvalidation.DNS1123SubdomainMaxLength {
-			log.V(1).Info("ServerMaintenance name is too long, it will be shortened using randam string", "name", newServerMaintenanceName)
-			serverMaintenance = &metalv1alpha1.ServerMaintenance{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    r.ManagerNamespace,
-					GenerateName: newServerMaintenanceName[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-",
-				},
-			}
-		} else {
-			serverMaintenance = &metalv1alpha1.ServerMaintenance{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: r.ManagerNamespace,
-					Name:      fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name),
-				},
-			}
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    r.ManagerNamespace,
+				GenerateName: "bmc-version-",
+			},
 		}
 
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {

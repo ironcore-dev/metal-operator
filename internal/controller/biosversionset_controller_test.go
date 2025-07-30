@@ -15,6 +15,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BIOSVersionSet Controller", func() {
@@ -118,6 +119,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 
 		AfterEach(func(ctx SpecContext) {
 			DeleteAllMetalResources(ctx, ns.Name)
+			bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
 		})
 
 		It("should successfully reconcile the resource", func(ctx SpecContext) {

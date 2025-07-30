@@ -178,9 +178,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 		server.Name = bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
 			metautils.SetLabels(server, bmcObj.Labels)
-			if server.Spec.Power == "" {
-				server.Spec.Power = metalv1alpha1.PowerUnmanaged
-			}
+			server.Spec.Power = metalv1alpha1.PowerUnmanaged
 			server.Spec.UUID = strings.ToLower(s.UUID)
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.SystemURI = s.URI

@@ -226,7 +226,7 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Spec.Power", metalv1alpha1.Power("On")),
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
@@ -291,6 +291,7 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
+				Power:      metalv1alpha1.PowerUnmanaged,
 				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -409,7 +410,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
-			HaveField("Spec.Power", metalv1alpha1.Power("On")),
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
@@ -508,6 +509,7 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
+				Power:      metalv1alpha1.PowerUnmanaged,
 				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -577,6 +579,7 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
+				Power:      metalv1alpha1.PowerUnmanaged,
 				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -632,6 +635,7 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
+				Power:      metalv1alpha1.PowerUnmanaged,
 				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{

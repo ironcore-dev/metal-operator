@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -225,18 +223,18 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
 
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", bmcSettings.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by BMCSettings resource")
-		Eventually(Object(bmcSettings)).Should(SatisfyAny(
+		Eventually(Object(bmcSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
@@ -244,18 +242,9 @@ var _ = Describe("BMCSettings Controller", func() {
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
-						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+						APIVersion: metalv1alpha1.GroupVersion.String(),
 					}}}),
-			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: "metal.ironcore.dev/v1alpha1",
-					}}}),
-		))
+		)
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
@@ -347,10 +336,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 		))
 
+		By("Ensuring that the Maintenance resource has been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
+
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", BMCSettings.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
@@ -365,7 +358,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		By("Ensuring that the Maintenance resource has been deleted")
-		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(Object(BMCSettings)).Should(SatisfyAll(

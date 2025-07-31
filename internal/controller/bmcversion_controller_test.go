@@ -5,7 +5,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -165,12 +164,12 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
 
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
@@ -256,12 +255,12 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
 
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())

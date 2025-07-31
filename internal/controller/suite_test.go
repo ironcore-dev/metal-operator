@@ -67,10 +67,10 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMC{}, &metalv1alpha1.BMCList{})).Should(
 		HaveField("Items", BeEmpty()))
 
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))).Should(
+	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenanceSet{}, &metalv1alpha1.ServerMaintenanceSetList{}, client.InNamespace(namespace))).Should(
 		HaveField("Items", BeEmpty()))
 
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenanceSet{}, &metalv1alpha1.ServerMaintenanceSetList{}, client.InNamespace(namespace))).Should(
+	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))).Should(
 		HaveField("Items", BeEmpty()))
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))).Should(
@@ -201,6 +201,9 @@ func SetupTest() *corev1.Namespace {
 				},
 			},
 		}
+
+		err = RegisterIndexFields(ctx, k8sManager)
+		Expect(err).ToNot(HaveOccurred(), "failed to register index fields")
 
 		// register reconciler here
 		Expect((&EndpointReconciler{

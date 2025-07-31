@@ -284,13 +284,21 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Deleting first ServerMaintenance to finish the maintenance on the server")
 		Eventually(k8sClient.Delete).WithArguments(ctx, serverMaintenance01).Should(Succeed())
 
+		By("Checking the second ServerMaintenance is now in maintenance")
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))
 
-		By("Checking the second ServerMaintenance is now in maintenance")
-		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		By("Setting the maintenance to completed")
+		Eventually(UpdateStatus(serverMaintenance02, func() {
+			serverMaintenance02.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
+		})).Should(Succeed())
+
+		By("Checking the Server is not in maintenance and cleaned up")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+			HaveField("Spec.MaintenanceBootConfigurationRef", BeNil()),
 		))
 	})
 })

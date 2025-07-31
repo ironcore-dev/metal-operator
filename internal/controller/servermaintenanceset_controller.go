@@ -5,15 +5,21 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -38,58 +44,41 @@ type ServerMaintenanceSetReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *ServerMaintenanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	replica := &metalv1alpha1.ServerMaintenanceSet{}
-
-	if err := r.Get(ctx, req.NamespacedName, replica); err != nil {
+	maintenanceSet := &metalv1alpha1.ServerMaintenanceSet{}
+	if err := r.Get(ctx, req.NamespacedName, maintenanceSet); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, replica)
+	return r.reconcileExists(ctx, maintenanceSet)
 }
 
-func (r *ServerMaintenanceSetReconciler) reconcileExists(ctx context.Context, replica *metalv1alpha1.ServerMaintenanceSet) (ctrl.Result, error) {
+func (r *ServerMaintenanceSetReconciler) reconcileExists(ctx context.Context, maintenanceSet *metalv1alpha1.ServerMaintenanceSet) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
-	if !replica.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, replica)
+	if !maintenanceSet.DeletionTimestamp.IsZero() {
+		return r.delete(ctx, log, maintenanceSet)
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, replica, ServerMaintenanceSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, maintenanceSet, ServerMaintenanceSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	return r.reconcile(ctx, log, replica)
+	return r.reconcile(ctx, log, maintenanceSet)
 }
 
-func (r *ServerMaintenanceSetReconciler) delete(ctx context.Context, log logr.Logger, replica *metalv1alpha1.ServerMaintenanceSet) (ctrl.Result, error) {
+func (r *ServerMaintenanceSetReconciler) delete(ctx context.Context, log logr.Logger, maintenanceSet *metalv1alpha1.ServerMaintenanceSet) (ctrl.Result, error) {
 	log.V(1).Info("Deleting ServerMaintenanceSet")
-
-	maintenancelist, err := r.getOwnedMaintenances(ctx, replica)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	for _, maintenance := range maintenancelist.Items {
-		if maintenance.Status.State == metalv1alpha1.ServerMaintenanceStateInMaintenance {
-			log.V(1).Info("Owned Maintenance is still inMaintenance", "maintenance", maintenance.Name)
-			continue
-		}
-		if err := r.Delete(ctx, &maintenance); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, replica, ServerMaintenanceSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, maintenanceSet, ServerMaintenanceSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Deleted ServerMaintenanceSet")
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceSetReconciler) reconcile(ctx context.Context, log logr.Logger, replica *metalv1alpha1.ServerMaintenanceSet) (ctrl.Result, error) {
-	log.V(1).Info("Reconciling ServerMaintenanceSet", "Name", replica.Name)
-	servers, err := r.getServersBySelector(ctx, replica)
+func (r *ServerMaintenanceSetReconciler) reconcile(ctx context.Context, log logr.Logger, maintenanceSet *metalv1alpha1.ServerMaintenanceSet) (ctrl.Result, error) {
+	log.V(1).Info("Reconciling ServerMaintenanceSet", "Name", maintenanceSet.Name)
+	servers, err := r.getServersBySelector(ctx, maintenanceSet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -99,96 +88,142 @@ func (r *ServerMaintenanceSetReconciler) reconcile(ctx context.Context, log logr
 		return ctrl.Result{}, nil
 	}
 
-	maintenancelist, err := r.getOwnedMaintenances(ctx, replica)
+	maintenancelist, err := r.getOwnedMaintenances(ctx, maintenanceSet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// If all servers have a maintenance object, only update the status
-	if len(servers.Items) == len(maintenancelist.Items) {
-		if modified, err := r.patchStatus(ctx, replica, calculateStatus(maintenancelist.Items)); err != nil || modified {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+	log.V(1).Info("Fetched ServerMaintenances", "Count", len(maintenancelist.Items))
+	// If there are no existing maintenances, create them
+	if err = r.createMaintenances(ctx, log, maintenanceSet, maintenancelist, servers); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create maintenances: %w", err)
 	}
-	var errs []error
-out:
-	for i, server := range servers.Items {
-		log.V(1).Info("Reconciling server", "server", server.Name)
-		// Check if the server already got a maintenance
-		for _, maintenance := range maintenancelist.Items {
-			if maintenance.Spec.ServerRef.Name == server.Name {
-				log.V(1).Info("Server is already in maintenance", "server", server.Name)
-				continue out
-			}
-		}
-		maintenance := metalv1alpha1.ServerMaintenance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-%d", replica.Name, i),
-				Namespace: replica.Namespace,
-			},
-		}
-		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &maintenance, func() error {
-			metautils.SetLabels(&maintenance, map[string]string{ServerMaintenanceSetFinalizer: replica.Name})
-			maintenance.Spec = metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:                       &v1.LocalObjectReference{Name: server.Name},
-				Policy:                          replica.Spec.Template.Policy,
-				ServerPower:                     replica.Spec.Template.ServerPower,
-				ServerBootConfigurationTemplate: replica.Spec.Template.ServerBootConfigurationTemplate,
-			}
-			return controllerutil.SetControllerReference(replica, &maintenance, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
-		})
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to create or patch serverMaintenance %s: %w", maintenance.Name, err))
-			continue
-		}
-		log.V(1).Info("Created or patched ServerMaintenance", "ServerMaintenance", maintenance.Name, "Operation", opResult)
-	}
-	if len(errs) > 0 {
-		return ctrl.Result{}, fmt.Errorf("errors occurred during servermaintenances creation: %v", errs)
+	// If there are existing maintenances, check if any are orphaned and delete them
+	if err = r.deleteOrphanedMaintenances(ctx, log, maintenancelist, servers); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned maintenances: %w", err)
 	}
 
 	// Fetch the list of maintenances again to get the updated status
-	maintenancelist, err = r.getOwnedMaintenances(ctx, replica)
+	maintenancelist, err = r.getOwnedMaintenances(ctx, maintenanceSet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Fetched ServerMaintenances", "Count", len(maintenancelist.Items))
-	if modified, err := r.patchStatus(ctx, replica, calculateStatus(maintenancelist.Items)); err != nil || modified {
+	if modified, err := r.patchStatus(ctx, maintenanceSet, calculateStatus(maintenancelist.Items)); err != nil || modified {
 		return ctrl.Result{}, err
 	}
-	log.V(1).Info("Reconciled ServerMaintenanceSet", "Name", replica.Name)
+	log.V(1).Info("Reconciled ServerMaintenanceSet", "Name", maintenanceSet.Name)
 
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceSetReconciler) patchStatus(ctx context.Context, replica *metalv1alpha1.ServerMaintenanceSet, status metalv1alpha1.ServerMaintenanceSetStatus) (bool, error) {
-	if replica.Status == status {
+func (r *ServerMaintenanceSetReconciler) createMaintenances(
+	ctx context.Context,
+	log logr.Logger,
+	maintenanceSet *metalv1alpha1.ServerMaintenanceSet,
+	maintenancelist *metalv1alpha1.ServerMaintenanceList,
+	serverList *metalv1alpha1.ServerList,
+) error {
+	var errs error
+	var createdMaintenances []string
+	for _, maintenance := range maintenancelist.Items {
+		if maintenance.Spec.ServerRef != nil {
+			createdMaintenances = append(createdMaintenances, maintenance.Spec.ServerRef.Name)
+		}
+	}
+	// Iterate through the servers that should be managed by this set.
+	for i, server := range serverList.Items {
+		log.V(1).Info("Reconciling server", "server", server.Name)
+
+		if !server.DeletionTimestamp.IsZero() {
+			log.V(1).Info("Server is marked for deletion, skipping", "server", server.Name)
+			continue
+		}
+
+		// Check the map to see if maintenance already exists.
+		if slices.Contains(createdMaintenances, server.Name) {
+			log.V(1).Info("maintenance already created, skipping", "server", server.Name)
+			continue
+		}
+
+		maintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%d", maintenanceSet.Name, i),
+				Namespace: maintenanceSet.Namespace,
+			},
+		}
+
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, maintenance, func() error {
+			metautils.SetLabels(maintenance, map[string]string{ServerMaintenanceSetFinalizer: maintenanceSet.Name})
+			maintenance.Spec = metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:                       &v1.LocalObjectReference{Name: server.Name},
+				Policy:                          maintenanceSet.Spec.Template.Policy,
+				ServerPower:                     maintenanceSet.Spec.Template.ServerPower,
+				ServerBootConfigurationTemplate: maintenanceSet.Spec.Template.ServerBootConfigurationTemplate,
+			}
+			return controllerutil.SetControllerReference(maintenanceSet, maintenance, r.Scheme)
+		})
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to create or patch serverMaintenance %s: %w", maintenance.Name, err))
+			continue
+		}
+		log.V(1).Info("Created or patched ServerMaintenance", "ServerMaintenance", maintenance.Name, "Operation", opResult)
+	}
+	return errs
+}
+
+func (r *ServerMaintenanceSetReconciler) deleteOrphanedMaintenances(
+	ctx context.Context,
+	log logr.Logger,
+	maintenancelist *metalv1alpha1.ServerMaintenanceList,
+	serverList *metalv1alpha1.ServerList,
+) error {
+	var errs error
+	var serverNames []string
+	for _, server := range serverList.Items {
+		if server.DeletionTimestamp.IsZero() {
+			serverNames = append(serverNames, server.Name)
+		}
+	}
+	for _, maintenance := range maintenancelist.Items {
+		log.V(1).Info("Checking for orphaned maintenance", "maintenance", maintenance.Name)
+		// Check if the maintenance is part of the server maintenance set
+		if !slices.Contains(serverNames, maintenance.Spec.ServerRef.Name) {
+			log.V(1).Info("Maintenance is orphaned, deleting", "maintenance", maintenance.Name)
+			if err := r.Delete(ctx, &maintenance); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to delete orphaned maintenance %s: %w", maintenance.Name, err))
+			} else {
+				log.V(1).Info("Deleted orphaned maintenance", "maintenance", maintenance.Name)
+			}
+			continue
+		}
+	}
+	return errs
+}
+
+func (r *ServerMaintenanceSetReconciler) patchStatus(ctx context.Context, maintenanceSet *metalv1alpha1.ServerMaintenanceSet, status metalv1alpha1.ServerMaintenanceSetStatus) (bool, error) {
+	if maintenanceSet.Status == status {
 		return false, nil
 	}
-	base := replica.DeepCopy()
-	replica.Status = status
-	if err := r.Status().Patch(ctx, replica, client.MergeFrom(base)); err != nil {
+	base := maintenanceSet.DeepCopy()
+	maintenanceSet.Status = status
+	if err := r.Status().Patch(ctx, maintenanceSet, client.MergeFrom(base)); err != nil {
 		return false, err
 	}
 
 	return true, nil
 }
 
-func (r *ServerMaintenanceSetReconciler) getOwnedMaintenances(ctx context.Context, replica *metalv1alpha1.ServerMaintenanceSet) (*metalv1alpha1.ServerMaintenanceList, error) {
+func (r *ServerMaintenanceSetReconciler) getOwnedMaintenances(ctx context.Context, maintenanceSet *metalv1alpha1.ServerMaintenanceSet) (*metalv1alpha1.ServerMaintenanceList, error) {
 	maintenancelist := &metalv1alpha1.ServerMaintenanceList{}
-	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, replica, maintenancelist); err != nil {
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, maintenanceSet, maintenancelist); err != nil {
 		return nil, err
-	}
-	log := log.FromContext(ctx)
-	for i := range maintenancelist.Items {
-		log.V(1).Info("Found ServerMaintenance", "Status", maintenancelist.Items[i].Status)
 	}
 	return maintenancelist, nil
 }
 
-func (r *ServerMaintenanceSetReconciler) getServersBySelector(ctx context.Context, replica *metalv1alpha1.ServerMaintenanceSet) (*metalv1alpha1.ServerList, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&replica.Spec.ServerSelector)
+func (r *ServerMaintenanceSetReconciler) getServersBySelector(ctx context.Context, maintenanceSet *metalv1alpha1.ServerMaintenanceSet) (*metalv1alpha1.ServerList, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&maintenanceSet.Spec.ServerSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -205,6 +240,8 @@ func calculateStatus(maintenances []metalv1alpha1.ServerMaintenance) metalv1alph
 	pendingCount := 0
 	maintenanceCount := 0
 	failedCount := 0
+	completed := 0
+
 	for _, m := range maintenances {
 		switch m.Status.State {
 		case metalv1alpha1.ServerMaintenanceStatePending:
@@ -213,12 +250,15 @@ func calculateStatus(maintenances []metalv1alpha1.ServerMaintenance) metalv1alph
 			maintenanceCount++
 		case metalv1alpha1.ServerMaintenanceStateFailed:
 			failedCount++
+		case metalv1alpha1.ServerMaintenanceStateCompleted:
+			completed++
 		}
 	}
 	newStatus.Maintenances = int32(len(maintenances))
 	newStatus.Pending = int32(pendingCount)
 	newStatus.Failed = int32(failedCount)
 	newStatus.InMaintenance = int32(maintenanceCount)
+	newStatus.Completed = int32(completed)
 	return newStatus
 }
 
@@ -227,6 +267,49 @@ func (r *ServerMaintenanceSetReconciler) SetupWithManager(mgr ctrl.Manager) erro
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.ServerMaintenanceSet{}).
 		Owns(&metalv1alpha1.ServerMaintenance{}).
+		Watches(&metalv1alpha1.Server{}, r.enqueueMaintenanceSetByServers()).
 		Named("servermaintenanceset").
 		Complete(r)
+}
+
+func (r *ServerMaintenanceSetReconciler) enqueueMaintenanceSetByServers() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+		log := ctrl.LoggerFrom(ctx)
+		server := object.(*metalv1alpha1.Server)
+		var req []reconcile.Request
+
+		maintenanceSetList := &metalv1alpha1.ServerMaintenanceSetList{}
+		if err := r.List(ctx, maintenanceSetList); err != nil {
+			log.Error(err, "failed to list host serverMaintenances")
+			return nil
+		}
+		for _, ms := range maintenanceSetList.Items {
+			selector, err := metav1.LabelSelectorAsSelector(&ms.Spec.ServerSelector)
+			if err != nil {
+				log.Error(err, "failed to convert label selector", "selector", ms.Spec.ServerSelector)
+				continue
+			}
+			if selector.Matches(labels.Set(server.Labels)) {
+				log.V(1).Info("Found ServerMaintenanceSet matching the server", "Server", server.Name, "MaintenanceSet", ms.Name)
+				req = append(req, reconcile.Request{
+					NamespacedName: types.NamespacedName{Namespace: ms.Namespace, Name: ms.Name},
+				})
+				continue
+			} else {
+				maintenances, err := r.getOwnedMaintenances(ctx, &ms)
+				if err != nil {
+					log.Error(err, "failed to get owned maintenances for ServerMaintenanceSet", "ServerMaintenanceSet", ms.Name)
+					continue
+				}
+				for _, maintenance := range maintenances.Items {
+					if maintenance.Spec.ServerRef != nil && maintenance.Spec.ServerRef.Name == server.Name {
+						req = append(req, reconcile.Request{
+							NamespacedName: types.NamespacedName{Namespace: ms.Namespace, Name: ms.Name},
+						})
+					}
+				}
+			}
+		}
+		return req
+	})
 }

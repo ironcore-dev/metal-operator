@@ -25,6 +25,8 @@ type ServerMaintenanceSetStatus struct {
 	InMaintenance int32 `json:"inMaintenance,omitempty"`
 	// Failed is the total number of failed server maintenances in the set.
 	Failed int32 `json:"failed,omitempty"`
+	// Completed is the total number of completed server maintenances in the set.
+	Completed int32 `json:"completed,omitempty"`
 }
 
 // +kubebuilder:object:root=true

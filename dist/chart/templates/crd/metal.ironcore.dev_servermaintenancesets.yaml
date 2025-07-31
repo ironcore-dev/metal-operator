@@ -184,6 +184,11 @@ spec:
             description: ServerMaintenanceSetStatus defines the observed state of
               ServerMaintenanceSet.
             properties:
+              completed:
+                description: Completed is the total number of completed server maintenances
+                  in the set.
+                format: int32
+                type: integer
               failed:
                 description: Failed is the total number of failed server maintenances
                   in the set.

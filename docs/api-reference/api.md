@@ -3363,6 +3363,17 @@ int32
 <p>Failed is the total number of failed server maintenances in the set.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>completed</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Completed is the total number of completed server maintenances in the set.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec
@@ -3450,8 +3461,11 @@ ServerBootConfigurationTemplate
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<tbody><tr><td><p>&#34;Completed&#34;</p></td>
 <td><p>ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>ServerMaintenanceStateFailed specifies that the server maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InMaintenance&#34;</p></td>
 <td><p>ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.</p>

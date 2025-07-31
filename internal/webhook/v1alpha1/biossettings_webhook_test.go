@@ -145,20 +145,38 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
 		})
 
+		It("Should NOT allow update settings is in progress. but should allow to Force it", func() {
+			By("Patching the biosSettings V1 to Inprogress state")
+			Eventually(UpdateStatus(biosSettingsV1, func() {
+				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
+			})).Should(Succeed())
+			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
+			biosSettingsV1Updated := biosSettingsV1.DeepCopy()
+			biosSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}
+			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().To(HaveOccurred())
+			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
+			biosSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
+			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().ToNot(HaveOccurred())
+
+			Eventually(UpdateStatus(biosSettingsV1, func() {
+				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateApplied
+			})).Should(Succeed())
+		})
+
 		It("Should refuse to delete if InProgress", func() {
 			By("Patching the biosSettingsV1 to Inprogress state")
 			Eventually(UpdateStatus(biosSettingsV1, func() {
 				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
 			})).Should(Succeed())
 
-			By("Deleting the BIOSSettings should fail")
+			By("Deleting the BIOSSettings V1 should fail")
 			Expect(k8sClient.Delete(ctx, biosSettingsV1)).To(Not(Succeed()))
 
 			Eventually(UpdateStatus(biosSettingsV1, func() {
 				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateApplied
 			})).Should(Succeed())
 
-			By("Deleting the BIOSSettings should pass: by DeferCleanup")
+			By("Deleting the BIOSSettings V1 should pass: by DeferCleanup")
 		})
 	})
 

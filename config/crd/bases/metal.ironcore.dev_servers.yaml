@@ -363,6 +363,10 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              systemURI:
+                description: SystemURI is the unique URI for the server resource in
+                  REDFISH API.
+                type: string
               systemUUID:
                 description: SystemUUID is the unique identifier for the server.
                 type: string

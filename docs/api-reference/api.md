@@ -12,9 +12,6 @@ Resource Types:
 <ul></ul>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">BIOSSettingUpdateState
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
-</p>
 <div>
 </div>
 <table>
@@ -124,7 +121,8 @@ ServerMaintenancePolicy
 </em>
 </td>
 <td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
 </td>
 </tr>
 <tr>
@@ -137,6 +135,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
@@ -219,7 +218,8 @@ ServerMaintenancePolicy
 </em>
 </td>
 <td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
 </td>
 </tr>
 <tr>
@@ -232,6 +232,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
@@ -292,20 +293,36 @@ BIOSSettingsState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State represents the current state of the bios configuration task.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>updateSettingState</code><br/>
+<code>lastAppliedTime</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">
-BIOSSettingUpdateState
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#time-v1-meta">
+Kubernetes meta/v1.Time
 </a>
 </em>
 </td>
 <td>
-<p>UpdateSettingState represents the current state of the bios setting update task.</p>
+<em>(Optional)</em>
+<p>LastAppliedTime represents the timestamp when the last setting was successfully applied.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the BIOSSettings&rsquo;s current state.</p>
 </td>
 </tr>
 </tbody>
@@ -352,39 +369,18 @@ BIOSVersionSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains BIOS version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
 </a>
 </em>
 </td>
 <td>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BIOS version</p>
+<p>
+(Members of <code>BIOSVersionTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSVersionTemplate defines the template for Version to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -397,33 +393,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
 </td>
 </tr>
 </table>
@@ -439,6 +410,217 @@ BIOSVersionStatus
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSet">BIOSVersionSet
+</h3>
+<div>
+<p>BIOSVersionSet is the Schema for the biosversionsets API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">
+BIOSVersionSetSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>biosVersionTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetStatus">
+BIOSVersionSetStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSet">BIOSVersionSet</a>)
+</p>
+<div>
+<p>BIOSVersionSetSpec defines the desired state of BIOSVersionSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>biosVersionTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionSetStatus">BIOSVersionSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSet">BIOSVersionSet</a>)
+</p>
+<div>
+<p>BIOSVersionSetStatus defines the observed state of BIOSVersionSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>fullyLabeledServers</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>fullyLabeledServers is the number of server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>AvailableBIOSVersion is the number of BIOSVersion current created by the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pendingBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>PendingBIOSVersion is the total number of pending BIOSVersion in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inProgressBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>InProgressBIOSVersion is the total number of BIOSVersion in the set that are currently in InProgress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completedBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>CompletedBIOSVersion is the total number of completed BIOSVersion in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failedBIOSVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FailedBIOSVersion is the total number of failed BIOSVersion in the set.</p>
 </td>
 </tr>
 </tbody>
@@ -461,39 +643,18 @@ BIOSVersionStatus
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains BIOS version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">
+BIOSVersionTemplate
 </a>
 </em>
 </td>
 <td>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BIOS version</p>
+<p>
+(Members of <code>BIOSVersionTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSVersionTemplate defines the template for Version to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -506,33 +667,8 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerRef is a reference to a specific server to apply bios upgrade on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -591,6 +727,7 @@ BIOSVersionState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State represents the current state of the bios configuration task.</p>
 </td>
 </tr>
@@ -598,12 +735,13 @@ BIOSVersionState
 <td>
 <code>upgradeTask</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.TaskStatus">
-TaskStatus
+<a href="#metal.ironcore.dev/v1alpha1.Task">
+Task
 </a>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>UpgradeTask contains the state of the Upgrade Task created by the BMC</p>
 </td>
 </tr>
@@ -619,6 +757,89 @@ TaskStatus
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the Bios version upgrade state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSetSpec">BIOSVersionSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains a BIOS version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatePolicy An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BIOS version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -672,8 +893,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
-This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
+<p>BMCUUID is the unique identifier for the BMC as defined in Redfish API.</p>
 </td>
 </tr>
 <tr>
@@ -759,6 +979,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMCSettingRef is a reference to a BMCSettings object that specifies
 the BMC configuration for this BMC.</p>
 </td>
@@ -1011,7 +1232,7 @@ string
 </em>
 </td>
 <td>
-<p>Version contains BMC version this settings applies to</p>
+<p>Version defines the BMC firmware for which the settings should be applied.</p>
 </td>
 </tr>
 <tr>
@@ -1036,6 +1257,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMCRef is a reference to a specific BMC to apply setting to.</p>
 </td>
 </tr>
@@ -1049,10 +1271,8 @@ ServerMaintenancePolicy
 </em>
 </td>
 <td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
-ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
-note: User approval is only enforced for server&rsquo;s which are reserved state
-ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be applied on the server.</p>
 </td>
 </tr>
 <tr>
@@ -1065,7 +1285,9 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<em>(Optional)</em>
+<p>ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
+server that needs to be updated with the BMC settings.</p>
 </td>
 </tr>
 </table>
@@ -1109,7 +1331,7 @@ string
 </em>
 </td>
 <td>
-<p>Version contains BMC version this settings applies to</p>
+<p>Version defines the BMC firmware for which the settings should be applied.</p>
 </td>
 </tr>
 <tr>
@@ -1134,6 +1356,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMCRef is a reference to a specific BMC to apply setting to.</p>
 </td>
 </tr>
@@ -1147,10 +1370,8 @@ ServerMaintenancePolicy
 </em>
 </td>
 <td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server when applying setting.
-ServerMaintenancePolicyOwnerApproval is asking for User approval for changing BMC settings
-note: User approval is only enforced for server&rsquo;s which are reserved state
-ServerMaintenancePolicyEnforced will will bypass user approval and apply setting directly</p>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be applied on the server.</p>
 </td>
 </tr>
 <tr>
@@ -1163,7 +1384,9 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 </em>
 </td>
 <td>
-<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+<em>(Optional)</em>
+<p>ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
+server that needs to be updated with the BMC settings.</p>
 </td>
 </tr>
 </tbody>
@@ -1174,7 +1397,7 @@ ServerMaintenancePolicyEnforced will will bypass user approval and apply setting
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsStatus">BMCSettingsStatus</a>)
 </p>
 <div>
-<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
+<p>BMCSettingsState specifies the current state of the server maintenance.</p>
 </div>
 <table>
 <thead>
@@ -1223,6 +1446,7 @@ BMCSettingsState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State represents the current state of the BMC configuration task.</p>
 </td>
 </tr>
@@ -1253,8 +1477,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>bmcUUID is the unique identifier for the BMC as defined in REDFISH API.
-This field is optional and can be omitted, controller will choose the first avaialbe Manager</p>
+<p>BMCUUID is the unique identifier for the BMC as defined in Redfish API.</p>
 </td>
 </tr>
 <tr>
@@ -1340,6 +1563,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMCSettingRef is a reference to a BMCSettings object that specifies
 the BMC configuration for this BMC.</p>
 </td>
@@ -1393,6 +1617,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MACAddress is the MAC address of the BMC.
 The format is validated using a regular expression pattern.</p>
 </td>
@@ -1407,6 +1632,7 @@ IP
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IP is the IP address of the BMC.
 The type is specified as string and is schemaless.</p>
 </td>
@@ -1419,6 +1645,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Manufacturer is the name of the BMC manufacturer.</p>
 </td>
 </tr>
@@ -1430,6 +1657,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Model is the model number or name of the BMC.</p>
 </td>
 </tr>
@@ -1441,6 +1669,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>SKU is the stock keeping unit identifier for the BMC.</p>
 </td>
 </tr>
@@ -1452,6 +1681,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>SerialNumber is the serial number of the BMC.</p>
 </td>
 </tr>
@@ -1463,6 +1693,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>FirmwareVersion is the version of the firmware currently running on the BMC.</p>
 </td>
 </tr>
@@ -1476,6 +1707,7 @@ BMCState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State represents the current state of the BMC.</p>
 </td>
 </tr>
@@ -1489,6 +1721,7 @@ BMCPowerState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>PowerState represents the current power state of the BMC.</p>
 </td>
 </tr>
@@ -1504,6 +1737,319 @@ BMCPowerState
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the BMC&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersion">BMCVersion
+</h3>
+<div>
+<p>BMCVersion is the Schema for the bmcversions API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">
+BMCVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BMC version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply BMC upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server managed by referred BMC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">
+BMCVersionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersion">BMCVersion</a>)
+</p>
+<div>
+<p>BMCVersionSpec defines the desired state of BMCVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains BMC version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BMC version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>BMCRef is a reference to a specific BMC to apply BMC upgrade on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server managed by referred BMC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionState">BMCVersionState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<td><p>BMCVersionStateCompleted specifies that the BMC upgrade maintenance has been completed.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BMCVersionStateFailed specifies that the BMC upgrade maintenance has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BMCVersionStateInProgress specifies that upgrading BMC is in progress.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BMCVersionStatePending specifies that the BMC upgrade maintenance is waiting</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersion">BMCVersion</a>)
+</p>
+<div>
+<p>BMCVersionStatus defines the observed state of BMCVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionState">
+BMCVersionState
+</a>
+</em>
+</td>
+<td>
+<p>State represents the current state of the BMC configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upgradeTask</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Task">
+Task
+</a>
+</em>
+</td>
+<td>
+<p>UpgradeTask contains the state of the Upgrade Task created by the BMC</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the BMC version upgrade state.</p>
 </td>
 </tr>
 </tbody>
@@ -1677,6 +2223,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MACAddress is the MAC address of the endpoint.</p>
 </td>
 </tr>
@@ -1690,6 +2237,7 @@ IP
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IP is the IP address of the endpoint.</p>
 </td>
 </tr>
@@ -1734,6 +2282,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MACAddress is the MAC address of the endpoint.</p>
 </td>
 </tr>
@@ -1747,6 +2296,7 @@ IP
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IP is the IP address of the endpoint.</p>
 </td>
 </tr>
@@ -1820,7 +2370,7 @@ net/netip.Prefix
 <h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
 </div>
@@ -1842,6 +2392,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
 to access the ImageURI. This secret includes sensitive information such as usernames and passwords.</p>
 </td>
@@ -1854,6 +2405,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>The network protocol that the server&rsquo;s update service uses to retrieve &lsquo;ImageURI&rsquo;</p>
 </td>
 </tr>
@@ -1924,6 +2476,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MACAddress is the MAC address of the endpoint.</p>
 </td>
 </tr>
@@ -1937,6 +2490,7 @@ IP
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IP is the IP address of the BMC.</p>
 </td>
 </tr>
@@ -2077,6 +2631,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Type is the type of the Processor.</p>
 </td>
 </tr>
@@ -2088,6 +2643,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Architecture is the architecture of the Processor.</p>
 </td>
 </tr>
@@ -2099,6 +2655,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>InstructionSet is the instruction set of the Processor.</p>
 </td>
 </tr>
@@ -2110,6 +2667,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Manufacturer is the manufacturer of the Processor.</p>
 </td>
 </tr>
@@ -2121,6 +2679,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Model is the model of the Processor.</p>
 </td>
 </tr>
@@ -2132,6 +2691,7 @@ int32
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MaxSpeedMHz is the maximum speed of the Processor in MHz.</p>
 </td>
 </tr>
@@ -2143,6 +2703,7 @@ int32
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>TotalCores is the total number of cores in the Processor.</p>
 </td>
 </tr>
@@ -2154,6 +2715,7 @@ int32
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>TotalThreads is the total number of threads in the Processor.</p>
 </td>
 </tr>
@@ -2325,7 +2887,19 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>SystemUUID is the unique identifier for the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemURI is the unique URI for the server resource in REDFISH API.</p>
 </td>
 </tr>
 <tr>
@@ -2338,6 +2912,7 @@ Power
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
@@ -2351,6 +2926,7 @@ IndicatorLED
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IndicatorLED specifies the desired state of the server&rsquo;s indicator LED.</p>
 </td>
 </tr>
@@ -2364,6 +2940,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerClaimRef is a reference to a ServerClaim object that claims this server.
 This field is optional and can be omitted if no claim is associated with this server.</p>
 </td>
@@ -2378,6 +2955,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.</p>
 </td>
 </tr>
@@ -2391,6 +2969,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMCRef is a reference to the BMC object associated with this server.
 This field is optional and can be omitted if no BMC is associated with this server.</p>
 </td>
@@ -2405,6 +2984,7 @@ BMCAccess
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMC contains the access details for the BMC.
 This field is optional and can be omitted if no BMC access is specified.</p>
 </td>
@@ -2419,6 +2999,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BootConfigurationRef is a reference to a BootConfiguration object that specifies
 the boot configuration for this server. This field is optional and can be omitted
 if no boot configuration is specified.</p>
@@ -2434,6 +3015,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
 the boot configuration for this server during maintenance. This field is optional and can be omitted</p>
 </td>
@@ -2448,6 +3030,7 @@ the boot configuration for this server during maintenance. This field is optiona
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BootOrder specifies the boot order of the server.</p>
 </td>
 </tr>
@@ -2461,6 +3044,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BIOSSettingsRef is a reference to a biossettings object that specifies
 the BIOS configuration for this server.</p>
 </td>
@@ -2543,6 +3127,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Image specifies the boot image to be used for the server.
 This field is optional and can be omitted if not specified.</p>
 </td>
@@ -2557,6 +3142,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
 the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
@@ -2615,6 +3201,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Image specifies the boot image to be used for the server.
 This field is optional and can be omitted if not specified.</p>
 </td>
@@ -2629,6 +3216,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
 the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
@@ -2687,6 +3275,7 @@ ServerBootConfigurationState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State represents the current state of the boot configuration.</p>
 </td>
 </tr>
@@ -2729,7 +3318,7 @@ ServerBootConfigurationSpec
 </em>
 </td>
 <td>
-<p>Parameters specifies the parameters to be used for rendering the boot configuration.</p>
+<p>Parameters specify the parameters to be used for rendering the boot configuration.</p>
 <br/>
 <br/>
 <table>
@@ -2754,6 +3343,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Image specifies the boot image to be used for the server.
 This field is optional and can be omitted if not specified.</p>
 </td>
@@ -2768,6 +3358,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
 the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
@@ -2840,6 +3431,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerRef is a reference to a specific server to be claimed.
 This field is optional and can be omitted if the server is to be selected using ServerSelector.</p>
 </td>
@@ -2854,6 +3446,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerSelector specifies a label selector to identify the server to be claimed.
 This field is optional and can be omitted if a specific server is referenced using ServerRef.</p>
 </td>
@@ -2868,6 +3461,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
 the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
@@ -2939,6 +3533,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerRef is a reference to a specific server to be claimed.
 This field is optional and can be omitted if the server is to be selected using ServerSelector.</p>
 </td>
@@ -2953,6 +3548,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerSelector specifies a label selector to identify the server to be claimed.
 This field is optional and can be omitted if a specific server is referenced using ServerRef.</p>
 </td>
@@ -2967,6 +3563,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
 the ignition configuration for the server. This field is optional and can be omitted if not specified.</p>
 </td>
@@ -3010,6 +3607,7 @@ Phase
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Phase represents the current phase of the server claim.</p>
 </td>
 </tr>
@@ -3065,6 +3663,7 @@ ServerMaintenancePolicy
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Policy specifies the maintenance policy to be enforced on the server.</p>
 </td>
 </tr>
@@ -3091,6 +3690,7 @@ Power
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerPower specifies the power state of the server during maintenance.</p>
 </td>
 </tr>
@@ -3104,6 +3704,7 @@ ServerBootConfigurationTemplate
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.</p>
 </td>
 </tr>
@@ -3127,7 +3728,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -3150,9 +3751,10 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
+<p>ServerMaintenanceRefItem is a reference to a ServerMaintenance object.</p>
 </div>
 <table>
 <thead>
@@ -3172,6 +3774,8 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that the BMCSettings has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -3402,6 +4006,7 @@ ServerMaintenancePolicy
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Policy specifies the maintenance policy to be enforced on the server.</p>
 </td>
 </tr>
@@ -3428,6 +4033,7 @@ Power
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerPower specifies the power state of the server during maintenance.</p>
 </td>
 </tr>
@@ -3441,6 +4047,7 @@ ServerBootConfigurationTemplate
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.</p>
 </td>
 </tr>
@@ -3463,6 +4070,8 @@ ServerBootConfigurationTemplate
 </thead>
 <tbody><tr><td><p>&#34;Completed&#34;</p></td>
 <td><p>ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.</p>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>ServerMaintenanceStateFailed specifies that the server maintenance has failed.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>ServerMaintenanceStateFailed specifies that the server maintenance has failed.</p>
@@ -3577,7 +4186,19 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>SystemUUID is the unique identifier for the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemURI</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>SystemURI is the unique URI for the server resource in REDFISH API.</p>
 </td>
 </tr>
 <tr>
@@ -3590,6 +4211,7 @@ Power
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
@@ -3603,6 +4225,7 @@ IndicatorLED
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IndicatorLED specifies the desired state of the server&rsquo;s indicator LED.</p>
 </td>
 </tr>
@@ -3616,6 +4239,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerClaimRef is a reference to a ServerClaim object that claims this server.
 This field is optional and can be omitted if no claim is associated with this server.</p>
 </td>
@@ -3630,6 +4254,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.</p>
 </td>
 </tr>
@@ -3643,6 +4268,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMCRef is a reference to the BMC object associated with this server.
 This field is optional and can be omitted if no BMC is associated with this server.</p>
 </td>
@@ -3657,6 +4283,7 @@ BMCAccess
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BMC contains the access details for the BMC.
 This field is optional and can be omitted if no BMC access is specified.</p>
 </td>
@@ -3671,6 +4298,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BootConfigurationRef is a reference to a BootConfiguration object that specifies
 the boot configuration for this server. This field is optional and can be omitted
 if no boot configuration is specified.</p>
@@ -3686,6 +4314,7 @@ Kubernetes core/v1.ObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
 the boot configuration for this server during maintenance. This field is optional and can be omitted</p>
 </td>
@@ -3700,6 +4329,7 @@ the boot configuration for this server during maintenance. This field is optiona
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BootOrder specifies the boot order of the server.</p>
 </td>
 </tr>
@@ -3713,6 +4343,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>BIOSSettingsRef is a reference to a biossettings object that specifies
 the BIOS configuration for this server.</p>
 </td>
@@ -3778,6 +4409,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Manufacturer is the name of the server manufacturer.</p>
 </td>
 </tr>
@@ -3789,6 +4421,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Model is the model of the server.</p>
 </td>
 </tr>
@@ -3800,6 +4433,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>SKU is the stock keeping unit identifier for the server.</p>
 </td>
 </tr>
@@ -3811,6 +4445,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>SerialNumber is the serial number of the server.</p>
 </td>
 </tr>
@@ -3824,6 +4459,7 @@ ServerPowerState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>PowerState represents the current power state of the server.</p>
 </td>
 </tr>
@@ -3837,6 +4473,7 @@ IndicatorLED
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IndicatorLED specifies the current state of the server&rsquo;s indicator LED.</p>
 </td>
 </tr>
@@ -3850,6 +4487,7 @@ ServerState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State represents the current state of the server.</p>
 </td>
 </tr>
@@ -3863,6 +4501,7 @@ ServerState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>NetworkInterfaces is a list of network interfaces associated with the server.</p>
 </td>
 </tr>
@@ -3876,6 +4515,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>TotalSystemMemory is the total amount of memory in bytes available on the server.</p>
 </td>
 </tr>
@@ -3889,6 +4529,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Processors is a list of Processors associated with the server.</p>
 </td>
 </tr>
@@ -3902,6 +4543,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Storages is a list of storages associated with the server.</p>
 </td>
 </tr>
@@ -3945,6 +4587,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Name is the name of the storage interface.</p>
 </td>
 </tr>
@@ -3958,6 +4601,7 @@ StorageState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State specifies the state of the storage device.</p>
 </td>
 </tr>
@@ -3971,6 +4615,7 @@ StorageState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Volumes is a collection of volumes associated with this storage.</p>
 </td>
 </tr>
@@ -3984,6 +4629,7 @@ StorageState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Drives is a collection of drives associated with this storage.</p>
 </td>
 </tr>
@@ -4013,6 +4659,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Name is the name of the storage interface.</p>
 </td>
 </tr>
@@ -4024,6 +4671,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>MediaType specifies the media type of the storage device.</p>
 </td>
 </tr>
@@ -4035,6 +4683,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Type specifies the type of the storage device.</p>
 </td>
 </tr>
@@ -4048,6 +4697,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Capacity specifies the size of the storage device in bytes.</p>
 </td>
 </tr>
@@ -4059,6 +4709,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Vendor specifies the vendor of the storage device.</p>
 </td>
 </tr>
@@ -4070,6 +4721,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Model specifies the model of the storage device.</p>
 </td>
 </tr>
@@ -4083,6 +4735,7 @@ StorageState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>State specifies the state of the storage device.</p>
 </td>
 </tr>
@@ -4138,6 +4791,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Name is the name of the storage interface.</p>
 </td>
 </tr>
@@ -4151,6 +4805,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Capacity specifies the size of the storage device in bytes.</p>
 </td>
 </tr>
@@ -4164,6 +4819,7 @@ StorageState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Status specifies the status of the volume.</p>
 </td>
 </tr>
@@ -4175,6 +4831,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>RAIDType specifies the RAID type of the associated Volume.</p>
 </td>
 </tr>
@@ -4186,17 +4843,19 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>VolumeUsage specifies the volume usage type for the Volume.</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="metal.ironcore.dev/v1alpha1.TaskStatus">TaskStatus
+<h3 id="metal.ironcore.dev/v1alpha1.Task">Task
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionStatus">BIOSVersionStatus</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionStatus">BMCVersionStatus</a>)
 </p>
 <div>
+<p>Task contains the status of the task created by the BMC for the BIOS upgrade.</p>
 </div>
 <table>
 <thead>
@@ -4208,42 +4867,50 @@ string
 <tbody>
 <tr>
 <td>
-<code>taskURI</code><br/>
+<code>URI</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>URI is the URI of the task created by the BMC for the BIOS upgrade.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>taskState</code><br/>
+<code>state</code><br/>
 <em>
 github.com/stmcginnis/gofish/redfish.TaskState
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>State is the current state of the task.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>taskStatus</code><br/>
+<code>status</code><br/>
 <em>
 github.com/stmcginnis/gofish/common.Health
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Status is the current status of the task.</p>
 </td>
 </tr>
 <tr>
 <td>
 <code>percentageComplete</code><br/>
 <em>
-int
+int32
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>PercentComplete is the percentage of completion of the task.</p>
 </td>
 </tr>
 </tbody>
@@ -4251,7 +4918,7 @@ int
 <h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionSpec">BIOSVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
 </p>
 <div>
 </div>

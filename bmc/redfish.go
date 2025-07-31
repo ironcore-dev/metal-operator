@@ -107,8 +107,8 @@ func (r *RedfishBMC) Logout() {
 }
 
 // PowerOn powers on the system using Redfish.
-func (r *RedfishBMC) PowerOn(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) PowerOn(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -123,8 +123,8 @@ func (r *RedfishBMC) PowerOn(ctx context.Context, systemUUID string) error {
 }
 
 // PowerOff gracefully shuts down the system using Redfish.
-func (r *RedfishBMC) PowerOff(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) PowerOff(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -135,8 +135,8 @@ func (r *RedfishBMC) PowerOff(ctx context.Context, systemUUID string) error {
 }
 
 // ForcePowerOff powers off the system using Redfish.
-func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -147,8 +147,8 @@ func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemUUID string) error
 }
 
 // Reset performs a reset on the system using Redfish.
-func (r *RedfishBMC) Reset(ctx context.Context, systemUUID string, resetType redfish.ResetType) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -169,6 +169,7 @@ func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	for _, s := range systems {
 		servers = append(servers, Server{
 			UUID:         s.UUID,
+			URI:          s.ODataID,
 			Model:        s.Model,
 			Manufacturer: s.Manufacturer,
 			PowerState:   PowerState(s.PowerState),
@@ -179,8 +180,8 @@ func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 }
 
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemUUID string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -237,7 +238,6 @@ func (r *RedfishBMC) getOEMManager(bmcUUID string) (OEMManagerInterface, error) 
 		manager.Manufacturer = manufacturer
 	}
 
-	// togo: improve. as of now use first one similar to r.GetManager()
 	oemManager, err := NewOEMManager(manager, r.client.Service)
 	if err != nil {
 		return nil, fmt.Errorf("not able create oem Manager: %v", err)
@@ -264,8 +264,8 @@ func (r *RedfishBMC) ResetManager(ctx context.Context, bmcUUID string, resetType
 }
 
 // GetSystemInfo retrieves information about the system using Redfish.
-func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemURI string) (SystemInfo, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to get systems: %w", err)
 	}
@@ -275,12 +275,10 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
-
 	systemProcessors, err := system.Processors()
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
 	}
-
 	processors := make([]Processor, 0, len(systemProcessors))
 	for _, p := range systemProcessors {
 		processors = append(processors, Processor{
@@ -298,6 +296,7 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 
 	return SystemInfo{
 		SystemUUID:        system.UUID,
+		SystemURI:         system.ODataID,
 		Manufacturer:      system.Manufacturer,
 		Model:             system.Model,
 		Status:            system.Status,
@@ -310,16 +309,16 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemUUID string) (Syst
 	}, nil
 }
 
-func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemUUID string) ([]string, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemURI string) ([]string, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return []string{}, err
 	}
 	return system.Boot.BootOrder, nil
 }
 
-func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemURI string) (string, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return "", err
 	}
@@ -336,7 +335,7 @@ func (r *RedfishBMC) GetBMCVersion(ctx context.Context, bmcUUID string) (string,
 
 func (r *RedfishBMC) GetBiosAttributeValues(
 	ctx context.Context,
-	systemUUID string,
+	systemURI string,
 	attributes []string,
 ) (
 	result redfish.SettingsAttributes,
@@ -345,7 +344,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(
 	if len(attributes) == 0 {
 		return result, err
 	}
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return result, err
 	}
@@ -387,12 +386,12 @@ func (r *RedfishBMC) GetBMCAttributeValues(
 
 func (r *RedfishBMC) GetBiosPendingAttributeValues(
 	ctx context.Context,
-	systemUUID string,
+	systemURI string,
 ) (
 	result redfish.SettingsAttributes,
 	err error,
 ) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return result, err
 	}
@@ -471,10 +470,10 @@ func (r *RedfishBMC) GetBMCPendingAttributeValues(
 // SetBiosAttributesOnReset sets given bios attributes.
 func (r *RedfishBMC) SetBiosAttributesOnReset(
 	ctx context.Context,
-	systemUUID string,
+	systemURI string,
 	attributes redfish.SettingsAttributes,
 ) (err error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return
 	}
@@ -506,8 +505,8 @@ func (r *RedfishBMC) SetBMCAttributesImediately(
 }
 
 // SetBootOrder sets bios boot order
-func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemUUID string, bootOrder []string) error {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrder []string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return err
 	}
@@ -636,6 +635,17 @@ func (r *RedfishBMC) checkAttribues(
 	return reset, errors.Join(errs...)
 }
 
+// check if the arrtibutes need to reboot when changed, and are correct type.
+// supported attrType, bmc and bios
+func (r *RedfishBMC) CheckBMCAttributes(bmcUUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
+	oemManager, err := r.getOEMManager(bmcUUID)
+	if err != nil {
+		return false, err
+	}
+
+	return oemManager.CheckBMCAttributes(attrs)
+}
+
 func (r *RedfishBMC) getSystemManufacturer() (string, error) {
 	systems, err := r.client.Service.Systems()
 	if err != nil {
@@ -648,19 +658,8 @@ func (r *RedfishBMC) getSystemManufacturer() (string, error) {
 	return "", fmt.Errorf("no system found to determine the Manufacturer")
 }
 
-// check if the arrtibutes need to reboot when changed, and are correct type.
-// supported attrType, bmc and bios
-func (r *RedfishBMC) CheckBMCAttributes(bmcUUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
-	oemManager, err := r.getOEMManager(bmcUUID)
-	if err != nil {
-		return false, err
-	}
-
-	return oemManager.CheckBMCAttributes(attrs)
-}
-
-func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Storage, error) {
-	system, err := r.getSystemByUUID(ctx, systemUUID)
+func (r *RedfishBMC) GetStorages(ctx context.Context, systemURI string) ([]Storage, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return nil, err
 	}
@@ -745,9 +744,11 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemUUID string) ([]Stor
 	return result, nil
 }
 
-func (r *RedfishBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*redfish.ComputerSystem, error) {
-	service := r.client.GetService()
-	var systems []*redfish.ComputerSystem
+func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*redfish.ComputerSystem, error) {
+	if len(systemURI) == 0 {
+		return nil, fmt.Errorf("can not process empty URI")
+	}
+	var system *redfish.ComputerSystem
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		r.options.ResourcePollingInterval,
@@ -755,23 +756,21 @@ func (r *RedfishBMC) getSystemByUUID(ctx context.Context, systemUUID string) (*r
 		true,
 		func(ctx context.Context) (bool, error) {
 			var err error
-			systems, err = service.Systems()
+			system, err = common.GetObject[redfish.ComputerSystem](r.client, systemURI)
 			return err == nil, nil
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for for server systems to be ready: %w", err)
 	}
-	for _, system := range systems {
-		if strings.ToLower(system.UUID) == systemUUID {
-			return system, nil
-		}
+	if system.UUID != "" {
+		return system, nil
 	}
-	return nil, fmt.Errorf("no system found for %v", systemUUID)
+	return nil, fmt.Errorf("no system found for %v", systemURI)
 }
 
 func (r *RedfishBMC) WaitForServerPowerState(
 	ctx context.Context,
-	systemUUID string,
+	systemURI string,
 	powerState redfish.PowerState,
 ) error {
 	if err := wait.PollUntilContextTimeout(
@@ -780,7 +779,7 @@ func (r *RedfishBMC) WaitForServerPowerState(
 		r.options.PowerPollingTimeout,
 		true,
 		func(ctx context.Context) (done bool, err error) {
-			sysInfo, err := r.getSystemByUUID(ctx, systemUUID)
+			sysInfo, err := r.getSystemFromUri(ctx, systemURI)
 			if err != nil {
 				return false, fmt.Errorf("failed to get system info: %w", err)
 			}
@@ -896,6 +895,136 @@ func (r *RedfishBMC) GetBiosUpgradeTask(
 			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
 				string(respTaskRawBody),
 				respTask.StatusCode)
+	}
+
+	oem, err := NewOEM(manufacturer, r.client.GetService())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get oem object, %v", err)
+	}
+
+	return oem.GetTaskMonitorDetails(ctx, respTask)
+}
+
+// UpgradeBMCVersion upgrade given BMC version.
+func (r *RedfishBMC) UpgradeBMCVersion(
+	ctx context.Context,
+	manufacturer string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	fatal := false
+	service := r.client.GetService()
+
+	upgradeServices, err := service.UpdateService()
+	if err != nil {
+		return "", fatal, err
+	}
+
+	type tActions struct {
+		SimpleUpdate struct {
+			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
+			Target          string
+		} `json:"#UpdateService.SimpleUpdate"`
+		StartUpdate common.ActionTarget `json:"#UpdateService.StartUpdate"`
+	}
+
+	var tUS struct {
+		Actions tActions
+	}
+
+	err = json.Unmarshal(upgradeServices.RawData, &tUS)
+	if err != nil {
+		return "", fatal, err
+	}
+
+	if len(manufacturer) == 0 {
+		manufacturer, err = r.getSystemManufacturer()
+		if err != nil {
+			return "", fatal, fmt.Errorf("failed to determine manufacturer")
+		}
+	}
+
+	oem, err := NewOEM(manufacturer, service)
+	if err != nil {
+		return "", fatal, err
+	}
+
+	RequestBody := oem.GetUpdateRequestBody(parameters)
+
+	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
+
+	if err != nil {
+		return "", fatal, err
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	// any error post this point is fatal, as we can not issue multiple upgrade requests.
+	// expectation is to move to failed state, and manually check the status before retrying
+	fatal = true
+
+	log.V(1).Info("update has been issued", "Response status code", resp.StatusCode)
+
+	if resp.StatusCode != http.StatusAccepted {
+		bmcRawBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "",
+				fatal,
+				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
+					err,
+					resp.StatusCode,
+				)
+		}
+		return "",
+			fatal,
+			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
+				string(bmcRawBody),
+				resp.StatusCode,
+			)
+	}
+
+	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
+	if err != nil {
+		log.V(1).Error(err,
+			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
+		return "", fatal, fmt.Errorf("failed to read task monitor URI. %v", err)
+	}
+
+	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
+
+	return taskMonitorURI, false, nil
+}
+
+func (r *RedfishBMC) GetBMCUpgradeTask(
+	ctx context.Context,
+	manufacturer string,
+	taskURI string,
+) (*redfish.Task, error) {
+
+	respTask, err := r.client.GetService().GetClient().Get(taskURI)
+	if err != nil {
+		return nil, err
+	}
+	defer respTask.Body.Close() // nolint: errcheck
+
+	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
+		respTaskRawBody, err := io.ReadAll(respTask.Body)
+		if err != nil {
+			return nil,
+				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+					err,
+					respTask.StatusCode)
+		}
+		return nil,
+			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
+				string(respTaskRawBody),
+				respTask.StatusCode)
+	}
+
+	if len(manufacturer) == 0 {
+		manufacturer, err = r.getSystemManufacturer()
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine manufacturer")
+		}
 	}
 
 	oem, err := NewOEM(manufacturer, r.client.GetService())

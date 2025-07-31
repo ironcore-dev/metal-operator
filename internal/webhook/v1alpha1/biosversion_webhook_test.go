@@ -28,19 +28,17 @@ var _ = Describe("BIOSVersion Webhook", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 "P71 v1.45 (12/06/2017)",
-				Image:                   metalv1alpha1.ImageSpec{URI: "one"},
-				ServerRef:               &v1.LocalObjectReference{Name: "foo"},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 "P71 v1.45 (12/06/2017)",
+					Image:                   metalv1alpha1.ImageSpec{URI: "one"},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: "foo"},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersionV1)).To(Succeed())
 		SetClient(k8sClient)
 		DeferCleanup(k8sClient.Delete, biosVersionV1)
-	})
-
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
 	})
 
 	Context("When creating or updating BIOSVersion under Validating Webhook", func() {
@@ -52,10 +50,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
-					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "foo"},
 				},
 			}
 			Expect(validator.ValidateCreate(ctx, biosVersionV2)).Error().To(HaveOccurred())
@@ -69,10 +69,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
@@ -87,10 +89,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
@@ -110,11 +114,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
@@ -134,10 +139,12 @@ var _ = Describe("BIOSVersion Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSVersionSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
@@ -149,20 +156,38 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().ToNot(HaveOccurred())
 		})
 
+		It("Should NOT allow update Version is in progress. but should allow to Force it", func() {
+			By("Patching the biosVersion V1 to InProgress state")
+			Eventually(UpdateStatus(biosVersionV1, func() {
+				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
+			})).Should(Succeed())
+			By("Updating an biosVersion V1 spec, should fail to update when inProgress")
+			biosVersionV1Updated := biosVersionV1.DeepCopy()
+			biosVersionV1Updated.Spec.Version = "P712"
+			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().To(HaveOccurred())
+			By("Updating an biosVersion V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
+			biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
+			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().ToNot(HaveOccurred())
+
+			Eventually(UpdateStatus(biosVersionV1, func() {
+				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateCompleted
+			})).Should(Succeed())
+		})
+
 		It("Should refuse to delete if InProgress", func() {
 			By("Patching the biosVersionV1 to InProgress state")
 			Eventually(UpdateStatus(biosVersionV1, func() {
 				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
 			})).Should(Succeed())
 
-			By("Deleting the BIOSSettings should fail")
+			By("Deleting the BIOSSettings V1 should fail")
 			Expect(k8sClient.Delete(ctx, biosVersionV1)).To(Not(Succeed()))
 
 			Eventually(UpdateStatus(biosVersionV1, func() {
 				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateCompleted
 			})).Should(Succeed())
 
-			By("Deleting the BIOSSettings should pass: by DeferCleanup")
+			By("Deleting the BIOSSettings V1 should pass: by DeferCleanup")
 
 		})
 	})

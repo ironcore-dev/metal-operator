@@ -79,6 +79,7 @@ flowchart LR
 - [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 - [**BIOSSettings**](concepts/biossettings.md): Handles updating the BIOS setting on the physical server's BIOS.
 - [**BIOSVersion**](concepts/biosversion.md): Handles upgrading the BIOS Version on the physical server's BIOS.
+- [**BIOSVersionSet**](concepts/biosversionset.md): Handles creation of multiple `BIOSVersion` by selecting physical server's through labels.
 - [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
 - [**ServerMaintenanceSet**](concepts/servermaintenanceset.md): Manages a set of ServerMaintenances.
@@ -95,6 +96,7 @@ flowchart LR
 
 - **BIOSSettingsReconciler**: Handles [`BIOSSettings`](concepts/biossettings.md) resource. Provides ability to update the bios settings on physical server's BIOS.
 - **BiosVersionReconciler**: Handles [`BIOSVersion`](concepts/biosversion.md) resource. Provides ability to upgrade the bios version on physical server's BIOS.
+- **BiosVersionSetReconciler**: Handles [`BIOSVersionSet`](concepts/biosversionset.md) resource. Provides ability to upgrade the bios version on several physical server's BIOS at a time through selecting server's through labels.
 - **BMCSettingsReconciler**: Handles [`BMCSettings`](concepts/bmcsettings.md) resource. Provides ability to update the bmc settings on physical server's Manager.
 - **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.
 

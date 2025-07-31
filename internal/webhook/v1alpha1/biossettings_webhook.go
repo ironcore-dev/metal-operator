@@ -70,6 +70,20 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 	}
 	biossettingslog.Info("Validation for BIOSSettings upon update", "name", biossettings.GetName())
 
+	oldBIOSSettings, ok := oldObj.(*metalv1alpha1.BIOSSettings)
+	if !ok {
+		return nil, fmt.Errorf("expected a BIOSSettings object for the oldObj but got %T", oldObj)
+	}
+	if oldBIOSSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress &&
+		!ShouldAllowForceUpdateInProgress(biossettings) {
+		err := fmt.Errorf("BIOSSettings (%v) is in progress, unable to update %v",
+			oldBIOSSettings.Name,
+			biossettings.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: biossettings.GroupVersionKind().Group, Kind: biossettings.Kind},
+			biossettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
 	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := v.Client.List(ctx, biosSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSSettingsList: %w", err)
@@ -86,7 +100,7 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj ru
 	}
 	biossettingslog.Info("Validation for BIOSSettings upon deletion", "name", biossettings.GetName())
 
-	if biossettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+	if biossettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(biossettings) {
 		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
 	}
 

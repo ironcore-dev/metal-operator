@@ -83,10 +83,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
@@ -131,10 +133,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 upgradeServerBiosVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 upgradeServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
@@ -227,10 +231,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
-				Version:                 upgradeServerBiosVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 upgradeServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
@@ -339,7 +345,7 @@ func ensureBiosVersionConditionTransisition(
 
 	By("Ensuring that BIOSVersion has updated the taskStatus with taskURI")
 	Eventually(Object(biosVersion)).Should(
-		HaveField("Status.UpgradeTask.TaskURI", "dummyTask"),
+		HaveField("Status.UpgradeTask.URI", "dummyTask"),
 	)
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeCompleted'")

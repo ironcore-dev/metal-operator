@@ -24,7 +24,7 @@ func main() {
 		Development: true,
 	}
 
-	log := ctrl.Log.WithName("setup")
+	log := ctrl.Log.WithName("RedfishMockServer")
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	srv := server.NewMockServer(log, ":8000")

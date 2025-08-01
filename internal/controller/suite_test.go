@@ -154,11 +154,14 @@ var _ = BeforeSuite(func() {
 	// set komega client
 	SetClient(k8sClient)
 
+	log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(log)
+
 	By("Starting the registry server")
 	var mgrCtx context.Context
 	mgrCtx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
-	registryServer := registry.NewServer(":30000")
+	registryServer := registry.NewServer(log, ":30000")
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
@@ -332,12 +335,15 @@ func SetupTest() *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+		logf.SetLogger(log)
+
 		// Start the Redfish Mock Server
-		mockServer := server.NewMockServer(ctrl.Log.WithName("RedfishMockServer"), ":8000")
-		Expect(mockServer.Start(mgrCtx)).NotTo(HaveOccurred(), " failed to start mock Redfish server")
+		mockServer := server.NewMockServer(log, ":8000")
 
 		go func() {
 			defer GinkgoRecover()
+			Expect(mockServer.Start(mgrCtx)).NotTo(HaveOccurred(), " failed to start mock Redfish server")
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
 		}()
 	})

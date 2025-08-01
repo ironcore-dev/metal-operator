@@ -1,0 +1,126 @@
+{
+    "@odata.type": "#AccountService.v1_15_0.AccountService",
+    "Id": "AccountService",
+    "Name": "Account Service",
+    "Description": "Account Service",
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "ServiceEnabled": true,
+    "AuthFailureLoggingThreshold": 3,
+    "MinPasswordLength": 8,
+    "AccountLockoutThreshold": 5,
+    "AccountLockoutDuration": 30,
+    "AccountLockoutCounterResetAfter": 30,
+    "AccountLockoutCounterResetEnabled": true,
+    "Accounts": {
+        "@odata.id": "/redfish/v1/AccountService/Accounts"
+    },
+    "Roles": {
+        "@odata.id": "/redfish/v1/AccountService/Roles"
+    },
+    "LocalAccountAuth": "Enabled",
+    "MultiFactorAuth": {
+        "OneTimePasscode": {
+            "Enabled": true
+        }
+    },
+    "LDAP": {
+        "AccountProviderType": "LDAPService",
+        "ServiceEnabled": false,
+        "ServiceAddresses": [
+            "ldaps://ldap.example.org:636"
+        ],
+        "Authentication": {
+            "AuthenticationType": "UsernameAndPassword",
+            "Username": "cn=Manager,dc=example,dc=org",
+            "Password": null
+        },
+        "LDAPService": {
+            "SearchSettings": {
+                "BaseDistinguishedNames": [
+                    "dc=example,dc=org"
+                ],
+                "UsernameAttribute": "uid",
+                "GroupsAttribute": "memberof",
+                "EmailAttribute": "mail"
+            }
+        },
+        "RemoteRoleMapping": [
+            {
+                "RemoteUser": "cn=Manager,dc=example,dc=org",
+                "LocalRole": "Administrator"
+            },
+            {
+                "RemoteGroup": "cn=Admins,ou=Groups,dc=example,dc=org",
+                "LocalRole": "Administrator"
+            },
+            {
+                "RemoteGroup": "cn=PowerUsers,ou=Groups,dc=example,dc=org",
+                "LocalRole": "Operator"
+            },
+            {
+                "RemoteGroup": "(cn=*)",
+                "LocalRole": "ReadOnly"
+            }
+        ]
+    },
+    "ActiveDirectory": {
+        "AccountProviderType": "ActiveDirectoryService",
+        "ServiceEnabled": true,
+        "ServiceAddresses": [
+            "ad1.example.org",
+            "ad2.example.org",
+            null,
+            null
+        ],
+        "Authentication": {
+            "AuthenticationType": "KerberosKeytab",
+            "KerberosKeytab": null
+        },
+        "RemoteRoleMapping": [
+            {
+                "RemoteGroup": "Administrators",
+                "LocalRole": "Administrator"
+            },
+            {
+                "RemoteUser": "DOMAIN\\Bob",
+                "LocalRole": "Operator"
+            },
+            {
+                "RemoteGroup": "PowerUsers",
+                "LocalRole": "Operator"
+            },
+            {
+                "RemoteGroup": "Everybody",
+                "LocalRole": "ReadOnly"
+            }
+        ]
+    },
+    "OAuth2": {
+        "AccountProviderType": "OAuth2",
+        "ServiceEnabled": true,
+        "ServiceAddresses": [
+            "https://contoso.org/.well-known/oauth-authorization-server"
+        ],
+        "OAuth2Service": {
+            "Mode": "Discovery",
+            "Issuer": "https://contoso.org/services/oauth2",
+            "Audience": [
+                "23:11:8A:33:CF:EA",
+                "92384634-2938-2342-8820-489239905423"
+            ],
+            "OAuthServiceSigningKeys": "ewogICAgImtleXMiOiBbCiAgICAgICAgewogICAgICAgICAgICAiZSI6ICJBUUFCIiwKICAgICAgICAgICAgImtpZCI6ICJvV1F2Tl8tRUxnd25HMzFNTEl4Rm5hTVlfNTd0Wk9FSUVQYnpaYlBqS2FBIiwKICAgICAgICAgICAgImt0eSI6ICJSU0EiLAogICAgICAgICAgICAibiI6ICJvYS1Kb2pkSGw2VHQ3N2Vma2h6aW5MMU9XNmZjMGhjQjloOTN2WUZyRVlPakozRjhfTFh1c1ItMW95MUFKdExZcF9KeVI4Q1ZET28yVGNCaTBuSkhKczF1dkN4WWljX202WE5vMHptVm1VQ2hVMnBYSlBGelZKRGV5VVhIWWVONG5yQ1k4XzlTLXlzWnlKa2RRaWJmeHlBRndUMHdpNlZldF9MYTE4N3JNZUFCU0tXdEdIVmpkOWk1UmhELWNGU1JaNk05M0s2bXFPUUpaX0pMXzJKUU93aGk5dFl4Q2drVVpqc1gyWXowMEZpdUVTWDhHcXRGQlI1UzhIT2p0b2FhZUJrTk5hYWZFOFdSUVl6QlVmOHpiNkVobUFMemc0Z0YxTVhRb3dZV25GcGpzYXcwNVRONHk3SWZJUVhLODlqbGxnbWFkWVVjbndaUmRMc1o2VTdBS1EiCiAgICAgICAgfQogICAgXQp9"
+        }
+    },
+    "AdditionalExternalAccountProviders": {
+        "@odata.id": "/redfish/v1/AccountService/ExternalAccountProviders"
+    },
+    "OutboundConnections": {
+        "@odata.id": "/redfish/v1/AccountService/OutboundConnections"
+    },
+    "RequireChangePasswordAction": false,
+    "@odata.id": "/redfish/v1/AccountService",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

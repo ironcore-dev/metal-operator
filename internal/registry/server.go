@@ -136,14 +136,14 @@ func (s *Server) Start(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		log.Println("Shutting down registry server...")
-		if err := server.Shutdown(context.Background()); err != nil {
+		if err := server.Shutdown(ctx); err != nil {
 			return fmt.Errorf("HTTP server Shutdown: %w", err)
 		}
 		log.Println("Registry server gracefully stopped.")
 		return nil
 	case err := <-errChan:
 		// In case of server startup error, attempt to shutdown gracefully before returning the error.
-		if shutdownErr := server.Shutdown(context.Background()); shutdownErr != nil {
+		if shutdownErr := server.Shutdown(ctx); shutdownErr != nil {
 			log.Printf("HTTP registry server Shutdown: %v", shutdownErr)
 		}
 		return err

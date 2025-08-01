@@ -32,13 +32,14 @@ func TestRegistry(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(log)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
 
 	// Initialize the registry
-	registryServer = registry.NewServer(registryAddr)
+	registryServer = registry.NewServer(log, registryAddr)
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(ctx)).To(Succeed(), "failed to start registry agent")
@@ -50,7 +51,7 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 
 	// Initialize your probe server
-	probeAgent = probe.NewAgent(systemUUID, registryURL, 100*time.Millisecond)
+	probeAgent = probe.NewAgent(log, systemUUID, registryURL, 100*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

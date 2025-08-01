@@ -62,33 +62,46 @@ type BMC interface {
 	// GetManager returns the manager
 	GetManager(UUID string) (*redfish.Manager, error)
 
-	// Reset performs a reset on the Manager.
+	// ResetManager performs a reset on the Manager.
 	ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error
 
+	// GetBootOrder retrieves the boot order for the system.
 	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
 
+	// GetBiosAttributeValues retrieves BIOS attribute values for the system.
 	GetBiosAttributeValues(ctx context.Context, systemURI string, attributes []string) (redfish.SettingsAttributes, error)
 
+	// GetBiosPendingAttributeValues retrieves pending BIOS attribute values for the system.
 	GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (redfish.SettingsAttributes, error)
 
+	// GetBMCAttributeValues retrieves BMC attribute values for the system.
 	GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (redfish.SettingsAttributes, error)
 
+	// GetBMCPendingAttributeValues retrieves pending BMC attribute values for the system.
 	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result redfish.SettingsAttributes, err error)
 
+	// CheckBiosAttributes checks if the BIOS attributes are valid and returns whether a reset is required.
 	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
 
+	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
 	CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
 
+	// SetBiosAttributesOnReset sets BIOS attributes on the system and applies them on the next reset.
 	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes redfish.SettingsAttributes) (err error)
 
-	SetBMCAttributesImediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error)
+	// SetBMCAttributesImmediately sets BMC attributes on the system and applies them immediately.
+	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error)
 
+	// GetBiosVersion retrieves the BIOS version for the system.
 	GetBiosVersion(ctx context.Context, systemURI string) (string, error)
 
+	// GetBMCVersion retrieves the BMC version for the system.
 	GetBMCVersion(ctx context.Context, UUID string) (string, error)
 
+	// SetBootOrder sets the boot order for the system.
 	SetBootOrder(ctx context.Context, systemURI string, order []string) error
 
+	// GetStorages retrieves storage information for the system.
 	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
 
 	GetProcessors(ctx context.Context, systemURI string) ([]Processor, error)
@@ -99,46 +112,42 @@ type BMC interface {
 		parameters *redfish.SimpleUpdateParameters,
 	) (string, bool, error)
 
-	GetBiosUpgradeTask(
-		ctx context.Context,
-		manufacturer string,
-		taskURI string,
-	) (*redfish.Task, error)
+	// GetBiosUpgradeTask retrieves the task for the BIOS upgrade.
+	GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
 
+	// WaitForServerPowerState waits for the server to reach the specified power state.
 	WaitForServerPowerState(ctx context.Context, systemURI string, powerState redfish.PowerState) error
 
-	UpgradeBMCVersion(
-		ctx context.Context,
-		manufacturer string,
-		parameters *redfish.SimpleUpdateParameters,
-	) (string, bool, error)
+	// UpgradeBMCVersion upgrades the BMC version for the system.
+	UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error)
 
-	GetBMCUpgradeTask(
-		ctx context.Context,
-		manufacturer string,
-		taskURI string,
-	) (*redfish.Task, error)
+	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
+	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
 }
 
+// OEMManagerInterface defines methods for OEM-specific BMC management.
 type OEMManagerInterface interface {
+	// GetOEMBMCSettingAttribute retrieves OEM-specific BMC setting attributes.
 	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
+
+	// GetBMCPendingAttributeValues retrieves pending BMC attribute values.
 	GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error)
+
+	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
 	CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error)
+
+	// GetObjFromUri retrieves an object from a given URI and populates the response object.
 	GetObjFromUri(uri string, respObj any) ([]string, error)
+
+	// UpdateBMCAttributesApplyAt updates BMC attributes and applies them at the specified time.
 	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
 }
 
+// OEMInterface defines methods for OEM-specific BMC operations.
 type OEMInterface interface {
-	GetUpdateRequestBody(
-		parameters *redfish.SimpleUpdateParameters,
-	) *oem.SimpleUpdateRequestBody
-	GetUpdateTaskMonitorURI(
-		response *http.Response,
-	) (string, error)
-	GetTaskMonitorDetails(
-		ctx context.Context,
-		taskMonitorResponse *http.Response,
-	) (*redfish.Task, error)
+	GetUpdateRequestBody(parameters *redfish.SimpleUpdateParameters) *oem.SimpleUpdateRequestBody
+	GetUpdateTaskMonitorURI(response *http.Response) (string, error)
+	GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error)
 }
 
 type Entity struct {

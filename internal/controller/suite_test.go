@@ -340,12 +340,15 @@ func SetupTest() *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+		logf.SetLogger(log)
+
 		// Start the Redfish Mock Server
-		mockServer := server.NewMockServer(ctrl.Log.WithName("RedfishMockServer"), ":8000")
-		Expect(mockServer.Start(mgrCtx)).NotTo(HaveOccurred(), " failed to start mock Redfish server")
+		mockServer := server.NewMockServer(log, ":8000")
 
 		go func() {
 			defer GinkgoRecover()
+			Expect(mockServer.Start(mgrCtx)).NotTo(HaveOccurred(), " failed to start mock Redfish server")
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
 		}()
 	})

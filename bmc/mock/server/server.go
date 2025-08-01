@@ -26,26 +26,26 @@ var (
 )
 
 type MockServer struct {
-	Log     logr.Logger
-	Addr    string
-	Handler http.Handler
+	log     logr.Logger
+	addr    string
+	handler http.Handler
 }
 
 func NewMockServer(log logr.Logger, addr string) *MockServer {
 	mux := http.NewServeMux()
 	server := &MockServer{
-		Addr: addr,
-		Log:  log,
+		addr: addr,
+		log:  log,
 	}
 
 	mux.HandleFunc("/redfish/v1/", server.redfishHandler)
-	server.Handler = mux
+	server.handler = mux
 
 	return server
 }
 
 func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
-	s.Log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
 	switch r.Method {
 	case http.MethodGet:
@@ -60,14 +60,14 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) {
-	s.Log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
 	urlPath := resolvePath(r.URL.Path)
 	body, err := io.ReadAll(r.Body)
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			s.Log.Error(err, "Failed to close request body")
+			s.log.Error(err, "Failed to close request body")
 		}
 	}(r.Body)
 	if err != nil || len(body) == 0 {
@@ -130,7 +130,7 @@ func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write(resp)
 		if err != nil {
-			s.Log.Error(err, "Failed to write response")
+			s.log.Error(err, "Failed to write response")
 			return
 		}
 		return
@@ -145,7 +145,7 @@ func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(content)
 	if err != nil {
-		s.Log.Error(err, "Failed to write response")
+		s.log.Error(err, "Failed to write response")
 		return
 	}
 }
@@ -165,7 +165,7 @@ func mergeJSON(base, update map[string]interface{}) {
 }
 
 func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
-	s.Log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
 	// You can parse JSON body here if needed
 	body, err := io.ReadAll(r.Body)
@@ -176,51 +176,51 @@ func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			s.Log.Error(err, "Failed to close request body")
+			s.log.Error(err, "Failed to close request body")
 		}
 	}(r.Body)
 
-	s.Log.Info("POST body received", "body", string(body))
+	s.log.Info("POST body received", "body", string(body))
 
 	// Respond with a 201 Created or similar
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(`{"status": "created"}`))
 	if err != nil {
-		s.Log.Error(err, "Failed to write response")
+		s.log.Error(err, "Failed to write response")
 		return
 	}
 }
 
 // Start starts the mock server and stops on ctx cancellation.
 func (s *MockServer) Start(ctx context.Context) error {
-	if s.Handler == nil {
+	if s.handler == nil {
 		return fmt.Errorf("mock redfish handler is nil")
 	}
 
 	srv := &http.Server{
-		Addr:    s.Addr,
-		Handler: s.Handler,
+		Addr:    s.addr,
+		Handler: s.handler,
 	}
 
 	done := make(chan struct{})
 
 	go func() {
-		s.Log.Info("Started mock server", "address", s.Addr)
+		s.log.Info("Started mock server", "address", s.addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			s.Log.Error(err, "Server failed")
+			s.log.Error(err, "Server failed")
 		}
 		close(done)
 	}()
 
 	go func() {
 		<-ctx.Done()
-		s.Log.Info("Shutting down mock server")
+		s.log.Info("Shutting down mock server")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			s.Log.Error(err, "Mock server shutdown failed")
+			s.log.Error(err, "Mock server shutdown failed")
 		}
 	}()
 

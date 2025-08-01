@@ -1,0 +1,9 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCVersionSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bmcversionset-sample
+spec:
+  # TODO(user): Add fields here

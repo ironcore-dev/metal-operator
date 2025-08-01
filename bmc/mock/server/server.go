@@ -1,0 +1,228 @@
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
+package server
+
+import (
+	"context"
+	"embed"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"path"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/go-logr/logr"
+)
+
+var (
+	//go:embed data/**
+	dataFS    embed.FS
+	overrides sync.Map
+)
+
+type MockServer struct {
+	Log     logr.Logger
+	Addr    string
+	Handler http.Handler
+}
+
+func NewMockServer(log logr.Logger, addr string) *MockServer {
+	mux := http.NewServeMux()
+	server := &MockServer{
+		Addr: addr,
+		Log:  log,
+	}
+
+	mux.HandleFunc("/redfish/v1/", server.redfishHandler)
+	server.Handler = mux
+
+	return server
+}
+
+func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
+	s.Log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+
+	switch r.Method {
+	case http.MethodGet:
+		s.handleRedfishGET(w, r)
+	case http.MethodPost:
+		s.handleRedfishPOST(w, r)
+	case http.MethodPatch:
+		s.handleRedfishPATCH(w, r)
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) {
+	s.Log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+
+	urlPath := resolvePath(r.URL.Path)
+	body, err := io.ReadAll(r.Body)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			s.Log.Error(err, "Failed to close request body")
+		}
+	}(r.Body)
+	if err != nil || len(body) == 0 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	var update map[string]interface{}
+	if err := json.Unmarshal(body, &update); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Load existing resource: from override if exists, else embedded
+	var base map[string]interface{}
+	if cached, ok := overrides.Load(urlPath); ok {
+		base = cached.(map[string]interface{})
+	} else {
+		data, err := dataFS.ReadFile(urlPath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.Unmarshal(data, &base); err != nil {
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// If it's a Collection (has "Members"), reject
+	if _, isCollection := base["Members"]; isCollection {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Merge update into base
+	mergeJSON(base, update)
+
+	// Store updated version in memory
+	overrides.Store(urlPath, base)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func resolvePath(urlPath string) string {
+	trimmed := strings.TrimPrefix(urlPath, "/redfish/v1")
+	trimmed = strings.Trim(trimmed, "/")
+
+	if trimmed == "" {
+		return "data/index.json"
+	}
+	return path.Join("data", trimmed, "index.json")
+}
+
+func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
+	urlPath := resolvePath(r.URL.Path)
+
+	if cached, ok := overrides.Load(urlPath); ok {
+		resp, _ := json.MarshalIndent(cached, "", "  ")
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write(resp)
+		if err != nil {
+			s.Log.Error(err, "Failed to write response")
+			return
+		}
+		return
+	}
+
+	content, err := dataFS.ReadFile(urlPath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(content)
+	if err != nil {
+		s.Log.Error(err, "Failed to write response")
+		return
+	}
+}
+
+func mergeJSON(base, update map[string]interface{}) {
+	for k, v := range update {
+		if bv, ok := base[k]; ok {
+			if bvMap, ok1 := bv.(map[string]interface{}); ok1 {
+				if vMap, ok2 := v.(map[string]interface{}); ok2 {
+					mergeJSON(bvMap, vMap)
+					continue
+				}
+			}
+		}
+		base[k] = v
+	}
+}
+
+func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
+	s.Log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+
+	// You can parse JSON body here if needed
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			s.Log.Error(err, "Failed to close request body")
+		}
+	}(r.Body)
+
+	s.Log.Info("POST body received", "body", string(body))
+
+	// Respond with a 201 Created or similar
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write([]byte(`{"status": "created"}`))
+	if err != nil {
+		s.Log.Error(err, "Failed to write response")
+		return
+	}
+}
+
+// Start starts the mock server and stops on ctx cancellation.
+func (s *MockServer) Start(ctx context.Context) error {
+	if s.Handler == nil {
+		return fmt.Errorf("mock redfish handler is nil")
+	}
+
+	srv := &http.Server{
+		Addr:    s.Addr,
+		Handler: s.Handler,
+	}
+
+	done := make(chan struct{})
+
+	go func() {
+		s.Log.Info("Started mock server", "address", s.Addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			s.Log.Error(err, "Server failed")
+		}
+		close(done)
+	}()
+
+	go func() {
+		<-ctx.Done()
+		s.Log.Info("Shutting down mock server")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			s.Log.Error(err, "Mock server shutdown failed")
+		}
+	}()
+
+	return nil
+}

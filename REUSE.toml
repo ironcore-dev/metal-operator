@@ -35,3 +35,9 @@ path = [
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2024 SAP SE or an SAP affiliate company and IronCore contributors"
 SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "bmc/mock/server/data/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Copyright (c) 2016-2024, Contributing Member(s) of Distributed Management Task Force, Inc.. All rights reserved."
+SPDX-License-Identifier = "BSD-3-Clause"

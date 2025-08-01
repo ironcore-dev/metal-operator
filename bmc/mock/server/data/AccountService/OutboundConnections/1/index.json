@@ -1,0 +1,35 @@
+{
+    "@odata.type": "#OutboundConnection.v1_0_1.OutboundConnection",
+    "Id": "1",
+    "Name": "Outbound Connection to contoso app",
+    "Status": {
+        "Health": "OK",
+        "HealthRollup": "OK",
+        "State": "Enabled"
+    },
+    "Authentication": "MTLS",
+    "Certificates": {
+        "@odata.id": "/redfish/v1/AccountService/OutboundConnections/1/Certificates"
+    },
+    "ClientCertificates": {
+        "@odata.id": "/redfish/v1/AccountService/OutboundConnections/1/ClientCertificates"
+    },
+    "ConnectionEnabled": true,
+    "EndpointURI": "wss://ws.contoso.com:443",
+    "RetryPolicy": {
+        "ConnectionRetryPolicy": "RetryCount",
+        "RetryIntervalMinutes": 5,
+        "RetryCount": 60
+    },
+    "Roles": [
+        "Administrator"
+    ],
+    "WebSocketPingIntervalMinutes": 10,
+    "Links": {
+        "Session": {
+            "@odata.id": "/redfish/v1/SessionService/Sessions/1234567890ABCDEG"
+        }
+    },
+    "@odata.id": "/redfish/v1/AccountService/OutboundConnections/1",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

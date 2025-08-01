@@ -92,6 +92,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})).Should(
 		HaveField("Items", BeEmpty()))
 
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettingsSet{}, &metalv1alpha1.BIOSSettingsSetList{})).Should(
+		HaveField("Items", BeEmpty()))
+
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))
 
@@ -322,6 +325,10 @@ func SetupTest() *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&BIOSSettingsSetReconciler{
+			Client: k8sManager.GetClient(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		go func() {

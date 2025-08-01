@@ -106,15 +106,22 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 	// Merge update into base
 	mergeJSON(base, update)
 
-	// Serialize and store
-	jsonBytes, err := json.MarshalIndent(base, "", "  ")
-	if err != nil {
-		http.Error(w, "Failed to marshal updated JSON", http.StatusInternalServerError)
-		return
-	}
-	overrides.Store(urlPath, jsonBytes)
+	// Store updated version in memory
+	overrides.Store(urlPath, deepCopy(base))
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func deepCopy(m map[string]interface{}) map[string]interface{} {
+	c := make(map[string]interface{})
+	for k, v := range m {
+		if vMap, ok := v.(map[string]interface{}); ok {
+			c[k] = deepCopy(vMap)
+		} else {
+			c[k] = v
+		}
+	}
+	return c
 }
 
 func resolvePath(urlPath string) string {

@@ -98,6 +98,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 					SettingsMap: biosSetting,
 					Priority:    1,
+					Name:        "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -129,7 +130,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettingsV1)()).To(Succeed())
 				g.Expect(acc.FindSlice(biosSettingsV1.Status.Conditions,
-					fmt.Sprintf("%s-%d", verifySettingCondition, biosSettingsV1.Status.CurrentSettingPriority),
+					verifySettingCondition,
 					condVerifySettingsUpdate)).To(BeTrue())
 				return condVerifySettingsUpdate.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
@@ -145,6 +146,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 					SettingsMap: biosSetting,
 					Priority:    1,
+					Name:        "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -189,6 +191,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 					SettingsMap: biosSetting,
 					Priority:    1,
+					Name:        "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -220,7 +223,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
 				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Status.CurrentSettingPriority),
+					verifySettingCondition,
 					condVerifySettingsUpdate)).To(BeTrue())
 				return condVerifySettingsUpdate.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
@@ -259,6 +262,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 					SettingsMap: biosSetting,
 					Priority:    1,
+					Name:        "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -370,6 +374,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 					SettingsMap: biosSetting,
 					Priority:    1,
+					Name:        "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -469,6 +474,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 					SettingsMap: biosSetting,
 					Priority:    1,
+					Name:        "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -559,6 +565,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 					SettingsMap: biosSetting,
 					Priority:    1,
+					Name:        "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -699,10 +706,12 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 					{
 						Priority:    100,
 						SettingsMap: map[string]string{"fooreboot": "10"},
+						Name:        "100",
 					},
 					{
 						Priority:    1000,
 						SettingsMap: map[string]string{"fooreboot": "100"},
+						Name:        "1000",
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
@@ -736,10 +745,12 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 					{
 						Priority:    100,
 						SettingsMap: map[string]string{"abc": "foo-bar"},
+						Name:        "100",
 					},
 					{
 						Priority:    1000,
 						SettingsMap: map[string]string{"fooreboot": "100"},
+						Name:        "1000",
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
@@ -773,10 +784,12 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 					{
 						Priority:    100,
 						SettingsMap: map[string]string{"abc": "foo-bar"},
+						Name:        "100",
 					},
 					{
 						Priority:    1000,
 						SettingsMap: map[string]string{"fooreboot": "100"},
+						Name:        "1000",
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
@@ -795,45 +808,13 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Deleting the BIOSSettingFlow")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 	})
-
-	It("should Fail when sequence of settings has duplicate priority", func(ctx SpecContext) {
-
-		By("Creating a BIOSSetting sequence of settings")
-		biosSettings := &metalv1alpha1.BIOSSettings{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-setting-flow-differnet-",
-			},
-			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority:    5,
-						SettingsMap: map[string]string{"abc": "foo-bar"},
-					},
-					{
-						Priority:    5,
-						SettingsMap: map[string]string{"fooreboot": "100"},
-					},
-				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-			},
-		}
-		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
-
-		By("Ensuring that the BIOSSetting Object has moved to completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
-		))
-	})
 })
 
 func ensureBiosSettingsFlowCondition(
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	requiredCondition := 7
+	commonCondition := 3
 	condMaintenanceDeleted := &metav1.Condition{}
 	condMaintenanceCreated := &metav1.Condition{}
 	condIssueSettingsUpdate := &metav1.Condition{}
@@ -850,7 +831,7 @@ func ensureBiosSettingsFlowCondition(
 		func(g Gomega) int {
 			g.Expect(Get(biosSettings)()).To(Succeed())
 			return len(biosSettings.Status.Conditions)
-		}).Should(BeNumerically(">=", requiredCondition*len(biosSettings.Spec.SettingsFlow)))
+		}).Should(BeNumerically("==", commonCondition))
 
 	By(fmt.Sprintf("Ensuring the wait for version upgrade condition has NOT been added %v", condPendingVersionUpdate.Status))
 	Eventually(
@@ -868,38 +849,39 @@ func ensureBiosSettingsFlowCondition(
 			return condMaintenanceCreated.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
-	for _, settings := range biosSettings.Spec.SettingsFlow {
+	// assumption, for unit testing the order of priority of settings in spec is ascending
+	for idx, settings := range biosSettings.Spec.SettingsFlow {
 		By(fmt.Sprintf("Ensuring the BIOSSettings Object has applied following settings %v", settings.SettingsMap))
 		By("Ensuring the timeout error start time has been recorded")
 		Eventually(
 			func(g Gomega) {
 				g.Expect(Get(biosSettings)()).To(Succeed())
 				By("Ensuring the timeout error start time has been recorded")
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", timeoutStartCondition, settings.Priority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[idx].Conditions,
+					timeoutStartCondition,
 					condTimerStarted)).To(BeTrue())
 				g.Expect(condTimerStarted.Status).To(Equal(metav1.ConditionTrue))
 
 				By("Ensuring the server has been powered on at the start")
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", turnServerOnCondition, settings.Priority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[idx].Conditions,
+					turnServerOnCondition,
 					condServerPoweredOn)).To(BeTrue())
 				g.Expect(condServerPoweredOn.Status).To(Equal(metav1.ConditionTrue))
 
 				By("Ensuring the check if reboot of server required has been completed")
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Status.CurrentSettingPriority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[idx].Conditions,
+					skipRebootCondition,
 					condSkipReboot)).To(BeTrue())
 
 				By("Ensuring the update has been issue to the server")
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, settings.Priority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[idx].Conditions,
+					issueSettingsUpdateCondition,
 					condIssueSettingsUpdate)).To(BeTrue())
 				g.Expect(condIssueSettingsUpdate.Status).To(Equal(metav1.ConditionTrue))
 
 				By("Ensuring the update has been applied by the server")
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", verifySettingCondition, settings.Priority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[idx].Conditions,
+					verifySettingCondition,
 					condVerifySettingsUpdate)).To(BeTrue())
 				g.Expect(condVerifySettingsUpdate.Status).To(Equal(metav1.ConditionTrue))
 			}).Should(Succeed())
@@ -920,7 +902,8 @@ func ensureBiosSettingsCondition(
 	waitForVersionUpgrade bool,
 ) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	requiredCondition := 7
+	commonConditions := 3
+	flowCondition := 5
 	condMaintenanceDeleted := &metav1.Condition{}
 	condMaintenanceCreated := &metav1.Condition{}
 	condIssueSettingsUpdate := &metav1.Condition{}
@@ -935,11 +918,11 @@ func ensureBiosSettingsCondition(
 	condRebootPowerOff := &metav1.Condition{}
 
 	if RebootNeeded {
-		requiredCondition += 2
+		flowCondition += 2
 	}
 
 	if waitForVersionUpgrade {
-		requiredCondition += 1
+		commonConditions += 1
 	}
 
 	By("Ensuring right number of conditions are present")
@@ -947,7 +930,13 @@ func ensureBiosSettingsCondition(
 		func(g Gomega) int {
 			g.Expect(Get(biosSettings)()).To(Succeed())
 			return len(biosSettings.Status.Conditions)
-		}).Should(BeNumerically("==", requiredCondition))
+		}).Should(BeNumerically("==", commonConditions))
+
+	Eventually(
+		func(g Gomega) int {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			return len(biosSettings.Status.FlowState[0].Conditions)
+		}).Should(BeNumerically("==", flowCondition))
 
 	if waitForVersionUpgrade {
 		By("Ensuring the wait for version upgrade condition has been added")
@@ -979,8 +968,8 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-				fmt.Sprintf("%s-%d", timeoutStartCondition, biosSettings.Status.CurrentSettingPriority),
+			g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+				timeoutStartCondition,
 				condTimerStarted)).To(BeTrue())
 			return condTimerStarted.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
@@ -989,8 +978,8 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-				fmt.Sprintf("%s-%d", turnServerOnCondition, biosSettings.Status.CurrentSettingPriority),
+			g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+				turnServerOnCondition,
 				condServerPoweredOn)).To(BeTrue())
 			return condServerPoweredOn.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
@@ -1000,24 +989,24 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Status.CurrentSettingPriority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+					skipRebootCondition,
 					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Status.CurrentSettingPriority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+					rebootPowerOffCondition,
 					condRebootPowerOff)).To(BeFalse())
 				return condRebootPowerOff.Status == ""
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Status.CurrentSettingPriority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+					rebootPowerOnCondition,
 					condRebootPowerOn)).To(BeFalse())
 				return condRebootPowerOn.Status == ""
 			}).Should(BeTrue())
@@ -1026,24 +1015,24 @@ func ensureBiosSettingsCondition(
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Status.CurrentSettingPriority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+					skipRebootCondition,
 					condSkipReboot)).To(BeTrue())
 				return condSkipReboot.Status == metav1.ConditionFalse
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Status.CurrentSettingPriority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+					rebootPowerOffCondition,
 					condRebootPowerOff)).To(BeTrue())
 				return condRebootPowerOff.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
 		Eventually(
 			func(g Gomega) bool {
 				g.Expect(Get(biosSettings)()).To(Succeed())
-				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-					fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Status.CurrentSettingPriority),
+				g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+					rebootPowerOnCondition,
 					condRebootPowerOn)).To(BeTrue())
 				return condRebootPowerOn.Status == metav1.ConditionTrue
 			}).Should(BeTrue())
@@ -1052,8 +1041,8 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-				fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, biosSettings.Status.CurrentSettingPriority),
+			g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+				issueSettingsUpdateCondition,
 				condIssueSettingsUpdate)).To(BeTrue())
 			return condIssueSettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
@@ -1061,8 +1050,17 @@ func ensureBiosSettingsCondition(
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
+			g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
+				verifySettingCondition,
+				condVerifySettingsUpdate)).To(BeTrue())
+			return condVerifySettingsUpdate.Status == metav1.ConditionTrue
+		}).Should(BeTrue())
+	By("Ensuring the update has been Verfied on the server")
+	Eventually(
+		func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
 			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
-				fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Status.CurrentSettingPriority),
+				verifySettingCondition,
 				condVerifySettingsUpdate)).To(BeTrue())
 			return condVerifySettingsUpdate.Status == metav1.ConditionTrue
 		}).Should(BeTrue())

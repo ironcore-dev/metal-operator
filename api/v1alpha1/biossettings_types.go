@@ -32,27 +32,47 @@ type BIOSSettingsSpec struct {
 }
 
 type SettingsFlowItem struct {
+	// Name identifies what this settings is doing
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1000
+	Name string `json:"name"`
+
 	// SettingsMap contains software (eg: BIOS, BMC) settings as map
+	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
+
 	// Priority defines the order of applying the settings
 	// any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
+	// +required
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=2147483645
 	Priority int32 `json:"priority"`
 }
 
-// BIOSSettingsState specifies the current state of the BIOS maintenance.
+// BIOSSettingsState specifies the current state of the BIOS Settings update.
 type BIOSSettingsState string
 
 const (
-	// BIOSSettingsStatePending specifies that the bios setting maintenance is waiting
+	// BIOSSettingsStatePending specifies that the bios setting update is waiting
 	BIOSSettingsStatePending BIOSSettingsState = "Pending"
 	// BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings
 	BIOSSettingsStateInProgress BIOSSettingsState = "InProgress"
-	// BIOSSettingsStateApplied specifies that the bios setting maintenance has been completed.
+	// BIOSSettingsStateApplied specifies that the bios setting update has been completed.
 	BIOSSettingsStateApplied BIOSSettingsState = "Applied"
-	// BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.
+	// BIOSSettingsStateFailed specifies that the bios setting update has failed.
 	BIOSSettingsStateFailed BIOSSettingsState = "Failed"
+)
+
+type BIOSSettingsFlowState string
+
+const (
+	// BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings for current Priority
+	BIOSSettingsFlowStateInProgress BIOSSettingsFlowState = "InProgress"
+	// BIOSSettingsFlowStateApplied specifies that the bios setting has been completed for current Priority
+	BIOSSettingsFlowStateApplied BIOSSettingsFlowState = "Applied"
+	// BIOSSettingsFlowStateFailed specifies that the bios setting update has failed.
+	BIOSSettingsFlowStateFailed BIOSSettingsFlowState = "Failed"
 )
 
 // BIOSSettingsStatus defines the observed state of BIOSSettings.
@@ -61,19 +81,41 @@ type BIOSSettingsStatus struct {
 	// +optional
 	State BIOSSettingsState `json:"state,omitempty"`
 
+	FlowState []BIOSSettingsFlowStatus `json:"flowState,omitempty"`
+
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
 	// +optional
 	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
-
-	// CurrentSettingPriority specifies the priority of the current settings in sequence of settings which currently is being applied.
-	// +optional
-	CurrentSettingPriority int32 `json:"currentSettingPriority,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOSSettings's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+type BIOSSettingsFlowStatus struct {
+	// State represents the current state of the bios configuration task for current priority.
+	// +optional
+	State BIOSSettingsFlowState `json:"flowState,omitempty"`
+
+	// Name identifies current priority settings from the Spec
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Priority identifies the settings priority from the Spec
+	// +optional
+	Priority int32 `json:"priority"`
+
+	// Conditions represents the latest available observations of the BIOSSettings's current Flowstate.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
+	// +optional
+	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -83,7 +125,6 @@ type BIOSSettingsStatus struct {
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=`.status.state`
-// +kubebuilder:printcolumn:name="CurrentPriority",type="string",JSONPath=`.status.currentSettingPriority`
 // +kubebuilder:printcolumn:name="AppliedOn",type=date,JSONPath=`.status.lastAppliedTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

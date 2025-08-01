@@ -73,8 +73,6 @@ const (
 	rebootPowerOnCompletedReason      = "RebootPowerOnCompleted"
 	verifySettingCondition            = "VerifySettingsPostUpdate"
 	verificationCompleteReason        = "VerificationComplete"
-	duplicatePriorityCheckCondition   = "DuplicatePriorityCheck"
-	duplicatePriorityFoundReason      = "DuplicatePriorityFoundInSettingsFlow"
 )
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings,verbs=get;list;watch;create;update;patch;delete
@@ -351,28 +349,6 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 		return ctrl.Result{}, err
 	}
 
-	seenPriorities := make(map[int32]bool)
-	for _, setting := range biosSettings.Spec.SettingsFlow {
-		if seenPriorities[setting.Priority] {
-			log.V(1).Info("Duplicate Priority found", "biosSettings SettingsFlow", biosSettings.Spec.SettingsFlow)
-			duplicatePriorityStateCondition, err := r.getCondition(acc, biosSettings.Status.Conditions, duplicatePriorityCheckCondition)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending Settings state %v", err)
-			}
-			if err := acc.Update(
-				duplicatePriorityStateCondition,
-				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(duplicatePriorityFoundReason),
-				conditionutils.UpdateMessage(fmt.Sprintf("Priority: %v, has duplicate value", setting.Priority)),
-			); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to update Pending BIOSVersion update condition: %w", err)
-			}
-			err = r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, duplicatePriorityStateCondition)
-			return ctrl.Result{}, err
-		}
-		seenPriorities[setting.Priority] = true
-	}
-
 	currentBiosVersion, settingsDiff, err := r.getBIOSVersionAndSettingDifference(ctx, log, bmcClient, biosSettings, server)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BIOS settings: %w", err)
@@ -381,8 +357,7 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 	// if conditions are present, skip this shortcut to be able capture all conditions states (ex: verifySetting, reboot etc)
 	if len(settingsDiff) == 0 && len(biosSettings.Status.Conditions) == 0 {
 		// move status to completed
-		verifySettingUpdate, err := r.getCondition(acc, biosSettings.Status.Conditions,
-			fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Status.CurrentSettingPriority))
+		verifySettingUpdate, err := r.getCondition(acc, biosSettings.Status.Conditions, verifySettingCondition)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for Verifyed Settings condition %v", err)
 		}
@@ -426,11 +401,16 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 		state = metalv1alpha1.BIOSSettingsStatePending
 		condition = versionCheckCondition
 	}
-	nextPriority := r.getNextSettingPriority(log, biosSettings)
-	if nextPriority != math.MaxInt32 && biosSettings.Status.CurrentSettingPriority == 0 {
-		log.V(1).Info("Updating the current setting priority to the first one", "currentSettingPriority", nextPriority)
+	nextPriority, name := r.getNextSettingPriority(log, biosSettings)
+	if nextPriority != math.MaxInt32 && len(biosSettings.Status.FlowState) == 0 {
+		log.V(1).Info("Updating the current setting priority to the first one", "SettingPriority", nextPriority)
 		biosSettingsBase := biosSettings.DeepCopy()
-		biosSettings.Status.CurrentSettingPriority = nextPriority
+		flowStatus := metalv1alpha1.BIOSSettingsFlowStatus{
+			Name:     name,
+			Priority: nextPriority,
+			State:    metalv1alpha1.BIOSSettingsFlowStateInProgress,
+		}
+		biosSettings.Status.FlowState = append(biosSettings.Status.FlowState, flowStatus)
 		return ctrl.Result{}, r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase))
 	}
 	return ctrl.Result{}, r.updateBiosSettingsStatus(ctx, log, biosSettings, state, condition)
@@ -443,9 +423,14 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
+	currSeqStateLen := len(biosSettings.Status.FlowState) - 1
 
 	if req, err := r.requestMaintenanceOnServer(ctx, log, biosSettings, server); err != nil || req {
 		return ctrl.Result{}, err
+	}
+
+	if biosSettings.Status.FlowState[currSeqStateLen].State == metalv1alpha1.BIOSSettingsFlowStateFailed {
+		return ctrl.Result{}, r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, nil)
 	}
 
 	// check if the maintenance is granted
@@ -454,8 +439,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 		return ctrl.Result{}, nil
 	}
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	timeoutCheck, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", timeoutStartCondition, biosSettings.Status.CurrentSettingPriority))
+	timeoutCheck, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, timeoutStartCondition)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get condition for TimeOut during setting update %v", err)
 	}
@@ -468,14 +452,13 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update starting setting update condition: %w", err)
 		}
-		err = r.updateBiosSettingsStatus(ctx, log, biosSettings, biosSettings.Status.State, timeoutCheck)
+		err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, biosSettings.Status.FlowState[currSeqStateLen].State, timeoutCheck, nil)
 		return ctrl.Result{}, err
 	} else {
 		startTime := timeoutCheck.LastTransitionTime.Time
 		if time.Now().After(startTime.Add(r.TimeoutExpiry)) {
 			log.V(1).Info("Timedout while updating the biosSettings")
-			timedOut, err := r.getCondition(acc, biosSettings.Status.Conditions,
-				fmt.Sprintf("%s-%d", timedOutCondition, biosSettings.Status.CurrentSettingPriority))
+			timedOut, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, timedOutCondition)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Condition for Timeout of BIOSSettings update %v", err)
 			}
@@ -487,7 +470,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update timeout during settings update condition: %w", err)
 			}
-			err = r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, timedOut)
+			err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsFlowStateFailed, timedOut, nil)
 			return ctrl.Result{}, err
 		}
 	}
@@ -510,9 +493,9 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) (bool, error) {
+	currSeqStateLen := len(biosSettings.Status.FlowState) - 1
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	turnOnServer, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", turnServerOnCondition, biosSettings.Status.CurrentSettingPriority))
+	turnOnServer, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, turnServerOnCondition)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for Initial powerOn of server %v", err)
 	}
@@ -540,7 +523,7 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 					return false, err
 				}
 			}
-			return false, r.updateBiosSettingsStatus(ctx, log, biosSettings, biosSettings.Status.State, turnOnServer)
+			return false, r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, biosSettings.Status.FlowState[currSeqStateLen].State, turnOnServer, nil)
 		}
 		// we need to request maintenance to get the server to power-On to apply the BIOS settings
 		if biosSettings.Spec.ServerMaintenanceRef == nil {
@@ -560,8 +543,9 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 
 	// check if we have already determined if we need reboot of not.
 	// if the condition is present, we have checked the skip reboot condition.
-	condFound, err := acc.FindSlice(biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Status.CurrentSettingPriority),
+	condFound, err := acc.FindSlice(
+		biosSettings.Status.FlowState[currSeqStateLen].Conditions,
+		skipRebootCondition,
 		&metav1.Condition{})
 	if err != nil {
 		return false, fmt.Errorf("failed to find Condition %v. error: %v", skipRebootCondition, err)
@@ -578,8 +562,7 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 			return false, err
 		}
 
-		skipReboot, err := r.getCondition(acc, biosSettings.Status.Conditions,
-			fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Status.CurrentSettingPriority))
+		skipReboot, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, skipRebootCondition)
 		if err != nil {
 			return false, fmt.Errorf("failed to get Condition for skip reboot post setting update %v", err)
 		}
@@ -605,14 +588,12 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 				return false, fmt.Errorf("failed to update skip reboot condition: %w", err)
 			}
 		}
-
-		err = r.updateBiosSettingsStatus(ctx, log, biosSettings, biosSettings.Status.State, skipReboot)
+		err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, biosSettings.Status.FlowState[currSeqStateLen].State, skipReboot, nil)
 		log.V(1).Info("Reconciled biosSettings at check if reboot is needed")
 		return false, err
 	}
 
-	issueBiosUpdate, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", issueSettingsUpdateCondition, biosSettings.Status.CurrentSettingPriority))
+	issueBiosUpdate, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, issueSettingsUpdateCondition)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for issuing BIOSSetting update to server %v", err)
 	}
@@ -621,15 +602,13 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 		return false, r.applyBiosSettingOnServer(ctx, log, bmcClient, biosSettings, server, issueBiosUpdate)
 	}
 
-	skipReboot, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Status.CurrentSettingPriority))
+	skipReboot, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, skipRebootCondition)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for reboot needed condition %v", err)
 	}
 
 	if skipReboot.Status != metav1.ConditionTrue {
-		rebootPowerOnCondition, err := r.getCondition(acc, biosSettings.Status.Conditions,
-			fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Status.CurrentSettingPriority))
+		rebootPowerOnCondition, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, rebootPowerOnCondition)
 		if err != nil {
 			return false, fmt.Errorf("failed to get Condition for reboot PowerOn condition %v", err)
 		}
@@ -649,8 +628,8 @@ func (r *BiosSettingsReconciler) VerifySettingsUpdateComplete(
 	server *metalv1alpha1.Server,
 ) (bool, error) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	verifySettingUpdate, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", verifySettingCondition, biosSettings.Status.CurrentSettingPriority))
+	currSeqStateLen := len(biosSettings.Status.FlowState) - 1
+	verifySettingUpdate, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, verifySettingCondition)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for Verification condition %v", err)
 	}
@@ -671,38 +650,36 @@ func (r *BiosSettingsReconciler) VerifySettingsUpdateComplete(
 			); err != nil {
 				return false, fmt.Errorf("failed to update verify biossetting condition: %w", err)
 			}
-			nextPriority := r.getNextSettingPriority(log, biosSettings)
+
+			nextPriority, settingName := r.getNextSettingPriority(log, biosSettings)
+			var flowStatus *metalv1alpha1.BIOSSettingsFlowStatus = nil
 			// If the current setting priority is not the last one, we want to continue setting rest of them
 			if nextPriority != math.MaxInt32 {
-				log.V(1).Info("Need to move on to the next sequence of BIOS setting update")
-				acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-				biosSettingsBase := biosSettings.DeepCopy()
-				if err := acc.UpdateSlice(
-					&biosSettings.Status.Conditions,
-					verifySettingUpdate.Type,
-					conditionutils.UpdateStatus(verifySettingUpdate.Status),
-					conditionutils.UpdateReason(verifySettingUpdate.Reason),
-					conditionutils.UpdateMessage(verifySettingUpdate.Message),
-				); err != nil {
-					return false, fmt.Errorf("failed to patch BIOSettings condition: %w", err)
+				biosSettings.Status.FlowState[currSeqStateLen].State = metalv1alpha1.BIOSSettingsFlowStateApplied
+				// add the next settings state
+				flowStatus = &metalv1alpha1.BIOSSettingsFlowStatus{
+					Name:     settingName,
+					Priority: nextPriority,
+					State:    metalv1alpha1.BIOSSettingsFlowStateInProgress,
 				}
-
-				biosSettings.Status.CurrentSettingPriority = nextPriority
-				log.V(1).Info("Updating the settings Priority", "currentSettingPriority", biosSettings.Status.CurrentSettingPriority)
-				if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
-					return false, fmt.Errorf("failed to patch BIOSSettings status: %w", err)
-				}
-				return false, nil
+				log.V(1).Info("Updating the settings Priority", "nextPriority", nextPriority)
 			}
-			log.V(1).Info("All BIOS settings seq have been applied and verified on the server")
-			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied, verifySettingUpdate)
+			log.V(1).Info("Verified BIOS setting sequence", "Name", biosSettings.Status.FlowState[currSeqStateLen].Name)
+			err := r.updateBiosSettingsFlowStatus(
+				ctx,
+				log,
+				biosSettings,
+				metalv1alpha1.BIOSSettingsFlowStateApplied,
+				verifySettingUpdate,
+				flowStatus)
 			return false, err
 		}
 		log.V(1).Info("Waiting on the BIOS setting to take place")
 		return true, nil
 	}
-	log.V(1).Info("Reconciled biosSettings at check verification completed", "currentSettingPriority", biosSettings.Status.CurrentSettingPriority)
-	return false, nil
+	// this condition is met when the flow of settings have all completed. hence, update the main state
+	log.V(1).Info("All BIOS settings seq have been applied and verified on the server")
+	return false, r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateApplied, verifySettingUpdate)
 }
 
 func (r *BiosSettingsReconciler) rebootServer(
@@ -711,9 +688,9 @@ func (r *BiosSettingsReconciler) rebootServer(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) error {
+	currSeqStateLen := len(biosSettings.Status.FlowState) - 1
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	rebootPowerOffCondition, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", rebootPowerOffCondition, biosSettings.Status.CurrentSettingPriority))
+	rebootPowerOffCondition, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, rebootPowerOffCondition)
 	if err != nil {
 		return fmt.Errorf("failed to get Condition for reboot PowerOff condition %v", err)
 	}
@@ -735,15 +712,14 @@ func (r *BiosSettingsReconciler) rebootServer(
 			); err != nil {
 				return fmt.Errorf("failed to update reboot server powerOff condition: %w", err)
 			}
-			err = r.updateBiosSettingsStatus(ctx, log, biosSettings, biosSettings.Status.State, rebootPowerOffCondition)
+			err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, biosSettings.Status.FlowState[currSeqStateLen].State, rebootPowerOffCondition, nil)
 			return err
 		}
 		log.V(1).Info("Reconciled biosSettings at reboot wait for power off")
 		return nil
 	}
 
-	rebootPowerOnCondition, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", rebootPowerOnCondition, biosSettings.Status.CurrentSettingPriority))
+	rebootPowerOnCondition, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, rebootPowerOnCondition)
 	if err != nil {
 		return fmt.Errorf("failed to get Condition for reboot PowerOn condition %v", err)
 	}
@@ -765,7 +741,7 @@ func (r *BiosSettingsReconciler) rebootServer(
 			); err != nil {
 				return fmt.Errorf("failed to update reboot server powerOn condition: %w", err)
 			}
-			err = r.updateBiosSettingsStatus(ctx, log, biosSettings, biosSettings.Status.State, rebootPowerOnCondition)
+			err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, biosSettings.Status.FlowState[currSeqStateLen].State, rebootPowerOnCondition, nil)
 			return err
 		}
 		log.V(1).Info("Reconciled biosSettings at reboot wait for power on")
@@ -782,6 +758,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	server *metalv1alpha1.Server,
 	issueBiosUpdate *metav1.Condition,
 ) error {
+	currSeqStateLen := len(biosSettings.Status.FlowState) - 1
 	_, settingsDiff, err := r.getBIOSVersionAndSettingDifference(ctx, log, bmcClient, biosSettings, server)
 	if err != nil {
 		return fmt.Errorf("failed to get BIOS settings difference: %w", err)
@@ -794,7 +771,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	}
 	var pendingSettingsDiff redfish.SettingsAttributes
 	if len(pendingSettings) == 0 {
-		log.V(1).Info("Applying settings", "settingsDiff", settingsDiff, "currentSettingPriority", biosSettings.Status.CurrentSettingPriority)
+		log.V(1).Info("Applying settings", "settingsDiff", settingsDiff, "SettingsName", biosSettings.Status.FlowState[currSeqStateLen].Name)
 		err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemURI, settingsDiff)
 		if err != nil {
 			return fmt.Errorf("failed to set BMC settings: %w", err)
@@ -807,8 +784,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 		return fmt.Errorf("failed to get pending BIOS settings: %w", err)
 	}
 
-	skipReboot, err := r.getCondition(acc, biosSettings.Status.Conditions,
-		fmt.Sprintf("%s-%d", skipRebootCondition, biosSettings.Status.CurrentSettingPriority))
+	skipReboot, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, skipRebootCondition)
 	if err != nil {
 		return fmt.Errorf("failed to get Condition for reboot needed condition %v", err)
 	}
@@ -827,8 +803,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	// all required settings should in pending settings.
 	if len(pendingSettingsDiff) > 0 {
 		log.V(1).Info("Unknown pending BIOS settings found", "Unknown pending settings", pendingSettingsDiff)
-		unexpectedPendingSettings, err := r.getCondition(acc, biosSettings.Status.Conditions,
-			fmt.Sprintf("%s-%d", unknownPendingSettingCondition, biosSettings.Status.CurrentSettingPriority))
+		unexpectedPendingSettings, err := r.getCondition(acc, biosSettings.Status.FlowState[currSeqStateLen].Conditions, unknownPendingSettingCondition)
 		if err != nil {
 			return fmt.Errorf("failed to get Condition for unexpected pending BIOSSetting state %v", err)
 		}
@@ -840,7 +815,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 		); err != nil {
 			return fmt.Errorf("failed to update unexpected pending settings found condition: %w", err)
 		}
-		err = r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, unexpectedPendingSettings)
+		err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsFlowStateFailed, unexpectedPendingSettings, nil)
 		return err
 	}
 
@@ -852,8 +827,8 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	); err != nil {
 		return fmt.Errorf("failed to update issued settings update condition: %w", err)
 	}
-	err = r.updateBiosSettingsStatus(ctx, log, biosSettings, biosSettings.Status.State, issueBiosUpdate)
-	log.V(1).Info("Reconciled biosSettings at issue Settings to server state", "currentPriority", biosSettings.Status.CurrentSettingPriority)
+	err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, biosSettings.Status.FlowState[currSeqStateLen].State, issueBiosUpdate, nil)
+	log.V(1).Info("Reconciled biosSettings at issue Settings to server state", "SettingsName", biosSettings.Status.FlowState[currSeqStateLen].Name)
 	return err
 }
 
@@ -943,7 +918,8 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	var priority int32 = math.MaxInt32
 
 	if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-		priority = biosSettings.Status.CurrentSettingPriority
+		currSeqStateLen := len(biosSettings.Status.FlowState) - 1
+		priority = biosSettings.Status.FlowState[currSeqStateLen].Priority
 	}
 
 	completeSettings := make(map[string]string)
@@ -1002,7 +978,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 	}
 
 	if len(diff) > 0 {
-		log.V(1).Info("currentSettings found on the server", "currentSettings", currentSettings)
+		log.V(1).Info("current BIOS settings on the server", "currentSettings", currentSettings)
 	}
 
 	if len(errs) > 0 {
@@ -1264,6 +1240,55 @@ func (r *BiosSettingsReconciler) patchServerMaintenancePowerState(
 	return nil
 }
 
+func (r *BiosSettingsReconciler) updateBiosSettingsFlowStatus(
+	ctx context.Context,
+	log logr.Logger,
+	biosSettings *metalv1alpha1.BIOSSettings,
+	state metalv1alpha1.BIOSSettingsFlowState,
+	condition *metav1.Condition,
+	newSettingsStatus *metalv1alpha1.BIOSSettingsFlowStatus,
+) error {
+	currSeqStateLen := len(biosSettings.Status.FlowState) - 1
+	if biosSettings.Status.FlowState[currSeqStateLen].State == state && condition == nil {
+		return nil
+	}
+
+	biosSettingsBase := biosSettings.DeepCopy()
+	biosSettings.Status.FlowState[currSeqStateLen].State = state
+
+	if state == metalv1alpha1.BIOSSettingsFlowStateApplied {
+		time := metav1.Now()
+		biosSettings.Status.FlowState[currSeqStateLen].LastAppliedTime = &time
+	}
+
+	if condition != nil {
+		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+		if err := acc.UpdateSlice(
+			&biosSettings.Status.FlowState[currSeqStateLen].Conditions,
+			condition.Type,
+			conditionutils.UpdateStatus(condition.Status),
+			conditionutils.UpdateReason(condition.Reason),
+			conditionutils.UpdateMessage(condition.Message),
+		); err != nil {
+			return fmt.Errorf("failed to patch BIOSettings condition: %w", err)
+		}
+	}
+
+	if newSettingsStatus != nil {
+		biosSettings.Status.FlowState = append(biosSettings.Status.FlowState, *newSettingsStatus)
+	}
+
+	if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
+		return fmt.Errorf("failed to patch BIOSSettings FlowState status: %w", err)
+	}
+
+	log.V(1).Info("Updated biosSettings Flow state",
+		"Settings Status", biosSettings.Status.FlowState[currSeqStateLen],
+	)
+
+	return nil
+}
+
 func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 	ctx context.Context,
 	log logr.Logger,
@@ -1299,6 +1324,7 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 	} else if state == metalv1alpha1.BIOSSettingsStatePending {
 		// reset, when we restart the setting update
 		biosSettings.Status.Conditions = nil
+		biosSettings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 	}
 
 	if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
@@ -1313,22 +1339,32 @@ func (r *BiosSettingsReconciler) updateBiosSettingsStatus(
 func (r *BiosSettingsReconciler) getNextSettingPriority(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
-) int32 {
+) (int32, string) {
 
-	currentSettings := biosSettings.Status.CurrentSettingPriority
-	var nextSettings int32 = math.MaxInt32
+	currentSettingsPriority := int32(0)
+	currentSettingsName := ""
+	var nextSettingsPriority int32 = math.MaxInt32
+	nextSettingsName := ""
+
+	if len(biosSettings.Status.FlowState) > 0 {
+		currentSettingsPriority = biosSettings.Status.FlowState[len(biosSettings.Status.FlowState)-1].Priority
+		currentSettingsName = biosSettings.Status.FlowState[len(biosSettings.Status.FlowState)-1].Name
+	}
 
 	if len(biosSettings.Spec.SettingsFlow) > 1 {
 		for _, settings := range biosSettings.Spec.SettingsFlow {
-			if settings.Priority > currentSettings && settings.Priority <= nextSettings {
-				nextSettings = settings.Priority
+			if settings.Priority >= currentSettingsPriority && settings.Priority <= nextSettingsPriority &&
+				settings.Name != currentSettingsName {
+				nextSettingsPriority = settings.Priority
+				nextSettingsName = settings.Name
 			}
 		}
-	} else if currentSettings < biosSettings.Spec.SettingsFlow[0].Priority {
-		nextSettings = biosSettings.Spec.SettingsFlow[0].Priority
+	} else if currentSettingsPriority == 0 {
+		nextSettingsPriority = biosSettings.Spec.SettingsFlow[0].Priority
+		nextSettingsName = biosSettings.Spec.SettingsFlow[0].Name
 	}
-	log.V(1).Info("Found next setting priority", "currentSettingPriority", currentSettings, "nextSettingPriority", nextSettings)
-	return nextSettings
+	log.V(1).Info("Found next setting priority", "currentSettingPriority", currentSettingsPriority, "nextSettingPriority", nextSettingsPriority)
+	return nextSettingsPriority, nextSettingsName
 }
 
 func (r *BiosSettingsReconciler) enqueueBiosSettingsByRefs(

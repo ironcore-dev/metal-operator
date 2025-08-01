@@ -8,33 +8,30 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"sync"
+
+	"github.com/go-logr/logr"
 
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 )
-
-// Ensure the log output goes to standard out (this is useful if you're running in a containerized environment).
-func init() {
-	log.SetOutput(os.Stdout)
-}
 
 // Server holds the HTTP server's state, including the systems store.
 type Server struct {
 	addr         string
 	mux          *http.ServeMux
 	systemsStore *sync.Map
+	log          logr.Logger
 }
 
 // NewServer initializes and returns a new Server instance.
-func NewServer(addr string) *Server {
+func NewServer(log logr.Logger, addr string) *Server {
 	mux := http.NewServeMux()
 	server := &Server{
 		addr:         addr,
 		mux:          mux,
 		systemsStore: &sync.Map{},
+		log:          log,
 	}
 	server.routes()
 	return server
@@ -62,7 +59,7 @@ func (s *Server) registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Store the registration information.
 	s.systemsStore.Store(reg.SystemUUID, reg.Data)
-	log.Printf("Registered system UUID: %s\n", reg.SystemUUID)
+	s.log.Info("Registered system UUID", "uuid", reg.SystemUUID)
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -79,26 +76,25 @@ func (s *Server) systemsHandler(w http.ResponseWriter, r *http.Request) {
 		server, ok := value.(registry.Server)
 		if !ok {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Println("Error asserting type of endpoints")
+			s.log.Info("Error asserting type of endpoints", "uuid", uuid)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 
 		if err := json.NewEncoder(w).Encode(server); err != nil {
-			log.Printf("Failed to encode result: %v\n", err)
 			http.Error(w, "Failed to encode result", http.StatusInternalServerError)
+			s.log.Error(err, "Error encoding server")
 		}
 	} else {
-		log.Printf("System UUID not found: %s\n", uuid)
+		s.log.Info("System not found", "uuid", uuid)
 		http.NotFound(w, r)
 	}
 }
 
 // deleteHandler handles the DELETE requests to remove a system by UUID.
 func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Received method: %s", r.Method)   // This will log the method of the request
-	log.Printf("Requested URI: %s", r.RequestURI) // This logs the full request URI
+	s.log.Info("Received delete request", "method", r.Method, "uri", r.RequestURI)
 
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Only DELETE method is allowed", http.StatusMethodNotAllowed)
@@ -117,12 +113,12 @@ func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Respond with success message
 	w.WriteHeader(http.StatusOK)
-	log.Printf("System with UUID %s deleted successfully", uuid)
+	s.log.Info("Deleted system UUID", "uuid", uuid)
 }
 
 // Start starts the server on the specified address and adds logging for key events.
 func (s *Server) Start(ctx context.Context) error {
-	log.Printf("Starting registry server on port %s\n", s.addr)
+	s.log.Info("Starting registry server", "address", s.addr)
 	server := &http.Server{Addr: s.addr, Handler: s.mux}
 
 	// Start the server in a new goroutine.
@@ -135,16 +131,16 @@ func (s *Server) Start(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Println("Shutting down registry server...")
+		s.log.Info("Shutting down registry server...")
 		if err := server.Shutdown(ctx); err != nil {
 			return fmt.Errorf("HTTP server Shutdown: %w", err)
 		}
-		log.Println("Registry server gracefully stopped.")
+		s.log.Info("Registry server graciously stopped")
 		return nil
 	case err := <-errChan:
-		// In case of server startup error, attempt to shutdown gracefully before returning the error.
+		// In case of server startup error, attempt to shut down gracefully before returning the error.
 		if shutdownErr := server.Shutdown(ctx); shutdownErr != nil {
-			log.Printf("HTTP registry server Shutdown: %v", shutdownErr)
+			s.log.Error(shutdownErr, "Error shutting down registry server")
 		}
 		return err
 	}

@@ -1,0 +1,69 @@
+{
+    "@odata.type": "#Sensor.v1_8_1.Sensor",
+    "Id": "CPU1Temp",
+    "Name": "CPU #1 Temperature",
+    "PhysicalContext": "CPU",
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "Reading": 37,
+    "ReadingUnits": "Cel",
+    "Thresholds": {
+        "UpperCaution": {
+            "Reading": 42,
+            "DwellTime": "PT5M",
+            "Activation": "Increasing",
+            "HysteresisReading": -2,
+            "HysteresisDuration": "PT1M",
+            "@Redfish.WriteableProperties": []
+        },
+        "UpperCautionUser": {
+            "Reading": 40,
+            "DwellTime": "PT5M",
+            "HysteresisReading": 0,
+            "HysteresisDuration": "PT10M",
+            "@Redfish.WriteableProperties": [
+                "Reading",
+                "DwellTime",
+                "HysteresisReading",
+                "HysteresisDuration"
+            ]
+        },
+        "UpperCritical": {
+            "Reading": 45,
+            "DwellTime": "PT1M",
+            "Activation": "Increasing",
+            "HysteresisReading": -2,
+            "HysteresisDuration": "PT1M",
+            "@Redfish.WriteableProperties": []
+        },
+        "UpperCriticalUser": {
+            "Reading": 45,
+            "DwellTime": "PT10S",
+            "HysteresisReading": -1,
+            "HysteresisDuration": "PT5M",
+            "@Redfish.WriteableProperties": [
+                "Reading",
+                "DwellTime",
+                "HysteresisReading",
+                "HysteresisDuration"
+            ]
+        },
+        "UpperFatal": {
+            "Reading": 50,
+            "DwellTime": "PT30S",
+            "Activation": "Increasing",
+            "@Redfish.WriteableProperties": []
+        }
+    },
+    "ReadingRangeMin": 0,
+    "ReadingRangeMax": 75,
+    "RelatedItem": [
+        {
+            "@odata.id": "/redfish/v1/Systems/437XR1138R2/Processors/CPU1"
+        }
+    ],
+    "@odata.id": "/redfish/v1/Chassis/1U/Sensors/CPU1Temp",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

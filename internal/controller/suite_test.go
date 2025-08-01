@@ -14,6 +14,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
@@ -82,9 +83,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 		func(g Gomega) {
 			err := List(serverList)()
 			g.Expect(err).ToNot(HaveOccurred())
-			for _, server := range serverList.Items {
-				if server.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&server, ServerFinalizer) {
-					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &server, ServerFinalizer)
+			for _, s := range serverList.Items {
+				if s.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&s, ServerFinalizer) {
+					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &s, ServerFinalizer)
 					g.Expect(err).ToNot(HaveOccurred())
 				}
 			}
@@ -338,6 +339,10 @@ func SetupTest() *corev1.Namespace {
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		// Start the Redfish Mock Server
+		mockServer := server.NewMockServer(ctrl.Log.WithName("RedfishMockServer"), ":8000")
+		Expect(mockServer.Start(mgrCtx)).NotTo(HaveOccurred(), " failed to start mock Redfish server")
 
 		go func() {
 			defer GinkgoRecover()

@@ -14,6 +14,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
@@ -82,9 +83,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 		func(g Gomega) {
 			err := List(serverList)()
 			g.Expect(err).ToNot(HaveOccurred())
-			for _, server := range serverList.Items {
-				if server.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&server, ServerFinalizer) {
-					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &server, ServerFinalizer)
+			for _, s := range serverList.Items {
+				if s.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&s, ServerFinalizer) {
+					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &s, ServerFinalizer)
 					g.Expect(err).ToNot(HaveOccurred())
 				}
 			}
@@ -151,11 +152,14 @@ var _ = BeforeSuite(func() {
 	// set komega client
 	SetClient(k8sClient)
 
+	log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(log)
+
 	By("Starting the registry server")
 	var mgrCtx context.Context
 	mgrCtx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
-	registryServer := registry.NewServer(":30000")
+	registryServer := registry.NewServer(log, ":30000")
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
@@ -324,8 +328,15 @@ func SetupTest() *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+		logf.SetLogger(log)
+
+		// Start the Redfish Mock Server
+		mockServer := server.NewMockServer(log, ":8000")
+
 		go func() {
 			defer GinkgoRecover()
+			Expect(mockServer.Start(mgrCtx)).NotTo(HaveOccurred(), " failed to start mock Redfish server")
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
 		}()
 	})

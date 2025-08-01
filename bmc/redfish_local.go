@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"time"
 
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	"github.com/ironcore-dev/metal-operator/bmc/common"
 	"github.com/stmcginnis/gofish/redfish"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
@@ -21,10 +22,7 @@ type RedfishLocalBMC struct {
 }
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
-func NewRedfishLocalBMCClient(
-	ctx context.Context,
-	options Options,
-) (BMC, error) {
+func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error) {
 	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
@@ -32,28 +30,37 @@ func NewRedfishLocalBMCClient(
 	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
 }
 
-func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
+func (r *RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(250 * time.Millisecond):
+		}
 
-	go func() {
-		time.Sleep(250 * time.Millisecond)
 		system, err := r.getSystemFromUri(ctx, systemURI)
 		if err != nil {
-			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to get system")
+			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to get system")
 			return
 		}
+
 		system.PowerState = redfish.OnPowerState
 		system.RawData = nil
-		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
-		if err := system.Patch(systemURI, system); err != nil {
-			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to Patch system to power on", "systemUUID", systemURI)
+		fullURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+
+		if err := system.Patch(fullURI, system); err != nil {
+			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to Patch system to power on", "systemUUID", fullURI)
 			return
 		}
 
 		// mock the bmc update here
 		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
-			time.Sleep(150 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(150 * time.Millisecond):
+			}
+
 			for key, data := range UnitTestMockUps.PendingBIOSSetting {
 				if _, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
 					UnitTestMockUps.BIOSSettingAttr[key] = data
@@ -61,39 +68,37 @@ func (r RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
 			}
 			UnitTestMockUps.ResetPendingBIOSSetting()
 		}
-	}()
+	}(ctx)
 	return nil
 }
 
-func (r RedfishLocalBMC) PowerOff(ctx context.Context, systemURI string) error {
+func (r *RedfishLocalBMC) PowerOff(ctx context.Context, systemURI string) error {
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(250 * time.Millisecond):
+		}
 
-	go func() {
-		time.Sleep(250 * time.Millisecond)
 		system, err := r.getSystemFromUri(ctx, systemURI)
 		if err != nil {
-			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to get system")
+			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to get system")
 			return
 		}
+
 		system.PowerState = redfish.OffPowerState
 		system.RawData = nil
-		systemURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
-		if err := system.Patch(systemURI, system); err != nil {
-			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Error(err, "failed to Patch system to power off", "systemURI", systemURI)
+		fullURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
+
+		if err := system.Patch(fullURI, system); err != nil {
+			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to Patch system to power off", "systemURI", fullURI)
 			return
 		}
-	}()
+	}(ctx)
 	return nil
 }
 
-func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(
-	ctx context.Context,
-	systemUUID string,
-) (
-	redfish.SettingsAttributes,
-	error,
-) {
+func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
 	if len(UnitTestMockUps.PendingBIOSSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
@@ -107,13 +112,8 @@ func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(
 	return result, nil
 }
 
-// mock SetBiosAttributesOnReset sets given bios attributes for unit testing.
-func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
-	ctx context.Context,
-	systemUUID string,
-	attributes redfish.SettingsAttributes,
-) error {
-
+// SetBiosAttributesOnReset mock SetBiosAttributesOnReset sets given bios attributes for unit testing.
+func (r *RedfishLocalBMC) SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) error {
 	UnitTestMockUps.ResetPendingBIOSSetting()
 	for key, attrData := range attributes {
 		if AttributesData, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
@@ -133,15 +133,7 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(
 	return nil
 }
 
-func (r *RedfishLocalBMC) GetBiosAttributeValues(
-	ctx context.Context,
-	systemUUID string,
-	attributes []string,
-) (
-	redfish.SettingsAttributes,
-	error,
-) {
-
+func (r *RedfishLocalBMC) GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -161,13 +153,7 @@ func (r *RedfishLocalBMC) GetBiosAttributeValues(
 	return result, nil
 }
 
-func (r *RedfishLocalBMC) getFilteredBiosRegistryAttributes(
-	readOnly bool,
-	immutable bool,
-) (
-	map[string]RegistryEntryAttributes,
-	error,
-) {
+func (r *RedfishLocalBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (map[string]RegistryEntryAttributes, error) {
 	filtered := make(map[string]RegistryEntryAttributes)
 	if len(UnitTestMockUps.BIOSSettingAttr) == 0 {
 		return filtered, fmt.Errorf("no bmc setting attributes found")
@@ -184,18 +170,17 @@ func (r *RedfishLocalBMC) getFilteredBiosRegistryAttributes(
 	return filtered, nil
 }
 
-// check if the attributes need to reboot when changed, and are correct type.
-// supported attrType, bmc and bios
+// CheckBiosAttributes checks if the attributes need to reboot when changed, and are correct type.
+// Supported attrTypes are: bmc and bios.
 func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool, error) {
-	reset := false
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
 
 	if err != nil {
-		return reset, err
+		return false, err
 	}
 
 	if len(filtered) == 0 {
-		return reset, err
+		return false, err
 	}
 	return r.checkAttribues(attrs, filtered)
 }
@@ -211,30 +196,31 @@ func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string)
 	return UnitTestMockUps.BIOSVersion, nil
 }
 
-func (r *RedfishLocalBMC) UpgradeBiosVersion(
-	ctx context.Context,
-	manufacturer string,
-	parameters *redfish.SimpleUpdateParameters,
-) (string, bool, error) {
+func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error) {
 	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
-	// note, ImageURI is mocked for testing upgrading to version
 	UnitTestMockUps.BIOSUpgradingVersion = parameters.ImageURI
-	// this go routine mocks the upgrade progress
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BIOSUpgradeTaskIndex = UnitTestMockUps.BIOSUpgradeTaskIndex + 1
+
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(20 * time.Millisecond):
 		}
-	}()
+
+		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Millisecond):
+			}
+			UnitTestMockUps.BIOSUpgradeTaskIndex++
+		}
+	}(ctx)
+
 	return "dummyTask", false, nil
 }
 
-func (r *RedfishLocalBMC) GetBiosUpgradeTask(
-	ctx context.Context,
-	manufacturer string,
-	taskURI string,
-) (*redfish.Task, error) {
+func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error) {
 	if UnitTestMockUps.BIOSUpgradeTaskIndex > len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
 		UnitTestMockUps.BIOSUpgradeTaskIndex = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
 	}
@@ -245,12 +231,16 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(
 	return &UnitTestMockUps.BIOSUpgradeTaskStatus[UnitTestMockUps.BIOSUpgradeTaskIndex], nil
 }
 
+// ResetManager resets the BMC manager with the given reset type.
 func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
-
-	// mock the bmc update here with timed delay
-	go func() {
+	go func(ctx context.Context) {
 		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
-			time.Sleep(150 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(150 * time.Millisecond):
+			}
+
 			for key, data := range UnitTestMockUps.PendingBMCSetting {
 				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
 					UnitTestMockUps.BMCSettingAttr[key] = data
@@ -258,17 +248,13 @@ func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetTy
 			}
 			UnitTestMockUps.ResetPendingBMCSetting()
 		}
-	}()
+	}(ctx)
 
 	return nil
 }
 
-// mock SetBiosAttributesOnReset sets given bios attributes for unit testing.
-func (r *RedfishLocalBMC) SetBMCAttributesImediately(
-	ctx context.Context,
-	UUID string,
-	attributes redfish.SettingsAttributes,
-) (err error) {
+// SetBMCAttributesImmediately sets given bios attributes.
+func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error) {
 	attrs := make(map[string]interface{}, len(attributes))
 	for name, value := range attributes {
 		attrs[name] = value
@@ -292,14 +278,8 @@ func (r *RedfishLocalBMC) SetBMCAttributesImediately(
 	return nil
 }
 
-func (r *RedfishLocalBMC) GetBMCAttributeValues(
-	ctx context.Context,
-	UUID string,
-	attributes []string,
-) (
-	result redfish.SettingsAttributes,
-	err error,
-) {
+// GetBMCAttributeValues retrieves the values of the specified BMC attributes.
+func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (result redfish.SettingsAttributes, err error) {
 	if len(attributes) == 0 {
 		return
 	}
@@ -318,13 +298,8 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(
 	return result, nil
 }
 
-func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(
-	ctx context.Context,
-	systemUUID string,
-) (
-	redfish.SettingsAttributes,
-	error,
-) {
+// GetBMCPendingAttributeValues retrieves the pending BMC attribute values.
+func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
 	if len(UnitTestMockUps.PendingBMCSetting) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
@@ -338,13 +313,7 @@ func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(
 	return result, nil
 }
 
-func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(
-	readOnly bool,
-	immutable bool,
-) (
-	filtered map[string]redfish.Attribute,
-	err error,
-) {
+func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(readOnly bool, immutable bool) (filtered map[string]redfish.Attribute, err error) {
 	filtered = make(map[string]redfish.Attribute)
 	if len(UnitTestMockUps.BMCSettingAttr) == 0 {
 		return filtered, fmt.Errorf("no bmc setting attributes found")
@@ -362,8 +331,8 @@ func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(
 	return filtered, err
 }
 
-// check if the arrtibutes need to reboot when changed, and are correct type.
-// supported attrType, bmc and bios
+// CheckBMCAttributes check if the attributes need to reboot when changed, and are of the correct type.
+// Supported attrType are: bmc and bios
 func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error) {
 	reset = false
 	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
@@ -378,6 +347,7 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.Settings
 	return common.CheckAttribues(attrs, filtered)
 }
 
+// GetBMCVersion retrieves the BMC version for the given system UUID.
 func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BMCVersion == "" {
 		var err error
@@ -389,30 +359,33 @@ func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) 
 	return UnitTestMockUps.BMCVersion, nil
 }
 
-func (r *RedfishLocalBMC) UpgradeBMCVersion(
-	ctx context.Context,
-	manufacturer string,
-	parameters *redfish.SimpleUpdateParameters,
-) (string, bool, error) {
+// UpgradeBMCVersion upgrades the BMC version to the specified version.
+func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error) {
 	UnitTestMockUps.BMCUpgradeTaskIndex = 0
-	// note, ImageURI is mocked for testing upgrading to version
 	UnitTestMockUps.BMCUpgradingVersion = parameters.ImageURI
-	// this go routine mocks the upgrade progress
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BMCUpgradeTaskIndex = UnitTestMockUps.BMCUpgradeTaskIndex + 1
+
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(20 * time.Millisecond):
 		}
-	}()
+
+		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Millisecond):
+			}
+			UnitTestMockUps.BMCUpgradeTaskIndex++
+		}
+	}(ctx)
+
 	return "dummyTask", false, nil
 }
 
-func (r *RedfishLocalBMC) GetBMCUpgradeTask(
-	ctx context.Context,
-	manufacturer string,
-	taskURI string,
-) (*redfish.Task, error) {
+// GetBMCUpgradeTask retrieves the status of the BMC upgrade task.
+func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error) {
 	if UnitTestMockUps.BMCUpgradeTaskIndex > len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
 		UnitTestMockUps.BMCUpgradeTaskIndex = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
 	}

@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"time"
 
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
@@ -27,6 +30,9 @@ import (
 
 var _ = Describe("Server Controller", func() {
 	ns := SetupTest()
+
+	log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(log)
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
@@ -242,7 +248,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(server.Spec.SystemUUID, registryURL, 100*time.Millisecond)
+		probeAgent := probe.NewAgent(log, server.Spec.SystemUUID, registryURL, 100*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -435,7 +441,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(server.Spec.SystemUUID, registryURL, 50*time.Millisecond)
+		probeAgent := probe.NewAgent(log, server.Spec.SystemUUID, registryURL, 50*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

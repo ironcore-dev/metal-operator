@@ -1,0 +1,15 @@
+{
+    "@odata.type": "#Session.v1_7_1.Session",
+    "Id": "1234567890ABCDEG",
+    "Name": "Outbound connection Session",
+    "Description": "OutboundConnection Session",
+    "UserName": "Administrator",
+    "SessionType": "OutboundConnection",
+    "Links": {
+        "OutboundConnection": {
+            "@odata.id": "/redfish/v1/AccountService/OutboundConnections/1"
+        }
+    },
+    "@odata.id": "/redfish/v1/SessionService/Sessions/1234567890ABCDEG",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

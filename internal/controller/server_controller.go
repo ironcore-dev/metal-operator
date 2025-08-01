@@ -542,6 +542,12 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
 
+	biosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get BIOS version for Server: %w", err)
+	}
+	server.Status.BIOSVersion = biosVersion
+
 	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
 	for _, processor := range systemInfo.Processors {
 		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
@@ -557,13 +563,11 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 		})
 	}
 
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+	if err = r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
 	}
 
-	log.V(1).Info("Updated Server status",
-		"Status", server.Status.State,
-		"powerState", server.Status.PowerState)
+	log.V(1).Info("Updated Server status", "Status", server.Status.State, "powerState", server.Status.PowerState)
 
 	return nil
 }

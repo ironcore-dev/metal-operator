@@ -387,6 +387,9 @@ spec:
           status:
             description: ServerStatus defines the observed state of Server.
             properties:
+              biosVersion:
+                description: BIOSVersion is the version of the server's BIOS.
+                type: string
               conditions:
                 description: Conditions represents the latest available observations
                   of the server's current state.

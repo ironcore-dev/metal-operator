@@ -4210,6 +4210,17 @@ string
 </tr>
 <tr>
 <td>
+<code>biosVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>BIOSVersion is the version of the server&rsquo;s BIOS.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>model</code><br/>
 <em>
 string

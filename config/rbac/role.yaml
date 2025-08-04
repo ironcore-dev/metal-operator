@@ -32,7 +32,6 @@ rules:
   - metal.ironcore.dev
   resources:
   - biossettings
-  - biosversion
   - biosversions
   - biosversionsets
   - bmcs

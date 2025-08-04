@@ -19,9 +19,9 @@ type BIOSVersionSetSpec struct {
 
 // BIOSVersionSetStatus defines the observed state of BIOSVersionSet.
 type BIOSVersionSetStatus struct {
-	// fullyLabeledServers is the number of server in the set.
+	// FullyLabeledServers is the number of servers in the set.
 	FullyLabeledServers int32 `json:"fullyLabeledServers,omitempty"`
-	// AvailableBIOSVersion is the number of BIOSVersion current created by the set.
+	// AvailableBIOSVersion is the number of BIOSVersion created by the set.
 	AvailableBIOSVersion int32 `json:"availableBIOSVersion,omitempty"`
 	// PendingBIOSVersion is the total number of pending BIOSVersion in the set.
 	PendingBIOSVersion int32 `json:"pendingBIOSVersion,omitempty"`

@@ -73,6 +73,8 @@ const (
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
 	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
 	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
+	// ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.
+	ServerMaintenanceStateCompleted ServerMaintenanceState = "Completed"
 )
 
 // +kubebuilder:object:root=true

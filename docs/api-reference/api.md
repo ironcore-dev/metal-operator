@@ -1972,13 +1972,13 @@ BMCVersionTemplate
 <tbody>
 <tr>
 <td>
-<code>fullyLabeledbmcs</code><br/>
+<code>fullyLabeledBMCS</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>FullyLabeledBMC is the number of server in the set.</p>
+<p>FullyLabeledBMCS is the number of server in the set.</p>
 </td>
 </tr>
 <tr>

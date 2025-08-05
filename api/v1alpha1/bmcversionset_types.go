@@ -19,8 +19,8 @@ type BMCVersionSetSpec struct {
 
 // BMCVersionSetStatus defines the observed state of BMCVersionSet.
 type BMCVersionSetStatus struct {
-	// FullyLabeledBMC is the number of server in the set.
-	FullyLabeledBMC int32 `json:"fullyLabeledbmcs,omitempty"`
+	// FullyLabeledBMCS is the number of server in the set.
+	FullyLabeledBMCS int32 `json:"fullyLabeledBMCS,omitempty"`
 	// AvailableBMCVersion is the number of BMCVersion current created by the set.
 	AvailableBMCVersion int32 `json:"availableBMCVersion,omitempty"`
 	// PendingBMCVersion is the total number of pending BMCVersion in the set.
@@ -37,7 +37,7 @@ type BMCVersionSetStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.bmcVersionTemplate.version`
-// +kubebuilder:printcolumn:name="selectedServers",type="integer",JSONPath=`.status.fullyLabeledServers`
+// +kubebuilder:printcolumn:name="selectedServers",type="integer",JSONPath=`.status.fullyLabeledBMCS`
 // +kubebuilder:printcolumn:name="AvailableBMCVersion",type="integer",JSONPath=`.status.availableBMCVersion`
 // +kubebuilder:printcolumn:name="Pending",type="integer",JSONPath=`.status.pendingBMCVersion`
 // +kubebuilder:printcolumn:name="InProgress",type="integer",JSONPath=`.status.inProgressBMCVersion`

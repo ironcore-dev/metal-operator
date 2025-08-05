@@ -140,7 +140,7 @@ func (r *BMCVersionSetReconciler) reconcile(
 
 	log.V(1).Info("updating the status of BMCVersionSet")
 	currentStatus := r.getOwnedBMCVersionSetStatus(ownedBMCVersions)
-	currentStatus.FullyLabeledBMC = int32(len(bmcList.Items))
+	currentStatus.FullyLabeledBMCS = int32(len(bmcList.Items))
 
 	err = r.updateStatus(ctx, log, currentStatus, bmcVersionSet)
 	if err != nil {

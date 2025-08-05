@@ -18,7 +18,7 @@ spec:
     - jsonPath: .spec.bmcVersionTemplate.version
       name: BMCVersion
       type: string
-    - jsonPath: .status.fullyLabeledServers
+    - jsonPath: .status.fullyLabeledBMCS
       name: selectedServers
       type: integer
     - jsonPath: .status.availableBMCVersion
@@ -236,8 +236,8 @@ spec:
                   in the set.
                 format: int32
                 type: integer
-              fullyLabeledbmcs:
-                description: FullyLabeledBMC is the number of server in the set.
+              fullyLabeledBMCS:
+                description: FullyLabeledBMCS is the number of server in the set.
                 format: int32
                 type: integer
               inProgressBMCVersion:

@@ -199,7 +199,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 
 			By("Checking if the status has been updated")
 			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
-				HaveField("Status.FullyLabeledBMC", BeNumerically("==", 2)),
+				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.InProgressBIOSVersion", BeNumerically("==", 0)),

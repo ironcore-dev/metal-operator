@@ -291,6 +291,18 @@ type NetworkInterface struct {
 	// MACAddress is the MAC address of the network interface.
 	// +required
 	MACAddress string `json:"macAddress"`
+
+	// DeviceName is the name of the device associated with the network interface.
+	// +required
+	DeviceName string `json:"deviceName"`
+
+	// Model is the model of the network interface.
+	// +required
+	Model string `json:"model"`
+
+	// Speed is the speed of the network interface in Mbps.
+	// +required
+	Speed int32 `json:"speed"`
 }
 
 // StorageDrive defines the details of one storage drive

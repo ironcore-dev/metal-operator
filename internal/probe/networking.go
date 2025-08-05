@@ -61,6 +61,9 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 				Name:       iface.Name,
 				IPAddress:  ip.String(),
 				MACAddress: iface.HardwareAddr.String(),
+				DeviceName: "", // Placeholder for device name, if available
+				Model:      "", // Placeholder for model, if available
+				Speed:      0,  // Placeholder for speed, if available
 			}
 			networkInterfaces = append(networkInterfaces, networkInterface)
 		}

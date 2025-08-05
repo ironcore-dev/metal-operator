@@ -6,4 +6,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: biossettingsset-sample
 spec:
-  # TODO(user): Add fields here
+  biosVersionTemplate:
+    version: 1.0
+    serverMaintenancePolicy: OwnerApproval
+    settings:
+      PxeDev1EnDis: Enabled
+
+

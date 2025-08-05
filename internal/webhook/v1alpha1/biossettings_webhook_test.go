@@ -150,6 +150,10 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Eventually(UpdateStatus(biosSettingsV1, func() {
 				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
 			})).Should(Succeed())
+			By("Updating an biosSettingsV1 spec with serverMaintenance should be success")
+			Eventually(Update(biosSettingsV1, func() {
+				biosSettingsV1.Spec.ServerMaintenanceRef = &v1.ObjectReference{Name: "foobar"}
+			})).Should(Succeed())
 			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
 			biosSettingsV1Updated := biosSettingsV1.DeepCopy()
 			biosSettingsV1Updated.Spec.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Priority: 1, SettingsMap: map[string]string{"test": "value"}}}

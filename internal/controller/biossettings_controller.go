@@ -1202,12 +1202,12 @@ func (r *BiosSettingsReconciler) patchMaintenanceRequestRefOnBiosSettings(
 			conditionutils.UpdateReason(condition.Reason),
 			conditionutils.UpdateMessage(condition.Message),
 		); err != nil {
-			return fmt.Errorf("failed to patch BIOSVersion condition: %w", err)
+			return fmt.Errorf("failed to patch BIOSSettings condition: %w", err)
 		}
 	}
 
 	if err := r.Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
-		log.V(1).Error(err, "failed to patch bios settings ref")
+		log.V(1).Error(err, "failed to patch serverMaintenanceRef onto BIOSsettings")
 		return err
 	}
 

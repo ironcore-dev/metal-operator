@@ -9,6 +9,9 @@ spec:
   serverRef:
     name: endpoint-sample-system-0
   version: 2.10.2
-  settings:
-    PxeDev1EnDis: Enabled
+  SettingsFlow:
+    - name: abc
+      priority: 10
+      settings:
+        PxeDev1EnDis: Enabled
   serverMaintenancePolicy: OwnerApproval

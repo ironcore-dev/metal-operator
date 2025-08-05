@@ -148,8 +148,8 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	server, modified, err := r.claimServer(ctx, log, claim)
-	if err != nil || modified {
+	server, err := r.claimServer(ctx, log, claim)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if server == nil {
@@ -162,7 +162,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err = r.patchServerRef(ctx, claim, server); err != nil || modified {
+	if modified, err := r.patchServerRef(ctx, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Patched ServerRef in Claim")
@@ -172,12 +172,12 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Applied BootConfiguration for ServerClaim")
 
-	if modified, err = r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
+	if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Patched ServerClaim phase", "Phase", claim.Status.Phase)
 
-	if modified, err = r.ensurePowerStateForServer(ctx, log, claim, server); err != nil || modified {
+	if modified, err := r.ensurePowerStateForServer(ctx, log, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured PowerState for Server", "Server", server.Name)
@@ -186,10 +186,10 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) error {
 	if server.Spec.ServerClaimRef != nil {
 		log.V(1).Info("Server is already claimed", "Server", server.Name, "Claim", server.Spec.ServerClaimRef.Name)
-		return false, nil
+		return nil
 	}
 
 	if server.Spec.ServerClaimRef == nil {
@@ -202,11 +202,11 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, lo
 			UID:        claim.UID,
 		}
 		if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
-			return false, fmt.Errorf("failed to patch claim ref for server: %w", err)
+			return fmt.Errorf("failed to patch claim ref for server: %w", err)
 		}
 		log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
 	}
-	return true, nil
+	return nil
 }
 
 func (r *ServerClaimReconciler) ensurePowerStateForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
@@ -300,13 +300,13 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 	return nil
 }
 
-func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, bool, error) {
+func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if server := checkForPrevUsedServer(log, serverList.Items, claim); server != nil {
-		return server, false, nil
+		return server, nil
 	}
 
 	// If no server is specified, find a server.
@@ -326,19 +326,19 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		server, err = r.claimFirstBestServer(ctx, log)
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if server == nil {
-		return nil, false, nil
+		return nil, nil
 	}
 	log.V(1).Info("Matching server found", "Server", server.Name)
 
-	modified, err := r.ensureObjectRefForServer(ctx, log, claim, server)
+	err = r.ensureObjectRefForServer(ctx, log, claim, server)
 	if err != nil {
-		return nil, modified, err
+		return nil, err
 	}
 	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
-	return server, modified, nil
+	return server, nil
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {

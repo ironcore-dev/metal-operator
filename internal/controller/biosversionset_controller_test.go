@@ -199,7 +199,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 
 			By("Checking if the status has been updated")
 			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
-				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+				HaveField("Status.FullyLabeledBMC", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.InProgressBIOSVersion", BeNumerically("==", 0)),
@@ -210,7 +210,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, biosVersionSet)).To(Succeed())
 		})
 
-		It("should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
+		It("should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
 			By("Create resource")
 			biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 				ObjectMeta: metav1.ObjectMeta{

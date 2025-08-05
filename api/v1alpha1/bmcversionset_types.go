@@ -9,9 +9,9 @@ import (
 
 // BMCVersionSetSpec defines the desired state of BMCVersionSet.
 type BMCVersionSetSpec struct {
-	// BMCSelector specifies a label selector to identify the servers that are to be selected.
+	// BMCSelector specifies a label selector to identify the BMC that are to be selected.
 	// +required
-	BMCSelector metav1.LabelSelector `json:"serverSelector"`
+	BMCSelector metav1.LabelSelector `json:"bmcSelector"`
 
 	// BMCVersionTemplate defines the template for the BMCversion Resource to be applied to the servers.
 	BMCVersionTemplate BMCVersionTemplate `json:"bmcVersionTemplate,omitempty"`
@@ -19,8 +19,8 @@ type BMCVersionSetSpec struct {
 
 // BMCVersionSetStatus defines the observed state of BMCVersionSet.
 type BMCVersionSetStatus struct {
-	// fullyLabeledServers is the number of server in the set.
-	FullyLabeledServers int32 `json:"fullyLabeledServers,omitempty"`
+	// FullyLabeledBMC is the number of server in the set.
+	FullyLabeledBMC int32 `json:"fullyLabeledbmcs,omitempty"`
 	// AvailableBMCVersion is the number of BMCVersion current created by the set.
 	AvailableBMCVersion int32 `json:"availableBMCVersion,omitempty"`
 	// PendingBMCVersion is the total number of pending BMCVersion in the set.

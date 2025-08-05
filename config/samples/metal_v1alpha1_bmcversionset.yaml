@@ -6,4 +6,14 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: bmcversionset-sample
 spec:
-  # TODO(user): Add fields here
+  bmcVersionTemplate:
+    version: "U59 v2.34 (10/04/2024)"
+    image:
+      URI: "https://foo-2.34_10_04_2024.signed.flash"
+      transferProtocol: "HTTPS"
+    updatePolicy: Normal
+    serverMaintenancePolicy: OwnerApproval
+  bmcSelector:
+    matchLabels: 
+      manufacturer: "dell"
+  

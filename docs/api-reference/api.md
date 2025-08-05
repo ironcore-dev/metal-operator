@@ -1869,7 +1869,7 @@ BMCVersionSetSpec
 <table>
 <tr>
 <td>
-<code>serverSelector</code><br/>
+<code>bmcSelector</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
@@ -1877,7 +1877,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>BMCSelector specifies a label selector to identify the servers that are to be selected.</p>
+<p>BMCSelector specifies a label selector to identify the BMC that are to be selected.</p>
 </td>
 </tr>
 <tr>
@@ -1928,7 +1928,7 @@ BMCVersionSetStatus
 <tbody>
 <tr>
 <td>
-<code>serverSelector</code><br/>
+<code>bmcSelector</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
@@ -1936,7 +1936,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>BMCSelector specifies a label selector to identify the servers that are to be selected.</p>
+<p>BMCSelector specifies a label selector to identify the BMC that are to be selected.</p>
 </td>
 </tr>
 <tr>
@@ -1972,13 +1972,13 @@ BMCVersionTemplate
 <tbody>
 <tr>
 <td>
-<code>fullyLabeledServers</code><br/>
+<code>fullyLabeledbmcs</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
-<p>fullyLabeledServers is the number of server in the set.</p>
+<p>FullyLabeledBMC is the number of server in the set.</p>
 </td>
 </tr>
 <tr>

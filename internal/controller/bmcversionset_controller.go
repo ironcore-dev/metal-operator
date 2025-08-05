@@ -30,13 +30,14 @@ type BMCVersionSetReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-const BMCVersionSetFinalizer = "metal.ironcore.dev/BMCVersionSet"
+const BMCVersionSetFinalizer = "metal.ironcore.dev/bmcversionset"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;update
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversion,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
+
 func (r *BMCVersionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	bmcVersionSet := &metalv1alpha1.BMCVersionSet{}
@@ -112,7 +113,7 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	serverList, err := r.getBMCBySelector(ctx, bmcVersionSet)
+	bmcList, err := r.getBMCBySelector(ctx, bmcVersionSet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -122,24 +123,24 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("Summary of servers and BMCVersions", "Server count", len(serverList.Items),
+	log.V(1).Info("Summary of BMC and BMCVersions", "BMCs count", len(bmcList.Items),
 		"BMCVersion count", len(ownedBMCVersions.Items))
 
-	// create BMCVersion for servers selected, if it does not exist
-	if err := r.createMissingBMCVersions(ctx, log, serverList, ownedBMCVersions, bmcVersionSet); err != nil {
+	// create BMCVersion for BMCs selected, if it does not exist
+	if err := r.createMissingBMCVersions(ctx, log, bmcList, ownedBMCVersions, bmcVersionSet); err != nil {
 		log.Error(err, "failed to create resources")
 		return ctrl.Result{}, err
 	}
 
-	// delete BMCVersion for servers which do not exist anymore
-	if _, err := r.deleteOrphanBMCVersions(ctx, log, serverList, ownedBMCVersions); err != nil {
+	// delete BMCVersion for BMCs which do not exist anymore
+	if _, err := r.deleteOrphanBMCVersions(ctx, log, bmcList, ownedBMCVersions); err != nil {
 		log.Error(err, "failed to cleanup resources")
 		return ctrl.Result{}, err
 	}
 
 	log.V(1).Info("updating the status of BMCVersionSet")
 	currentStatus := r.getOwnedBMCVersionSetStatus(ownedBMCVersions)
-	currentStatus.FullyLabeledServers = int32(len(serverList.Items))
+	currentStatus.FullyLabeledBMC = int32(len(bmcList.Items))
 
 	err = r.updateStatus(ctx, log, currentStatus, bmcVersionSet)
 	if err != nil {
@@ -193,8 +194,8 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 ) ([]string, error) {
 
 	bmcMap := make(map[string]bool)
-	for _, server := range bmcList.Items {
-		bmcMap[server.Name] = true
+	for _, bmc := range bmcList.Items {
+		bmcMap[bmc.Name] = true
 	}
 
 	var errs []error

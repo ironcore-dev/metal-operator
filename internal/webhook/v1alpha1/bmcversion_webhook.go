@@ -71,7 +71,7 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		return nil, fmt.Errorf("expected a BMCVersion object for the oldObj but got %T", oldObj)
 	}
 	if oldBMCVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(bmcversion) {
+		!ShouldAllowForceUpdateInProgress(bmcversion) && oldBMCVersion.Spec.ServerMaintenanceRefs != nil {
 		err := fmt.Errorf("BMCVersion (%v) is in progress, unable to update %v",
 			oldBMCVersion.Name,
 			bmcversion.Name)

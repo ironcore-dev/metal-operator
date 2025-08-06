@@ -161,6 +161,10 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			Eventually(UpdateStatus(biosVersionV1, func() {
 				biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
 			})).Should(Succeed())
+			By("mock servermaintenance Creation maintenance")
+			Eventually(Update(biosVersionV1, func() {
+				biosVersionV1.Spec.ServerMaintenanceRef = &v1.ObjectReference{Name: "foobar-Maintenance"}
+			})).Should(Succeed())
 			By("Updating an biosVersion V1 spec, should fail to update when inProgress")
 			biosVersionV1Updated := biosVersionV1.DeepCopy()
 			biosVersionV1Updated.Spec.Version = "P712"

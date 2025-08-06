@@ -99,10 +99,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 defaultMockUpServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 defaultMockUpServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -149,10 +151,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 upgradeServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -240,10 +244,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 upgradeServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())

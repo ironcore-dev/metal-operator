@@ -128,7 +128,7 @@ func (r *ServerReconciler) shouldDelete(
 		return false
 	}
 
-	if controllerutil.ContainsFinalizer(server, BMCSettingFinalizer) &&
+	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
 		server.Status.State == metalv1alpha1.ServerStateMaintenance {
 		log.V(1).Info("postponing delete as server is in Maintenance state")
 		return false

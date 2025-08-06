@@ -46,10 +46,9 @@ func (r *RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
 
 		system.PowerState = redfish.OnPowerState
 		system.RawData = nil
-		fullURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
 
-		if err := system.Patch(fullURI, system); err != nil {
-			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to Patch system to power on", "systemUUID", fullURI)
+		if err := system.Patch(systemURI, system); err != nil {
+			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to Patch system to power on", "SystemID", system.ID)
 			return
 		}
 
@@ -88,10 +87,9 @@ func (r *RedfishLocalBMC) PowerOff(ctx context.Context, systemURI string) error 
 
 		system.PowerState = redfish.OffPowerState
 		system.RawData = nil
-		fullURI := fmt.Sprintf("/redfish/v1/Systems/%s", system.ID)
 
-		if err := system.Patch(fullURI, system); err != nil {
-			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to Patch system to power off", "systemURI", fullURI)
+		if err := system.Patch(systemURI, system); err != nil {
+			ctrl.LoggerFrom(ctx).V(1).Error(err, "failed to Patch system to power off", "SystemID", system.ID)
 			return
 		}
 	}(ctx)

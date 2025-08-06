@@ -21,26 +21,36 @@ const (
 	BMCVersionStateFailed BMCVersionState = "Failed"
 )
 
-// BMCVersionSpec defines the desired state of BMCVersion.
-type BMCVersionSpec struct {
-	// Version contains BMC version to upgrade to
+type BMCVersionTemplate struct {
+	// Version contains a BMC version to upgrade to
 	// +required
 	Version string `json:"version"`
-	// An indication of whether the server's upgrade service should bypass vendor update policies
+
+	// UpdatePolicy is an indication of whether the server's upgrade service should bypass vendor update policies
+	// +optional
 	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
+
 	// details regarding the image to use to upgrade to given BMC version
 	// +required
 	Image ImageSpec `json:"image"`
 
-	// BMCRef is a reference to a specific BMC to apply BMC upgrade on.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bmcRef is immutable"
-	BMCRef *corev1.LocalObjectReference `json:"bmcRef,omitempty"`
-
-	// ServerMaintenancePolicy is maintenance policy to be enforced on the server managed by referred BMC.
+	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.
+	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
+	// +optional
 	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
+}
+
+// BMCVersionSpec defines the desired state of BMCVersion.
+type BMCVersionSpec struct {
+	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
+	BMCVersionTemplate `json:",inline"`
+
+	// BMCRef is a reference to a specific BMC to apply BMC upgrade on.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bmcRef is immutable"
+	BMCRef *corev1.LocalObjectReference `json:"bmcRef,omitempty"`
 }
 
 // BMCVersionStatus defines the observed state of BMCVersion.

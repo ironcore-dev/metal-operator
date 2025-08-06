@@ -38,6 +38,7 @@ rules:
   - bmcsecrets
   - bmcsettings
   - bmcversions
+  - bmcversionsets
   - endpoints
   - serverbootconfigurations
   - serverclaims
@@ -62,6 +63,7 @@ rules:
   - bmcsecrets/finalizers
   - bmcsettings/finalizers
   - bmcversions/finalizers
+  - bmcversionsets/finalizers
   - endpoints/finalizers
   - serverbootconfigurations/finalizers
   - serverclaims/finalizers
@@ -79,6 +81,7 @@ rules:
   - bmcsecrets/status
   - bmcsettings/status
   - bmcversions/status
+  - bmcversionsets/status
   - endpoints/status
   - serverbootconfigurations/status
   - serverclaims/status

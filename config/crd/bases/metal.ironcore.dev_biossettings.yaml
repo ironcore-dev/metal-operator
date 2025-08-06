@@ -58,6 +58,31 @@ spec:
           spec:
             description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
+              flow:
+                description: 'SettingsMap contains software (eg: BIOS, BMC) settings
+                  as map'
+                items:
+                  properties:
+                    name:
+                      description: Name of settings
+                      type: string
+                    priority:
+                      description: |-
+                        Priority defines the order in which settings are applied.
+                        Lower priorities come first.
+                      format: int32
+                      type: integer
+                    settings:
+                      additionalProperties:
+                        type: string
+                      description: 'Settings contains software (eg: BIOS, BMC) settings
+                        as map.'
+                      type: object
+                  required:
+                  - name
+                  - priority
+                  type: object
+                type: array
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
                   enforced on the server.
@@ -124,12 +149,6 @@ spec:
                 x-kubernetes-validations:
                 - message: serverRef is immutable
                   rule: self == oldSelf
-              settings:
-                additionalProperties:
-                  type: string
-                description: 'SettingsMap contains software (eg: BIOS, BMC) settings
-                  as map'
-                type: object
               version:
                 description: 'Version contains software (eg: BIOS, BMC) version this
                   settings applies to'
@@ -196,6 +215,15 @@ spec:
                   - reason
                   - status
                   - type
+                  type: object
+                type: array
+              flowStatus:
+                items:
+                  properties:
+                    applied:
+                      type: boolean
+                    name:
+                      type: string
                   type: object
                 type: array
               lastAppliedTime:

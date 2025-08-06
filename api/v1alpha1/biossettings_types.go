@@ -16,7 +16,7 @@ type BIOSSettingsSpec struct {
 
 	// SettingsMap contains software (eg: BIOS, BMC) settings as map
 	// +optional
-	SettingsMap map[string]string `json:"settings,omitempty"`
+	Flow []BIOSSettingFlowItem `json:"flow,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
@@ -29,6 +29,19 @@ type BIOSSettingsSpec struct {
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
 	// +optional
 	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+}
+
+type BIOSSettingFlowItem struct {
+	// Settings contains software (eg: BIOS, BMC) settings as map.
+	// +optional
+	Settings map[string]string `json:"settings,omitempty"`
+	// Priority defines the order in which settings are applied.
+	// Lower priorities come first.
+	// +required
+	Priority int32 `json:"priority,omitempty"`
+	// Name of settings
+	// +required
+	Name string `json:"name,omitempty"`
 }
 
 // BIOSSettingsState specifies the current state of the BIOS maintenance.
@@ -58,6 +71,11 @@ const (
 	BIOSSettingUpdateStateVerification BIOSSettingUpdateState = "VerifySettingUpdate"
 )
 
+type BIOSSettingFlowItemStatus struct {
+	Name    string `json:"name,omitempty"`
+	Applied bool   `json:"applied,omitempty"`
+}
+
 // BIOSSettingsStatus defines the observed state of BIOSSettings.
 type BIOSSettingsStatus struct {
 	// State represents the current state of the bios configuration task.
@@ -67,6 +85,8 @@ type BIOSSettingsStatus struct {
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
 	// +optional
 	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
+
+	FlowStatus []BIOSSettingFlowItemStatus `json:"flowStatus,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOSSettings's current state.
 	// +patchStrategy=merge

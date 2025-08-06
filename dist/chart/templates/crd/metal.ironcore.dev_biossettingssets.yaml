@@ -70,7 +70,7 @@ spec:
           spec:
             description: BIOSSettingsSetSpec defines the desired state of BIOSSettingsSet.
             properties:
-              biosVersionTemplate:
+              biosSettingsTemplate:
                 description: BiosSettingsTemplate defines the template for the BIOSSettings
                   Resource to be applied to the servers.
                 properties:

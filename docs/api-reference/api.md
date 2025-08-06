@@ -163,7 +163,7 @@ BIOSSettingsSetSpec
 <table>
 <tr>
 <td>
-<code>biosVersionTemplate</code><br/>
+<code>biosSettingsTemplate</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
 BIOSSettingsTemplate
@@ -222,7 +222,7 @@ BIOSSettingsSetStatus
 <tbody>
 <tr>
 <td>
-<code>biosVersionTemplate</code><br/>
+<code>biosSettingsTemplate</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
 BIOSSettingsTemplate

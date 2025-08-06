@@ -6,10 +6,13 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: biossettingsset-sample
 spec:
-  biosVersionTemplate:
-    version: 1.0
+  biosSettingsTemplate:
+    version: P79 v1.45 (12/06/2017)
     serverMaintenancePolicy: OwnerApproval
     settings:
-      PxeDev1EnDis: Enabled
+      abc: Enabled
+  serverSelector:
+    matchLabels: 
+      manufacturer: "dell"
 
 

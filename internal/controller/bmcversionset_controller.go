@@ -140,7 +140,7 @@ func (r *BMCVersionSetReconciler) reconcile(
 
 	log.V(1).Info("updating the status of BMCVersionSet")
 	currentStatus := r.getOwnedBMCVersionSetStatus(ownedBMCVersions)
-	currentStatus.FullyLabeledBMCS = int32(len(bmcList.Items))
+	currentStatus.FullyLabeledBMCs = int32(len(bmcList.Items))
 
 	err = r.updateStatus(ctx, log, currentStatus, bmcVersionSet)
 	if err != nil {
@@ -159,14 +159,14 @@ func (r *BMCVersionSetReconciler) createMissingBMCVersions(
 	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 ) error {
 
-	BMCWithBMCVersion := make(map[string]bool)
+	BMCWithBMCVersion := make(map[string]struct{})
 	for _, bmcVersion := range bmcVersionList.Items {
-		BMCWithBMCVersion[bmcVersion.Spec.BMCRef.Name] = true
+		BMCWithBMCVersion[bmcVersion.Spec.BMCRef.Name] = struct{}{}
 	}
 
 	var errs []error
 	for _, bmc := range bmcList.Items {
-		if !BMCWithBMCVersion[bmc.Name] {
+		if _, ok := BMCWithBMCVersion[bmc.Name]; !ok {
 			newBMCVersion := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "bmc-version-update-through-set-",
@@ -193,15 +193,15 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	bmcVersionList *metalv1alpha1.BMCVersionList,
 ) ([]string, error) {
 
-	bmcMap := make(map[string]bool)
+	bmcMap := make(map[string]struct{})
 	for _, bmc := range bmcList.Items {
-		bmcMap[bmc.Name] = true
+		bmcMap[bmc.Name] = struct{}{}
 	}
 
 	var errs []error
 	var warnings []string
 	for _, bmcVersion := range bmcVersionList.Items {
-		if !bmcMap[bmcVersion.Spec.BMCRef.Name] {
+		if _, ok := bmcMap[bmcVersion.Spec.BMCRef.Name]; !ok {
 			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
 				log.V(1).Info("waiting for BMCVersion to move out of InProgress state", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
 				warnings = append(warnings, fmt.Sprintf("BMCVersion %s is still in progress, skipping deletion", bmcVersion.Name))

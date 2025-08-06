@@ -169,7 +169,7 @@ func (r *BMCVersionSetReconciler) createMissingBMCVersions(
 		if _, ok := BMCWithBMCVersion[bmc.Name]; !ok {
 			newBMCVersion := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "bmc-version-update-through-set-",
+					GenerateName: "bmc-version-set-",
 				}}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCVersion, func() error {

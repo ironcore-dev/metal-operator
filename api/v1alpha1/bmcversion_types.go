@@ -26,7 +26,7 @@ type BMCVersionTemplate struct {
 	// +required
 	Version string `json:"version"`
 
-	// UpdatePolicy An indication of whether the server's upgrade service should bypass vendor update policies
+	// UpdatePolicy is an indication of whether the server's upgrade service should bypass vendor update policies
 	// +optional
 	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
 
@@ -45,7 +45,7 @@ type BMCVersionTemplate struct {
 
 // BMCVersionSpec defines the desired state of BMCVersion.
 type BMCVersionSpec struct {
-	// defines the template for Version to be applied on the server's BMC.
+	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
 	BMCVersionTemplate `json:",inline"`
 
 	// BMCRef is a reference to a specific BMC to apply BMC upgrade on.

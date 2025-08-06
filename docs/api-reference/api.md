@@ -1794,7 +1794,7 @@ BMCVersionTemplate
 <p>
 (Members of <code>BMCVersionTemplate</code> are embedded into this type.)
 </p>
-<p>defines the template for Version to be applied on the server&rsquo;s BMC.</p>
+<p>BMCVersionTemplate defines the template for BMC version to be applied on the server&rsquo;s BMC.</p>
 </td>
 </tr>
 <tr>
@@ -2067,7 +2067,7 @@ BMCVersionTemplate
 <p>
 (Members of <code>BMCVersionTemplate</code> are embedded into this type.)
 </p>
-<p>defines the template for Version to be applied on the server&rsquo;s BMC.</p>
+<p>BMCVersionTemplate defines the template for BMC version to be applied on the server&rsquo;s BMC.</p>
 </td>
 </tr>
 <tr>
@@ -2208,7 +2208,7 @@ UpdatePolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdatePolicy An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+<p>UpdatePolicy is an indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
 </td>
 </tr>
 <tr>

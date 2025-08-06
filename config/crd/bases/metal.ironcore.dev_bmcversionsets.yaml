@@ -205,7 +205,7 @@ spec:
                       type: object
                     type: array
                   updatePolicy:
-                    description: UpdatePolicy An indication of whether the server's
+                    description: UpdatePolicy is an indication of whether the server's
                       upgrade service should bypass vendor update policies
                     type: string
                   version:

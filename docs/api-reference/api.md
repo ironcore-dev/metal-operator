@@ -664,7 +664,7 @@ int32
 </em>
 </td>
 <td>
-<p>fullyLabeledServers is the number of server in the set.</p>
+<p>FullyLabeledServers is the number of servers in the set.</p>
 </td>
 </tr>
 <tr>
@@ -675,7 +675,7 @@ int32
 </em>
 </td>
 <td>
-<p>AvailableBIOSVersion is the number of BIOSVersion current created by the set.</p>
+<p>AvailableBIOSVersion is the number of BIOSVersion created by the set.</p>
 </td>
 </tr>
 <tr>
@@ -4305,6 +4305,17 @@ string
 <td>
 <em>(Optional)</em>
 <p>Manufacturer is the name of the server manufacturer.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>biosVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>BIOSVersion is the version of the server&rsquo;s BIOS.</p>
 </td>
 </tr>
 <tr>

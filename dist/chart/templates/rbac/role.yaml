@@ -36,6 +36,7 @@ rules:
   resources:
   - biossettings
   - biosversions
+  - biosversionsets
   - bmcs
   - bmcsecrets
   - bmcsettings
@@ -59,6 +60,7 @@ rules:
   resources:
   - biossettings/finalizers
   - biosversions/finalizers
+  - biosversionsets/finalizers
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - bmcsettings/finalizers
@@ -75,6 +77,7 @@ rules:
   resources:
   - biossettings/status
   - biosversions/status
+  - biosversionsets/status
   - bmcs/status
   - bmcsecrets/status
   - bmcsettings/status

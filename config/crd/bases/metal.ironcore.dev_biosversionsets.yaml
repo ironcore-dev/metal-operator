@@ -211,8 +211,8 @@ spec:
             description: BIOSVersionSetStatus defines the observed state of BIOSVersionSet.
             properties:
               availableBIOSVersion:
-                description: AvailableBIOSVersion is the number of BIOSVersion current
-                  created by the set.
+                description: AvailableBIOSVersion is the number of BIOSVersion created
+                  by the set.
                 format: int32
                 type: integer
               completedBIOSVersion:
@@ -226,7 +226,7 @@ spec:
                 format: int32
                 type: integer
               fullyLabeledServers:
-                description: fullyLabeledServers is the number of server in the set.
+                description: FullyLabeledServers is the number of servers in the set.
                 format: int32
                 type: integer
               inProgressBIOSVersion:

@@ -37,7 +37,7 @@ type BMCVersionSetStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.bmcVersionTemplate.version`
-// +kubebuilder:printcolumn:name="selectedServers",type="integer",JSONPath=`.status.fullyLabeledBMCs`
+// +kubebuilder:printcolumn:name="selectedBMCs",type="integer",JSONPath=`.status.fullyLabeledBMCs`
 // +kubebuilder:printcolumn:name="AvailableBMCVersion",type="integer",JSONPath=`.status.availableBMCVersion`
 // +kubebuilder:printcolumn:name="Pending",type="integer",JSONPath=`.status.pendingBMCVersion`
 // +kubebuilder:printcolumn:name="InProgress",type="integer",JSONPath=`.status.inProgressBMCVersion`

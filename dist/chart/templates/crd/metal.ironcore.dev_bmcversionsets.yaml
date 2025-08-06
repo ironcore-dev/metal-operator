@@ -25,7 +25,7 @@ spec:
       name: BMCVersion
       type: string
     - jsonPath: .status.fullyLabeledBMCs
-      name: selectedServers
+      name: selectedBMCs
       type: integer
     - jsonPath: .status.availableBMCVersion
       name: AvailableBMCVersion

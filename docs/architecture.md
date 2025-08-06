@@ -83,6 +83,7 @@ flowchart LR
 - [**BIOSVersionSet**](concepts/biosversionset.md): Handles creation of multiple `BIOSVersion` by selecting physical server's through labels.
 - [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
+- [**BMCVersionSet**](concepts/bmcversionset.md): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.
 
 ### 2. Controllers
 
@@ -100,6 +101,7 @@ flowchart LR
 - **BiosVersionSetReconciler**: Handles [`BIOSVersionSet`](concepts/biosversionset.md) resource. Provides ability to upgrade the bios version on several physical server's BIOS at a time through selecting server's through labels.
 - **BMCSettingsReconciler**: Handles [`BMCSettings`](concepts/bmcsettings.md) resource. Provides ability to update the bmc settings on physical server's Manager.
 - **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.
+- **BMCVersionSetReconciler**: Handles [`BMCVersionSet`](concepts/bmcversionset.md) resource. Provides ability to upgrade the BMC version on several physical server's BMC at a time through selecting BMC's through labels.
 
 - **Boot Operator (External Component)**: Monitors `ServerBootConfiguration` resources to prepare the boot environment (e.g., configuring DHCP, PXE servers). Once the boot environment is ready, it updates the `ServerBootConfiguration` status to **Ready**.
 

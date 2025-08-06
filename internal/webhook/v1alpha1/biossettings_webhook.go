@@ -75,7 +75,7 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 		return nil, fmt.Errorf("expected a BIOSSettings object for the oldObj but got %T", oldObj)
 	}
 	if oldBIOSSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(biossettings) {
+		!ShouldAllowForceUpdateInProgress(biossettings) && oldBIOSSettings.Spec.ServerMaintenanceRef != nil {
 		err := fmt.Errorf("BIOSSettings (%v) is in progress, unable to update %v",
 			oldBIOSSettings.Name,
 			biossettings.Name)

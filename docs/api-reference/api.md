@@ -789,7 +789,7 @@ int32
 </em>
 </td>
 <td>
-<p>fullyLabeledServers is the number of server in the set.</p>
+<p>FullyLabeledServers is the number of servers in the set.</p>
 </td>
 </tr>
 <tr>
@@ -800,7 +800,7 @@ int32
 </em>
 </td>
 <td>
-<p>AvailableBIOSVersion is the number of BIOSVersion current created by the set.</p>
+<p>AvailableBIOSVersion is the number of BIOSVersion created by the set.</p>
 </td>
 </tr>
 <tr>
@@ -2007,39 +2007,18 @@ BMCVersionSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BMCVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains BMC version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">
+BMCVersionTemplate
 </a>
 </em>
 </td>
 <td>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BMC version</p>
+<p>
+(Members of <code>BMCVersionTemplate</code> are embedded into this type.)
+</p>
+<p>BMCVersionTemplate defines the template for BMC version to be applied on the server&rsquo;s BMC.</p>
 </td>
 </tr>
 <tr>
@@ -2055,32 +2034,6 @@ Kubernetes core/v1.LocalObjectReference
 <p>BMCRef is a reference to a specific BMC to apply BMC upgrade on.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server managed by referred BMC.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRefs</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
-[]ServerMaintenanceRefItem
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -2094,6 +2047,217 @@ BMCVersionStatus
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionSet">BMCVersionSet
+</h3>
+<div>
+<p>BMCVersionSet is the Schema for the bmcversionsets API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionSetSpec">
+BMCVersionSetSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>bmcSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>BMCSelector specifies a label selector to identify the BMC that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcVersionTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">
+BMCVersionTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BMCVersionTemplate defines the template for the BMCversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionSetStatus">
+BMCVersionSetStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionSetSpec">BMCVersionSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionSet">BMCVersionSet</a>)
+</p>
+<div>
+<p>BMCVersionSetSpec defines the desired state of BMCVersionSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>bmcSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>BMCSelector specifies a label selector to identify the BMC that are to be selected.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcVersionTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">
+BMCVersionTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BMCVersionTemplate defines the template for the BMCversion Resource to be applied to the servers.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionSetStatus">BMCVersionSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionSet">BMCVersionSet</a>)
+</p>
+<div>
+<p>BMCVersionSetStatus defines the observed state of BMCVersionSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>fullyLabeledBMCs</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FullyLabeledBMCs is the number of server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableBMCVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>AvailableBMCVersion is the number of BMCVersion current created by the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pendingBMCVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>PendingBMCVersion is the total number of pending BMCVersion in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inProgressBMCVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>InProgressBMCVersion is the total number of BMCVersion in the set that are currently in InProgress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completedBMCVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>CompletedBMCVersion is the total number of completed BMCVersion in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failedBMCVersion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FailedBMCVersion is the total number of failed BMCVersion in the set.</p>
 </td>
 </tr>
 </tbody>
@@ -2116,39 +2280,18 @@ BMCVersionStatus
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BMCVersionTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains BMC version to upgrade to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
-UpdatePolicy
+<a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">
+BMCVersionTemplate
 </a>
 </em>
 </td>
 <td>
-<p>An indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
-ImageSpec
-</a>
-</em>
-</td>
-<td>
-<p>details regarding the image to use to upgrade to given BMC version</p>
+<p>
+(Members of <code>BMCVersionTemplate</code> are embedded into this type.)
+</p>
+<p>BMCVersionTemplate defines the template for BMC version to be applied on the server&rsquo;s BMC.</p>
 </td>
 </tr>
 <tr>
@@ -2162,32 +2305,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>BMCRef is a reference to a specific BMC to apply BMC upgrade on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenancePolicy is maintenance policy to be enforced on the server managed by referred BMC.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRefs</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
-[]ServerMaintenanceRefItem
-</a>
-</em>
-</td>
-<td>
-<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </tbody>
@@ -2274,6 +2391,89 @@ Task
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the BMC version upgrade state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCVersionSetSpec">BMCVersionSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains a BMC version to upgrade to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UpdatePolicy">
+UpdatePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatePolicy is an indication of whether the server&rsquo;s upgrade service should bypass vendor update policies</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ImageSpec">
+ImageSpec
+</a>
+</em>
+</td>
+<td>
+<p>details regarding the image to use to upgrade to given BMC version</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.</p>
 </td>
 </tr>
 </tbody>
@@ -2594,7 +2794,7 @@ net/netip.Prefix
 <h3 id="metal.ironcore.dev/v1alpha1.ImageSpec">ImageSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>)
 </p>
 <div>
 </div>
@@ -3952,7 +4152,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -3975,7 +4175,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>)
 </p>
 <div>
 <p>ServerMaintenanceRefItem is a reference to a ServerMaintenance object.</p>
@@ -4430,6 +4630,17 @@ string
 <td>
 <em>(Optional)</em>
 <p>Manufacturer is the name of the server manufacturer.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>biosVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>BIOSVersion is the version of the server&rsquo;s BIOS.</p>
 </td>
 </tr>
 <tr>
@@ -4979,7 +5190,7 @@ int32
 <h3 id="metal.ironcore.dev/v1alpha1.UpdatePolicy">UpdatePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionSpec">BMCVersionSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>)
 </p>
 <div>
 </div>

@@ -1,0 +1,19 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCVersionSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bmcversionset-sample
+spec:
+  bmcVersionTemplate:
+    version: "U59 v2.34 (10/04/2024)"
+    image:
+      URI: "https://foo-2.34_10_04_2024.signed.flash"
+      transferProtocol: "HTTPS"
+    updatePolicy: Normal
+    serverMaintenancePolicy: OwnerApproval
+  bmcSelector:
+    matchLabels: 
+      manufacturer: "dell"
+  

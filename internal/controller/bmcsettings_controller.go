@@ -561,6 +561,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	// if the server maintenance refs are not provided, we will create server maintenance refs for all the servers which are in the BMC.
 	serverWithMaintenances := make(map[string]bool, len(servers))
 	if bmcSetting.Spec.ServerMaintenanceRefs != nil {
+		// we fetch all the references already in the Spec (self created/provided by user)
 		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return false, errors.Join(err...)
@@ -568,6 +569,17 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		for _, serverMaintenance := range serverMaintenances {
 			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
 		}
+	}
+
+	// we also fetch all the references owned by this Resource.
+	// This is needed in case we are reconciling before we have patched the references.
+	// possible when we reconcile after CreateOrPatch, before ref have been written
+	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmcSetting, serverMaintenancesList); err != nil {
+		return false, err
+	}
+	for _, serverMaintenance := range serverMaintenancesList.Items {
+		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
 	}
 
 	var errs []error
@@ -578,10 +590,10 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: r.ManagerNamespace,
-				Name:      fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name),
-			}}
-
+				Namespace:    r.ManagerNamespace,
+				GenerateName: "bmc-settings-",
+			},
+		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
 			serverMaintenance.Spec.Policy = bmcSetting.Spec.ServerMaintenancePolicy
 			serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOn
@@ -602,7 +614,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			ServerMaintenanceRefs,
 			metalv1alpha1.ServerMaintenanceRefItem{
 				ServerMaintenanceRef: &corev1.ObjectReference{
-					APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+					APIVersion: metalv1alpha1.GroupVersion.String(),
 					Kind:       "ServerMaintenance",
 					Namespace:  serverMaintenance.Namespace,
 					Name:       serverMaintenance.Name,

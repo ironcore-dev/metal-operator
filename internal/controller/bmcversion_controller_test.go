@@ -5,7 +5,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -100,10 +99,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 defaultMockUpServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 defaultMockUpServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -150,10 +151,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 upgradeServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -165,12 +168,12 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
 
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
@@ -241,10 +244,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 upgradeServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -256,12 +261,12 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
 
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())

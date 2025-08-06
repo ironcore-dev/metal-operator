@@ -150,6 +150,10 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Eventually(UpdateStatus(biosSettingsV1, func() {
 				biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
 			})).Should(Succeed())
+			By("mock servermaintenance Creation maintenance")
+			Eventually(Update(biosSettingsV1, func() {
+				biosSettingsV1.Spec.ServerMaintenanceRef = &v1.ObjectReference{Name: "foobar-Maintenance"}
+			})).Should(Succeed())
 			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
 			biosSettingsV1Updated := biosSettingsV1.DeepCopy()
 			biosSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}

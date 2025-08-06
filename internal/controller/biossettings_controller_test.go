@@ -93,10 +93,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					SettingsMap:             BIOSSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettingsV1)).To(Succeed())
@@ -119,10 +121,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion + "2",
-				SettingsMap:             BIOSSetting,
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion + "2",
+					SettingsMap:             BIOSSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
@@ -161,10 +165,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					SettingsMap:             BIOSSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -211,10 +217,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					SettingsMap:             BIOSSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -325,10 +333,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					SettingsMap:             BIOSSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -427,10 +437,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					SettingsMap:             BIOSSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -502,8 +514,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	It("should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
-		biosSetting := make(map[string]string)
-		biosSetting["abc"] = "bar-wait-on-version-upgrade"
+		BIOSSetting := make(map[string]string)
+		BIOSSetting["abc"] = "bar-wait-on-version-upgrade"
 
 		// put the server in PowerOn state,
 
@@ -520,10 +532,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-upgrade-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "2.45.455b66-rev4",
-				SettingsMap:             biosSetting,
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 "2.45.455b66-rev4",
+					SettingsMap:             BIOSSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())

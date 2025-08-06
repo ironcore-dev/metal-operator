@@ -15,8 +15,10 @@ import (
 
 var _ = Describe("BIOSSettings Webhook", func() {
 	var (
-		biosSettingsV1 *metalv1alpha1.BIOSSettings
-		validator      BIOSSettingsCustomValidator
+		biosSettingsV1                 *metalv1alpha1.BIOSSettings
+		validator                      BIOSSettingsCustomValidator
+		defaultMockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
+		anotherMockUpServerBiosVersion = "P71 v1.45 (12/06/2017)"
 	)
 
 	BeforeEach(func() {
@@ -29,10 +31,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 "P70 v1.45 (12/06/2017)",
-				SettingsMap:             map[string]string{},
-				ServerRef:               &v1.LocalObjectReference{Name: "foo"},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: "foo"},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					SettingsMap:             map[string]string{},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettingsV1)).To(Succeed())
@@ -49,10 +53,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					ServerRef:               &v1.LocalObjectReference{Name: "foo"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerRef: &v1.LocalObjectReference{Name: "foo"},
+					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+						Version:                 defaultMockUpServerBiosVersion,
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
 				},
 			}
 			Expect(validator.ValidateCreate(ctx, biosSettingsV2)).Error().To(HaveOccurred())
@@ -66,10 +72,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
+					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+						Version:                 defaultMockUpServerBiosVersion,
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
@@ -84,10 +92,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
+					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+						Version:                 anotherMockUpServerBiosVersion,
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
@@ -107,10 +117,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
+					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+						Version:                 anotherMockUpServerBiosVersion,
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
@@ -130,10 +142,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BIOSSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					ServerRef:               &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerRef: &v1.LocalObjectReference{Name: "bar"},
+					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+						Version:                 anotherMockUpServerBiosVersion,
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())

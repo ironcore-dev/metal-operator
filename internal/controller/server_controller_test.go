@@ -4,6 +4,8 @@
 package controller
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
@@ -725,5 +728,57 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, claim)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	It("Should updated the OSBooted condition when the bootstate endpoint is called", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				UUID:       "38947555-7742-3448-3784-823347823834",
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					Address: "127.0.0.1",
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
+
+		var bootstateRequest registry.BootstatePayload
+		bootstateRequest.SystemUUID = server.Spec.SystemUUID
+		bootstateRequest.Booted = true
+		marshaled, err := json.Marshal(bootstateRequest)
+		Expect(err).NotTo(HaveOccurred())
+		response, err := http.Post(registryURL+"/bootstate", "application/json", bytes.NewBuffer(marshaled))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.Body.Close()).To(Succeed())
+		Expect(response.StatusCode).To(Equal(http.StatusOK))
+		Eventually(Object(server)).Should(HaveField("Status.Conditions", ContainElement(HaveField("Type", registry.OSBootedCondition))))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Eventually(Get(bmcSecret)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })

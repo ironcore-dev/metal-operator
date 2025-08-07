@@ -300,9 +300,9 @@ type NetworkInterface struct {
 	// +required
 	Model string `json:"model"`
 
-	// Speed is the speed of the network interface in Mbps.
+	// Speed is the speed of the network interface
 	// +required
-	Speed int32 `json:"speed"`
+	Speed string `json:"speed"`
 }
 
 // StorageDrive defines the details of one storage drive

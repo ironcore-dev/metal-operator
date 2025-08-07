@@ -455,6 +455,10 @@ spec:
                 items:
                   description: NetworkInterface defines the details of a network interface.
                   properties:
+                    deviceName:
+                      description: DeviceName is the name of the device associated
+                        with the network interface.
+                      type: string
                     ip:
                       description: |-
                         IP is the IP address assigned to the network interface.
@@ -463,13 +467,22 @@ spec:
                     macAddress:
                       description: MACAddress is the MAC address of the network interface.
                       type: string
+                    model:
+                      description: Model is the model of the network interface.
+                      type: string
                     name:
                       description: Name is the name of the network interface.
                       type: string
+                    speed:
+                      description: Speed is the speed of the network interface
+                      type: string
                   required:
+                  - deviceName
                   - ip
                   - macAddress
+                  - model
                   - name
+                  - speed
                   type: object
                 type: array
               powerState:

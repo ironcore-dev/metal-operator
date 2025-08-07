@@ -27,7 +27,7 @@ var _ = Describe("RegistryServer", func() {
 						MACAddress: "abcd",
 						DeviceName: "eth0",
 						Model:      "virtio",
-						Speed:      1000,
+						Speed:      "1000Mbps",
 					},
 				},
 			},
@@ -56,7 +56,7 @@ var _ = Describe("RegistryServer", func() {
 					MACAddress: "abcd",
 					DeviceName: "eth0",
 					Model:      "virtio",
-					Speed:      1000,
+					Speed:      "1000Mbps",
 				},
 			},
 		}))

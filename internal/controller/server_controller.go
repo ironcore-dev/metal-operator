@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
@@ -62,6 +63,8 @@ const (
 	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
 	// InternalAnnotationTypeValue is the value for the internal annotation type
 	InternalAnnotationTypeValue = "Internal"
+	// PoweringOnCondition is the condition type for powering on a server
+	PoweringOnCondition = "PoweringOn"
 )
 
 const (
@@ -889,6 +892,9 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, redfish.OnPowerState); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
+		if err := r.updatePowerOnCondition(ctx, server); err != nil {
+			return fmt.Errorf("failed to update power on condition: %w", err)
+		}
 	case powerOpOff:
 		log.V(1).Info("Server Power Off")
 		powerOffType := bmcClient.PowerOff
@@ -914,6 +920,23 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	log.V(1).Info("Ensured server power state", "PowerState", server.Spec.Power)
 
 	return nil
+}
+
+func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *metalv1alpha1.Server) error {
+	original := server.DeepCopy()
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	err := acc.UpdateSlice(
+		&server.Status.Conditions,
+		PoweringOnCondition,
+		conditionutils.UpdateStatus(metav1.ConditionTrue),
+		conditionutils.UpdateReason("ServerPowerOn"),
+		conditionutils.UpdateMessage("Server is powering on"),
+		conditionutils.UpdateObserved(server),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update powering on condition: %w", err)
+	}
+	return r.Status().Patch(ctx, server, client.MergeFrom(original))
 }
 
 func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {

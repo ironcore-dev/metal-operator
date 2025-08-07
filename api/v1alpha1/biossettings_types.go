@@ -67,6 +67,8 @@ const (
 type BIOSSettingsFlowState string
 
 const (
+	// BIOSSettingsFlowStatePending specifies that the BIOSSetting Controller is updating the settings for current Priority
+	BIOSSettingsFlowStatePending BIOSSettingsFlowState = "Pending"
 	// BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings for current Priority
 	BIOSSettingsFlowStateInProgress BIOSSettingsFlowState = "InProgress"
 	// BIOSSettingsFlowStateApplied specifies that the bios setting has been completed for current Priority

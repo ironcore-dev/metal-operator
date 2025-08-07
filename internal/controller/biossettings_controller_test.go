@@ -521,9 +521,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 		)
 
-		By("Ensuring that the BIOS setting has reached next state: issue/reboot or verification state")
-		// check condition
-
 		// because of the mocking, the transistions are super fast here.
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
@@ -705,7 +702,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 					{
 						Priority:    100,
-						SettingsMap: map[string]string{"fooreboot": "10"},
+						SettingsMap: map[string]string{"abc": "10"},
 						Name:        "100",
 					},
 					{
@@ -727,7 +724,150 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Ensuring that the BIOSSettings conditions are updated")
 		ensureBiosSettingsFlowCondition(biosSettings)
 
-		By("Deleting the BIOSSettingFlow")
+		By("Deleting the BIOSSetting")
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+	})
+
+	It("should fail if duplicate keys in names or settings found", func(ctx SpecContext) {
+
+		By("Creating a BIOSSetting with sequence of settings")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority:    100,
+						SettingsMap: map[string]string{"fooreboot": "10"},
+						Name:        "100",
+					},
+					{
+						Priority:    1000,
+						SettingsMap: map[string]string{"fooreboot": "100"},
+						Name:        "1000",
+					},
+				},
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to Failed")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+		))
+
+		By("Ensuring right number of conditions are present")
+		Eventually(
+			func(g Gomega) int {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				return len(biosSettings.Status.Conditions)
+			}).Should(BeNumerically("==", 1))
+
+		By("Ensuring the update has been applied by the server")
+		duplicateKeyCheckConditionCheck := &metav1.Condition{}
+		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+		Eventually(
+			func(g Gomega) bool {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
+					duplicateKeyCheckCondition,
+					duplicateKeyCheckConditionCheck)).To(BeTrue())
+				return duplicateKeyCheckConditionCheck.Status == metav1.ConditionTrue
+			}).Should(BeTrue())
+
+		biosSettings2 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority:    100,
+						SettingsMap: map[string]string{"abc": "10"},
+						Name:        "100",
+					},
+					{
+						Priority:    1000,
+						SettingsMap: map[string]string{"fooreboot": "100"},
+						Name:        "100",
+					},
+				},
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings2)).To(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to Failed")
+		Eventually(Object(biosSettings2)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+		))
+
+		By("Ensuring right number of conditions are present")
+		Eventually(
+			func(g Gomega) int {
+				g.Expect(Get(biosSettings2)()).To(Succeed())
+				return len(biosSettings2.Status.Conditions)
+			}).Should(BeNumerically("==", 1))
+
+		By("Ensuring the update has been applied by the server")
+		duplicateKeyCheckConditionCheck2 := &metav1.Condition{}
+		Eventually(
+			func(g Gomega) bool {
+				g.Expect(Get(biosSettings2)()).To(Succeed())
+				g.Expect(acc.FindSlice(biosSettings2.Status.Conditions,
+					duplicateKeyCheckCondition,
+					duplicateKeyCheckConditionCheck2)).To(BeTrue())
+				return duplicateKeyCheckConditionCheck2.Status == metav1.ConditionTrue
+			}).Should(BeTrue())
+
+		By("Deleting the biosSettings2")
+		Expect(k8sClient.Delete(ctx, biosSettings2)).To(Succeed())
+	})
+
+	It("should successfully apply sequence of different settings", func(ctx SpecContext) {
+
+		By("Creating a BIOSSetting sequence of settings")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-differnet-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority:    100,
+						SettingsMap: map[string]string{"abc": "foo-bar"},
+						Name:        "100",
+					},
+					{
+						Priority:    1000,
+						SettingsMap: map[string]string{"fooreboot": "100"},
+						Name:        "1000",
+					},
+				},
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to completed")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+		))
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings)
+
+		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 	})
 
@@ -766,46 +906,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Ensuring that the BIOSSettings conditions are updated")
 		ensureBiosSettingsFlowCondition(biosSettings)
 
-		By("Deleting the BIOSSettingFlow")
-		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
-	})
-
-	It("should successfully apply sequence of different settings", func(ctx SpecContext) {
-
-		By("Creating a BIOSSetting sequence of settings")
-		biosSettings := &metalv1alpha1.BIOSSettings{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-setting-flow-differnet-",
-			},
-			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority:    100,
-						SettingsMap: map[string]string{"abc": "foo-bar"},
-						Name:        "100",
-					},
-					{
-						Priority:    1000,
-						SettingsMap: map[string]string{"fooreboot": "100"},
-						Name:        "1000",
-					},
-				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-			},
-		}
-		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
-
-		By("Ensuring that the BIOSSetting Object has moved to completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
-		By("Ensuring that the BIOSSettings conditions are updated")
-		ensureBiosSettingsFlowCondition(biosSettings)
-
-		By("Deleting the BIOSSettingFlow")
+		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 	})
 })
@@ -814,7 +915,7 @@ func ensureBiosSettingsFlowCondition(
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	commonCondition := 3
+	commonCondition := 2
 	condMaintenanceDeleted := &metav1.Condition{}
 	condMaintenanceCreated := &metav1.Condition{}
 	condIssueSettingsUpdate := &metav1.Condition{}
@@ -852,7 +953,6 @@ func ensureBiosSettingsFlowCondition(
 	// assumption, for unit testing the order of priority of settings in spec is ascending
 	for idx, settings := range biosSettings.Spec.SettingsFlow {
 		By(fmt.Sprintf("Ensuring the BIOSSettings Object has applied following settings %v", settings.SettingsMap))
-		By("Ensuring the timeout error start time has been recorded")
 		Eventually(
 			func(g Gomega) {
 				g.Expect(Get(biosSettings)()).To(Succeed())
@@ -902,7 +1002,7 @@ func ensureBiosSettingsCondition(
 	waitForVersionUpgrade bool,
 ) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	commonConditions := 3
+	commonConditions := 2
 	flowCondition := 5
 	condMaintenanceDeleted := &metav1.Condition{}
 	condMaintenanceCreated := &metav1.Condition{}
@@ -1051,15 +1151,6 @@ func ensureBiosSettingsCondition(
 		func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
 			g.Expect(acc.FindSlice(biosSettings.Status.FlowState[0].Conditions,
-				verifySettingCondition,
-				condVerifySettingsUpdate)).To(BeTrue())
-			return condVerifySettingsUpdate.Status == metav1.ConditionTrue
-		}).Should(BeTrue())
-	By("Ensuring the update has been Verfied on the server")
-	Eventually(
-		func(g Gomega) bool {
-			g.Expect(Get(biosSettings)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosSettings.Status.Conditions,
 				verifySettingCondition,
 				condVerifySettingsUpdate)).To(BeTrue())
 			return condVerifySettingsUpdate.Status == metav1.ConditionTrue

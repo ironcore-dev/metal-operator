@@ -156,6 +156,9 @@ BIOSSettingsStatus
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
 <td><p>BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings for current Priority</p>
 </td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BIOSSettingsFlowStatePending specifies that the BIOSSetting Controller is updating the settings for current Priority</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsFlowStatus">BIOSSettingsFlowStatus

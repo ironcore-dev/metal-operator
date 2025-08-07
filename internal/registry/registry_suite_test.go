@@ -27,12 +27,13 @@ func TestRegistry(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(log)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
 
-	server = registry.NewServer(testServerAddr)
+	server = registry.NewServer(log, testServerAddr)
 	go func() {
 		defer GinkgoRecover()
 		Expect(server.Start(ctx)).To(Succeed(), "failed to start registry server")

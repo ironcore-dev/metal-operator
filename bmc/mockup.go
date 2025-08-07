@@ -5,7 +5,7 @@ package bmc
 
 import "github.com/stmcginnis/gofish/redfish"
 
-// RedfishLocalBMC is an implementation of the BMC interface for Redfish.
+// RedfishMockUps is an implementation of the BMC interface for Redfish.
 type RedfishMockUps struct {
 	BIOSSettingAttr       map[string]map[string]any
 	PendingBIOSSetting    map[string]map[string]any

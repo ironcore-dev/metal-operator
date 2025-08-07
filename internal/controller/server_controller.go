@@ -36,9 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -258,7 +256,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	log.V(1).Info("Updated Server status after state transition")
 
 	log.V(1).Info("Reconciled Server")
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 }
 
 // Server state-machine:
@@ -1037,31 +1035,6 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Create a channel to send periodic events
-	ch := make(chan event.TypedGenericEvent[*metalv1alpha1.Server])
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start a goroutine to send events to the channel at the specified interval
-	go func() {
-		ticker := time.NewTicker(r.ResyncInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				// Emit an event to trigger reconciliation
-				ch <- event.TypedGenericEvent[*metalv1alpha1.Server]{
-					Object: &metalv1alpha1.Server{},
-				}
-			case <-ctx.Done():
-				close(ch)
-				return
-			}
-		}
-	}()
-
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
@@ -1071,7 +1044,6 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&metalv1alpha1.ServerBootConfiguration{},
 			r.enqueueServerByServerBootConfiguration(),
 		).
-		WatchesRawSource(source.Channel(ch, &handler.TypedEnqueueRequestForObject[*metalv1alpha1.Server]{})).
 		Complete(r)
 }
 

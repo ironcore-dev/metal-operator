@@ -9,9 +9,9 @@ type NetworkInterface struct {
 	Name       string `json:"name"`
 	IPAddress  string `json:"ipAddress"`
 	MACAddress string `json:"macAddress"`
-	DeviceName string `json:"deviceName"`
-	Model      string `json:"model"`
-	Speed      string `json:"speed"`
+	PCIAddress string `json:"pciAddress",omitempty`
+	Model      string `json:"model",omitempty`
+	Speed      string `json:"speed",omitempty`
 }
 
 // Server represents a server with a list of network interfaces.

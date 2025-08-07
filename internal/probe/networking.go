@@ -4,6 +4,7 @@
 package probe
 
 import (
+	"fmt"
 	"net"
 	"strings"
 
@@ -57,13 +58,22 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 				continue
 			}
 
+			pciAddress := getNetworkDevicePCIAddress(iface.Name)
+			speed := getNetworkDeviceSpeed(iface.Name)
+			deviceData := getNetworkDeviceModaliasData(iface.Name)
+
+			model := ""
+			if deviceData != nil {
+				model = fmt.Sprintf("%s %s", deviceData.vendorID, deviceData.productID)
+			}
+
 			networkInterface := registry.NetworkInterface{
 				Name:       iface.Name,
 				IPAddress:  ip.String(),
 				MACAddress: iface.HardwareAddr.String(),
-				DeviceName: "", // Placeholder for device name, if available
-				Model:      "", // Placeholder for model, if available
-				Speed:      "", // Placeholder for speed, if available
+				PCIAddress: pciAddress,
+				Model:      model,
+				Speed:      speed,
 			}
 			networkInterfaces = append(networkInterfaces, networkInterface)
 		}

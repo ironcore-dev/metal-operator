@@ -801,7 +801,7 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 			Name:       s.Name,
 			IP:         metalv1alpha1.MustParseIP(s.IPAddress),
 			MACAddress: s.MACAddress,
-			DeviceName: s.DeviceName,
+			PCIAddress: s.PCIAddress,
 			Model:      s.Model,
 			Speed:      s.Speed,
 		})

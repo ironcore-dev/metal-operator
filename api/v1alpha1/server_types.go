@@ -292,16 +292,16 @@ type NetworkInterface struct {
 	// +required
 	MACAddress string `json:"macAddress"`
 
-	// DeviceName is the name of the device associated with the network interface.
-	// +required
-	DeviceName string `json:"deviceName"`
+	// PCIAddress is the PCI address of the network interface.
+	// +optional
+	PCIAddress string `json:"pciAddress"`
 
 	// Model is the model of the network interface.
-	// +required
+	// +optional
 	Model string `json:"model"`
 
 	// Speed is the speed of the network interface
-	// +required
+	// +optional
 	Speed string `json:"speed"`
 }
 

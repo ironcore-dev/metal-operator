@@ -28,22 +28,6 @@ type deviceModaliasData struct {
 	progIface    string
 }
 
-func getNetworkDeviceMacAddress(device string) string {
-	// For devices that have addr_assign_type != 0, return empty string since the MAC address is random.
-	value, err := os.ReadFile(filepath.Join(pathSysClassNet, device, "addr_assign_type"))
-	if err != nil {
-		return ""
-	}
-	if strings.TrimSpace(string(value)) != "0" {
-		return ""
-	}
-	value, err = os.ReadFile(filepath.Join(pathSysClassNet, device, "address"))
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(value))
-}
-
 func getNetworkDeviceSpeed(device string) string {
 	speed, err := os.ReadFile(filepath.Join(pathSysClassNet, device, "speed"))
 	if err != nil {

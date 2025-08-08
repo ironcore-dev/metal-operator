@@ -469,8 +469,17 @@ spec:
                     macAddress:
                       description: MACAddress is the MAC address of the network interface.
                       type: string
+                    model:
+                      description: Model is the model of the network interface.
+                      type: string
                     name:
                       description: Name is the name of the network interface.
+                      type: string
+                    pciAddress:
+                      description: PCIAddress is the PCI address of the network interface.
+                      type: string
+                    speed:
+                      description: Speed is the speed of the network interface
                       type: string
                   required:
                   - ip

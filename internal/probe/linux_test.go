@@ -58,37 +58,6 @@ var _ = Describe("Linux network device probe functions", func() {
 		}
 	})
 
-	Describe("getNetworkDeviceMacAddress", func() {
-		BeforeEach(func() {
-			sysDevicesNetDir := filepath.Join(tmpSysDevices, pciID, pciAddress, "net", deviceName)
-			Expect(os.MkdirAll(sysDevicesNetDir, 0755)).To(Succeed())
-
-			netDeviceNetPath := filepath.Join(tmpSysClassNet, deviceName)
-			symLink := fmt.Sprintf("../../devices/%s/%s/net/%s", pciID, pciAddress, deviceName)
-			Expect(os.Symlink(symLink, netDeviceNetPath)).To(Succeed())
-		})
-
-		It("returns MAC address when addr_assign_type is 0", func() {
-			Expect(os.WriteFile(filepath.Join(tmpSysClassNet, deviceName, "addr_assign_type"), []byte("0\n"), 0644)).To(Succeed())
-			Expect(os.WriteFile(filepath.Join(tmpSysClassNet, deviceName, "address"), []byte("aa:bb:cc:dd:ee:ff\n"), 0644)).To(Succeed())
-			Expect(getNetworkDeviceMacAddress(deviceName)).To(Equal("aa:bb:cc:dd:ee:ff"))
-		})
-
-		It("returns empty string when addr_assign_type is not 0", func() {
-			Expect(os.WriteFile(filepath.Join(tmpSysClassNet, deviceName, "addr_assign_type"), []byte("1\n"), 0644)).To(Succeed())
-			Expect(getNetworkDeviceMacAddress(deviceName)).To(BeEmpty())
-		})
-
-		It("returns empty string if addr_assign_type file is missing", func() {
-			Expect(getNetworkDeviceMacAddress(deviceName)).To(BeEmpty())
-		})
-
-		It("returns empty string if address file is missing", func() {
-			Expect(os.WriteFile(filepath.Join(tmpSysClassNet, deviceName, "addr_assign_type"), []byte("0\n"), 0644)).To(Succeed())
-			Expect(getNetworkDeviceMacAddress(deviceName)).To(BeEmpty())
-		})
-	})
-
 	Describe("getNetworkDeviceSpeed", func() {
 		BeforeEach(func() {
 			sysDevicesNetDir := filepath.Join(tmpSysDevices, pciID, pciAddress, "net", deviceName)
@@ -206,7 +175,7 @@ var _ = Describe("Linux network device probe functions", func() {
 
 			It("returns modalias data for valid PCI device", func() {
 				modalStr := "pci:v000010DEd00001C82sv00001043sd00008613bc03sc00i00"
-				Expect(len(modalStr)).To(Equal(53))
+				Expect(modalStr).To(HaveLen(53))
 				Expect(os.WriteFile(filepath.Join(pciDeviceDir, "modalias"), []byte(modalStr), 0644)).To(Succeed())
 
 				data := getNetworkDeviceModaliasData(deviceName)

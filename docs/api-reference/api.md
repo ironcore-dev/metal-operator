@@ -2548,6 +2548,42 @@ string
 <p>MACAddress is the MAC address of the network interface.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>pciAddress</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PCIAddress is the PCI address of the network interface.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>model</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Model is the model of the network interface.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>speed</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Speed is the speed of the network interface</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Phase">Phase

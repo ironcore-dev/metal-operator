@@ -6,7 +6,6 @@ package probe
 import (
 	"errors"
 	"net"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -176,8 +175,3 @@ var _ = Describe("networking.go", func() {
 		})
 	})
 })
-
-func TestProbeNetworking(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Probe Networking Suite")
-}

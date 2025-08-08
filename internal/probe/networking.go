@@ -4,21 +4,54 @@
 package probe
 
 import (
+	"fmt"
 	"net"
 	"strings"
 
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 )
 
-// IsSLAAC checks if the given IPv6 address is a SLAAC address.
-func IsSLAAC(ip string) bool {
+// isSLAAC checks if the given IPv6 address is a SLAAC address.
+func isSLAAC(ip string) bool {
 	return strings.Contains(ip, "ff:fe")
+}
+
+type NIC interface {
+	Interfaces() ([]net.Interface, error)
+	Addrs(iface *net.Interface) ([]net.Addr, error)
+}
+
+type nic struct{}
+
+func NewNIC() NIC {
+	return &nic{}
+}
+
+func (nic *nic) Interfaces() ([]net.Interface, error) {
+	return net.Interfaces()
+}
+
+func (nic *nic) Addrs(iface *net.Interface) ([]net.Addr, error) {
+	return iface.Addrs()
+}
+
+type NetworkDataCollector interface {
+	CollectNetworkData() ([]registry.NetworkInterface, error)
+}
+
+type networkDataCollector struct {
+	nic   NIC
+	linux LinuxNetworkData
+}
+
+func NewNetworkDataCollector(nic NIC, linux LinuxNetworkData) NetworkDataCollector {
+	return &networkDataCollector{nic: nic, linux: linux}
 }
 
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,
 // ignoring loopback and tunnel (tun) devices.
-func collectNetworkData() ([]registry.NetworkInterface, error) {
-	interfaces, err := net.Interfaces()
+func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface, error) {
+	interfaces, err := n.nic.Interfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +67,7 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 			continue
 		}
 
-		addrs, err := iface.Addrs()
+		addrs, err := n.nic.Addrs(&iface)
 		if err != nil {
 			return nil, err
 		}
@@ -53,14 +86,26 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 			}
 
 			// Filter out SLAAC addresses
-			if ip.To4() == nil && IsSLAAC(ip.String()) {
+			if ip.To4() == nil && isSLAAC(ip.String()) {
 				continue
+			}
+
+			pciAddress := n.linux.GetNetworkDevicePCIAddress(iface.Name)
+			speed := n.linux.GetNetworkDeviceSpeed(iface.Name)
+			deviceData := n.linux.GetNetworkDeviceModaliasData(iface.Name)
+
+			model := ""
+			if deviceData != nil {
+				model = fmt.Sprintf("%s %s", deviceData.vendorID, deviceData.productID)
 			}
 
 			networkInterface := registry.NetworkInterface{
 				Name:       iface.Name,
 				IPAddress:  ip.String(),
 				MACAddress: iface.HardwareAddr.String(),
+				PCIAddress: pciAddress,
+				Model:      model,
+				Speed:      speed,
 			}
 			networkInterfaces = append(networkInterfaces, networkInterface)
 		}

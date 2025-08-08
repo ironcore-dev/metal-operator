@@ -13,6 +13,8 @@ import (
 )
 
 var _ = Describe("Linux network device probe functions", func() {
+	subject := NewLinux()
+
 	var (
 		tmpSysClassNet   string
 		tmpBusPciDevices string
@@ -70,11 +72,11 @@ var _ = Describe("Linux network device probe functions", func() {
 
 		It("returns speed value", func() {
 			Expect(os.WriteFile(filepath.Join(tmpSysClassNet, deviceName, "speed"), []byte("1000\n"), 0644)).To(Succeed())
-			Expect(getNetworkDeviceSpeed(deviceName)).To(Equal("1000"))
+			Expect(subject.GetNetworkDeviceSpeed(deviceName)).To(Equal("1000"))
 		})
 
 		It("returns empty string if speed file is missing", func() {
-			Expect(getNetworkDeviceSpeed(deviceName)).To(BeEmpty())
+			Expect(subject.GetNetworkDeviceSpeed(deviceName)).To(BeEmpty())
 		})
 	})
 
@@ -91,18 +93,18 @@ var _ = Describe("Linux network device probe functions", func() {
 			symLink = fmt.Sprintf("../../../%s", pciAddress)
 			Expect(os.Symlink(symLink, sysDeviceNetPath)).To(Succeed())
 
-			Expect(getNetworkDevicePath(deviceName)).To(HaveSuffix("/sys/devices/pci0000:00/0000:00:1f.6"))
+			Expect(subject.GetNetworkDevicePath(deviceName)).To(HaveSuffix("/sys/devices/pci0000:00/0000:00:1f.6"))
 		})
 
 		It("returns empty string for virtual device", func() {
 			netDevicePath := filepath.Join(tmpSysClassNet, deviceName)
 			target := fmt.Sprintf("../../devices/virtual/net/%s", deviceName)
 			Expect(os.Symlink(target, netDevicePath)).To(Succeed())
-			Expect(getNetworkDevicePath(deviceName)).To(BeEmpty())
+			Expect(subject.GetNetworkDevicePath(deviceName)).To(BeEmpty())
 		})
 
 		It("returns empty string if symlink is missing", func() {
-			Expect(getNetworkDevicePath(deviceName)).To(BeEmpty())
+			Expect(subject.GetNetworkDevicePath(deviceName)).To(BeEmpty())
 		})
 
 		It("returns empty string if device symlink is missing", func() {
@@ -113,7 +115,7 @@ var _ = Describe("Linux network device probe functions", func() {
 			symLink := fmt.Sprintf("../../devices/%s/%s/net/%s", pciID, pciAddress, deviceName)
 			Expect(os.Symlink(symLink, netDevicePath)).To(Succeed())
 
-			Expect(getNetworkDevicePath(deviceName)).To(BeEmpty())
+			Expect(subject.GetNetworkDevicePath(deviceName)).To(BeEmpty())
 		})
 	})
 
@@ -135,20 +137,20 @@ var _ = Describe("Linux network device probe functions", func() {
 			sysDevicePath := filepath.Join(tmpSysDevices, pciID, pciAddress)
 			Expect(os.Symlink("../../../bus/pci", filepath.Join(sysDevicePath, "subsystem"))).To(Succeed())
 
-			Expect(getNetworkDevicePCIAddress(deviceName)).To(Equal("0000:00:1f.6"))
+			Expect(subject.GetNetworkDevicePCIAddress(deviceName)).To(Equal("0000:00:1f.6"))
 		})
 
 		It("returns empty string if not PCI device", func() {
 			sysDevicePath := filepath.Join(tmpSysDevices, pciID, pciAddress)
 			Expect(os.Symlink("../../../bus/usb", filepath.Join(sysDevicePath, "subsystem"))).To(Succeed())
 
-			Expect(getNetworkDevicePCIAddress(deviceName)).To(BeEmpty())
+			Expect(subject.GetNetworkDevicePCIAddress(deviceName)).To(BeEmpty())
 		})
 	})
 
 	Describe("getNetworkDeviceModaliasData", func() {
 		It("returns nil if PCI address is not found", func() {
-			Expect(getNetworkDeviceModaliasData(deviceName)).To(BeNil())
+			Expect(subject.GetNetworkDeviceModaliasData(deviceName)).To(BeNil())
 		})
 
 		Context("when modalias file exists", func() {
@@ -178,7 +180,7 @@ var _ = Describe("Linux network device probe functions", func() {
 				Expect(modalStr).To(HaveLen(53))
 				Expect(os.WriteFile(filepath.Join(pciDeviceDir, "modalias"), []byte(modalStr), 0644)).To(Succeed())
 
-				data := getNetworkDeviceModaliasData(deviceName)
+				data := subject.GetNetworkDeviceModaliasData(deviceName)
 
 				Expect(data).NotTo(BeNil())
 				Expect(data.vendorID).To(Equal("8086"))
@@ -191,21 +193,21 @@ var _ = Describe("Linux network device probe functions", func() {
 			})
 
 			It("returns nil if modalias file is missing", func() {
-				Expect(getNetworkDeviceModaliasData(deviceName)).To(BeNil())
+				Expect(subject.GetNetworkDeviceModaliasData(deviceName)).To(BeNil())
 			})
 
 			It("returns nil if modalias string wrong length", func() {
 				modalStr := "pci:tooshort"
 				Expect(os.WriteFile(filepath.Join(pciDeviceDir, "modalias"), []byte(modalStr), 0644)).To(Succeed())
 
-				Expect(getNetworkDeviceModaliasData(deviceName)).To(BeNil())
+				Expect(subject.GetNetworkDeviceModaliasData(deviceName)).To(BeNil())
 			})
 
 			It("returns nil if modalias string not for pci device", func() {
 				modalStr := "usb:v1D6Bp0001d0206dc09dsc00dp00ic09isc00ip00"
 				Expect(os.WriteFile(filepath.Join(pciDeviceDir, "modalias"), []byte(modalStr), 0644)).To(Succeed())
 
-				Expect(getNetworkDeviceModaliasData(deviceName)).To(BeNil())
+				Expect(subject.GetNetworkDeviceModaliasData(deviceName)).To(BeNil())
 			})
 		})
 	})

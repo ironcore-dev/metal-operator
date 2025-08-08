@@ -16,10 +16,42 @@ func isSLAAC(ip string) bool {
 	return strings.Contains(ip, "ff:fe")
 }
 
+type NIC interface {
+	Interfaces() ([]net.Interface, error)
+	Addrs(iface *net.Interface) ([]net.Addr, error)
+}
+
+type nic struct{}
+
+func NewNIC() NIC {
+	return &nic{}
+}
+
+func (nic *nic) Interfaces() ([]net.Interface, error) {
+	return net.Interfaces()
+}
+
+func (nic *nic) Addrs(iface *net.Interface) ([]net.Addr, error) {
+	return iface.Addrs()
+}
+
+type NetworkDataCollector interface {
+	CollectNetworkData() ([]registry.NetworkInterface, error)
+}
+
+type networkDataCollector struct {
+	netInterfaces NIC
+	linuxNetData  LinuxNetworkData
+}
+
+func NewNetworkDataCollector(netInterfaces NIC, linuxNetData LinuxNetworkData) NetworkDataCollector {
+	return &networkDataCollector{netInterfaces: netInterfaces, linuxNetData: linuxNetData}
+}
+
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,
 // ignoring loopback and tunnel (tun) devices.
-var collectNetworkData = func() ([]registry.NetworkInterface, error) {
-	interfaces, err := net.Interfaces()
+func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface, error) {
+	interfaces, err := n.netInterfaces.Interfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +67,7 @@ var collectNetworkData = func() ([]registry.NetworkInterface, error) {
 			continue
 		}
 
-		addrs, err := iface.Addrs()
+		addrs, err := n.netInterfaces.Addrs(&iface)
 		if err != nil {
 			return nil, err
 		}
@@ -58,9 +90,9 @@ var collectNetworkData = func() ([]registry.NetworkInterface, error) {
 				continue
 			}
 
-			pciAddress := getNetworkDevicePCIAddress(iface.Name)
-			speed := getNetworkDeviceSpeed(iface.Name)
-			deviceData := getNetworkDeviceModaliasData(iface.Name)
+			pciAddress := n.linuxNetData.GetNetworkDevicePCIAddress(iface.Name)
+			speed := n.linuxNetData.GetNetworkDeviceSpeed(iface.Name)
+			deviceData := n.linuxNetData.GetNetworkDeviceModaliasData(iface.Name)
 
 			model := ""
 			if deviceData != nil {

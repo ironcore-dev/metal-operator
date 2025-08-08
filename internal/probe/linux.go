@@ -28,7 +28,20 @@ type deviceModaliasData struct {
 	progIface    string
 }
 
-func getNetworkDeviceSpeed(device string) string {
+type LinuxNetworkData interface {
+	GetNetworkDeviceSpeed(device string) string
+	GetNetworkDevicePath(device string) string
+	GetNetworkDevicePCIAddress(device string) string
+	GetNetworkDeviceModaliasData(device string) *deviceModaliasData
+}
+
+type linuxNetworkData struct{}
+
+func NewLinux() LinuxNetworkData {
+	return &linuxNetworkData{}
+}
+
+func (l *linuxNetworkData) GetNetworkDeviceSpeed(device string) string {
 	speed, err := os.ReadFile(filepath.Join(pathSysClassNet, device, "speed"))
 	if err != nil {
 		return ""
@@ -36,7 +49,7 @@ func getNetworkDeviceSpeed(device string) string {
 	return strings.TrimSpace(string(speed))
 }
 
-func getNetworkDevicePath(device string) string {
+func (l *linuxNetworkData) GetNetworkDevicePath(device string) string {
 	netDeviceLink, err := os.Readlink(filepath.Join(pathSysClassNet, device)) // e.g., ../../devices/pci0000:00/0000:00:1f.6/net/eth0
 	if err != nil {
 		return ""
@@ -55,8 +68,8 @@ func getNetworkDevicePath(device string) string {
 	return filepath.Clean(filepath.Join(devicePath, deviceLink)) // e.g., /sys/devices/pci0000:00/0000:00:1f.6
 }
 
-func getNetworkDevicePCIAddress(device string) string {
-	devicePath := getNetworkDevicePath(device)
+func (l *linuxNetworkData) GetNetworkDevicePCIAddress(device string) string {
+	devicePath := l.GetNetworkDevicePath(device)
 	if devicePath == "" {
 		return ""
 	}
@@ -73,8 +86,8 @@ func getNetworkDevicePCIAddress(device string) string {
 	return filepath.Base(devicePath) // e.g., 0000:00:1f.6
 }
 
-func getNetworkDeviceModaliasData(device string) *deviceModaliasData {
-	pciAddress := getNetworkDevicePCIAddress(device)
+func (l *linuxNetworkData) GetNetworkDeviceModaliasData(device string) *deviceModaliasData {
+	pciAddress := l.GetNetworkDevicePCIAddress(device)
 	if pciAddress == "" {
 		return nil
 	}

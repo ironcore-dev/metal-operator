@@ -11,14 +11,14 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 )
 
-// IsSLAAC checks if the given IPv6 address is a SLAAC address.
-func IsSLAAC(ip string) bool {
+// isSLAAC checks if the given IPv6 address is a SLAAC address.
+func isSLAAC(ip string) bool {
 	return strings.Contains(ip, "ff:fe")
 }
 
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,
 // ignoring loopback and tunnel (tun) devices.
-func collectNetworkData() ([]registry.NetworkInterface, error) {
+var collectNetworkData = func() ([]registry.NetworkInterface, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 			}
 
 			// Filter out SLAAC addresses
-			if ip.To4() == nil && IsSLAAC(ip.String()) {
+			if ip.To4() == nil && isSLAAC(ip.String()) {
 				continue
 			}
 

@@ -90,16 +90,16 @@ func getNetworkDeviceModaliasData(device string) *deviceModaliasData {
 	}
 
 	// e.g, /sys/devices/pci0000:00/0000:00:03.0/0000:03:00.0/modalias
-	// -> pci:v000010DEd00001C82sv00001043sd00008613bc03sc00i00
+	// -> pci:v00008086d000024DBsv0000103Csd0000006Abc01sc01i8A
 	//
 	// pci -- PCI device
-	// v000010DE -- PCI vendor ID
-	// d00001C82 -- PCI device ID (the product/model ID)
-	// sv00001043 -- PCI subsystem vendor ID
-	// sd00008613 -- PCI subsystem device ID (subdevice product/model ID)
-	// bc03 -- PCI base class
-	// sc00 -- PCI subclass
-	// i00 -- programming interface
+	// v00008086 -- PCI vendor ID
+	// d000024DB -- PCI device ID (the product/model ID)
+	// sv0000103C -- PCI subsystem vendor ID
+	// sd0000006A -- PCI subsystem device ID (subdevice product/model ID)
+	// bc01 -- PCI base class
+	// sc01 -- PCI subclass
+	// i8A -- programming interface
 
 	if strings.ToLower(modalias[0:3]) != "pci" {
 		return nil

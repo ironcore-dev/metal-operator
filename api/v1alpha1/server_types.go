@@ -294,15 +294,15 @@ type NetworkInterface struct {
 
 	// PCIAddress is the PCI address of the network interface.
 	// +optional
-	PCIAddress string `json:"pciAddress"`
+	PCIAddress string `json:"pciAddress,omitempty"`
 
 	// Model is the model of the network interface.
 	// +optional
-	Model string `json:"model"`
+	Model string `json:"model,omitempty"`
 
 	// Speed is the speed of the network interface
 	// +optional
-	Speed string `json:"speed"`
+	Speed string `json:"speed,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive

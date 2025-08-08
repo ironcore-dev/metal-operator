@@ -174,20 +174,20 @@ var _ = Describe("Linux network device probe functions", func() {
 			})
 
 			It("returns modalias data for valid PCI device", func() {
-				modalStr := "pci:v000010DEd00001C82sv00001043sd00008613bc03sc00i00"
+				modalStr := "pci:v00008086d000024DBsv0000103Csd0000006Abc01sc01i8A"
 				Expect(modalStr).To(HaveLen(53))
 				Expect(os.WriteFile(filepath.Join(pciDeviceDir, "modalias"), []byte(modalStr), 0644)).To(Succeed())
 
 				data := getNetworkDeviceModaliasData(deviceName)
 
 				Expect(data).NotTo(BeNil())
-				Expect(data.vendorID).To(Equal("10de"))
-				Expect(data.productID).To(Equal("1c82"))
-				Expect(data.subvendorID).To(Equal("1043"))
-				Expect(data.subproductID).To(Equal("8613"))
-				Expect(data.class).To(Equal("03"))
-				Expect(data.subclass).To(Equal("00"))
-				Expect(data.progIface).To(Equal("00"))
+				Expect(data.vendorID).To(Equal("8086"))
+				Expect(data.productID).To(Equal("24db"))
+				Expect(data.subvendorID).To(Equal("103c"))
+				Expect(data.subproductID).To(Equal("006a"))
+				Expect(data.class).To(Equal("01"))
+				Expect(data.subclass).To(Equal("01"))
+				Expect(data.progIface).To(Equal("8a"))
 			})
 
 			It("returns nil if modalias file is missing", func() {

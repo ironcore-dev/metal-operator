@@ -40,12 +40,12 @@ type NetworkDataCollector interface {
 }
 
 type networkDataCollector struct {
-	nic          NIC
-	linuxNetData LinuxNetworkData
+	nic   NIC
+	linux LinuxNetworkData
 }
 
-func NewNetworkDataCollector(nic NIC, linuxNetData LinuxNetworkData) NetworkDataCollector {
-	return &networkDataCollector{nic: nic, linuxNetData: linuxNetData}
+func NewNetworkDataCollector(nic NIC, linux LinuxNetworkData) NetworkDataCollector {
+	return &networkDataCollector{nic: nic, linux: linux}
 }
 
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,
@@ -90,9 +90,9 @@ func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface
 				continue
 			}
 
-			pciAddress := n.linuxNetData.GetNetworkDevicePCIAddress(iface.Name)
-			speed := n.linuxNetData.GetNetworkDeviceSpeed(iface.Name)
-			deviceData := n.linuxNetData.GetNetworkDeviceModaliasData(iface.Name)
+			pciAddress := n.linux.GetNetworkDevicePCIAddress(iface.Name)
+			speed := n.linux.GetNetworkDeviceSpeed(iface.Name)
+			deviceData := n.linux.GetNetworkDeviceModaliasData(iface.Name)
 
 			model := ""
 			if deviceData != nil {

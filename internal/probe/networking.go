@@ -40,18 +40,18 @@ type NetworkDataCollector interface {
 }
 
 type networkDataCollector struct {
-	netInterfaces NIC
-	linuxNetData  LinuxNetworkData
+	nic          NIC
+	linuxNetData LinuxNetworkData
 }
 
-func NewNetworkDataCollector(netInterfaces NIC, linuxNetData LinuxNetworkData) NetworkDataCollector {
-	return &networkDataCollector{netInterfaces: netInterfaces, linuxNetData: linuxNetData}
+func NewNetworkDataCollector(nic NIC, linuxNetData LinuxNetworkData) NetworkDataCollector {
+	return &networkDataCollector{nic: nic, linuxNetData: linuxNetData}
 }
 
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,
 // ignoring loopback and tunnel (tun) devices.
 func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface, error) {
-	interfaces, err := n.netInterfaces.Interfaces()
+	interfaces, err := n.nic.Interfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface
 			continue
 		}
 
-		addrs, err := n.netInterfaces.Addrs(&iface)
+		addrs, err := n.nic.Addrs(&iface)
 		if err != nil {
 			return nil, err
 		}

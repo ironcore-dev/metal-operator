@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package probe
 
 import (
@@ -140,7 +143,7 @@ var _ = Describe("networking.go", func() {
 			Expect(result[0].MACAddress).To(Equal("00:11:22:33:44:55"))
 			Expect(result[0].PCIAddress).To(Equal("0000:00:1f.6"))
 			Expect(result[0].Model).To(Equal("8086 15b8"))
-			Expect(result[0].Speed).To(Equal(1000))
+			Expect(result[0].Speed).To(Equal("1000"))
 
 			Expect(result[1].IPAddress).To(Equal("2001:db8::1")) // non-SLAAC IPv6
 		})

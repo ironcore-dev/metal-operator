@@ -925,6 +925,40 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	return err
 }
 
+func (r *BiosSettingsReconciler) ensureNoStrandedStatus(
+	ctx context.Context,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) (bool, error) {
+
+	removeIndex := func(s []metalv1alpha1.BIOSSettingsFlowStatus, index int) []metalv1alpha1.BIOSSettingsFlowStatus {
+		return append(s[:index], s[index+1:]...)
+	}
+
+	// Incase the settings Spec got changed during Inprogress and left behind Stale states clean it up.
+	settingsNamePriorityMap := map[string]int32{}
+	biosSettingsBase := biosSettings.DeepCopy()
+	toDelete := map[int]struct{}{}
+	for _, settings := range biosSettings.Spec.SettingsFlow {
+		settingsNamePriorityMap[settings.Name] = settings.Priority
+	}
+	for idx, flowStatus := range biosSettings.Status.FlowState {
+		if value, ok := settingsNamePriorityMap[flowStatus.Name]; !ok || value != flowStatus.Priority {
+			toDelete[idx] = struct{}{}
+		}
+	}
+	for indexToDelete := range toDelete {
+		biosSettings.Status.FlowState = removeIndex(biosSettings.Status.FlowState, indexToDelete)
+	}
+
+	if len(toDelete) > 0 {
+		if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
+			return false, fmt.Errorf("failed to patch BIOSSettings FlowState status: %w", err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 func (r *BiosSettingsReconciler) handleSettingAppliedState(
 	ctx context.Context,
 	log logr.Logger,
@@ -934,6 +968,10 @@ func (r *BiosSettingsReconciler) handleSettingAppliedState(
 ) (ctrl.Result, error) {
 	// clean up maintenance crd and references.
 	if err := r.cleanupServerMaintenanceReferences(ctx, log, biosSettings); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if requeue, err := r.ensureNoStrandedStatus(ctx, biosSettings); requeue || err != nil {
 		return ctrl.Result{}, err
 	}
 

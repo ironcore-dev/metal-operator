@@ -38,9 +38,9 @@ type SettingsFlowItem struct {
 	// +kubebuilder:validation:MaxLength=1000
 	Name string `json:"name"`
 
-	// SettingsMap contains software (eg: BIOS, BMC) settings as map
+	// Settings contains software (eg: BIOS, BMC) settings as map
 	// +optional
-	SettingsMap map[string]string `json:"settings,omitempty"`
+	Settings map[string]string `json:"settings,omitempty"`
 
 	// Priority defines the order of applying the settings
 	// any int greater than 0. lower number have higher Priority (ie; lower number is applied first)

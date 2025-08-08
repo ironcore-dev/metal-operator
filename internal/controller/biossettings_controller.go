@@ -363,7 +363,7 @@ func (r *BiosSettingsReconciler) handleSettingPendingState(
 			duplicateName = append(duplicateName, settings.Name)
 		}
 		allNames[settings.Name] = struct{}{}
-		for key := range settings.SettingsMap {
+		for key := range settings.Settings {
 			if _, ok := allSettingsNames[key]; ok {
 				duplicateSettingsNames = append(duplicateSettingsNames, key)
 			}
@@ -487,7 +487,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 		// if the state is InProgress, go ahead and apply/Verify the settings
 		if currentSettingsFlowStatus.State != metalv1alpha1.BIOSSettingsFlowStateInProgress {
 			// else, check if the settings is still as expected, and proceed.
-			settingDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, settings.SettingsMap, server)
+			settingDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, settings.Settings, server)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed get current Settings difference. current Settings Name: %v, error: %v", settings.Name, err)
 			}
@@ -531,8 +531,8 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 		}
 
 		// apply the current settings
-		if ok, err := r.applySettingUpdate(ctx, log, bmcClient, biosSettings, &settings, currentSettingsFlowStatus, server); ok {
-			if requeue, err := r.VerifySettingsUpdateComplete(ctx, log, bmcClient, biosSettings, &settings, currentSettingsFlowStatus, server); requeue {
+		if ok, err := r.applySettingUpdate(ctx, log, bmcClient, biosSettings, &settings, currentSettingsFlowStatus, server); ok && err == nil {
+			if requeue, err := r.VerifySettingsUpdateComplete(ctx, log, bmcClient, biosSettings, &settings, currentSettingsFlowStatus, server); requeue && err == nil {
 				return ctrl.Result{RequeueAfter: r.ResyncInterval}, err
 			}
 			return ctrl.Result{}, err
@@ -613,7 +613,7 @@ func (r *BiosSettingsReconciler) applySettingUpdate(
 	}
 	if !condFound {
 		log.V(1).Info("Verify if the current Settings needs reboot of server")
-		settingsDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, currentSettings.SettingsMap, server)
+		settingsDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, currentSettings.Settings, server)
 		if err != nil {
 			return false, fmt.Errorf("failed to get BIOS settings difference: %w", err)
 		}
@@ -742,7 +742,7 @@ func (r *BiosSettingsReconciler) VerifySettingsUpdateComplete(
 	}
 	if verifySettingUpdate.Status != metav1.ConditionTrue {
 		// make sure the setting has actually applied.
-		settingsDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, currentSettings.SettingsMap, server)
+		settingsDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, currentSettings.Settings, server)
 
 		if err != nil {
 			return false, fmt.Errorf("failed to get BIOS settings: %w", err)
@@ -852,7 +852,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	server *metalv1alpha1.Server,
 	issueBiosUpdate *metav1.Condition,
 ) error {
-	settingsDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, currentSettings.SettingsMap, server)
+	settingsDiff, err := r.getCurrentSettingDifference(ctx, log, bmcClient, currentSettings.Settings, server)
 	if err != nil {
 		return fmt.Errorf("failed to get BIOS settings difference: %w", err)
 	}
@@ -1067,7 +1067,7 @@ func (r *BiosSettingsReconciler) getBIOSVersionAndSettingDifference(
 
 	completeSettings := make(map[string]string)
 	for _, settings := range biosSettings.Spec.SettingsFlow {
-		for key, value := range settings.SettingsMap {
+		for key, value := range settings.Settings {
 			completeSettings[key] = value
 		}
 	}
@@ -1253,7 +1253,7 @@ func (r *BiosSettingsReconciler) patchBiosSettingsRefOnServer(
 	server *metalv1alpha1.Server,
 	biosSettingsReference *corev1.LocalObjectReference,
 ) (err error) {
-	if server.Spec.BIOSSettingsRef == biosSettingsReference {
+	if biosSettingsReference != nil && server.Spec.BIOSSettingsRef != nil && server.Spec.BIOSSettingsRef.Name == biosSettingsReference.Name {
 		return nil
 	}
 
@@ -1371,7 +1371,7 @@ func (r *BiosSettingsReconciler) updateBiosSettingsFlowStatus(
 			}
 			currentIdx = idx
 			continue
-		} else if currentSettingsFlowStatus.State == metalv1alpha1.BIOSSettingsFlowStateInProgress &&
+		} else if state == metalv1alpha1.BIOSSettingsFlowStateInProgress &&
 			flowStatus.State == metalv1alpha1.BIOSSettingsFlowStateInProgress {
 			// if current is InProgress, move all other settings state to Pending state.
 			// This can happen when we suddenly detect settings change in actual BMC and have to start over the settings

@@ -151,8 +151,8 @@ spec:
                     settings:
                       additionalProperties:
                         type: string
-                      description: 'SettingsMap contains software (eg: BIOS, BMC)
-                        settings as map'
+                      description: 'Settings contains software (eg: BIOS, BMC) settings
+                        as map'
                       type: object
                   required:
                   - name

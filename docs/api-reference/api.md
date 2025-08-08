@@ -4706,7 +4706,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>Settings contains software (eg: BIOS, BMC) settings as map</p>
 </td>
 </tr>
 <tr>

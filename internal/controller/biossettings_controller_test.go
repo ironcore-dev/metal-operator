@@ -5,7 +5,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -96,9 +95,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					SettingsMap: biosSetting,
-					Priority:    1,
-					Name:        "one",
+					Settings: biosSetting,
+					Priority: 1,
+					Name:     "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -144,9 +143,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version: defaultMockUpServerBiosVersion + "2",
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					SettingsMap: biosSetting,
-					Priority:    1,
-					Name:        "one",
+					Settings: biosSetting,
+					Priority: 1,
+					Name:     "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -189,9 +188,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					SettingsMap: biosSetting,
-					Priority:    1,
-					Name:        "one",
+					Settings: biosSetting,
+					Priority: 1,
+					Name:     "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -260,9 +259,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					SettingsMap: biosSetting,
-					Priority:    1,
-					Name:        "one",
+					Settings: biosSetting,
+					Priority: 1,
+					Name:     "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -372,9 +371,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					SettingsMap: biosSetting,
-					Priority:    1,
-					Name:        "one",
+					Settings: biosSetting,
+					Priority: 1,
+					Name:     "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
@@ -472,9 +471,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					SettingsMap: biosSetting,
-					Priority:    1,
-					Name:        "one",
+					Settings: biosSetting,
+					Priority: 1,
+					Name:     "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -560,9 +559,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				Version: "2.45.455b66-rev4",
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					SettingsMap: biosSetting,
-					Priority:    1,
-					Name:        "one",
+					Settings: biosSetting,
+					Priority: 1,
+					Name:     "one",
 				}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -701,14 +700,14 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 					{
-						Priority:    100,
-						SettingsMap: map[string]string{"abc": "10"},
-						Name:        "100",
+						Priority: 100,
+						Settings: map[string]string{"abc": "10"},
+						Name:     "100",
 					},
 					{
-						Priority:    1000,
-						SettingsMap: map[string]string{"fooreboot": "100"},
-						Name:        "1000",
+						Priority: 1000,
+						Settings: map[string]string{"fooreboot": "100"},
+						Name:     "1000",
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
@@ -718,7 +717,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
-		Eventually(Object(biosSettings)).WithTimeout(5 * time.Second).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 		By("Ensuring that the BIOSSettings conditions are updated")
@@ -740,14 +739,14 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 					{
-						Priority:    100,
-						SettingsMap: map[string]string{"fooreboot": "10"},
-						Name:        "100",
+						Priority: 100,
+						Settings: map[string]string{"fooreboot": "10"},
+						Name:     "100",
 					},
 					{
-						Priority:    1000,
-						SettingsMap: map[string]string{"fooreboot": "100"},
-						Name:        "1000",
+						Priority: 1000,
+						Settings: map[string]string{"fooreboot": "100"},
+						Name:     "1000",
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
@@ -789,14 +788,14 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 					{
-						Priority:    100,
-						SettingsMap: map[string]string{"abc": "10"},
-						Name:        "100",
+						Priority: 100,
+						Settings: map[string]string{"abc": "10"},
+						Name:     "100",
 					},
 					{
-						Priority:    1000,
-						SettingsMap: map[string]string{"fooreboot": "100"},
-						Name:        "100",
+						Priority: 1000,
+						Settings: map[string]string{"fooreboot": "100"},
+						Name:     "100",
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
@@ -832,7 +831,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Expect(k8sClient.Delete(ctx, biosSettings2)).To(Succeed())
 	})
 
-	It("should successfully apply sequence of different settings", func(ctx SpecContext) {
+	It("should successfully apply sequence of different settings and reconcile from applied state", func(ctx SpecContext) {
 
 		By("Creating a BIOSSetting sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -844,14 +843,14 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				Version: defaultMockUpServerBiosVersion,
 				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 					{
-						Priority:    100,
-						SettingsMap: map[string]string{"abc": "foo-bar"},
-						Name:        "100",
+						Priority: 100,
+						Settings: map[string]string{"abc": "foo-bar"},
+						Name:     "100",
 					},
 					{
-						Priority:    1000,
-						SettingsMap: map[string]string{"fooreboot": "100"},
-						Name:        "1000",
+						Priority: 1000,
+						Settings: map[string]string{"fooreboot": "100"},
+						Name:     "1000",
 					},
 				},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
@@ -861,50 +860,26 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
 		By("Ensuring that the BIOSSettings conditions are updated")
 		ensureBiosSettingsFlowCondition(biosSettings)
 
-		By("Deleting the BIOSSettings")
-		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
-	})
+		// should reconcile again from the Applied state when the settings has been changed
+		Eventually(Update(biosSettings, func() {
+			biosSettings.Spec.SettingsFlow[1].Settings = map[string]string{"fooreboot": "1000"}
+		})).Should(Succeed())
 
-	It("should successfully apply sequence of different settings", func(ctx SpecContext) {
-
-		By("Creating a BIOSSetting sequence of settings")
-		biosSettings := &metalv1alpha1.BIOSSettings{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-setting-flow-differnet-",
-			},
-			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority:    100,
-						SettingsMap: map[string]string{"abc": "foo-bar"},
-						Name:        "100",
-					},
-					{
-						Priority:    1000,
-						SettingsMap: map[string]string{"fooreboot": "100"},
-						Name:        "1000",
-					},
-				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-			},
-		}
-		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+		By("Ensuring that the BIOSSetting Object has moved to out of completed")
+		Eventually(Object(biosSettings)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
+		)
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
-		By("Ensuring that the BIOSSettings conditions are updated")
-		ensureBiosSettingsFlowCondition(biosSettings)
+		)
 
 		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
@@ -952,7 +927,7 @@ func ensureBiosSettingsFlowCondition(
 
 	// assumption, for unit testing the order of priority of settings in spec is ascending
 	for idx, settings := range biosSettings.Spec.SettingsFlow {
-		By(fmt.Sprintf("Ensuring the BIOSSettings Object has applied following settings %v", settings.SettingsMap))
+		By(fmt.Sprintf("Ensuring the BIOSSettings Object has applied following settings %v", settings.Settings))
 		Eventually(
 			func(g Gomega) {
 				g.Expect(Get(biosSettings)()).To(Succeed())

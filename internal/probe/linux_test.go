@@ -7,16 +7,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-func TestLinuxProbe(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Linux Probe Suite")
-}
 
 var _ = Describe("Linux network device probe functions", func() {
 	var (

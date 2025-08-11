@@ -1383,6 +1383,7 @@ func (r *BiosSettingsReconciler) updateBiosSettingsFlowStatus(
 		// if the currentFlowStatus is missing, add it.
 		currentSettingsFlowStatus.State = state
 		biosSettings.Status.FlowState = append(biosSettings.Status.FlowState, *currentSettingsFlowStatus)
+		currentIdx = 0
 	}
 
 	if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {

@@ -2584,6 +2584,18 @@ string
 <p>Speed is the speed of the network interface</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>revision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Revision is the revision of the network interface.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Phase">Phase

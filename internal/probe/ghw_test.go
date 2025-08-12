@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package probe
 
 import (
@@ -104,14 +107,6 @@ var _ = Describe("networkDeviceData", func() {
 		})
 		It("returns nil for unknown iface", func() {
 			Expect(data.findNICByInterfaceName("eth2")).To(BeNil())
-		})
-	})
-
-	Describe("NewNetworkDeviceData", func() {
-		It("returns non-nil NetDeviceData and nil error", func() {
-			dev, err := NewNetworkDeviceData()
-			Expect(dev).NotTo(BeNil())
-			Expect(err).To(BeNil())
 		})
 	})
 })

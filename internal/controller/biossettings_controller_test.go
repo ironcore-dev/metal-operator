@@ -589,6 +589,48 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
 		)
 	})
+
+	It("should allow retry using annotation", func(ctx SpecContext) {
+		// settings which does not reboot. mocked at
+		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
+		BIOSSetting := make(map[string]string)
+		BIOSSetting["fooreboot"] = "10"
+
+		By("Creating a BIOSSetting")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-from-server-avail",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				Version:                 defaultMockUpServerBiosVersion,
+				SettingsMap:             BIOSSetting,
+				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Moving to Failed state")
+		Eventually(UpdateStatus(biosSettings, func() {
+			biosSettings.Status.State = metalv1alpha1.BIOSSettingsStateFailed
+		})).Should(Succeed())
+
+		Eventually(Update(biosSettings, func() {
+			biosSettings.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
+			}
+		})).Should(Succeed())
+
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
+		))
+
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
+		))
+	})
 })
 
 func ensureBiosSettingsCondition(

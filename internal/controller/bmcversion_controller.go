@@ -252,6 +252,20 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 		// clean up maintenance crd and references and mark completed if version matches.
 		return ctrl.Result{}, r.checkVersionAndTransistionState(ctx, log, bmcVersion, bmcClient, bmc)
 	case metalv1alpha1.BMCVersionStateFailed:
+		if shouldRetryReconciliation(bmcVersion) {
+			log.V(1).Info("Retrying BMCVersion reconciliation")
+
+			bmcVersionBase := bmcVersion.DeepCopy()
+			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
+			bmcVersion.Status.Conditions = nil
+			annotations := bmcVersion.GetAnnotations()
+			delete(annotations, metalv1alpha1.OperationAnnotation)
+			bmcVersion.SetAnnotations(annotations)
+			if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion status for retrying: %w", err)
+			}
+			return ctrl.Result{}, nil
+		}
 		log.V(1).Info("Failed to upgrade BMCVersion", "ctx", ctx, "BMCVersion", bmcVersion, "BMC", bmc.Name)
 		return ctrl.Result{}, nil
 	}
@@ -712,6 +726,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 	// find the servers which has maintenance and do not create maintenance for them.
 	serverWithMaintenances := make(map[string]bool, len(servers))
 	if bmcVersion.Spec.ServerMaintenanceRefs != nil {
+		// we fetch all the references already in the Spec (self created/provided by user)
 		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcVersion.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return false, errors.Join(err...)
@@ -719,6 +734,17 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 		for _, serverMaintenance := range serverMaintenances {
 			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
 		}
+	}
+
+	// we also fetch all the references owned by this Resource.
+	// This is needed in case we are reconciling before we have patched the references.
+	// possible when we reconcile after CreateOrPatch, before ref have been written
+	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmcVersion, serverMaintenancesList); err != nil {
+		return false, err
+	}
+	for _, serverMaintenance := range serverMaintenancesList.Items {
+		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
 	}
 
 	var errs []error
@@ -729,8 +755,8 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: r.ManagerNamespace,
-				Name:      fmt.Sprintf("%s-%s", bmcVersion.Name, server.Name),
+				Namespace:    r.ManagerNamespace,
+				GenerateName: "bmc-version-",
 			},
 		}
 
@@ -999,7 +1025,7 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByServerRefs(
 	host := obj.(*metalv1alpha1.Server)
 
 	// return early if hosts are not required states
-	if host.Status.State != metalv1alpha1.ServerStateMaintenance {
+	if host.Status.State != metalv1alpha1.ServerStateMaintenance || host.Spec.ServerMaintenanceRef == nil {
 		return nil
 	}
 

@@ -282,8 +282,7 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 	case metalv1alpha1.BMCSettingsStateApplied:
 		return ctrl.Result{}, r.handleSettingAppliedState(ctx, log, bmcSetting, BMC, bmcClient)
 	case metalv1alpha1.BMCSettingsStateFailed:
-		r.handleFailedState(ctx, log, bmcSetting, BMC)
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.handleFailedState(ctx, log, bmcSetting, BMC)
 	}
 	log.V(1).Info("Unknown State found", "BMCSettings state", bmcSetting.Status.State)
 	return ctrl.Result{}, nil
@@ -414,10 +413,22 @@ func (r *BMCSettingsReconciler) handleFailedState(
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
-) {
-	log.V(1).Info("Handle failed setting update with no maintenance reference")
+) error {
+	if shouldRetryReconciliation(bmcSetting) {
+		log.V(1).Info("Retrying BMCSettings reconciliation")
+		bmcSettingsBase := bmcSetting.DeepCopy()
+		bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
+		annotations := bmcSetting.GetAnnotations()
+		delete(annotations, metalv1alpha1.OperationAnnotation)
+		bmcSetting.SetAnnotations(annotations)
+		if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingsBase)); err != nil {
+			return fmt.Errorf("failed to patch BMCSettings status for retrying: %w", err)
+		}
+		return nil
+	}
 	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bmc settings maintenance
 	log.V(1).Info("Failed to update BMC setting", "ctx", ctx, "bmcSetting", bmcSetting, "BMC", BMC)
+	return nil
 }
 
 func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
@@ -561,6 +572,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	// if the server maintenance refs are not provided, we will create server maintenance refs for all the servers which are in the BMC.
 	serverWithMaintenances := make(map[string]bool, len(servers))
 	if bmcSetting.Spec.ServerMaintenanceRefs != nil {
+		// we fetch all the references already in the Spec (self created/provided by user)
 		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return false, errors.Join(err...)
@@ -568,6 +580,17 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		for _, serverMaintenance := range serverMaintenances {
 			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
 		}
+	}
+
+	// we also fetch all the references owned by this Resource.
+	// This is needed in case we are reconciling before we have patched the references.
+	// possible when we reconcile after CreateOrPatch, before ref have been written
+	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmcSetting, serverMaintenancesList); err != nil {
+		return false, err
+	}
+	for _, serverMaintenance := range serverMaintenancesList.Items {
+		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
 	}
 
 	var errs []error
@@ -578,10 +601,10 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: r.ManagerNamespace,
-				Name:      fmt.Sprintf("%s-%s", bmcSetting.Name, server.Name),
-			}}
-
+				Namespace:    r.ManagerNamespace,
+				GenerateName: "bmc-settings-",
+			},
+		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, serverMaintenance, func() error {
 			serverMaintenance.Spec.Policy = bmcSetting.Spec.ServerMaintenancePolicy
 			serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOn
@@ -602,7 +625,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			ServerMaintenanceRefs,
 			metalv1alpha1.ServerMaintenanceRefItem{
 				ServerMaintenanceRef: &corev1.ObjectReference{
-					APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+					APIVersion: metalv1alpha1.GroupVersion.String(),
 					Kind:       "ServerMaintenance",
 					Namespace:  serverMaintenance.Namespace,
 					Name:       serverMaintenance.Name,

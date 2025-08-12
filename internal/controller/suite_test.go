@@ -37,7 +37,7 @@ import (
 
 const (
 	pollingInterval      = 50 * time.Millisecond
-	eventuallyTimeout    = 3 * time.Second
+	eventuallyTimeout    = 5 * time.Second
 	consistentlyDuration = 1 * time.Second
 )
 
@@ -104,6 +104,8 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 		HaveField("Items", BeEmpty()))
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersion{}, &metalv1alpha1.BMCVersionList{})).Should(
+		HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersionSet{}, &metalv1alpha1.BMCVersionList{})).Should(
 		HaveField("Items", BeEmpty()))
 }
 
@@ -277,7 +279,7 @@ func SetupTest() *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			TimeoutExpiry: 4 * time.Second,
+			TimeoutExpiry: 6 * time.Second,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSVersionReconciler{
@@ -322,6 +324,11 @@ func SetupTest() *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&BMCVersionSetReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		go func() {

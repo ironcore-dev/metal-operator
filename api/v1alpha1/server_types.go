@@ -189,6 +189,9 @@ type ServerStatus struct {
 	// +optional
 	Manufacturer string `json:"manufacturer,omitempty"`
 
+	// BIOSVersion is the version of the server's BIOS.
+	BIOSVersion string `json:"biosVersion,omitempty"`
+
 	// Model is the model of the server.
 	// +optional
 	Model string `json:"model,omitempty"`

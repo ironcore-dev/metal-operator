@@ -130,6 +130,12 @@ var _ = Describe("BMCSettings Webhook", func() {
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
 			})).Should(Succeed())
+			By("mock servermaintenance Creation maintenance")
+			Eventually(Update(BMCSettingsV1, func() {
+				BMCSettingsV1.Spec.ServerMaintenanceRefs = []metalv1alpha1.ServerMaintenanceRefItem{
+					{ServerMaintenanceRef: &v1.ObjectReference{Name: "foobar-Maintenance"}},
+				}
+			})).Should(Succeed())
 			By("Updating an bmcSettings V1 spec, should fail to update when inProgress")
 			bmcSettingsV1Updated := BMCSettingsV1.DeepCopy()
 			bmcSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}

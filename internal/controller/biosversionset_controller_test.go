@@ -15,6 +15,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BIOSVersionSet Controller", func() {
@@ -118,6 +119,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 
 		AfterEach(func(ctx SpecContext) {
 			DeleteAllMetalResources(ctx, ns.Name)
+			bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
 		})
 
 		It("should successfully reconcile the resource", func(ctx SpecContext) {
@@ -208,7 +210,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, biosVersionSet)).To(Succeed())
 		})
 
-		It("should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
+		It("should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
 			By("Create resource")
 			biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 				ObjectMeta: metav1.ObjectMeta{

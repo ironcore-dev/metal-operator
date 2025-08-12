@@ -33,10 +33,12 @@ rules:
   resources:
   - biossettings
   - biosversions
+  - biosversionsets
   - bmcs
   - bmcsecrets
   - bmcsettings
   - bmcversions
+  - bmcversionsets
   - endpoints
   - serverbootconfigurations
   - serverclaims
@@ -56,10 +58,12 @@ rules:
   resources:
   - biossettings/finalizers
   - biosversions/finalizers
+  - biosversionsets/finalizers
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - bmcsettings/finalizers
   - bmcversions/finalizers
+  - bmcversionsets/finalizers
   - endpoints/finalizers
   - serverbootconfigurations/finalizers
   - serverclaims/finalizers
@@ -72,10 +76,12 @@ rules:
   resources:
   - biossettings/status
   - biosversions/status
+  - biosversionsets/status
   - bmcs/status
   - bmcsecrets/status
   - bmcsettings/status
   - bmcversions/status
+  - bmcversionsets/status
   - endpoints/status
   - serverbootconfigurations/status
   - serverclaims/status

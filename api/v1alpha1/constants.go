@@ -8,6 +8,8 @@ const (
 	OperationAnnotation = "metal.ironcore.dev/operation"
 	// OperationAnnotationIgnore skips the reconciliation of a resource if set to true.
 	OperationAnnotationIgnore = "ignore"
+	// OperationAnnotationRetry restarts the reconciliation of a resource from failed state -> initial state.
+	OperationAnnotationRetry = "retry"
 	// InstanceTypeAnnotation is used to specify the type of Server.
 	InstanceTypeAnnotation = "metal.ironcore.dev/instance-type"
 	// ForceUpdateAnnotation is used to indicate that the spec should be forcefully updated.

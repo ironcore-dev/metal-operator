@@ -959,7 +959,20 @@ func (r *BiosSettingsReconciler) handleFailedState(
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
-	log.V(1).Info("Handle failed setting update with no maintenance reference")
+	if shouldRetryReconciliation(biosSettings) {
+		log.V(1).Info("Retrying BIOSSettings reconciliation")
+		biosSettingsBase := biosSettings.DeepCopy()
+		biosSettings.Status.State = metalv1alpha1.BIOSSettingsStatePending
+		// todo: add FlowState reset after the #403 is merged
+		biosSettings.Status.Conditions = nil
+		annotations := biosSettings.GetAnnotations()
+		delete(annotations, metalv1alpha1.OperationAnnotation)
+		biosSettings.SetAnnotations(annotations)
+		if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for retrying: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
 	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bios settings maintenance
 	log.V(1).Info("Failed to update bios setting", "ctx", ctx, "biosSettings", biosSettings, "server", server)
 	return ctrl.Result{}, nil

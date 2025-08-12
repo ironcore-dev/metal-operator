@@ -472,6 +472,9 @@ spec:
                     pciAddress:
                       description: PCIAddress is the PCI address of the network interface.
                       type: string
+                    revision:
+                      description: Revision is the revision of the network interface.
+                      type: string
                     speed:
                       description: Speed is the speed of the network interface
                       type: string

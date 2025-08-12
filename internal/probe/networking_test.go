@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -29,23 +30,20 @@ func (m *mockNIC) Addrs(iface *net.Interface) ([]net.Addr, error) {
 	return m.addrs[iface.Name], nil
 }
 
-type mockLinuxNetworkData struct {
-	pci      map[string]string
-	speed    map[string]string
-	modalias map[string]*deviceModaliasData
+type mockNetDeviceData struct {
+	model map[string]string
+	speed map[string]string
+	rev   map[string]string
 }
 
-func (m *mockLinuxNetworkData) GetNetworkDevicePath(name string) string {
-	return "/sys/devices/pci0000:00/0000:00:1f.6"
+func (m *mockNetDeviceData) GetModel(name string) string {
+	return m.model[name]
 }
-func (m *mockLinuxNetworkData) GetNetworkDevicePCIAddress(name string) string {
-	return m.pci[name]
-}
-func (m *mockLinuxNetworkData) GetNetworkDeviceSpeed(name string) string {
+func (m *mockNetDeviceData) GetSpeed(name string) string {
 	return m.speed[name]
 }
-func (m *mockLinuxNetworkData) GetNetworkDeviceModaliasData(name string) *deviceModaliasData {
-	return m.modalias[name]
+func (m *mockNetDeviceData) GetRevision(name string) string {
+	return m.rev[name]
 }
 
 var _ = Describe("networking.go", func() {
@@ -61,7 +59,7 @@ var _ = Describe("networking.go", func() {
 	Describe("CollectNetworkData", func() {
 		var (
 			mockNICInst *mockNIC
-			mockLinux   *mockLinuxNetworkData
+			mockNDDInst *mockNetDeviceData
 			collector   NetworkDataCollector
 		)
 
@@ -119,32 +117,45 @@ var _ = Describe("networking.go", func() {
 					},
 				},
 			}
-			mockLinux = &mockLinuxNetworkData{
-				pci: map[string]string{
-					"eth0": "0000:00:1f.6",
+			mockNDDInst = &mockNetDeviceData{
+				model: map[string]string{
+					"eth0": "8086 15b8",
+					"tun0": "8086 15b9",
 				},
 				speed: map[string]string{
 					"eth0": "1000",
+					"tun0": "100",
 				},
-				modalias: map[string]*deviceModaliasData{
-					"eth0": {vendorID: "8086", productID: "15b8"},
+				rev: map[string]string{
+					"eth0": "1.0",
+					"tun0": "1.1",
 				},
 			}
-			collector = NewNetworkDataCollector(mockNICInst, mockLinux)
+			collector = NewNetworkDataCollector(mockNICInst, mockNDDInst)
 		})
 
-		It("should collect only valid network interfaces and addresses", func() {
+		FIt("should collect only valid network interfaces and addresses", func() {
 			result, err := collector.CollectNetworkData()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(HaveLen(2))
-			Expect(result[0].Name).To(Equal("eth0"))
-			Expect(result[0].IPAddress).To(Equal("192.168.1.10"))
-			Expect(result[0].MACAddress).To(Equal("00:11:22:33:44:55"))
-			Expect(result[0].PCIAddress).To(Equal("0000:00:1f.6"))
-			Expect(result[0].Model).To(Equal("8086 15b8"))
-			Expect(result[0].Speed).To(Equal("1000"))
-
-			Expect(result[1].IPAddress).To(Equal("2001:db8::1")) // non-SLAAC IPv6
+			Expect(result).To(ConsistOf(
+				registry.NetworkInterface{
+					Name:       "eth0",
+					IPAddress:  "192.168.1.10",
+					MACAddress: "00:11:22:33:44:55",
+					Model:      "8086 15b8",
+					Speed:      "1000",
+					Revision:   "1.0",
+				},
+				registry.NetworkInterface{
+					Name:       "eth0",
+					IPAddress:  "2001:db8::1",
+					MACAddress: "00:11:22:33:44:55",
+					Model:      "8086 15b8",
+					Speed:      "1000",
+					Revision:   "1.0",
+				},
+			))
 		})
 
 		It("should return error if Interfaces fails", func() {

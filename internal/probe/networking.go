@@ -40,12 +40,12 @@ type NetworkDataCollector interface {
 }
 
 type networkDataCollector struct {
-	nic   NIC
-	linux LinuxNetworkData
+	nic NIC
+	ndd NetDeviceData
 }
 
-func NewNetworkDataCollector(nic NIC, linux LinuxNetworkData) NetworkDataCollector {
-	return &networkDataCollector{nic: nic, linux: linux}
+func NewNetworkDataCollector(nic NIC, ndd NetDeviceData) NetworkDataCollector {
+	return &networkDataCollector{nic: nic, ndd: ndd}
 }
 
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,
@@ -53,7 +53,7 @@ func NewNetworkDataCollector(nic NIC, linux LinuxNetworkData) NetworkDataCollect
 func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface, error) {
 	interfaces, err := n.nic.Interfaces()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get network interfaces: %w", err)
 	}
 
 	var networkInterfaces []registry.NetworkInterface
@@ -90,22 +90,17 @@ func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface
 				continue
 			}
 
-			pciAddress := n.linux.GetNetworkDevicePCIAddress(iface.Name)
-			speed := n.linux.GetNetworkDeviceSpeed(iface.Name)
-			deviceData := n.linux.GetNetworkDeviceModaliasData(iface.Name)
-
-			model := ""
-			if deviceData != nil {
-				model = fmt.Sprintf("%s %s", deviceData.vendorID, deviceData.productID)
-			}
+			model := n.ndd.GetModel(iface.Name)
+			speed := n.ndd.GetSpeed(iface.Name)
+			revision := n.ndd.GetRevision(iface.Name)
 
 			networkInterface := registry.NetworkInterface{
 				Name:       iface.Name,
 				IPAddress:  ip.String(),
 				MACAddress: iface.HardwareAddr.String(),
-				PCIAddress: pciAddress,
 				Model:      model,
 				Speed:      speed,
+				Revision:   revision,
 			}
 			networkInterfaces = append(networkInterfaces, networkInterface)
 		}

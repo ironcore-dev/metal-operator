@@ -34,7 +34,7 @@ func NewAgent(systemUUID, registryURL string, duration time.Duration) *Agent {
 
 // Init initializes the Agent's Server field with network interface data.
 func (a *Agent) Init() error {
-	interfaces, err := NewNetworkDataCollector(NewNIC(), NewLinux()).CollectNetworkData()
+	interfaces, err := NewNetworkDataCollector(NewNIC(), NewNetworkDeviceData()).CollectNetworkData()
 	if err != nil {
 		return err
 	}

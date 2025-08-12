@@ -303,6 +303,10 @@ type NetworkInterface struct {
 	// Speed is the speed of the network interface
 	// +optional
 	Speed string `json:"speed,omitempty"`
+
+	// Revision is the revision of the network interface.
+	// +optional
+	Revision string `json:"revision,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive

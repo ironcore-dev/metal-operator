@@ -15,10 +15,6 @@ type BIOSSettingsTemplate struct {
 
 	// SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
 	// +optional
-	SettingsMap map[string]string `json:"settings,omitempty"`
-
-	// SettingsMap contains software (eg: BIOS, BMC) settings as map
-	// +optional
 	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.

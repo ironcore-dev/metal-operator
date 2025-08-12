@@ -116,15 +116,9 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
-                  settings:
-                    additionalProperties:
-                      type: string
+                  settingsFlow:
                     description: SettingsFlow contains BIOS settings sequence to apply
                       on the BIOS in given order
-                    type: object
-                  settingsFlow:
-                    description: 'SettingsMap contains software (eg: BIOS, BMC) settings
-                      as map'
                     items:
                       properties:
                         name:

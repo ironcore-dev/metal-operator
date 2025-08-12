@@ -594,18 +594,6 @@ string
 </tr>
 <tr>
 <td>
-<code>settings</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>settingsFlow</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
@@ -615,7 +603,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
 </td>
 </tr>
 <tr>

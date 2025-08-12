@@ -57,7 +57,7 @@ func (r *BIOSSettingsSetReconciler) reconcileExists(
 ) (ctrl.Result, error) {
 	// if object is being deleted - reconcile deletion
 	if !biosSettingsSet.DeletionTimestamp.IsZero() {
-		log.V(1).Info("object is being deleted")
+		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, biosSettingsSet)
 	}
 
@@ -104,7 +104,7 @@ func (r *BIOSSettingsSetReconciler) delete(
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("biosSettingsSet is deleted")
+	log.V(1).Info("BIOSSettingsSet is deleted")
 	return ctrl.Result{}, nil
 }
 
@@ -148,12 +148,12 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 	log.V(1).Info("Summary of servers and BIOSSettings", "Server count", len(serverList.Items),
 		"BIOSVersion count", len(ownedBiosSettings.Items))
 
-	if err := r.deleteOrphanBIOSVersions(ctx, log, serverList, ownedBiosSettings); err != nil {
+	if err := r.deleteOrphanBIOSSettings(ctx, log, serverList, ownedBiosSettings); err != nil {
 		log.Error(err, "failed to cleanup resources")
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("updating the status of BIOSSettingsSet")
+	log.V(1).Info("Updating the status of BIOSSettingsSet")
 	currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
 	currentStatus.FullyLabeledServers = int32(len(serverList.Items))
 
@@ -211,7 +211,7 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(
 	return errors.Join(errs...)
 }
 
-func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSVersions(
+func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(
 	ctx context.Context,
 	log logr.Logger,
 	serverList *metalv1alpha1.ServerList,
@@ -227,7 +227,7 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSVersions(
 	for _, biosSettings := range biosSettingsList.Items {
 		if _, ok := serverWithSettings[biosSettings.Name]; !ok {
 			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-				log.V(1).Info("waiting for BIOSSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "status", biosSettings.Status)
+				log.V(1).Info("Waiting for BIOSSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "status", biosSettings.Status)
 				continue
 			}
 			if err := r.Delete(ctx, &biosSettings); err != nil {

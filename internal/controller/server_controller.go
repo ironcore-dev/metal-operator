@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
@@ -36,9 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -62,6 +61,8 @@ const (
 	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
 	// InternalAnnotationTypeValue is the value for the internal annotation type
 	InternalAnnotationTypeValue = "Internal"
+	// PoweringOnCondition is the condition type for powering on a server
+	PoweringOnCondition = "PoweringOn"
 )
 
 const (
@@ -258,7 +259,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	log.V(1).Info("Updated Server status after state transition")
 
 	log.V(1).Info("Reconciled Server")
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 }
 
 // Server state-machine:
@@ -889,6 +890,9 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, redfish.OnPowerState); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
+		if err := r.updatePowerOnCondition(ctx, server); err != nil {
+			return fmt.Errorf("failed to update power on condition: %w", err)
+		}
 	case powerOpOff:
 		log.V(1).Info("Server Power Off")
 		powerOffType := bmcClient.PowerOff
@@ -914,6 +918,23 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	log.V(1).Info("Ensured server power state", "PowerState", server.Spec.Power)
 
 	return nil
+}
+
+func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *metalv1alpha1.Server) error {
+	original := server.DeepCopy()
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	err := acc.UpdateSlice(
+		&server.Status.Conditions,
+		PoweringOnCondition,
+		conditionutils.UpdateStatus(metav1.ConditionTrue),
+		conditionutils.UpdateReason("ServerPowerOn"),
+		conditionutils.UpdateMessage("Server is powering on"),
+		conditionutils.UpdateObserved(server),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update powering on condition: %w", err)
+	}
+	return r.Status().Patch(ctx, server, client.MergeFrom(original))
 }
 
 func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
@@ -1037,31 +1058,6 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Create a channel to send periodic events
-	ch := make(chan event.TypedGenericEvent[*metalv1alpha1.Server])
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start a goroutine to send events to the channel at the specified interval
-	go func() {
-		ticker := time.NewTicker(r.ResyncInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				// Emit an event to trigger reconciliation
-				ch <- event.TypedGenericEvent[*metalv1alpha1.Server]{
-					Object: &metalv1alpha1.Server{},
-				}
-			case <-ctx.Done():
-				close(ch)
-				return
-			}
-		}
-	}()
-
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
@@ -1071,7 +1067,6 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&metalv1alpha1.ServerBootConfiguration{},
 			r.enqueueServerByServerBootConfiguration(),
 		).
-		WatchesRawSource(source.Channel(ch, &handler.TypedEnqueueRequestForObject[*metalv1alpha1.Server]{})).
 		Complete(r)
 }
 

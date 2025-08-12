@@ -119,14 +119,19 @@ spec:
                   settings:
                     additionalProperties:
                       type: string
-                    description: 'SettingsMap contains software (eg: BIOS, BMC) settings
-                      as map'
+                    description: SettingsFlow contains BIOS settings sequence to apply
+                      on the BIOS in given order
                     type: object
                   settingsFlow:
                     description: 'SettingsMap contains software (eg: BIOS, BMC) settings
                       as map'
                     items:
                       properties:
+                        name:
+                          description: Name identifies what this settings is doing
+                          maxLength: 1000
+                          minLength: 1
+                          type: string
                         priority:
                           description: |-
                             Priority defines the order of applying the settings
@@ -138,10 +143,11 @@ spec:
                         settings:
                           additionalProperties:
                             type: string
-                          description: 'SettingsMap contains software (eg: BIOS, BMC)
+                          description: 'Settings contains software (eg: BIOS, BMC)
                             settings as map'
                           type: object
                       required:
+                      - name
                       - priority
                       type: object
                     type: array

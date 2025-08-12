@@ -9,8 +9,11 @@ spec:
   biosSettingsTemplate:
     version: P79 v1.45 (12/06/2017)
     serverMaintenancePolicy: OwnerApproval
-    settings:
-      abc: Enabled
+    settingsFlow:
+      - name: abc
+        priority: 10
+        settings:
+          abc: Enabled
   serverSelector:
     matchLabels: 
       manufacturer: "dell"

@@ -10,31 +10,6 @@
 </div>
 Resource Types:
 <ul></ul>
-<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingUpdateState">BIOSSettingUpdateState
-(<code>string</code> alias)</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;IssueSettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateIssue specifies that the bios new setting was posted to server&rsquo;s RedFish API</p>
-</td>
-</tr><tr><td><p>&#34;VerifySettingUpdate&#34;</p></td>
-<td><p>BIOSSettingUpdateStateVerification specifies that the bios setting is beening verified.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOff&#34;</p></td>
-<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOff specifies that the bios setting state is waiting on server to turn off during Reboot.</p>
-</td>
-</tr><tr><td><p>&#34;WaitOnServerRebootPowerOn&#34;</p></td>
-<td><p>BIOSSettingUpdateWaitOnServerRebootPowerOn specifies that the bios setting state is waiting on server to turn on during Reboot.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettings">BIOSSettings
 </h3>
 <div>
@@ -117,6 +92,117 @@ BIOSSettingsStatus
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsFlowState">BIOSSettingsFlowState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowStatus">BIOSSettingsFlowStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applied&#34;</p></td>
+<td><p>BIOSSettingsFlowStateApplied specifies that the bios setting has been completed for current Priority</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>BIOSSettingsFlowStateFailed specifies that the bios setting update has failed.</p>
+</td>
+</tr><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings for current Priority</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BIOSSettingsFlowStatePending specifies that the BIOSSetting Controller is updating the settings for current Priority</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsFlowStatus">BIOSSettingsFlowStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>flowState</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowState">
+BIOSSettingsFlowState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>State represents the current state of the bios configuration task for current priority.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Name identifies current priority settings from the Spec</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>priority</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Priority identifies the settings priority from the Spec</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the BIOSSettings&rsquo;s current Flowstate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastAppliedTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LastAppliedTime represents the timestamp when the last setting was successfully applied.</p>
 </td>
 </tr>
 </tbody>
@@ -385,7 +471,7 @@ Kubernetes core/v1.LocalObjectReference
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsStatus">BIOSSettingsStatus</a>)
 </p>
 <div>
-<p>BIOSSettingsState specifies the current state of the BIOS maintenance.</p>
+<p>BIOSSettingsState specifies the current state of the BIOS Settings update.</p>
 </div>
 <table>
 <thead>
@@ -395,16 +481,16 @@ Kubernetes core/v1.LocalObjectReference
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Applied&#34;</p></td>
-<td><p>BIOSSettingsStateApplied specifies that the bios setting maintenance has been completed.</p>
+<td><p>BIOSSettingsStateApplied specifies that the bios setting update has been completed.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>BIOSSettingsStateFailed specifies that the bios setting maintenance has failed.</p>
+<td><p>BIOSSettingsStateFailed specifies that the bios setting update has failed.</p>
 </td>
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
 <td><p>BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings</p>
 </td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td><p>BIOSSettingsStatePending specifies that the bios setting maintenance is waiting</p>
+<td><p>BIOSSettingsStatePending specifies that the bios setting update is waiting</p>
 </td>
 </tr></tbody>
 </table>
@@ -436,6 +522,18 @@ BIOSSettingsState
 <td>
 <em>(Optional)</em>
 <p>State represents the current state of the bios configuration task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flowState</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsFlowStatus">
+[]BIOSSettingsFlowStatus
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 <tr>
@@ -503,8 +601,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>TODO: remove after PR: 403 merged. This is not going to be used anymore.
-SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
 </td>
 </tr>
 <tr>
@@ -4799,7 +4896,6 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 (<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>)
 </p>
 <div>
-<p>TODO: remove this when #403 is merged</p>
 </div>
 <table>
 <thead>
@@ -4811,6 +4907,17 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 <tbody>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name identifies what this settings is doing</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>settings</code><br/>
 <em>
 map[string]string
@@ -4818,7 +4925,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>SettingsMap contains software (eg: BIOS, BMC) settings as map</p>
+<p>Settings contains software (eg: BIOS, BMC) settings as map</p>
 </td>
 </tr>
 <tr>

@@ -33,8 +33,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: "foo"},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version:                 defaultMockUpServerBiosVersion,
-					SettingsMap:             map[string]string{},
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: map[string]string{},
+						Priority: 1,
+						Name:     "one",
+					}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -55,8 +59,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 				Spec: metalv1alpha1.BIOSSettingsSpec{
 					ServerRef: &v1.LocalObjectReference{Name: "foo"},
 					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-						Version:                 defaultMockUpServerBiosVersion,
-						SettingsMap:             map[string]string{},
+						Version: defaultMockUpServerBiosVersion,
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
 				},
@@ -74,8 +82,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 				Spec: metalv1alpha1.BIOSSettingsSpec{
 					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-						Version:                 defaultMockUpServerBiosVersion,
-						SettingsMap:             map[string]string{},
+						Version: defaultMockUpServerBiosVersion,
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
 				},
@@ -94,8 +106,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 				Spec: metalv1alpha1.BIOSSettingsSpec{
 					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-						Version:                 anotherMockUpServerBiosVersion,
-						SettingsMap:             map[string]string{},
+						Version: anotherMockUpServerBiosVersion,
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
 				},
@@ -119,8 +135,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 				Spec: metalv1alpha1.BIOSSettingsSpec{
 					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-						Version:                 anotherMockUpServerBiosVersion,
-						SettingsMap:             map[string]string{},
+						Version: anotherMockUpServerBiosVersion,
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
 				},
@@ -144,8 +164,12 @@ var _ = Describe("BIOSSettings Webhook", func() {
 				Spec: metalv1alpha1.BIOSSettingsSpec{
 					ServerRef: &v1.LocalObjectReference{Name: "bar"},
 					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-						Version:                 anotherMockUpServerBiosVersion,
-						SettingsMap:             map[string]string{},
+						Version: anotherMockUpServerBiosVersion,
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
 				},
@@ -170,7 +194,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			})).Should(Succeed())
 			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
 			biosSettingsV1Updated := biosSettingsV1.DeepCopy()
-			biosSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}
+			biosSettingsV1Updated.Spec.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Priority: 1, Settings: map[string]string{"test": "value"}}}
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().To(HaveOccurred())
 			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
 			biosSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}

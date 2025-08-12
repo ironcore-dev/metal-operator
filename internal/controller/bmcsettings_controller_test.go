@@ -376,4 +376,51 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Spec.BMCSettingRef", BeNil()),
 		))
 	})
+
+	It("should allow retry using annotation", func(ctx SpecContext) {
+		// settings which does not reboot. mocked at
+		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
+		bmcSetting := make(map[string]string)
+		bmcSetting["fooreboot"] = "145"
+
+		By("update the server state to Available  state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
+
+		By("Creating a BMCSetting")
+		BMCSettings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-bmc-upgrade",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				Version:                 "1.45.455b66-rev4",
+				SettingsMap:             bmcSetting,
+				BMCRef:                  &v1.LocalObjectReference{Name: bmc.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, BMCSettings)).To(Succeed())
+
+		By("Moving to Failed state")
+		Eventually(UpdateStatus(BMCSettings, func() {
+			BMCSettings.Status.State = metalv1alpha1.BMCSettingsStateFailed
+		})).Should(Succeed())
+
+		Eventually(Update(BMCSettings, func() {
+			BMCSettings.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
+			}
+		})).Should(Succeed())
+
+		Eventually(Object(BMCSettings)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+		)
+
+		Eventually(Object(BMCSettings)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		)
+	})
 })

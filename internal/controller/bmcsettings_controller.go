@@ -282,8 +282,7 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 	case metalv1alpha1.BMCSettingsStateApplied:
 		return ctrl.Result{}, r.handleSettingAppliedState(ctx, log, bmcSetting, BMC, bmcClient)
 	case metalv1alpha1.BMCSettingsStateFailed:
-		r.handleFailedState(ctx, log, bmcSetting, BMC)
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.handleFailedState(ctx, log, bmcSetting, BMC)
 	}
 	log.V(1).Info("Unknown State found", "BMCSettings state", bmcSetting.Status.State)
 	return ctrl.Result{}, nil
@@ -414,10 +413,22 @@ func (r *BMCSettingsReconciler) handleFailedState(
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
-) {
-	log.V(1).Info("Handle failed setting update with no maintenance reference")
+) error {
+	if shouldRetryReconciliation(bmcSetting) {
+		log.V(1).Info("Retrying BMCSettings reconciliation")
+		bmcSettingsBase := bmcSetting.DeepCopy()
+		bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
+		annotations := bmcSetting.GetAnnotations()
+		delete(annotations, metalv1alpha1.OperationAnnotation)
+		bmcSetting.SetAnnotations(annotations)
+		if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingsBase)); err != nil {
+			return fmt.Errorf("failed to patch BMCSettings status for retrying: %w", err)
+		}
+		return nil
+	}
 	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bmc settings maintenance
 	log.V(1).Info("Failed to update BMC setting", "ctx", ctx, "bmcSetting", bmcSetting, "BMC", BMC)
+	return nil
 }
 
 func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(

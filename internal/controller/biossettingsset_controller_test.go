@@ -131,7 +131,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 						Version:                 defaultMockUpServerBiosVersion,
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-							{Settings: map[string]string{"fooreboot": "144"}, Priority: 1},
+							{Settings: map[string]string{"fooreboot": "144"}, Priority: 1, Name: "one"},
 						},
 					},
 					ServerSelector: metav1.LabelSelector{
@@ -212,7 +212,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 						Version:                 defaultMockUpServerBiosVersion,
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-							{Settings: map[string]string{"abc": "foo-bar"}, Priority: 10},
+							{Settings: map[string]string{"abc": "foo-bar"}, Priority: 10, Name: "foo-bar"},
 						},
 					},
 					ServerSelector: metav1.LabelSelector{

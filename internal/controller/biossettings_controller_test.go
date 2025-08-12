@@ -645,8 +645,13 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version:                 defaultMockUpServerBiosVersion,
-				SettingsMap:             BIOSSetting,
+				Version: defaultMockUpServerBiosVersion,
+				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+					{
+						Priority: 100,
+						Settings: BIOSSetting,
+						Name:     "100",
+					}},
 				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},

@@ -929,28 +929,30 @@ func (r *BiosSettingsReconciler) ensureNoStrandedStatus(
 	ctx context.Context,
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (bool, error) {
-
-	removeIndex := func(s []metalv1alpha1.BIOSSettingsFlowStatus, index int) []metalv1alpha1.BIOSSettingsFlowStatus {
-		return append(s[:index], s[index+1:]...)
+	removeFlow := func(s []metalv1alpha1.BIOSSettingsFlowStatus, toRemove metalv1alpha1.BIOSSettingsFlowStatus) []metalv1alpha1.BIOSSettingsFlowStatus {
+		for index, item := range s {
+			if item.Name == toRemove.Name && item.Priority == toRemove.Priority {
+				return append(s[:index], s[index+1:]...)
+			}
+		}
+		return s
 	}
 
 	// Incase the settings Spec got changed during Inprogress and left behind Stale states clean it up.
 	settingsNamePriorityMap := map[string]int32{}
 	biosSettingsBase := biosSettings.DeepCopy()
-	toDelete := map[int]struct{}{}
+	biosFlowStateBase := append([]metalv1alpha1.BIOSSettingsFlowStatus{}, biosSettings.Status.FlowState...)
 	for _, settings := range biosSettings.Spec.SettingsFlow {
 		settingsNamePriorityMap[settings.Name] = settings.Priority
 	}
-	for idx, flowStatus := range biosSettings.Status.FlowState {
+	for _, flowStatus := range biosSettings.Status.FlowState {
 		if value, ok := settingsNamePriorityMap[flowStatus.Name]; !ok || value != flowStatus.Priority {
-			toDelete[idx] = struct{}{}
+			biosFlowStateBase = removeFlow(biosFlowStateBase, flowStatus)
 		}
 	}
-	for indexToDelete := range toDelete {
-		biosSettings.Status.FlowState = removeIndex(biosSettings.Status.FlowState, indexToDelete)
-	}
 
-	if len(toDelete) > 0 {
+	if len(biosFlowStateBase) != len(biosSettings.Status.FlowState) {
+		biosSettings.Status.FlowState = biosFlowStateBase
 		if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
 			return false, fmt.Errorf("failed to patch BIOSSettings FlowState status: %w", err)
 		}
@@ -1434,7 +1436,7 @@ func (r *BiosSettingsReconciler) updateBiosSettingsFlowStatus(
 		// if the currentFlowStatus is missing, add it.
 		currentSettingsFlowStatus.State = state
 		biosSettings.Status.FlowState = append(biosSettings.Status.FlowState, *currentSettingsFlowStatus)
-		currentIdx = 0
+		currentIdx = len(biosSettings.Status.FlowState) - 1
 	}
 
 	if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {

@@ -14,7 +14,7 @@
 1. `BIOSSettingsSet` filters `Servers` matching the provided label
 2. `BIOSSettingsSet` creates `BIOSSettings` CRD for each `Server` selected
 3. `BIOSSettingsSet` monitors the created `BIOSSettings` and updates the status
-4. `BIOSSettingsSet` creates or deletes `BIOSSettings` based on the changes to `Server` CRD>
+4. `BIOSSettingsSet` creates or deletes `BIOSSettings` based on the changes to `Server` CRD
 
 ## Example
 

@@ -25,7 +25,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-const BIOSVersionSetFinalizer = "metal.ironcore.dev/BIOSVersionSet"
+const BIOSVersionSetFinalizer = "metal.ironcore.dev/biosversionset"
 
 // BIOSVersionSetReconciler reconciles a BIOSVersionSet object
 type BIOSVersionSetReconciler struct {

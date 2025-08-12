@@ -13,7 +13,6 @@ type BIOSSettingsSetSpec struct {
 	BIOSSettingsTemplate BIOSSettingsTemplate `json:"biosSettingsTemplate,omitempty"`
 
 	// ServerSelector specifies a label selector to identify the servers that are to be selected.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="ServerSelector is immutable"
 	// +required
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 }

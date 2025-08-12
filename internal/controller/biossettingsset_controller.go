@@ -31,7 +31,7 @@ type BIOSSettingsSetReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-const biosSettingsSetFinalizer = "metal.ironcore.dev/biosSettingsSet"
+const biosSettingsSetFinalizer = "metal.ironcore.dev/biossettingsset"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingssets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingssets/status,verbs=get;update;patch
@@ -77,10 +77,19 @@ func (r *BIOSSettingsSetReconciler) delete(
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
 
-	if currentStatus.AvailableBIOSSettings != (currentStatus.CompletedBIOSSettings+currentStatus.FailedBIOSSettings) ||
-		currentStatus.AvailableBIOSSettings != biosSettingsSet.Status.AvailableBIOSSettings {
+	delatableBIOSSettings := map[string]struct{}{}
+	for _, biosSettings := range ownedBiosSettings.Items {
+		if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
+			delatableBIOSSettings[biosSettings.Name] = struct{}{}
+		} else if biosSettings.Spec.ServerMaintenanceRef == nil {
+			delatableBIOSSettings[biosSettings.Name] = struct{}{}
+		}
+	}
+
+	if len(ownedBiosSettings.Items) != len(delatableBIOSSettings) ||
+		int32(len(ownedBiosSettings.Items)) != biosSettingsSet.Status.AvailableBIOSSettings {
+		currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
 		err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 		if err != nil {
 			log.Error(err, "failed to update current Status")
@@ -131,7 +140,7 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createMissingBIOSVersions(ctx, log, serverList, ownedBiosSettings, biosSettingsSet); err != nil {
+	if err := r.createMissingBIOSSettings(ctx, log, serverList, ownedBiosSettings, biosSettingsSet); err != nil {
 		log.Error(err, "failed to create resources")
 		return ctrl.Result{}, err
 	}
@@ -157,7 +166,7 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsSetReconciler) createMissingBIOSVersions(
+func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(
 	ctx context.Context,
 	log logr.Logger,
 	serverList *metalv1alpha1.ServerList,
@@ -165,19 +174,18 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSVersions(
 	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
 ) error {
 
-	serverWithSettings := make(map[string]bool)
+	serverWithSettings := make(map[string]struct{})
 	for _, biosSettings := range biosSettingsList.Items {
-		serverWithSettings[biosSettings.Spec.ServerRef.Name] = true
+		serverWithSettings[biosSettings.Spec.ServerRef.Name] = struct{}{}
 	}
 
 	var errs []error
 	for _, server := range serverList.Items {
-		if !serverWithSettings[server.Name] {
-
+		if _, ok := serverWithSettings[server.Name]; !ok {
 			newBiosSettingsName := fmt.Sprintf("%s-%s", biosSettingsSet.Name, server.Name)
 			var newBiosSetting *metalv1alpha1.BIOSSettings
 			if len(newBiosSettingsName) > utilvalidation.DNS1123SubdomainMaxLength {
-				log.V(1).Info("BiosSettings name is too long, it will be shortened using randam string", "name", newBiosSettingsName)
+				log.V(1).Info("BiosSettings name is too long, it will be shortened using random string", "name", newBiosSettingsName)
 				newBiosSetting = &metalv1alpha1.BIOSSettings{
 					ObjectMeta: metav1.ObjectMeta{
 						GenerateName: newBiosSettingsName[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-",
@@ -210,14 +218,14 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSVersions(
 	biosSettingsList *metalv1alpha1.BIOSSettingsList,
 ) error {
 
-	serverWithSettings := make(map[string]bool)
+	serverWithSettings := make(map[string]struct{})
 	for _, server := range serverList.Items {
-		serverWithSettings[server.Spec.BIOSSettingsRef.Name] = true
+		serverWithSettings[server.Spec.BIOSSettingsRef.Name] = struct{}{}
 	}
 
 	var errs []error
 	for _, biosSettings := range biosSettingsList.Items {
-		if !serverWithSettings[biosSettings.Name] {
+		if _, ok := serverWithSettings[biosSettings.Name]; !ok {
 			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
 				log.V(1).Info("waiting for BIOSSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "status", biosSettings.Status)
 				continue

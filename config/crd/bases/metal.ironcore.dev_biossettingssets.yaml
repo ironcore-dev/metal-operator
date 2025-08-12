@@ -199,9 +199,6 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
-                x-kubernetes-validations:
-                - message: ServerSelector is immutable
-                  rule: self == oldSelf
             required:
             - serverSelector
             type: object

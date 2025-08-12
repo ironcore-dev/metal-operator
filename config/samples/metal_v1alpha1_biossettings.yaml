@@ -8,7 +8,10 @@ metadata:
 spec:
   serverRef:
     name: endpoint-sample-system-0
-  version: 2.10.2
-  settings:
-    PxeDev1EnDis: Enabled
+  version: P79 v1.45 (12/06/2017)
+  settingsFlow:
+    - name: abc
+      priority: 10
+      settings:
+        abc: Enabled
   serverMaintenancePolicy: OwnerApproval

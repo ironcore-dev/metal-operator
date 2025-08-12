@@ -222,6 +222,20 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 		// clean up maintenance crd and references and mark completed if version matches.
 		return false, r.checkVersionAndTransistionState(ctx, log, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateFailed:
+		if shouldRetryReconciliation(biosVersion) {
+			log.V(1).Info("Retrying BIOSVersion reconciliation")
+
+			biosVersionBase := biosVersion.DeepCopy()
+			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+			biosVersion.Status.Conditions = nil
+			annotations := biosVersion.GetAnnotations()
+			delete(annotations, metalv1alpha1.OperationAnnotation)
+			biosVersion.SetAnnotations(annotations)
+			if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+				return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)
+			}
+			return true, nil
+		}
 		log.V(1).Info("Failed to upgrade BIOSVersion", "ctx", ctx, "BIOSVersion", biosVersion, "server", server)
 		return false, nil
 	}

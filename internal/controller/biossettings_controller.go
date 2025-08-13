@@ -941,18 +941,18 @@ func (r *BiosSettingsReconciler) ensureNoStrandedStatus(
 	// Incase the settings Spec got changed during Inprogress and left behind Stale states clean it up.
 	settingsNamePriorityMap := map[string]int32{}
 	biosSettingsBase := biosSettings.DeepCopy()
-	biosFlowStateBase := append([]metalv1alpha1.BIOSSettingsFlowStatus{}, biosSettings.Status.FlowState...)
 	for _, settings := range biosSettings.Spec.SettingsFlow {
 		settingsNamePriorityMap[settings.Name] = settings.Priority
 	}
+	nextFlowStatuses := make([]metalv1alpha1.BIOSSettingsFlowStatus, 0)
 	for _, flowStatus := range biosSettings.Status.FlowState {
-		if value, ok := settingsNamePriorityMap[flowStatus.Name]; !ok || value != flowStatus.Priority {
-			biosFlowStateBase = removeFlow(biosFlowStateBase, flowStatus)
+		if value, ok := settingsNamePriorityMap[flowStatus.Name]; ok && value == flowStatus.Priority {
+			nextFlowStatuses = append(nextFlowStatuses, flowStatus)
 		}
 	}
 
-	if len(biosFlowStateBase) != len(biosSettings.Status.FlowState) {
-		biosSettings.Status.FlowState = biosFlowStateBase
+	if len(nextFlowStatuses) != len(biosSettings.Status.FlowState) {
+		biosSettings.Status.FlowState = nextFlowStatuses
 		if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
 			return false, fmt.Errorf("failed to patch BIOSSettings FlowState status: %w", err)
 		}

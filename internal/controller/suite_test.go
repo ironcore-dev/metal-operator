@@ -30,8 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	//+kubebuilder:scaffold:imports
 )
@@ -119,8 +117,6 @@ func deleteAndList(ctx context.Context, obj client.Object, objList client.Object
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
@@ -161,7 +157,7 @@ var _ = BeforeSuite(func() {
 	var mgrCtx context.Context
 	mgrCtx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
-	registryServer := registry.NewServer(":30000")
+	registryServer := registry.NewServer(GinkgoLogr, ":30000")
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
@@ -340,11 +336,8 @@ func SetupTest() *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
-		logf.SetLogger(log)
-
 		// Start the Redfish Mock Server
-		mockServer := server.NewMockServer(log, ":8000")
+		mockServer := server.NewMockServer(GinkgoLogr, ":8000")
 
 		go func() {
 			defer GinkgoRecover()

@@ -8,9 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
 	. "github.com/onsi/ginkgo/v2"                         // nolint: staticcheck
 	. "github.com/onsi/gomega"                            // nolint: staticcheck
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega" // nolint: staticcheck
@@ -104,9 +101,7 @@ func TransistionServerFromInitialToAvailableState(
 	), fmt.Sprintf("Expected Server to be in PowerState 'on' in discovery state %v", server))
 
 	By("Starting the probe agent")
-	log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
-	logf.SetLogger(log)
-	probeAgent := probe.NewAgent(log, server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
+	probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

@@ -141,9 +141,6 @@ var _ = BeforeSuite(func() {
 
 	Expect(metalv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
-	err = metalv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -336,12 +333,17 @@ func SetupTest() *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		// Start the Redfish Mock Server
+		mockCtx, cancel := context.WithCancel(context.Background())
+		DeferCleanup(cancel)
 		mockServer := server.NewMockServer(GinkgoLogr, ":8000")
 
 		go func() {
 			defer GinkgoRecover()
-			Expect(mockServer.Start(mgrCtx)).NotTo(HaveOccurred(), " failed to start mock Redfish server")
+			Expect(mockServer.Start(mockCtx)).To(Succeed(), "failed to start mock Redfish server")
+		}()
+
+		go func() {
+			defer GinkgoRecover()
 			Expect(k8sManager.Start(mgrCtx)).To(Succeed(), "failed to start manager")
 		}()
 	})

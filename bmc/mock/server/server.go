@@ -75,7 +75,7 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var update map[string]interface{}
+	var update map[string]any
 	if err := json.Unmarshal(body, &update); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -228,7 +228,7 @@ func (s *MockServer) Start(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		s.log.Info("Shutting down mock server")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		defer cancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {

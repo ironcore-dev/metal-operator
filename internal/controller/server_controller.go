@@ -246,7 +246,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 			return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 		}
 		log.V(1).Info("Updated Server status after state transition")
-		return ctrl.Result{Requeue: requeue, RequeueAfter: r.ResyncInterval}, nil
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)

@@ -94,14 +94,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					Settings: biosSetting,
-					Priority: 1,
-					Name:     "one",
-				}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettingsV1)).To(Succeed())
@@ -142,14 +144,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion + "2",
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					Settings: biosSetting,
-					Priority: 1,
-					Name:     "one",
-				}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion + "2",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
@@ -187,14 +191,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					Settings: biosSetting,
-					Priority: 1,
-					Name:     "one",
-				}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -258,14 +264,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					Settings: biosSetting,
-					Priority: 1,
-					Name:     "one",
-				}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -370,14 +378,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					Settings: biosSetting,
-					Priority: 1,
-					Name:     "one",
-				}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -470,14 +480,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					Settings: biosSetting,
-					Priority: 1,
-					Name:     "one",
-				}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -558,14 +570,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-bios-upgrade-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: "2.45.455b66-rev4",
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-					Settings: biosSetting,
-					Priority: 1,
-					Name:     "one",
-				}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: "2.45.455b66-rev4",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -635,8 +649,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	It("should allow retry using annotation", func(ctx SpecContext) {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
-		BIOSSetting := make(map[string]string)
-		BIOSSetting["fooreboot"] = "10"
+		biosSetting := make(map[string]string)
+		biosSetting["fooreboot"] = "10"
 
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -645,15 +659,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority: 100,
-						Settings: BIOSSetting,
-						Name:     "100",
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
 					}},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -745,21 +760,23 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				GenerateName: "test-setting-flow-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority: 100,
-						Settings: map[string]string{"abc": "10"},
-						Name:     "100",
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{
+							Priority: 100,
+							Settings: map[string]string{"abc": "10"},
+							Name:     "100",
+						},
+						{
+							Priority: 1000,
+							Settings: map[string]string{"fooreboot": "100"},
+							Name:     "1000",
+						},
 					},
-					{
-						Priority: 1000,
-						Settings: map[string]string{"fooreboot": "100"},
-						Name:     "1000",
-					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -785,21 +802,23 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				GenerateName: "test-setting-flow-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority: 100,
-						Settings: map[string]string{"fooreboot": "10"},
-						Name:     "100",
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{
+							Priority: 100,
+							Settings: map[string]string{"fooreboot": "10"},
+							Name:     "100",
+						},
+						{
+							Priority: 1000,
+							Settings: map[string]string{"fooreboot": "100"},
+							Name:     "1000",
+						},
 					},
-					{
-						Priority: 1000,
-						Settings: map[string]string{"fooreboot": "100"},
-						Name:     "1000",
-					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -834,21 +853,23 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				GenerateName: "test-setting-flow-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority: 100,
-						Settings: map[string]string{"abc": "10"},
-						Name:     "100",
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{
+							Priority: 100,
+							Settings: map[string]string{"abc": "10"},
+							Name:     "100",
+						},
+						{
+							Priority: 1000,
+							Settings: map[string]string{"fooreboot": "100"},
+							Name:     "100",
+						},
 					},
-					{
-						Priority: 1000,
-						Settings: map[string]string{"fooreboot": "100"},
-						Name:     "100",
-					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings2)).To(Succeed())
@@ -889,21 +910,23 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				GenerateName: "test-setting-flow-differnet-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority: 100,
-						Settings: map[string]string{"abc": "foo-bar"},
-						Name:     "100",
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{
+							Priority: 100,
+							Settings: map[string]string{"abc": "foo-bar"},
+							Name:     "100",
+						},
+						{
+							Priority: 1000,
+							Settings: map[string]string{"fooreboot": "100"},
+							Name:     "1000",
+						},
 					},
-					{
-						Priority: 1000,
-						Settings: map[string]string{"fooreboot": "100"},
-						Name:     "1000",
-					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
@@ -947,21 +970,23 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				GenerateName: "test-setting-flow-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
-				Version: defaultMockUpServerBiosVersion,
-				SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-					{
-						Priority: 100,
-						Settings: map[string]string{"abc": "10"},
-						Name:     oldNames[0],
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{
+							Priority: 100,
+							Settings: map[string]string{"abc": "10"},
+							Name:     oldNames[0],
+						},
+						{
+							Priority: 1000,
+							Settings: map[string]string{"fooreboot": "100"},
+							Name:     oldNames[1],
+						},
 					},
-					{
-						Priority: 1000,
-						Settings: map[string]string{"fooreboot": "100"},
-						Name:     oldNames[1],
-					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
-				ServerRef:               &v1.LocalObjectReference{Name: server.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())

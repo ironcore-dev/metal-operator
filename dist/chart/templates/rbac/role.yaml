@@ -35,6 +35,7 @@ rules:
   - metal.ironcore.dev
   resources:
   - biossettings
+  - biossettingssets
   - biosversions
   - biosversionsets
   - bmcs
@@ -60,6 +61,7 @@ rules:
   - metal.ironcore.dev
   resources:
   - biossettings/finalizers
+  - biossettingssets/finalizers
   - biosversions/finalizers
   - biosversionsets/finalizers
   - bmcs/finalizers
@@ -78,6 +80,7 @@ rules:
   - metal.ironcore.dev
   resources:
   - biossettings/status
+  - biossettingssets/status
   - biosversions/status
   - biosversionsets/status
   - bmcs/status

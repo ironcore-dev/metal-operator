@@ -52,27 +52,18 @@ BIOSSettingsSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSSettingsTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settingsFlow</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
-[]SettingsFlowItem
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
+<p>
+(Members of <code>BIOSSettingsTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -86,34 +77,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to a specific server to apply bios setting on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </table>
@@ -244,6 +207,217 @@ Kubernetes meta/v1.Time
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSet">BIOSSettingsSet
+</h3>
+<div>
+<p>BIOSSettingsSet is the Schema for the biossettingssets API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">
+BIOSSettingsSetSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>biosSettingsTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BiosSettingsTemplate defines the template for the BIOSSettings Resource to be applied to the servers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetStatus">
+BIOSSettingsSetStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSet">BIOSSettingsSet</a>)
+</p>
+<div>
+<p>BIOSSettingsSetSpec defines the desired state of BIOSSettingsSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>biosSettingsTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BiosSettingsTemplate defines the template for the BIOSSettings Resource to be applied to the servers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServerSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSetStatus">BIOSSettingsSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSet">BIOSSettingsSet</a>)
+</p>
+<div>
+<p>BIOSSettingsSetStatus defines the observed state of BIOSSettingsSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>fullyLabeledServers</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FullyLabeledServers is the number of server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableBIOSSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>AvailableBIOSVersion is the number of Settings current created by the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pendingBIOSSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>PendingBIOSSettings is the total number of pending server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inProgressBIOSSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>InProgressBIOSSettings is the total number of server in the set that are currently in InProgress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completedBIOSSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>CompletedBIOSSettings is the total number of completed server in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failedBIOSSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FailedBIOSSettings is the total number of failed server in the set.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec
 </h3>
 <p>
@@ -262,27 +436,18 @@ Kubernetes meta/v1.Time
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BIOSSettingsTemplate</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settingsFlow</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
-[]SettingsFlowItem
+<a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">
+BIOSSettingsTemplate
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
+<p>
+(Members of <code>BIOSSettingsTemplate</code> are embedded into this type.)
+</p>
+<p>BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.</p>
 </td>
 </tr>
 <tr>
@@ -296,34 +461,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to a specific server to apply bios setting on.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -425,6 +562,76 @@ Kubernetes meta/v1.Time
 <td>
 <em>(Optional)</em>
 <p>Conditions represents the latest available observations of the BIOSSettings&rsquo;s current state.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSetSpec">BIOSSettingsSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version contains software (eg: BIOS, BMC) version this settings applies to</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settingsFlow</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.SettingsFlowItem">
+[]SettingsFlowItem
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.</p>
 </td>
 </tr>
 </tbody>
@@ -4030,7 +4237,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4674,7 +4881,7 @@ k8s.io/apimachinery/pkg/api/resource.Quantity
 <h3 id="metal.ironcore.dev/v1alpha1.SettingsFlowItem">SettingsFlowItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsSpec">BIOSSettingsSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>)
 </p>
 <div>
 </div>

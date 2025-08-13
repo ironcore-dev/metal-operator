@@ -274,7 +274,7 @@ func (r *BIOSSettingsSetReconciler) getServersBySelector(
 	ctx context.Context,
 	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
 ) (*metalv1alpha1.ServerList, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&biosSettingsSet.Spec.ServerSelector)
+	selector, err := GetServerSelectorFromSetSelector(biosSettingsSet.Spec.ServerSelector.DeepCopy())
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +319,7 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, biosSettingsSet := range biosSettingsSetList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(&biosSettingsSet.Spec.ServerSelector)
+		selector, err := GetServerSelectorFromSetSelector(biosSettingsSet.Spec.ServerSelector.DeepCopy())
 		if err != nil {
 			log.Error(err, "failed to convert label selector")
 			return nil

@@ -264,7 +264,7 @@ func (r *BIOSVersionSetReconciler) getServersBySelector(
 	ctx context.Context,
 	biosVersionSet *metalv1alpha1.BIOSVersionSet,
 ) (*metalv1alpha1.ServerList, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&biosVersionSet.Spec.ServerSelector)
+	selector, err := GetServerSelectorFromSetSelector(biosVersionSet.Spec.ServerSelector.DeepCopy())
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, biosVersionSet := range biosVersionSetList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(&biosVersionSet.Spec.ServerSelector)
+		selector, err := GetServerSelectorFromSetSelector(biosVersionSet.Spec.ServerSelector.DeepCopy())
 		if err != nil {
 			log.Error(err, "failed to convert label selector")
 			return nil

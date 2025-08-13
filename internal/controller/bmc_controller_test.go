@@ -99,7 +99,8 @@ var _ = Describe("BMC Controller", func() {
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
 
 		bmcLabels := map[string]string{
-			"foo": "bar",
+			"foo":                  "bar",
+			ServerBIOSVersionLabel: "P79v1.4512062017",
 		}
 
 		By("Creating a BMC resource")

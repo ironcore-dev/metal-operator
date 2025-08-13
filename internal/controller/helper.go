@@ -7,14 +7,40 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
+	fieldOwner             = client.FieldOwner("metal.ironcore.dev/controller-manager")
+	ServerBIOSVersionLabel = "metal.ironcore.dev/server-bios-version"
 )
+
+func ConvertBIOSVersionToLabel(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'A' && r <= 'Z') ||
+			(r >= 'a' && r <= 'z') ||
+			(r >= '0' && r <= '9') ||
+			r == '-' || r == '_' || r == '.' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func GetServerSelectorFromSetSelector(serverSelector *metav1.LabelSelector) (labels.Selector, error) {
+	if serverSelector.MatchLabels != nil {
+		if biosVersion, ok := serverSelector.MatchLabels[ServerBIOSVersionLabel]; ok {
+			serverSelector.MatchLabels[ServerBIOSVersionLabel] = ConvertBIOSVersionToLabel(biosVersion)
+		}
+	}
+	return metav1.LabelSelectorAsSelector(serverSelector)
+}
 
 // shouldIgnoreReconciliation checks if the object should be ignored during reconciliation.
 func shouldIgnoreReconciliation(obj client.Object) bool {

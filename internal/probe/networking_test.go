@@ -160,11 +160,13 @@ var _ = Describe("networking.go", func() {
 
 		It("should return error if Interfaces fails", func() {
 			mockNICInst.errIface = errors.New("iface error")
+			mockNICInst.errAddrs = nil
 			_, err := collector.CollectNetworkData()
 			Expect(err).To(MatchError("iface error"))
 		})
 
 		It("should return error if Addrs fails", func() {
+			mockNICInst.errIface = nil
 			mockNICInst.errAddrs = errors.New("addrs error")
 			_, err := collector.CollectNetworkData()
 			Expect(err).To(MatchError("addrs error"))

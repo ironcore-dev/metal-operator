@@ -4,7 +4,6 @@
 package probe
 
 import (
-	"fmt"
 	"net"
 	"strings"
 
@@ -53,7 +52,7 @@ func NewNetworkDataCollector(nic NIC, ndd NetDeviceData) NetworkDataCollector {
 func (n *networkDataCollector) CollectNetworkData() ([]registry.NetworkInterface, error) {
 	interfaces, err := n.nic.Interfaces()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get network interfaces: %w", err)
+		return nil, err
 	}
 
 	var networkInterfaces []registry.NetworkInterface

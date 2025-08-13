@@ -134,7 +134,7 @@ var _ = Describe("networking.go", func() {
 			collector = NewNetworkDataCollector(mockNICInst, mockNDDInst)
 		})
 
-		FIt("should collect only valid network interfaces and addresses", func() {
+		It("should collect only valid network interfaces and addresses", func() {
 			result, err := collector.CollectNetworkData()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(HaveLen(2))

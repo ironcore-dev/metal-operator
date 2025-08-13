@@ -11,8 +11,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var (
@@ -27,13 +25,10 @@ func TestRegistry(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	log := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
-	logf.SetLogger(log)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
 
-	server = registry.NewServer(log, testServerAddr)
+	server = registry.NewServer(GinkgoLogr, testServerAddr)
 	go func() {
 		defer GinkgoRecover()
 		Expect(server.Start(ctx)).To(Succeed(), "failed to start registry server")

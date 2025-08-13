@@ -26,7 +26,9 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 				},
 			},
-			Spec: metalv1alpha1.ServerSpec{},
+			Spec: metalv1alpha1.ServerSpec{
+				Power: metalv1alpha1.PowerUnmanaged,
+			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 	})

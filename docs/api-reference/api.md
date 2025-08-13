@@ -1399,6 +1399,9 @@ off action can take time while the OS is in the shutdown process.</p>
 <td><p>PoweringOnPowerState A temporary state between Off and On. This
 temporary state can be very short.</p>
 </td>
+</tr><tr><td><p>&#34;Unmanaged&#34;</p></td>
+<td><p>UnmanagedPowerState the system power state is not managed.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCSecret">BMCSecret
@@ -2030,7 +2033,6 @@ BMCPowerState
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>PowerState represents the current power state of the BMC.</p>
 </td>
 </tr>
@@ -3103,6 +3105,9 @@ string
 </tr><tr><td><p>&#34;On&#34;</p></td>
 <td><p>PowerOn indicates that the device is powered on.</p>
 </td>
+</tr><tr><td><p>&#34;Unmanaged&#34;</p></td>
+<td><p>PowerUnmanaged indicates that the power state is not managed.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Processor">Processor
@@ -3421,7 +3426,6 @@ Power
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
@@ -4199,7 +4203,6 @@ Power
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>ServerPower specifies the power state of the server during maintenance.</p>
 </td>
 </tr>
@@ -4342,7 +4345,6 @@ Power
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>ServerPower specifies the power state of the server during maintenance.</p>
 </td>
 </tr>
@@ -4452,6 +4454,9 @@ The power off action can take time while the OS is in the shutdown process.</p>
 <td><p>ServerPoweringOnPowerState indicates a temporary state between Off and On.
 This temporary state can be very short.</p>
 </td>
+</tr><tr><td><p>&#34;Unmanaged&#34;</p></td>
+<td><p>UnmanagedServerPowerState indicates that the server power state is not managed.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec
@@ -4515,7 +4520,6 @@ Power
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>Power specifies the desired power state of the server.</p>
 </td>
 </tr>
@@ -4774,7 +4778,6 @@ ServerPowerState
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>PowerState represents the current power state of the server.</p>
 </td>
 </tr>

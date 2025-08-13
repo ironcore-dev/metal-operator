@@ -294,6 +294,22 @@ type NetworkInterface struct {
 	// MACAddress is the MAC address of the network interface.
 	// +required
 	MACAddress string `json:"macAddress"`
+
+	// PCIAddress is the PCI address of the network interface.
+	// +optional
+	PCIAddress string `json:"pciAddress,omitempty"`
+
+	// Model is the model of the network interface.
+	// +optional
+	Model string `json:"model,omitempty"`
+
+	// Speed is the speed of the network interface
+	// +optional
+	Speed string `json:"speed,omitempty"`
+
+	// Revision is the revision of the network interface.
+	// +optional
+	Revision string `json:"revision,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive

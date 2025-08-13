@@ -258,6 +258,13 @@ func (r *BiosSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 	// if referred server contains reference to different BIOSSettings object - stop reconciliation
 	server, err := r.getReferredServer(ctx, log, biosSettings.Spec.ServerRef)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info("Referred server object is not found")
+			// here we will move it to pending state,
+			// to allow deletion of the resource and allow re-apply of setting if server comes back.
+			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStatePending, nil)
+			return ctrl.Result{}, err
+		}
 		log.V(1).Info("Referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}

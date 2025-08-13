@@ -8,8 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BIOSSettingsSpec defines the desired state of BIOSSettings.
-type BIOSSettingsSpec struct {
+type BIOSSettingsTemplate struct {
 	// Version contains software (eg: BIOS, BMC) version this settings applies to
 	// +required
 	Version string `json:"version"`
@@ -17,10 +16,6 @@ type BIOSSettingsSpec struct {
 	// SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order
 	// +optional
 	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
-
-	// ServerRef is a reference to a specific server to apply bios setting on.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
@@ -48,6 +43,16 @@ type SettingsFlowItem struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=2147483645
 	Priority int32 `json:"priority"`
+}
+
+// BIOSSettingsSpec defines the desired state of BIOSSettings.
+type BIOSSettingsSpec struct {
+	// BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.
+	BIOSSettingsTemplate `json:",inline"`
+
+	// ServerRef is a reference to a specific server to apply bios setting on.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
+	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 }
 
 // BIOSSettingsState specifies the current state of the BIOS Settings update.

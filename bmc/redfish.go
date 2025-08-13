@@ -306,6 +306,7 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemURI string) (Syste
 		IndicatorLED:      string(system.IndicatorLED),
 		TotalSystemMemory: quantity,
 		Processors:        processors,
+		BIOSVersion:       system.BIOSVersion,
 	}, nil
 }
 

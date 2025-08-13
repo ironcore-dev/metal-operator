@@ -182,51 +182,19 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		return ctrl.Result{}, nil
 	}
 
-	// do late state initialization
-	if server.Status.State == "" {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
-			return ctrl.Result{}, err
-		}
-	}
-
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
 	}
 	defer bmcClient.Logout()
 
-	if modified, err := r.patchServerURI(ctx, log, bmcClient, server); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcClient, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Handled annotation operations")
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
+	if modified, err := r.handleServerPatchOperations(ctx, log, bmcClient, server); err != nil || modified {
 		return ctrl.Result{}, err
-	}
-	log.V(1).Info("Ensured finalizer has been added")
-
-	if server.Spec.ServerMaintenanceRef != nil {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
-	} else {
-		if server.Spec.ServerClaimRef != nil {
-			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
-				return ctrl.Result{}, err
-			}
-		}
-		// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
-		// 		 back to available state.
-		if server.Spec.ServerClaimRef == nil && server.Status.State == metalv1alpha1.ServerStateReserved {
-			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-				return ctrl.Result{}, err
-			}
-		}
-
 	}
 
 	if err := r.updateServerStatus(ctx, log, bmcClient, server); err != nil {
@@ -260,6 +228,53 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+}
+
+func (r *ServerReconciler) handleServerPatchOperations(
+	ctx context.Context,
+	log logr.Logger,
+	bmcClient bmc.BMC,
+	server *metalv1alpha1.Server,
+) (bool, error) {
+	// do late state initialization
+	if server.Status.State == "" {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
+			return modified, err
+		}
+	}
+
+	if modified, err := r.patchServerURI(ctx, log, bmcClient, server); err != nil || modified {
+		return modified, err
+	}
+
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
+		return modified, err
+	}
+	log.V(1).Info("Ensured finalizer has been added")
+
+	if server.Spec.ServerMaintenanceRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
+			return modified, err
+		}
+	} else {
+		if server.Spec.ServerClaimRef != nil {
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
+				return modified, err
+			}
+		}
+		// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
+		// 		 back to available state.
+		if server.Spec.ServerClaimRef == nil && server.Status.State == metalv1alpha1.ServerStateReserved {
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+				return modified, err
+			}
+		}
+	}
+	if modified, err := r.patchDynamicLabels(ctx, log, server); err != nil || modified {
+		return modified, err
+	}
+	log.V(1).Info("Updated Server status")
+	return false, nil
 }
 
 // Server state-machine:
@@ -523,6 +538,37 @@ func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
+func (r *ServerReconciler) patchDynamicLabels(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	// Update the dynamic labels based on the server current status.
+
+	updatedBIOSVersion := ConvertBIOSVersionToLabel(server.Status.BIOSVersion)
+	labels := server.GetLabels()
+	var serverBase *metalv1alpha1.Server
+	if labels == nil {
+		labels = make(map[string]string)
+		serverBase = server.DeepCopy()
+	} else {
+		if value, ok := labels[ServerBIOSVersionLabel]; !ok || value != updatedBIOSVersion {
+			log.V(1).Info("Updating Server BIOS version label", "Label", ServerBIOSVersionLabel, "Value", server.Status, "labels", labels)
+			serverBase = server.DeepCopy()
+		} else {
+			return false, nil
+		}
+	}
+	if serverBase != nil {
+		labels[ServerBIOSVersionLabel] = updatedBIOSVersion
+		server.SetLabels(labels)
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to update Server labels: %w", err)
+		}
+		log.V(1).Info("Updated Server labels", "Labels", labels)
+		return true, nil
+	}
+
+	return false, nil
+
+}
+
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
 	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
 		log.V(1).Info("Server has no BMC connection configured")
@@ -542,12 +588,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	server.Status.Model = systemInfo.Model
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
 	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
-
-	biosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemURI)
-	if err != nil {
-		return fmt.Errorf("failed to get BIOS version for Server: %w", err)
-	}
-	server.Status.BIOSVersion = biosVersion
+	server.Status.BIOSVersion = systemInfo.BIOSVersion
 
 	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
 	for _, processor := range systemInfo.Processors {

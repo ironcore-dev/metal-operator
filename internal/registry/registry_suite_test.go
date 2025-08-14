@@ -32,7 +32,7 @@ var _ = BeforeSuite(func() {
 	ctx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
 
-	server = registry.NewServer(testServerAddr)
+	server = registry.NewServer(testServerAddr, nil)
 	go func() {
 		defer GinkgoRecover()
 		Expect(server.Start(ctx)).To(Succeed(), "failed to start registry server")

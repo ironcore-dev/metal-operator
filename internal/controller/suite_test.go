@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -148,19 +149,24 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
-
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
-
-	// set komega client
-	SetClient(k8sClient)
-
-	By("Starting the registry server")
 	var mgrCtx context.Context
 	mgrCtx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
-	registryServer := registry.NewServer(":30000")
+	cluster, err := cluster.New(cfg)
+	go func() {
+		defer GinkgoRecover()
+		Expect(cluster.Start(mgrCtx)).To(Succeed(), "failed to start cluster")
+	}()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cluster).NotTo(BeNil())
+
+	// set komega client
+	Expect(RegisterIndexFields(mgrCtx, cluster.GetFieldIndexer())).To(Succeed())
+	k8sClient = cluster.GetClient()
+	SetClient(k8sClient)
+
+	By("Starting the registry server")
+	registryServer := registry.NewServer(":30000", k8sClient)
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
@@ -197,6 +203,7 @@ func SetupTest() *corev1.Namespace {
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
+		Expect(RegisterIndexFields(mgrCtx, k8sManager.GetFieldIndexer())).To(Succeed())
 
 		prefixDB := &macdb.MacPrefixes{
 			MacPrefixes: []macdb.MacPrefix{

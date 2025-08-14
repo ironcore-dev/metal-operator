@@ -13,7 +13,11 @@ import (
 	"os"
 	"sync"
 
+	"github.com/ironcore-dev/controller-utils/conditionutils"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Ensure the log output goes to standard out (this is useful if you're running in a containerized environment).
@@ -26,15 +30,17 @@ type Server struct {
 	addr         string
 	mux          *http.ServeMux
 	systemsStore *sync.Map
+	k8sClient    client.Client
 }
 
 // NewServer initializes and returns a new Server instance.
-func NewServer(addr string) *Server {
+func NewServer(addr string, k8sClient client.Client) *Server {
 	mux := http.NewServeMux()
 	server := &Server{
 		addr:         addr,
 		mux:          mux,
 		systemsStore: &sync.Map{},
+		k8sClient:    k8sClient,
 	}
 	server.routes()
 	return server
@@ -45,6 +51,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/register", s.registerHandler)
 	s.mux.HandleFunc("/delete/", s.deleteHandler)
 	s.mux.HandleFunc("/systems/", s.systemsHandler)
+	s.mux.HandleFunc("/bootstate", s.bootstateHandler)
 }
 
 // registerHandler handles the /register endpoint.
@@ -118,6 +125,60 @@ func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
 	// Respond with success message
 	w.WriteHeader(http.StatusOK)
 	log.Printf("System with UUID %s deleted successfully", uuid)
+}
+
+func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+		log.Printf("Received method: %s, but only POST allowed", r.Method)
+		return
+	}
+	var bootstate registry.BootstatePayload
+	if err := json.NewDecoder(r.Body).Decode(&bootstate); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("Failed to decode bootstate payload: %v", err)
+		return
+	}
+	log.Printf("Received boot state for system UUID: %s, Booted: %t\n", bootstate.SystemUUID, bootstate.Booted)
+	if !bootstate.Booted {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	var servers metalv1alpha1.ServerList
+	if err := s.k8sClient.List(r.Context(), &servers, client.MatchingFields{"spec.systemUUID": bootstate.SystemUUID}); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to list servers for system UUID %s: %v", bootstate.SystemUUID, err), http.StatusInternalServerError)
+		log.Printf("Failed to list servers for system UUID %s: %v", bootstate.SystemUUID, err)
+		return
+	}
+	if len(servers.Items) == 0 {
+		http.Error(w, fmt.Sprintf("No servers found for system UUID %s", bootstate.SystemUUID), http.StatusNotFound)
+		log.Printf("No servers found for system UUID: %s", bootstate.SystemUUID)
+		return
+	}
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	for _, server := range servers.Items {
+		original := server.DeepCopy()
+		err := acc.UpdateSlice(
+			&server.Status.Conditions,
+			registry.OSBootedCondition,
+			conditionutils.UpdateStatus(metav1.ConditionTrue),
+			conditionutils.UpdateReason("BootStatePosted"),
+			conditionutils.UpdateMessage("Server successfully posted boot state"),
+			conditionutils.UpdateObserved(&server),
+		)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to update booted condition for server %s: %v", server.Name, err), http.StatusInternalServerError)
+			log.Printf("Failed to update booted condition for server %s: %v", server.Name, err)
+			return
+		}
+		if err := s.k8sClient.Status().Patch(r.Context(), &server, client.MergeFrom(original)); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to update boot state for server %s: %v", server.Name, err), http.StatusInternalServerError)
+			log.Printf("Failed to update boot state for server %s: %v", server.Name, err)
+			return
+		}
+		log.Printf("Updated boot state for server %s: %t", server.Name, bootstate.Booted)
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // Start starts the server on the specified address and adds logging for key events.

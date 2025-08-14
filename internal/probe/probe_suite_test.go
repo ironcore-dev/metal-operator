@@ -38,7 +38,7 @@ var _ = BeforeSuite(func() {
 	DeferCleanup(cancel)
 
 	// Initialize the registry
-	registryServer = registry.NewServer(registryAddr)
+	registryServer = registry.NewServer(registryAddr, nil)
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(ctx)).To(Succeed(), "failed to start registry agent")

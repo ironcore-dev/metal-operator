@@ -708,7 +708,7 @@ func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*r
 		return nil, fmt.Errorf("can not process empty URI")
 	}
 	var system *redfish.ComputerSystem
-	err := wait.PollUntilContextTimeout(
+	if err := wait.PollUntilContextTimeout(
 		ctx,
 		r.options.ResourcePollingInterval,
 		r.options.ResourcePollingTimeout,
@@ -717,8 +717,7 @@ func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*r
 			var err error
 			system, err = common.GetObject[redfish.ComputerSystem](r.client, systemURI)
 			return err == nil, nil
-		})
-	if err != nil {
+		}); err != nil {
 		return nil, fmt.Errorf("failed to wait for for server systems to be ready: %w", err)
 	}
 	if system.UUID != "" {

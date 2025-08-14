@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -34,8 +33,5 @@ func main() {
 		return
 	}
 
-	<-ctx.Done()
-
-	time.Sleep(1 * time.Second)
 	log.Info("Mock server stopped")
 }

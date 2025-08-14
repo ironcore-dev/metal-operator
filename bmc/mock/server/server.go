@@ -29,6 +29,7 @@ type MockServer struct {
 	log     logr.Logger
 	addr    string
 	handler http.Handler
+	mu      sync.Mutex
 }
 
 func NewMockServer(log logr.Logger, addr string) *MockServer {
@@ -60,6 +61,9 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
 	urlPath := resolvePath(r.URL.Path)
@@ -225,16 +229,14 @@ func (s *MockServer) Start(ctx context.Context) error {
 		close(done)
 	}()
 
-	go func() {
-		<-ctx.Done()
-		s.log.Info("Shutting down mock server")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-		defer cancel()
+	<-ctx.Done()
+	s.log.Info("Shutting down mock server")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
 
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			s.log.Error(err, "Mock server shutdown failed")
-		}
-	}()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		s.log.Error(err, "Mock server shutdown failed")
+	}
 
 	return nil
 }

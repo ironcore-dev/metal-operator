@@ -225,16 +225,14 @@ func (s *MockServer) Start(ctx context.Context) error {
 		close(done)
 	}()
 
-	go func() {
-		<-ctx.Done()
-		s.log.Info("Shutting down mock server")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-		defer cancel()
+	<-ctx.Done()
+	s.log.Info("Shutting down mock server")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
 
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			s.log.Error(err, "Mock server shutdown failed")
-		}
-	}()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		s.log.Error(err, "Mock server shutdown failed")
+	}
 
 	return nil
 }

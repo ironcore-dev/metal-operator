@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -783,6 +784,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Ensuring that the BIOSSetting Object has moved to completed")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("Status.FlowState", HaveLen(len(biosSettings.Spec.SettingsFlow))),
 		))
 		By("Ensuring that the BIOSSettings conditions are updated")
 		ensureBiosSettingsFlowCondition(biosSettings)
@@ -930,9 +932,10 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
-		Eventually(Object(biosSettings)).Should(
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		)
+			HaveField("Status.FlowState", HaveLen(len(biosSettings.Spec.SettingsFlow))),
+		))
 		By("Ensuring that the BIOSSettings conditions are updated")
 		ensureBiosSettingsFlowCondition(biosSettings)
 
@@ -947,11 +950,97 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		)
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
-		Eventually(Object(biosSettings)).Should(
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		)
+			HaveField("Status.FlowState", HaveLen(len(biosSettings.Spec.SettingsFlow))),
+		))
 
 		By("Deleting the BIOSSettings")
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+	})
+
+	It("should successfully apply sequence of settings when the names and priority changed", func(ctx SpecContext) {
+
+		newNames := []string{"1000", "10000"}
+		oldNames := []string{"100", "1000"}
+		By("Creating a BIOSSetting with sequence of settings")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-setting-flow-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{
+							Priority: 100,
+							Settings: map[string]string{"abc": "10"},
+							Name:     oldNames[0],
+						},
+						{
+							Priority: 1000,
+							Settings: map[string]string{"fooreboot": "100"},
+							Name:     oldNames[1],
+						},
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		Eventually(Object(biosSettings)).WithPolling(1 * time.Microsecond).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
+		)
+
+		Eventually(Object(biosSettings)).WithPolling(1 * time.Microsecond).Should(SatisfyAny(
+			HaveField("Status.FlowState", HaveLen(1)),
+			HaveField("Status.FlowState", HaveLen(2)),
+		))
+
+		Eventually(
+			func(g Gomega) {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				for idx := range biosSettings.Status.FlowState {
+					g.Expect(biosSettings.Status.FlowState[idx].Name).Should(Equal(oldNames[idx]))
+				}
+			}).Should(Succeed())
+
+		Eventually(Update(biosSettings, func() {
+			biosSettings.Spec.SettingsFlow = []metalv1alpha1.SettingsFlowItem{
+				{
+					Priority: 1000,
+					Settings: map[string]string{"abc": "10"},
+					Name:     newNames[0],
+				},
+				{
+					Priority: 10000,
+					Settings: map[string]string{"fooreboot": "100"},
+					Name:     newNames[1],
+				},
+			}
+		})).Should(Succeed())
+
+		By("Ensuring that the BIOSSetting Object has moved to completed")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("Status.FlowState", HaveLen(len(biosSettings.Spec.SettingsFlow))),
+		))
+
+		Eventually(
+			func(g Gomega) {
+				g.Expect(Get(biosSettings)()).To(Succeed())
+				for idx := range biosSettings.Status.FlowState {
+					g.Expect(biosSettings.Status.FlowState[idx].Name).Should(Equal(newNames[idx]))
+				}
+			}).Should(Succeed())
+
+		By("Ensuring that the BIOSSettings conditions are updated")
+		ensureBiosSettingsFlowCondition(biosSettings)
+
+		By("Deleting the BIOSSetting")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 	})
 })

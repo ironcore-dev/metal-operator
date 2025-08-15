@@ -104,10 +104,6 @@ func (r *BMCSettingsReconciler) delete(
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) {
-		return ctrl.Result{}, nil
-	}
-
 	if err := r.cleanupReferences(ctx, log, bmcSetting); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err

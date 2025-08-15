@@ -786,7 +786,7 @@ BIOSVersionTemplate
 </em>
 </td>
 <td>
-<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+<p>BIOSVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
 </td>
 </tr>
 </table>
@@ -845,7 +845,7 @@ BIOSVersionTemplate
 </em>
 </td>
 <td>
-<p>BiosVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
+<p>BIOSVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.</p>
 </td>
 </tr>
 </tbody>

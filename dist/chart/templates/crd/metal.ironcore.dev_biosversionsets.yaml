@@ -71,7 +71,7 @@ spec:
             description: BIOSVersionSetSpec defines the desired state of BIOSVersionSet.
             properties:
               biosVersionTemplate:
-                description: BiosVersionTemplate defines the template for the BIOSversion
+                description: BIOSVersionTemplate defines the template for the BIOSversion
                   Resource to be applied to the servers.
                 properties:
                   image:

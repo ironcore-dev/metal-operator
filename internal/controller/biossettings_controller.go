@@ -141,10 +141,6 @@ func (r *BiosSettingsReconciler) delete(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosSettings, BIOSSettingsFinalizer) {
-		return ctrl.Result{}, nil
-	}
-
 	if err := r.cleanupReferences(ctx, log, biosSettings); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err

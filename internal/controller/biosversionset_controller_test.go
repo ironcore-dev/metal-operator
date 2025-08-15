@@ -130,7 +130,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
-					BiosVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 upgradeServerBiosVersion,
 						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
@@ -170,8 +170,8 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			By("Checking the biosVersion01 have completed")
 			Eventually(Object(biosVersion02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
-				HaveField("Spec.Version", biosVersionSet.Spec.BiosVersionTemplate.Version),
-				HaveField("Spec.Image.URI", biosVersionSet.Spec.BiosVersionTemplate.Image.URI),
+				HaveField("Spec.Version", biosVersionSet.Spec.BIOSVersionTemplate.Version),
+				HaveField("Spec.Image.URI", biosVersionSet.Spec.BIOSVersionTemplate.Image.URI),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BIOSVersionSet",
@@ -185,8 +185,8 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			By("Checking the biosVersion02 have completed")
 			Eventually(Object(biosVersion03)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
-				HaveField("Spec.Version", biosVersionSet.Spec.BiosVersionTemplate.Version),
-				HaveField("Spec.Image.URI", biosVersionSet.Spec.BiosVersionTemplate.Image.URI),
+				HaveField("Spec.Version", biosVersionSet.Spec.BIOSVersionTemplate.Version),
+				HaveField("Spec.Image.URI", biosVersionSet.Spec.BIOSVersionTemplate.Image.URI),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BIOSVersionSet",
@@ -218,7 +218,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					Namespace:    ns.Name,
 				},
 				Spec: metalv1alpha1.BIOSVersionSetSpec{
-					BiosVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
 						Version:                 upgradeServerBiosVersion,
 						Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,

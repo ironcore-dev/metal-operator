@@ -21,22 +21,23 @@ import (
 
 var (
 	//go:embed data/**
-	dataFS    embed.FS
-	overrides sync.Map
+	dataFS embed.FS
 )
 
 type MockServer struct {
-	log     logr.Logger
-	addr    string
-	handler http.Handler
-	mu      sync.Mutex
+	log       logr.Logger
+	addr      string
+	handler   http.Handler
+	mu        sync.RWMutex
+	overrides map[string]any
 }
 
 func NewMockServer(log logr.Logger, addr string) *MockServer {
 	mux := http.NewServeMux()
 	server := &MockServer{
-		addr: addr,
-		log:  log,
+		addr:      addr,
+		log:       log,
+		overrides: make(map[string]any),
 	}
 
 	mux.HandleFunc("/redfish/v1/", server.redfishHandler)
@@ -61,9 +62,6 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
 	urlPath := resolvePath(r.URL.Path)
@@ -74,6 +72,7 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 			s.log.Error(err, "Failed to close request body")
 		}
 	}(r.Body)
+
 	if err != nil || len(body) == 0 {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
@@ -85,10 +84,13 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Load existing resource: from override if exists, else embedded
-	var base map[string]interface{}
-	if cached, ok := overrides.Load(urlPath); ok {
-		base = cached.(map[string]interface{})
+	var base map[string]any
+	if cached, ok := s.overrides[urlPath]; ok {
+		base = deepCopy(cached.(map[string]any))
 	} else {
 		data, err := dataFS.ReadFile(urlPath)
 		if err != nil {
@@ -107,19 +109,19 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Merge update into base
+	// Merge update into the copy
 	mergeJSON(base, update)
 
-	// Store updated version in memory
-	overrides.Store(urlPath, deepCopy(base))
+	// Store the newly modified version
+	s.overrides[urlPath] = base
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func deepCopy(m map[string]interface{}) map[string]interface{} {
-	c := make(map[string]interface{})
+func deepCopy(m map[string]any) map[string]any {
+	c := make(map[string]any)
 	for k, v := range m {
-		if vMap, ok := v.(map[string]interface{}); ok {
+		if vMap, ok := v.(map[string]any); ok {
 			c[k] = deepCopy(vMap)
 		} else {
 			c[k] = v
@@ -141,13 +143,16 @@ func resolvePath(urlPath string) string {
 func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
 	urlPath := resolvePath(r.URL.Path)
 
-	if cached, ok := overrides.Load(urlPath); ok {
+	s.mu.RLock()
+	cached, hasOverride := s.overrides[urlPath]
+	s.mu.RUnlock()
+
+	if hasOverride {
 		resp, _ := json.MarshalIndent(cached, "", "  ")
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write(resp)
 		if err != nil {
 			s.log.Error(err, "Failed to write response")
-			return
 		}
 		return
 	}
@@ -162,7 +167,6 @@ func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write(content)
 	if err != nil {
 		s.log.Error(err, "Failed to write response")
-		return
 	}
 }
 
@@ -183,7 +187,6 @@ func mergeJSON(base, update map[string]interface{}) {
 func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
-	// You can parse JSON body here if needed
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -198,7 +201,6 @@ func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 
 	s.log.Info("POST body received", "body", string(body))
 
-	// Respond with a 201 Created or similar
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(`{"status": "created"}`))

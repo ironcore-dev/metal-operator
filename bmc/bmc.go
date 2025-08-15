@@ -104,13 +104,11 @@ type BMC interface {
 	// GetStorages retrieves storage information for the system.
 	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
 
+	// GetProcessors retrieves processor information for the system.
 	GetProcessors(ctx context.Context, systemURI string) ([]Processor, error)
 
-	UpgradeBiosVersion(
-		ctx context.Context,
-		manufacturer string,
-		parameters *redfish.SimpleUpdateParameters,
-	) (string, bool, error)
+	// UpgradeBiosVersion upgrades the BIOS version for the system.
+	UpgradeBiosVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error)
 
 	// GetBiosUpgradeTask retrieves the task for the BIOS upgrade.
 	GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)

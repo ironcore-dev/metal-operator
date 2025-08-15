@@ -141,7 +141,7 @@ func (r *BIOSVersionSetReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.updateSpec(ctx, log, biosVersionSet, ownedBiosVersions); err != nil {
+	if err := r.patchOrCreateBIOSVersionfromTemplate(ctx, log, &biosVersionSet.Spec.BIOSVersionTemplate, ownedBiosVersions); err != nil {
 		log.Error(err, "failed to update specs")
 		return ctrl.Result{}, err
 	}
@@ -234,14 +234,14 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(
 	return warnings, errors.Join(errs...)
 }
 
-func (r *BIOSVersionSetReconciler) updateSpec(
+func (r *BIOSVersionSetReconciler) patchOrCreateBIOSVersionfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
+	biosVersionTemplate *metalv1alpha1.BIOSVersionTemplate,
 	biosVersionList *metalv1alpha1.BIOSVersionList,
 ) error {
 	if len(biosVersionList.Items) == 0 {
-		log.V(1).Info("No BIOSVersion found, skipping spec update")
+		log.V(1).Info("No BIOSVersion found, skipping spec template update")
 		return nil
 	}
 
@@ -249,7 +249,7 @@ func (r *BIOSVersionSetReconciler) updateSpec(
 	for _, biosVersion := range biosVersionList.Items {
 		if biosVersion.Status.State != metalv1alpha1.BIOSVersionStateInProgress {
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
-				biosVersion.Spec.BIOSVersionTemplate = *biosVersionSet.Spec.BIOSVersionTemplate.DeepCopy()
+				biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
 				return nil
 			}) //nolint:errcheck
 			if err != nil {

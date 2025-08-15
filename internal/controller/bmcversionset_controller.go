@@ -138,8 +138,8 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.updateSpec(ctx, log, bmcVersionSet, ownedBMCVersions); err != nil {
-		log.Error(err, "failed to update specs")
+	if err := r.patchOrCreateBMCVersionfromTemplate(ctx, log, &bmcVersionSet.Spec.BMCVersionTemplate, ownedBMCVersions); err != nil {
+		log.Error(err, "failed to update biosSettings specs")
 		return ctrl.Result{}, err
 	}
 
@@ -221,14 +221,14 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	return warnings, errors.Join(errs...)
 }
 
-func (r *BMCVersionSetReconciler) updateSpec(
+func (r *BMCVersionSetReconciler) patchOrCreateBMCVersionfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
-	bmcVersionSet *metalv1alpha1.BMCVersionSet,
+	bmcVersionTemplate *metalv1alpha1.BMCVersionTemplate,
 	bmcVersionList *metalv1alpha1.BMCVersionList,
 ) error {
 	if len(bmcVersionList.Items) == 0 {
-		log.V(1).Info("No BMCVersion found, skipping spec update")
+		log.V(1).Info("No BMCVersion found, skipping spec template update")
 		return nil
 	}
 
@@ -236,7 +236,7 @@ func (r *BMCVersionSetReconciler) updateSpec(
 	for _, bmcVersion := range bmcVersionList.Items {
 		if bmcVersion.Status.State != metalv1alpha1.BMCVersionStateInProgress {
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
-				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionSet.Spec.BMCVersionTemplate.DeepCopy()
+				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
 				return nil
 			}) //nolint:errcheck
 			if err != nil {

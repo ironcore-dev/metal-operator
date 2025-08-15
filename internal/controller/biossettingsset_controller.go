@@ -153,7 +153,7 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.updateSpec(ctx, log, biosSettingsSet, ownedBiosSettings); err != nil {
+	if err := r.patchOrCreateBIOSSettingsfromTemplate(ctx, log, &biosSettingsSet.Spec.BIOSSettingsTemplate, ownedBiosSettings); err != nil {
 		log.Error(err, "failed to update specs")
 		return ctrl.Result{}, err
 	}
@@ -248,14 +248,14 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(
 	return errors.Join(errs...)
 }
 
-func (r *BIOSSettingsSetReconciler) updateSpec(
+func (r *BIOSSettingsSetReconciler) patchOrCreateBIOSSettingsfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
-	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
+	biosSettingsTemplate *metalv1alpha1.BIOSSettingsTemplate,
 	biosSettingsList *metalv1alpha1.BIOSSettingsList,
 ) error {
 	if len(biosSettingsList.Items) == 0 {
-		log.V(1).Info("No BIOSSettings found, skipping spec update")
+		log.V(1).Info("No BIOSSettings found, skipping spec template update")
 		return nil
 	}
 
@@ -263,7 +263,7 @@ func (r *BIOSSettingsSetReconciler) updateSpec(
 	for _, biosSettings := range biosSettingsList.Items {
 		if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
-				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsSet.Spec.BIOSSettingsTemplate.DeepCopy()
+				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
 				return nil
 			}) //nolint:errcheck
 			if err != nil {

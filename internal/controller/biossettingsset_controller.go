@@ -153,6 +153,11 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 		return ctrl.Result{}, err
 	}
 
+	if err := r.updateSpec(ctx, log, biosSettingsSet, ownedBiosSettings); err != nil {
+		log.Error(err, "failed to update specs")
+		return ctrl.Result{}, err
+	}
+
 	log.V(1).Info("Updating the status of BIOSSettingsSet")
 	currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
 	currentStatus.FullyLabeledServers = int32(len(serverList.Items))
@@ -182,6 +187,11 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(
 	var errs []error
 	for _, server := range serverList.Items {
 		if _, ok := serverWithSettings[server.Name]; !ok {
+			if server.Spec.BIOSSettingsRef != nil {
+				// this is the case where the server already has a different BIOSSettingsRef, and we should not create a new one for this server
+				log.V(1).Info("Server already has different BIOSSettingsRef, skipping creation", "server", server.Name)
+				continue
+			}
 			newBiosSettingsName := fmt.Sprintf("%s-%s", biosSettingsSet.Name, server.Name)
 			var newBiosSetting *metalv1alpha1.BIOSSettings
 			if len(newBiosSettingsName) > utilvalidation.DNS1123SubdomainMaxLength {
@@ -217,15 +227,14 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(
 	serverList *metalv1alpha1.ServerList,
 	biosSettingsList *metalv1alpha1.BIOSSettingsList,
 ) error {
-
-	serverWithSettings := make(map[string]struct{})
+	serverMap := make(map[string]bool)
 	for _, server := range serverList.Items {
-		serverWithSettings[server.Spec.BIOSSettingsRef.Name] = struct{}{}
+		serverMap[server.Name] = true
 	}
 
 	var errs []error
 	for _, biosSettings := range biosSettingsList.Items {
-		if _, ok := serverWithSettings[biosSettings.Name]; !ok {
+		if _, ok := serverMap[biosSettings.Spec.ServerRef.Name]; !ok {
 			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
 				log.V(1).Info("Waiting for BIOSSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "status", biosSettings.Status)
 				continue
@@ -236,6 +245,35 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(
 		}
 	}
 
+	return errors.Join(errs...)
+}
+
+func (r *BIOSSettingsSetReconciler) updateSpec(
+	ctx context.Context,
+	log logr.Logger,
+	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
+	biosSettingsList *metalv1alpha1.BIOSSettingsList,
+) error {
+	if len(biosSettingsList.Items) == 0 {
+		log.V(1).Info("No BIOSSettings found, skipping spec update")
+		return nil
+	}
+
+	var errs []error
+	for _, biosSettings := range biosSettingsList.Items {
+		if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
+			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
+				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsSet.Spec.BIOSSettingsTemplate.DeepCopy()
+				return nil
+			}) //nolint:errcheck
+			if err != nil {
+				errs = append(errs, err)
+			}
+			if opResult != controllerutil.OperationResultNone {
+				log.V(1).Info("Patched biosSettings with updated spec", "BIOSSettings", biosSettings.Name, "Operation", opResult)
+			}
+		}
+	}
 	return errors.Join(errs...)
 }
 

@@ -138,6 +138,11 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
+	if err := r.updateSpec(ctx, log, bmcVersionSet, ownedBMCVersions); err != nil {
+		log.Error(err, "failed to update specs")
+		return ctrl.Result{}, err
+	}
+
 	log.V(1).Info("updating the status of BMCVersionSet")
 	currentStatus := r.getOwnedBMCVersionSetStatus(ownedBMCVersions)
 	currentStatus.FullyLabeledBMCs = int32(len(bmcList.Items))
@@ -214,6 +219,35 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	}
 
 	return warnings, errors.Join(errs...)
+}
+
+func (r *BMCVersionSetReconciler) updateSpec(
+	ctx context.Context,
+	log logr.Logger,
+	bmcVersionSet *metalv1alpha1.BMCVersionSet,
+	bmcVersionList *metalv1alpha1.BMCVersionList,
+) error {
+	if len(bmcVersionList.Items) == 0 {
+		log.V(1).Info("No BMCVersion found, skipping spec update")
+		return nil
+	}
+
+	var errs []error
+	for _, bmcVersion := range bmcVersionList.Items {
+		if bmcVersion.Status.State != metalv1alpha1.BMCVersionStateInProgress {
+			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
+				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionSet.Spec.BMCVersionTemplate.DeepCopy()
+				return nil
+			}) //nolint:errcheck
+			if err != nil {
+				errs = append(errs, err)
+			}
+			if opResult != controllerutil.OperationResultNone {
+				log.V(1).Info("Patched BMCVersion with updated spec", "BMCVersions", bmcVersion.Name, "Operation", opResult)
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (r *BMCVersionSetReconciler) getOwnedBMCVersionSetStatus(

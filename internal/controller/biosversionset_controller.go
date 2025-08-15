@@ -141,6 +141,11 @@ func (r *BIOSVersionSetReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
+	if err := r.updateSpec(ctx, log, biosVersionSet, ownedBiosVersions); err != nil {
+		log.Error(err, "failed to update specs")
+		return ctrl.Result{}, err
+	}
+
 	log.V(1).Info("updating the status of BIOSVersionSet")
 	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
 	currentStatus.FullyLabeledServers = int32(len(serverList.Items))
@@ -186,7 +191,7 @@ func (r *BIOSVersionSetReconciler) createMissingBIOSVersions(
 			}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {
-				newBiosVersion.Spec.BIOSVersionTemplate = *biosVersionSet.Spec.BiosVersionTemplate.DeepCopy()
+				newBiosVersion.Spec.BIOSVersionTemplate = *biosVersionSet.Spec.BIOSVersionTemplate.DeepCopy()
 				newBiosVersion.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
 				return controllerutil.SetControllerReference(biosVersionSet, newBiosVersion, r.Client.Scheme())
 			})
@@ -227,6 +232,35 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(
 	}
 
 	return warnings, errors.Join(errs...)
+}
+
+func (r *BIOSVersionSetReconciler) updateSpec(
+	ctx context.Context,
+	log logr.Logger,
+	biosVersionSet *metalv1alpha1.BIOSVersionSet,
+	biosVersionList *metalv1alpha1.BIOSVersionList,
+) error {
+	if len(biosVersionList.Items) == 0 {
+		log.V(1).Info("No BIOSVersion found, skipping spec update")
+		return nil
+	}
+
+	var errs []error
+	for _, biosVersion := range biosVersionList.Items {
+		if biosVersion.Status.State != metalv1alpha1.BIOSVersionStateInProgress {
+			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
+				biosVersion.Spec.BIOSVersionTemplate = *biosVersionSet.Spec.BIOSVersionTemplate.DeepCopy()
+				return nil
+			}) //nolint:errcheck
+			if err != nil {
+				errs = append(errs, err)
+			}
+			if opResult != controllerutil.OperationResultNone {
+				log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersions", biosVersion.Name, "Operation", opResult)
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionSetStatus(

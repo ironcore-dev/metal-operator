@@ -1,0 +1,16 @@
+{
+    "@odata.type": "#ComponentIntegrity.v1_2_2.ComponentIntegrity",
+    "Id": "USB-Integrity",
+    "Name": "Component Integrity",
+    "Description": "SPDM Integrity Information for a USB controller. The SPDM protocol to this USB controller is completely disabled.",
+    "Status": {
+        "Health": "OK",
+        "State": "Enabled"
+    },
+    "ComponentIntegrityType": "SPDM",
+    "ComponentIntegrityTypeVersion": "",
+    "ComponentIntegrityEnabled": false,
+    "TargetComponentURI": "/redfish/v1/Systems/437XR1138R2/USBControllers/USB1",
+    "@odata.id": "/redfish/v1/ComponentIntegrity/USB-Integrity",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

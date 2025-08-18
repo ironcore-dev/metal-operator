@@ -780,6 +780,18 @@ func (r *RedfishBMC) CreateOrUpdateAccount(
 	return nil
 }
 
+func (r *RedfishBMC) GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error) {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounts: %w", err)
+	}
+	return accounts, nil
+}
+
 func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*redfish.ComputerSystem, error) {
 	if len(systemURI) == 0 {
 		return nil, fmt.Errorf("can not process empty URI")

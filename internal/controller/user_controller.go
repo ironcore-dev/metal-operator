@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,14 +71,21 @@ func (r *UserReconciler) reconcile(ctx context.Context, log logr.Logger, user *m
 	}, bmcObj); err != nil {
 		return ctrl.Result{}, err
 	}
-	if bmcObj.Spec.AdminUserRef == nil {
+	// Add this check once we use the user CRD also for BMC admin users
+	/*if bmcObj.Spec.AdminUserRef == nil {
 		return ctrl.Result{}, fmt.Errorf("BMC %s does not have an admin user reference set", bmcObj.Name)
 	}
+	*/
 	bmcClient, err := r.getBMCClient(ctx, log, bmcObj, user)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
+	err = r.patchUserStatus(ctx, log, user, bmcClient)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update User status: %w", err)
+	}
+
 	if user.Spec.BMCSecretRef == nil {
 		log.Info("No BMCSecret reference set for User, creating a new one", "User", user.Name)
 		if err := r.handleMissingBMCSecretRef(ctx, log, bmcClient, user); err != nil {
@@ -103,21 +111,54 @@ func (r *UserReconciler) reconcile(ctx context.Context, log logr.Logger, user *m
 	return r.handleRotatingPassword(ctx, log, user, bmcClient)
 }
 
+func (r *UserReconciler) patchUserStatus(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, bmcClient bmc.BMC) error {
+	accounts, err := bmcClient.GetAccounts(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get BMC accounts: %w", err)
+	}
+	for _, account := range accounts {
+		if account.UserName == user.Spec.UserName {
+			log.V(1).Info("BMC account already exists", "User", user.Name, "AccountID", account.ID)
+			userBase := user.DeepCopy()
+			user.Status.ID = account.ID
+			user.Status.PasswordExpiration = account.PasswordExpiration
+			if err := r.Status().Patch(ctx, user, client.MergeFrom(userBase)); err != nil {
+				return fmt.Errorf("failed to patch User status with BMC account ID: %w", err)
+			}
+			log.Info("Updated User status with BMC account ID", "User", user.Name, "AccountID", account.ID)
+			return nil
+		}
+	}
+	return nil
+}
+
 func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, bmcClient bmc.BMC) (ctrl.Result, error) {
 	forceRotation := false
 	if user.GetAnnotations() != nil && user.GetAnnotations()[metalv1alpha1.OperationAnnotation] == metalv1alpha1.OperationAnnotationRotateCredentials {
 		log.Info("User has rotation annotation set, triggering password rotation", "User", user.Name)
 		forceRotation = true
 	}
-	if user.Spec.RotationPeriod == nil && !forceRotation {
+	if user.Status.PasswordExpiration != "" {
+		exp, err := time.Parse(time.RFC3339, user.Status.PasswordExpiration)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to parse password expiration time: %w", err)
+		}
+		if exp.Before(metav1.Now().Time) {
+			log.Info("BMC user password has expired, rotating password", "User", user.Name)
+			// If the password has expired, we need to rotate it
+			forceRotation = true
+		}
+
+	}
+	if user.Spec.RotationPolicy == nil && !forceRotation {
 		log.V(1).Info("No rotation period set for BMC user, skipping password rotation", "User", user.Name)
 		return ctrl.Result{}, nil
 	}
-	if user.Status.LastRotation.Add(user.Spec.RotationPeriod.Duration).After(metav1.Now().Time) && !forceRotation {
+	if user.Status.LastRotation.Add(user.Spec.RotationPolicy.Duration).After(metav1.Now().Time) && !forceRotation {
 		log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 		return ctrl.Result{
 			Requeue:      true,
-			RequeueAfter: user.Spec.RotationPeriod.Duration,
+			RequeueAfter: user.Spec.RotationPolicy.Duration,
 		}, nil
 	}
 	newPassword, err := GenerateRandomPassword(16)
@@ -140,7 +181,7 @@ func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Lo
 	log.Info("Updated last rotation time for BMC user", "User", user.Name)
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: user.Spec.RotationPeriod.Duration,
+		RequeueAfter: user.Spec.RotationPolicy.Duration,
 	}, nil
 }
 
@@ -173,15 +214,15 @@ func (r *UserReconciler) handleMissingEffectiveBMCSecretRef(ctx context.Context,
 		return ctrl.Result{}, fmt.Errorf("failed to update BMC account password: %w", err)
 	}
 	log.Info("Created effective BMCSecret for User", "User", user.Name)
-	if user.Spec.RotationPeriod == nil {
+	if user.Spec.RotationPolicy == nil {
 		// If no rotation period is set, we don't need to requeue
 		return ctrl.Result{}, nil
 	}
-	log.Info("Requeuing for password rotation", "User", user.Name, "RotationPeriod", user.Spec.RotationPeriod.Duration)
+	log.Info("Requeuing for password rotation", "User", user.Name, "RotationPolicy", user.Spec.RotationPolicy.Duration)
 	// If a rotation period is set, we requeue for the next rotation
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: user.Spec.RotationPeriod.Duration,
+		RequeueAfter: user.Spec.RotationPolicy.Duration,
 	}, nil
 }
 

@@ -16,17 +16,19 @@ type UserSpec struct {
 	UserName       string                   `json:"userName"`
 	RoleID         string                   `json:"roleID"`
 	Description    string                   `json:"description,omitempty"`
-	RotationPeriod *metav1.Duration         `json:"rotationPeriod,omitempty"`
+	RotationPolicy *metav1.Duration         `json:"rotationPeriod,omitempty"`
 	BMCSecretRef   *v1.LocalObjectReference `json:"bmcSecretRef,omitempty"`
 	BMCRef         *v1.LocalObjectReference `json:"bmcRef,omitempty"`
 	Enabled        bool                     `json:"enabled"`
-	IsAdmin        bool                     `json:"isAdmin"`
+	// set if the user should be used by the BMC reconciler to access the system.
+	UseForBMCAccess bool `json:"useForBMCAccess,omitempty"`
 }
 
 // UserStatus defines the observed state of User
 type UserStatus struct {
 	EffectiveBMCSecretRef *v1.LocalObjectReference `json:"effectiveBMCSecretRef,omitempty"`
 	LastRotation          *metav1.Time             `json:"lastRotation,omitempty"`
+	PasswordExpiration    string                   `json:"passwordExpiration,omitempty"`
 	ID                    string                   `json:"id,omitempty"` // ID of the user in the BMC system
 }
 

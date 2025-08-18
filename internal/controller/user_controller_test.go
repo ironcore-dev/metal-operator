@@ -241,7 +241,7 @@ var _ = Describe("User Controller", func() {
 				BMCSecretRef: &v1.LocalObjectReference{
 					Name: bmcSecret.Name,
 				},
-				RotationPeriod: &metav1.Duration{
+				RotationPolicy: &metav1.Duration{
 					Duration: 1 * time.Second,
 				},
 			},

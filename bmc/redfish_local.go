@@ -408,3 +408,48 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.Settings
 	}
 	return common.CheckAttribues(attrs, filtered)
 }
+
+func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
+	if UnitTestMockUps.BMCVersion == "" {
+		var err error
+		UnitTestMockUps.BMCVersion, err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
+		if err != nil {
+			return "", err
+		}
+	}
+	return UnitTestMockUps.BMCVersion, nil
+}
+
+func (r *RedfishLocalBMC) UpgradeBMCVersion(
+	ctx context.Context,
+	manufacturer string,
+	parameters *redfish.SimpleUpdateParameters,
+) (string, bool, error) {
+	UnitTestMockUps.BMCUpgradeTaskIndex = 0
+	// note, ImageURI is mocked for testing upgrading to version
+	UnitTestMockUps.BMCUpgradingVersion = parameters.ImageURI
+	// this go routine mocks the upgrade progress
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+			time.Sleep(5 * time.Millisecond)
+			UnitTestMockUps.BMCUpgradeTaskIndex = UnitTestMockUps.BMCUpgradeTaskIndex + 1
+		}
+	}()
+	return "dummyTask", false, nil
+}
+
+func (r *RedfishLocalBMC) GetBMCUpgradeTask(
+	ctx context.Context,
+	manufacturer string,
+	taskURI string,
+) (*redfish.Task, error) {
+	if UnitTestMockUps.BMCUpgradeTaskIndex > len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+		UnitTestMockUps.BMCUpgradeTaskIndex = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+	}
+	task := UnitTestMockUps.BMCUpgradeTaskStatus[UnitTestMockUps.BMCUpgradeTaskIndex].TaskState
+	if task == redfish.CompletedTaskState {
+		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
+	}
+	return &UnitTestMockUps.BMCUpgradeTaskStatus[UnitTestMockUps.BMCUpgradeTaskIndex], nil
+}

@@ -6,11 +6,8 @@ package controller
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
-	toolscache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -31,8 +28,6 @@ import (
 
 const (
 	ServerClaimFinalizer = "metal.ironcore.dev/serverclaim"
-
-	cacheUpdateTimeout time.Duration = time.Second
 )
 
 // ServerClaimReconciler reconciles a ServerClaim object
@@ -41,7 +36,6 @@ type ServerClaimReconciler struct {
 	Cache                   cache.Cache
 	Scheme                  *runtime.Scheme
 	MaxConcurrentReconciles int
-	claimMutex              sync.Mutex
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverclaims,verbs=get;list;watch;create;update;patch;delete
@@ -154,9 +148,9 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	server, modified, err := r.claimServer(ctx, log, claim)
-	if err != nil || modified {
-		return ctrl.Result{Requeue: true}, err
+	server, err := r.claimServer(ctx, log, claim)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 	if server == nil {
 		log.V(1).Info("No server found for claim")
@@ -173,7 +167,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Patched ServerRef in Claim")
 
-	if err := r.applyBootConfiguration(ctx, log, server, claim); err != nil {
+	if err = r.applyBootConfiguration(ctx, log, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
 	log.V(1).Info("Applied BootConfiguration for ServerClaim")
@@ -192,10 +186,10 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) error {
 	if server.Spec.ServerClaimRef != nil {
 		log.V(1).Info("Server is already claimed", "Server", server.Name, "Claim", server.Spec.ServerClaimRef.Name)
-		return false, nil
+		return nil
 	}
 
 	if server.Spec.ServerClaimRef == nil {
@@ -207,12 +201,12 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, lo
 			Name:       claim.Name,
 			UID:        claim.UID,
 		}
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return false, fmt.Errorf("failed to patch claim ref for server: %w", err)
+		if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
+			return fmt.Errorf("failed to patch claim ref for server: %w", err)
 		}
 		log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
 	}
-	return true, nil
+	return nil
 }
 
 func (r *ServerClaimReconciler) ensurePowerStateForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
@@ -306,22 +300,19 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 	return nil
 }
 
-func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, bool, error) {
-	// fast path: check if the server already points to the current claim
-	// read-only operation, no need to lock
+func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if server := checkForPrevUsedServer(log, serverList.Items, claim); server != nil {
-		return server, false, nil
+		return server, nil
 	}
 
-	// slow path: claim a server
-	// The claimMutex ensures that claiming operations are serialized.
-	r.claimMutex.Lock()
-	defer r.claimMutex.Unlock()
-
+	// If no server is specified, find a server.
+	// ensureObjectRefForServer() uses a patch with optimistic locking,
+	// so it will not overwrite the claim with a different server,
+	// in case controller-runtimes cached client is not up to date.
 	var (
 		server *metalv1alpha1.Server
 		err    error
@@ -335,64 +326,19 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		server, err = r.claimFirstBestServer(ctx, log)
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if server == nil {
-		return nil, false, nil
+		return nil, nil
 	}
 	log.V(1).Info("Matching server found", "Server", server.Name)
 
-	// controller-runtime does use a cached client by default, which is updated asynchronously.
-	// As the next claiming operation might be performed as soon as the mutex is released
-	// it is required to ensure that the cached server object is up-to-date. Otherwise, the same
-	// server might be claimed again by another claim. This is achieved by establishing a temporary
-	// watch on server objects and waiting for an update containing the expected resource version.
-	informer, err := r.Cache.GetInformer(ctx, server)
+	err = r.ensureObjectRefForServer(ctx, log, claim, server)
 	if err != nil {
-		return nil, false, err
-	}
-	ServerRef := make(chan *v1.ObjectReference)
-	defer close(ServerRef)
-
-	handler := toolscache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(oldObj, newObj any) {
-			newServer := newObj.(*metalv1alpha1.Server)
-			if newServer.Name != server.Name || newServer.Namespace != server.Namespace {
-				return
-			}
-			if newServer.Spec.ServerClaimRef == nil {
-				return
-			}
-			ServerRef <- newServer.Spec.ServerClaimRef
-		},
-	}
-	// The watch is initialized before calling ensureObjectRefForServer to ensure that the
-	// issued update is not missed.
-	registration, err := informer.AddEventHandler(handler)
-	if err != nil {
-		return nil, false, err
-	}
-	defer func() { _ = informer.RemoveEventHandler(registration) }()
-
-	modified, err := r.ensureObjectRefForServer(ctx, log, claim, server)
-	if err != nil {
-		return nil, modified, err
+		return nil, err
 	}
 	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
-	if !modified {
-		return server, modified, nil
-	}
-	for {
-		select {
-		case cachedServerRef := <-ServerRef:
-			if cachedServerRef.Name == server.Spec.ServerClaimRef.Name &&
-				cachedServerRef.Namespace == server.Spec.ServerClaimRef.Namespace {
-				return server, modified, nil
-			}
-		case <-time.After(cacheUpdateTimeout):
-			return nil, modified, fmt.Errorf("timeout waiting for server update")
-		}
-	}
+	return server, nil
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
@@ -502,9 +448,9 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
 		log := ctrl.LoggerFrom(ctx)
 
-		host := object.(*metalv1alpha1.Server)
+		server := object.(*metalv1alpha1.Server)
 
-		if host.Status.State == metalv1alpha1.ServerStateMaintenance || host.Spec.ServerMaintenanceRef != nil {
+		if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
 			return nil
 		}
 		var req []reconcile.Request
@@ -514,7 +460,7 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 			return nil
 		}
 		for _, claim := range claimList.Items {
-			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == host.Name {
+			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == server.Name {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
 				})

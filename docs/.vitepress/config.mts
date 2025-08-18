@@ -50,12 +50,15 @@ export default withMermaid({
           { text: 'BMCSecrets', link: '/concepts/bmcsecrets' },
           { text: 'BMCSettings', link: '/concepts/bmcsettings' },
           { text: 'BMCVersion', link: '/concepts/bmcversion' },
+          { text: 'BMCVersionSet', link: '/concepts/bmcversionset' },
           { text: 'Servers', link: '/concepts/servers' },
           { text: 'ServerClaims', link: '/concepts/serverclaims' },
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
           { text: 'ServerMaintenance', link: '/concepts/servermaintenance' },
           { text: 'BIOSSettings', link: '/concepts/biossettings' },
           { text: 'BIOSVersion', link: '/concepts/biosversion' },
+          { text: 'BIOSVersionSet', link: '/concepts/biosversionset' },
+          { text: 'BIOSSettingsSet', link: '/concepts/biossettingsset' },
         ]
       },
       {

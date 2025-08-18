@@ -1,4 +1,4 @@
-name: Pull Request Code test
+name: Tests
 
 on:
   pull_request:
@@ -8,12 +8,19 @@ on:
     - '**/*.md'
 
 jobs:
-  checks:
-    name: test
+  test:
+    name: Run on Ubuntu
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-go@v5
-      with:
-        go-version-file: 'go.mod'
-    - run: make test
+      - name: Clone the code
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Running Tests
+        run: |
+          go mod tidy
+          make test

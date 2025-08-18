@@ -108,6 +108,17 @@ type BMC interface {
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 
 	GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error)
+	UpgradeBMCVersion(
+		ctx context.Context,
+		manufacturer string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, bool, error)
+
+	GetBMCUpgradeTask(
+		ctx context.Context,
+		manufacturer string,
+		taskURI string,
+	) (*redfish.Task, error)
 }
 
 type OEMManagerInterface interface {

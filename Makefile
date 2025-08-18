@@ -65,7 +65,6 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 fmt: goimports ## Run goimports against code.
 	$(GOIMPORTS) -w .
 
-
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
@@ -343,7 +342,7 @@ endef
 KIND_CLUSTER_NAME ?= metal
 
 .PHONY: kind-create
-kind-create: $(ENVTEST) ## create metal kind cluster if needed
+kind-create: $(ENVTEST) kubectl ## create metal kind cluster if needed
 	./scripts/kind-with-registry.sh
 
 .PHONY: kind-delete

@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -225,18 +223,18 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
 
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", bmcSettings.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the Maintenance resource has been referenced by BMCSettings resource")
-		Eventually(Object(bmcSettings)).Should(SatisfyAny(
+		Eventually(Object(bmcSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &v1.ObjectReference{
@@ -244,18 +242,9 @@ var _ = Describe("BMCSettings Controller", func() {
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
-						APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+						APIVersion: metalv1alpha1.GroupVersion.String(),
 					}}}),
-			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: "metal.ironcore.dev/v1alpha1",
-					}}}),
-		))
+		)
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
@@ -347,10 +336,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 		))
 
+		By("Ensuring that the Maintenance resource has been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
+
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      fmt.Sprintf("%s-%s", BMCSettings.Name, server.Name),
+				Name:      serverMaintenanceList.Items[0].Name,
 			},
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
@@ -365,7 +358,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		By("Ensuring that the Maintenance resource has been deleted")
-		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(Object(BMCSettings)).Should(SatisfyAll(
@@ -383,5 +375,52 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", BeNil()),
 		))
+	})
+
+	It("should allow retry using annotation", func(ctx SpecContext) {
+		// settings which does not reboot. mocked at
+		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
+		bmcSetting := make(map[string]string)
+		bmcSetting["fooreboot"] = "145"
+
+		By("update the server state to Available  state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
+
+		By("Creating a BMCSetting")
+		BMCSettings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-bmc-upgrade",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				Version:                 "1.45.455b66-rev4",
+				SettingsMap:             bmcSetting,
+				BMCRef:                  &v1.LocalObjectReference{Name: bmc.Name},
+				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, BMCSettings)).To(Succeed())
+
+		By("Moving to Failed state")
+		Eventually(UpdateStatus(BMCSettings, func() {
+			BMCSettings.Status.State = metalv1alpha1.BMCSettingsStateFailed
+		})).Should(Succeed())
+
+		Eventually(Update(BMCSettings, func() {
+			BMCSettings.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
+			}
+		})).Should(Succeed())
+
+		Eventually(Object(BMCSettings)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+		)
+
+		Eventually(Object(BMCSettings)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		)
 	})
 })

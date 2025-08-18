@@ -48,6 +48,9 @@ resources:
   kind: Server
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -82,6 +85,9 @@ resources:
   kind: BIOSSettings
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -112,7 +118,39 @@ resources:
   kind: User
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: BMCVersion
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
   webhooks:
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: BIOSVersionSet
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: BIOSSettingsSet
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: BMCVersionSet
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

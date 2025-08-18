@@ -85,6 +85,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.Manufacturer", "Contoso"),
+			HaveField("Status.BIOSVersion", "P79 v1.45 (12/06/2017)"),
 			HaveField("Status.Model", "3500"),
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
@@ -226,7 +227,7 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Spec.Power", metalv1alpha1.Power("On")),
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
@@ -235,6 +236,9 @@ var _ = Describe("Server Controller", func() {
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			HaveField("Status.Conditions", ContainElement(
+				HaveField("Type", PoweringOnCondition),
+			)),
 		))
 
 		By("Starting the probe agent")
@@ -409,7 +413,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
-			HaveField("Spec.Power", metalv1alpha1.Power("On")),
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
@@ -420,10 +424,14 @@ var _ = Describe("Server Controller", func() {
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
 			HaveField("Status.Manufacturer", "Contoso"),
+			HaveField("Status.BIOSVersion", "P79 v1.45 (12/06/2017)"),
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			HaveField("Status.Conditions", ContainElement(
+				HaveField("Type", PoweringOnCondition),
+			)),
 		))
 
 		By("Starting the probe agent")

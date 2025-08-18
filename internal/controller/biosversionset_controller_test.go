@@ -210,7 +210,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, biosVersionSet)).To(Succeed())
 		})
 
-		It("should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
+		It("should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
 			By("Create resource")
 			biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 				ObjectMeta: metav1.ObjectMeta{

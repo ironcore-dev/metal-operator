@@ -99,10 +99,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 defaultMockUpServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 defaultMockUpServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -149,10 +151,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 upgradeServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -240,10 +244,12 @@ var _ = Describe("BMCVersion Controller", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version:                 upgradeServerBMCVersion,
-				Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-				BMCRef:                  &v1.LocalObjectReference{Name: bmcCRD.Name},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
@@ -323,6 +329,44 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BiosVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	It("should allow retry using annotation", func(ctx SpecContext) {
+		By("Creating a BMCVersion")
+		bmcVersion := &metalv1alpha1.BMCVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCVersionSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmcCRD.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
+
+		By("Moving to Failed state")
+		Eventually(UpdateStatus(bmcVersion, func() {
+			bmcVersion.Status.State = metalv1alpha1.BMCVersionStateFailed
+		})).Should(Succeed())
+
+		Eventually(Update(bmcVersion, func() {
+			bmcVersion.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
+			}
+		})).Should(Succeed())
+
+		Eventually(Object(bmcVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateInProgress),
+		)
+
+		Eventually(Object(bmcVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
+		)
 	})
 })
 

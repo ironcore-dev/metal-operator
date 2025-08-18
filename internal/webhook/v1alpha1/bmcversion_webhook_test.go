@@ -30,9 +30,11 @@ var _ = Describe("BMCVersion Webhook", func() {
 				GenerateName: "test-bmc-ver",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
-				Version: "P70 v1.45 (12/06/2017)",
-				Image:   metalv1alpha1.ImageSpec{URI: "P70 v1.45 (12/06/2017)"},
-				BMCRef:  &v1.LocalObjectReference{Name: "foo"},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version: "P70 v1.45 (12/06/2017)",
+					Image:   metalv1alpha1.ImageSpec{URI: "P70 v1.45 (12/06/2017)"},
+				},
+				BMCRef: &v1.LocalObjectReference{Name: "foo"},
 			},
 		}
 		By("Creating an BMCVersion")
@@ -55,9 +57,12 @@ var _ = Describe("BMCVersion Webhook", func() {
 					GenerateName: "test-bmc-ver",
 				},
 				Spec: metalv1alpha1.BMCVersionSpec{
-					Version: "P71 v1.45 (12/06/2017)",
-					Image:   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
-					BMCRef:  &v1.LocalObjectReference{Name: "foo"},
+					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					BMCRef: &v1.LocalObjectReference{Name: "foo"},
 				},
 			}
 			Expect(validator.ValidateCreate(ctx, BMCVersionV2)).Error().To(HaveOccurred())
@@ -71,9 +76,12 @@ var _ = Describe("BMCVersion Webhook", func() {
 					GenerateName: "test-bmc-ver",
 				},
 				Spec: metalv1alpha1.BMCVersionSpec{
-					Version: "P70 v1.45 (12/06/2017)",
-					Image:   metalv1alpha1.ImageSpec{URI: "P70 v1.45 (12/06/2017)"},
-					BMCRef:  &v1.LocalObjectReference{Name: "bar"},
+					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+						Version:                 "P70 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P70 v1.45 (12/06/2017)"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
@@ -88,9 +96,12 @@ var _ = Describe("BMCVersion Webhook", func() {
 					GenerateName: "test-bmc-ver",
 				},
 				Spec: metalv1alpha1.BMCVersionSpec{
-					Version: "P71 v1.45 (12/06/2017)",
-					Image:   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
-					BMCRef:  &v1.LocalObjectReference{Name: "bar"},
+					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
@@ -110,9 +121,12 @@ var _ = Describe("BMCVersion Webhook", func() {
 					GenerateName: "test-bmc-ver",
 				},
 				Spec: metalv1alpha1.BMCVersionSpec{
-					Version: "P71 v1.45 (12/06/2017)",
-					Image:   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
-					BMCRef:  &v1.LocalObjectReference{Name: "bar"},
+					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
 				},
 			}
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
@@ -128,6 +142,12 @@ var _ = Describe("BMCVersion Webhook", func() {
 			By("Patching the biosSettings V1 to Inprogress state")
 			Eventually(UpdateStatus(BMCVersionV1, func() {
 				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateInProgress
+			})).Should(Succeed())
+			By("mock servermaintenance Creation maintenance")
+			Eventually(Update(BMCVersionV1, func() {
+				BMCVersionV1.Spec.ServerMaintenanceRefs = []metalv1alpha1.ServerMaintenanceRefItem{
+					{ServerMaintenanceRef: &v1.ObjectReference{Name: "foobar-Maintenance"}},
+				}
 			})).Should(Succeed())
 			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
 			BMCVersionV1Updated := BMCVersionV1.DeepCopy()

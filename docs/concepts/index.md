@@ -11,7 +11,9 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**ServerBootConfiguration**](/concepts/serverbootconfigurations): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](/concepts/servermaintenance): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 - [**BIOSSettings**](/concepts/biossettings): Handles updating the BIOS setting on the physical server's BIOS.
+- [**BIOSSettingsSet**](/concepts/biossettingsset): Handles creation of multiple `BIOSSettings` by selecting physical server's through labels.
 - [**BIOSVersion**](/concepts/biosversion): Handles upgrading the BIOS Version on the physical server's BIOS.
 - [**BIOSVersionSet**](/concepts/biosversionset): Handles creation of multiple `BIOSVersion` by selecting physical server's through labels.
 - [**BMCSettings**](/concepts/bmcsettings): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](/concepts/bmcversion): Handles upgrading the BMC Version on the physical server's Manager.
+- [**BMCVersionSet**](/concepts/bmcversionset): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.

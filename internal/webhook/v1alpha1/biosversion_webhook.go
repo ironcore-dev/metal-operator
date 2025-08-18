@@ -77,7 +77,7 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		return nil, fmt.Errorf("expected a BIOSVersion object for the oldObj but got %T", oldObj)
 	}
 	if oldBIOSVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(biosversion) {
+		!ShouldAllowForceUpdateInProgress(biosversion) && oldBIOSVersion.Spec.ServerMaintenanceRef != nil {
 		err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
 			oldBIOSVersion.Name,
 			biosversion.Name)

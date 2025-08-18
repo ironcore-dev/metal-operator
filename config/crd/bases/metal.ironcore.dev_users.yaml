@@ -75,17 +75,18 @@ spec:
                 type: string
               enabled:
                 type: boolean
-              isAdmin:
-                type: boolean
               roleID:
                 type: string
               rotationPeriod:
                 type: string
+              useForBMCAccess:
+                description: set if the user should be used by the BMC reconciler
+                  to access the system.
+                type: boolean
               userName:
                 type: string
             required:
             - enabled
-            - isAdmin
             - roleID
             - userName
             type: object
@@ -112,6 +113,8 @@ spec:
                 type: string
               lastRotation:
                 format: date-time
+                type: string
+              passwordExpiration:
                 type: string
             type: object
         type: object

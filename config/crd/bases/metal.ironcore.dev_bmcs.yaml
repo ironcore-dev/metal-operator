@@ -87,8 +87,9 @@ spec:
                   rule: self == oldSelf
               adminUserRef:
                 description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                  AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
+                  This secret is used for administrative access to the BMC and may include elevated privileges.
+                  It will replqce the BMCSecretRef for administrative operations.
                 properties:
                   name:
                     default: ""
@@ -105,7 +106,6 @@ spec:
                 description: |-
                   BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
                   required to access the BMC. This secret includes sensitive information such as usernames and passwords.
-                  BMCSecretRef is deprecated and will be removed in a future release.
                 properties:
                   name:
                     default: ""
@@ -247,17 +247,18 @@ spec:
                       type: string
                     enabled:
                       type: boolean
-                    isAdmin:
-                      type: boolean
                     roleID:
                       type: string
                     rotationPeriod:
                       type: string
+                    useForBMCAccess:
+                      description: set if the user should be used by the BMC reconciler
+                        to access the system.
+                      type: boolean
                     userName:
                       type: string
                   required:
                   - enabled
-                  - isAdmin
                   - roleID
                   - userName
                   type: object

@@ -1246,8 +1246,7 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
-required to access the BMC. This secret includes sensitive information such as usernames and passwords.
-BMCSecretRef is deprecated and will be removed in a future release.</p>
+required to access the BMC. This secret includes sensitive information such as usernames and passwords.</p>
 </td>
 </tr>
 <tr>
@@ -1260,6 +1259,10 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
+This secret is used for administrative access to the BMC and may include elevated privileges.
+It will replqce the BMCSecretRef for administrative operations.</p>
 </td>
 </tr>
 <tr>
@@ -1858,8 +1861,7 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
-required to access the BMC. This secret includes sensitive information such as usernames and passwords.
-BMCSecretRef is deprecated and will be removed in a future release.</p>
+required to access the BMC. This secret includes sensitive information such as usernames and passwords.</p>
 </td>
 </tr>
 <tr>
@@ -1872,6 +1874,10 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
+This secret is used for administrative access to the BMC and may include elevated privileges.
+It will replqce the BMCSecretRef for administrative operations.</p>
 </td>
 </tr>
 <tr>
@@ -5493,12 +5499,13 @@ bool
 </tr>
 <tr>
 <td>
-<code>isAdmin</code><br/>
+<code>useForBMCAccess</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
+<p>set if the user should be used by the BMC reconciler to access the system.</p>
 </td>
 </tr>
 </table>
@@ -5612,12 +5619,13 @@ bool
 </tr>
 <tr>
 <td>
-<code>isAdmin</code><br/>
+<code>useForBMCAccess</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
+<p>set if the user should be used by the BMC reconciler to access the system.</p>
 </td>
 </tr>
 </tbody>
@@ -5657,6 +5665,16 @@ Kubernetes core/v1.LocalObjectReference
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#time-v1-meta">
 Kubernetes meta/v1.Time
 </a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>passwordExpiration</code><br/>
+<em>
+string
 </em>
 </td>
 <td>

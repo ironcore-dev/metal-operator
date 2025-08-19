@@ -77,7 +77,7 @@ func (r *BIOSVersionSetReconciler) delete(
 
 	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
 	}
 
 	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
@@ -87,7 +87,7 @@ func (r *BIOSVersionSetReconciler) delete(
 		err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
 		if err != nil {
 			log.Error(err, "failed to update current Status")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to update current BIOSVersionSet Status: %w", err)
 		}
 		log.Info("Waiting on the created BIOSVersion to reach terminal status")
 		return ctrl.Result{}, nil
@@ -118,12 +118,12 @@ func (r *BIOSVersionSetReconciler) reconcile(
 
 	serverList, err := r.getServersBySelector(ctx, biosVersionSet)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get servers by selector: %w", err)
 	}
 
 	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
 	}
 
 	log.V(1).Info("Summary of servers and BIOSVersions", "Server count", len(serverList.Items),
@@ -131,19 +131,16 @@ func (r *BIOSVersionSetReconciler) reconcile(
 
 	// create BIOSVersion for servers selected, if it does not exist
 	if err := r.createMissingBIOSVersions(ctx, log, serverList, ownedBiosVersions, biosVersionSet); err != nil {
-		log.Error(err, "failed to create resources")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to create missing BIOSVersions: %w", err)
 	}
 
 	// delete BIOSVersion for servers which do not exist anymore
 	if _, err := r.deleteOrphanBIOSVersions(ctx, log, serverList, ownedBiosVersions); err != nil {
-		log.Error(err, "failed to cleanup resources")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSVersions: %w", err)
 	}
 
 	if err := r.patchOrCreateBIOSVersionfromTemplate(ctx, log, &biosVersionSet.Spec.BIOSVersionTemplate, ownedBiosVersions); err != nil {
-		log.Error(err, "failed to update specs")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to patch or create BIOSVersion from template: %w", err)
 	}
 
 	log.V(1).Info("updating the status of BIOSVersionSet")
@@ -152,8 +149,7 @@ func (r *BIOSVersionSetReconciler) reconcile(
 
 	err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
 	if err != nil {
-		log.Error(err, "failed to update current Status")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to update current BIOSVersionSet Status: %w", err)
 	}
 	// wait for any updates from owned resources
 	return ctrl.Result{}, nil
@@ -322,7 +318,7 @@ func (r *BIOSVersionSetReconciler) updateStatus(
 	biosVersionSet.Status = *currentStatus
 
 	if err := r.Status().Patch(ctx, biosVersionSet, client.MergeFrom(biosVersionSetBase)); err != nil {
-		return fmt.Errorf("failed to patch BIOSVersionSet status: %w", err)
+		return err
 	}
 
 	log.V(1).Info("Updated biosVersionSet state ", "new state", currentStatus)
@@ -338,14 +334,14 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 
 	biosVersionSetList := &metalv1alpha1.BIOSVersionSetList{}
 	if err := r.List(ctx, biosVersionSetList); err != nil {
-		log.Error(err, "failed to list BIOSVersionSet")
+		log.V(1).Error(err, "failed to list BIOSVersionSet")
 		return nil
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, biosVersionSet := range biosVersionSetList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&biosVersionSet.Spec.ServerSelector)
 		if err != nil {
-			log.Error(err, "failed to convert label selector")
+			log.V(1).Error(err, "failed to convert label selector")
 			return nil
 		}
 		// if the host label matches the selector, enqueue the request
@@ -359,6 +355,7 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 		} else { // if the label has been removed
 			ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, &biosVersionSet)
 			if err != nil {
+				log.V(1).Error(err, "failed to get owned BIOSVersions")
 				return nil
 			}
 			for _, biosVersion := range ownedBiosVersions.Items {

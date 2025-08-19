@@ -75,7 +75,7 @@ func (r *BIOSSettingsSetReconciler) delete(
 
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, biosSettingsSet)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSSettings resources %w", err)
 	}
 
 	delatableBIOSSettings := map[string]struct{}{}
@@ -92,8 +92,7 @@ func (r *BIOSSettingsSetReconciler) delete(
 		currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
 		err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 		if err != nil {
-			log.Error(err, "failed to update current Status")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to update current BIOSSettingsSet Status %w", err)
 		}
 		log.Info("Waiting on the created BIOSSettings to reach terminal status")
 		return ctrl.Result{}, nil
@@ -124,7 +123,7 @@ func (r *BIOSSettingsSetReconciler) reconcile(
 
 	serverList, err := r.getServersBySelector(ctx, biosSettingsSet)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get Servers through label selector %w", err)
 	}
 	return r.handleBiosSettings(ctx, log, serverList, biosSettingsSet)
 }
@@ -141,21 +140,18 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 	}
 
 	if err := r.createMissingBIOSSettings(ctx, log, serverList, ownedBiosSettings, biosSettingsSet); err != nil {
-		log.Error(err, "failed to create resources")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to create missing BIOSSettings resources %w", err)
 	}
 
 	log.V(1).Info("Summary of servers and BIOSSettings", "Server count", len(serverList.Items),
 		"BIOSVersion count", len(ownedBiosSettings.Items))
 
 	if err := r.deleteOrphanBIOSSettings(ctx, log, serverList, ownedBiosSettings); err != nil {
-		log.Error(err, "failed to cleanup resources")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSSettings resources %w", err)
 	}
 
 	if err := r.patchOrCreateBIOSSettingsfromTemplate(ctx, log, &biosSettingsSet.Spec.BIOSSettingsTemplate, ownedBiosSettings); err != nil {
-		log.Error(err, "failed to update specs")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to patch or create BIOSSettings from template %w", err)
 	}
 
 	log.V(1).Info("Updating the status of BIOSSettingsSet")
@@ -164,8 +160,7 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 
 	err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 	if err != nil {
-		log.Error(err, "failed to update current Status")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to update current BIOSSettingsSet Status %w", err)
 	}
 	// wait for any updates from owned resources
 	return ctrl.Result{}, nil
@@ -336,7 +331,7 @@ func (r *BIOSSettingsSetReconciler) updateStatus(
 	biosSettingsSet.Status = *currentStatus
 
 	if err := r.Status().Patch(ctx, biosSettingsSet, client.MergeFrom(biosSettingsSetBase)); err != nil {
-		return fmt.Errorf("failed to patch BIOSSettingsSet status: %w", err)
+		return err
 	}
 
 	log.V(1).Info("Updated biosSettingsSet state ", "new state", currentStatus)
@@ -352,14 +347,14 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 
 	biosSettingsSetList := &metalv1alpha1.BIOSSettingsSetList{}
 	if err := r.List(ctx, biosSettingsSetList); err != nil {
-		log.Error(err, "failed to list BIOSVersionSet")
+		log.V(1).Error(err, "failed to list BIOSVersionSet")
 		return nil
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, biosSettingsSet := range biosSettingsSetList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&biosSettingsSet.Spec.ServerSelector)
 		if err != nil {
-			log.Error(err, "failed to convert label selector")
+			log.V(1).Error(err, "failed to convert label selector")
 			return nil
 		}
 		// if the host label matches the selector, enqueue the request
@@ -373,6 +368,7 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 		} else { // if the label has been removed
 			ownedBiosVersions, err := r.getOwnedBIOSSettings(ctx, &biosSettingsSet)
 			if err != nil {
+				log.V(1).Error(err, "failed to get owned BIOSVersion resources")
 				return nil
 			}
 			for _, biosVersion := range ownedBiosVersions.Items {

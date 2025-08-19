@@ -78,6 +78,10 @@ func (r *ServerMaintenanceSetReconciler) delete(ctx context.Context, log logr.Lo
 
 func (r *ServerMaintenanceSetReconciler) reconcile(ctx context.Context, log logr.Logger, maintenanceSet *metalv1alpha1.ServerMaintenanceSet) (ctrl.Result, error) {
 	log.V(1).Info("Reconciling ServerMaintenanceSet", "Name", maintenanceSet.Name)
+	if shouldIgnoreReconciliation(maintenanceSet) {
+		log.V(1).Info("Skipped reconciliation for ServerMaintenanceSet", "Name", maintenanceSet.Name)
+		return ctrl.Result{}, nil
+	}
 	servers, err := r.getServersBySelector(ctx, maintenanceSet)
 	if err != nil {
 		return ctrl.Result{}, err

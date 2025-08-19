@@ -154,13 +154,14 @@ func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Lo
 		log.V(1).Info("No rotation period set for BMC user, skipping password rotation", "User", user.Name)
 		return ctrl.Result{}, nil
 	}
-	if user.Status.LastRotation.Add(user.Spec.RotationPolicy.Duration).After(metav1.Now().Time) && !forceRotation {
+	if user.Status.LastRotation != nil && user.Status.LastRotation.Add(user.Spec.RotationPolicy.Duration).After(metav1.Now().Time) && !forceRotation {
 		log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 		return ctrl.Result{
 			Requeue:      true,
 			RequeueAfter: user.Spec.RotationPolicy.Duration,
 		}, nil
 	}
+	log.Info("Rotating BMC user password", "User", user.Name)
 	newPassword, err := GenerateRandomPassword(16)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to generate new password for BMC user %s: %w", user.Name, err)
@@ -317,7 +318,7 @@ func (r *UserReconciler) setEffectiveSecretRef(ctx context.Context, log logr.Log
 }
 
 func (r *UserReconciler) getBMCClient(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, user *metalv1alpha1.User) (bmcClient bmc.BMC, err error) {
-	if bmcObj.Spec.AdminUserRef.Name == user.Name {
+	if bmcObj.Spec.AdminUserRef != nil && bmcObj.Spec.AdminUserRef.Name == user.Name {
 		if user.Spec.BMCSecretRef == nil {
 			// if this user is the admin user, we cannot create a BMC client without a BMCSecretRef (password)
 			return bmcClient, fmt.Errorf("BMC %s admin user %s does not have a BMCSecretRef set", bmcObj.Name, user.Name)

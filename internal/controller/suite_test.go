@@ -113,6 +113,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 		HaveField("Items", BeEmpty()))
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersionSet{}, &metalv1alpha1.BMCVersionList{})).Should(
 		HaveField("Items", BeEmpty()))
+
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSecret{}, &metalv1alpha1.BMCSecretList{})).Should(
+		HaveField("Items", BeEmpty()))
 }
 
 func deleteAndList(ctx context.Context, obj client.Object, objList client.ObjectList, namespaceOpt ...client.DeleteAllOfOption) func() (client.ObjectList, error) {

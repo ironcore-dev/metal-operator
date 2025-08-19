@@ -4,7 +4,6 @@
 package controller
 
 import (
-	"fmt"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -18,12 +17,10 @@ import (
 var _ = Describe("User Controller", func() {
 	ns := SetupTest()
 
-	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
-	})
+	var bmc *metalv1alpha1.BMC
 
-	It("Should initialeze user", func(ctx SpecContext) {
-		By("Creating an Endpoint object")
+	BeforeEach(func(ctx SpecContext) {
+		By("Ensuring clean state")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-server-",
@@ -35,15 +32,21 @@ var _ = Describe("User Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-
 		By("Ensuring that the BMC resource has been created for an endpoint")
-		bmc := &metalv1alpha1.BMC{
+		bmc = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: endpoint.Name,
 			},
 		}
 		Eventually(Get(bmc)).Should(Succeed())
+	})
 
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
+	})
+
+	It("Should initialeze user", func(ctx SpecContext) {
+		By("Creating a User resource")
 		user := &metalv1alpha1.User{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-user",
@@ -55,7 +58,7 @@ var _ = Describe("User Controller", func() {
 					Name: bmc.Name,
 				},
 				BMCSecretRef: &v1.LocalObjectReference{
-					Name: "test-bmc-secret",
+					Name: "test-user-secret",
 				},
 			},
 		}
@@ -68,7 +71,7 @@ var _ = Describe("User Controller", func() {
 
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-bmc-secret",
+				Name: "test-user-secret",
 			},
 			Data: map[string][]byte{
 				"username": []byte("foo"),
@@ -86,13 +89,6 @@ var _ = Describe("User Controller", func() {
 			}
 		})).Should(Succeed())
 
-		By("Ensuring that the Server resource has been created")
-		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("%s-system-0", bmc.Name),
-			},
-		}
-		Eventually(Get(server)).Should(Succeed())
 		By("Ensuring that the User resource has been patched with the BMC secret reference")
 		Eventually(Object(user)).Should(SatisfyAll(
 			HaveField("Status.EffectiveBMCSecretRef", Not(BeNil())),
@@ -193,31 +189,10 @@ var _ = Describe("User Controller", func() {
 		))
 	})
 	It("Should rotate password if rotationPeriod is set", func(ctx SpecContext) {
-		By("Creating an Endpoint object")
-		endpoint := &metalv1alpha1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
-			Spec: metalv1alpha1.EndpointSpec{
-				// emulator BMC mac address
-				MACAddress: "23:11:8A:33:CF:EA",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
-			},
-		}
-		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-
-		By("Ensuring that the BMC resource has been created for an endpoint")
-		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: endpoint.Name,
-			},
-		}
-		Eventually(Get(bmc)).Should(Succeed())
 		By("Creating a BMCSecret for the User")
-
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-bmc-secret",
+				Name: "test-user-secret",
 			},
 			Data: map[string][]byte{
 				"username": []byte("foo"),
@@ -259,7 +234,7 @@ var _ = Describe("User Controller", func() {
 		})).Should(Succeed())
 
 		By("Ensuring that a new secret with new password has been rotated and set to EffectiveBMCSecretRef")
-		Eventually(Object(adminUser)).Should(SatisfyAll(
+		Eventually(Object(adminUser), "2s").Should(SatisfyAll(
 			HaveField("Status.LastRotation", Not(BeNil())),
 			HaveField("Status.EffectiveBMCSecretRef", Not(BeNil())),
 			HaveField("Status.EffectiveBMCSecretRef.Name", Not(Equal(bmcSecret.Name))),
@@ -272,5 +247,67 @@ var _ = Describe("User Controller", func() {
 		Eventually(Get(newSecret)).Should(Succeed())
 		Expect(newSecret.Data).To(Not(HaveKeyWithValue("password", []byte("bar"))))
 
+	})
+
+	It("Should just create additional bmc users", func(ctx SpecContext) {
+		user01 := &metalv1alpha1.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "user01",
+			},
+			Spec: metalv1alpha1.UserSpec{
+				UserName: "user01",
+				RoleID:   "Readonly",
+				BMCRef: &v1.LocalObjectReference{
+					Name: bmc.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, user01)).To(Succeed())
+		Eventually(Get(user01)).Should(Succeed())
+		By("Ensuring that the User resource has EffectiveBMCSecretRef")
+		Eventually(Object(user01), "4s").Should(SatisfyAll(
+			HaveField("Status.EffectiveBMCSecretRef", Not(BeNil())),
+			HaveField("Status.ID", Not(BeEmpty())),
+		))
+		By("Ensuring that the BMCSecret has been created")
+		effectiveSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: user01.Status.EffectiveBMCSecretRef.Name,
+			},
+		}
+		Eventually(Get(effectiveSecret)).Should(Succeed())
+		Expect(effectiveSecret.Data).To(HaveKeyWithValue("username", []byte("user01")))
+		Expect(effectiveSecret.Data).To(HaveKeyWithValue("password", Not(BeEmpty())))
+
+		By("Creating a second user with the same BMCRef")
+		user02 := &metalv1alpha1.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "user02",
+			},
+			Spec: metalv1alpha1.UserSpec{
+				UserName: "user02",
+				RoleID:   "Readonly",
+				BMCRef: &v1.LocalObjectReference{
+					Name: bmc.Name,
+				},
+				BMCSecretRef: &v1.LocalObjectReference{
+					Name: user01.Status.EffectiveBMCSecretRef.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, user02)).To(Succeed())
+		Eventually(Get(user02)).Should(Succeed())
+		By("Ensuring that the User resource has EffectiveBMCSecretRef")
+		Eventually(Object(user02)).Should(SatisfyAll(
+			HaveField("Status.EffectiveBMCSecretRef", Not(BeNil())),
+			HaveField("Status.ID", Not(BeEmpty())),
+		))
+		By("Ensuring that the BMCSecret has been created")
+		effectiveSecret02 := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: user02.Status.EffectiveBMCSecretRef.Name,
+			},
+		}
+		Eventually(Get(effectiveSecret02)).Should(Succeed())
 	})
 })

@@ -5,7 +5,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -165,7 +164,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			Eventually(Get(bmcVersion03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
 				HaveField("Status.FailedBMCVersion", BeNumerically("==", 0)),
@@ -202,7 +201,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			))
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBMCVersion", BeNumerically("==", 2)),
@@ -257,7 +256,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			Eventually(Get(bmcVersion03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
 				HaveField("Status.FailedBMCVersion", BeNumerically("==", 0)),
@@ -290,7 +289,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			))
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBMCVersion", BeNumerically("==", 2)),
@@ -313,7 +312,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			Eventually(Get(bmcVersion03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 1)),
 				HaveField("Status.CompletedBMCVersion", BeNumerically("==", 1)),
@@ -323,6 +322,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 
 			By("creating the deleted BMC")
 			BMCToDelete.ResourceVersion = ""
+			BMCToDelete.Spec.BMCSettingRef = nil
 			BMCToDelete.Spec.Endpoint = bmc02.Spec.Endpoint
 			Expect(k8sClient.Create(ctx, BMCToDelete)).Should(Succeed())
 
@@ -351,7 +351,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			)
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBMCVersion", BeNumerically("==", 2)),
@@ -378,7 +378,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			Eventually(Get(bmcVersion01)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 3)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 3)),
 				HaveField("Status.FailedBMCVersion", BeNumerically("==", 0)),
@@ -390,7 +390,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			)
 
 			By("Checking if the status has been updated")
-			Eventually(Object(bmcVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 3)),
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 3)),
 				HaveField("Status.CompletedBMCVersion", BeNumerically("==", 3)),

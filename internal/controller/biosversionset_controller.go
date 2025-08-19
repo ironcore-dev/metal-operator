@@ -139,8 +139,8 @@ func (r *BIOSVersionSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSVersions: %w", err)
 	}
 
-	if err := r.patchOrCreateBIOSVersionfromTemplate(ctx, log, &biosVersionSet.Spec.BIOSVersionTemplate, ownedBiosVersions); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to patch or create BIOSVersion from template: %w", err)
+	if err := r.patchBIOSVersionfromTemplate(ctx, log, &biosVersionSet.Spec.BIOSVersionTemplate, ownedBiosVersions); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to patch BIOSVersion spec from template: %w", err)
 	}
 
 	log.V(1).Info("updating the status of BIOSVersionSet")
@@ -230,7 +230,7 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(
 	return warnings, errors.Join(errs...)
 }
 
-func (r *BIOSVersionSetReconciler) patchOrCreateBIOSVersionfromTemplate(
+func (r *BIOSVersionSetReconciler) patchBIOSVersionfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
 	biosVersionTemplate *metalv1alpha1.BIOSVersionTemplate,
@@ -243,17 +243,25 @@ func (r *BIOSVersionSetReconciler) patchOrCreateBIOSVersionfromTemplate(
 
 	var errs []error
 	for _, biosVersion := range biosVersionList.Items {
-		if biosVersion.Status.State != metalv1alpha1.BIOSVersionStateInProgress {
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
+		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+			continue
+		}
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
+			// serverMaintenanceRef might not be part of the patching template, so we do not patch if not provided
+			if biosVersionTemplate.ServerMaintenanceRef != nil {
 				biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
-				return nil
-			}) //nolint:errcheck
-			if err != nil {
-				errs = append(errs, err)
+			} else {
+				serverMaintenanceRef := biosVersion.Spec.ServerMaintenanceRef
+				biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
+				biosVersion.Spec.ServerMaintenanceRef = serverMaintenanceRef
 			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersions", biosVersion.Name, "Operation", opResult)
-			}
+			return nil
+		}) //nolint:errcheck
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersions", biosVersion.Name, "Operation", opResult)
 		}
 	}
 	return errors.Join(errs...)

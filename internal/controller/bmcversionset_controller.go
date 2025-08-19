@@ -135,8 +135,8 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCVersion resources %w", err)
 	}
 
-	if err := r.patchOrCreateBMCVersionfromTemplate(ctx, log, &bmcVersionSet.Spec.BMCVersionTemplate, ownedBMCVersions); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update biosSettings specs %w", err)
+	if err := r.patchBMCVersionfromTemplate(ctx, log, &bmcVersionSet.Spec.BMCVersionTemplate, ownedBMCVersions); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion spec from template %w", err)
 	}
 
 	log.V(1).Info("updating the status of BMCVersionSet")
@@ -216,7 +216,7 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	return warnings, errors.Join(errs...)
 }
 
-func (r *BMCVersionSetReconciler) patchOrCreateBMCVersionfromTemplate(
+func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
 	bmcVersionTemplate *metalv1alpha1.BMCVersionTemplate,
@@ -229,17 +229,18 @@ func (r *BMCVersionSetReconciler) patchOrCreateBMCVersionfromTemplate(
 
 	var errs []error
 	for _, bmcVersion := range bmcVersionList.Items {
-		if bmcVersion.Status.State != metalv1alpha1.BMCVersionStateInProgress {
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
-				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
-				return nil
-			}) //nolint:errcheck
-			if err != nil {
-				errs = append(errs, err)
-			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched BMCVersion with updated spec", "BMCVersions", bmcVersion.Name, "Operation", opResult)
-			}
+		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+			continue
+		}
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
+			bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+			return nil
+		}) //nolint:errcheck
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched BMCVersion with updated spec", "BMCVersions", bmcVersion.Name, "Operation", opResult)
 		}
 	}
 	return errors.Join(errs...)

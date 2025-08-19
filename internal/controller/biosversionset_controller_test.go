@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -161,7 +159,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Eventually(Get(biosVersion03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
@@ -198,7 +196,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			))
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 2)),
@@ -249,7 +247,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Eventually(Get(biosVersion03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
@@ -282,7 +280,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			))
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 2)),
@@ -292,13 +290,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 
 			By("Deleting the server02")
 			Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
+			Eventually(Get(server02)).ShouldNot(Succeed())
 
 			By("Checking if the BIOSVersion have been deleted")
 			Eventually(Get(biosVersion02)).ShouldNot(Succeed())
 			Eventually(Get(biosVersion03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 1)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 1)),
 				HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 1)),
@@ -319,7 +318,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			)
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 2)),
@@ -343,7 +342,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Eventually(Get(biosVersion01)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 3)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 3)),
 				HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
@@ -355,7 +354,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			)
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosVersionSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosVersionSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 3)),
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 3)),
 				HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 3)),

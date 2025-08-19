@@ -4,8 +4,6 @@
 package controller
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -41,7 +39,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Creating a Server")
 			server01 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-",
+					GenerateName: "test-maintenance-01-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "foo",
 					},
@@ -66,7 +64,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Creating a second Server")
 			server02 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-",
+					GenerateName: "test-maintenance-02-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "bar",
 					},
@@ -91,7 +89,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Creating a third Server")
 			server03 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-",
+					GenerateName: "test-maintenance-03-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "bar",
 					},
@@ -241,13 +239,13 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			Eventually(Get(biosSettings03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosSettingsSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
 				HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
 			))
 
-			By("Checking the biosSettings01 have completed")
+			By("Checking the biosSettings02 have completed")
 			Eventually(Object(biosSettings02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -260,7 +258,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				})),
 			))
 
-			By("Checking the biosSettings02 have completed")
+			By("Checking the biosSettings03 have completed")
 			Eventually(Object(biosSettings03)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -274,7 +272,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			))
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosSettingsSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 2)),
@@ -284,13 +282,14 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 
 			By("Deleting the server02")
 			Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
+			Eventually(Get(server02)).ShouldNot(Succeed())
 
 			By("Checking if the BIOSSettings have been deleted")
 			Eventually(Get(biosSettings02)).ShouldNot(Succeed())
 			Eventually(Get(biosSettings03)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosSettingsSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 1)),
 				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 1)),
 				HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 1)),
@@ -300,6 +299,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 
 			By("creating the server02")
 			server02.ResourceVersion = ""
+			server02.Spec.BIOSSettingsRef = nil
 			Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
 			By("Checking if the BIOSSettings have been created")
 			Eventually(Get(biosSettings02)).Should(Succeed())
@@ -311,7 +311,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			)
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosSettingsSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
 				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
 				HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 2)),
@@ -335,7 +335,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			Eventually(Get(biosSettings01)).Should(Succeed())
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosSettingsSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 3)),
 				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 3)),
 				HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
@@ -347,7 +347,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			)
 
 			By("Checking if the status has been updated")
-			Eventually(Object(biosSettingsSet)).WithTimeout(10 * time.Second).Should(SatisfyAll(
+			Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
 				HaveField("Status.FullyLabeledServers", BeNumerically("==", 3)),
 				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 3)),
 				HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 3)),

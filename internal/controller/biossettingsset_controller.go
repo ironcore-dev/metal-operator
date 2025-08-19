@@ -150,8 +150,8 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSSettings resources %w", err)
 	}
 
-	if err := r.patchOrCreateBIOSSettingsfromTemplate(ctx, log, &biosSettingsSet.Spec.BIOSSettingsTemplate, ownedBiosSettings); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to patch or create BIOSSettings from template %w", err)
+	if err := r.patchBIOSSettingsfromTemplate(ctx, log, &biosSettingsSet.Spec.BIOSSettingsTemplate, ownedBiosSettings); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings spec from template %w", err)
 	}
 
 	log.V(1).Info("Updating the status of BIOSSettingsSet")
@@ -184,7 +184,7 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(
 		if _, ok := serverWithSettings[server.Name]; !ok {
 			if server.Spec.BIOSSettingsRef != nil {
 				// this is the case where the server already has a different BIOSSettingsRef, and we should not create a new one for this server
-				log.V(1).Info("Server already has different BIOSSettingsRef, skipping creation", "server", server.Name)
+				log.V(1).Info("Server already has different BIOSSettingsRef, skipping creation", "server", server.Name, "BIOSSettingsRef", server.Spec.BIOSSettingsRef)
 				continue
 			}
 			newBiosSettingsName := fmt.Sprintf("%s-%s", biosSettingsSet.Name, server.Name)
@@ -243,7 +243,7 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(
 	return errors.Join(errs...)
 }
 
-func (r *BIOSSettingsSetReconciler) patchOrCreateBIOSSettingsfromTemplate(
+func (r *BIOSSettingsSetReconciler) patchBIOSSettingsfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
 	biosSettingsTemplate *metalv1alpha1.BIOSSettingsTemplate,
@@ -256,17 +256,25 @@ func (r *BIOSSettingsSetReconciler) patchOrCreateBIOSSettingsfromTemplate(
 
 	var errs []error
 	for _, biosSettings := range biosSettingsList.Items {
-		if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
+		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+			continue
+		}
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
+			// serverMaintenanceRef might not be part of the patching template, so we do not patch if not provided
+			if biosSettingsTemplate.ServerMaintenanceRef != nil {
 				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
-				return nil
-			}) //nolint:errcheck
-			if err != nil {
-				errs = append(errs, err)
+			} else {
+				serverMaintenanceRef := biosSettings.Spec.ServerMaintenanceRef
+				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
+				biosSettings.Spec.ServerMaintenanceRef = serverMaintenanceRef
 			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched biosSettings with updated spec", "BIOSSettings", biosSettings.Name, "Operation", opResult)
-			}
+			return nil
+		}) //nolint:errcheck
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched biosSettings with updated spec", "BIOSSettings", biosSettings.Name, "Operation", opResult)
 		}
 	}
 	return errors.Join(errs...)

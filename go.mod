@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/ironcore-dev/controller-utils v0.10.0
 	github.com/onsi/ginkgo/v2 v2.24.0
-	github.com/onsi/gomega v1.37.0
+	github.com/onsi/gomega v1.38.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stmcginnis/gofish v0.20.0
 	golang.org/x/crypto v0.41.0

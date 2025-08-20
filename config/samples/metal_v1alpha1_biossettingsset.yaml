@@ -1,0 +1,21 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BIOSSettingsSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: biossettingsset-sample
+spec:
+  biosSettingsTemplate:
+    version: P79 v1.45 (12/06/2017)
+    serverMaintenancePolicy: OwnerApproval
+    settingsFlow:
+      - name: abc
+        priority: 10
+        settings:
+          abc: Enabled
+  serverSelector:
+    matchLabels: 
+      manufacturer: "dell"
+
+

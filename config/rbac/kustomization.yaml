@@ -22,9 +22,24 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- bmcversionset_admin_role.yaml
+- bmcversionset_editor_role.yaml
+- bmcversionset_viewer_role.yaml
+- biosversionset_admin_role.yaml
+- biosversionset_editor_role.yaml
+- biosversionset_viewer_role.yaml
+- biossettingsset_admin_role.yaml
+- biossettingsset_editor_role.yaml
+- biossettingsset_viewer_role.yaml
 - biosversion_admin_role.yaml
 - biosversion_editor_role.yaml
 - biosversion_viewer_role.yaml
+- bmcsettings_admin_role.yaml
+- bmcsettings_editor_role.yaml
+- bmcsettings_viewer_role.yaml
+- bmcversion_admin_role.yaml
+- bmcversion_editor_role.yaml
+- bmcversion_viewer_role.yaml
 - servermaintenance_admin_role.yaml
 - servermaintenance_editor_role.yaml
 - servermaintenance_viewer_role.yaml

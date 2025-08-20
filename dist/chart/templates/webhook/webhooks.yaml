@@ -25,6 +25,7 @@ webhooks:
       - operations:
           - CREATE
           - UPDATE
+          - DELETE
         apiGroups:
           - metal.ironcore.dev
         apiVersions:
@@ -52,6 +53,48 @@ webhooks:
           - v1alpha1
         resources:
           - biosversions
+  - name: vbmcsettings-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: metal-operator-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-metal-ironcore-dev-v1alpha1-bmcsettings
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        apiGroups:
+          - metal.ironcore.dev
+        apiVersions:
+          - v1alpha1
+        resources:
+          - bmcsettings
+  - name: vbmcversion-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: metal-operator-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-metal-ironcore-dev-v1alpha1-bmcversion
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        apiGroups:
+          - metal.ironcore.dev
+        apiVersions:
+          - v1alpha1
+        resources:
+          - bmcversions
   - name: vendpoint-v1alpha1.kb.io
     clientConfig:
       service:
@@ -72,4 +115,23 @@ webhooks:
           - v1alpha1
         resources:
           - endpoints
+  - name: vserver-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: metal-operator-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-metal-ironcore-dev-v1alpha1-server
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - operations:
+          - DELETE
+        apiGroups:
+          - metal.ironcore.dev
+        apiVersions:
+          - v1alpha1
+        resources:
+          - servers
 {{- end }}

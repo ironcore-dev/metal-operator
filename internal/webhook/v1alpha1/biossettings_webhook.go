@@ -33,7 +33,7 @@ func SetupBIOSSettingsWebhookWithManager(mgr ctrl.Manager) error {
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
-// +kubebuilder:webhook:path=/validate-metal-ironcore-dev-v1alpha1-biossettings,mutating=false,failurePolicy=fail,sideEffects=None,groups=metal.ironcore.dev,resources=biossettings,verbs=create;update,versions=v1alpha1,name=vbiossettings-v1alpha1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-metal-ironcore-dev-v1alpha1-biossettings,mutating=false,failurePolicy=fail,sideEffects=None,groups=metal.ironcore.dev,resources=biossettings,verbs=create;update;delete,versions=v1alpha1,name=vbiossettings-v1alpha1.kb.io,admissionReviewVersions=v1
 
 // BIOSSettingsCustomValidator struct is responsible for validating the BIOSSettings resource
 // when it is created, updated, or deleted.
@@ -59,15 +59,7 @@ func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj ru
 		return nil, fmt.Errorf("failed to list BIOSSettingsList: %w", err)
 	}
 
-	for _, bs := range biosSettingsList.Items {
-		if biossettings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: biossettings.GroupVersionKind().Group, Kind: biossettings.Kind},
-				biossettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("ServerRef").Child("Name"), bs.Spec.ServerRef.Name)})
-		}
-	}
-
-	return nil, nil
+	return checkForDuplicateBiosSettingsRefToServer(biosSettingsList, biossettings)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
@@ -78,19 +70,27 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 	}
 	biossettingslog.Info("Validation for BIOSSettings upon update", "name", biossettings.GetName())
 
+	oldBIOSSettings, ok := oldObj.(*metalv1alpha1.BIOSSettings)
+	if !ok {
+		return nil, fmt.Errorf("expected a BIOSSettings object for the oldObj but got %T", oldObj)
+	}
+	// we do not allow Updates to BIOSSettings post server Maintenance creation
+	if oldBIOSSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress &&
+		!ShouldAllowForceUpdateInProgress(biossettings) && oldBIOSSettings.Spec.ServerMaintenanceRef != nil {
+		err := fmt.Errorf("BIOSSettings (%v) is in progress, unable to update %v",
+			oldBIOSSettings.Name,
+			biossettings.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: biossettings.GroupVersionKind().Group, Kind: biossettings.Kind},
+			biossettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	}
+
 	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := v.Client.List(ctx, biosSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSSettingsList: %w", err)
 	}
 
-	for _, bs := range biosSettingsList.Items {
-		if biossettings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name && biossettings.Name != bs.Name {
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: biossettings.GroupVersionKind().Group, Kind: biossettings.Kind},
-				biossettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("ServerRef").Child("Name"), bs.Spec.ServerRef.Name)})
-		}
-	}
-	return nil, nil
+	return checkForDuplicateBiosSettingsRefToServer(biosSettingsList, biossettings)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
@@ -101,7 +101,32 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj ru
 	}
 	biossettingslog.Info("Validation for BIOSSettings upon deletion", "name", biossettings.GetName())
 
-	// TODO(user): fill in your validation logic upon object deletion.
+	if biossettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(biossettings) {
+		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
+	}
 
+	return nil, nil
+}
+
+func checkForDuplicateBiosSettingsRefToServer(
+	biosSettingsList *metalv1alpha1.BIOSSettingsList,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) (admission.Warnings, error) {
+
+	for _, bs := range biosSettingsList.Items {
+		if biosSettings.Name == bs.Name {
+			continue
+		}
+		if biosSettings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
+			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
+				biosSettings.Spec.ServerRef.Name,
+				biosSettings.Name,
+				bs.Spec.ServerRef.Name,
+				bs.Name)
+			return nil, apierrors.NewInvalid(
+				schema.GroupKind{Group: biosSettings.GroupVersionKind().Group, Kind: biosSettings.Kind},
+				biosSettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", "ServerRef"), err)})
+		}
+	}
 	return nil, nil
 }

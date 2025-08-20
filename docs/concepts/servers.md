@@ -76,17 +76,19 @@ stateDiagram-v2
     Initial --> Discovery : Server object created
     Discovery --> Available : Discovery complete
     Available --> Reserved : ServerClaim created
+    Reserved --> Maintenance : Maintenance initiated
+    Maintenance --> Reserved : Maintenance complete
     Reserved --> Cleanup : ServerClaim removed
     Cleanup --> Available : Cleanup complete
     Available --> Maintenance : Maintenance initiated
-    Maintenance --> Available : Maintenance complete
+    Maintenance --> Initial : Maintenance complete
     Available --> Error : Error detected
     Reserved --> Error : Error detected
     Discovery --> Error : Error detected
     Cleanup --> Error : Error detected
     Maintenance --> Error : Error detected
     Error --> Maintenance : Enter maintenance to fix error
-    Error --> Available : Error resolved
+    Error --> Initial : Error resolved
 ```
 
 ## Interaction with BMC

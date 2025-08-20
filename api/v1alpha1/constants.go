@@ -10,6 +10,14 @@ const (
 	OperationAnnotationIgnore = "ignore"
 	// OperationAnnotationUpdateServerDetails is used to trigger bmc controller to update server details like cpu, memory, and disk.
 	OperationAnnotationUpdateServerDetails = "update-server-details"
+	// OperationAnnotationRetry restarts the reconciliation of a resource from failed state -> initial state.
+	OperationAnnotationRetry = "retry"
 	// InstanceTypeAnnotation is used to specify the type of Server.
 	InstanceTypeAnnotation = "metal.ironcore.dev/instance-type"
+	// ForceUpdateAnnotation is used to indicate that the spec should be forcefully updated.
+	ForceUpdateAnnotation = "metal.ironcore.dev/force-update-resource"
+	// OperationAnnotationForceUpdateOrDeleteInProgress allows update/Delete of a resource even if it is in progress.
+	OperationAnnotationForceUpdateOrDeleteInProgress = "ForceUpdateOrDeleteInProgress"
+	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
+	OperationAnnotationForceUpdateInProgress = "ForceUpdateInProgress"
 )

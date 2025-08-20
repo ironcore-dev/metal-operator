@@ -12,7 +12,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: bmcs.metal.ironcore.dev
 spec:
   {{- if .Values.webhook.enable }}
@@ -102,8 +102,6 @@ spec:
                   macAddress:
                     description: MACAddress is the MAC address of the endpoint.
                     type: string
-                required:
-                - ip
                 type: object
                 x-kubernetes-validations:
                 - message: access is immutable
@@ -124,6 +122,26 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              bmcSettingsRef:
+                description: |-
+                  BMCSettingRef is a reference to a BMCSettings object that specifies
+                  the BMC configuration for this BMC.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              bmcUUID:
+                description: BMCUUID is the unique identifier for the BMC as defined
+                  in Redfish API.
+                type: string
               consoleProtocol:
                 description: |-
                   ConsoleProtocol specifies the protocol to be used for console access to the BMC.
@@ -133,6 +151,10 @@ spec:
                     description: |-
                       Name specifies the name of the console protocol.
                       This could be a protocol such as "SSH", "Telnet", etc.
+                    enum:
+                    - IPMI
+                    - SSH
+                    - SSHLenovo
                     type: string
                   port:
                     description: |-

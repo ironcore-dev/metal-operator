@@ -5,6 +5,7 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -24,25 +25,33 @@ const (
 	ManufacturerHPE    Manufacturer = "HPE"
 )
 
+type SettingAttributeValueTypes string
+
+const (
+	TypeInteger      SettingAttributeValueTypes = "integer"
+	TypeString       SettingAttributeValueTypes = "string"
+	TypeEnumerations SettingAttributeValueTypes = "enumeration"
+)
+
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
-	PowerOn(ctx context.Context, systemUUID string) error
+	PowerOn(ctx context.Context, systemURI string) error
 
 	// PowerOff gracefully shuts down the system.
-	PowerOff(ctx context.Context, systemUUID string) error
+	PowerOff(ctx context.Context, systemURI string) error
 
 	// ForcePowerOff powers off the system.
-	ForcePowerOff(ctx context.Context, systemUUID string) error
+	ForcePowerOff(ctx context.Context, systemURI string) error
 
 	// Reset performs a reset on the system.
-	Reset(ctx context.Context, systemUUID string, resetType redfish.ResetType) error
+	Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error
 
 	// SetPXEBootOnce sets the boot device for the next system boot.
-	SetPXEBootOnce(ctx context.Context, systemUUID string) error
+	SetPXEBootOnce(ctx context.Context, systemURI string) error
 
 	// GetSystemInfo retrieves information about the system.
-	GetSystemInfo(ctx context.Context, systemUUID string) (SystemInfo, error)
+	GetSystemInfo(ctx context.Context, systemURI string) (SystemInfo, error)
 
 	// Logout closes the BMC client connection by logging out
 	Logout()
@@ -51,23 +60,36 @@ type BMC interface {
 	GetSystems(ctx context.Context) ([]Server, error)
 
 	// GetManager returns the manager
-	GetManager() (*Manager, error)
+	GetManager(UUID string) (*redfish.Manager, error)
 
-	GetBootOrder(ctx context.Context, systemUUID string) ([]string, error)
+	// Reset performs a reset on the Manager.
+	ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error
 
-	GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error)
+	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
 
-	GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error)
+	GetBiosAttributeValues(ctx context.Context, systemURI string, attributes []string) (redfish.SettingsAttributes, error)
+
+	GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (redfish.SettingsAttributes, error)
+
+	GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (redfish.SettingsAttributes, error)
+
+	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result redfish.SettingsAttributes, err error)
 
 	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
 
-	SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) (err error)
+	CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
 
-	GetBiosVersion(ctx context.Context, systemUUID string) (string, error)
+	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes redfish.SettingsAttributes) (err error)
 
-	SetBootOrder(ctx context.Context, systemUUID string, order []string) error
+	SetBMCAttributesImediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error)
 
-	GetStorages(ctx context.Context, systemUUID string) ([]Storage, error)
+	GetBiosVersion(ctx context.Context, systemURI string) (string, error)
+
+	GetBMCVersion(ctx context.Context, UUID string) (string, error)
+
+	SetBootOrder(ctx context.Context, systemURI string, order []string) error
+
+	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
 
 	GetProcessors(ctx context.Context, systemUUID string) ([]Processor, error)
 
@@ -83,7 +105,40 @@ type BMC interface {
 		taskURI string,
 	) (*redfish.Task, error)
 
-	WaitForServerPowerState(ctx context.Context, systemUUID string, powerState redfish.PowerState) error
+	WaitForServerPowerState(ctx context.Context, systemURI string, powerState redfish.PowerState) error
+
+	UpgradeBMCVersion(
+		ctx context.Context,
+		manufacturer string,
+		parameters *redfish.SimpleUpdateParameters,
+	) (string, bool, error)
+
+	GetBMCUpgradeTask(
+		ctx context.Context,
+		manufacturer string,
+		taskURI string,
+	) (*redfish.Task, error)
+}
+
+type OEMManagerInterface interface {
+	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
+	GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error)
+	CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error)
+	GetObjFromUri(uri string, respObj any) ([]string, error)
+	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
+}
+
+type OEMInterface interface {
+	GetUpdateRequestBody(
+		parameters *redfish.SimpleUpdateParameters,
+	) *oem.SimpleUpdateRequestBody
+	GetUpdateTaskMonitorURI(
+		response *http.Response,
+	) (string, error)
+	GetTaskMonitorDetails(
+		ctx context.Context,
+		taskMonitorResponse *http.Response,
+	) (*redfish.Task, error)
 }
 
 type Entity struct {
@@ -120,8 +175,8 @@ type RegistryEntry struct {
 	Attributes []RegistryEntryAttributes
 }
 
-// BiosRegistry describes the Message Registry file locator Resource.
-type BiosRegistry struct {
+// Registry describes the Message Registry file locator Resource.
+type Registry struct {
 	common.Entity
 	// ODataContext is the odata context.
 	ODataContext string `json:"@odata.context"`
@@ -145,6 +200,7 @@ type NetworkInterface struct {
 
 type Server struct {
 	UUID         string
+	URI          string
 	Model        string
 	Manufacturer string
 	PowerState   PowerState
@@ -241,7 +297,9 @@ type SystemInfo struct {
 	PowerState        redfish.PowerState
 	NetworkInterfaces []NetworkInterface
 	TotalSystemMemory resource.Quantity
+	SystemURI         string
 	SystemUUID        string
+	SystemInfo        string
 	SerialNumber      string
 	SKU               string
 	IndicatorLED      string
@@ -258,19 +316,21 @@ type Manager struct {
 	PowerState      string
 	State           string
 	MACAddress      string
+	OemLinks        json.RawMessage
 }
 
-type OEMInterface interface {
-	GetUpdateRequestBody(
-		parameters *redfish.SimpleUpdateParameters,
-	) *oem.SimpleUpdateRequestBody
-	GetUpdateTaskMonitorURI(
-		response *http.Response,
-	) (string, error)
-	GetTaskMonitorDetails(
-		ctx context.Context,
-		taskMonitorResponse *http.Response,
-	) (*redfish.Task, error)
+func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerInterface, error) {
+	var OEMManager OEMManagerInterface
+	switch ooem.Manufacturer {
+	case string(ManufacturerDell):
+		OEMManager = &oem.DellIdracManager{
+			BMC:     ooem,
+			Service: service,
+		}
+	default:
+		return nil, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
+	}
+	return OEMManager, nil
 }
 
 func NewOEM(manufacturer string, service *gofish.Service) (OEMInterface, error) {

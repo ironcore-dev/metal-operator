@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: servermaintenances.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -76,7 +76,7 @@ spec:
                     description: Name specifies the name of the boot configuration.
                     type: string
                   spec:
-                    description: Parameters specifies the parameters to be used for
+                    description: Parameters specify the parameters to be used for
                       rendering the boot configuration.
                     properties:
                       ignitionSecretRef:

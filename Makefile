@@ -65,7 +65,6 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 fmt: goimports ## Run goimports against code.
 	$(GOIMPORTS) -w .
 
-
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
@@ -125,7 +124,7 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 .PHONY: startdocs
 startdocs: ## Start the local mkdocs based development environment.
 	docker build -t $(IMAGE) -f docs/Dockerfile . --load
-	docker run -p 9000:9000 -v `pwd`/:/docs $(IMAGE)
+	docker run --rm -p 5173:5173 -v `pwd`/:/app $(IMAGE)
 
 .PHONY: cleandocs
 cleandocs: ## Remove all local mkdocs Docker images (cleanup).
@@ -253,7 +252,7 @@ GOIMPORTS ?= $(LOCALBIN)/goimports
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.17.1
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
@@ -343,7 +342,7 @@ endef
 KIND_CLUSTER_NAME ?= metal
 
 .PHONY: kind-create
-kind-create: $(ENVTEST) ## create metal kind cluster if needed
+kind-create: $(ENVTEST) kubectl ## create metal kind cluster if needed
 	./scripts/kind-with-registry.sh
 
 .PHONY: kind-delete

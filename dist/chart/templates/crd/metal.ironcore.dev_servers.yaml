@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: servers.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -322,6 +322,9 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: serverClaimRef cannot be switched directly
+                  rule: self == null || oldSelf == null || self == oldSelf
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
                   object that maintains this server.
@@ -366,6 +369,10 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              systemURI:
+                description: SystemURI is the unique URI for the server resource in
+                  REDFISH API.
+                type: string
               systemUUID:
                 description: SystemUUID is the unique identifier for the server.
                 type: string
@@ -380,6 +387,9 @@ spec:
           status:
             description: ServerStatus defines the observed state of Server.
             properties:
+              biosVersion:
+                description: BIOSVersion is the version of the server's BIOS.
+                type: string
               conditions:
                 description: Conditions represents the latest available observations
                   of the server's current state.

@@ -12,17 +12,22 @@ import (
 // Power defines the possible power states for a device.
 type Power string
 
+// Do not forget to update controller-gen validation if you add new power states.
 const (
 	// PowerOn indicates that the device is powered on.
 	PowerOn Power = "On"
 
 	// PowerOff indicates that the device is powered off.
 	PowerOff Power = "Off"
+
+	// PowerUnmanaged indicates that the power state is not managed.
+	PowerUnmanaged Power = "Unmanaged"
 )
 
 // ServerPowerState defines the possible power states for a server.
 type ServerPowerState string
 
+// Do not forget to update controller-gen validation if you add new power states.
 const (
 	// ServerOnPowerState indicates that the system is powered on.
 	ServerOnPowerState ServerPowerState = "On"
@@ -41,6 +46,9 @@ const (
 	// ServerPoweringOffPowerState indicates a temporary state between On and Off.
 	// The power off action can take time while the OS is in the shutdown process.
 	ServerPoweringOffPowerState ServerPowerState = "PoweringOff"
+
+	// UnmanagedServerPowerState indicates that the server power state is not managed.
+	UnmanagedServerPowerState ServerPowerState = "Unmanaged"
 )
 
 // BMCAccess defines the access details for the BMC.
@@ -84,7 +92,8 @@ type ServerSpec struct {
 	SystemURI string `json:"systemURI,omitempty"`
 
 	// Power specifies the desired power state of the server.
-	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Enum=On;Off;Unmanaged
 	Power Power `json:"power,omitempty"`
 
 	// IndicatorLED specifies the desired state of the server's indicator LED.
@@ -205,7 +214,8 @@ type ServerStatus struct {
 	SerialNumber string `json:"serialNumber,omitempty"`
 
 	// PowerState represents the current power state of the server.
-	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Enum=On;Off;Paused;PoweringOn;PoweringOff;Unmanaged
 	PowerState ServerPowerState `json:"powerState,omitempty"`
 
 	// IndicatorLED specifies the current state of the server's indicator LED.

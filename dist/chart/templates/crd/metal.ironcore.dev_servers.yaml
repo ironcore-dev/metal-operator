@@ -276,6 +276,10 @@ spec:
                 x-kubernetes-map-type: atomic
               power:
                 description: Power specifies the desired power state of the server.
+                enum:
+                - "On"
+                - "Off"
+                - Unmanaged
                 type: string
               serverClaimRef:
                 description: |-
@@ -484,6 +488,13 @@ spec:
               powerState:
                 description: PowerState represents the current power state of the
                   server.
+                enum:
+                - "On"
+                - "Off"
+                - Paused
+                - PoweringOn
+                - PoweringOff
+                - Unmanaged
                 type: string
               processors:
                 description: Processors is a list of Processors associated with the

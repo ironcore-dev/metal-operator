@@ -275,9 +275,29 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemURI string) (Syste
 	if err != nil {
 		return SystemInfo{}, fmt.Errorf("failed to parse memory quantity: %w", err)
 	}
+
+	return SystemInfo{
+		SystemUUID:        system.UUID,
+		SystemURI:         system.ODataID,
+		Manufacturer:      system.Manufacturer,
+		Model:             system.Model,
+		Status:            system.Status,
+		PowerState:        system.PowerState,
+		SerialNumber:      system.SerialNumber,
+		SKU:               system.SKU,
+		IndicatorLED:      string(system.IndicatorLED),
+		TotalSystemMemory: quantity,
+	}, nil
+}
+
+func (r *RedfishBMC) GetProcessors(ctx context.Context, systemURI string) ([]Processor, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get systems: %w", err)
+	}
 	systemProcessors, err := system.Processors()
 	if err != nil {
-		return SystemInfo{}, fmt.Errorf("failed to get processors: %w", err)
+		return nil, fmt.Errorf("failed to get processors: %w", err)
 	}
 	processors := make([]Processor, 0, len(systemProcessors))
 	for _, p := range systemProcessors {
@@ -293,20 +313,7 @@ func (r *RedfishBMC) GetSystemInfo(ctx context.Context, systemURI string) (Syste
 			TotalThreads:   int32(p.TotalThreads),
 		})
 	}
-
-	return SystemInfo{
-		SystemUUID:        system.UUID,
-		SystemURI:         system.ODataID,
-		Manufacturer:      system.Manufacturer,
-		Model:             system.Model,
-		Status:            system.Status,
-		PowerState:        system.PowerState,
-		SerialNumber:      system.SerialNumber,
-		SKU:               system.SKU,
-		IndicatorLED:      string(system.IndicatorLED),
-		TotalSystemMemory: quantity,
-		Processors:        processors,
-	}, nil
+	return processors, nil
 }
 
 func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemURI string) ([]string, error) {

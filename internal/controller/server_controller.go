@@ -318,7 +318,7 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logg
 	}
 	log.V(1).Info("Ensured power state for Server")
 
-	if err := r.updateServerStatusSystemInfo(ctx, log, bmcClient, server); err != nil {
+	if err := r.updateServerStatusFromSystemInfo(ctx, log, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to update server status system info: %w", err)
 	}
 	log.V(1).Info("Updated Server status system info")
@@ -470,8 +470,8 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	if server.Spec.ServerMaintenanceRef == nil {
 		log.V(1).Info("Server is in Maintenance state, but no ServerMaintenanceRef is set, transitioning back to previous state")
-		// update system info in case the server was changed in Maintenance state (hardwere changes, biosVersion etc.)
-		if err := r.updateServerStatusSystemInfo(ctx, log, bmcClient, server); err != nil {
+		// update system info in case the server was changed during Maintenance state (hardwere changes, biosVersion etc.)
+		if err := r.updateServerStatusFromSystemInfo(ctx, log, bmcClient, server); err != nil {
 			return false, fmt.Errorf("failed to update server status system info: %w", err)
 		}
 		if server.Spec.ServerClaimRef == nil {
@@ -519,7 +519,7 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 	return nil
 }
 
-func (r *ServerReconciler) updateServerStatusSystemInfo(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
 	serverBase := server.DeepCopy()
 	systemInfo, err := bmcClient.GetSystemInfo(ctx, server.Spec.SystemURI)
 	if err != nil {

@@ -75,7 +75,7 @@ func (r *BIOSSettingsSetReconciler) delete(
 
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, biosSettingsSet)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSSettings resources %w", err)
 	}
 
 	delatableBIOSSettings := map[string]struct{}{}
@@ -92,8 +92,7 @@ func (r *BIOSSettingsSetReconciler) delete(
 		currentStatus := r.getOwnedBIOSSettingsSetStatus(ownedBiosSettings)
 		err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 		if err != nil {
-			log.Error(err, "failed to update current Status")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to update current BIOSSettingsSet Status %w", err)
 		}
 		log.Info("Waiting on the created BIOSSettings to reach terminal status")
 		return ctrl.Result{}, nil
@@ -124,7 +123,7 @@ func (r *BIOSSettingsSetReconciler) reconcile(
 
 	serverList, err := r.getServersBySelector(ctx, biosSettingsSet)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get Servers through label selector %w", err)
 	}
 	return r.handleBiosSettings(ctx, log, serverList, biosSettingsSet)
 }
@@ -141,16 +140,18 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 	}
 
 	if err := r.createMissingBIOSSettings(ctx, log, serverList, ownedBiosSettings, biosSettingsSet); err != nil {
-		log.Error(err, "failed to create resources")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to create missing BIOSSettings resources %w", err)
 	}
 
 	log.V(1).Info("Summary of servers and BIOSSettings", "Server count", len(serverList.Items),
 		"BIOSVersion count", len(ownedBiosSettings.Items))
 
 	if err := r.deleteOrphanBIOSSettings(ctx, log, serverList, ownedBiosSettings); err != nil {
-		log.Error(err, "failed to cleanup resources")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSSettings resources %w", err)
+	}
+
+	if err := r.patchBIOSSettingsfromTemplate(ctx, log, &biosSettingsSet.Spec.BIOSSettingsTemplate, ownedBiosSettings); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings spec from template %w", err)
 	}
 
 	log.V(1).Info("Updating the status of BIOSSettingsSet")
@@ -159,8 +160,7 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 
 	err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 	if err != nil {
-		log.Error(err, "failed to update current Status")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to update current BIOSSettingsSet Status %w", err)
 	}
 	// wait for any updates from owned resources
 	return ctrl.Result{}, nil
@@ -182,6 +182,11 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(
 	var errs []error
 	for _, server := range serverList.Items {
 		if _, ok := serverWithSettings[server.Name]; !ok {
+			if server.Spec.BIOSSettingsRef != nil {
+				// this is the case where the server already has a different BIOSSettingsRef, and we should not create a new one for this server
+				log.V(1).Info("Server already has different BIOSSettingsRef, skipping creation", "server", server.Name, "BIOSSettingsRef", server.Spec.BIOSSettingsRef)
+				continue
+			}
 			newBiosSettingsName := fmt.Sprintf("%s-%s", biosSettingsSet.Name, server.Name)
 			var newBiosSetting *metalv1alpha1.BIOSSettings
 			if len(newBiosSettingsName) > utilvalidation.DNS1123SubdomainMaxLength {
@@ -217,15 +222,14 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(
 	serverList *metalv1alpha1.ServerList,
 	biosSettingsList *metalv1alpha1.BIOSSettingsList,
 ) error {
-
-	serverWithSettings := make(map[string]struct{})
+	serverMap := make(map[string]bool)
 	for _, server := range serverList.Items {
-		serverWithSettings[server.Spec.BIOSSettingsRef.Name] = struct{}{}
+		serverMap[server.Name] = true
 	}
 
 	var errs []error
 	for _, biosSettings := range biosSettingsList.Items {
-		if _, ok := serverWithSettings[biosSettings.Name]; !ok {
+		if _, ok := serverMap[biosSettings.Spec.ServerRef.Name]; !ok {
 			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
 				log.V(1).Info("Waiting for BIOSSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "status", biosSettings.Status)
 				continue
@@ -236,6 +240,43 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(
 		}
 	}
 
+	return errors.Join(errs...)
+}
+
+func (r *BIOSSettingsSetReconciler) patchBIOSSettingsfromTemplate(
+	ctx context.Context,
+	log logr.Logger,
+	biosSettingsTemplate *metalv1alpha1.BIOSSettingsTemplate,
+	biosSettingsList *metalv1alpha1.BIOSSettingsList,
+) error {
+	if len(biosSettingsList.Items) == 0 {
+		log.V(1).Info("No BIOSSettings found, skipping spec template update")
+		return nil
+	}
+
+	var errs []error
+	for _, biosSettings := range biosSettingsList.Items {
+		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+			continue
+		}
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
+			// serverMaintenanceRef might not be part of the patching template, so we do not patch if not provided
+			if biosSettingsTemplate.ServerMaintenanceRef != nil {
+				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
+			} else {
+				serverMaintenanceRef := biosSettings.Spec.ServerMaintenanceRef
+				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
+				biosSettings.Spec.ServerMaintenanceRef = serverMaintenanceRef
+			}
+			return nil
+		}) //nolint:errcheck
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched biosSettings with updated spec", "BIOSSettings", biosSettings.Name, "Operation", opResult)
+		}
+	}
 	return errors.Join(errs...)
 }
 
@@ -298,7 +339,7 @@ func (r *BIOSSettingsSetReconciler) updateStatus(
 	biosSettingsSet.Status = *currentStatus
 
 	if err := r.Status().Patch(ctx, biosSettingsSet, client.MergeFrom(biosSettingsSetBase)); err != nil {
-		return fmt.Errorf("failed to patch BIOSSettingsSet status: %w", err)
+		return err
 	}
 
 	log.V(1).Info("Updated biosSettingsSet state ", "new state", currentStatus)
@@ -314,14 +355,14 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 
 	biosSettingsSetList := &metalv1alpha1.BIOSSettingsSetList{}
 	if err := r.List(ctx, biosSettingsSetList); err != nil {
-		log.Error(err, "failed to list BIOSVersionSet")
+		log.V(1).Error(err, "failed to list BIOSVersionSet")
 		return nil
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, biosSettingsSet := range biosSettingsSetList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&biosSettingsSet.Spec.ServerSelector)
 		if err != nil {
-			log.Error(err, "failed to convert label selector")
+			log.V(1).Error(err, "failed to convert label selector")
 			return nil
 		}
 		// if the host label matches the selector, enqueue the request
@@ -335,6 +376,7 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 		} else { // if the label has been removed
 			ownedBiosVersions, err := r.getOwnedBIOSSettings(ctx, &biosSettingsSet)
 			if err != nil {
+				log.V(1).Error(err, "failed to get owned BIOSVersion resources")
 				return nil
 			}
 			for _, biosVersion := range ownedBiosVersions.Items {

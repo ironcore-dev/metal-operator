@@ -12,6 +12,8 @@ const (
 	OperationAnnotationRetry = "retry"
 	// InstanceTypeAnnotation is used to specify the type of Server.
 	InstanceTypeAnnotation = "metal.ironcore.dev/instance-type"
+	// OperationAnnotationRotateCredentials is used to indicate that credentials should be rotated.
+	OperationAnnotationRotateCredentials = "rotate-credentials"
 	// ForceUpdateAnnotation is used to indicate that the spec should be forcefully updated.
 	ForceUpdateAnnotation = "metal.ironcore.dev/force-update-resource"
 	// OperationAnnotationForceUpdateOrDeleteInProgress allows update/Delete of a resource even if it is in progress.

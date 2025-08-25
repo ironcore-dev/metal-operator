@@ -11,6 +11,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
@@ -66,6 +68,30 @@ func (s *Server) registerHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+// Utility: normalize and sort each segment of UUID (case-insensitive)
+func normalizeAndSortUUIDSegments(u string) []string {
+	segments := strings.Split(strings.ToLower(strings.TrimSpace(u)), "-")
+	sortedSegments := make([]string, len(segments))
+	for i, segment := range segments {
+		chars := strings.Split(segment, "")
+		sort.Strings(chars)
+		sortedSegments[i] = strings.Join(chars, "")
+	}
+	return sortedSegments
+}
+
+func equalSortedSegments(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // systemsHandler handles the /systems/{uuid} endpoint.
 func (s *Server) systemsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -75,6 +101,7 @@ func (s *Server) systemsHandler(w http.ResponseWriter, r *http.Request) {
 
 	uuid := r.URL.Path[len("/systems/"):]
 
+	// 1) Exact match first (fast path)
 	if value, ok := s.systemsStore.Load(uuid); ok {
 		server, ok := value.(registry.Server)
 		if !ok {
@@ -82,17 +109,53 @@ func (s *Server) systemsHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Error asserting type of endpoints")
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
-
 		if err := json.NewEncoder(w).Encode(server); err != nil {
 			log.Printf("Failed to encode result: %v\n", err)
 			http.Error(w, "Failed to encode result", http.StatusInternalServerError)
 		}
-	} else {
-		log.Printf("System UUID not found: %s\n", uuid)
-		http.NotFound(w, r)
+		return
 	}
+
+	// 2) Fuzzy match (sorted-chars per UUID segment)
+	want := normalizeAndSortUUIDSegments(uuid)
+
+	var (
+		foundServer registry.Server
+		found       bool
+	)
+
+	s.systemsStore.Range(func(k, v any) bool {
+		keyStr, ok := k.(string)
+		if !ok {
+			return true // skip
+		}
+
+		if equalSortedSegments(want, normalizeAndSortUUIDSegments(keyStr)) {
+			// type assert and serve
+			server, ok := v.(registry.Server)
+			if !ok {
+				// keep scanning in case another entry matches
+				return true
+			}
+			foundServer = server
+			found = true
+			return false // stop Range
+		}
+		return true
+	})
+
+	if found {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(foundServer); err != nil {
+			log.Printf("Failed to encode result (fuzzy): %v\n", err)
+			http.Error(w, "Failed to encode result", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	log.Printf("System UUID not found (exact or fuzzy): %s\n", uuid)
+	http.NotFound(w, r)
 }
 
 // deleteHandler handles the DELETE requests to remove a system by UUID.

@@ -47,7 +47,7 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting registry agent")
-	agent := probe.NewAgent(serverUUID, registryURL, duration)
+	agent := probe.NewAgent(setupLog, serverUUID, registryURL, duration)
 	if err := agent.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running probe agent")
 		os.Exit(1)

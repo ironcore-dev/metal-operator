@@ -1,0 +1,33 @@
+{
+    "@odata.type": "#ActionInfo.v1_4_1.ActionInfo",
+    "Id": "RekeyActionInfo",
+    "Name": "Rekey Action Info",
+    "Parameters": [
+        {
+            "Name": "KeyPairAlgorithm",
+            "Required": true,
+            "DataType": "String",
+            "AllowableValues": [
+                "TPM_ALG_RSA",
+                "TPM_ALG_ECDSA"
+            ]
+        },
+        {
+            "Name": "KeyBitLength",
+            "Required": false,
+            "DataType": "Number"
+        },
+        {
+            "Name": "KeyCurveId",
+            "Required": false,
+            "DataType": "String",
+            "AllowableValues": [
+                "TPM_ECC_NIST_P256",
+                "TPM_ECC_NIST_P384",
+                "TPM_ECC_NIST_P521"
+            ]
+        }
+    ],
+    "@odata.id": "/redfish/v1/UpdateService/ClientCertificates/1/RekeyActionInfo",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

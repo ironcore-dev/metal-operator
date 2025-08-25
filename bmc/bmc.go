@@ -91,6 +91,8 @@ type BMC interface {
 
 	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
 
+	GetProcessors(ctx context.Context, systemURI string) ([]Processor, error)
+
 	UpgradeBiosVersion(
 		ctx context.Context,
 		manufacturer string,
@@ -293,8 +295,6 @@ type SystemInfo struct {
 	Model             string
 	Status            common.Status
 	PowerState        redfish.PowerState
-	NetworkInterfaces []NetworkInterface
-	Processors        []Processor
 	TotalSystemMemory resource.Quantity
 	SystemURI         string
 	SystemUUID        string

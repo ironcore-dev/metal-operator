@@ -93,8 +93,6 @@ type BMC interface {
 
 	GetProcessors(ctx context.Context, systemURI string) ([]Processor, error)
 
-	ResetBMC(ctx context.Context, systemURI string) error
-
 	UpgradeBiosVersion(
 		ctx context.Context,
 		manufacturer string,

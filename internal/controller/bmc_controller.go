@@ -32,10 +32,11 @@ const BMCFinalizer = "metal.ironcore.dev/bmc"
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	Insecure          bool
-	BMCPollingOptions bmc.Options
-	LastBMCFailure    map[types.NamespacedName]time.Time
+	Scheme               *runtime.Scheme
+	Insecure             bool
+	BMCFailureResetDelay time.Duration
+	BMCPollingOptions    bmc.Options
+	LastBMCFailure       map[types.NamespacedName]time.Time
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -228,19 +229,22 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 }
 
 func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) (ctrl.Result, error) {
+	if r.BMCFailureResetDelay == 0 {
+		// If ResetBMCAfterFailures is not set, just return the error
+		return ctrl.Result{}, err
+	}
 	lastFailure, ok := r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}]
 	if !ok {
 		// First failure, record the timestamp
 		r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}] = time.Now()
 	}
-	if ok && time.Since(lastFailure) > r.BMCPollingOptions.ResetAfterTime {
+	if ok && time.Since(lastFailure) > r.BMCFailureResetDelay {
 		// If the failure has persisted for more than 10 minutes, log an event
-		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCPollingOptions.ResetAfterTime)
+		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCFailureResetDelay)
 		if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to reset BMC after persistent connection failures: %w", err)
 		}
-		log.Info("Reset BMC after persistent connection failures")
-		// Reset the timestamp to avoid repeated logging
+		log.Info("BMC reset after persistent connection failures")
 		delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
 	}
 	return ctrl.Result{}, err

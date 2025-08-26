@@ -205,11 +205,11 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) e
 
 	resetCMD := ""
 	switch bmcObj.Status.Manufacturer {
-	case "Dell":
+	case string(bmc.ManufacturerDell):
 		resetCMD = "racreset"
-	case "HPE":
+	case string(bmc.ManufacturerHPE):
 		resetCMD = ""
-	case "Lenovo":
+	case string(bmc.ManufacturerLenovo):
 		resetCMD = ""
 	default:
 		return fmt.Errorf("unsupported BMC manufacturer %s for reset", bmcObj.Status.Manufacturer)

@@ -7,9 +7,11 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -174,4 +176,46 @@ func CreateBMCClient(
 
 func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmc.Name, "system", index)
+}
+
+func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) error {
+	username, password, err := GetBMCCredentialsForBMCSecretName(ctx, c, bmcObj.Spec.BMCSecretRef.Name)
+	if err != nil {
+		return fmt.Errorf("failed to get credentials from BMC secret: %w", err)
+	}
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			return nil
+		},
+		Timeout: 5 * time.Second,
+	}
+	client, err := ssh.Dial("tcp", net.JoinHostPort(bmcObj.Spec.Endpoint.IP.String(), "22"), config)
+	if err != nil {
+		return fmt.Errorf("failed to dial ssh: %w", err)
+	}
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create ssh session: %w", err)
+	}
+	defer session.Close()
+
+	resetCMD := ""
+	switch bmcObj.Status.Manufacturer {
+	case "Dell":
+		resetCMD = "racreset"
+	case "HPE":
+		resetCMD = ""
+	case "Lenovo":
+		resetCMD = ""
+	default:
+		return fmt.Errorf("unsupported BMC manufacturer %s for reset", bmcObj.Status.Manufacturer)
+	}
+	if err := session.Run(resetCMD); err != nil {
+		return fmt.Errorf("failed to run reset command: %w", err)
+	}
+	return nil
 }

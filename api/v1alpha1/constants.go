@@ -18,4 +18,6 @@ const (
 	OperationAnnotationForceUpdateOrDeleteInProgress = "ForceUpdateOrDeleteInProgress"
 	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
 	OperationAnnotationForceUpdateInProgress = "ForceUpdateInProgress"
+	// OperationAnnotationForceBMCReset forces a BMC reset before next operation
+	OperationAnnotationForceBMCReset = "ForceBMCReset"
 )

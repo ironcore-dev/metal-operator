@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
+	"golang.org/x/crypto/ssh"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -43,6 +45,7 @@ type Options struct {
 	Password  string
 	BasicAuth bool
 
+	ResetAfterTime          time.Duration
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
@@ -1040,4 +1043,32 @@ func (r *RedfishBMC) GetBMCUpgradeTask(
 	}
 
 	return oem.GetTaskMonitorDetails(ctx, respTask)
+}
+
+func (r *RedfishBMC) ResetBMC(ctx context.Context, bmcUUID string) error {
+	config := &ssh.ClientConfig{
+		User: r.options.Username,
+		Auth: []ssh.AuthMethod{ssh.Password(r.options.Password)},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			return nil
+		},
+		Timeout: 5 * time.Second,
+	}
+	client, err := ssh.Dial("tcp", net.JoinHostPort(r.options.Endpoint, "22"), config)
+	if err != nil {
+		return fmt.Errorf("failed to dial ssh: %w", err)
+	}
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create ssh session: %w", err)
+	}
+
+	defer session.Close()
+
+	if err := session.Run("racreset"); err != nil {
+		return fmt.Errorf("failed to run racreset command: %w", err)
+	}
+	return nil
 }

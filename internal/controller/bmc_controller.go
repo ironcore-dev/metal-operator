@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -34,6 +35,7 @@ type BMCReconciler struct {
 	Scheme            *runtime.Scheme
 	Insecure          bool
 	BMCPollingOptions bmc.Options
+	LastBMCFailure    map[types.NamespacedName]time.Time
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -50,6 +52,8 @@ func (r *BMCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if err := r.Get(ctx, req.NamespacedName, bmcObj); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	r.Client.Status()
 
 	return r.reconcileExists(ctx, log, bmcObj)
 }
@@ -88,12 +92,17 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
 	}
+	if modified, err := r.handleAnnotionOperations(ctx, log, bmcObj); err != nil || modified {
+		return ctrl.Result{}, err
+	}
 
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
+		return r.handleBMCConnectionFailure(ctx, log, bmcObj, fmt.Errorf("failed to get BMC client: %w", err))
 	}
 	defer bmcClient.Logout()
+	// Reset the failure timestamp on successful connection
+	delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
 
 	if err := r.updateBMCStatusDetails(ctx, log, bmcClient, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update BMC status: %w", err)
@@ -197,6 +206,46 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	return nil
 }
 
+func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	annotations := bmcObj.GetAnnotations()
+	operation, ok := annotations[metalv1alpha1.OperationAnnotationForceBMCReset]
+	if !ok {
+		return false, nil
+	}
+
+	log.V(1).Info("Handling operation", "Operation", operation)
+	if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
+		return false, fmt.Errorf("failed to reset server: %w", err)
+	}
+	log.V(1).Info("Operation completed", "Operation", operation)
+	bmcBase := bmcObj.DeepCopy()
+	delete(annotations, metalv1alpha1.OperationAnnotation)
+	bmcObj.SetAnnotations(annotations)
+	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return false, fmt.Errorf("failed to patch bmc annotations: %w", err)
+	}
+	return true, nil
+}
+
+func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) (ctrl.Result, error) {
+	lastFailure, ok := r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}]
+	if !ok {
+		// First failure, record the timestamp
+		r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}] = time.Now()
+	}
+	if ok && time.Since(lastFailure) > r.BMCPollingOptions.ResetAfterTime {
+		// If the failure has persisted for more than 10 minutes, log an event
+		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCPollingOptions.ResetAfterTime)
+		if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to reset BMC after persistent connection failures: %w", err)
+		}
+		log.Info("Reset BMC after persistent connection failures")
+		// Reset the timestamp to avoid repeated logging
+		delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
+	}
+	return ctrl.Result{}, err
+}
+
 func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {
 	return []ctrl.Request{
 		{
@@ -215,6 +264,8 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.LastBMCFailure = make(map[types.NamespacedName]time.Time)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).

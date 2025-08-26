@@ -54,8 +54,6 @@ func (r *BMCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	r.Client.Status()
-
 	return r.reconcileExists(ctx, log, bmcObj)
 }
 
@@ -99,7 +97,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
-		return r.handleBMCConnectionFailure(ctx, log, bmcObj, fmt.Errorf("failed to get BMC client: %w", err))
+		return ctrl.Result{}, r.handleBMCConnectionFailure(ctx, log, bmcObj, fmt.Errorf("failed to get BMC client: %w", err))
 	}
 	defer bmcClient.Logout()
 	// Reset the failure timestamp on successful connection
@@ -228,10 +226,10 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	return true, nil
 }
 
-func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) (ctrl.Result, error) {
+func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) error {
 	if r.BMCFailureResetDelay == 0 {
 		// If ResetBMCAfterFailures is not set, just return the error
-		return ctrl.Result{}, err
+		return err
 	}
 	lastFailure, ok := r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}]
 	if !ok {
@@ -241,13 +239,13 @@ func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr
 	if ok && time.Since(lastFailure) > r.BMCFailureResetDelay {
 		// If the failure has persisted for more than 10 minutes, log an event
 		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCFailureResetDelay)
-		if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to reset BMC after persistent connection failures: %w", err)
+		if resetErr := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
+			return fmt.Errorf("failed to reset BMC after persistent connection failures: %w", resetErr)
 		}
 		log.Info("BMC reset after persistent connection failures")
 		delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
 	}
-	return ctrl.Result{}, err
+	return err
 }
 
 func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {

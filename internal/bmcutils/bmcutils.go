@@ -195,13 +195,17 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) e
 	if err != nil {
 		return fmt.Errorf("failed to dial ssh: %w", err)
 	}
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create ssh session: %w", err)
 	}
-	defer session.Close()
+	defer func() {
+		_ = session.Close()
+	}()
 
 	resetCMD := ""
 	switch bmcObj.Status.Manufacturer {

@@ -231,7 +231,7 @@ var _ = Describe("BMC Controller", func() {
 		By("Updating BMC labels")
 		bmcLabels["foo"] = "baz"
 
-		Expect(Update(bmc, func() {
+		Eventually(Update(bmc, func() {
 			maps.Copy(bmc.Labels, bmcLabels)
 		})).Should(Succeed())
 

@@ -50,7 +50,7 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 
 	// Initialize your probe server
-	probeAgent = probe.NewAgent(systemUUID, registryURL, 100*time.Millisecond)
+	probeAgent = probe.NewAgent(systemUUID, registryURL, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

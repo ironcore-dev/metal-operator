@@ -101,7 +101,7 @@ func TransistionServerFromInitialToAvailableState(
 	), fmt.Sprintf("Expected Server to be in PowerState 'on' in discovery state %v", server))
 
 	By("Starting the probe agent")
-	probeAgent := probe.NewAgent(server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
+	probeAgent := probe.NewAgent(server.Spec.SystemUUID, "http://localhost:30000", 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

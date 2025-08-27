@@ -12,17 +12,16 @@ import (
 	"os"
 	"path/filepath"
 
+	cmdclient "github.com/ironcore-dev/metal-operator/internal/cmd/client"
 	"github.com/ironcore-dev/metal-operator/internal/console"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 var (
-	kubeconfigPath        string
 	kubeconfig            string
 	serialConsoleNumber   int
 	skipHostKeyValidation bool
@@ -54,7 +53,7 @@ func runConsole(cmd *cobra.Command, args []string) error {
 	}
 	serverName = args[0]
 
-	k8sClient, err := createClient()
+	k8sClient, err := cmdclient.CreateClient(kubeconfig, scheme)
 	if err != nil {
 		return err
 	}
@@ -165,29 +164,6 @@ func openConsoleStream(ctx context.Context, k8sClient client.Client, serverName 
 		return fmt.Errorf("error during SOL session: %v", err)
 	}
 	return nil
-}
-
-func createClient() (client.Client, error) {
-	if kubeconfig != "" {
-		kubeconfigPath = kubeconfig
-	} else {
-		kubeconfigPath = os.Getenv("KUBECONFIG")
-		if kubeconfigPath == "" {
-			fmt.Println("Error: --kubeconfig flag or KUBECONFIG environment variable must be set")
-			os.Exit(1)
-		}
-	}
-
-	clientConfig, err := config.GetConfigWithContext("")
-	if err != nil {
-		return nil, fmt.Errorf("failed getting client config: %w", err)
-	}
-
-	k8sClient, err := client.New(clientConfig, client.Options{Scheme: scheme})
-	if err != nil {
-		return nil, fmt.Errorf("failed creating controller-runtime client: %w", err)
-	}
-	return k8sClient, nil
 }
 
 func expandPath(path string) (string, error) {

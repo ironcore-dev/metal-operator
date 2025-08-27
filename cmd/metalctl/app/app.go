@@ -4,11 +4,10 @@
 package app
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	metalv1alphav1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/spf13/cobra"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -31,5 +30,6 @@ func NewCommand() *cobra.Command {
 	}
 	root.AddCommand(NewMoveCommand())
 	root.AddCommand(NewConsoleCommand())
+	root.AddCommand(NewVisualizationCommand())
 	return root
 }

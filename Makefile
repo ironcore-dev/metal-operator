@@ -249,6 +249,7 @@ GEN_CRD_API_REFERENCE_DOCS ?= $(LOCALBIN)/gen-crd-api-reference-docs
 KUBEBUILDER ?= $(LOCALBIN)/kubebuilder
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
+METALCTL ?= $(LOCALBIN)/metalctl
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.5.0
@@ -318,6 +319,10 @@ $(GEN_CRD_API_REFERENCE_DOCS): $(LOCALBIN)
 kubebuilder: $(KUBEBUILDER) ## Download kubebuilder locally if necessary.
 $(KUBEBUILDER): $(LOCALBIN)
 	$(call go-install-tool,$(KUBEBUILDER),sigs.k8s.io/kubebuilder/v4,$(KUBEBUILDER_VERSION))
+
+.PHONY: metalctl
+metalctl: $(METALCTL) ## Build metalctl locally if necessary.
+	go build -o $(METALCTL) ./cmd/metalctl
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary

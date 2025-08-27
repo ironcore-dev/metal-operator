@@ -22,6 +22,7 @@ path = [
     "hack/**",
     "package.json",
     "package-lock.json",
+    "internal/cmd/visualizer/index.html",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2024 SAP SE or an SAP affiliate company and IronCore contributors"

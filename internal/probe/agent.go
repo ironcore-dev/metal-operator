@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jaypipes/ghw"
 	"log"
 	"net/http"
 	"time"
@@ -17,30 +18,78 @@ import (
 )
 
 type Agent struct {
-	SystemUUID  string
-	RegistryURL string
-	Duration    time.Duration
-	Server      *registry.Server // Pointer to Server for late initialization.
+	SystemUUID       string
+	RegistryURL      string
+	Duration         time.Duration
+	Server           *registry.Server // Pointer to Server for late initialization.
+	LLDPSyncInterval time.Duration
+	LLDPSyncDuration time.Duration
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(systemUUID, registryURL string, duration time.Duration) *Agent {
+func NewAgent(systemUUID, registryURL string, duration, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
 	return &Agent{
-		SystemUUID:  systemUUID,
-		RegistryURL: registryURL,
-		Duration:    duration,
+		SystemUUID:       systemUUID,
+		RegistryURL:      registryURL,
+		Duration:         duration,
+		LLDPSyncInterval: LLDPSyncInterval,
+		LLDPSyncDuration: LLDPSyncDuration,
 	}
 }
 
 // Init initializes the Agent's Server field with network interface data.
-func (a *Agent) Init() error {
+func (a *Agent) Init(ctx context.Context) error {
 	interfaces, err := collectNetworkData()
 	if err != nil {
 		return err
 	}
+	systeminfo, err := collectSystemInfoData()
+	if err != nil {
+		return err
+	}
 
-	a.Server = &registry.Server{NetworkInterfaces: interfaces}
+	cpuInfos, err := collectCPUInfoData()
+	if err != nil {
+		return err
+	}
+
+	LLDPInfo, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
+	if err != nil {
+		return err
+	}
+
+	BlockDevices, err := collectStorageInfoData()
+	if err != nil {
+		return err
+	}
+
+	a.Server = &registry.Server{
+		SystemInfo:        systeminfo,
+		CPU:               cpuInfos,
+		NetworkInterfaces: interfaces,
+		LLDP:              LLDPInfo,
+		Storage:           BlockDevices,
+	}
 	return nil
+}
+
+func collectCPUInfoData() ([]registry.CPUInfo, error) {
+	var cpuInfos []registry.CPUInfo
+	cpuInfo, err := ghw.CPU()
+	if err != nil {
+		return cpuInfos, fmt.Errorf("failed to get CPU info: %w", err)
+	}
+	for _, processor := range cpuInfo.Processors {
+		cpuInfos = append(cpuInfos, registry.CPUInfo{
+			ID:                   processor.ID,
+			TotalCores:           processor.TotalCores,
+			TotalHardwareThreads: processor.TotalHardwareThreads,
+			Vendor:               processor.Vendor,
+			Model:                processor.Model,
+			Capabilities:         processor.Capabilities,
+		})
+	}
+	return cpuInfos, nil
 }
 
 // Start begins the periodic registration process.
@@ -50,7 +99,7 @@ func (a *Agent) Start(ctx context.Context) error {
 
 	// Ensure the Agent is initialized.
 	if a.Server == nil {
-		if err := a.Init(); err != nil {
+		if err := a.Init(ctx); err != nil {
 			log.Printf("Error initializing agent: %v", err)
 			return err
 		}

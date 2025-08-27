@@ -11,7 +11,41 @@ type NetworkInterface struct {
 	MACAddress string `json:"macAddress"`
 }
 
+type DMI struct {
+	BIOSInformation   BIOSInformation
+	SystemInformation ServerInformation
+	BoardInformation  BoardInformation
+}
+
+type BIOSInformation struct {
+	Vendor  string
+	Version string
+	Date    string
+}
+
+type ServerInformation struct {
+	Manufacturer string
+	ProductName  string
+	Version      string
+	SerialNumber string
+	UUID         string
+	SKUNumber    string
+	Family       string
+}
+
+type BoardInformation struct {
+	Manufacturer string
+	Product      string
+	Version      string
+	SerialNumber string
+	AssetTag     string
+}
+
 // Server represents a server with a list of network interfaces.
 type Server struct {
+	SystemInfo        DMI                `json:"systemInfo,omitempty"`
+	CPU               []CPUInfo          `json:"cpu,omitempty"`
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
+	LLDP              LLDP               `json:"lldp,omitempty"`
+	Storage           []BlockDevice      `json:"storage,omitempty"`
 }

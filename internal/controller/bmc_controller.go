@@ -207,7 +207,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 
 func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
 	annotations := bmcObj.GetAnnotations()
-	operation, ok := annotations[metalv1alpha1.OperationAnnotationForceBMCReset]
+	operation, ok := annotations[metalv1alpha1.OperationAnnotationForceReset]
 	if !ok {
 		return false, nil
 	}

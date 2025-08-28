@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -19,6 +20,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/stmcginnis/gofish/common"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,9 +33,11 @@ const BMCFinalizer = "metal.ironcore.dev/bmc"
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	Insecure          bool
-	BMCPollingOptions bmc.Options
+	Scheme               *runtime.Scheme
+	Insecure             bool
+	BMCFailureResetDelay time.Duration
+	BMCPollingOptions    bmc.Options
+	LastBMCFailure       map[types.NamespacedName]time.Time
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -88,12 +92,17 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
 	}
+	if modified, err := r.handleAnnotionOperations(ctx, log, bmcObj); err != nil || modified {
+		return ctrl.Result{}, err
+	}
 
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
+		return ctrl.Result{}, r.handleBMCConnectionFailure(ctx, log, bmcObj, err)
 	}
 	defer bmcClient.Logout()
+	// Reset the failure timestamp on successful connection
+	delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
 
 	if err := r.updateBMCStatusDetails(ctx, log, bmcClient, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update BMC status: %w", err)
@@ -171,7 +180,6 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	if err != nil {
 		return fmt.Errorf("failed to get servers from BMC %s: %w", bmcObj.Name, err)
 	}
-
 	var errs []error
 	for i, s := range servers {
 		server := &metalv1alpha1.Server{}
@@ -197,6 +205,57 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	return nil
 }
 
+func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	annotations := bmcObj.GetAnnotations()
+	operation, ok := annotations[metalv1alpha1.OperationAnnotationForceReset]
+	if !ok {
+		return false, nil
+	}
+	log.V(1).Info("Handling operation", "Operation", operation)
+	if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj, 5*time.Minute); err != nil {
+		return false, fmt.Errorf("failed to reset server: %w", err)
+	}
+	log.V(1).Info("Operation completed", "Operation", operation)
+	bmcBase := bmcObj.DeepCopy()
+	delete(annotations, metalv1alpha1.OperationAnnotation)
+	bmcObj.SetAnnotations(annotations)
+	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return false, fmt.Errorf("failed to patch bmc annotations: %w", err)
+	}
+	return true, nil
+}
+
+func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) error {
+	if r.BMCFailureResetDelay == 0 {
+		// If ResetBMCAfterFailures is not set, just return the error
+		return fmt.Errorf("failed to get BMC client: %w", err)
+	}
+	if httpErr, ok := err.(*common.Error); ok {
+		// only handle 5xx errors
+		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
+			return fmt.Errorf("failed to get BMC client: %w", err)
+		}
+	} else {
+		// For non-HTTP errors, we don't attempt a reset
+		return fmt.Errorf("failed to get BMC client: %w", err)
+	}
+	lastFailure, ok := r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}]
+	if !ok {
+		// First failure, record the timestamp
+		r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}] = time.Now()
+	}
+	if ok && time.Since(lastFailure) > r.BMCFailureResetDelay {
+		// If the failure has persisted for more than 10 minutes, log an event
+		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCFailureResetDelay)
+		if resetErr := bmcutils.ResetBMC(ctx, r.Client, bmcObj, 5*time.Minute); err != nil {
+			return fmt.Errorf("failed to reset BMC after persistent connection failures: %w", resetErr)
+		}
+		log.Info("BMC reset after persistent connection failures")
+		delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
+	}
+	return err
+}
+
 func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {
 	return []ctrl.Request{
 		{
@@ -215,6 +274,8 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.LastBMCFailure = make(map[types.NamespacedName]time.Time)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).

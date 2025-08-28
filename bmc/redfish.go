@@ -79,7 +79,7 @@ func NewRedfishBMCClient(
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to redfish endpoint: %w", err)
+		return nil, err
 	}
 	bmc := &RedfishBMC{client: client}
 	if options.ResourcePollingInterval == 0 {

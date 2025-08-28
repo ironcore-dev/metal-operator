@@ -20,6 +20,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/stmcginnis/gofish/common"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -97,7 +98,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
-		return ctrl.Result{}, r.handleBMCConnectionFailure(ctx, log, bmcObj, fmt.Errorf("failed to get BMC client: %w", err))
+		return ctrl.Result{}, r.handleBMCConnectionFailure(ctx, log, bmcObj, err)
 	}
 	defer bmcClient.Logout()
 	// Reset the failure timestamp on successful connection
@@ -179,7 +180,6 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	if err != nil {
 		return fmt.Errorf("failed to get servers from BMC %s: %w", bmcObj.Name, err)
 	}
-
 	var errs []error
 	for i, s := range servers {
 		server := &metalv1alpha1.Server{}
@@ -211,7 +211,6 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	if !ok {
 		return false, nil
 	}
-
 	log.V(1).Info("Handling operation", "Operation", operation)
 	if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
 		return false, fmt.Errorf("failed to reset server: %w", err)
@@ -229,7 +228,16 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) error {
 	if r.BMCFailureResetDelay == 0 {
 		// If ResetBMCAfterFailures is not set, just return the error
-		return err
+		return fmt.Errorf("failed to get BMC client: %w", err)
+	}
+	if httpErr, ok := err.(*common.Error); ok {
+		// only handle 5xx errors
+		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
+			return fmt.Errorf("failed to get BMC client: %w", err)
+		}
+	} else {
+		// For non-HTTP errors, we don't attempt a reset
+		return fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	lastFailure, ok := r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}]
 	if !ok {

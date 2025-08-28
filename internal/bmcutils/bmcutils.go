@@ -189,7 +189,7 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) e
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
-		Timeout: 5 * time.Second,
+		Timeout: 5 * time.Minute,
 	}
 	client, err := ssh.Dial("tcp", net.JoinHostPort(bmcObj.Spec.Endpoint.IP.String(), "22"), config)
 	if err != nil {

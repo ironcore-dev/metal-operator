@@ -178,7 +178,7 @@ func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmc.Name, "system", index)
 }
 
-func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) error {
+func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, timeout time.Duration) error {
 	username, password, err := GetBMCCredentialsForBMCSecretName(ctx, c, bmcObj.Spec.BMCSecretRef.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get credentials from BMC secret: %w", err)
@@ -189,7 +189,7 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) e
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
-		Timeout: 5 * time.Minute,
+		Timeout: timeout,
 	}
 	client, err := ssh.Dial("tcp", net.JoinHostPort(bmcObj.Spec.Endpoint.IP.String(), "22"), config)
 	if err != nil {
@@ -206,7 +206,6 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) e
 	defer func() {
 		_ = session.Close()
 	}()
-
 	resetCMD := ""
 	switch bmcObj.Status.Manufacturer {
 	case string(bmc.ManufacturerDell):
@@ -218,8 +217,20 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) e
 	default:
 		return fmt.Errorf("unsupported BMC manufacturer %s for reset", bmcObj.Status.Manufacturer)
 	}
-	if err := session.Run(resetCMD); err != nil {
-		return fmt.Errorf("failed to run reset command: %w", err)
+	// cancel reset cmd after 5 minutes
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(resetCMD)
+	}()
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("timeout waiting for BMC reset command to complete: %w", ctx.Err())
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("failed to run reset command: %w", err)
+		}
 	}
 	return nil
 }

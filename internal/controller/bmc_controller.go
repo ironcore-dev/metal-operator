@@ -212,7 +212,7 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 		return false, nil
 	}
 	log.V(1).Info("Handling operation", "Operation", operation)
-	if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
+	if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj, 5*time.Minute); err != nil {
 		return false, fmt.Errorf("failed to reset server: %w", err)
 	}
 	log.V(1).Info("Operation completed", "Operation", operation)
@@ -247,7 +247,7 @@ func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr
 	if ok && time.Since(lastFailure) > r.BMCFailureResetDelay {
 		// If the failure has persisted for more than 10 minutes, log an event
 		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCFailureResetDelay)
-		if resetErr := bmcutils.ResetBMC(ctx, r.Client, bmcObj); err != nil {
+		if resetErr := bmcutils.ResetBMC(ctx, r.Client, bmcObj, 5*time.Minute); err != nil {
 			return fmt.Errorf("failed to reset BMC after persistent connection failures: %w", resetErr)
 		}
 		log.Info("BMC reset after persistent connection failures")

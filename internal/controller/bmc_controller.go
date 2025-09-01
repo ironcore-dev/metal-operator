@@ -21,7 +21,9 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/stmcginnis/gofish/common"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -98,7 +100,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
-		return ctrl.Result{}, r.handleBMCConnectionFailure(ctx, log, bmcObj, err)
+		return r.handleBMCConnectionFailure(ctx, log, bmcObj, err)
 	}
 	defer bmcClient.Logout()
 	// Reset the failure timestamp on successful connection
@@ -115,7 +117,10 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	log.V(1).Info("Discovered servers")
 
 	log.V(1).Info("Reconciled BMC")
-	return ctrl.Result{}, nil
+	// keep checking bmc status every 5 minutes
+	return ctrl.Result{
+		RequeueAfter: 5 * time.Minute,
+	}, nil
 }
 
 func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
@@ -148,8 +153,6 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}
-
-	// TODO: Secret rotation/User management
 
 	manager, err := bmcClient.GetManager(bmcObj.Spec.BMCUUID)
 	if err != nil {
@@ -212,8 +215,8 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 		return false, nil
 	}
 	log.V(1).Info("Handling operation", "Operation", operation)
-	if err := bmcutils.ResetBMC(ctx, r.Client, bmcObj, 5*time.Minute); err != nil {
-		return false, fmt.Errorf("failed to reset server: %w", err)
+	if err := r.resetBMC(ctx, log, bmcObj); err != nil {
+		return false, fmt.Errorf("failed to create BMC reset job: %w", err)
 	}
 	log.V(1).Info("Operation completed", "Operation", operation)
 	bmcBase := bmcObj.DeepCopy()
@@ -225,19 +228,18 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	return true, nil
 }
 
-func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) error {
-	if r.BMCFailureResetDelay == 0 {
-		// If ResetBMCAfterFailures is not set, just return the error
-		return fmt.Errorf("failed to get BMC client: %w", err)
+func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) (ctrl.Result, error) {
+	if r.BMCFailureResetDelay == 0 || bmcObj.Status.State == metalv1alpha1.BMCStateError {
+		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	if httpErr, ok := err.(*common.Error); ok {
 		// only handle 5xx errors
 		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-			return fmt.Errorf("failed to get BMC client: %w", err)
+			return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 		}
 	} else {
 		// For non-HTTP errors, we don't attempt a reset
-		return fmt.Errorf("failed to get BMC client: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	lastFailure, ok := r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}]
 	if !ok {
@@ -245,15 +247,88 @@ func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr
 		r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}] = time.Now()
 	}
 	if ok && time.Since(lastFailure) > r.BMCFailureResetDelay {
-		// If the failure has persisted for more than 10 minutes, log an event
 		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCFailureResetDelay)
-		if resetErr := bmcutils.ResetBMC(ctx, r.Client, bmcObj, 5*time.Minute); err != nil {
-			return fmt.Errorf("failed to reset BMC after persistent connection failures: %w", resetErr)
+		// patch status to indicate error
+		bmcBase := bmcObj.DeepCopy()
+		bmcObj.Status.State = metalv1alpha1.BMCStateError
+		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch BMC status: %w", err)
 		}
-		log.Info("BMC reset after persistent connection failures")
+		if err := r.resetBMC(ctx, log, bmcObj); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to create BMC reset job: %w", err)
+		}
+		log.Info("executing BMC reset after persistent connection failures")
 		delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
+		// Requeue after 15 minutes to give the BMC time to reset
+		return ctrl.Result{RequeueAfter: 15 * time.Minute}, nil
 	}
-	return err
+	return ctrl.Result{}, err
+}
+
+func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
+	// get the image version of the operator
+	if bmcObj.Status.State != metalv1alpha1.BMCStateError {
+		return fmt.Errorf("cannot reset BMC %s in state %s", bmcObj.Name, bmcObj.Status.State)
+	}
+	// check if a job is already running for this BMC
+	job := &batchv1.Job{}
+	if err := r.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("bmc-reset-%s-", bmcObj.Name), Namespace: bmcObj.Namespace}, job); err == nil {
+		// job already exists
+		log.V(1).Info("BMC reset job already exists", "Job", job.Name)
+		if job.Status.Active > 0 {
+			log.V(1).Info("BMC reset job is already running", "Job", job.Name)
+			return nil
+		}
+		// delete old job
+		if err := r.Delete(ctx, job); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete old BMC reset job: %w", err)
+		}
+	} else if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to get BMC reset job: %w", err)
+	}
+	// create new k8s job which resets the BMC
+	newJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("bmc-reset-%s-", bmcObj.Name),
+			Namespace: bmcObj.Namespace,
+			Labels:    bmcObj.Labels,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: func(i int32) *int32 { return &i }(3),
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  "bmc-reset",
+							Image: "ironcoredev/bmc:latest",
+							Command: []string{
+								"bmc",
+								"reset",
+								"--bmc-name", bmcObj.Name,
+								"--timeout", "5m",
+							},
+							ImagePullPolicy: v1.PullIfNotPresent,
+							Env: []v1.EnvVar{
+								{
+									Name:  "KUBECONFIG",
+									Value: "/etc/kubernetes/kubeconfig/kubeconfig",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newJob, func() error {
+		return controllerutil.SetControllerReference(bmcObj, newJob, r.Scheme)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create or patch BMC reset job: %w", err)
+	}
+	log.Info("Created or patched BMC reset job", "Job", job.Name, "Operation", opResult)
+	return nil
 }
 
 func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {

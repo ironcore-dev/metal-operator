@@ -2,6 +2,7 @@
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= controller:latest
 METALPROBE_IMG ?= metalprobe:latest
+BMC_IMG 	   ?= bmc:latest
 
 # Docker image name for the mkdocs based local development setup
 IMAGE=ironcore-dev/metal-operator-docs
@@ -169,10 +170,15 @@ docker-build-controller-manager: ## Build controller-manager.
 docker-build-metalprobe: ## Build metalprobe.
 	docker build --target probe -t ${METALPROBE_IMG} .
 
+.PHONY: docker-build-bmc
+docker-build-metalprobe: ## Build metalprobe.
+	docker build --target probe -t ${BMC_IMG} .
+
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMG}
 	$(CONTAINER_TOOL) push ${METALPROBE_IMG}
+	$(CONTAINER_TOOL) push ${BMC_IMG}
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:

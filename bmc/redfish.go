@@ -71,11 +71,12 @@ func NewRedfishBMCClient(
 	options Options,
 ) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
-		Endpoint:  options.Endpoint,
-		Username:  options.Username,
-		Password:  options.Password,
-		Insecure:  true,
-		BasicAuth: options.BasicAuth,
+		Endpoint:         options.Endpoint,
+		Username:         options.Username,
+		Password:         options.Password,
+		Insecure:         true,
+		ReuseConnections: true,
+		BasicAuth:        options.BasicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
@@ -749,6 +750,52 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemURI string) ([]Stora
 		return result, nil
 	}
 	return result, nil
+}
+
+func (r *RedfishBMC) CreateOrUpdateAccount(
+	ctx context.Context, userName,
+	role, password string, enabled bool,
+) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	for _, a := range accounts {
+		if a.UserName == userName {
+			a.RoleID = role
+			a.UserName = userName
+			a.Enabled = enabled
+			if err := a.Update(); err != nil {
+				return fmt.Errorf("failed to update account: %w", err)
+			}
+			if password != "" {
+				if err := a.ChangePassword(password, r.options.Password); err != nil {
+					return fmt.Errorf("failed to change account password: %w", err)
+				}
+			}
+		}
+	}
+	_, err = service.CreateAccount(userName, password, role)
+	if err != nil {
+		return fmt.Errorf("failed to update account: %w", err)
+	}
+	return nil
+}
+
+func (r *RedfishBMC) GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error) {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounts: %w", err)
+	}
+	return accounts, nil
 }
 
 func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*redfish.ComputerSystem, error) {

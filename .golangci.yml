@@ -30,6 +30,10 @@ linters:
           - dupl
           - lll
         path: internal/*
+      - linters:
+          - dupl
+          - lll
+        path: bmc/*
     paths:
       - third_party$
       - builtin$

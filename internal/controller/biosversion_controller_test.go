@@ -222,7 +222,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
-		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{

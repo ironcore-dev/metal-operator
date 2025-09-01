@@ -255,7 +255,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// else, unit test finishes the state very fast without being able to check the transition
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
 		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -369,7 +369,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
 		By("update the server powerstate to Off and reserved state")
 		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -561,7 +561,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// powerOn is needed to skip the change in power on system, Hence skip maintenance.
 		By("update the server powerstate to On and reserved state")
 		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
-		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BMCSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{

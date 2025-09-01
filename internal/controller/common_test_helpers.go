@@ -101,7 +101,7 @@ func TransistionServerFromInitialToAvailableState(
 	), fmt.Sprintf("Expected Server to be in PowerState 'on' in discovery state %v", server))
 
 	By("Starting the probe agent")
-	probeAgent := probe.NewAgent(server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
+	probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -131,8 +131,8 @@ func TransistionServerFromInitialToAvailableState(
 	), fmt.Sprintf("Expected Server to be Powered Off in Available State %v", server))
 }
 
-// TransistionServerToReserveredState transistions the server to Reserved
-func TransistionServerToReserveredState(
+// TransitionServerToReservedState transitions the server to Reserved
+func TransitionServerToReservedState(
 	ctx context.Context,
 	k8sClient client.Client,
 	serverClaim *metalv1alpha1.ServerClaim,
@@ -140,7 +140,7 @@ func TransistionServerToReserveredState(
 	nameSpace string,
 ) {
 	if server.Status.State == metalv1alpha1.ServerStateReserved {
-		By("Ensuring the server in Reserevd state consistently")
+		By("Ensuring the server in Reserved state consistently")
 		Consistently(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 			fmt.Sprintf("Expected server to be consistently in Reserved State %v", server.Status.State))

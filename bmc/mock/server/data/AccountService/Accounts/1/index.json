@@ -1,0 +1,33 @@
+{
+    "@odata.type": "#ManagerAccount.v1_12_0.ManagerAccount",
+    "Id": "1",
+    "Name": "User Account",
+    "Description": "User Account",
+    "Enabled": true,
+    "Password": null,
+    "PasswordChangeRequired": false,
+    "AccountTypes": [
+        "Redfish"
+    ],
+    "UserName": "Administrator",
+    "EmailAddress": "Tiffany@contoso.com",
+    "PhoneNumber": "312-555-1212",
+    "OneTimePasscodeDeliveryAddress": "3125551212@smsrelay.contoso.com",
+    "RoleId": "Administrator",
+    "Locked": false,
+    "Certificates": {
+        "@odata.id": "/redfish/v1/AccountService/Accounts/1/Certificates"
+    },
+    "Links": {
+        "Role": {
+            "@odata.id": "/redfish/v1/AccountService/Roles/Administrator"
+        }
+    },
+    "Actions": {
+        "#ManagerAccount.ChangePassword": {
+            "target": "/redfish/v1/AccountService/Accounts/1/Actions/ManagerAccount.ChangePassword"
+        }
+    },
+    "@odata.id": "/redfish/v1/AccountService/Accounts/1",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

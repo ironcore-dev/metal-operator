@@ -167,6 +167,11 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Patched ServerRef in Claim")
 
+	if server.Status.State != metalv1alpha1.ServerStateReserved {
+		log.V(1).Info("Server is not in reserved state", "Server", server.Name, "ServerState", server.Status.State)
+		return ctrl.Result{}, nil
+	}
+
 	if err = r.applyBootConfiguration(ctx, log, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}

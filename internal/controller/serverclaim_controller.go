@@ -157,11 +157,6 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
-	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
-		log.V(1).Info("Skipped ServerClaim reconciliation as its in maintenance")
-		return ctrl.Result{}, nil
-	}
-
 	if modified, err := r.patchServerRef(ctx, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -356,7 +351,7 @@ func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log 
 		log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
 		return nil, nil
 	}
-	if server.Status.State != metalv1alpha1.ServerStateAvailable && server.Status.State != metalv1alpha1.ServerStateReserved {
+	if server.Status.State != metalv1alpha1.ServerStateAvailable {
 		log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 		return nil, nil
 	}
@@ -393,7 +388,7 @@ func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log l
 			log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
 			continue
 		}
-		if server.Status.State != metalv1alpha1.ServerStateAvailable && server.Status.State != metalv1alpha1.ServerStateReserved {
+		if server.Status.State != metalv1alpha1.ServerStateAvailable {
 			log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 			continue
 		}

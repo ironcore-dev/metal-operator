@@ -18,6 +18,12 @@ const (
 
 	// PowerOff indicates that the device is powered off.
 	PowerOff Power = "Off"
+
+	// TopologyHeightUnit is the annotation key for the height unit of a server in a rack.
+	TopologyHeightUnit = "topology.metal.ironcore.dev/heightunit"
+
+	// TopologyRack is the annotation key for the rack of a server.
+	TopologyRack = "topology.metal.ironcore.dev/rack"
 )
 
 // ServerPowerState defines the possible power states for a server.

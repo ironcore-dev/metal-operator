@@ -1,0 +1,13 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  labels:
+    topology.metal.ironcore.dev/rack: "3"
+    topology.metal.ironcore.dev/heightunit: "2"
+  name: server-3-2
+spec:
+  uuid: "12345"
+  bmcRef:
+    name: sample-bmc
+  power: "Off"
+  indicatorLED: "Off"

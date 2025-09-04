@@ -26,6 +26,8 @@ import (
 const (
 	// ServerMaintenanceFinalizer is the finalizer for the ServerMaintenance resource.
 	ServerMaintenanceFinalizer = "metal.ironcore.dev/servermaintenance"
+	// ServerMaintenanceServerRefIndex is the index for the server reference in the ServerMaintenance resource.
+	ServerMaintenanceServerRefIndex = "spec.serverRef"
 )
 
 // ServerMaintenanceReconciler reconciles a ServerMaintenance object
@@ -58,6 +60,7 @@ func (r *ServerMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 func (r *ServerMaintenanceReconciler) reconcileExists(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	if !serverMaintenance.DeletionTimestamp.IsZero() {
+		log.V(1).Info("maintenance is being deleted")
 		return r.delete(ctx, log, serverMaintenance)
 	}
 	return r.reconcile(ctx, log, serverMaintenance)
@@ -92,6 +95,8 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 		return r.handleInMaintenanceState(ctx, log, serverMaintenance)
 	case metalv1alpha1.ServerMaintenanceStateFailed:
 		return r.handleFailedState(log, serverMaintenance)
+	case metalv1alpha1.ServerMaintenanceStateCompleted:
+		return r.handleCompletedState(ctx, log, serverMaintenance)
 	}
 	return ctrl.Result{}, nil
 }
@@ -100,6 +105,13 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 	server, err := r.getServerRef(ctx, serverMaintenance)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+	if server == nil {
+		log.V(1).Info("Server not found, nothing to do", "ServerMaintenance", serverMaintenance.Name)
+		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed); err != nil || modified {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 	if server.Spec.ServerMaintenanceRef != nil {
 		if server.Spec.ServerMaintenanceRef.UID != serverMaintenance.UID {
@@ -200,6 +212,28 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	return ctrl.Result{}, nil
 }
 
+func (r *ServerMaintenanceReconciler) handleCompletedState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+	log.V(1).Info("Handling completed state for server maintenance", "ServerMaintenance", serverMaintenance.Name)
+	server, err := r.getServerRef(ctx, serverMaintenance)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info("Server not found, nothing to cleanup", "ServerMaintenance", serverMaintenance.Name)
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+	if server != nil && server.Spec.ServerMaintenanceRef == nil {
+		log.V(1).Info("Server is not in maintenance, nothing to cleanup", "ServerMaintenance", serverMaintenance.Name)
+		return ctrl.Result{}, nil
+	}
+
+	if err := r.cleanup(ctx, log, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to cleanup server maintenanceRef: %w", err)
+	}
+	log.V(1).Info("Server maintenance completed", "Server", server.Name, "Maintenance", serverMaintenance.Name)
+	return ctrl.Result{}, nil
+}
+
 func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, error) {
 	if maintenance.Spec.ServerBootConfigurationTemplate == nil {
 		log.V(1).Info("No ServerBootConfigurationTemplate specified")
@@ -237,6 +271,10 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 
 func (r *ServerMaintenanceReconciler) setAndPatchServerPowerState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) error {
 	serverBase := server.DeepCopy()
+	if maintenance.Spec.ServerPower == "" {
+		log.V(1).Info("No server power state specified, skipping patch", "Server", server.Name)
+		return nil
+	}
 	server.Spec.Power = maintenance.Spec.ServerPower
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch server power state: %w", err)
@@ -273,15 +311,15 @@ func (r *ServerMaintenanceReconciler) handleFailedState(log logr.Logger, serverM
 }
 
 func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
-	if serverMaintenance.Spec.ServerRef == nil {
-		return ctrl.Result{}, nil
-	}
+	log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", serverMaintenance.Name)
 	server, err := r.getServerRef(ctx, serverMaintenance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.cleanup(ctx, log, server); err != nil {
-		return ctrl.Result{}, err
+	if server != nil {
+		if err := r.cleanup(ctx, log, server); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, serverMaintenance, ServerMaintenanceFinalizer); err != nil || modified {
@@ -293,10 +331,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 func (r *ServerMaintenanceReconciler) getServerRef(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get server: %w", err)
-		}
-		return nil, fmt.Errorf("server not found")
+		return nil, err
 	}
 	return server, nil
 }
@@ -417,12 +452,14 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 		var req []reconcile.Request
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-		if err := r.List(ctx, maintenanceList); err != nil {
+		if err := r.List(ctx, maintenanceList, client.MatchingFields{
+			ServerMaintenanceServerRefIndex: server.Name,
+		}); err != nil {
 			log.Error(err, "failed to list host serverMaintenances")
 			return nil
 		}
 		for _, maintenance := range maintenanceList.Items {
-			if server.Spec.ServerMaintenanceRef != nil && maintenance.Spec.ServerRef.Name == server.Spec.ServerMaintenanceRef.Name {
+			if server.Spec.ServerMaintenanceRef != nil && maintenance.Name == server.Spec.ServerMaintenanceRef.Name {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
 				})
@@ -447,9 +484,15 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 		if _, ok := annotations[metalv1alpha1.ServerMaintenanceNeededLabelKey]; !ok {
 			return req
 		}
+		if claim.Spec.ServerRef == nil {
+			log.V(1).Info("ServerClaim has no ServerRef, skipping")
+			return req
+		}
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-		if err := r.List(ctx, maintenanceList); err != nil {
+		if err := r.List(ctx, maintenanceList, client.MatchingFields{
+			ServerMaintenanceServerRefIndex: claim.Spec.ServerRef.Name,
+		}); err != nil {
 			log.Error(err, "failed to list host serverMaintenances")
 			return nil
 		}

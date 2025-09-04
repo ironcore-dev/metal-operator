@@ -62,8 +62,9 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
-fmt: goimports ## Run goimports against code.
+fmt: goimports  controller-gen ## Run goimports against code.
 	$(GOIMPORTS) -w .
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..." 
 
 .PHONY: vet
 vet: ## Run go vet against code.

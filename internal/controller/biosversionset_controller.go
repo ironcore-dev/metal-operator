@@ -123,7 +123,7 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 			biosVersionBase := biosVersion.DeepCopy()
 			annotations := biosVersion.GetAnnotations()
 			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropogatedOperationAnnotation] = metalv1alpha1.PropogatedOperationAnnotationIgnored
+			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.PropagatedOperationAnnotationIgnored
 			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))
 			}

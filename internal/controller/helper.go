@@ -28,7 +28,7 @@ func shouldIgnoreReconciliation(obj client.Object) bool {
 // isChildIgnoredThroughSets checks if the object's child is marked ignore operation through parent.
 func isChildIgnoredThroughSets(childObj client.Object) bool {
 	annotations := childObj.GetAnnotations()
-	valPropogated, found := annotations[metalv1alpha1.PropogatedOperationAnnotation]
+	valPropagated, found := annotations[metalv1alpha1.PropagatedOperationAnnotation]
 	if !found {
 		return false
 	}
@@ -36,7 +36,7 @@ func isChildIgnoredThroughSets(childObj client.Object) bool {
 	if !found {
 		return false
 	}
-	return valIgnored == metalv1alpha1.OperationAnnotationIgnore && valPropogated == metalv1alpha1.PropogatedOperationAnnotationIgnored
+	return valIgnored == metalv1alpha1.OperationAnnotationIgnore && valPropagated == metalv1alpha1.PropagatedOperationAnnotationIgnored
 }
 
 // shouldRetryReconciliation checks if the object should retry reconciliation from failed state.

@@ -119,7 +119,7 @@ func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
 			bmcVersionBase := bmcVersion.DeepCopy()
 			annotations := bmcVersion.GetAnnotations()
 			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropogatedOperationAnnotation] = metalv1alpha1.PropogatedOperationAnnotationIgnored
+			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.PropagatedOperationAnnotationIgnored
 			if err := r.Patch(ctx, &bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations: %w", err))
 			}

@@ -128,7 +128,7 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
 			biosSettingsBase := biosSettings.DeepCopy()
 			annotations := biosSettings.GetAnnotations()
 			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropogatedOperationAnnotation] = metalv1alpha1.PropogatedOperationAnnotationIgnored
+			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.PropagatedOperationAnnotationIgnored
 			if err := r.Patch(ctx, &biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations: %w", err))
 			}
@@ -304,7 +304,7 @@ func (r *BIOSSettingsSetReconciler) patchBIOSSettingsfromTemplate(
 				annotations := biosSettings.GetAnnotations()
 				log.V(1).Info("Ignore operation deleted on child object", "BiosSettings", biosSettings.Name)
 				delete(annotations, metalv1alpha1.OperationAnnotation)
-				delete(annotations, metalv1alpha1.PropogatedOperationAnnotation)
+				delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
 				biosSettings.SetAnnotations(annotations)
 			}
 			return nil

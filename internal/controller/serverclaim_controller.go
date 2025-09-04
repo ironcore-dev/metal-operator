@@ -346,6 +346,27 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	return server, nil
 }
 
+func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
+		log.V(1).Info("Server in or entering Maintenance, Hence can not be claimed")
+		return true, nil
+	}
+	// check if the current available state is a temerary state between multiple Maintenances states.
+	// We do not want to claim server while it is undergoing series of Maintenance in sequence.
+	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
+		serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
+		return serverMaintenance.Spec.ServerRef.Name == server.Name, nil
+	}); err != nil {
+		return true, err
+	}
+	if len(serverMaintenancesList.Items) == 0 {
+		return false, nil
+	}
+	log.V(1).Info("Server has ongoing Maintenances, Hence can not be claimed")
+	return true, nil
+}
+
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
 	log.V(1).Info("Trying to claim server by reference")
 	server := &metalv1alpha1.Server{}
@@ -362,6 +383,12 @@ func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log 
 	}
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
+		return nil, nil
+	}
+	isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, log, server)
+	// is undergoing maintenance and not in Reserved State, we should not claim this server
+	if server.Status.State != metalv1alpha1.ServerStateReserved && (err != nil || isUnderMaintenance) {
+		log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
 		return nil, nil
 	}
 	if claim.Spec.ServerSelector == nil {
@@ -401,6 +428,12 @@ func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log l
 			log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
 			continue
 		}
+		isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, log, &server)
+		// is undergoing maintenance and not in Reserved State, we should not claim this server
+		if server.Status.State != metalv1alpha1.ServerStateReserved && (err != nil || isUnderMaintenance) {
+			log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
+			continue
+		}
 		return &server, nil
 	}
 	return nil, nil
@@ -429,6 +462,12 @@ func (r *ServerClaimReconciler) claimFirstBestServer(ctx context.Context, log lo
 			continue
 		}
 		if server.Status.State != metalv1alpha1.ServerStateAvailable {
+			continue
+		}
+		isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, log, &server)
+		// is undergoing maintenance and not in Reserved State, we should not claim this server
+		if server.Status.State != metalv1alpha1.ServerStateReserved && (err != nil || isUnderMaintenance) {
+			log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
 			continue
 		}
 		return &server, nil

@@ -6,8 +6,12 @@ package v1alpha1
 const (
 	// OperationAnnotation indicates which operation should be performed outside the current spec definition flow.
 	OperationAnnotation = "metal.ironcore.dev/operation"
+	// PropogatedOperationAnnotation indicates which operation should be performed outside the current spec definition flow.
+	PropogatedOperationAnnotation = "metal.ironcore.dev/operationPropogated"
 	// OperationAnnotationIgnore skips the reconciliation of a resource if set to true.
 	OperationAnnotationIgnore = "ignore"
+	// PropogatedOperationAnnotationIgnored skips the reconciliation of a resource if set to true.
+	PropogatedOperationAnnotationIgnored = "propogatedIgnored"
 	// OperationAnnotationRetry restarts the reconciliation of a resource from failed state -> initial state.
 	OperationAnnotationRetry = "retry"
 	// InstanceTypeAnnotation is used to specify the type of Server.

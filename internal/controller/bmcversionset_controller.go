@@ -98,6 +98,36 @@ func (r *BMCVersionSetReconciler) delete(
 	return ctrl.Result{}, nil
 }
 
+func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	bmcVersionSet *metalv1alpha1.BMCVersionSet,
+) error {
+	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
+	if err != nil {
+		return err
+	}
+	if len(ownedBMCVersions.Items) == 0 {
+		log.V(1).Info("No BMCVersion found, skipping ignore annotation propagation")
+		return nil
+	}
+	var errs []error
+	for _, bmcVersion := range ownedBMCVersions.Items {
+		// should not overwrite the ignored annotation written by others on child
+		// should not overwrite if the annotation is already written on the child
+		if !isChildIgnoredThroughSets(&bmcVersion) && !shouldIgnoreReconciliation(&bmcVersion) {
+			bmcVersionBase := bmcVersion.DeepCopy()
+			annotations := bmcVersion.GetAnnotations()
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
+			annotations[metalv1alpha1.PropogatedOperationAnnotation] = metalv1alpha1.PropogatedOperationAnnotationIgnored
+			if err := r.Patch(ctx, &bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations: %w", err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (r *BMCVersionSetReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -105,7 +135,8 @@ func (r *BMCVersionSetReconciler) reconcile(
 ) (ctrl.Result, error) {
 	if shouldIgnoreReconciliation(bmcVersionSet) {
 		log.V(1).Info("Skipped BMCVersionSet reconciliation")
-		return ctrl.Result{}, nil
+		err := r.handleIgnoreAnnotationPropagation(ctx, log, bmcVersionSet)
+		return ctrl.Result{}, err
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcVersionSet, BMCVersionSetFinalizer); err != nil || modified {

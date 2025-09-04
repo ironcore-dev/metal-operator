@@ -102,6 +102,36 @@ func (r *BIOSVersionSetReconciler) delete(
 	return ctrl.Result{}, nil
 }
 
+func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	biosVersionSet *metalv1alpha1.BIOSVersionSet,
+) error {
+	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
+	if err != nil {
+		return err
+	}
+	if len(ownedBiosVersions.Items) == 0 {
+		log.V(1).Info("No BIOSVersion found, skipping ignore annotation propagation")
+		return nil
+	}
+	var errs []error
+	for _, biosVersion := range ownedBiosVersions.Items {
+		// should not overwrite the already ignored annotation on child
+		// should not overwrite if the annotation already present on the child
+		if !isChildIgnoredThroughSets(&biosVersion) && !shouldIgnoreReconciliation(&biosVersion) {
+			biosVersionBase := biosVersion.DeepCopy()
+			annotations := biosVersion.GetAnnotations()
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
+			annotations[metalv1alpha1.PropogatedOperationAnnotation] = metalv1alpha1.PropogatedOperationAnnotationIgnored
+			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (r *BIOSVersionSetReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -109,7 +139,8 @@ func (r *BIOSVersionSetReconciler) reconcile(
 ) (ctrl.Result, error) {
 	if shouldIgnoreReconciliation(biosVersionSet) {
 		log.V(1).Info("Skipped BIOSVersionSet reconciliation")
-		return ctrl.Result{}, nil
+		err := r.handleIgnoreAnnotationPropagation(ctx, log, biosVersionSet)
+		return ctrl.Result{}, err
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersionSet, BIOSVersionSetFinalizer); err != nil || modified {

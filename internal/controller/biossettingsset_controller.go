@@ -107,6 +107,36 @@ func (r *BIOSSettingsSetReconciler) delete(
 	return ctrl.Result{}, nil
 }
 
+func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
+) error {
+	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, biosSettingsSet)
+	if err != nil {
+		return err
+	}
+	if len(ownedBiosSettings.Items) == 0 {
+		log.V(1).Info("No BIOSSettings found, skipping ignore annotation propagation")
+		return nil
+	}
+	var errs []error
+	for _, biosSettings := range ownedBiosSettings.Items {
+		// should not overwrite the already ignored annotation on child
+		// should not overwrite if the annotation already present on the child
+		if !isChildIgnoredThroughSets(&biosSettings) && !shouldIgnoreReconciliation(&biosSettings) {
+			biosSettingsBase := biosSettings.DeepCopy()
+			annotations := biosSettings.GetAnnotations()
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
+			annotations[metalv1alpha1.PropogatedOperationAnnotation] = metalv1alpha1.PropogatedOperationAnnotationIgnored
+			if err := r.Patch(ctx, &biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
+				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations: %w", err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (r *BIOSSettingsSetReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -114,7 +144,8 @@ func (r *BIOSSettingsSetReconciler) reconcile(
 ) (ctrl.Result, error) {
 	if shouldIgnoreReconciliation(biosSettingsSet) {
 		log.V(1).Info("Skipped BIOSSettingsSet reconciliation")
-		return ctrl.Result{}, nil
+		err := r.handleIgnoreAnnotationPropagation(ctx, log, biosSettingsSet)
+		return ctrl.Result{}, err
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettingsSet, biosSettingsSetFinalizer); err != nil || modified {
@@ -267,6 +298,14 @@ func (r *BIOSSettingsSetReconciler) patchBIOSSettingsfromTemplate(
 				serverMaintenanceRef := biosSettings.Spec.ServerMaintenanceRef
 				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
 				biosSettings.Spec.ServerMaintenanceRef = serverMaintenanceRef
+			}
+
+			if isChildIgnoredThroughSets(&biosSettings) {
+				annotations := biosSettings.GetAnnotations()
+				log.V(1).Info("Ignore operation deleted on child object", "BiosSettings", biosSettings.Name)
+				delete(annotations, metalv1alpha1.OperationAnnotation)
+				delete(annotations, metalv1alpha1.PropogatedOperationAnnotation)
+				biosSettings.SetAnnotations(annotations)
 			}
 			return nil
 		}) //nolint:errcheck

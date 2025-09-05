@@ -62,7 +62,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 				},
 			},
 		}
-		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+		TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
 	})
 
 	AfterEach(func(ctx SpecContext) {
@@ -221,7 +221,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		// note: ImageURI need to have the version string.
 
 		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
+		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
 		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BIOSVersion")

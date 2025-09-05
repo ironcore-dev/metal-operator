@@ -20,13 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TransistionServerFromInitialToAvailableState transistions the server to AvailableState
-func TransistionServerFromInitialToAvailableState(
-	ctx context.Context,
-	k8sClient client.Client,
-	server *metalv1alpha1.Server,
-	BootConfigNameSpace string,
-) {
+// TransitionServerFromInitialToAvailableState transitions the server to AvailableState
+func TransitionServerFromInitialToAvailableState(ctx context.Context, k8sClient client.Client, server *metalv1alpha1.Server, BootConfigNameSpace string) {
 	if server.ResourceVersion == "" && server.Name == "" {
 		By("Ensuring the server has been created")
 		Expect(k8sClient.Create(ctx, server)).Should(SatisfyAny(
@@ -146,7 +141,7 @@ func TransitionServerToReservedState(
 			fmt.Sprintf("Expected server to be consistently in Reserved State %v", server.Status.State))
 		return
 	}
-	TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, nameSpace)
+	TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, nameSpace)
 
 	if serverClaim.ResourceVersion == "" && serverClaim.Name == "" {
 		Expect(k8sClient.Create(ctx, serverClaim)).Should(SatisfyAny(
@@ -214,7 +209,7 @@ func TransitionServerToReservedState(
 	)
 }
 
-func BuildServerClaim(
+func CreateServerClaim(
 	ctx context.Context,
 	k8sClient client.Client,
 	server metalv1alpha1.Server,

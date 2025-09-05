@@ -59,7 +59,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 		}
-		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+		TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
 	})
 
 	AfterEach(func(ctx SpecContext) {
@@ -108,7 +108,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 	It("Should wait to put a Server into maintenance until approval", func(ctx SpecContext) {
 
-		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "abc:abc")
+		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "abc:abc")
 		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating an ServerMaintenance object")

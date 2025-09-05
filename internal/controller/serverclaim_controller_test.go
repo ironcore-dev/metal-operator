@@ -63,7 +63,7 @@ var _ = Describe("ServerClaim Controller", func() {
 				},
 			},
 		}
-		TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+		TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
 	})
 
 	AfterEach(func(ctx SpecContext) {

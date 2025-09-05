@@ -178,11 +178,8 @@ func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmc.Name, "system", index)
 }
 
-func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, timeout time.Duration) error {
-	username, password, err := GetBMCCredentialsForBMCSecretName(ctx, c, bmcObj.Spec.BMCSecretRef.Name)
-	if err != nil {
-		return fmt.Errorf("failed to get credentials from BMC secret: %w", err)
-	}
+func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+	// If Redfish reset fails, try SSH-based reset for known manufacturers
 	config := &ssh.ClientConfig{
 		User: username,
 		Auth: []ssh.AuthMethod{ssh.Password(password)},
@@ -191,7 +188,7 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, t
 		},
 		Timeout: timeout,
 	}
-	client, err := ssh.Dial("tcp", net.JoinHostPort(bmcObj.Spec.Endpoint.IP.String(), "22"), config)
+	client, err := ssh.Dial("tcp", net.JoinHostPort(ip, "22"), config)
 	if err != nil {
 		return fmt.Errorf("failed to dial ssh: %w", err)
 	}
@@ -207,7 +204,7 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, t
 		_ = session.Close()
 	}()
 	resetCMD := ""
-	switch bmcObj.Status.Manufacturer {
+	switch manufacturer {
 	case string(bmc.ManufacturerDell):
 		resetCMD = "racreset"
 	case string(bmc.ManufacturerHPE):
@@ -215,7 +212,7 @@ func ResetBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, t
 	case string(bmc.ManufacturerLenovo):
 		resetCMD = ""
 	default:
-		return fmt.Errorf("unsupported BMC manufacturer %s for reset", bmcObj.Status.Manufacturer)
+		return fmt.Errorf("unsupported BMC manufacturer %s for reset", manufacturer)
 	}
 	// cancel reset cmd after 5 minutes
 	ctx, cancel := context.WithTimeout(ctx, timeout)

@@ -34,10 +34,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/metalprobe/main.go
 
-FROM builder AS bmc-builder
+FROM builder AS bmctools-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/bmc/main.go
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/bmctools/main.go
 
 
 # Use distroless as minimal base image to package the manager binary
@@ -58,10 +58,10 @@ USER 65532:65532
 
 ENTRYPOINT ["/metalprobe"]
 
-FROM gcr.io/distroless/static:nonroot AS bmc
+FROM gcr.io/distroless/static:nonroot AS bmctools
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
-COPY --from=bmc-builder /workspace/bmc .
+COPY --from=bmctools-builder /workspace/bmctools .
 USER 65532:65532
 
-ENTRYPOINT ["/bmc"]
+ENTRYPOINT ["/bmctools"]

@@ -14,7 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/manager/main.go cmd/manager/main.go
 COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
-COPY cmd/bmc/main.go cmd/bmc/main.go
+COPY cmd/bmctools/main.go cmd/bmctools/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/

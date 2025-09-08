@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ironcore-dev/metal-operator/cmd/bmc/cmds"
+	"github.com/ironcore-dev/metal-operator/cmd/bmctools/cmds"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 

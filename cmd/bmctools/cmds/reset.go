@@ -28,7 +28,9 @@ func NewResetCommand() *cobra.Command {
 	resetCmd.Flags().DurationVar(&timeout, "timeout", 2*time.Minute, "Timeout for the reset operation.")
 	resetCmd.Flags().StringVar(&bmcAddress, "bmc_address", "", "BMC address to connect to.")
 	resetCmd.Flags().StringVar(&bmcManufacturer, "bmc_manufacturer", "", "BMC manufacturer name")
-	resetCmd.Flags().StringVar(&bmcModel, "bmc_model", "", "BMC model. If not set, it will use the default model for the manufacturer.")
+	resetCmd.Flags().StringVar(&bmcModel,
+		"bmc_model", "", "BMC model. If not set, it will use the default model for the manufacturer.",
+	)
 	return resetCmd
 }
 
@@ -43,11 +45,11 @@ func runReset(cmd *cobra.Command, args []string) error {
 
 	password, ok := os.LookupEnv(metalv1alpha1.BMCSecretUsernameKeyName)
 	if !ok {
-		return fmt.Errorf("Password environment variable must be set")
+		return fmt.Errorf("password environment variable must be set")
 	}
 	username, ok := os.LookupEnv(metalv1alpha1.BMCSecretPasswordKeyName)
 	if !ok {
-		return fmt.Errorf("Username environment variable must be set")
+		return fmt.Errorf("username environment variable must be set")
 	}
 
 	if err := bmcutils.SSHResetBMC(cmd.Context(), bmcAddress, username, bmcManufacturer, password, timeout); err != nil {

@@ -96,6 +96,15 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	if err := r.handleAnnotionOperations(ctx, log, bmcObj); err != nil {
 		return ctrl.Result{}, err
 	}
+	if bmcObj.Status.State == metalv1alpha1.BMCStateResetting {
+		running, err := r.checkResetJobStatus(ctx, log, bmcObj)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("BMC reset job status: %w", err)
+		}
+		if running {
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+	}
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
 		return r.handleBMCConnectionFailure(ctx, log, bmcObj, err)
@@ -157,9 +166,11 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 
 	// parse time to metav1.Time: ISO 8601 format
 	lastResetTime := &metav1.Time{}
-	t, err := time.Parse(time.RFC3339, manager.LastResetTime)
-	if err == nil {
-		lastResetTime = &metav1.Time{Time: t}
+	if manager.LastResetTime != "" {
+		t, err := time.Parse(time.RFC3339, manager.LastResetTime)
+		if err == nil {
+			lastResetTime = &metav1.Time{Time: t}
+		}
 	}
 	if manager != nil {
 		bmcBase := bmcObj.DeepCopy()
@@ -219,8 +230,8 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	switch operation {
 	case metalv1alpha1.OperationAnnotationForceReset:
 		// check if last reset was less than 1 minutes ago
-		if bmcObj.Status.LastResetTime.IsZero() == false && time.Since(bmcObj.Status.LastResetTime.Time) < 1*time.Minute {
-			return fmt.Errorf("bmc reset done less than 5 minutes ago, not forcing another reset")
+		if !bmcObj.Status.LastResetTime.IsZero() && time.Since(bmcObj.Status.LastResetTime.Time) < 1*time.Minute {
+			return fmt.Errorf("bmc reset done less than 1 minutes ago, not forcing another reset")
 		}
 		if bmcObj.Status.State == metalv1alpha1.BMCStateResetting {
 			// BMC is resetting, give it some time
@@ -228,16 +239,16 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 		}
 		log.V(1).Info("Handling operation", "Operation", operation)
 		if err := r.resetBMC(ctx, log, bmcObj); err != nil {
-			return fmt.Errorf("failed to create BMC reset job: %w", err)
+			return fmt.Errorf("failed to reset BMC: %w", err)
 		}
 	}
-	// remove annotation after handling
-	annotations := bmcObj.GetAnnotations()
-	delete(annotations, metalv1alpha1.OperationAnnotation)
-	bmcObj.SetAnnotations(annotations)
-	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcObj)); err != nil {
+	bmcBase := bmcObj.DeepCopy()
+	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
+	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return fmt.Errorf("failed to remove operation annotation: %w", err)
 	}
+	log.V(1).Info("Removed operation annotation", "Operation", operation)
+
 	return nil
 }
 
@@ -395,6 +406,10 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 }
 
 func (r *BMCReconciler) checkResetJobStatus(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	// some bmcs need time to start the reset process
+	if !bmcObj.Status.LastResetTime.IsZero() && time.Since(bmcObj.Status.LastResetTime.Time) < 5*time.Second {
+		return true, nil
+	}
 	job := &batchv1.Job{}
 	if err := r.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("bmc-reset-%s-", bmcObj.Name), Namespace: bmcObj.Namespace}, job); err != nil {
 		if apierrors.IsNotFound(err) {

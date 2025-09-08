@@ -302,5 +302,57 @@ var _ = Describe("BMC Validation", func() {
 			bmc.Spec.Endpoint = nil
 		})).Should(Succeed())
 	})
+})
 
+var _ = Describe("BMC Reset", func() {
+	ns := SetupTest()
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
+	})
+	It("Should reset the BMC", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+		By("Creating a BMC resource")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: 8000,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		By("Resetting the BMC")
+		Eventually(Update(bmc, func() {
+			bmc.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceReset,
+			}
+		})).Should(Succeed())
+
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Status.LastResetTime", Not(BeNil())),
+			HaveField("Status.State", metalv1alpha1.BMCStateResetting),
+			HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		))
+	})
 })

@@ -20,13 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TransistionServerFromInitialToAvailableState transistions the server to AvailableState
-func TransistionServerFromInitialToAvailableState(
-	ctx context.Context,
-	k8sClient client.Client,
-	server *metalv1alpha1.Server,
-	BootConfigNameSpace string,
-) {
+// TransitionServerFromInitialToAvailableState transitions the server to AvailableState
+func TransitionServerFromInitialToAvailableState(ctx context.Context, k8sClient client.Client, server *metalv1alpha1.Server, BootConfigNameSpace string) {
 	if server.ResourceVersion == "" && server.Name == "" {
 		By("Ensuring the server has been created")
 		Expect(k8sClient.Create(ctx, server)).Should(SatisfyAny(
@@ -101,7 +96,7 @@ func TransistionServerFromInitialToAvailableState(
 	), fmt.Sprintf("Expected Server to be in PowerState 'on' in discovery state %v", server))
 
 	By("Starting the probe agent")
-	probeAgent := probe.NewAgent(server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
+	probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, "http://localhost:30000", 50*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -131,8 +126,8 @@ func TransistionServerFromInitialToAvailableState(
 	), fmt.Sprintf("Expected Server to be Powered Off in Available State %v", server))
 }
 
-// TransistionServerToReserveredState transistions the server to Reserved
-func TransistionServerToReserveredState(
+// TransitionServerToReservedState transitions the server to Reserved
+func TransitionServerToReservedState(
 	ctx context.Context,
 	k8sClient client.Client,
 	serverClaim *metalv1alpha1.ServerClaim,
@@ -140,13 +135,13 @@ func TransistionServerToReserveredState(
 	nameSpace string,
 ) {
 	if server.Status.State == metalv1alpha1.ServerStateReserved {
-		By("Ensuring the server in Reserevd state consistently")
+		By("Ensuring the server in Reserved state consistently")
 		Consistently(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 			fmt.Sprintf("Expected server to be consistently in Reserved State %v", server.Status.State))
 		return
 	}
-	TransistionServerFromInitialToAvailableState(ctx, k8sClient, server, nameSpace)
+	TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, nameSpace)
 
 	if serverClaim.ResourceVersion == "" && serverClaim.Name == "" {
 		Expect(k8sClient.Create(ctx, serverClaim)).Should(SatisfyAny(
@@ -214,7 +209,7 @@ func TransistionServerToReserveredState(
 	)
 }
 
-func BuildServerClaim(
+func CreateServerClaim(
 	ctx context.Context,
 	k8sClient client.Client,
 	server metalv1alpha1.Server,

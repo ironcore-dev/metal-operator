@@ -70,9 +70,15 @@ fmt: goimports ## Run goimports against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-.PHONY: test
-test: manifests generate fmt vet setup-envtest startbmc ## Run tests.
+.PHONY: check-gen
+check-gen: generate manifests docs helm fmt ## Run code generation, manifests generation, documentation generation, helm plugin setup, and formatting checks.
+
+.PHONY: test-only
+test-only: setup-envtest ## Run tests without generating manifests or code.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+
+.PHONY: test
+test: manifests generate fmt vet setup-envtest test-only ## Run tests.
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.

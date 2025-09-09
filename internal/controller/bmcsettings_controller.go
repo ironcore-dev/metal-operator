@@ -347,7 +347,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 			return ctrl.Result{}, fmt.Errorf("failed to check BMC settings provided: %w", err)
 		}
 
-		err = bmcClient.SetBMCAttributesImediately(ctx, BMC.Spec.BMCUUID, settingsDiff)
+		err = bmcClient.SetBMCAttributesImmediately(ctx, BMC.Spec.BMCUUID, settingsDiff)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
 		}

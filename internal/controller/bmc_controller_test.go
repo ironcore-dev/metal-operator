@@ -4,6 +4,7 @@
 package controller
 
 import (
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
@@ -348,11 +349,17 @@ var _ = Describe("BMC Reset", func() {
 				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceReset,
 			}
 		})).Should(Succeed())
-
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Status.LastResetTime", Not(BeNil())),
 			HaveField("Status.State", metalv1alpha1.BMCStateResetting),
 			HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		))
+		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+		enabledCondition := &metav1.Condition{}
+		Eventually(
+			func(g Gomega) metav1.ConditionStatus {
+				g.Expect(Get(bmc)()).To(Succeed())
+				g.Expect(acc.FindSlice(bmc.Status.Conditions, bmcEnabledConditionType, enabledCondition)).To(BeTrue())
+				return enabledCondition.Status
+			}, "7s").Should(Equal(metav1.ConditionTrue))
 	})
 })

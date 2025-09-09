@@ -58,13 +58,13 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen goimports ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(GOIMPORTS) -w .
 
 .PHONY: fmt
-fmt: goimports  controller-gen ## Run goimports against code.
+fmt: goimports ## Run goimports against code.
 	$(GOIMPORTS) -w .
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..." 
 
 .PHONY: vet
 vet: ## Run go vet against code.

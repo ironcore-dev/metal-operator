@@ -97,6 +97,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))
 
+	Eventually(deleteAndList(ctx, &metalv1alpha1.User{}, &metalv1alpha1.UserList{})).Should(
+		HaveField("Items", BeEmpty()))
+
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersion{}, &metalv1alpha1.BIOSVersionList{})).Should(
 		HaveField("Items", BeEmpty()))
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersionSet{}, &metalv1alpha1.BIOSVersionSetList{})).Should(
@@ -108,6 +111,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersion{}, &metalv1alpha1.BMCVersionList{})).Should(
 		HaveField("Items", BeEmpty()))
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersionSet{}, &metalv1alpha1.BMCVersionList{})).Should(
+		HaveField("Items", BeEmpty()))
+
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSecret{}, &metalv1alpha1.BMCSecretList{})).Should(
 		HaveField("Items", BeEmpty()))
 }
 
@@ -303,6 +309,17 @@ func SetupTest() *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			BMCOptions: bmc.Options{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&UserReconciler{
+			Client:   k8sManager.GetClient(),
+			Scheme:   k8sManager.GetScheme(),
+			Insecure: true,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

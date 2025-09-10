@@ -16,9 +16,8 @@ const (
 	OperationAnnotationRotateCredentials = "rotate-credentials"
 	// ForceUpdateAnnotation is used to indicate that the spec should be forcefully updated.
 	ForceUpdateAnnotation = "metal.ironcore.dev/force-update-resource"
-
 	// OperationAnnotationForceUpdateOrDeleteInProgress allows update/Delete of a resource even if it is in progress.
 	OperationAnnotationForceUpdateOrDeleteInProgress = "ForceUpdateOrDeleteInProgress"
-	// OperationAnnotationForceUpdateOrDeleteInProgress allows update/Delete of a resource even if it is in progress.
+	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
 	OperationAnnotationForceUpdateInProgress = "ForceUpdateInProgress"
 )

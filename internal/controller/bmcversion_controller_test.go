@@ -234,8 +234,8 @@ var _ = Describe("BMCVersion Controller", func() {
 		// note: ImageURI need to have the version string.
 
 		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
-		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
+		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{

@@ -1,0 +1,15 @@
+{
+    "@odata.type": "#EventDestination.v1_14_0.EventDestination",
+    "Id": "3",
+    "Name": "EventSubscription for SMTP",
+    "Destination": "mailto:spam@contoso.com",
+    "ResourceTypes": [
+        "Certificate",
+        "ComputerSystem"
+    ],
+    "Context": "EmailUser3",
+    "Protocol": "SMTP",
+    "SubscriptionType": "OEM",
+    "@odata.id": "/redfish/v1/EventService/Subscriptions/3",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

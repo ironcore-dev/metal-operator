@@ -1,0 +1,13 @@
+{
+    "@odata.type": "#Sensor.v1_8_1.Sensor",
+    "Id": "PS2Out3VCurrent",
+    "Name": "Power Supply #2 3V Output Current",
+    "ReadingType": "Current",
+    "ElectricalContext": "Total",
+    "Status": {
+        "State": "Absent"
+    },
+    "PhysicalContext": "PowerSupply",
+    "@odata.id": "/redfish/v1/Chassis/1U/Sensors/PS2Out3VCurrent",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
@@ -29,8 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	//+kubebuilder:scaffold:imports
 )
@@ -82,9 +81,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 		func(g Gomega) {
 			err := List(serverList)()
 			g.Expect(err).ToNot(HaveOccurred())
-			for _, server := range serverList.Items {
-				if server.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&server, ServerFinalizer) {
-					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &server, ServerFinalizer)
+			for _, s := range serverList.Items {
+				if s.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&s, ServerFinalizer) {
+					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &s, ServerFinalizer)
 					g.Expect(err).ToNot(HaveOccurred())
 				}
 			}
@@ -124,8 +123,6 @@ func deleteAndList(ctx context.Context, obj client.Object, objList client.Object
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
@@ -150,9 +147,6 @@ var _ = BeforeSuite(func() {
 
 	Expect(metalv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
-	err = metalv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -166,7 +160,7 @@ var _ = BeforeSuite(func() {
 	var mgrCtx context.Context
 	mgrCtx, cancel := context.WithCancel(context.Background())
 	DeferCleanup(cancel)
-	registryServer := registry.NewServer(":30000")
+	registryServer := registry.NewServer(GinkgoLogr, ":30000")
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
@@ -355,6 +349,15 @@ func SetupTest() *corev1.Namespace {
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		mockCtx, cancel := context.WithCancel(context.Background())
+		DeferCleanup(cancel)
+		mockServer := server.NewMockServer(GinkgoLogr, ":8000")
+
+		go func() {
+			defer GinkgoRecover()
+			Expect(mockServer.Start(mockCtx)).To(Succeed(), "failed to start mock Redfish server")
+		}()
 
 		go func() {
 			defer GinkgoRecover()

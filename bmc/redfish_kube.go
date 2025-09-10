@@ -89,7 +89,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	return nil
 }
 
-func (r RedfishKubeBMC) createJob(
+func (r *RedfishKubeBMC) createJob(
 	ctx context.Context,
 	c client.Client,
 	cmd []string,

@@ -200,8 +200,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		// put server in reserved state. and create a bmc setting in Ownerapproved which needs reboot.
 		// this is needed to check the states traversed.
-		serverClaim := BuildServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransistionServerToReserveredState(ctx, k8sClient, serverClaim, server, ns.Name)
+		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
+		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
 
 		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{

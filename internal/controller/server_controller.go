@@ -318,6 +318,11 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logg
 	}
 	log.V(1).Info("Ensured power state for Server")
 
+	if err := r.updateServerStatusFromSystemInfo(ctx, log, bmcClient, server); err != nil {
+		return false, fmt.Errorf("failed to update server status system info: %w", err)
+	}
+	log.V(1).Info("Updated Server status system info")
+
 	if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, log, server); err != nil {
 		return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
 	}
@@ -353,39 +358,6 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Server state set to power on")
 
-	storages, err := bmcClient.GetStorages(ctx, server.Spec.SystemURI)
-	if err != nil {
-		return false, fmt.Errorf("failed to get storages for Server: %w", err)
-	}
-	server.Status.Storages = nil
-	for _, storage := range storages {
-		metalStorage := metalv1alpha1.Storage{
-			Name:  storage.Name,
-			State: metalv1alpha1.StorageState(storage.State),
-		}
-		for _, drive := range storage.Drives {
-			metalStorage.Drives = append(metalStorage.Drives, metalv1alpha1.StorageDrive{
-				Name:      drive.Name,
-				Model:     drive.Model,
-				Vendor:    drive.Vendor,
-				Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
-				Type:      string(drive.Type),
-				State:     metalv1alpha1.StorageState(drive.State),
-				MediaType: drive.MediaType,
-			})
-		}
-		metalStorage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))
-		for _, volume := range storage.Volumes {
-			metalStorage.Volumes = append(metalStorage.Volumes, metalv1alpha1.StorageVolume{
-				Name:        volume.Name,
-				Capacity:    resource.NewQuantity(volume.SizeBytes, resource.BinarySI),
-				State:       metalv1alpha1.StorageState(volume.State),
-				RAIDType:    string(volume.RAIDType),
-				VolumeUsage: volume.VolumeUsage,
-			})
-		}
-		server.Status.Storages = append(server.Status.Storages, metalStorage)
-	}
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to patch Server status: %w", err)
 	}
@@ -496,13 +468,17 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 }
 
 func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef == nil {
-		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial)
-	}
-	if server.Spec.ServerMaintenanceRef == nil && server.Spec.ServerClaimRef != nil {
+	if server.Spec.ServerMaintenanceRef == nil {
+		log.V(1).Info("Server is in Maintenance state, but no ServerMaintenanceRef is set, transitioning back to previous state")
+		// update system info in case the server was changed during Maintenance state (hardwere changes, biosVersion etc.)
+		if err := r.updateServerStatusFromSystemInfo(ctx, log, bmcClient, server); err != nil {
+			return false, fmt.Errorf("failed to update server status system info: %w", err)
+		}
+		if server.Spec.ServerClaimRef == nil {
+			return r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial)
+		}
 		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
 	}
-
 	if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
@@ -523,34 +499,50 @@ func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
+// updates the Server status which can be changed via Spec
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
 	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
 		log.V(1).Info("Server has no BMC connection configured")
 		return nil
 	}
-
 	systemInfo, err := bmcClient.GetSystemInfo(ctx, server.Spec.SystemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get system info for Server: %w", err)
 	}
-
 	serverBase := server.DeepCopy()
 	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
-	server.Status.SerialNumber = systemInfo.SerialNumber
-	server.Status.SKU = systemInfo.SKU
-	server.Status.Manufacturer = systemInfo.Manufacturer
-	server.Status.Model = systemInfo.Model
 	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
-	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
+	if err = r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return fmt.Errorf("failed to patch Server status: %w", err)
+	}
+	log.V(1).Info("Updated Server status", "Status", server.Status.State, "powerState", server.Status.PowerState)
+	return nil
+}
 
+func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+	serverBase := server.DeepCopy()
+	systemInfo, err := bmcClient.GetSystemInfo(ctx, server.Spec.SystemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system info for Server: %w", err)
+	}
 	biosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get BIOS version for Server: %w", err)
 	}
 	server.Status.BIOSVersion = biosVersion
+	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
+	server.Status.SerialNumber = systemInfo.SerialNumber
+	server.Status.SKU = systemInfo.SKU
+	server.Status.Manufacturer = systemInfo.Manufacturer
+	server.Status.Model = systemInfo.Model
+	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
 
-	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(systemInfo.Processors))
-	for _, processor := range systemInfo.Processors {
+	processors, err := bmcClient.GetProcessors(ctx, server.Spec.SystemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get processors for Server: %w", err)
+	}
+	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(processors))
+	for _, processor := range processors {
 		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
 			ID:             processor.ID,
 			Type:           processor.Type,
@@ -563,13 +555,44 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, log logr.Logg
 			TotalThreads:   processor.TotalThreads,
 		})
 	}
-
-	if err = r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return fmt.Errorf("failed to patch Server status: %w", err)
+	storages, err := bmcClient.GetStorages(ctx, server.Spec.SystemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get storages for Server: %w", err)
+	}
+	server.Status.Storages = nil
+	for _, storage := range storages {
+		metalStorage := metalv1alpha1.Storage{
+			Name:  storage.Name,
+			State: metalv1alpha1.StorageState(storage.State),
+		}
+		for _, drive := range storage.Drives {
+			metalStorage.Drives = append(metalStorage.Drives, metalv1alpha1.StorageDrive{
+				Name:      drive.Name,
+				Model:     drive.Model,
+				Vendor:    drive.Vendor,
+				Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
+				Type:      string(drive.Type),
+				State:     metalv1alpha1.StorageState(drive.State),
+				MediaType: drive.MediaType,
+			})
+		}
+		metalStorage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))
+		for _, volume := range storage.Volumes {
+			metalStorage.Volumes = append(metalStorage.Volumes, metalv1alpha1.StorageVolume{
+				Name:        volume.Name,
+				Capacity:    resource.NewQuantity(volume.SizeBytes, resource.BinarySI),
+				State:       metalv1alpha1.StorageState(volume.State),
+				RAIDType:    string(volume.RAIDType),
+				VolumeUsage: volume.VolumeUsage,
+			})
+		}
+		server.Status.Storages = append(server.Status.Storages, metalStorage)
 	}
 
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return fmt.Errorf("failed to patch Server status: %w", err)
+	}
 	log.V(1).Info("Updated Server status", "Status", server.Status.State, "powerState", server.Status.PowerState)
-
 	return nil
 }
 

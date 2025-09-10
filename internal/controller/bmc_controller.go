@@ -24,7 +24,6 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -133,10 +132,9 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	}
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
-		return r.handleBMCConnectionFailure(ctx, bmcObj, err)
+		return ctrl.Result{}, r.updateReadyConditionOnBMCFailure(ctx, bmcObj, err)
 	}
 	defer bmcClient.Logout()
-	log.V(1).Info("Connected to BMC")
 
 	if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionTrue, bmcConnectedReason, "BMC is connected"); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to set BMC connected condition: %w", err)
@@ -234,7 +232,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 			server.Spec.UUID = strings.ToLower(s.UUID)
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.SystemURI = s.URI
-			server.Spec.BMCRef = &v1.LocalObjectReference{Name: bmcObj.Name}
+			server.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmcObj.Name}
 			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
 		})
 		if err != nil {
@@ -271,7 +269,7 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	return true, nil
 }
 
-func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, bmcObj *metalv1alpha1.BMC, err error) (ctrl.Result, error) {
+func (r *BMCReconciler) updateReadyConditionOnBMCFailure(ctx context.Context, bmcObj *metalv1alpha1.BMC, err error) error {
 	if httpErr, ok := err.(*common.Error); ok {
 		// only handle 5xx errors
 		switch httpErr.HTTPReturnedStatusCode {
@@ -279,36 +277,36 @@ func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, bmcObj *
 			{
 				// Unauthorized error, likely due to bad credentials
 				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, "BMC credentials are invalid"); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to set BMC unauthorized condition: %w", err)
+					return fmt.Errorf("failed to set BMC unauthorized condition: %w", err)
 				}
 			}
 		case 500:
 			{
 				// Internal Server Error, might be transient
 				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcInternalErrorReason, "BMC internal server error"); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to set BMC internal server error condition: %w", err)
+					return fmt.Errorf("failed to set BMC internal server error condition: %w", err)
 				}
 			}
 		case 503:
 			{
 				// Service Unavailable, might be transient
 				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcConnectionFailedReason, "BMC service unavailable"); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to set BMC service unavailable condition: %w", err)
+					return fmt.Errorf("failed to set BMC service unavailable condition: %w", err)
 				}
 			}
 		default:
 			{
 				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, fmt.Sprintf("BMC connection error: %v", err)); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to set BMC error condition: %w", err)
+					return fmt.Errorf("failed to set BMC error condition: %w", err)
 				}
 			}
 		}
 	} else {
 		if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, fmt.Sprintf("BMC connection error: %v", err)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to set BMC error condition: %w", err)
+			return fmt.Errorf("failed to set BMC error condition: %w", err)
 		}
 	}
-	return ctrl.Result{}, err
+	return err
 }
 
 func (r *BMCReconciler) shouldSkipReconciliation(bmcObj *metalv1alpha1.BMC) bool {
@@ -387,10 +385,10 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: func(i int32) *int32 { return &i }(3),
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
 						{
 							Name:  "bmc-reset",
 							Image: r.BMCToolsImage,
@@ -403,14 +401,14 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 								"--bmc_manufacturer", bmcObj.Status.Manufacturer,
 								"--timeout", "5m",
 							},
-							ImagePullPolicy: v1.PullIfNotPresent,
-							Env: []v1.EnvVar{
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env: []corev1.EnvVar{
 								{
 									Name: metalv1alpha1.BMCSecretPasswordKeyName,
-									ValueFrom: &v1.EnvVarSource{
-										SecretKeyRef: &v1.SecretKeySelector{
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
 											Key: metalv1alpha1.BMCSecretPasswordKeyName,
-											LocalObjectReference: v1.LocalObjectReference{
+											LocalObjectReference: corev1.LocalObjectReference{
 												Name: bmcObj.Spec.BMCSecretRef.Name,
 											},
 										},
@@ -418,10 +416,10 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 								},
 								{
 									Name: metalv1alpha1.BMCSecretUsernameKeyName,
-									ValueFrom: &v1.EnvVarSource{
-										SecretKeyRef: &v1.SecretKeySelector{
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
 											Key: metalv1alpha1.BMCSecretPasswordKeyName,
-											LocalObjectReference: v1.LocalObjectReference{
+											LocalObjectReference: corev1.LocalObjectReference{
 												Name: bmcObj.Spec.BMCSecretRef.Name,
 											},
 										},

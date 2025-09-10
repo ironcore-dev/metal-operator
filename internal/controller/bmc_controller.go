@@ -33,10 +33,21 @@ import (
 )
 
 const (
-	BMCFinalizer            = "metal.ironcore.dev/bmc"
-	bmcResettingReason      = "ResettingBMC"
-	bmcReadyReason          = "BMCReady"
-	bmcEnabledConditionType = "BMCEnabled"
+	BMCFinalizer = "metal.ironcore.dev/bmc"
+
+	bmcResetConditionType = "Reset"
+	bmcReadyConditionType = "Ready"
+
+	bmcAuthenticationFailedReason = "AuthenticationFailed"
+	bmcInternalErrorReason        = "InternalServerError"
+	bmcUnknownErrorReason         = "UnknownError"
+	bmcConnectionFailedReason     = "ConnectionFailed"
+	bmcUserResetReason            = "UserRequested"
+	bmcAutoResetReason            = "AutoResetting"
+	bmcConnectedReason            = "BMCConnected"
+
+	bmcUserResetMessage = "BMC reset initiated by user. Waiting for it to come back online."
+	bmcAutoResetMessage = "BMC reset initiated automatically after repeated connection failures. Waiting for it to come back online."
 )
 
 // BMCReconciler reconciles a BMC object
@@ -46,7 +57,6 @@ type BMCReconciler struct {
 	Insecure             bool
 	BMCFailureResetDelay time.Duration
 	BMCPollingOptions    bmc.Options
-	LastBMCFailure       map[types.NamespacedName]time.Time
 	ManagerNamespace     string
 	BMCToolsImage        string
 }
@@ -102,33 +112,39 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
 	}
-	log.V(1).Info("BMC conditions at start of reconciliation", "Conditions", bmcObj.Status.Conditions)
-
-	if resetting, err := r.isResetting(log, bmcObj); err != nil || resetting {
-		log.V(1).Info("BMC is resetting, requeueing", "BMC", bmcObj.Name, "Error", err)
+	if r.shouldSkipReconciliation(bmcObj) {
+		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{
 			RequeueAfter: 5 * time.Second,
-		}, err
+		}, nil
+	}
+	if r.shouldResetBMC(bmcObj) {
+		log.V(1).Info("BMC needs reset, resetting", "BMC", bmcObj.Name)
+		if err := r.resetBMC(ctx, log, bmcObj, bmcAutoResetReason, bmcAutoResetMessage); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to reset BMC: %w", err)
+		}
+		log.V(1).Info("BMC reset initiated", "BMC", bmcObj.Name)
+		return ctrl.Result{
+			RequeueAfter: 10 * time.Second,
+		}, nil
 	}
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcObj); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err != nil {
-		return r.handleBMCConnectionFailure(ctx, log, bmcObj, err)
+		return r.handleBMCConnectionFailure(ctx, bmcObj, err)
 	}
 	defer bmcClient.Logout()
 	log.V(1).Info("Connected to BMC")
-	bmcBase := bmcObj.DeepCopy()
-	if err := r.updateConditions(bmcObj, bmcEnabledConditionType, corev1.ConditionTrue, "BMCConnected", "BMC is connected"); err != nil {
+
+	if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionTrue, bmcConnectedReason, "BMC is connected"); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to set BMC connected condition: %w", err)
 	}
-	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to patch IP and MAC address status: %w", err)
+	if err := r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, "ResetComplete", "BMC reset is complete"); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to set BMC reset complete condition: %w", err)
 	}
-	log.Info("conditions after update", "Conditions", bmcObj.Status.Conditions)
-	// Reset the failure timestamp on successful connection
-	delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
+
 	if err := r.updateBMCStatusDetails(ctx, log, bmcClient, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update BMC status: %w", err)
 	}
@@ -177,7 +193,6 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	if err != nil {
 		return fmt.Errorf("failed to get manager details for BMC %s: %w", bmcObj.Name, err)
 	}
-
 	// parse time to metav1.Time: ISO 8601 format
 	lastResetTime := &metav1.Time{}
 	if manager.LastResetTime != "" {
@@ -202,7 +217,6 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	} else {
 		log.V(1).Info("Manager details not available for BMC", "BMC", bmcObj.Name)
 	}
-
 	return nil
 }
 
@@ -232,7 +246,6 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 	if len(errs) > 0 {
 		return fmt.Errorf("errors occurred during server discovery: %v", errs)
 	}
-
 	return nil
 }
 
@@ -244,10 +257,10 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	switch operation {
 	case metalv1alpha1.OperationAnnotationForceReset:
 		log.V(1).Info("Handling operation", "Operation", operation)
-		if err := r.resetBMC(ctx, log, bmcObj); err != nil {
+		if err := r.resetBMC(ctx, log, bmcObj, bmcUserResetReason, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
-		log.V(1).Info("Handled operation", "Operation", operation)
+		log.V(0).Info("Handled operation", "Operation", operation)
 	}
 	bmcBase := bmcObj.DeepCopy()
 	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
@@ -258,39 +271,86 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	return true, nil
 }
 
-func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, err error) (ctrl.Result, error) {
-	if r.BMCFailureResetDelay == 0 {
-		// no reset delay configured, just return the error
-		return ctrl.Result{}, err
-	}
+func (r *BMCReconciler) handleBMCConnectionFailure(ctx context.Context, bmcObj *metalv1alpha1.BMC, err error) (ctrl.Result, error) {
 	if httpErr, ok := err.(*common.Error); ok {
 		// only handle 5xx errors
-		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-			return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
+		switch httpErr.HTTPReturnedStatusCode {
+		case 401:
+			{
+				// Unauthorized error, likely due to bad credentials
+				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, "BMC credentials are invalid"); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to set BMC unauthorized condition: %w", err)
+				}
+			}
+		case 500:
+			{
+				// Internal Server Error, might be transient
+				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcInternalErrorReason, "BMC internal server error"); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to set BMC internal server error condition: %w", err)
+				}
+			}
+		case 503:
+			{
+				// Service Unavailable, might be transient
+				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcConnectionFailedReason, "BMC service unavailable"); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to set BMC service unavailable condition: %w", err)
+				}
+			}
+		default:
+			{
+				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, fmt.Sprintf("BMC connection error: %v", err)); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to set BMC error condition: %w", err)
+				}
+			}
 		}
 	} else {
-		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
-	}
-	lastFailure, ok := r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}]
-	if !ok {
-		// First failure, record the timestamp
-		r.LastBMCFailure[types.NamespacedName{Name: bmcObj.Name}] = time.Now()
-	}
-	if ok && time.Since(lastFailure) > r.BMCFailureResetDelay {
-		log.Error(err, "BMC connection failure has persisted for more than %v", r.BMCFailureResetDelay)
-		err := r.resetBMC(ctx, log, bmcObj)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to reset job: %w", err)
+		if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, fmt.Sprintf("BMC connection error: %v", err)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to set BMC error condition: %w", err)
 		}
-		log.Info("executing BMC reset after persistent connection failures")
-		delete(r.LastBMCFailure, types.NamespacedName{Name: bmcObj.Name})
-		// reset in progress, requeue after 5 minutes to check status
-		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 	}
 	return ctrl.Result{}, err
 }
 
-func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) shouldSkipReconciliation(bmcObj *metalv1alpha1.BMC) bool {
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	condition := &metav1.Condition{}
+	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
+	if err != nil || !found {
+		return false
+	}
+	if condition.Status == metav1.ConditionTrue {
+		// give bmc some time to start the reset process
+		if time.Since(condition.LastTransitionTime.Time) < 5*time.Second {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *BMCReconciler) shouldResetBMC(bmcObj *metalv1alpha1.BMC) bool {
+	if r.BMCFailureResetDelay == 0 {
+		return false
+	}
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	bmcResetCondition := &metav1.Condition{}
+	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, bmcResetCondition)
+	if err != nil || (found && bmcResetCondition.Status == metav1.ConditionTrue) {
+		return false
+	}
+	readyCondition := &metav1.Condition{}
+	found, err = acc.FindSlice(bmcObj.Status.Conditions, bmcReadyConditionType, readyCondition)
+	if err != nil || !found {
+		return false
+	}
+	if readyCondition.Status == metav1.ConditionFalse && (readyCondition.Reason == bmcInternalErrorReason || readyCondition.Reason == bmcConnectionFailedReason) {
+		if time.Since(readyCondition.LastTransitionTime.Time) > r.BMCFailureResetDelay {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, reason, message string) error {
 	running, err := r.checkResetJobStatus(ctx, log, bmcObj)
 	if err != nil {
 		return fmt.Errorf("BMC reset job status: %w", err)
@@ -299,13 +359,8 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 		// job is still running, requeue
 		return fmt.Errorf("BMC reset job is still running")
 	}
-	bmcBase := bmcObj.DeepCopy()
-	if err := r.updateConditions(bmcObj, bmcEnabledConditionType, corev1.ConditionFalse, bmcResettingReason, "BMC is resetting"); err != nil {
+	if err := r.updateConditions(ctx, bmcObj, true, bmcResetConditionType, corev1.ConditionTrue, reason, message); err != nil {
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
-	}
-	bmcObj.Status.State = metalv1alpha1.BMCStateResetting
-	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-		return fmt.Errorf("failed to patch IP and MAC address status: %w", err)
 	}
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
 	if err == nil {
@@ -318,32 +373,16 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 	if httpErr, ok := err.(*common.Error); ok {
 		// only handle 5xx errors
 		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-			return fmt.Errorf("failed to get BMC client: %w", err)
+			return fmt.Errorf("cannot reset bmc: %w", err)
 		}
 	} else {
-		return fmt.Errorf("failed to get BMC client: %w", err)
+		return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
 	}
-	// If we reach here, Redfish reset failed or was not possible
-	job := &batchv1.Job{}
-	if err := r.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("bmc-reset-%s-", bmcObj.Name), Namespace: r.ManagerNamespace}, job); err == nil {
-		// job already exists
-		log.V(1).Info("BMC reset job already exists", "Job", job.Name)
-		if job.Status.Active > 0 {
-			log.V(1).Info("BMC reset job is already running", "Job", job.Name)
-			return nil
-		}
-		// delete old job
-		if err := r.Delete(ctx, job); err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to delete old BMC reset job: %w", err)
-		}
-	} else if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get BMC reset job: %w", err)
-	}
-	// create new k8s job which resets the BMC
+	// If we reach here, Redfish reset failed or was not possible, fall back to reset via ssh
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("bmc-reset-%s-", bmcObj.Name),
-			Namespace: bmcObj.Namespace,
+			Name:      fmt.Sprintf("bmc-reset-%s", bmcObj.Name),
+			Namespace: r.ManagerNamespace,
 			Labels:    bmcObj.Labels,
 		},
 		Spec: batchv1.JobSpec{
@@ -354,7 +393,7 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 					Containers: []v1.Container{
 						{
 							Name:  "bmc-reset",
-							Image: "ironcoredev/bmct:latest",
+							Image: r.BMCToolsImage,
 							Command: []string{
 								"bmc",
 								"reset",
@@ -401,17 +440,22 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 	if err != nil {
 		return fmt.Errorf("failed to create or patch BMC reset job: %w", err)
 	}
-	log.Info("Created or patched BMC reset job", "Job", job.Name, "Operation", opResult)
+	log.Info("Created or patched BMC reset job", "Job", newJob.Name, "Operation", opResult)
 	return nil
 }
 
-func (r *BMCReconciler) updateConditions(bmcObj *metalv1alpha1.BMC, conditionType string, status corev1.ConditionStatus, reason, message string) error {
+func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alpha1.BMC, createIfNotFound bool, conditionType string, status corev1.ConditionStatus, reason, message string) error {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	condition := &metav1.Condition{}
-	_, err := acc.FindSlice(bmcObj.Status.Conditions, conditionType, condition)
+	ok, err := acc.FindSlice(bmcObj.Status.Conditions, conditionType, condition)
 	if err != nil {
 		return fmt.Errorf("failed to find condition %s: %w", conditionType, err)
 	}
+	if !ok && !createIfNotFound {
+		// condition not found and not allowed to create
+		return nil
+	}
+	bmcBase := bmcObj.DeepCopy()
 	if err := acc.UpdateSlice(
 		&bmcObj.Status.Conditions,
 		conditionType,
@@ -421,24 +465,10 @@ func (r *BMCReconciler) updateConditions(bmcObj *metalv1alpha1.BMC, conditionTyp
 	); err != nil {
 		return fmt.Errorf("failed to patch condition %s: %w", conditionType, err)
 	}
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return fmt.Errorf("failed to patch BMC conditions: %w", err)
+	}
 	return nil
-}
-
-func (r *BMCReconciler) isResetting(log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	condition := &metav1.Condition{}
-	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcEnabledConditionType, condition)
-	if err != nil || !found {
-		return false, err
-	}
-	if condition.Status == metav1.ConditionFalse && condition.Reason == bmcResettingReason {
-		// give bmc time to start resetting
-		if !condition.LastTransitionTime.Time.IsZero() && time.Since(condition.LastTransitionTime.Time) < 5*time.Second {
-			log.V(1).Info("BMC is resetting", "ConditionStatus", condition.Status, "ConditionReason", condition.Reason, "LastTransitionTime", condition.LastTransitionTime)
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func (r *BMCReconciler) checkResetJobStatus(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
@@ -483,8 +513,6 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.LastBMCFailure = make(map[types.NamespacedName]time.Time)
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).

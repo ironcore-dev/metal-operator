@@ -21,6 +21,8 @@ type RedfishMockUps struct {
 	BMCUpgradingVersion  string
 	BMCUpgradeTaskIndex  int
 	BMCUpgradeTaskStatus []redfish.Task
+
+	SimulateUnvailableBMC bool
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -104,6 +106,8 @@ func (r *RedfishMockUps) InitializeDefaults() {
 			PercentComplete: 100,
 		},
 	}
+
+	r.SimulateUnvailableBMC = false
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {

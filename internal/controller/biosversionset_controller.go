@@ -107,6 +107,9 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 	log logr.Logger,
 	biosVersionSet *metalv1alpha1.BIOSVersionSet,
 ) error {
+	if !shouldChildIgnoreReconciliation(biosVersionSet) {
+		return nil
+	}
 	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
 	if err != nil {
 		return err
@@ -137,10 +140,13 @@ func (r *BIOSVersionSetReconciler) reconcile(
 	log logr.Logger,
 	biosVersionSet *metalv1alpha1.BIOSVersionSet,
 ) (ctrl.Result, error) {
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if shouldIgnoreReconciliation(biosVersionSet) {
 		log.V(1).Info("Skipped BIOSVersionSet reconciliation")
-		err := r.handleIgnoreAnnotationPropagation(ctx, log, biosVersionSet)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersionSet, BIOSVersionSetFinalizer); err != nil || modified {

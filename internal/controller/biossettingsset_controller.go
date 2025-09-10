@@ -112,6 +112,9 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
 	log logr.Logger,
 	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
 ) error {
+	if !shouldChildIgnoreReconciliation(biosSettingsSet) {
+		return nil
+	}
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, biosSettingsSet)
 	if err != nil {
 		return err
@@ -142,10 +145,13 @@ func (r *BIOSSettingsSetReconciler) reconcile(
 	log logr.Logger,
 	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
 ) (ctrl.Result, error) {
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, biosSettingsSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if shouldIgnoreReconciliation(biosSettingsSet) {
 		log.V(1).Info("Skipped BIOSSettingsSet reconciliation")
-		err := r.handleIgnoreAnnotationPropagation(ctx, log, biosSettingsSet)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosSettingsSet, biosSettingsSetFinalizer); err != nil || modified {

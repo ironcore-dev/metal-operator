@@ -103,6 +103,9 @@ func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
 	log logr.Logger,
 	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 ) error {
+	if !shouldChildIgnoreReconciliation(bmcVersionSet) {
+		return nil
+	}
 	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
 	if err != nil {
 		return err
@@ -133,10 +136,13 @@ func (r *BMCVersionSetReconciler) reconcile(
 	log logr.Logger,
 	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 ) (ctrl.Result, error) {
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, bmcVersionSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if shouldIgnoreReconciliation(bmcVersionSet) {
 		log.V(1).Info("Skipped BMCVersionSet reconciliation")
-		err := r.handleIgnoreAnnotationPropagation(ctx, log, bmcVersionSet)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcVersionSet, BMCVersionSetFinalizer); err != nil || modified {

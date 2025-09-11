@@ -119,6 +119,13 @@ spec:
               serverPower:
                 description: ServerPower specifies the power state of the server during
                   maintenance.
+                enum:
+                - "On"
+                - "Off"
+                - Paused
+                - PoweringOn
+                - PoweringOff
+                - Unmanaged
                 type: string
               serverRef:
                 description: ServerRef is a reference to the server that is to be

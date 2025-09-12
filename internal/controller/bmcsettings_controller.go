@@ -515,6 +515,17 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	for _, server := range servers {
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
 			serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.UID)
+			serverMaintenance := &metalv1alpha1.ServerMaintenance{}
+			key := client.ObjectKey{Name: serverMaintenanceRef.Name, Namespace: serverMaintenanceRef.Namespace}
+			if err := r.Get(ctx, key, serverMaintenance); err != nil {
+				log.V(1).Error(err, "failed to get referred server's Manitenance", "Server", server.Name, "ServerMaintenanceRef", serverMaintenanceRef)
+				return false
+			}
+			// this gives us the waiting time for the server to be prepared for maintenance by ServerMaintenance controller
+			if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
+				log.V(1).Info("ServerMaintenance not yet in maintenance state", "Server", server.Name, "ServerMaintenance", serverMaintenance.Name, "State", serverMaintenance.Status.State)
+				notInMaintenanceState = append(notInMaintenanceState, server.Name)
+			}
 			if server.Spec.ServerMaintenanceRef == nil || serverMaintenanceRef == nil {
 				// server in maintenance for other tasks. or
 				// server maintenance ref is wrong in either server or bmcSetting

@@ -6,11 +6,15 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/stmcginnis/gofish/redfish"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +35,10 @@ const (
 // ServerMaintenanceReconciler reconciles a ServerMaintenance object
 type ServerMaintenanceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	Insecure       bool
+	ResyncInterval time.Duration
+	BMCOptions     bmc.Options
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
@@ -114,13 +121,7 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 	}
 	if server.Spec.ServerClaimRef == nil {
 		log.V(1).Info("Server has no claim, move to maintenance right away", "Server", server.Name)
-		if err = r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
-			log.Error(err, "failed to patch server maintenance ref")
-			return ctrl.Result{}, err
-		}
-		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
+		return r.moveToInMaintenanceState(ctx, log, serverMaintenance, server)
 	}
 	serverClaim := &metalv1alpha1.ServerClaim{}
 	if err := r.Get(ctx,
@@ -150,23 +151,11 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 			return ctrl.Result{}, nil
 		}
 		log.V(1).Info("Server approved for maintenance", "Server", server.Name, "Maintenance", serverMaintenance.Name)
-		if err = r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
-			log.Error(err, "failed to patch server maintenance ref")
-			return ctrl.Result{}, err
-		}
-		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
+		return r.moveToInMaintenanceState(ctx, log, serverMaintenance, server)
 	}
 	if serverMaintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced {
 		log.V(1).Info("Enforcing maintenance", "Server", server.Name, "Maintenance", serverMaintenance.Name)
-		if err = r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
-			log.Error(err, "failed to patch server maintenance ref")
-			return ctrl.Result{}, err
-		}
-		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
+		return r.moveToInMaintenanceState(ctx, log, serverMaintenance, server)
 	}
 	return ctrl.Result{}, nil
 }
@@ -346,6 +335,60 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logg
 		return fmt.Errorf("failed to patch server claim annotations: %w", err)
 	}
 	return nil
+}
+
+func (r *ServerMaintenanceReconciler) moveToInMaintenanceState(
+	ctx context.Context,
+	log logr.Logger,
+	serverMaintenance *metalv1alpha1.ServerMaintenance,
+	server *metalv1alpha1.Server,
+) (ctrl.Result, error) {
+	if err := r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
+		log.Error(err, "failed to patch server maintenance ref")
+		return ctrl.Result{}, err
+	}
+
+	if wait, ok, err := r.configureMaintenanceBootConfig(ctx, log, serverMaintenance, server); err != nil {
+		return ctrl.Result{}, err
+	} else if wait {
+		return ctrl.Result{RequeueAfter: 2 * time.Minute}, nil
+	} else if !ok {
+		log.V(1).Info("maintenance boot configuration is completed")
+	}
+
+	if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *ServerMaintenanceReconciler) configureMaintenanceBootConfig(
+	ctx context.Context,
+	log logr.Logger,
+	serverMaintenance *metalv1alpha1.ServerMaintenance,
+	server *metalv1alpha1.Server,
+) (bool, bool, error) {
+	if serverMaintenance.Spec.MaintenanceBootPolicy == metalv1alpha1.MaintenanceBootPolicyNone {
+		return false, false, nil
+	}
+	if server.Status.State != metalv1alpha1.ServerStateMaintenance {
+		log.V(1).Info("Waiting for server to enter maintenance state before configuring maintenance boot config", "Server", server.Name, "State", server.Status.State)
+		return true, false, nil
+	}
+
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	defer bmcClient.Logout()
+
+	err = bmcClient.SetBootOverride(ctx, server.Spec.SystemURI, redfish.Boot{
+		BootSourceOverrideEnabled: redfish.ContinuousBootSourceOverrideEnabled,
+		BootSourceOverrideTarget:  redfish.BootSourceOverrideTarget(serverMaintenance.Spec.MaintenanceBootPolicy),
+		BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode},
+	)
+	log.V(1).Info(" boot override during maintenance is set", "Server", server.Name)
+	return false, err == nil, err
 }
 
 func (r *ServerMaintenanceReconciler) removeBootConfigRefFromServer(ctx context.Context, log logr.Logger, config *metalv1alpha1.ServerBootConfiguration, server *metalv1alpha1.Server) error {

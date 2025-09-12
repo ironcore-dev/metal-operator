@@ -460,7 +460,7 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	}
 
 	// check if the maintenance is granted
-	if ok := r.checkIfMaintenanceGranted(log, biosSettings, server); !ok {
+	if ok := r.checkIfMaintenanceGranted(ctx, log, biosSettings, server); !ok {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
 		return ctrl.Result{}, nil
 	}
@@ -1143,6 +1143,7 @@ func (r *BiosSettingsReconciler) checkForRequiredPowerStatus(
 }
 
 func (r *BiosSettingsReconciler) checkIfMaintenanceGranted(
+	ctx context.Context,
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
@@ -1152,6 +1153,17 @@ func (r *BiosSettingsReconciler) checkIfMaintenanceGranted(
 	}
 
 	if server.Status.State == metalv1alpha1.ServerStateMaintenance {
+		serverMaintenence, err := r.getReferredServerMaintenance(ctx, log, biosSettings.Spec.ServerMaintenanceRef)
+		if err != nil {
+			log.V(1).Info("Failed to get referred ServerMaintenance", "error", err, "serverMaintenanceRef", biosSettings.Spec.ServerMaintenanceRef)
+			return false
+		}
+		if serverMaintenence.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
+			log.V(1).Info("ServerMaintenance is not in maintenance. waiting...",
+				"serverMaintenance State", serverMaintenence.Status.State,
+				"serverMaintenance", serverMaintenence.Name)
+			return false
+		}
 		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosSettings.Spec.ServerMaintenanceRef.UID {
 			// server in maintenance for other tasks. or
 			// server maintenance ref is wrong in either server or biosSettings

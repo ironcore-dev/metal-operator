@@ -101,6 +101,9 @@ type BMC interface {
 	// SetBootOrder sets the boot order for the system.
 	SetBootOrder(ctx context.Context, systemURI string, order []string) error
 
+	// SetBootOverride sets the boot Override for the system.
+	SetBootOverride(ctx context.Context, systemURI string, overrideConfig redfish.Boot) error
+
 	// GetStorages retrieves storage information for the system.
 	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
 

@@ -209,6 +209,17 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 			return false, nil
 		}
 
+		serverMaintenence, err := r.getReferredServerMaintenance(ctx, log, biosVersion.Spec.ServerMaintenanceRef)
+		if err != nil {
+			return false, fmt.Errorf("failed to get referred serverMaintenance obj from BIOSVersion: %w", err)
+		}
+		if serverMaintenence.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
+			log.V(1).Info("ServerMaintenance is not in maintenance. waiting...",
+				"serverMaintenance State", serverMaintenence.Status.State,
+				"serverMaintenance", serverMaintenence.Name)
+			return false, nil
+		}
+
 		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosVersion.Spec.ServerMaintenanceRef.UID {
 			// server in maintenance for other tasks. or
 			// server maintenance ref is wrong in either server or biosSettings

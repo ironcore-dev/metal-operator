@@ -488,6 +488,15 @@ func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrd
 	)
 }
 
+// SetBootOverride sets server boot override
+func (r *RedfishBMC) SetBootOverride(ctx context.Context, systemURI string, overrideConfig redfish.Boot) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return err
+	}
+	return system.SetBoot(overrideConfig)
+}
+
 func (r *RedfishBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (map[string]RegistryEntryAttributes, error) {
 	registries, err := r.client.Service.Registries()
 	if err != nil {

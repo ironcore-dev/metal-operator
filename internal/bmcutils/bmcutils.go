@@ -23,17 +23,19 @@ func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metal
 	return metalv1alpha1.HTTPSProtocolScheme
 }
 
-func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
+func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (username string, password string, err error) {
 	// TODO: use constants for secret keys
-	username, ok := secret.Data["username"]
+	user, ok := secret.Data["username"]
 	if !ok {
-		return "", "", fmt.Errorf("no username found in the BMC secret")
+		return username, password, fmt.Errorf("no username found in the BMC secret")
 	}
-	password, ok := secret.Data["password"]
+	username = string(user)
+	pw, ok := secret.Data["password"]
 	if !ok {
-		return "", "", fmt.Errorf("no password found in the BMC secret")
+		return username, password, fmt.Errorf("no password found in the BMC secret")
 	}
-	return string(username), string(password), nil
+	password = string(pw)
+	return
 }
 
 func GetBMCFromBMCName(ctx context.Context, c client.Client, bmcName string) (*metalv1alpha1.BMC, error) {
@@ -116,18 +118,29 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		}
 		address = endpoint.Spec.IP.String()
 	}
-
 	if bmcObj.Spec.Endpoint != nil {
 		address = bmcObj.Spec.Endpoint.IP.String()
 	}
 
 	bmcSecret := &metalv1alpha1.BMCSecret{}
+	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
+
+	if bmcObj.Spec.AdminUserRef != nil {
+		user := &metalv1alpha1.User{}
+		if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.AdminUserRef.Name}, user); err != nil {
+			return nil, fmt.Errorf("failed to get admin user: %w", err)
+		}
+		if user.Status.EffectiveBMCSecretRef == nil {
+			return nil, fmt.Errorf("admin user %s has no effective BMC secret reference", user.Name)
+		}
+		if err := c.Get(ctx, client.ObjectKey{Name: user.Status.EffectiveBMCSecretRef.Name}, bmcSecret); err != nil {
+			return nil, fmt.Errorf("failed to get BMC secret: %w", err)
+		}
+		return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	}
 	if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSecretRef.Name}, bmcSecret); err != nil {
 		return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 	}
-
-	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
-
 	return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
 }
 
@@ -154,17 +167,17 @@ func CreateBMCClient(
 	case metalv1alpha1.ProtocolRedfish:
 		bmcClient, err = bmc.NewRedfishBMCClient(ctx, bmcOptions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	case metalv1alpha1.ProtocolRedfishLocal:
 		bmcClient, err = bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	case metalv1alpha1.ProtocolRedfishKube:
 		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, c, DefaultKubeNamespace)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	default:
 		return nil, fmt.Errorf("unsupported BMC protocol %s", bmcProtocol)

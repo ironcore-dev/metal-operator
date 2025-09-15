@@ -141,10 +141,6 @@ func (r *BiosSettingsReconciler) delete(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosSettings, BIOSSettingsFinalizer) {
-		return ctrl.Result{}, nil
-	}
-
 	if err := r.cleanupReferences(ctx, log, biosSettings); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
@@ -932,6 +928,33 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 	return err
 }
 
+func (r *BiosSettingsReconciler) ensureNoStrandedStatus(
+	ctx context.Context,
+	biosSettings *metalv1alpha1.BIOSSettings,
+) (bool, error) {
+	// Incase the settings Spec got changed during Inprogress and left behind Stale states clean it up.
+	settingsNamePriorityMap := map[string]int32{}
+	biosSettingsBase := biosSettings.DeepCopy()
+	for _, settings := range biosSettings.Spec.SettingsFlow {
+		settingsNamePriorityMap[settings.Name] = settings.Priority
+	}
+	nextFlowStatuses := make([]metalv1alpha1.BIOSSettingsFlowStatus, 0)
+	for _, flowStatus := range biosSettings.Status.FlowState {
+		if value, ok := settingsNamePriorityMap[flowStatus.Name]; ok && value == flowStatus.Priority {
+			nextFlowStatuses = append(nextFlowStatuses, flowStatus)
+		}
+	}
+
+	if len(nextFlowStatuses) != len(biosSettings.Status.FlowState) {
+		biosSettings.Status.FlowState = nextFlowStatuses
+		if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
+			return false, fmt.Errorf("failed to patch BIOSSettings FlowState status: %w", err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 func (r *BiosSettingsReconciler) handleSettingAppliedState(
 	ctx context.Context,
 	log logr.Logger,
@@ -941,6 +964,10 @@ func (r *BiosSettingsReconciler) handleSettingAppliedState(
 ) (ctrl.Result, error) {
 	// clean up maintenance crd and references.
 	if err := r.cleanupServerMaintenanceReferences(ctx, log, biosSettings); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if requeue, err := r.ensureNoStrandedStatus(ctx, biosSettings); requeue || err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -1403,7 +1430,7 @@ func (r *BiosSettingsReconciler) updateBiosSettingsFlowStatus(
 		// if the currentFlowStatus is missing, add it.
 		currentSettingsFlowStatus.State = state
 		biosSettings.Status.FlowState = append(biosSettings.Status.FlowState, *currentSettingsFlowStatus)
-		currentIdx = 0
+		currentIdx = len(biosSettings.Status.FlowState) - 1
 	}
 
 	if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {

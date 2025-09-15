@@ -504,7 +504,7 @@ func main() { // nolint: gocyclo
 	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting registry server", "RegistryURL", registryURL)
-	registryServer := registry.NewServer(fmt.Sprintf(":%d", registryPort))
+	registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort))
 	go func() {
 		if err := registryServer.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running registry server")

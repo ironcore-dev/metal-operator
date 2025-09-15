@@ -7,11 +7,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -21,10 +20,11 @@ type Agent struct {
 	RegistryURL string
 	Duration    time.Duration
 	Server      *registry.Server // Pointer to Server for late initialization.
+	log         logr.Logger
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(systemUUID, registryURL string, duration time.Duration) *Agent {
+func NewAgent(log logr.Logger, systemUUID, registryURL string, duration time.Duration) *Agent {
 	return &Agent{
 		SystemUUID:  systemUUID,
 		RegistryURL: registryURL,
@@ -58,30 +58,30 @@ func (a *Agent) Start(ctx context.Context) error {
 	// Ensure the Agent is initialized.
 	if a.Server == nil {
 		if err := a.Init(); err != nil {
-			log.Printf("Error initializing agent: %v", err)
+			a.log.Error(err, "failed to initialize agent")
 			return err
 		}
 	}
 
 	// Run the registration immediately before starting the ticker loop.
-	log.Println("Registering server ...")
+	a.log.Info("Registering server ...")
 	if err := a.registerServer(ctx); err != nil {
-		log.Printf("Error during initial registration: %v", err)
+		a.log.Error(err, "failed to initially register server")
 		return err
 	}
-	log.Printf("Server with UUID: %s registered.", a.SystemUUID)
+	a.log.Info("Server registered", "uuid", a.SystemUUID)
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Probe agent stopped.")
+			a.log.Info("Probe agent stopped.")
 			return nil
 		case <-ticker.C:
-			log.Println("Registering server ...")
+			a.log.Info("Registering server ...")
 			if err := a.registerServer(ctx); err != nil {
-				log.Printf("Error during periodic registration: %v", err)
+				a.log.Error(err, "failed to register server")
 			}
-			log.Printf("Server with UUID: %s re-registered.", a.SystemUUID)
+			a.log.Info("Server registered", "uuid", a.SystemUUID)
 		}
 	}
 }
@@ -109,22 +109,22 @@ func (a *Agent) registerServer(ctx context.Context) error {
 
 			resp, err := http.Post(a.RegistryURL+"/register", "application/json", bytes.NewBuffer(jsonData))
 			if err != nil {
-				log.Printf("Error posting data: %v", err)
+				a.log.Error(err, "failed to post registration data", "url", a.RegistryURL)
 				return false, nil
 			}
 			defer func() {
 				err := resp.Body.Close()
 				if err != nil {
-					log.Printf("failed to close response body: %v", err)
+					a.log.Error(err, "failed to close response body")
 				}
 			}()
 
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				fmt.Printf("Failed to register server: %s. Retrying...\n", resp.Status)
+				a.log.Error(err, "failed to register server", "url", a.RegistryURL)
 				return false, nil
 			}
 
-			log.Println("Server registered successfully.")
+			a.log.Info("Server registered")
 			return true, nil
 		},
 	)

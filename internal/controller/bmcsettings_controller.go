@@ -104,10 +104,6 @@ func (r *BMCSettingsReconciler) delete(
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) {
-		return ctrl.Result{}, nil
-	}
-
 	if err := r.cleanupReferences(ctx, log, bmcSetting); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
@@ -351,7 +347,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 			return ctrl.Result{}, fmt.Errorf("failed to check BMC settings provided: %w", err)
 		}
 
-		err = bmcClient.SetBMCAttributesImediately(ctx, BMC.Spec.BMCUUID, settingsDiff)
+		err = bmcClient.SetBMCAttributesImmediately(ctx, BMC.Spec.BMCUUID, settingsDiff)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
 		}

@@ -148,17 +148,12 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	server, modified, err := r.claimServer(ctx, log, claim)
-	if err != nil || modified {
-		return ctrl.Result{Requeue: true}, err
+	server, err := r.claimServer(ctx, log, claim)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 	if server == nil {
 		log.V(1).Info("No server found for claim")
-		return ctrl.Result{}, nil
-	}
-
-	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
-		log.V(1).Info("Skipped ServerClaim reconciliation as its in maintenance")
 		return ctrl.Result{}, nil
 	}
 
@@ -167,7 +162,12 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Patched ServerRef in Claim")
 
-	if err := r.applyBootConfiguration(ctx, log, server, claim); err != nil {
+	if server.Status.State != metalv1alpha1.ServerStateReserved {
+		log.V(1).Info("Server is not in reserved state", "Server", server.Name, "ServerState", server.Status.State)
+		return ctrl.Result{}, nil
+	}
+
+	if err = r.applyBootConfiguration(ctx, log, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
 	log.V(1).Info("Applied BootConfiguration for ServerClaim")
@@ -186,10 +186,10 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) error {
 	if server.Spec.ServerClaimRef != nil {
 		log.V(1).Info("Server is already claimed", "Server", server.Name, "Claim", server.Spec.ServerClaimRef.Name)
-		return false, nil
+		return nil
 	}
 
 	if server.Spec.ServerClaimRef == nil {
@@ -202,11 +202,11 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, lo
 			UID:        claim.UID,
 		}
 		if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
-			return false, fmt.Errorf("failed to patch claim ref for server: %w", err)
+			return fmt.Errorf("failed to patch claim ref for server: %w", err)
 		}
 		log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
 	}
-	return true, nil
+	return nil
 }
 
 func (r *ServerClaimReconciler) ensurePowerStateForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
@@ -300,13 +300,13 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 	return nil
 }
 
-func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, bool, error) {
+func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if server := checkForPrevUsedServer(log, serverList.Items, claim); server != nil {
-		return server, false, nil
+		return server, nil
 	}
 
 	// If no server is specified, find a server.
@@ -326,19 +326,19 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		server, err = r.claimFirstBestServer(ctx, log)
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if server == nil {
-		return nil, false, nil
+		return nil, nil
 	}
 	log.V(1).Info("Matching server found", "Server", server.Name)
 
-	modified, err := r.ensureObjectRefForServer(ctx, log, claim, server)
+	err = r.ensureObjectRefForServer(ctx, log, claim, server)
 	if err != nil {
-		return nil, modified, err
+		return nil, err
 	}
 	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
-	return server, modified, nil
+	return server, nil
 }
 
 func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
@@ -351,7 +351,7 @@ func (r *ServerClaimReconciler) claimServerByReference(ctx context.Context, log 
 		log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
 		return nil, nil
 	}
-	if server.Status.State != metalv1alpha1.ServerStateAvailable && server.Status.State != metalv1alpha1.ServerStateReserved {
+	if server.Status.State != metalv1alpha1.ServerStateAvailable {
 		log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 		return nil, nil
 	}
@@ -388,7 +388,7 @@ func (r *ServerClaimReconciler) claimServerBySelector(ctx context.Context, log l
 			log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
 			continue
 		}
-		if server.Status.State != metalv1alpha1.ServerStateAvailable && server.Status.State != metalv1alpha1.ServerStateReserved {
+		if server.Status.State != metalv1alpha1.ServerStateAvailable {
 			log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 			continue
 		}
@@ -448,9 +448,9 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
 		log := ctrl.LoggerFrom(ctx)
 
-		host := object.(*metalv1alpha1.Server)
+		server := object.(*metalv1alpha1.Server)
 
-		if host.Status.State == metalv1alpha1.ServerStateMaintenance || host.Spec.ServerMaintenanceRef != nil {
+		if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
 			return nil
 		}
 		var req []reconcile.Request
@@ -460,7 +460,7 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 			return nil
 		}
 		for _, claim := range claimList.Items {
-			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == host.Name {
+			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == server.Name {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
 				})

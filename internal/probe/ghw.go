@@ -22,13 +22,21 @@ type networkDeviceData struct {
 	pciInfo *ghw.PCIInfo
 }
 
-func NewNetworkDeviceData() NetDeviceData {
-	netInfo, _ := ghw.Network()
-	pciInfo, _ := ghw.PCI()
+func NewNetworkDeviceData() (NetDeviceData, error) {
+	netInfo, err := ghw.Network()
+	if err != nil {
+		return nil, fmt.Errorf("error getting network info: %w", err)
+	}
+
+	pciInfo, err := ghw.PCI()
+	if err != nil {
+		return nil, fmt.Errorf("error getting PCI info: %w", err)
+	}
+
 	return &networkDeviceData{
 		netInfo: netInfo,
 		pciInfo: pciInfo,
-	}
+	}, nil
 }
 
 func (n *networkDeviceData) GetModel(ifaceName string) string {

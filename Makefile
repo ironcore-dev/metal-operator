@@ -3,6 +3,10 @@
 CONTROLLER_IMG ?= controller:latest
 METALPROBE_IMG ?= metalprobe:latest
 
+BUILDPLATFORM ?= linux/amd64
+TARGETOS ?= linux
+TARGETARCH ?= amd64
+
 # Docker image name for the mkdocs based local development setup
 IMAGE=ironcore-dev/metal-operator-docs
 
@@ -163,11 +167,11 @@ docker-build: docker-build-controller-manager docker-build-metalprobe
 
 .PHONY: docker-build-controller-manager
 docker-build-controller-manager: ## Build controller-manager.
-	docker build --target manager -t ${CONTROLLER_IMG} --build-arg TARGETOS=${TARGETOS} --build-arg TARGETARCH=${TARGETARCH} .
+	docker build --target manager -t ${CONTROLLER_IMG} --build-arg BUILDPLATFORM=${BUILDPLATFORM} --build-arg TARGETOS=${TARGETOS} --build-arg TARGETARCH=${TARGETARCH} .
 
 .PHONY: docker-build-metalprobe
 docker-build-metalprobe: ## Build metalprobe.
-	docker build --target probe -t ${METALPROBE_IMG} --build-arg TARGETOS=${TARGETOS} --build-arg TARGETARCH=${TARGETARCH} .
+	docker build --target probe -t ${METALPROBE_IMG} --build-arg BUILDPLATFORM=${BUILDPLATFORM} --build-arg TARGETOS=${TARGETOS} --build-arg TARGETARCH=${TARGETARCH} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.

@@ -167,17 +167,17 @@ func CreateBMCClient(
 	case metalv1alpha1.ProtocolRedfish:
 		bmcClient, err = bmc.NewRedfishBMCClient(ctx, bmcOptions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	case metalv1alpha1.ProtocolRedfishLocal:
 		bmcClient, err = bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	case metalv1alpha1.ProtocolRedfishKube:
 		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, c, DefaultKubeNamespace)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	default:
 		return nil, fmt.Errorf("unsupported BMC protocol %s", bmcProtocol)

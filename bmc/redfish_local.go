@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/metal-operator/bmc/common"
+	gofishCommon "github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -24,7 +25,18 @@ type RedfishLocalBMC struct {
 func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error) {
 	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create RedfishBMC client: %w", err)
+		return nil, err
+	}
+	if acc, ok := UnitTestMockUps.Accounts[options.Username]; ok {
+		if acc.Password != options.Password {
+			return nil, &gofishCommon.Error{
+				HTTPReturnedStatusCode: 401,
+			}
+		}
+	} else {
+		return nil, &gofishCommon.Error{
+			HTTPReturnedStatusCode: 401,
+		}
 	}
 	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
 }
@@ -160,35 +172,38 @@ func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) 
 	return r.checkAttribues(attrs, filtered)
 }
 
+// GetAccounts retrieves all user accounts from the BMC.
+func (r *RedfishLocalBMC) GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error) {
+	accounts := make([]*redfish.ManagerAccount, 0, len(UnitTestMockUps.Accounts))
+	for _, a := range UnitTestMockUps.Accounts {
+		accounts = append(accounts, a)
+	}
+	return accounts, nil
+}
+
 // CreateOrUpdateAccount creates or updates a user account on the BMC.
 func (r *RedfishLocalBMC) CreateOrUpdateAccount(
 	ctx context.Context, userName, role, password string, enabled bool,
 ) error {
-	service, err := r.client.GetService().AccountService()
-	if err != nil {
-		return fmt.Errorf("failed to get account service: %w", err)
-	}
-	accounts, err := service.Accounts()
-	if err != nil {
-		return fmt.Errorf("failed to get accounts: %w", err)
-	}
-	//log.V(1).Info("Accounts", "accounts", accounts)
-	for _, a := range accounts {
+	for _, a := range UnitTestMockUps.Accounts {
 		if a.UserName == userName {
 			a.RoleID = role
 			a.UserName = userName
 			a.Enabled = enabled
 			a.Password = password
-			if err := a.Update(); err != nil {
-				return fmt.Errorf("failed to update account: %w", err)
-			}
 			return nil
 		}
 	}
-	_, err = service.CreateAccount(userName, password, role)
-	if err != nil {
-		return fmt.Errorf("failed to update account: %w", err)
+	newAccount := redfish.ManagerAccount{
+		Entity: gofishCommon.Entity{
+			ID: fmt.Sprintf("%d", len(UnitTestMockUps.Accounts)+1),
+		},
+		UserName: userName,
+		RoleID:   role,
+		Enabled:  enabled,
+		Password: password,
 	}
+	UnitTestMockUps.Accounts[userName] = &newAccount
 	return nil
 }
 

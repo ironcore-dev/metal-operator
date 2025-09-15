@@ -36,13 +36,13 @@ func NewAgent(log logr.Logger, systemUUID, registryURL string, duration time.Dur
 func (a *Agent) Init() error {
 	ndd, err := NewNetworkDeviceData()
 	if err != nil {
-		log.Printf("Error loading network device data: %v", err)
+		a.log.Error(err, "failed loading network device data")
 		return err
 	}
 
 	interfaces, err := NewNetworkDataCollector(NewNIC(), ndd).CollectNetworkData()
 	if err != nil {
-		log.Printf("Error collecting network data: %v", err)
+		a.log.Error(err, "failed collecting network data")
 		return err
 	}
 

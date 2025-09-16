@@ -1535,25 +1535,17 @@ BMCSettingsSpec
 <table>
 <tr>
 <td>
-<code>version</code><br/>
+<code>BMCSettingsTemplate</code><br/>
 <em>
-string
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsTemplate">
+BMCSettingsTemplate
+</a>
 </em>
 </td>
 <td>
-<p>Version defines the BMC firmware for which the settings should be applied.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>settings</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SettingsMap contains bmc settings as map</p>
+<p>
+(Members of <code>BMCSettingsTemplate</code> are embedded into this type.)
+</p>
 </td>
 </tr>
 <tr>
@@ -1568,35 +1560,6 @@ Kubernetes core/v1.LocalObjectReference
 <td>
 <em>(Optional)</em>
 <p>BMCRef is a reference to a specific BMC to apply setting to.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be applied on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRefs</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
-[]ServerMaintenanceRefItem
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
-server that needs to be updated with the BMC settings.</p>
 </td>
 </tr>
 </table>
@@ -1616,13 +1579,10 @@ BMCSettingsStatus
 </tr>
 </tbody>
 </table>
-<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSet">BMCSettingsSet
 </h3>
-<p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
-</p>
 <div>
-<p>BMCSettingsSpec defines the desired state of BMCSettings.</p>
+<p>BMCSettingsSet is the Schema for the bmcsettingssets API.</p>
 </div>
 <table>
 <thead>
@@ -1634,25 +1594,230 @@ BMCSettingsStatus
 <tbody>
 <tr>
 <td>
-<code>version</code><br/>
+<code>metadata</code><br/>
 <em>
-string
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
 </em>
 </td>
 <td>
-<p>Version defines the BMC firmware for which the settings should be applied.</p>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
 </td>
 </tr>
 <tr>
 <td>
-<code>settings</code><br/>
+<code>spec</code><br/>
 <em>
-map[string]string
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSetSpec">
+BMCSettingsSetSpec
+</a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>SettingsMap contains bmc settings as map</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>bmcSettingsTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsTemplate">
+BMCSettingsTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the servers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>BMCSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSetStatus">
+BMCSettingsSetStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSetSpec">BMCSettingsSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSet">BMCSettingsSet</a>)
+</p>
+<div>
+<p>BMCSettingsSetSpec defines the desired state of BMCSettingsSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>bmcSettingsTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsTemplate">
+BMCSettingsTemplate
+</a>
+</em>
+</td>
+<td>
+<p>BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the servers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>BMCSelector specifies a label selector to identify the servers that are to be selected.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSetStatus">BMCSettingsSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSet">BMCSettingsSet</a>)
+</p>
+<div>
+<p>BMCSettingsSetStatus defines the observed state of BMCSettingsSet.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>fullyLabeledBMCs</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FullyLabeledBMCs is the number of BMC in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableBMCSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>AvailableBMCSettings is the number of BMCSettings currently created by the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pendingBMCSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>PendingBMCSettings is the total number of pending BMC in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inProgressBMCSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>InProgressBMCSettings is the total number of BMC in the set that are currently in progress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completedBMCSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>CompletedBMCSettings is the total number of completed BMC in the set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failedBMCSettings</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>FailedBMCSettings is the total number of failed BMC in the set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettings">BMCSettings</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>BMCSettingsTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BMCSettingsTemplate">
+BMCSettingsTemplate
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>BMCSettingsTemplate</code> are embedded into this type.)
+</p>
 </td>
 </tr>
 <tr>
@@ -1667,35 +1832,6 @@ Kubernetes core/v1.LocalObjectReference
 <td>
 <em>(Optional)</em>
 <p>BMCRef is a reference to a specific BMC to apply setting to.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenancePolicy</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenancePolicy is a maintenance policy to be applied on the server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverMaintenanceRefs</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
-[]ServerMaintenanceRefItem
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
-server that needs to be updated with the BMC settings.</p>
 </td>
 </tr>
 </tbody>
@@ -1757,6 +1893,75 @@ BMCSettingsState
 <td>
 <em>(Optional)</em>
 <p>State represents the current state of the BMC configuration task.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.BMCSettingsTemplate">BMCSettingsTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSetSpec">BMCSettingsSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version defines the BMC firmware for which the settings should be applied.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>settings</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SettingsMap contains bmc settings as map</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenancePolicy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenancePolicy is a maintenance policy to be applied on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverMaintenanceRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
+[]ServerMaintenanceRefItem
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
+server that needs to be updated with the BMC settings.</p>
 </td>
 </tr>
 </tbody>
@@ -4251,7 +4456,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsTemplate">BMCSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4274,7 +4479,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsTemplate">BMCSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>)
 </p>
 <div>
 <p>ServerMaintenanceRefItem is a reference to a ServerMaintenance object.</p>

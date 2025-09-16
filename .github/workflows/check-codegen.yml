@@ -11,15 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v5
-    - uses: actions/setup-go@v5
+    - uses: actions/setup-go@v6
       with:
         go-version-file: 'go.mod'
-    - name: Run make generate
-      run: make generate
-    - name: Run make docs
-      run: make docs
-    - name: Run make helm
-      run: make helm
+    - name: Run code gen checks
+      run: make check-gen
     - name: Compare the expected and actual generated/* directories
       run: |
         if [ "$(git diff | wc -l)" -gt "0" ]; then

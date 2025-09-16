@@ -1,0 +1,14 @@
+{
+    "@odata.etag": "W/\"AB6D42B0\"",
+    "@odata.type": "#OutboundConnectionCollection.OutboundConnectionCollection",
+    "Description": "Outbound Connections for the AccountService",
+    "Name": "OutboundConnection",
+    "Members": [
+        {
+            "@odata.id": "/redfish/v1/AccountService/OutboundConnections/1"
+        }
+    ],
+    "Members@odata.count": 1,
+    "@odata.id": "/redfish/v1/AccountService/OutboundConnections",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

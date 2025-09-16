@@ -7,13 +7,13 @@ const (
 	// OperationAnnotation indicates which operation should be performed outside the current spec definition flow.
 	OperationAnnotation = "metal.ironcore.dev/operation"
 	// PropagatedOperationAnnotation indicates which operation should be performed outside the current spec definition flow.
-	PropagatedOperationAnnotation = "metal.ironcore.dev/operation-propogated"
+	PropagatedOperationAnnotation = "metal.ironcore.dev/operation-propagated"
 	// OperationAnnotationIgnore skips the reconciliation of a resource if OperationAnnotation is set to this.
 	OperationAnnotationIgnore = "ignore"
 	// OperationAnnotationIgnoreChild skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
 	OperationAnnotationIgnoreChild = "ignore-child"
-	// PropagatedOperationAnnotationIgnored skips the reconciliation of a resource if PropagatedOperationAnnotation is set to this.
-	PropagatedOperationAnnotationIgnored = "propagated-ignore"
+	// OperationAnnotationIgnoreChildAndSelf skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
+	OperationAnnotationIgnoreChildAndSelf = "ignore-child-and-self"
 	// OperationAnnotationRetry restarts the reconciliation of a resource from failed state -> initial state.
 	OperationAnnotationRetry = "retry"
 	// InstanceTypeAnnotation is used to specify the type of Server.

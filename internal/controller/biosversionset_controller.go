@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -75,6 +76,10 @@ func (r *BIOSVersionSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
@@ -107,9 +112,6 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 	log logr.Logger,
 	biosVersionSet *metalv1alpha1.BIOSVersionSet,
 ) error {
-	if !shouldChildIgnoreReconciliation(biosVersionSet) {
-		return nil
-	}
 	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
 	if err != nil {
 		return err
@@ -118,6 +120,36 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 		log.V(1).Info("No BIOSVersion found, skipping ignore annotation propagation")
 		return nil
 	}
+	if !shouldChildIgnoreReconciliation(biosVersionSet) {
+		// if the Set object does not have the ignore annotation anymore,
+		// we should remove the ignore annotation on the child
+		var errs []error
+		for _, biosVersion := range ownedBiosVersions.Items {
+			// if the Child object is ignored through sets, we should remove the ignore annotation on the child
+			// ad the Set object does not have the ignore annotation anymore
+			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
+				if isChildIgnoredThroughSets(&biosVersion) {
+					annotations := biosVersion.GetAnnotations()
+					log.V(1).Info("Ignore operation deleted on child object", "BIOSVersion", biosVersion.Name)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
+					delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
+					biosVersion.SetAnnotations(annotations)
+				}
+				return nil
+			})
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations Propogartion removal: %w for: %v", err, biosVersion.Name))
+			}
+			if opResult != controllerutil.OperationResultNone {
+				log.V(1).Info("Patched BIOSVersion's annotations to remove Ignore", "BIOSVersion", biosVersion.Name, "Operation", opResult)
+			}
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
+		}
+		return nil
+	}
+
 	var errs []error
 	for _, biosVersion := range ownedBiosVersions.Items {
 		// should not overwrite the already ignored annotation on child
@@ -126,7 +158,7 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 			biosVersionBase := biosVersion.DeepCopy()
 			annotations := biosVersion.GetAnnotations()
 			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.PropagatedOperationAnnotationIgnored
+			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.OperationAnnotationIgnoreChild
 			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))
 			}
@@ -422,7 +454,25 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 func (r *BIOSVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSVersionSet{}).
-		Owns(&metalv1alpha1.BIOSVersion{}).
+		Watches(
+			&metalv1alpha1.BIOSVersion{},
+			handler.EnqueueRequestForOwner(r.Scheme, r.RESTMapper(), &metalv1alpha1.BIOSVersionSet{}),
+			builder.WithPredicates(
+				predicate.Funcs{
+					CreateFunc: func(e event.CreateEvent) bool {
+						return true
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						return enqueFromChildObjUpdatesExceptAnnotation(e)
+					},
+					DeleteFunc: func(e event.DeleteEvent) bool {
+						return true
+					}, GenericFunc: func(e event.GenericEvent) bool {
+						return false
+					},
+				},
+			),
+		).
 		Watches(&metalv1alpha1.Server{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
 			builder.WithPredicates(predicate.LabelChangedPredicate{})).

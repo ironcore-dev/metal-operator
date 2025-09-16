@@ -404,7 +404,7 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, log logr.
 	}
 	isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, log, server)
 	// is undergoing maintenance and not in Reserved State, we should not claim this server
-	if server.Status.State != metalv1alpha1.ServerStateReserved && (err != nil || isUnderMaintenance) {
+	if err != nil || isUnderMaintenance {
 		log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
 		return false
 	}

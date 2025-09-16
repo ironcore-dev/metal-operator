@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -73,6 +74,11 @@ func (r *BIOSSettingsSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
+	// handle propogartion of ignore annotation to child when parent is being deleted
+	// so that the deleted annotations can be passed to children before parent is deleted
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, biosSettingsSet); err != nil {
+		return ctrl.Result{}, err
+	}
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, biosSettingsSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSSettings resources %w", err)
@@ -112,15 +118,41 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
 	log logr.Logger,
 	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
 ) error {
-	if !shouldChildIgnoreReconciliation(biosSettingsSet) {
-		return nil
-	}
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, biosSettingsSet)
 	if err != nil {
 		return err
 	}
 	if len(ownedBiosSettings.Items) == 0 {
 		log.V(1).Info("No BIOSSettings found, skipping ignore annotation propagation")
+		return nil
+	}
+	if !shouldChildIgnoreReconciliation(biosSettingsSet) {
+		// if the Set object does not have the ignore annotation anymore,
+		// we should remove the ignore annotation on the child
+		var errs []error
+		for _, biosSettings := range ownedBiosSettings.Items {
+			// if the Child object is ignored through sets, we should remove the ignore annotation on the child
+			// ad the Set object does not have the ignore annotation anymore
+			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
+				if isChildIgnoredThroughSets(&biosSettings) {
+					annotations := biosSettings.GetAnnotations()
+					log.V(1).Info("Ignore operation deleted on child object", "BIOSSettings", biosSettings.Name)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
+					delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
+					biosSettings.SetAnnotations(annotations)
+				}
+				return nil
+			})
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations Propogartion removal: %w for: %v", err, biosSettings.Name))
+			}
+			if opResult != controllerutil.OperationResultNone {
+				log.V(1).Info("Patched BIOSSettings's annotations to remove Ignore", "BIOSSettings", biosSettings.Name, "Operation", opResult)
+			}
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
+		}
 		return nil
 	}
 	var errs []error
@@ -131,7 +163,7 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
 			biosSettingsBase := biosSettings.DeepCopy()
 			annotations := biosSettings.GetAnnotations()
 			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.PropagatedOperationAnnotationIgnored
+			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.OperationAnnotationIgnoreChild
 			if err := r.Patch(ctx, &biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations: %w", err))
 			}
@@ -305,14 +337,6 @@ func (r *BIOSSettingsSetReconciler) patchBIOSSettingsfromTemplate(
 				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
 				biosSettings.Spec.ServerMaintenanceRef = serverMaintenanceRef
 			}
-
-			if isChildIgnoredThroughSets(&biosSettings) {
-				annotations := biosSettings.GetAnnotations()
-				log.V(1).Info("Ignore operation deleted on child object", "BiosSettings", biosSettings.Name)
-				delete(annotations, metalv1alpha1.OperationAnnotation)
-				delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
-				biosSettings.SetAnnotations(annotations)
-			}
 			return nil
 		}) //nolint:errcheck
 		if err != nil {
@@ -443,7 +467,25 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 func (r *BIOSSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSSettingsSet{}).
-		Owns(&metalv1alpha1.BIOSSettings{}).
+		Watches(
+			&metalv1alpha1.BIOSSettings{},
+			handler.EnqueueRequestForOwner(r.Scheme, r.RESTMapper(), &metalv1alpha1.BIOSSettingsSet{}),
+			builder.WithPredicates(
+				predicate.Funcs{
+					CreateFunc: func(e event.CreateEvent) bool {
+						return true
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						return enqueFromChildObjUpdatesExceptAnnotation(e)
+					},
+					DeleteFunc: func(e event.DeleteEvent) bool {
+						return true
+					}, GenericFunc: func(e event.GenericEvent) bool {
+						return false
+					},
+				},
+			),
+		).
 		Watches(
 			&metalv1alpha1.Server{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),

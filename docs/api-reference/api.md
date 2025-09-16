@@ -3085,7 +3085,7 @@ string
 <h3 id="metal.ironcore.dev/v1alpha1.Power">Power
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaimSpec">ServerClaimSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerClaimSpec">ServerClaimSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">ServerMaintenanceTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
 </p>
 <div>
 <p>Power defines the possible power states for a device.</p>
@@ -3793,7 +3793,7 @@ ServerBootConfigurationState
 <h3 id="metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">ServerBootConfigurationTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">ServerMaintenanceTemplate</a>)
 </p>
 <div>
 <p>ServerBootConfigurationTemplate defines the parameters to be used for rendering a boot configuration.</p>
@@ -4164,16 +4164,18 @@ ServerMaintenanceSpec
 <table>
 <tr>
 <td>
-<code>policy</code><br/>
+<code>ServerMaintenanceTemplate</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">
+ServerMaintenanceTemplate
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Policy specifies the maintenance policy to be enforced on the server.</p>
+<p>
+(Members of <code>ServerMaintenanceTemplate</code> are embedded into this type.)
+</p>
+<p>ServerMaintenanceTemplate defines the template for the ServerMaintenance Resource to be applied to the server.</p>
 </td>
 </tr>
 <tr>
@@ -4187,34 +4189,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to the server that is to be maintained.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverPower</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.Power">
-Power
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerPower specifies the power state of the server during maintenance.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverBootConfigurationTemplate</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">
-ServerBootConfigurationTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.</p>
 </td>
 </tr>
 </table>
@@ -4237,7 +4211,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">ServerMaintenanceTemplate</a>)
 </p>
 <div>
 <p>ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.</p>
@@ -4344,10 +4318,10 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
-<code>template</code><br/>
+<code>serverMaintenanceTemplate</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">
-ServerMaintenanceSpec
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">
+ServerMaintenanceTemplate
 </a>
 </em>
 </td>
@@ -4403,10 +4377,10 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
-<code>template</code><br/>
+<code>serverMaintenanceTemplate</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">
-ServerMaintenanceSpec
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">
+ServerMaintenanceTemplate
 </a>
 </em>
 </td>
@@ -4492,7 +4466,7 @@ int32
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenance">ServerMaintenance</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSetSpec">ServerMaintenanceSetSpec</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenance">ServerMaintenance</a>)
 </p>
 <div>
 <p>ServerMaintenanceSpec defines the desired state of a ServerMaintenance</p>
@@ -4507,16 +4481,18 @@ int32
 <tbody>
 <tr>
 <td>
-<code>policy</code><br/>
+<code>ServerMaintenanceTemplate</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
-ServerMaintenancePolicy
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">
+ServerMaintenanceTemplate
 </a>
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Policy specifies the maintenance policy to be enforced on the server.</p>
+<p>
+(Members of <code>ServerMaintenanceTemplate</code> are embedded into this type.)
+</p>
+<p>ServerMaintenanceTemplate defines the template for the ServerMaintenance Resource to be applied to the server.</p>
 </td>
 </tr>
 <tr>
@@ -4530,34 +4506,6 @@ Kubernetes core/v1.LocalObjectReference
 </td>
 <td>
 <p>ServerRef is a reference to the server that is to be maintained.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverPower</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.Power">
-Power
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerPower specifies the power state of the server during maintenance.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serverBootConfigurationTemplate</code><br/>
-<em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">
-ServerBootConfigurationTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.</p>
 </td>
 </tr>
 </tbody>
@@ -4618,6 +4566,66 @@ ServerMaintenanceState
 </td>
 <td>
 <p>State specifies the current state of the server maintenance.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceTemplate">ServerMaintenanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSetSpec">ServerMaintenanceSetSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceSpec">ServerMaintenanceSpec</a>)
+</p>
+<div>
+<p>ServerMaintenanceTemplate defines the template for the ServerMaintenance Resource to be applied to the server.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>policy</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">
+ServerMaintenancePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Policy specifies the maintenance policy to be enforced on the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverPower</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.Power">
+Power
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerPower specifies the power state of the server during maintenance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverBootConfigurationTemplate</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">
+ServerBootConfigurationTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.</p>
 </td>
 </tr>
 </tbody>

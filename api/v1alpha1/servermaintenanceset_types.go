@@ -12,7 +12,7 @@ type ServerMaintenanceSetSpec struct {
 	// ServerLabelSelector specifies a label selector to identify the servers that are to be maintained.
 	ServerSelector metav1.LabelSelector `json:"serverLabelSelector"`
 	// Template specifies the template for the server maintenance.
-	Template ServerMaintenanceSpec `json:"template"`
+	ServerMaintenanceTemplate ServerMaintenanceTemplate `json:"serverMaintenanceTemplate"`
 }
 
 // ServerMaintenanceSetStatus defines the observed state of ServerMaintenanceSet.

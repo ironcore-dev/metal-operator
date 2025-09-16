@@ -160,10 +160,8 @@ func (r *ServerMaintenanceSetReconciler) createMaintenances(
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, maintenance, func() error {
 			metautils.SetLabels(maintenance, map[string]string{ServerMaintenanceSetFinalizer: maintenanceSet.Name})
 			maintenance.Spec = metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:                       &v1.LocalObjectReference{Name: server.Name},
-				Policy:                          maintenanceSet.Spec.Template.Policy,
-				ServerPower:                     maintenanceSet.Spec.Template.ServerPower,
-				ServerBootConfigurationTemplate: maintenanceSet.Spec.Template.ServerBootConfigurationTemplate,
+				ServerRef:                 &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: maintenanceSet.Spec.ServerMaintenanceTemplate,
 			}
 			return controllerutil.SetControllerReference(maintenanceSet, maintenance, r.Scheme)
 		})

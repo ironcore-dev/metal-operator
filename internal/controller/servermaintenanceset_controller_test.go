@@ -104,9 +104,8 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 						"metal.ironcore.dev/hostname": "test-hostname",
 					},
 				},
-				Template: metalv1alpha1.ServerMaintenanceSpec{
-					Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
-					ServerRef: &v1.LocalObjectReference{},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
 		}
@@ -245,9 +244,8 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 						"metal.ironcore.dev/hostname": "test-hostname",
 					},
 				},
-				Template: metalv1alpha1.ServerMaintenanceSpec{
-					Policy:    metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
-					ServerRef: &v1.LocalObjectReference{},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 				},
 			},
 		}

@@ -83,14 +83,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},
@@ -121,14 +123,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},
@@ -213,14 +217,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},
@@ -234,14 +240,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},

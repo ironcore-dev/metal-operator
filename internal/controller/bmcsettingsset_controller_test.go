@@ -28,6 +28,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 		var bmc01 *metalv1alpha1.BMC
 		var bmc02 *metalv1alpha1.BMC
 
+		const changedBMCSetting = "changed-bmc-setting"
+
 		BeforeEach(func(ctx SpecContext) {
 
 			By("Creating a BMCSecret")
@@ -122,7 +124,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		It("Should successfully reconcile when BMCSettingsSet was generated, labels match and bmcsettings were generated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
-			bmcSetting["abc"] = "changed-bmc-setting"
+			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
@@ -157,7 +159,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc01.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "changed-bmc-setting")),
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",
@@ -195,7 +197,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		It("Should successfully reconcile when bmc resource was deleted", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
-			bmcSetting["abc"] = "changed-bmc-setting"
+			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
@@ -230,7 +232,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc01.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "changed-bmc-setting")),
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",
@@ -283,7 +285,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		It("Should successfully reconcile when label of bmc02 was changed", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
-			bmcSetting["abc"] = "changed-bmc-setting"
+			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
@@ -339,7 +341,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings02)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc02.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "changed-bmc-setting")),
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",
@@ -367,7 +369,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 		})
 		It("Should successfully reconcile when bmcsettingset was updated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
-			bmcSetting["abc"] = "changed-bmc-setting"
+			bmcSetting["abc"] = changedBMCSetting
 			bmcSettingNew := make(map[string]string)
 			bmcSettingNew["abc"] = "new-bmc-setting"
 
@@ -404,7 +406,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc01.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "changed-bmc-setting")),
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",

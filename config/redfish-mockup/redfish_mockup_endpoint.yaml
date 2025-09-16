@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/part-of: metal-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: metal-operator
-  name: endpoint-sample
+  name: node005-ap046
 spec:
-  ip: "127.0.0.1"
-  macAddress: "23:11:8A:33:CF:EA"
+  ip: "10.246.48.104"
+  macAddress: "2c:ea:7f:f3:6d:d2"

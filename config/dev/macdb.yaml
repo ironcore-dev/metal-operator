@@ -1,12 +1,34 @@
 macPrefixes:
-- macPrefix: 23
-  manufacturer: Foo
-  protocol: RedfishKube
-  port: 8000
+- macPrefix: f4
+  manufacturer: dell
+  protocol: Redfish
+  port: 443
   type: bmc
   defaultCredentials:
-    - username: foo
-      password: bar
+    - username: automation
+      password: Password12
+  console:
+    type: ssh
+    port: 22
+- macPrefix: 2c
+  manufacturer: dell
+  protocol: Redfish
+  port: 443
+  type: bmc
+  defaultCredentials:
+    - username: automation
+      password: Password12
   console:
     type: SSH
+    port: 22
+- macPrefix: 7C
+  manufacturer: hpe
+  protocol: Redfish
+  port: 443
+  type: bmc
+  defaultCredentials:
+    - username: automation
+      password: Password12
+  console:
+    type: ssh
     port: 22

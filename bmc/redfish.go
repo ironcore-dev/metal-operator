@@ -494,7 +494,19 @@ func (r *RedfishBMC) SetBootOverride(ctx context.Context, systemURI string, over
 	if err != nil {
 		return err
 	}
-	return system.SetBoot(overrideConfig)
+	var tSystem struct {
+		Settings common.Settings `json:"@Redfish.Settings"`
+	}
+	// Unfortunately, some vendors (like Dell) support setting through different url.
+	// Hence we need to set it through this url.
+	err = json.Unmarshal(system.RawData, &tSystem)
+	if err != nil {
+		return err
+	}
+	if tSystem.Settings.SettingsObject.String() == "" {
+		return system.SetBoot(overrideConfig)
+	}
+	return system.Patch(tSystem.Settings.SettingsObject.String(), overrideConfig)
 }
 
 func (r *RedfishBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (map[string]RegistryEntryAttributes, error) {

@@ -6,11 +6,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: biosversion-sample
 spec:
-  version: "U59 v2.34 (10/04/2024)"
+  version: "2.22.1"
   image:
-    URI: "https://foo-2.34_10_04_2024.signed.flash"
+    URI: "https://repo.eu-de-1.cloud.sap/hw-firmware/dell/poweredge-r640/BIOS_M73JJ_WN64_2.22.1.EXE"
     transferProtocol: "HTTPS"
-  updatePolicy: Normal
   serverRef:
-    name: endpoint-sample-hpe-system-0
+    name: node005-ap046-system-0 
   serverMaintenancePolicy: OwnerApproval

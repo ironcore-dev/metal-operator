@@ -58,10 +58,6 @@ spec:
           spec:
             description: ServerMaintenanceSpec defines the desired state of a ServerMaintenance
             properties:
-              maintenanceBootPolicy:
-                description: MaintenanceBootPolicy specifies the boot policy to be
-                  enforced on the server during maintenance.
-                type: string
               policy:
                 description: Policy specifies the maintenance policy to be enforced
                   on the server.

@@ -17,16 +17,6 @@ const (
 	ServerMaintenanceApprovalKey = "metal.ironcore.dev/maintenance-approval"
 )
 
-// ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.
-type MaintenanceBootPolicy string
-
-const (
-	// ServerMaintenanceBootPolicyBIOSSettingBoot specifies that the Server boot order is change to "BIOSSttings" during Maintenance period.
-	MaintenanceBootPolicyBIOSSetup MaintenanceBootPolicy = "BiosSetup"
-	// MaintenanceBootPolicyNone specifies that the Server boot order is not changed for Maintenance period.
-	MaintenanceBootPolicyNone MaintenanceBootPolicy = "None"
-)
-
 // ServerBootConfigurationTemplate defines the parameters to be used for rendering a boot configuration.
 type ServerBootConfigurationTemplate struct {
 	// Name specifies the name of the boot configuration.
@@ -43,10 +33,6 @@ type ServerMaintenanceSpec struct {
 	// Policy specifies the maintenance policy to be enforced on the server.
 	// +optional
 	Policy ServerMaintenancePolicy `json:"policy,omitempty"`
-
-	// MaintenanceBootPolicy specifies the boot policy to be enforced on the server during maintenance.
-	// +optional
-	MaintenanceBootPolicy MaintenanceBootPolicy `json:"maintenanceBootPolicy,omitempty"`
 
 	// ServerRef is a reference to the server that is to be maintained.
 	// +required
@@ -85,6 +71,8 @@ const (
 	ServerMaintenanceStatePending ServerMaintenanceState = "Pending"
 	// ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
+	// ServerMaintenanceStatePreapareMaintenance specifies that the server is in maintenance.
+	ServerMaintenanceStatePreapareMaintenance ServerMaintenanceState = "PrepareForMaintenance"
 	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
 	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
 )

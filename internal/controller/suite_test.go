@@ -104,6 +104,8 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettings{}, &metalv1alpha1.BMCSettingsList{})).Should(
 		HaveField("Items", BeEmpty()))
+	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettingsSet{}, &metalv1alpha1.BMCSettingsSetList{})).Should(
+		HaveField("Items", BeEmpty()))
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersion{}, &metalv1alpha1.BMCVersionList{})).Should(
 		HaveField("Items", BeEmpty()))
@@ -322,6 +324,11 @@ func SetupTest() *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&BMCSettingsSetReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCVersionSetReconciler{

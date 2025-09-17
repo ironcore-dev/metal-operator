@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -112,9 +113,7 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 		if config, err := r.getMaintenanceBootConfigurationRef(ctx, log, serverMaintenance); err != nil || config == nil {
 			return ctrl.Result{}, err
 		} else {
-			if config.Spec.IgnitionSecretRef.Name == serverMaintenance.Spec.ServerBootConfigurationTemplate.Name &&
-				config.Spec.Image == serverMaintenance.Spec.ServerBootConfigurationTemplate.Spec.Image &&
-				config.Spec.ServerRef.Name == serverMaintenance.Spec.ServerBootConfigurationTemplate.Spec.ServerRef.Name {
+			if reflect.DeepEqual(config.Spec, serverMaintenance.Spec.ServerBootConfigurationTemplate.Spec) {
 				// no changes
 				log.V(1).Info("No changes in ServerBootConfigurationTemplate")
 			} else {
@@ -186,6 +185,13 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
+	// rest of the operation can be done only if the server is in maintenance state
+	// else, we will hit conflict with ServerClaim controller which will still be asserting Specs on Serevr
+	if server.Status.State != metalv1alpha1.ServerStateMaintenance {
+		return ctrl.Result{}, fmt.Errorf("server is not in maintenance state, current state: %s", server.Status.State)
+	}
+
 	config, err := r.applyServerBootConfiguration(ctx, log, serverMaintenance, server)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -248,7 +254,7 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 	}
 	log.V(1).Info("Created or patched Config", "Config", config.Name, "Operation", opResult)
 	serverBase := server.DeepCopy()
-	server.Spec.MaintenanceBootConfigurationRef = &v1.ObjectReference{
+	server.Spec.BootConfigurationRef = &v1.ObjectReference{
 		Namespace:  config.Namespace,
 		Name:       config.Name,
 		UID:        config.UID,
@@ -317,7 +323,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 			log.V(1).Info("maintenance boot revert is completed")
 		}
 	}
-	if err := r.cleanup(ctx, log, server); err != nil {
+	if err := r.cleanup(ctx, log, server, serverMaintenance); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -339,17 +345,22 @@ func (r *ServerMaintenanceReconciler) getServerRef(ctx context.Context, serverMa
 	return server, nil
 }
 
-func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
+func (r *ServerMaintenanceReconciler) cleanup(
+	ctx context.Context,
+	log logr.Logger,
+	server *metalv1alpha1.Server,
+	serverMaintenance *metalv1alpha1.ServerMaintenance) error {
 	if server != nil && server.Spec.ServerMaintenanceRef != nil {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
 			log.Error(err, "failed to remove maintenance ref from server")
 		}
 	}
-	if server.Spec.MaintenanceBootConfigurationRef != nil {
+	if server.Spec.BootConfigurationRef != nil &&
+		serverMaintenance.Spec.ServerBootConfigurationTemplate != nil {
 		config := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
-				Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
+				Name:      serverMaintenance.Name,
+				Namespace: serverMaintenance.Namespace,
 			},
 		}
 		if err := r.Delete(ctx, config); err != nil {
@@ -357,6 +368,7 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logg
 				return fmt.Errorf("failed to delete serverbootconfig: %w", err)
 			}
 		}
+		// note: remove the bootConfig this controller set
 		if err := r.removeBootConfigRefFromServer(ctx, log, config, server); err != nil {
 			return fmt.Errorf("failed to remove maintenance boot config ref from server: %w", err)
 		}
@@ -423,11 +435,13 @@ func (r *ServerMaintenanceReconciler) removeBootConfigRefFromServer(ctx context.
 	if server == nil {
 		return nil
 	}
-	if ref := server.Spec.MaintenanceBootConfigurationRef; ref == nil || (ref.Name != config.Name && ref.Namespace != config.Namespace) {
+	if ref := server.Spec.BootConfigurationRef; ref == nil || (ref.Name != config.Name && ref.Namespace != config.Namespace) {
 		return nil
 	}
 	serverBase := server.DeepCopy()
-	server.Spec.MaintenanceBootConfigurationRef = nil
+	// remove the boot configuration ref by the maintenance only
+	// this will be replaced by the reserved boot configuration if provided, by serverClaim
+	server.Spec.BootConfigurationRef = nil
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

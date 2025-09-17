@@ -1676,11 +1676,6 @@ func (in *ServerSpec) DeepCopyInto(out *ServerSpec) {
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}
-	if in.MaintenanceBootConfigurationRef != nil {
-		in, out := &in.MaintenanceBootConfigurationRef, &out.MaintenanceBootConfigurationRef
-		*out = new(v1.ObjectReference)
-		**out = **in
-	}
 	if in.BootOrder != nil {
 		in, out := &in.BootOrder, &out.BootOrder
 		*out = make([]BootOrder, len(*in))

@@ -115,13 +115,10 @@ type ServerSpec struct {
 	// BootConfigurationRef is a reference to a BootConfiguration object that specifies
 	// the boot configuration for this server. This field is optional and can be omitted
 	// if no boot configuration is specified.
+	// This is used during initial provisioning of the server automatically.
+	// This is also used during maintenance if Maintenance needs server to be taken offline
 	// +optional
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
-
-	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
-	// the boot configuration for this server during maintenance. This field is optional and can be omitted
-	// +optional
-	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
 	// BootOrder specifies the boot order of the server.
 	// +optional

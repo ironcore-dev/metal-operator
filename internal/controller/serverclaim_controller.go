@@ -306,17 +306,19 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		return nil, err
 	}
 
-	var selectedServer *metalv1alpha1.Server
-	var prevSelectedServer *metalv1alpha1.Server
+	// fetch previously claimed server if its present
+	// keeping this separate for reason of clarity
 	for _, server := range serverList.Items {
 		// find previously claimed server
 		if ref := server.Spec.ServerClaimRef; ref != nil {
 			if ref.UID == claim.UID && ref.Name == claim.Name && ref.Namespace == claim.Namespace {
-				prevSelectedServer = &server
-				break
+				return &server, nil
 			}
 		}
+	}
 
+	var selectedServer *metalv1alpha1.Server
+	for _, server := range serverList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
 		if err != nil {
 			return nil, err
@@ -346,12 +348,8 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		// we continue through the loop to find if previously claimed server is also present
 		if selectedServer == nil && r.isServerClaimable(ctx, log, &server, claim) {
 			selectedServer = &server
+			break
 		}
-	}
-
-	// use previously claimed server if its found
-	if prevSelectedServer != nil {
-		selectedServer = prevSelectedServer
 	}
 	if selectedServer == nil {
 		return nil, nil

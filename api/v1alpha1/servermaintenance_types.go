@@ -23,10 +23,32 @@ type ServerBootConfigurationTemplate struct {
 	// +required
 	Name string `json:"name"`
 
+	// BootType specifies the type of boot configuration.
+	// It can be either "Oneoff" or "Persistent". If not specified, it defaults to "Persistent".
+	// "Persistent" will set the configuration reboot the server before setting the server to the desired power state mentioned in spec.
+	//
+	// "Oneoff" will set the configuration to boot once. next boot-up will boot into default boot order.
+	// if power state mentioned in spec is "PowerOn", server will be powered on and will boot into the configuration.
+	// if power state is "PowerOff", server will be powered off and will boot into the configuration on next power on.
+	//
+	// +kubebuilder:validation:Enum=Oneoff;Persistent
+	// +optional
+	// +kubebuilder:default=Persistent
+	Boottype BootType `json:"bootType,omitempty"`
+
 	// Parameters specify the parameters to be used for rendering the boot configuration.
 	// +required
 	Spec ServerBootConfigurationSpec `json:"spec"`
 }
+
+type BootType string
+
+const (
+	// BootTypeOneOff indicates that the server should boot into this configuration one time.
+	BootTypeOneOff BootType = "Oneoff"
+	// BootTypePersistent indicates that the server should boot into this configuration continuously.
+	BootTypePersistent BootType = "Persistent"
+)
 
 // ServerMaintenanceSpec defines the desired state of a ServerMaintenance
 type ServerMaintenanceSpec struct {
@@ -61,6 +83,9 @@ const (
 type ServerMaintenanceStatus struct {
 	// State specifies the current state of the server maintenance.
 	State ServerMaintenanceState `json:"state,omitempty"`
+	// DefaultBootOrder specifies the default boot order of the server before maintenance.
+	// +optional
+	DefaultBootOrder []string `json:"defaultBootOrder,omitempty"`
 }
 
 // ServerMaintenanceState specifies the current state of the server maintenance.

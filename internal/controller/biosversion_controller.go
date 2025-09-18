@@ -38,6 +38,7 @@ type BIOSVersionReconciler struct {
 	Scheme           *runtime.Scheme
 	BMCOptions       bmc.Options
 	ResyncInterval   time.Duration
+	ProbeImage       string
 }
 
 const (
@@ -212,6 +213,11 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 		serverMaintenence, err := r.getReferredServerMaintenance(ctx, log, biosVersion.Spec.ServerMaintenanceRef)
 		if err != nil {
 			return false, fmt.Errorf("failed to get referred serverMaintenance obj from BIOSVersion: %w", err)
+		}
+		if serverMaintenence.Status.State == metalv1alpha1.ServerMaintenanceStateFailed {
+			log.V(1).Info("server maintenance request failed. Please check the ServerMaintenance object")
+			err := r.updateBiosVersionStatus(ctx, log, biosVersion, metalv1alpha1.BIOSVersionStateFailed, nil, nil, nil)
+			return false, err
 		}
 		if serverMaintenence.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
 			log.V(1).Info("ServerMaintenance is not in maintenance. waiting...",
@@ -624,6 +630,13 @@ func (r *BIOSVersionReconciler) requestMaintenanceOnServer(
 		serverMaintenance.Spec.Policy = biosVersion.Spec.ServerMaintenancePolicy
 		serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOn
 		serverMaintenance.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
+		serverMaintenance.Spec.ServerBootConfigurationTemplate = &metalv1alpha1.ServerBootConfigurationTemplate{
+			Name: biosVersion.Name,
+			Spec: metalv1alpha1.ServerBootConfigurationSpec{
+				ServerRef: corev1.LocalObjectReference{Name: server.Name},
+				Image:     r.ProbeImage,
+			},
+		}
 		if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance && serverMaintenance.Status.State != "" {
 			serverMaintenance.Status.State = ""
 		}

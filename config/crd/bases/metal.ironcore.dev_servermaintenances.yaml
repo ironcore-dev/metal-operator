@@ -66,6 +66,20 @@ spec:
                 description: ServerBootConfigurationTemplate specifies the boot configuration
                   to be applied to the server during maintenance.
                 properties:
+                  bootType:
+                    default: Persistent
+                    description: |-
+                      BootType specifies the type of boot configuration.
+                      It can be either "Oneoff" or "Persistent". If not specified, it defaults to "Persistent".
+                      "Persistent" will set the configuration reboot the server before setting the server to the desired power state mentioned in spec.
+
+                      "Oneoff" will set the configuration to boot once. next boot-up will boot into default boot order.
+                      if power state mentioned in spec is "PowerOn", server will be powered on and will boot into the configuration.
+                      if power state is "PowerOff", server will be powered off and will boot into the configuration on next power on.
+                    enum:
+                    - Oneoff
+                    - Persistent
+                    type: string
                   name:
                     description: Name specifies the name of the boot configuration.
                     type: string
@@ -73,15 +87,6 @@ spec:
                     description: Parameters specify the parameters to be used for
                       rendering the boot configuration.
                     properties:
-                      bootType:
-                        default: Oneoff
-                        description: |-
-                          BootType specifies the type of boot configuration.
-                          It can be either "Oneoff" or "Continueous". If not specified, it defaults to "Oneoff".
-                        enum:
-                        - Oneoff
-                        - Continueous
-                        type: string
                       ignitionSecretRef:
                         description: |-
                           IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
@@ -150,6 +155,12 @@ spec:
           status:
             description: ServerMaintenanceStatus defines the observed state of a ServerMaintenance
             properties:
+              defaultBootOrder:
+                description: DefaultBootOrder specifies the default boot order of
+                  the server before maintenance.
+                items:
+                  type: string
+                type: array
               state:
                 description: State specifies the current state of the server maintenance.
                 type: string

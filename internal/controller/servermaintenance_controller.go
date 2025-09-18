@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -110,17 +111,12 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 			return ctrl.Result{}, err
 		}
 
-		if config, err := r.getMaintenanceBootConfigurationRef(ctx, log, serverMaintenance); err != nil || config == nil {
+		if changed, _, err := r.hasBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
 			return ctrl.Result{}, err
-		} else {
-			if reflect.DeepEqual(config.Spec, serverMaintenance.Spec.ServerBootConfigurationTemplate.Spec) {
-				// no changes
-				log.V(1).Info("No changes in ServerBootConfigurationTemplate")
-			} else {
-				return r.moveToPrepareMaintenanceState(ctx, log, serverMaintenance, server)
-			}
+		} else if changed {
+			return r.moveToPrepareMaintenanceState(ctx, log, serverMaintenance, server)
 		}
-		err = r.setAndPatchServerPowerState(ctx, log, server, serverMaintenance)
+		err = r.setAndPatchServerPowerState(ctx, log, server, serverMaintenance.Spec.ServerPower)
 		return ctrl.Result{}, err
 	case metalv1alpha1.ServerMaintenanceStateFailed:
 		return r.handleFailedState(log, serverMaintenance)
@@ -189,19 +185,37 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 	// rest of the operation can be done only if the server is in maintenance state
 	// else, we will hit conflict with ServerClaim controller which will still be asserting Specs on Serevr
 	if server.Status.State != metalv1alpha1.ServerStateMaintenance {
-		return ctrl.Result{}, fmt.Errorf("server is not in maintenance state, current state: %s", server.Status.State)
+		log.V(1).Info("Waiting for server to be in maintenance state", "Server", server.Name, "CurrentState", server.Status.State)
+		return ctrl.Result{}, nil
 	}
 
-	config, err := r.applyServerBootConfiguration(ctx, log, serverMaintenance, server)
-	if err != nil {
+	config := &metalv1alpha1.ServerBootConfiguration{}
+	changed := false
+	if changed, config, err = r.hasBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
 		return ctrl.Result{}, err
+	} else if changed || config == nil {
+		// turn server power off before applying new boot configuration
+		// this will help schedule the job to change the boot order for the server
+		// note: if the server is already off, this will be a no-op
+		if server.Spec.Power != metalv1alpha1.PowerOff && server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+			if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff); err != nil {
+				return ctrl.Result{}, err
+			}
+			// requeue to give time to the server to power off
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
+		// if no config found or if it has changed, we need to create or path it
+		config, err = r.applyServerBootConfiguration(ctx, log, serverMaintenance, server)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Note: this is to check skip of BootConfiguration
 	// implication of skipping is that the server will still continue to run the OS during Maintenance
 	// might be subjected to reboots
 	val, found := serverMaintenance.GetAnnotations()[metalv1alpha1.OperationSkipBootConfiguration]
-	if config == nil && !(found && val == metalv1alpha1.OperationBootConfigurationSkip) {
+	if config == nil && (!found || val != metalv1alpha1.OperationBootConfigurationSkip) {
 		log.V(1).Info("No ServerBootConfigurationTemplate boot configuration", "Server", server.Name)
 		_, err = r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed)
 		return ctrl.Result{}, err
@@ -220,10 +234,16 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 		}
 		if config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady {
 			log.V(1).Info("Server maintenance boot configuration is ready", "Server", server.Name)
+			// now we change the boot order to the server and power it on to complete the configuration
+			if requeue, err := r.configureBootOrder(ctx, log, server, serverMaintenance); err != nil {
+				return ctrl.Result{}, err
+			} else if requeue {
+				return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+			}
 		}
 	}
 	if server.Spec.Power != serverMaintenance.Spec.ServerPower {
-		if err := r.setAndPatchServerPowerState(ctx, log, server, serverMaintenance); err != nil {
+		if err := r.setAndPatchServerPowerState(ctx, log, server, serverMaintenance.Spec.ServerPower); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -267,9 +287,12 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 	return config, nil
 }
 
-func (r *ServerMaintenanceReconciler) setAndPatchServerPowerState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) error {
+func (r *ServerMaintenanceReconciler) setAndPatchServerPowerState(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, power metalv1alpha1.Power) error {
+	if server.Spec.Power == power {
+		return nil
+	}
 	serverBase := server.DeepCopy()
-	server.Spec.Power = maintenance.Spec.ServerPower
+	server.Spec.Power = power
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch server power state: %w", err)
 	}
@@ -312,17 +335,21 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	// clean up the maintenance boot config if it was set, before removing server from Maintennace
-	if serverMaintenance != nil {
-		log.V(1).Info("Restoring boot order after maintenance")
-		if wait, ok, err := r.revertMaintenanceBootConfig(ctx, log, serverMaintenance, server); err != nil {
-			return ctrl.Result{}, err
-		} else if wait {
-			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
-		} else if !ok {
-			log.V(1).Info("maintenance boot revert is completed")
-		}
+	if requeue, err := r.revertMaintenanceBootConfig(ctx, log, server, serverMaintenance); err != nil {
+		return ctrl.Result{}, err
+	} else if requeue {
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
+	// make sure the server is powered on before removing maintenance
+	// this will ensure the server is booted into default boot order
+	if server.Spec.Power != metalv1alpha1.PowerOn && server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
+		if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOn); err != nil {
+			return ctrl.Result{}, err
+		}
+		// requeue to give time to the server to power off
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+	}
+
 	if err := r.cleanup(ctx, log, server, serverMaintenance); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -400,7 +427,6 @@ func (r *ServerMaintenanceReconciler) moveToPrepareMaintenanceState(
 	server *metalv1alpha1.Server,
 ) (ctrl.Result, error) {
 	if err := r.updateServerRef(ctx, log, serverMaintenance, server); err != nil {
-		log.Error(err, "failed to patch server maintenance ref")
 		return ctrl.Result{}, err
 	}
 
@@ -410,28 +436,134 @@ func (r *ServerMaintenanceReconciler) moveToPrepareMaintenanceState(
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) revertMaintenanceBootConfig(
-	ctx context.Context,
-	log logr.Logger,
-	serverMaintenance *metalv1alpha1.ServerMaintenance,
-	server *metalv1alpha1.Server,
-) (bool, bool, error) {
+func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) (bool, error) {
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
-		return false, false, fmt.Errorf("failed to create BMC client: %w", err)
+		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 
-	err = bmcClient.SetBootOverride(ctx, server.Spec.SystemURI, redfish.Boot{
-		BootSourceOverrideEnabled: redfish.DisabledBootSourceOverrideEnabled,
-		BootSourceOverrideTarget:  redfish.NoneBootSourceOverrideTarget,
-		BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode},
-	)
-	log.V(1).Info("boot override during maintenance is reverted", "Server", server.Name)
-	return false, err == nil, err
+	switch maintenance.Spec.ServerBootConfigurationTemplate.Boottype {
+	case metalv1alpha1.BootTypeOneOff:
+		// note: with this option, the next server boot up will exter pxe boot.
+		// if Maintenance Spec.ServerPower is PowerOn, server will be powered on and will boot into pxe
+		// if Maintenance Spec.ServerPower is PowerOff, server will be powered off and will boot into pxe on next power on
+		// we do not need to save the default boot order as the server will boot into default boot order on next boot up
+		if err := bmcClient.SetPXEBootOnce(ctx, server.Spec.SystemURI); err != nil {
+			return false, fmt.Errorf("failed to set PXE boot once: %w", err)
+		}
+	case metalv1alpha1.BootTypePersistent:
+		bootOrder, err := bmcClient.GetBootOrder(ctx, server.Spec.SystemURI)
+		if err != nil {
+			return false, fmt.Errorf("failed to get boot order: %w", err)
+		}
+		bootOptions, err := bmcClient.GetBootOptions(ctx, server.Spec.SystemURI)
+		if err != nil {
+			return false, fmt.Errorf("failed to get boot options: %w", err)
+		}
+
+		pxeBoot := ""
+		for _, bootOption := range bootOptions {
+			if strings.Contains(strings.ToLower(bootOption.DisplayName), "pxe") {
+				pxeBoot = bootOption.BootOptionReference
+				if strings.EqualFold(bootOrder[0], bootOption.BootOptionReference) {
+					// already set to pxe boot
+					return false, nil
+				}
+				break
+			}
+		}
+
+		if maintenance.Status.DefaultBootOrder == nil {
+			// note in this option, the server will always boot into pxe until changed again
+			// the job needs to be completed, else any other BIOS config job triggered will fail as exsisting job is not completed
+			if err := bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, redfish.Boot{BootOrder: []string{pxeBoot}}); err != nil {
+				return false, fmt.Errorf("failed to set PXE boot once: %w", err)
+			}
+			// save the current boot order to revert back after maintenance
+			maintenanceBase := maintenance.DeepCopy()
+			maintenance.Status.DefaultBootOrder = bootOrder
+			if err := r.Status().Patch(ctx, maintenance, client.MergeFrom(maintenanceBase)); err != nil {
+				return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+			}
+			log.V(1).Info("Saved default boot order for server", "Server", server.Name, "BootOrder", bootOrder)
+		}
+		// we need to complete the job to set the boot order correctly. Turn the server power on
+		if server.Spec.Power != metalv1alpha1.PowerOn && server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
+			if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOn); err != nil {
+				return false, err
+			}
+			// requeue to give time to the server to power off
+			return true, nil
+		}
+	default:
+		return false, fmt.Errorf("unknown boot type: %s", maintenance.Spec.ServerBootConfigurationTemplate.Boottype)
+	}
+	log.V(1).Info("Configured boot order for server",
+		"Server", server.Name,
+		"BootType", maintenance.Spec.ServerBootConfigurationTemplate.Boottype)
+	return false, nil
 }
 
-func (r *ServerMaintenanceReconciler) removeBootConfigRefFromServer(ctx context.Context, log logr.Logger, config *metalv1alpha1.ServerBootConfiguration, server *metalv1alpha1.Server) error {
+func (r *ServerMaintenanceReconciler) revertMaintenanceBootConfig(
+	ctx context.Context,
+	log logr.Logger,
+	server *metalv1alpha1.Server,
+	serverMaintenance *metalv1alpha1.ServerMaintenance,
+) (bool, error) {
+	// we need to revert the boot order only if it was changed by the maintenance
+	if serverMaintenance.Status.DefaultBootOrder == nil {
+		return false, nil
+	}
+	// if the server is not off, we need to turn it off first to change the boot order
+	// this will help schedule the job to change the boot order for the server
+	// note: if the server is already off, this will be a no-op
+	if server.Spec.Power != metalv1alpha1.PowerOff && server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+		if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff); err != nil {
+			return false, err
+		}
+		// requeue to give time to the server to power off
+		return true, nil
+	}
+
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	if err != nil {
+		return false, fmt.Errorf("failed to create BMC client: %w", err)
+	}
+	defer bmcClient.Logout()
+
+	err = bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, redfish.Boot{
+		BootOrder: serverMaintenance.Status.DefaultBootOrder,
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to revert boot order: %w", err)
+	}
+
+	// save the current boot order to revert back after maintenance
+	maintenanceBase := serverMaintenance.DeepCopy()
+	serverMaintenance.Status.DefaultBootOrder = nil
+	if err := r.Status().Patch(ctx, serverMaintenance, client.MergeFrom(maintenanceBase)); err != nil {
+		return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+	}
+	log.V(1).Info("revert to default boot order", "Server", server.Name, "BootOrder", nil)
+
+	if server.Spec.Power != metalv1alpha1.PowerOn && server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
+		if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOn); err != nil {
+			return false, err
+		}
+		// requeue to give time to the server to power off
+		return true, nil
+	}
+	log.V(1).Info("boot override during maintenance is reverted", "Server", serverMaintenance.Name)
+	return false, nil
+}
+
+func (r *ServerMaintenanceReconciler) removeBootConfigRefFromServer(
+	ctx context.Context,
+	log logr.Logger,
+	config *metalv1alpha1.ServerBootConfiguration,
+	server *metalv1alpha1.Server,
+) error {
 	if server == nil {
 		return nil
 	}
@@ -509,6 +641,26 @@ func (r *ServerMaintenanceReconciler) getMaintenanceBootConfigurationRef(
 	return config, nil
 }
 
+func (r *ServerMaintenanceReconciler) hasBootConfigurationChanged(
+	ctx context.Context,
+	log logr.Logger,
+	serverMaintenance *metalv1alpha1.ServerMaintenance,
+) (bool, *metalv1alpha1.ServerBootConfiguration, error) {
+	config, err := r.getMaintenanceBootConfigurationRef(ctx, log, serverMaintenance)
+	if err != nil {
+		return false, config, err
+	}
+	if config == nil {
+		return false, config, nil
+	}
+	if reflect.DeepEqual(config.Spec, serverMaintenance.Spec.ServerBootConfigurationTemplate.Spec) {
+		// no changes
+		log.V(1).Info("No changes in ServerBootConfigurationTemplate")
+		return false, config, nil
+	}
+	return true, config, nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -521,27 +673,13 @@ func (r *ServerMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
-		log := ctrl.LoggerFrom(ctx)
 		server := object.(*metalv1alpha1.Server)
 		var req []reconcile.Request
 
-		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-		if err := r.List(ctx, maintenanceList); err != nil {
-			log.Error(err, "failed to list host serverMaintenances")
-			return nil
-		}
-		for _, maintenance := range maintenanceList.Items {
-			if server.Spec.ServerMaintenanceRef != nil && maintenance.Spec.ServerRef.Name == server.Spec.ServerMaintenanceRef.Name {
-				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
-				})
-				return req
-			}
-			if server.Spec.ServerMaintenanceRef == nil {
-				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
-				})
-			}
+		if server.Spec.ServerMaintenanceRef != nil {
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{Namespace: server.Spec.ServerMaintenanceRef.Namespace, Name: server.Spec.ServerMaintenanceRef.Name},
+			}}
 		}
 		return req
 	})

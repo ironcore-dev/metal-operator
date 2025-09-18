@@ -38,6 +38,7 @@ type BMCVersionReconciler struct {
 	Scheme           *runtime.Scheme
 	BMCOptions       bmc.Options
 	ResyncInterval   time.Duration
+	ProbeImage       string
 }
 
 const (
@@ -242,8 +243,11 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 		}
 
 		// check if the maintenance is granted
-		if ok := r.checkIfMaintenanceGranted(ctx, log, bmcClient, bmcVersion); !ok {
+		if ok, failed := r.checkIfMaintenanceGranted(ctx, log, bmcClient, bmcVersion); !ok {
 			log.V(1).Info("Waiting for maintenance to be granted before continuing with updating bmc version")
+			return ctrl.Result{}, err
+		} else if failed == metalv1alpha1.ServerMaintenanceStateFailed {
+			err := r.updateBMCVersionStatus(ctx, log, bmcVersion, metalv1alpha1.BMCVersionStateFailed, nil, nil, nil)
 			return ctrl.Result{}, err
 		}
 
@@ -413,28 +417,43 @@ func (r *BMCVersionReconciler) checkIfMaintenanceGranted(
 	log logr.Logger,
 	bmcClient bmc.BMC,
 	bmcVersion *metalv1alpha1.BMCVersion,
-) bool {
+) (bool, metalv1alpha1.ServerMaintenanceState) {
 
 	// todo length
 	if bmcVersion.Spec.ServerMaintenanceRefs == nil {
-		return true
+		return true, ""
 	}
 
 	servers, err := r.getServers(ctx, log, bmcClient, bmcVersion)
 	if err != nil {
 		log.V(1).Error(err, "Failed to get ref. servers to determine maintenance state ")
-		return false
+		return false, ""
 	}
 
 	if len(bmcVersion.Spec.ServerMaintenanceRefs) != len(servers) {
 		log.V(1).Info("Not all servers have Maintenance", "ServerMaintenanceRefs", bmcVersion.Spec.ServerMaintenanceRefs, "Servers", servers)
-		return false
+		return false, ""
 	}
 
-	notInMaintenanceState := make(map[string]bool, len(servers))
+	notInMaintenanceState := make(map[string]metalv1alpha1.ServerMaintenanceState, len(servers))
 	for _, server := range servers {
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
 			serverMaintenanceRef, ok := r.getServerMaintenanceRefForServer(bmcVersion.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.UID)
+			serverMaintenance := &metalv1alpha1.ServerMaintenance{}
+			key := client.ObjectKey{Name: serverMaintenanceRef.Name, Namespace: serverMaintenanceRef.Namespace}
+			if err := r.Get(ctx, key, serverMaintenance); err != nil {
+				log.V(1).Error(err, "failed to get referred server's Manitenance", "Server", server.Name, "ServerMaintenanceRef", serverMaintenanceRef)
+				notInMaintenanceState[server.Name] = ""
+			}
+			if serverMaintenance.Status.State == metalv1alpha1.ServerMaintenanceStateFailed {
+				// fail imediately if any of the server maintenance request failed, as we can not proceed further
+				return false, metalv1alpha1.ServerMaintenanceStateFailed
+			}
+			// this gives us the waiting time for the server to be prepared for maintenance by ServerMaintenance controller
+			if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
+				log.V(1).Info("ServerMaintenance not yet in maintenance state", "Server", server.Name, "ServerMaintenance", serverMaintenance.Name, "State", serverMaintenance.Status.State)
+				notInMaintenanceState[server.Name] = serverMaintenance.Status.State
+			}
 			if server.Spec.ServerMaintenanceRef == nil || !ok || server.Spec.ServerMaintenanceRef.UID != serverMaintenanceRef.UID {
 				// server in maintenance for other tasks. or
 				// server maintenance ref is wrong in either server or bmcVersion
@@ -444,22 +463,22 @@ func (r *BMCVersionReconciler) checkIfMaintenanceGranted(
 					"ServerMaintenanceRef", server.Spec.ServerMaintenanceRef,
 					"BMCVersionMaintenaceRef", serverMaintenanceRef,
 				)
-				notInMaintenanceState[server.Name] = false
+				notInMaintenanceState[server.Name] = serverMaintenance.Status.State
 			}
 		} else {
 			// we still need to wait for server to enter maintenance
 			// wait for update on the server obj
 			log.V(1).Info("Server not yet in maintenance", "Server", server.Name, "State", server.Status.State, "MaintenanceRef", server.Spec.ServerMaintenanceRef)
-			notInMaintenanceState[server.Name] = false
+			notInMaintenanceState[server.Name] = metalv1alpha1.ServerMaintenanceStatePending
 		}
 	}
 
 	if len(notInMaintenanceState) > 0 {
 		log.V(1).Info("Some servers not yet in maintenance", "req maintenances on servers", bmcVersion.Spec.ServerMaintenanceRefs)
-		return false
+		return false, metalv1alpha1.ServerMaintenanceStatePreapareMaintenance
 	}
 
-	return true
+	return true, metalv1alpha1.ServerMaintenanceStateInMaintenance
 }
 
 func (r *BMCVersionReconciler) checkVersionAndTransistionState(
@@ -764,6 +783,13 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 			serverMaintenance.Spec.Policy = bmcVersion.Spec.ServerMaintenancePolicy
 			serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOn
 			serverMaintenance.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
+			serverMaintenance.Spec.ServerBootConfigurationTemplate = &metalv1alpha1.ServerBootConfigurationTemplate{
+				Name: bmcVersion.Name,
+				Spec: metalv1alpha1.ServerBootConfigurationSpec{
+					ServerRef: corev1.LocalObjectReference{Name: server.Name},
+					Image:     r.ProbeImage,
+				},
+			}
 			if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance && serverMaintenance.Status.State != "" {
 				serverMaintenance.Status.State = ""
 			}

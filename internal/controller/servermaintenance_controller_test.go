@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -97,7 +96,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
 		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreapareMaintenance),
 		))
 
 		By("Checking the Server is in maintenance")
@@ -153,29 +152,17 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
 			metalv1alpha1.ServerMaintenanceApprovalKey:         "true",
 		}
-		By("Checking the ServerMaintenanceRef")
-		Eventually(Object(server)).Should(
-			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
-		)
-		bootConfig := &metalv1alpha1.ServerBootConfiguration{}
-
-		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
-			Name:      server.Spec.BootConfigurationRef.Name,
-			Namespace: server.Spec.BootConfigurationRef.Namespace,
-		}, bootConfig).Should(Succeed())
-
-		By("Checking the BootConfigurationRef")
+		By("Checking the ServerMaintenanceRef and BootConfigurationRef")
+		By("Checking the ")
 		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
 			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance.Name),
 			HaveField("Spec.BootConfigurationRef", Not(BeNil())),
 			HaveField("Spec.BootConfigurationRef.Name", serverMaintenance.Name),
 			HaveField("Spec.BootConfigurationRef.Namespace", serverMaintenance.Namespace),
 		))
 
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
+		MarkBootConfigReady(ctx, k8sClient, server.Spec.BootConfigurationRef.Name, server.Spec.BootConfigurationRef.Namespace)
 
 		By("Checking the Server is in maintenance")
 		Eventually(Object(server)).Should(SatisfyAll(
@@ -185,7 +172,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
 			HaveField("ObjectMeta.Annotations", maintenanceLabels),
 		))
-
 		By("Checking the ServerMaintenance is in maintenance")
 		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
@@ -197,7 +183,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Spec.BootConfigurationRef.Name", serverClaim.Name),
 		))
 		By("Checking the ServerClaim is cleaned up")
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
@@ -251,31 +237,24 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, serverMaintenance01)).To(Succeed())
-		By("Checking the ServerMaintenanceRef")
-		Eventually(Object(server)).Should(
-			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
-		)
-		Eventually(Object(serverMaintenance01)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
-		))
-		bootConfig := &metalv1alpha1.ServerBootConfiguration{}
-		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
-			Name:      server.Spec.BootConfigurationRef.Name,
-			Namespace: server.Spec.BootConfigurationRef.Namespace,
-		}, bootConfig).Should(Succeed())
-
-		By("Checking the BootConfigurationRef")
+		By("Checking the ServerMaintenanceRef and BootConfigurationRef")
 		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
 			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
 			HaveField("Spec.BootConfigurationRef", Not(BeNil())),
 			HaveField("Spec.BootConfigurationRef.Name", serverMaintenance01.Name),
 			HaveField("Spec.BootConfigurationRef.Namespace", serverMaintenance01.Namespace),
 		))
+		By("Checking the ServerMaintenance state is PrepareMaintenance")
+		Eventually(Object(serverMaintenance01)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreapareMaintenance),
+		))
+		MarkBootConfigReady(ctx, k8sClient, server.Spec.BootConfigurationRef.Name, server.Spec.BootConfigurationRef.Namespace)
 
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
+		By("Checking the ServerMaintenance state is PrepareMaintenance")
+		Eventually(Object(serverMaintenance01)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		))
 
 		By("Creating a second ServerMaintenance object")
 		Expect(k8sClient.Create(ctx, serverMaintenance02)).To(Succeed())
@@ -295,11 +274,21 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Deleting first ServerMaintenance to finish the maintenance on the server")
 		Eventually(k8sClient.Delete).WithArguments(ctx, serverMaintenance01).Should(Succeed())
 
+		By("Checking the second ServerMaintenance is now PreparingMaintenance")
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreapareMaintenance),
 		))
 
-		By("Checking the second ServerMaintenance is now in maintenance")
+		By("Checking the ServerMaintenanceRef and BootConfigurationRef")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance02.Name),
+			HaveField("Spec.BootConfigurationRef", Not(BeNil())),
+			HaveField("Spec.BootConfigurationRef.Name", serverMaintenance02.Name),
+			HaveField("Spec.BootConfigurationRef.Namespace", serverMaintenance02.Namespace),
+		))
+		MarkBootConfigReady(ctx, k8sClient, server.Spec.BootConfigurationRef.Name, server.Spec.BootConfigurationRef.Namespace)
+
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))

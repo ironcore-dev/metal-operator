@@ -174,6 +174,17 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: bmcSettings.Name}),
 		))
+		By("Ensuring that the Maintenance resource has been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
+
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      serverMaintenanceList.Items[0].Name,
+			},
+		}
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
 
 		By("Ensuring that the BMCSettings has reached next state")
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
@@ -259,6 +270,8 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Update(serverClaim, func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 		})).Should(Succeed())
+
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
 
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
@@ -348,6 +361,8 @@ var _ = Describe("BMCSettings Controller", func() {
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
+
 		By("Ensuring that the BMCSettings resource hasmoved to next state")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
@@ -419,6 +434,18 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 		)
 
+		By("Ensuring that the Maintenance resource has been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
+
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      serverMaintenanceList.Items[0].Name,
+			},
+		}
+		Eventually(Get(serverMaintenance)).Should(Succeed())
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
 		Eventually(Object(BMCSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		)

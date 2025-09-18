@@ -19,27 +19,11 @@ type ServerBootConfigurationSpec struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
-	// BootType specifies the type of boot configuration.
-	// It can be either "Oneoff" or "Continueous". If not specified, it defaults to "Oneoff".
-	// +kubebuilder:validation:Enum=Oneoff;Continueous
-	// +optional
-	// +kubebuilder:default=Oneoff
-	Boottype BootType `json:"bootType,omitempty"`
-
 	// IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
 	// the ignition configuration for the server. This field is optional and can be omitted if not specified.
 	// +optional
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
 }
-
-type BootType string
-
-const (
-	// BootTypeOneOff indicates that the server should boot into this configuration one time.
-	BootTypeOneOff BootType = "Oneoff"
-	// BootTypeContinueous indicates that the server should boot into this configuration continuously.
-	BootTypeContinueous BootType = "Continueous"
-)
 
 // ServerBootConfigurationState defines the possible states of a ServerBootConfiguration.
 type ServerBootConfigurationState string

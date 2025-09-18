@@ -201,26 +201,6 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              bootOrder:
-                description: BootOrder specifies the boot order of the server.
-                items:
-                  description: BootOrder represents the boot order of the server.
-                  properties:
-                    device:
-                      description: Device is the device to boot from.
-                      type: string
-                    name:
-                      description: Name is the name of the boot device.
-                      type: string
-                    priority:
-                      description: Priority is the priority of the boot device.
-                      type: integer
-                  required:
-                  - device
-                  - name
-                  - priority
-                  type: object
-                type: array
               indicatorLED:
                 description: IndicatorLED specifies the desired state of the server's
                   indicator LED.

@@ -17,6 +17,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -62,25 +63,7 @@ func TransitionServerFromInitialToAvailableState(ctx context.Context, k8sClient 
 	// need long time to create boot config
 	// as we go through multiple reconcile before creating the boot config
 	By("Ensuring the boot configuration has been created")
-	bootConfig := &metalv1alpha1.ServerBootConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: BootConfigNameSpace,
-			Name:      server.Name,
-		},
-	}
-	Eventually(Get(bootConfig)).Should(
-		Succeed(),
-		fmt.Sprintf("Expected to get the bootConfig %v, created by Server %v", bootConfig, server.Name),
-	)
-	Eventually(Object(bootConfig)).Should(
-		HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
-		"Expected to get the bootConfig to reach pending state")
-
-	By("Patching the boot configuration to a Ready state")
-	Eventually(UpdateStatus(bootConfig, func() {
-		bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-	})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", bootConfig))
-
+	bootConfig := MarkBootConfigReady(ctx, k8sClient, server.Name, BootConfigNameSpace)
 	Eventually(Object(bootConfig)).Should(SatisfyAll(
 		HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStateReady),
 		HaveField("Spec.IgnitionSecretRef", Not(BeNil())),
@@ -245,4 +228,23 @@ func CreateServerClaim(
 		},
 	}
 	return serverClaim
+}
+
+func MarkBootConfigReady(ctx context.Context, k8sClient client.Client, name, namespace string) *metalv1alpha1.ServerBootConfiguration {
+	bootConfig := &metalv1alpha1.ServerBootConfiguration{}
+	Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}, bootConfig).Should(Succeed())
+
+	Eventually(Object(bootConfig)).Should(
+		HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
+		"Expected to get the bootConfig to reach pending state",
+	)
+
+	By("Patching the boot configuration to a Ready state")
+	Eventually(UpdateStatus(bootConfig, func() {
+		bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+	})).Should(Succeed())
+	return bootConfig
 }

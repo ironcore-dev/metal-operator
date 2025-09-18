@@ -41,6 +41,7 @@ type BiosSettingsReconciler struct {
 	BMCOptions       bmc.Options
 	ResyncInterval   time.Duration
 	TimeoutExpiry    time.Duration
+	ProbeImage       string
 }
 
 const (
@@ -460,8 +461,13 @@ func (r *BiosSettingsReconciler) handleSettingInProgressState(
 	}
 
 	// check if the maintenance is granted
-	if ok := r.checkIfMaintenanceGranted(ctx, log, biosSettings, server); !ok {
+	if ok, state := r.checkIfMaintenanceGranted(ctx, log, biosSettings, server); !ok {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
+		if state == metalv1alpha1.ServerMaintenanceStateFailed {
+			log.V(1).Info("server maintenance request failed. Please check the ServerMaintenance object")
+			err := r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, nil)
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -1147,38 +1153,38 @@ func (r *BiosSettingsReconciler) checkIfMaintenanceGranted(
 	log logr.Logger,
 	biosSettings *metalv1alpha1.BIOSSettings,
 	server *metalv1alpha1.Server,
-) bool {
+) (bool, metalv1alpha1.ServerMaintenanceState) {
 	if biosSettings.Spec.ServerMaintenanceRef == nil {
-		return true
+		return true, ""
 	}
 
 	if server.Status.State == metalv1alpha1.ServerStateMaintenance {
 		serverMaintenence, err := r.getReferredServerMaintenance(ctx, log, biosSettings.Spec.ServerMaintenanceRef)
 		if err != nil {
 			log.V(1).Info("Failed to get referred ServerMaintenance", "error", err, "serverMaintenanceRef", biosSettings.Spec.ServerMaintenanceRef)
-			return false
+			return false, ""
 		}
 		if serverMaintenence.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
 			log.V(1).Info("ServerMaintenance is not in maintenance. waiting...",
 				"serverMaintenance State", serverMaintenence.Status.State,
 				"serverMaintenance", serverMaintenence.Name)
-			return false
+			return false, serverMaintenence.Status.State
 		}
 		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosSettings.Spec.ServerMaintenanceRef.UID {
 			// server in maintenance for other tasks. or
 			// server maintenance ref is wrong in either server or biosSettings
 			// wait for update on the server obj
 			log.V(1).Info("Server is already in maintenance for other tasks", "Server", server.Name, "serverMaintenanceRef", server.Spec.ServerMaintenanceRef)
-			return false
+			return false, serverMaintenence.Status.State
 		}
 	} else {
 		// we still need to wait for server to enter maintenance
 		// wait for update on the server obj
 		log.V(1).Info("Server not yet in maintenance", "Server", server.Name, "State", server.Status.State, "MaintenanceRef", server.Spec.ServerMaintenanceRef)
-		return false
+		return false, ""
 	}
 
-	return true
+	return true, metalv1alpha1.ServerMaintenanceStateInMaintenance
 }
 
 func (r *BiosSettingsReconciler) requestMaintenanceOnServer(
@@ -1202,6 +1208,13 @@ func (r *BiosSettingsReconciler) requestMaintenanceOnServer(
 		serverMaintenance.Spec.Policy = biosSettings.Spec.ServerMaintenancePolicy
 		serverMaintenance.Spec.ServerPower = metalv1alpha1.PowerOn
 		serverMaintenance.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
+		serverMaintenance.Spec.ServerBootConfigurationTemplate = &metalv1alpha1.ServerBootConfigurationTemplate{
+			Name: biosSettings.Name,
+			Spec: metalv1alpha1.ServerBootConfigurationSpec{
+				ServerRef: corev1.LocalObjectReference{Name: server.Name},
+				Image:     r.ProbeImage,
+			},
+		}
 		if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance && serverMaintenance.Status.State != "" {
 			serverMaintenance.Status.State = ""
 		}

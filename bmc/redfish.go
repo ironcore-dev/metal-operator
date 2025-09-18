@@ -320,6 +320,14 @@ func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemURI string) ([]stri
 	return system.Boot.BootOrder, nil
 }
 
+func (r *RedfishBMC) GetBootOptions(ctx context.Context, systemURI string) ([]*redfish.BootOption, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return nil, err
+	}
+	return system.BootOptions()
+}
+
 func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemURI string) (string, error) {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
@@ -474,22 +482,7 @@ func (r *RedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID st
 }
 
 // SetBootOrder sets bios boot order
-func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrder []string) error {
-	system, err := r.getSystemFromUri(ctx, systemURI)
-	if err != nil {
-		return err
-	}
-	return system.SetBoot(
-		redfish.Boot{
-			BootSourceOverrideEnabled: redfish.ContinuousBootSourceOverrideEnabled,
-			BootSourceOverrideTarget:  redfish.NoneBootSourceOverrideTarget,
-			BootOrder:                 bootOrder,
-		},
-	)
-}
-
-// SetBootOverride sets server boot override
-func (r *RedfishBMC) SetBootOverride(ctx context.Context, systemURI string, overrideConfig redfish.Boot) error {
+func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrder redfish.Boot) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return err
@@ -504,12 +497,15 @@ func (r *RedfishBMC) SetBootOverride(ctx context.Context, systemURI string, over
 		return err
 	}
 	if tSystem.Settings.SettingsObject.String() == "" {
-		return system.SetBoot(overrideConfig)
+		return system.SetBoot(bootOrder)
 	}
-	return system.Patch(tSystem.Settings.SettingsObject.String(), overrideConfig)
+	return system.SetBoot(bootOrder)
 }
 
-func (r *RedfishBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (map[string]RegistryEntryAttributes, error) {
+func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
+	readOnly bool,
+	immutable bool,
+) (map[string]RegistryEntryAttributes, error) {
 	registries, err := r.client.Service.Registries()
 	if err != nil {
 		return nil, err

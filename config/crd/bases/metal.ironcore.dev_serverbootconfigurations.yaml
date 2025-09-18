@@ -57,15 +57,6 @@ spec:
             description: ServerBootConfigurationSpec defines the desired state of
               ServerBootConfiguration.
             properties:
-              bootType:
-                default: Oneoff
-                description: |-
-                  BootType specifies the type of boot configuration.
-                  It can be either "Oneoff" or "Continueous". If not specified, it defaults to "Oneoff".
-                enum:
-                - Oneoff
-                - Continueous
-                type: string
               ignitionSecretRef:
                 description: |-
                   IgnitionSecretRef is a reference to the Kubernetes Secret object that contains

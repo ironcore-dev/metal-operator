@@ -315,6 +315,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.LastAppliedTime", BeNil()),
 		))
 
+		_ = MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
+
 		By("Ensuring that the Server is in correct power state")
 		Eventually(Object(server)).Should(
 			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
@@ -428,6 +430,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 		)
 
+		_ = MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
+
 		By("Ensuring that the Server is in Maintenance")
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
@@ -521,6 +525,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 			}),
 		)
 
+		_ = MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
+
 		By("Ensuring that the Server is in Maintenance")
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
@@ -600,10 +606,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		})).Should(Succeed())
 
 		By("Ensuring that the biosSettings resource has setting updated, and moved the state")
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		)
+
+		_ = MarkBootConfigReady(ctx, k8sClient, biosSettings.Name, ns.Name)
 		// due to nature of mocking, we cant not determine few steps here. hence need a longer wait time
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
@@ -677,6 +684,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 		))
+
+		_ = MarkBootConfigReady(ctx, k8sClient, biosSettings.Name, ns.Name)
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
@@ -768,6 +777,8 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		_ = MarkBootConfigReady(ctx, k8sClient, biosSettings.Name, ns.Name)
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
@@ -910,6 +921,8 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
+		_ = MarkBootConfigReady(ctx, k8sClient, biosSettings.Name, ns.Name)
+
 		By("Ensuring that the BIOSSetting Object has moved to completed")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
@@ -927,6 +940,8 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 		)
+
+		_ = MarkBootConfigReady(ctx, k8sClient, biosSettings.Name, ns.Name)
 
 		By("Ensuring that the BIOSSetting Object has moved to completed")
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
@@ -968,6 +983,8 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		_ = MarkBootConfigReady(ctx, k8sClient, biosSettings.Name, ns.Name)
 
 		Eventually(Object(biosSettings)).WithPolling(1 * time.Microsecond).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),

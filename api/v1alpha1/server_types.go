@@ -59,16 +59,6 @@ type BMCAccess struct {
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
 }
 
-// BootOrder represents the boot order of the server.
-type BootOrder struct {
-	// Name is the name of the boot device.
-	Name string `json:"name"`
-	// Priority is the priority of the boot device.
-	Priority int `json:"priority"`
-	// Device is the device to boot from.
-	Device string `json:"device"`
-}
-
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
@@ -119,10 +109,6 @@ type ServerSpec struct {
 	// This is also used during maintenance if Maintenance needs server to be taken offline
 	// +optional
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
-
-	// BootOrder specifies the boot order of the server.
-	// +optional
-	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 
 	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.

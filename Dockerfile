@@ -14,7 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/manager/main.go cmd/manager/main.go
 COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
-COPY cmd/bmctools/main.go cmd/bmctools/main.go
+COPY cmd/bmctools/ cmd/bmctools/
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM builder AS bmctools-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/bmctools/main.go
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o bmctools cmd/bmctools/main.go
 
 
 # Use distroless as minimal base image to package the manager binary

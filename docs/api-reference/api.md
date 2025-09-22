@@ -1900,6 +1900,9 @@ the BMC configuration for this BMC.</p>
 </tr><tr><td><p>&#34;Error&#34;</p></td>
 <td><p>BMCStateError indicates that there is an error with the BMC.</p>
 </td>
+</tr><tr><td><p>&#34;Resetting&#34;</p></td>
+<td><p>BMCStateResetting indicates that the BMC is in the process of resetting.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus
@@ -2032,6 +2035,20 @@ BMCPowerState
 <td>
 <em>(Optional)</em>
 <p>PowerState represents the current power state of the BMC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastResetTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LastResetTime is the timestamp of the last reset operation performed on the BMC.</p>
 </td>
 </tr>
 <tr>

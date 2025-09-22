@@ -29,10 +29,10 @@ func NewResetCommand() *cobra.Command {
 		RunE:  runReset,
 	}
 	resetCmd.Flags().DurationVar(&timeout, "timeout", 2*time.Minute, "Timeout for the reset operation.")
-	resetCmd.Flags().StringVar(&bmcAddress, "bmc_address", "", "BMC address to connect to.")
-	resetCmd.Flags().StringVar(&bmcManufacturer, "bmc_manufacturer", "", "BMC manufacturer name")
+	resetCmd.Flags().StringVar(&bmcAddress, "bmc-address", "", "BMC address to connect to.")
+	resetCmd.Flags().StringVar(&bmcManufacturer, "bmc-manufacturer", "", "BMC manufacturer name")
 	resetCmd.Flags().StringVar(&bmcModel,
-		"bmc_model", "", "BMC model. If not set, it will use the default model for the manufacturer.",
+		"bmc-model", "", "BMC model. If not set, it will use the default model for the manufacturer.",
 	)
 	return resetCmd
 }

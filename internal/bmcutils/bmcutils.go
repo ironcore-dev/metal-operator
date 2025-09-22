@@ -188,6 +188,17 @@ func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password strin
 		},
 		Timeout: timeout,
 	}
+	resetCMD := ""
+	switch manufacturer {
+	case string(bmc.ManufacturerDell):
+		resetCMD = "racreset"
+	case string(bmc.ManufacturerHPE):
+		resetCMD = "cd /map1 && reset"
+	case string(bmc.ManufacturerLenovo):
+		resetCMD = "resetsp"
+	default:
+		return fmt.Errorf("unsupported BMC manufacturer %s for bmc reset", manufacturer)
+	}
 	client, err := ssh.Dial("tcp", net.JoinHostPort(ip, "22"), config)
 	if err != nil {
 		return fmt.Errorf("failed to dial ssh: %w", err)
@@ -203,17 +214,6 @@ func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password strin
 	defer func() {
 		_ = session.Close()
 	}()
-	resetCMD := ""
-	switch manufacturer {
-	case string(bmc.ManufacturerDell):
-		resetCMD = "racreset"
-	case string(bmc.ManufacturerHPE):
-		resetCMD = ""
-	case string(bmc.ManufacturerLenovo):
-		resetCMD = ""
-	default:
-		return fmt.Errorf("unsupported BMC manufacturer %s for reset", manufacturer)
-	}
 	// cancel reset cmd after 5 minutes
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

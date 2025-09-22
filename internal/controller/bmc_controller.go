@@ -11,6 +11,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/go-logr/logr"
@@ -20,6 +21,8 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+
+	//"github.com/kubernetes/utils/ptr"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 	batchv1 "k8s.io/api/batch/v1"
@@ -349,13 +352,9 @@ func (r *BMCReconciler) shouldResetBMC(bmcObj *metalv1alpha1.BMC) bool {
 }
 
 func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, reason, message string) error {
-	running, err := r.checkResetJobStatus(ctx, log, bmcObj)
+	err := r.checkResetJobStatus(ctx, log, bmcObj)
 	if err != nil {
 		return fmt.Errorf("BMC reset job status: %w", err)
-	}
-	if running {
-		// job is still running, requeue
-		return fmt.Errorf("BMC reset job is still running")
 	}
 	if err := r.updateConditions(ctx, bmcObj, true, bmcResetConditionType, corev1.ConditionTrue, reason, message); err != nil {
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
@@ -376,6 +375,10 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 	} else {
 		return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
 	}
+	username, password, err := bmcutils.GetBMCCredentialsForBMCSecretName(ctx, r.Client, bmcObj.Spec.BMCSecretRef.Name)
+	if err != nil {
+		return fmt.Errorf("failed to get BMC credentials: %w", err)
+	}
 	// If we reach here, Redfish reset failed or was not possible, fall back to reset via ssh
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -384,7 +387,7 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 			Labels:    bmcObj.Labels,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: func(i int32) *int32 { return &i }(3),
+			BackoffLimit: ptr.To[int32](3),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -397,33 +400,19 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 								"reset",
 								bmcObj.Name,
 								"--model", bmcObj.Status.Model,
-								"--bmc_address", bmcObj.Spec.Endpoint.IP.String(),
-								"--bmc_manufacturer", bmcObj.Status.Manufacturer,
+								"--bmc-address", bmcObj.Spec.Endpoint.IP.String(),
+								"--bmc-manufacturer", bmcObj.Status.Manufacturer,
 								"--timeout", "5m",
 							},
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
 								{
-									Name: metalv1alpha1.BMCSecretPasswordKeyName,
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											Key: metalv1alpha1.BMCSecretPasswordKeyName,
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: bmcObj.Spec.BMCSecretRef.Name,
-											},
-										},
-									},
+									Name:  metalv1alpha1.BMCSecretPasswordKeyName,
+									Value: password,
 								},
 								{
-									Name: metalv1alpha1.BMCSecretUsernameKeyName,
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											Key: metalv1alpha1.BMCSecretPasswordKeyName,
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: bmcObj.Spec.BMCSecretRef.Name,
-											},
-										},
-									},
+									Name:  metalv1alpha1.BMCSecretUsernameKeyName,
+									Value: username,
 								},
 							},
 						},
@@ -469,28 +458,28 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 	return nil
 }
 
-func (r *BMCReconciler) checkResetJobStatus(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
+func (r *BMCReconciler) checkResetJobStatus(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
 	job := &batchv1.Job{}
-	if err := r.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("bmc-reset-%s-", bmcObj.Name), Namespace: bmcObj.Namespace}, job); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("bmc-reset-%s", bmcObj.Name), Namespace: bmcObj.Namespace}, job); err != nil {
 		if apierrors.IsNotFound(err) {
-			return false, nil
+			return nil
 		}
-		return false, fmt.Errorf("failed to get BMC reset job: %w", err)
+		return fmt.Errorf("failed to get BMC reset job: %w", err)
 	}
 	if job.Status.Failed > 0 && job.Status.Active == 0 {
-		return false, fmt.Errorf("BMC reset job failed")
+		return fmt.Errorf("BMC reset job failed")
 	}
 	if job.Status.Active > 0 {
-		return true, nil
+		return fmt.Errorf("BMC reset job is still running")
 	}
 	if job.Status.Succeeded > 0 {
 		// delete job after successful completion
 		if err := r.Delete(ctx, job); err != nil && !apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("failed to delete completed BMC reset job: %w", err)
+			return fmt.Errorf("failed to delete completed BMC reset job: %w", err)
 		}
 		log.Info("Deleted completed BMC reset job", "Job", job.Name)
 	}
-	return false, nil
+	return nil
 }
 
 func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {

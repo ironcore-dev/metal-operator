@@ -5,6 +5,7 @@ package bmcutils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -13,6 +14,11 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	BmcSecretUsernameKey = "username"
+	BmcSecretPasswordKey = "password"
 )
 
 func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {
@@ -27,15 +33,30 @@ func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metal
 
 func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
 	// TODO: use constants for secret keys
-	username, ok := secret.Data["username"]
-	if !ok {
-		return "", "", fmt.Errorf("no username found in the BMC secret")
+	username, err := getValueFromSecret(secret, BmcSecretUsernameKey)
+	if err != nil {
+		return "", "", err
 	}
-	password, ok := secret.Data["password"]
-	if !ok {
-		return "", "", fmt.Errorf("no password found in the BMC secret")
+	password, err := getValueFromSecret(secret, BmcSecretPasswordKey)
+	if err != nil {
+		return "", "", err
 	}
-	return string(username), string(password), nil
+	return username, password, nil
+}
+
+func getValueFromSecret(secret *metalv1alpha1.BMCSecret, key string) (string, error) {
+	if secret == nil {
+		return "", errors.New("secret cannot be nil")
+	}
+	value, ok := secret.Data[key]
+	if ok {
+		return string(value), nil
+	}
+	valueStr, ok := secret.StringData[key]
+	if ok {
+		return valueStr, nil
+	}
+	return "", fmt.Errorf("cannot find value in BMCSecret '%s' for key '%s' in data nor in stringData", secret.Name, key)
 }
 
 func GetBMCFromBMCName(ctx context.Context, c client.Client, bmcName string) (*metalv1alpha1.BMC, error) {

@@ -198,13 +198,13 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 			}
 			return len(maintenanceList.Items) == 3
 		}).Should(BeTrue())
-		Eventually(maintenanceList.Items[2], "7s").Should(SatisfyAll(
+		Eventually(maintenanceList.Items[2]).Should(SatisfyAll(
 			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
 			HaveField("Spec.ServerRef.Name", Equal(server03.Name)),
 		))
 
 		By("Checking if the status has been updated")
-		Eventually(Object(servermaintenanceset), "5s").Should(SatisfyAll(
+		Eventually(Object(servermaintenanceset)).Should(SatisfyAll(
 			HaveField("Status.Maintenances", BeNumerically("==", 3)),
 			HaveField("Status.Pending", BeNumerically("==", 0)),
 			HaveField("Status.InMaintenance", BeNumerically("==", 3)),

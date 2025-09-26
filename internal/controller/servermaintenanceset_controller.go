@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,10 +129,11 @@ func (r *ServerMaintenanceSetReconciler) createMaintenances(
 	serverList *metalv1alpha1.ServerList,
 ) error {
 	var errs error
-	var createdMaintenances []string
+	// Create a map of existing maintenances for quick lookup.
+	createdMaintenances := make(map[string]struct{})
 	for _, maintenance := range maintenancelist.Items {
 		if maintenance.Spec.ServerRef != nil {
-			createdMaintenances = append(createdMaintenances, maintenance.Spec.ServerRef.Name)
+			createdMaintenances[maintenance.Spec.ServerRef.Name] = struct{}{}
 		}
 	}
 	// Iterate through the servers that should be managed by this set.
@@ -146,7 +146,7 @@ func (r *ServerMaintenanceSetReconciler) createMaintenances(
 		}
 
 		// Check the map to see if maintenance already exists.
-		if slices.Contains(createdMaintenances, server.Name) {
+		if _, exists := createdMaintenances[server.Name]; exists {
 			log.V(1).Info("maintenance already created, skipping", "server", server.Name)
 			continue
 		}
@@ -181,16 +181,16 @@ func (r *ServerMaintenanceSetReconciler) deleteOrphanedMaintenances(
 	serverList *metalv1alpha1.ServerList,
 ) error {
 	var errs error
-	var serverNames []string
+	activeServers := make(map[string]struct{})
 	for _, server := range serverList.Items {
 		if server.DeletionTimestamp.IsZero() {
-			serverNames = append(serverNames, server.Name)
+			activeServers[server.Name] = struct{}{}
 		}
 	}
 	for _, maintenance := range maintenancelist.Items {
 		log.V(1).Info("Checking for orphaned maintenance", "maintenance", maintenance.Name)
 		// Check if the maintenance is part of the server maintenance set
-		if !slices.Contains(serverNames, maintenance.Spec.ServerRef.Name) {
+		if _, exists := activeServers[maintenance.Spec.ServerRef.Name]; !exists {
 			log.V(1).Info("Maintenance is orphaned, deleting", "maintenance", maintenance.Name)
 			if err := r.Delete(ctx, &maintenance); err != nil {
 				errs = errors.Join(errs, fmt.Errorf("failed to delete orphaned maintenance %s: %w", maintenance.Name, err))

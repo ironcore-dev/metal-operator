@@ -10,7 +10,7 @@ import (
 // ServerMaintenanceSetSpec defines the desired state of ServerMaintenanceSet.
 type ServerMaintenanceSetSpec struct {
 	// ServerLabelSelector specifies a label selector to identify the servers that are to be maintained.
-	ServerSelector metav1.LabelSelector `json:"serverLabelSelector"`
+	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 	// Template specifies the template for the server maintenance.
 	ServerMaintenanceTemplate ServerMaintenanceTemplate `json:"serverMaintenanceTemplate"`
 }

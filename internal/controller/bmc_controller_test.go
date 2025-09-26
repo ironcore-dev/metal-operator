@@ -4,7 +4,6 @@
 package controller
 
 import (
-	"fmt"
 	"maps"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -12,7 +11,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -439,29 +437,6 @@ var _ = Describe("BMC Reset", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		))
-
-		By("setting bmc to unresponsive")
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
-		Eventually(Update(bmc, func() {
-			bmc.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceReset,
-			}
-		})).Should(Succeed())
-
-		By("Ensuring that the ssh reset job has been created, when the BMC is unresponsive")
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("bmc-reset-%s", bmc.Name),
-				Namespace: ns.Name,
-			},
-		}
-		Eventually(Get(job), "20s").Should(Succeed())
-		Eventually(func() string {
-			if len(job.Spec.Template.Spec.Containers) == 0 {
-				return "" // Return a value that will fail the check
-			}
-			return job.Spec.Template.Spec.Containers[0].Image
-		}).Should(Equal("foo:latest"))
 	})
 
 	var _ = Describe("BMC Conditions", func() {

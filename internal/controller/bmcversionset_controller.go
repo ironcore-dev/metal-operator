@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -72,6 +73,10 @@ func (r *BMCVersionSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, bmcVersionSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get owned BMCVersion resources %w", err)
@@ -98,11 +103,75 @@ func (r *BMCVersionSetReconciler) delete(
 	return ctrl.Result{}, nil
 }
 
+func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	bmcVersionSet *metalv1alpha1.BMCVersionSet,
+) error {
+	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
+	if err != nil {
+		return err
+	}
+	if len(ownedBMCVersions.Items) == 0 {
+		log.V(1).Info("No BMCVersion found, skipping ignore annotation propagation")
+		return nil
+	}
+	if !shouldChildIgnoreReconciliation(bmcVersionSet) {
+		// if the Set object does not have the ignore annotation anymore,
+		// we should remove the ignore annotation on the child
+		var errs []error
+		for _, bmcVersion := range ownedBMCVersions.Items {
+			// if the Child object is ignored through sets, we should remove the ignore annotation on the child
+			// ad the Set object does not have the ignore annotation anymore
+			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
+				if isChildIgnoredThroughSets(&bmcVersion) {
+					annotations := bmcVersion.GetAnnotations()
+					log.V(1).Info("Ignore operation deleted on child object", "BMCVersion", bmcVersion.Name)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
+					delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
+					bmcVersion.SetAnnotations(annotations)
+				}
+				return nil
+			})
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations Propogartion removal: %w for: %v", err, bmcVersion.Name))
+			}
+			if opResult != controllerutil.OperationResultNone {
+				log.V(1).Info("Patched BMCVersion's annotations to remove Ignore", "BMCVersion", bmcVersion.Name, "Operation", opResult)
+			}
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
+		}
+		return nil
+	}
+
+	var errs []error
+	for _, bmcVersion := range ownedBMCVersions.Items {
+		// should not overwrite the ignored annotation written by others on child
+		// should not overwrite if the annotation is already written on the child
+		if !isChildIgnoredThroughSets(&bmcVersion) && !shouldIgnoreReconciliation(&bmcVersion) {
+			bmcVersionBase := bmcVersion.DeepCopy()
+			annotations := bmcVersion.GetAnnotations()
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
+			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.OperationAnnotationIgnoreChild
+			if err := r.Patch(ctx, &bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations: %w", err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (r *BMCVersionSetReconciler) reconcile(
 	ctx context.Context,
 	log logr.Logger,
 	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 ) (ctrl.Result, error) {
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, bmcVersionSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if shouldIgnoreReconciliation(bmcVersionSet) {
 		log.V(1).Info("Skipped BMCVersionSet reconciliation")
 		return ctrl.Result{}, nil
@@ -363,7 +432,25 @@ func (r *BMCVersionSetReconciler) enqueueByBMC(ctx context.Context, obj client.O
 func (r *BMCVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMCVersionSet{}).
-		Owns(&metalv1alpha1.BMCVersion{}).
+		Watches(
+			&metalv1alpha1.BMCVersion{},
+			handler.EnqueueRequestForOwner(r.Scheme, r.RESTMapper(), &metalv1alpha1.BMCVersionSet{}),
+			builder.WithPredicates(
+				predicate.Funcs{
+					CreateFunc: func(e event.CreateEvent) bool {
+						return true
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						return enqueFromChildObjUpdatesExceptAnnotation(e)
+					},
+					DeleteFunc: func(e event.DeleteEvent) bool {
+						return true
+					}, GenericFunc: func(e event.GenericEvent) bool {
+						return false
+					},
+				},
+			),
+		).
 		Watches(&metalv1alpha1.BMC{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByBMC),
 			builder.WithPredicates(predicate.LabelChangedPredicate{})).

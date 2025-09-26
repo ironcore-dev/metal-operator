@@ -21,10 +21,8 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 
-	//"github.com/kubernetes/utils/ptr"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -275,31 +273,24 @@ func (r *BMCReconciler) updateReadyConditionOnBMCFailure(ctx context.Context, bm
 		// only handle 5xx errors
 		switch httpErr.HTTPReturnedStatusCode {
 		case 401:
-			{
-				// Unauthorized error, likely due to bad credentials
-				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, "BMC credentials are invalid"); err != nil {
-					return fmt.Errorf("failed to set BMC unauthorized condition: %w", err)
-				}
+			// Unauthorized error, likely due to bad credentials
+			if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, "BMC credentials are invalid"); err != nil {
+				return fmt.Errorf("failed to set BMC unauthorized condition: %w", err)
 			}
+
 		case 500:
-			{
-				// Internal Server Error, might be transient
-				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcInternalErrorReason, "BMC internal server error"); err != nil {
-					return fmt.Errorf("failed to set BMC internal server error condition: %w", err)
-				}
+			// Internal Server Error, might be transient
+			if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcInternalErrorReason, "BMC internal server error"); err != nil {
+				return fmt.Errorf("failed to set BMC internal server error condition: %w", err)
 			}
 		case 503:
-			{
-				// Service Unavailable, might be transient
-				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcConnectionFailedReason, "BMC service unavailable"); err != nil {
-					return fmt.Errorf("failed to set BMC service unavailable condition: %w", err)
-				}
+			// Service Unavailable, might be transient
+			if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcConnectionFailedReason, "BMC service unavailable"); err != nil {
+				return fmt.Errorf("failed to set BMC service unavailable condition: %w", err)
 			}
 		default:
-			{
-				if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, fmt.Sprintf("BMC connection error: %v", err)); err != nil {
-					return fmt.Errorf("failed to set BMC error condition: %w", err)
-				}
+			if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, fmt.Sprintf("BMC connection error: %v", err)); err != nil {
+				return fmt.Errorf("failed to set BMC error condition: %w", err)
 			}
 		}
 	} else {
@@ -420,7 +411,6 @@ func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).
-		Owns(&batchv1.Job{}).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
 		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
 		Complete(r)

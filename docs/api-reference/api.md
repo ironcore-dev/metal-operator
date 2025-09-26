@@ -1900,9 +1900,6 @@ the BMC configuration for this BMC.</p>
 </tr><tr><td><p>&#34;Error&#34;</p></td>
 <td><p>BMCStateError indicates that there is an error with the BMC.</p>
 </td>
-</tr><tr><td><p>&#34;Resetting&#34;</p></td>
-<td><p>BMCStateResetting indicates that the BMC is in the process of resetting.</p>
-</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus

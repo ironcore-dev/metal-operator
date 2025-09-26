@@ -2,7 +2,7 @@ resources:
 - ../default
 
 patches:
-#  --registry-url, --probe-os-image, --probe-image and are mandatory flags.
+#  --registry-url, --probe-os-image and --probe-image are mandatory flags.
 # The following patch will add value for above flags
 - path: manager_args_patch.yaml
   target:

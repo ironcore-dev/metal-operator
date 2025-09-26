@@ -65,10 +65,6 @@ func (v *BMCCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj 
 		return nil, fmt.Errorf("expected a BMC object for the newObj but got %T", newObj)
 	}
 	bmclog.Info("Validation for BMC upon update", "name", bmc.GetName())
-	if bmc.Status.State == metalv1alpha1.BMCStateResetting {
-		return nil, fmt.Errorf("cannot update BMC %q while it is in resetting state", bmc.Name)
-	}
-
 	return nil, nil
 }
 

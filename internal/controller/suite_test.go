@@ -227,7 +227,6 @@ func SetupTest() *corev1.Namespace {
 			Scheme:           k8sManager.GetScheme(),
 			Insecure:         true,
 			ManagerNamespace: ns.Name,
-			BMCToolsImage:    "foo:latest",
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{

@@ -224,9 +224,6 @@ const (
 
 	// BMCStateError indicates that there is an error with the BMC.
 	BMCStateError BMCState = "Error"
-
-	// BMCStateResetting indicates that the BMC is in the process of resetting.
-	BMCStateResetting BMCState = "Resetting"
 )
 
 // +kubebuilder:object:root=true

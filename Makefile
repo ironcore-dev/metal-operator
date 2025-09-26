@@ -166,7 +166,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: docker-build-controller-manager docker-build-metalprobe docker-build-bmctools
+docker-build: docker-build-controller-manager docker-build-metalprobe
 
 .PHONY: docker-build-controller-manager
 docker-build-controller-manager: ## Build controller-manager.

@@ -67,7 +67,6 @@ func main() { // nolint: gocyclo
 		managerNamespace                   string
 		probeImage                         string
 		probeOSImage                       string
-		bmcToolsImage                      string
 		registryPort                       int
 		registryProtocol                   string
 		registryURL                        string
@@ -109,7 +108,6 @@ func main() { // nolint: gocyclo
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
-	flag.StringVar(&bmcToolsImage, "bmc-tools-image", "", "Image for the BMC tools.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
 	flag.BoolVar(&insecure, "insecure", true, "If true, use http instead of https for connecting to a BMC.")
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
@@ -151,11 +149,6 @@ func main() { // nolint: gocyclo
 
 	if probeImage == "" {
 		setupLog.Error(nil, "probe image must be set")
-		os.Exit(1)
-	}
-
-	if bmcToolsImage == "" {
-		setupLog.Error(nil, "bmc-tools image must be set")
 		os.Exit(1)
 	}
 
@@ -322,7 +315,6 @@ func main() { // nolint: gocyclo
 		Insecure:             insecure,
 		BMCFailureResetDelay: bmcFailureResetDelay,
 		ManagerNamespace:     managerNamespace,
-		BMCToolsImage:        bmcToolsImage,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BMC")
 		os.Exit(1)

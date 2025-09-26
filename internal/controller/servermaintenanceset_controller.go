@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -88,7 +89,7 @@ func (r *ServerMaintenanceSetReconciler) reconcile(ctx context.Context, log logr
 	}
 
 	if len(servers.Items) == 0 {
-		log.V(1).Info("No servers found")
+		log.V(0).Info("No servers found")
 		return ctrl.Result{}, nil
 	}
 
@@ -136,7 +137,7 @@ func (r *ServerMaintenanceSetReconciler) createMaintenances(
 		}
 	}
 	// Iterate through the servers that should be managed by this set.
-	for i, server := range serverList.Items {
+	for _, server := range serverList.Items {
 		log.V(1).Info("Reconciling server", "server", server.Name)
 
 		if !server.DeletionTimestamp.IsZero() {
@@ -149,21 +150,20 @@ func (r *ServerMaintenanceSetReconciler) createMaintenances(
 			log.V(1).Info("maintenance already created, skipping", "server", server.Name)
 			continue
 		}
-
+		maintenanceName := truncateString(fmt.Sprintf("%s-%s-", maintenanceSet.Name, server.Name), utilvalidation.DNS1123SubdomainMaxLength-5)
 		maintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-%d", maintenanceSet.Name, i),
-				Namespace: maintenanceSet.Namespace,
+				GenerateName: maintenanceName,
+				Namespace:    maintenanceSet.Namespace,
 			},
 		}
-
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, maintenance, func() error {
 			metautils.SetLabels(maintenance, map[string]string{ServerMaintenanceSetFinalizer: maintenanceSet.Name})
 			maintenance.Spec = metalv1alpha1.ServerMaintenanceSpec{
 				ServerRef:                 &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenanceTemplate: maintenanceSet.Spec.ServerMaintenanceTemplate,
 			}
-			return controllerutil.SetControllerReference(maintenanceSet, maintenance, r.Scheme)
+			return controllerutil.SetControllerReference(maintenanceSet, maintenance, r.Client.Scheme())
 		})
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("failed to create or patch serverMaintenance %s: %w", maintenance.Name, err))

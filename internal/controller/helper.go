@@ -47,3 +47,11 @@ func GenerateRandomPassword(length int) ([]byte, error) {
 	}
 	return result, nil
 }
+
+// truncateString truncates a string to the specified maximum length.
+func truncateString(s string, maxLength int) string {
+	if len(s) <= maxLength {
+		return s
+	}
+	return s[:maxLength]
+}

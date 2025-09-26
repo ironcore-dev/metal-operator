@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,7 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		By("Creating a Server")
 		server01 = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-maintenance-1-",
+				GenerateName: "server-1-",
 				Labels: map[string]string{
 					"metal.ironcore.dev/hostname": "test-hostname",
 				},
@@ -63,7 +64,7 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		By("Creating a second Server")
 		server02 = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-maintenance-2-",
+				GenerateName: "server-2-",
 				Labels: map[string]string{
 					"metal.ironcore.dev/hostname": "test-hostname",
 					"metal.ironcore.dev/foo":      "bar",
@@ -111,26 +112,24 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, servermaintenanceset)).To(Succeed())
 
-		By("Checking if the maintenance has been created")
-		maintenance01 := &metalv1alpha1.ServerMaintenance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      servermaintenanceset.Name + "-0",
-				Namespace: servermaintenanceset.Namespace,
-			},
-		}
-		Eventually(Object(maintenance01)).Should(SatisfyAll(
+		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+		By("Checking if the maintenances have been created")
+		Eventually(func() bool {
+			// List the resources
+			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
+			if err != nil {
+				return false
+			}
+			return len(maintenanceList.Items) == 2
+		}).Should(BeTrue())
+		By("Checking if the maintenances have been created")
+
+		Eventually(maintenanceList.Items[0]).Should(SatisfyAll(
 			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
 			HaveField("Spec.ServerRef.Name", Not(BeEmpty())),
 			HaveField("Spec.Policy", Equal(metalv1alpha1.ServerMaintenancePolicyEnforced)),
 		))
-		By("Checking if the 2nd maintenance has been created")
-		maintenance02 := &metalv1alpha1.ServerMaintenance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      servermaintenanceset.Name + "-1",
-				Namespace: servermaintenanceset.Namespace,
-			},
-		}
-		Eventually(Object(maintenance02)).Should(SatisfyAll(
+		Eventually(maintenanceList.Items[1]).Should(SatisfyAll(
 			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
 			HaveField("Spec.ServerRef.Name", Not(BeEmpty())),
 			HaveField("Spec.Policy", Equal(metalv1alpha1.ServerMaintenancePolicyEnforced)),
@@ -145,7 +144,7 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		))
 
 		By("Deleting the first maintenance")
-		Expect(k8sClient.Delete(ctx, maintenance01)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, &maintenanceList.Items[0])).To(Succeed())
 
 		By("Checking that maintenance is recreated")
 		Eventually(Object(servermaintenanceset)).Should(SatisfyAll(
@@ -154,11 +153,19 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 			HaveField("Status.InMaintenance", BeNumerically("==", 2)),
 			HaveField("Status.Failed", BeNumerically("==", 0)),
 		))
+		Eventually(func() bool {
+			// List the resources
+			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
+			if err != nil {
+				return false
+			}
+			return len(maintenanceList.Items) == 2
+		}).Should(BeTrue())
 
 		By("Creating a third Server after set has been created")
 		server03 := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-maintenance-3-",
+				GenerateName: "server-3-",
 				Labels: map[string]string{
 					"metal.ironcore.dev/hostname": "test-hostname",
 				},
@@ -182,15 +189,18 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		Expect(k8sClient.Create(ctx, server03)).Should(Succeed())
 
 		By("Checking if the third maintenance has been created")
-		maintenance03 := &metalv1alpha1.ServerMaintenance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      servermaintenanceset.Name + "-2",
-				Namespace: servermaintenanceset.Namespace,
-			},
-		}
-		Eventually(Object(maintenance03)).Should(SatisfyAll(
+		maintenanceList = &metalv1alpha1.ServerMaintenanceList{}
+		Eventually(func() bool {
+			// List the resources
+			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
+			if err != nil {
+				return false
+			}
+			return len(maintenanceList.Items) == 3
+		}).Should(BeTrue())
+		Eventually(maintenanceList.Items[2], "7s").Should(SatisfyAll(
 			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
-			HaveField("Spec.ServerRef.Name", Not(BeEmpty())),
+			HaveField("Spec.ServerRef.Name", Equal(server03.Name)),
 		))
 
 		By("Checking if the status has been updated")
@@ -203,14 +213,14 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		))
 
 		By("Setting the maintenances to completed")
-		Eventually(UpdateStatus(maintenance01, func() {
-			maintenance01.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
+		Eventually(UpdateStatus(&maintenanceList.Items[0], func() {
+			maintenanceList.Items[0].Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
 		})).Should(Succeed())
-		Eventually(UpdateStatus(maintenance02, func() {
-			maintenance02.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
+		Eventually(UpdateStatus(&maintenanceList.Items[1], func() {
+			maintenanceList.Items[1].Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
 		})).Should(Succeed())
-		Eventually(UpdateStatus(maintenance03, func() {
-			maintenance03.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
+		Eventually(UpdateStatus(&maintenanceList.Items[2], func() {
+			maintenanceList.Items[2].Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
 		})).Should(Succeed())
 
 		By("Deleting the first server")

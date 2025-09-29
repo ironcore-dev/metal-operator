@@ -23,12 +23,12 @@ metadata:
   name: bios-update
   namespace: ops
   annotations:
-    metal.ironcore.dev/reason: "BIOS update"
+    metal.ironcore.dev/maintenance-reason: "BIOS update"
 spec:
   serverSelector:
     matchLabels:
-    hardwareType: gpu-node
-    location: datacenter-1
+      hardwareType: gpu-node
+      location: datacenter-1
   template:
     policy: OwnerApproval
     serverPower: On # or Off

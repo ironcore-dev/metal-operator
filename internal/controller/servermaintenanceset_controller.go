@@ -159,6 +159,9 @@ func (r *ServerMaintenanceSetReconciler) createMaintenances(
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, maintenance, func() error {
 			metautils.SetLabels(maintenance, map[string]string{ServerMaintenanceSetFinalizer: maintenanceSet.Name})
+			if maintenanceSet.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] != "" {
+				metautils.SetAnnotations(maintenance, map[string]string{metalv1alpha1.ServerMaintenanceReasonAnnotationKey: maintenanceSet.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey]})
+			}
 			maintenance.Spec = metalv1alpha1.ServerMaintenanceSpec{
 				ServerRef:                 &v1.LocalObjectReference{Name: server.Name},
 				ServerMaintenanceTemplate: maintenanceSet.Spec.ServerMaintenanceTemplate,

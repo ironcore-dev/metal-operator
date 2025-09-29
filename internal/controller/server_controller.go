@@ -829,6 +829,9 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 			Name:       s.Name,
 			IP:         metalv1alpha1.MustParseIP(s.IPAddress),
 			MACAddress: s.MACAddress,
+			Model:      s.Model,
+			Speed:      s.Speed,
+			Revision:   s.Revision,
 		})
 	}
 	server.Status.NetworkInterfaces = nics

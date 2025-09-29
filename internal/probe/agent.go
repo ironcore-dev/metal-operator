@@ -34,8 +34,15 @@ func NewAgent(log logr.Logger, systemUUID, registryURL string, duration time.Dur
 
 // Init initializes the Agent's Server field with network interface data.
 func (a *Agent) Init() error {
-	interfaces, err := collectNetworkData()
+	ndd, err := NewNetworkDeviceData()
 	if err != nil {
+		a.log.Error(err, "failed loading network device data")
+		return err
+	}
+
+	interfaces, err := NewNetworkDataCollector(NewNIC(), ndd).CollectNetworkData()
+	if err != nil {
+		a.log.Error(err, "failed collecting network data")
 		return err
 	}
 

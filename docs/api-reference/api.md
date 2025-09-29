@@ -4305,7 +4305,7 @@ ServerMaintenanceSetSpec
 <table>
 <tr>
 <td>
-<code>serverLabelSelector</code><br/>
+<code>serverSelector</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
@@ -4364,7 +4364,7 @@ ServerMaintenanceSetStatus
 <tbody>
 <tr>
 <td>
-<code>serverLabelSelector</code><br/>
+<code>serverSelector</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector

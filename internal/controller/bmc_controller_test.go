@@ -7,6 +7,7 @@ import (
 	"maps"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalBmc "github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -386,5 +387,148 @@ var _ = Describe("BMC Validation", func() {
 			bmc.Spec.Endpoint = nil
 		})).Should(Succeed())
 	})
+})
 
+var _ = Describe("BMC Reset", func() {
+	ns := SetupTest()
+
+	AfterEach(func(ctx SpecContext) {
+		DeleteAllMetalResources(ctx, ns.Name)
+	})
+	It("Should reset the BMC", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+		By("Creating a BMC resource")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: 8000,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		By("Resetting the BMC")
+		Eventually(Update(bmc, func() {
+			bmc.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceReset,
+			}
+		})).Should(Succeed())
+		By("Ensuring that the reset annotation has been removed")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		))
+	})
+
+	var _ = Describe("BMC Conditions", func() {
+		ns := SetupTest()
+
+		AfterEach(func(ctx SpecContext) {
+			DeleteAllMetalResources(ctx, ns.Name)
+		})
+		It("Should create ready conditions when there are bmc connection errors", func(ctx SpecContext) {
+			metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+			By("Creating a BMCSecret")
+			bmcSecret := &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-",
+				},
+				Data: map[string][]byte{
+					metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+					metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+			By("Creating a BMC resource")
+			bmc := &metalv1alpha1.BMC{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-bmc-",
+				},
+				Spec: metalv1alpha1.BMCSpec{
+					Endpoint: &metalv1alpha1.InlineEndpoint{
+						IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+						MACAddress: "aa:bb:cc:dd:ee:ff",
+					},
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: 8000,
+					},
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+			By("Ensuring right conditions are present")
+			Eventually(Object(bmc)).Should(
+				HaveField("Status.Conditions", HaveLen(1)),
+			)
+			Eventually(Object(bmc)).Should(
+				HaveField("Status.Conditions", ContainElement(
+					SatisfyAll(
+						HaveField("Type", bmcReadyConditionType),
+						HaveField("Status", metav1.ConditionFalse),
+					),
+				)),
+			)
+
+			metalBmc.UnitTestMockUps.SimulateUnvailableBMC = false
+
+			By("Ensuring right conditions are present, after bmc becomes responsive again")
+			Eventually(Object(bmc)).Should(
+				HaveField("Status.Conditions", HaveLen(1)),
+			)
+			Eventually(Object(bmc)).Should(
+				HaveField("Status.Conditions", ContainElement(
+					SatisfyAll(
+						HaveField("Type", bmcReadyConditionType),
+						HaveField("Status", metav1.ConditionTrue),
+					),
+				)),
+			)
+
+			By("resetting the BMC")
+			Eventually(Update(bmc, func() {
+				bmc.Annotations = map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceReset,
+				}
+			},
+			)).Should(Succeed())
+
+			By("Ensuring right conditions are present, after user requested reset")
+			Eventually(Object(bmc)).Should(
+				HaveField("Status.Conditions", HaveLen(2)),
+			)
+			Eventually(Object(bmc)).Should(
+				HaveField("Status.Conditions", ContainElement(
+					SatisfyAll(
+						HaveField("Type", bmcResetConditionType),
+						HaveField("Status", metav1.ConditionTrue),
+						HaveField("Reason", bmcUserResetReason),
+					),
+				)),
+			)
+		})
+	})
 })

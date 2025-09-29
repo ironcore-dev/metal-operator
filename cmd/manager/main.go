@@ -315,6 +315,9 @@ func main() { // nolint: gocyclo
 		Insecure:             insecure,
 		BMCFailureResetDelay: bmcFailureResetDelay,
 		ManagerNamespace:     managerNamespace,
+		BMCOptions: bmc.Options{
+			BasicAuth: true,
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BMC")
 		os.Exit(1)

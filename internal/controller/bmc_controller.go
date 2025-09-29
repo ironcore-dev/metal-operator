@@ -55,7 +55,7 @@ type BMCReconciler struct {
 	Scheme               *runtime.Scheme
 	Insecure             bool
 	BMCFailureResetDelay time.Duration
-	BMCPollingOptions    bmc.Options
+	BMCOptions           bmc.Options
 	ManagerNamespace     string
 }
 
@@ -129,7 +129,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcObj); err != nil || modified {
 		return ctrl.Result{}, err
 	}
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return ctrl.Result{}, r.updateReadyConditionOnBMCFailure(ctx, bmcObj, err)
 	}
@@ -344,7 +344,7 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 	if err := r.updateConditions(ctx, bmcObj, true, bmcResetConditionType, corev1.ConditionTrue, reason, message); err != nil {
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
 	}
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCPollingOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
 	if err == nil {
 		if err := bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, redfish.GracefulRestartResetType); err == nil {
 			log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)

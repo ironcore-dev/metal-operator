@@ -145,6 +145,7 @@ const (
 // BMCPowerState defines the possible power states for a BMC.
 type BMCPowerState string
 
+// Do not forget to update controller-gen validation if you add new power states.
 const (
 	// OnPowerState the system is powered on.
 	OnPowerState BMCPowerState = "On"
@@ -159,6 +160,8 @@ const (
 	// PoweringOffPowerState A temporary state between On and Off. The power
 	// off action can take time while the OS is in the shutdown process.
 	PoweringOffPowerState BMCPowerState = "PoweringOff"
+	// UnmanagedPowerState the system power state is not managed.
+	UnmanagedPowerState BMCPowerState = "Unmanaged"
 )
 
 // BMCStatus defines the observed state of BMC.
@@ -201,7 +204,8 @@ type BMCStatus struct {
 	State BMCState `json:"state,omitempty"`
 
 	// PowerState represents the current power state of the BMC.
-	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Enum=On;Off;Paused;PoweringOn;PoweringOff;Unmanaged
 	PowerState BMCPowerState `json:"powerState,omitempty"`
 
 	// LastResetTime is the timestamp of the last reset operation performed on the BMC.

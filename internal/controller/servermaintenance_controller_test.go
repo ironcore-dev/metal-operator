@@ -45,6 +45,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
+				Power:      metalv1alpha1.PowerUnmanaged,
 				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{

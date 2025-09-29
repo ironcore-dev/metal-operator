@@ -170,6 +170,16 @@ var _ = Describe("BMCVersionSet Controller", func() {
 				HaveField("Status.FailedBMCVersion", BeNumerically("==", 0)),
 			))
 
+			By("Ensuring that the BootConfig resource has been created/ marked ready")
+			var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeNil())))
+			for _, serverMaintaince := range serverMaintenanceList.Items {
+				if metav1.IsControlledBy(&serverMaintaince, bmcVersion02) || metav1.IsControlledBy(&serverMaintaince, bmcVersion03) {
+					By(fmt.Sprintf("Marking the maintenance %v ", serverMaintaince.Name))
+					_ = MarkBootConfigReady(ctx, k8sClient, serverMaintaince.Name, ns.Name)
+				}
+			}
+
 			By("Checking the bmcVersion02 have completed")
 			Eventually(Object(bmcVersion02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
@@ -261,6 +271,16 @@ var _ = Describe("BMCVersionSet Controller", func() {
 				HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
 				HaveField("Status.FailedBMCVersion", BeNumerically("==", 0)),
 			))
+
+			By("Ensuring that the BootConfig resource has been created/ marked ready")
+			var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeNil())))
+			for _, serverMaintaince := range serverMaintenanceList.Items {
+				if metav1.IsControlledBy(&serverMaintaince, bmcVersion02) || metav1.IsControlledBy(&serverMaintaince, bmcVersion03) {
+					By(fmt.Sprintf("Marking the maintenance %v ", serverMaintaince.Name))
+					_ = MarkBootConfigReady(ctx, k8sClient, serverMaintaince.Name, ns.Name)
+				}
+			}
 
 			By("Checking the bmcVersion02 have completed")
 			Eventually(Object(bmcVersion02)).Should(SatisfyAll(

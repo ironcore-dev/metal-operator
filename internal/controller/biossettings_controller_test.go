@@ -52,7 +52,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-maintenance-",
+				GenerateName: "test-biossettings-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
@@ -725,7 +725,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-maintenance-",
+				GenerateName: "test-biossettings-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",

@@ -39,7 +39,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Creating a Server")
 			server01 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-01-",
+					GenerateName: "test-biossettingsset-01-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "foo",
 					},
@@ -64,7 +64,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Creating a second Server")
 			server02 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-02-",
+					GenerateName: "test-biossettingsset-02-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "bar",
 					},
@@ -89,7 +89,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			By("Creating a third Server")
 			server03 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-maintenance-03-",
+					GenerateName: "test-biossettingsset-03-",
 					Labels: map[string]string{
 						"metal.ironcore.dev/Manufacturer": "bar",
 					},
@@ -149,6 +149,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			}
 			Eventually(Get(biosSettings02)).Should(Succeed())
 
+			_ = MarkBootConfigReady(ctx, k8sClient, biosSettings02.Name, ns.Name)
+
 			By("Checking the biosSettings02 have completed")
 			Eventually(Object(biosSettings02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
@@ -170,6 +172,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				},
 			}
 			Eventually(Get(biosSettings03)).Should(Succeed())
+
+			_ = MarkBootConfigReady(ctx, k8sClient, biosSettings03.Name, ns.Name)
 
 			By("Checking the biosSettings03 have completed")
 			Eventually(Object(biosSettings03)).Should(SatisfyAll(
@@ -245,6 +249,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
 			))
 
+			_ = MarkBootConfigReady(ctx, k8sClient, biosSettings02.Name, ns.Name)
+
 			By("Checking the biosSettings02 have completed")
 			Eventually(Object(biosSettings02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
@@ -257,6 +263,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					BlockOwnerDeletion: ptr.To(true),
 				})),
 			))
+
+			_ = MarkBootConfigReady(ctx, k8sClient, biosSettings03.Name, ns.Name)
 
 			By("Checking the biosSettings03 have completed")
 			Eventually(Object(biosSettings03)).Should(SatisfyAll(
@@ -305,6 +313,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			Eventually(Get(biosSettings02)).Should(Succeed())
 			Eventually(Get(biosSettings03)).Should(Succeed())
 
+			// we do not mark boot config ready for biosSettings02 once again, as
+			// as the biosSettings will already be applied on it
 			By("Checking the biosSettings02 have completed")
 			Eventually(Object(biosSettings02)).Should(
 				HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
@@ -340,6 +350,10 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 3)),
 				HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
 			))
+
+			// we do not mark boot config ready for biosSettings01, as
+			// the server in unit testing all point to same mockup server
+			// and Hence, the biosSettings will already be applied on it when other biosSettings are applied.
 
 			By("Checking the biosSettings01 have completed")
 			Eventually(Object(biosSettings01)).Should(

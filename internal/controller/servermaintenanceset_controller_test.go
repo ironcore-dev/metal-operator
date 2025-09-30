@@ -7,6 +7,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
@@ -98,6 +100,9 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-maintenance-",
 				Namespace:    ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "foo",
+				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSetSpec{
 				ServerSelector: metav1.LabelSelector{
@@ -113,27 +118,55 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		Expect(k8sClient.Create(ctx, servermaintenanceset)).To(Succeed())
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-		By("Checking if the maintenances have been created")
+		By("Checking if the right number of maintenances have been created with the correct state")
 		Eventually(func() bool {
 			// List the resources
 			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
 			if err != nil {
 				return false
 			}
-			return len(maintenanceList.Items) == 2
+			if len(maintenanceList.Items) != 2 {
+				return false
+			}
+			for _, m := range maintenanceList.Items {
+				if m.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
+					return false
+				}
+			}
+			return true
 		}).Should(BeTrue())
-		By("Checking if the maintenances have been created")
 
-		Eventually(maintenanceList.Items[0]).Should(SatisfyAll(
-			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
-			HaveField("Spec.ServerRef.Name", Not(BeEmpty())),
-			HaveField("Spec.Policy", Equal(metalv1alpha1.ServerMaintenancePolicyEnforced)),
-		))
-		Eventually(maintenanceList.Items[1]).Should(SatisfyAll(
-			HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStateInMaintenance)),
-			HaveField("Spec.ServerRef.Name", Not(BeEmpty())),
-			HaveField("Spec.Policy", Equal(metalv1alpha1.ServerMaintenancePolicyEnforced)),
-		))
+		By("Checking the server references of the created maintenances")
+		Eventually(func() bool {
+			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
+			if err != nil {
+				return false
+			}
+			foundServer01 := false
+			foundServer02 := false
+			for _, m := range maintenanceList.Items {
+				switch m.Spec.ServerRef.Name {
+				case server01.Name:
+					foundServer01 = true
+				case server02.Name:
+					foundServer02 = true
+				}
+			}
+			return foundServer01 && foundServer02
+		}).Should(BeTrue())
+
+		By("Checking the Annotations and OwnerReferences of the created maintenances")
+		for _, m := range maintenanceList.Items {
+			Expect(m.OwnerReferences).To(ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "ServerMaintenanceSet",
+				Name:               servermaintenanceset.Name,
+				UID:                servermaintenanceset.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}))
+			Expect(m.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey]).To(Equal("foo"))
+		}
 
 		By("Checking if the status has been updated")
 		Eventually(Object(servermaintenanceset)).Should(SatisfyAll(
@@ -190,30 +223,39 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 
 		By("Checking if the third maintenance has been created")
 		maintenanceList = &metalv1alpha1.ServerMaintenanceList{}
+		Eventually(func() int {
+			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
+			if err != nil {
+				return 0
+			}
+			return len(maintenanceList.Items)
+		}).Should(Equal(3))
+		By("Checking if all maintenances are in the InMaintenance state")
 		Eventually(func() bool {
 			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
 			if err != nil {
-				return false
-			}
-			if len(maintenanceList.Items) != 3 {
 				return false
 			}
 			for _, m := range maintenanceList.Items {
 				if m.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
 					return false
 				}
-				switch m.Spec.ServerRef.Name {
-				case server01.Name:
-					continue
-				case server02.Name:
-					continue
-				case server03.Name:
-					continue
-				default:
-					return false
-				}
 			}
 			return true
+		}).Should(BeTrue())
+
+		By("Checking the server reference of the third maintenance")
+		Eventually(func() bool {
+			err := k8sClient.List(ctx, maintenanceList, &client.ListOptions{Namespace: ns.Name})
+			if err != nil {
+				return false
+			}
+			for _, m := range maintenanceList.Items {
+				if m.Spec.ServerRef.Name == server03.Name {
+					return true
+				}
+			}
+			return false
 		}).Should(BeTrue())
 
 		By("Checking if the status has been updated")

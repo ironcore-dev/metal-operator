@@ -2,8 +2,15 @@ apiVersion: metal.ironcore.dev/v1alpha1
 kind: ServerMaintenance
 metadata:
   labels:
-    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/name: servermaintenance
+    app.kubernetes.io/part-of: metal-operator
     app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
   name: servermaintenance-sample
 spec:
-  # TODO(user): Add fields here
+  policy: OwnerApproval
+  serverPower: "Off"
+  serverRef:
+    name: server-sample
+
+  

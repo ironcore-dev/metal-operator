@@ -15,8 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var _ BMC = (*RedfishLocalBMC)(nil)
-
 // RedfishLocalBMC implements the BMC interface for Redfish.
 type RedfishLocalBMC struct {
 	*RedfishBMC
@@ -42,7 +40,9 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 
 // setSystemPowerState updates the power state of a system.
 func (r *RedfishLocalBMC) setSystemPowerState(ctx context.Context, systemURI string, state redfish.PowerState) error {
-	// Apply a 150ms delay before performing the power state change.
+	UnitTestMockUps.Lock()
+	defer UnitTestMockUps.Unlock()
+
 	time.Sleep(150 * time.Millisecond)
 
 	system, err := r.getSystemFromUri(ctx, systemURI)
@@ -65,6 +65,9 @@ func (r *RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
 			log.FromContext(ctx).Error(err, "PowerOn failed", "systemURI", systemURI)
 			return
 		}
+
+		UnitTestMockUps.Lock()
+		defer UnitTestMockUps.Unlock()
 
 		// Apply pending BIOS settings after a delay (mock for testing).
 		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
@@ -92,6 +95,9 @@ func (r *RedfishLocalBMC) PowerOff(ctx context.Context, systemURI string) error 
 
 // GetBiosPendingAttributeValues returns pending BIOS attribute values.
 func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
+	UnitTestMockUps.Lock()
+	defer UnitTestMockUps.Unlock()
+
 	pending := UnitTestMockUps.PendingBIOSSetting
 	if len(pending) == 0 {
 		return redfish.SettingsAttributes{}, nil
@@ -106,6 +112,9 @@ func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(ctx context.Context, sys
 
 // SetBiosAttributesOnReset sets BIOS attributes, applying them immediately or on next reset.
 func (r *RedfishLocalBMC) SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) error {
+	UnitTestMockUps.Lock()
+	defer UnitTestMockUps.Unlock()
+
 	UnitTestMockUps.ResetPendingBIOSSetting()
 	for key, value := range attributes {
 		if attrData, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
@@ -129,6 +138,10 @@ func (r *RedfishLocalBMC) GetBiosAttributeValues(ctx context.Context, systemUUID
 		return nil, nil
 	}
 
+	UnitTestMockUps.RLock()
+	defer UnitTestMockUps.RUnlock()
+
+	// The rest of the function now operates on a consistent, locked view of the data.
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get filtered BIOS attributes: %w", err)
@@ -185,9 +198,15 @@ func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string)
 
 // UpgradeBiosVersion initiates a BIOS upgrade.
 func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
+	UnitTestMockUps.Lock()
 	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
 	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
+	UnitTestMockUps.Unlock()
+
 	go func() {
+		UnitTestMockUps.Lock()
+		defer UnitTestMockUps.Unlock()
+
 		time.Sleep(20 * time.Millisecond)
 		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
 			time.Sleep(5 * time.Millisecond)
@@ -199,6 +218,9 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer s
 
 // GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
 func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
+	UnitTestMockUps.Lock()
+	defer UnitTestMockUps.Unlock()
+
 	index := UnitTestMockUps.BIOSUpgradeTaskIndex
 	if index >= len(UnitTestMockUps.BIOSUpgradeTaskStatus) {
 		index = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
@@ -213,6 +235,9 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, 
 // ResetManager resets the BMC with a delay for pending settings.
 func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
 	go func() {
+		UnitTestMockUps.Lock()
+		defer UnitTestMockUps.Unlock()
+
 		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
 			time.Sleep(150 * time.Millisecond)
 			for key, data := range UnitTestMockUps.PendingBMCSetting {
@@ -320,9 +345,15 @@ func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) 
 
 // UpgradeBMCVersion initiates a BMC upgrade.
 func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
+	UnitTestMockUps.Lock()
 	UnitTestMockUps.BMCUpgradeTaskIndex = 0
 	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
+	defer UnitTestMockUps.Unlock()
+
 	go func() {
+		UnitTestMockUps.Lock()
+		defer UnitTestMockUps.Unlock()
+
 		time.Sleep(20 * time.Millisecond)
 		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
 			time.Sleep(5 * time.Millisecond)
@@ -334,6 +365,9 @@ func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer st
 
 // GetBMCUpgradeTask retrieves the status of a BMC upgrade task.
 func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
+	UnitTestMockUps.Lock()
+	defer UnitTestMockUps.Unlock()
+
 	index := UnitTestMockUps.BMCUpgradeTaskIndex
 	if index >= len(UnitTestMockUps.BMCUpgradeTaskStatus) {
 		index = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1

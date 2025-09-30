@@ -81,6 +81,7 @@ func main() { // nolint: gocyclo
 		resourcePollingTimeout             time.Duration
 		discoveryTimeout                   time.Duration
 		biosSettingsApplyTimeout           time.Duration
+		bmcFailureResetDelay               time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 	)
@@ -100,6 +101,8 @@ func main() { // nolint: gocyclo
 		"Defines the interval at which the registry is polled for new server information.")
 	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 2*time.Minute,
 		"Defines the interval at which the server is polled.")
+	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
+		"Reset the BMC after this duration of consecutive failures. 0 to disable.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
@@ -141,6 +144,11 @@ func main() { // nolint: gocyclo
 
 	if probeOSImage == "" {
 		setupLog.Error(nil, "probe OS image must be set")
+		os.Exit(1)
+	}
+
+	if probeImage == "" {
+		setupLog.Error(nil, "probe image must be set")
 		os.Exit(1)
 	}
 
@@ -308,9 +316,11 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Insecure: insecure,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Insecure:             insecure,
+		BMCFailureResetDelay: bmcFailureResetDelay,
+		ManagerNamespace:     managerNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BMC")
 		os.Exit(1)

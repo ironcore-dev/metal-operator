@@ -3,10 +3,16 @@
 
 package bmc
 
-import "github.com/stmcginnis/gofish/redfish"
+import (
+	"sync"
+
+	"github.com/stmcginnis/gofish/redfish"
+)
 
 // RedfishMockUps is an implementation of the BMC interface for Redfish.
 type RedfishMockUps struct {
+	mu sync.RWMutex
+
 	BIOSSettingAttr       map[string]map[string]any
 	PendingBIOSSetting    map[string]map[string]any
 	BIOSVersion           string
@@ -26,6 +32,9 @@ type RedfishMockUps struct {
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.BIOSSettingAttr = map[string]map[string]any{
 		"abc":       {"type": "string", "reboot": false, "value": "bar"},
 		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
@@ -111,6 +120,9 @@ func (r *RedfishMockUps) InitializeDefaults() {
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.BIOSSettingAttr = map[string]map[string]any{
 		"abc":       {"type": "string", "reboot": false, "value": "bar"},
 		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
@@ -119,21 +131,40 @@ func (r *RedfishMockUps) ResetBIOSSettings() {
 }
 
 func (r *RedfishMockUps) ResetPendingBIOSSetting() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.PendingBIOSSetting = map[string]map[string]any{}
 }
 
 func (r *RedfishMockUps) ResetBIOSVersionUpdate() {
-	r.ResetBIOSSettings()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// NOTE: We do not call r.ResetBIOSSettings() here to avoid locking twice (deadlock/panic).
+	// Instead, we copy the logic directly, or ensure ResetBIOSSettings() does not lock itself.
+	r.BIOSSettingAttr = map[string]map[string]any{
+		"abc":       {"type": "string", "reboot": false, "value": "bar"},
+		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
+	}
+	r.PendingBIOSSetting = map[string]map[string]any{}
+
 	r.BIOSUpgradeTaskIndex = 0
 	r.BIOSUpgradingVersion = ""
 	r.BIOSVersion = ""
 }
 
 func (r *RedfishMockUps) ResetPendingBMCSetting() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.PendingBMCSetting = map[string]map[string]any{}
 }
 
 func (r *RedfishMockUps) ResetBMCSettings() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.BMCSettingAttr = map[string]map[string]any{
 		"abc":       {"type": redfish.StringAttributeType, "reboot": false, "value": "bar"},
 		"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
@@ -142,7 +173,16 @@ func (r *RedfishMockUps) ResetBMCSettings() {
 }
 
 func (r *RedfishMockUps) ResetBMCVersionUpdate() {
-	r.ResetBMCSettings()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// NOTE: Copying logic from ResetBMCSettings to avoid double-locking.
+	r.BMCSettingAttr = map[string]map[string]any{
+		"abc":       {"type": redfish.StringAttributeType, "reboot": false, "value": "bar"},
+		"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
+	}
+	r.PendingBMCSetting = map[string]map[string]any{}
+
 	r.BMCVersion = ""
 	r.BMCUpgradingVersion = ""
 	r.BMCUpgradeTaskIndex = 0

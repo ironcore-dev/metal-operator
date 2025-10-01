@@ -14,4 +14,5 @@ resources:
 - metal_v1alpha1_biosversionset.yaml
 - metal_v1alpha1_bmcversionset.yaml
 - metal_v1alpha1_biossettingsset.yaml
+- metal_v1alpha1_bmcsettingsset.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

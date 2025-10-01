@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"slices"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/stmcginnis/gofish/redfish"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
@@ -72,6 +74,44 @@ func GenerateRandomPassword(length int) ([]byte, error) {
 		result[i] = letters[n.Int64()]
 	}
 	return result, nil
+}
+
+func rearrangeBootOrder(
+	currentOrder []string,
+	currentBootOptions []*redfish.BootOption,
+	highPriorityBootOrderFunc func(*redfish.BootOption) bool,
+	removeBootOrderFunc func(*redfish.BootOption) bool,
+) []string {
+	var highPrioirtyBootDevices []*redfish.BootOption
+	var removedBootOption []*redfish.BootOption
+	for _, bootOption := range currentBootOptions {
+		if removeBootOrderFunc(bootOption) {
+			removedBootOption = append(removedBootOption, bootOption)
+		}
+		if highPriorityBootOrderFunc(bootOption) {
+			highPrioirtyBootDevices = append(highPrioirtyBootDevices, bootOption)
+		}
+	}
+
+	var newBootOrder []string
+	// Add high priority boot devices first
+	for _, bootDevice := range highPrioirtyBootDevices {
+		newBootOrder = append(newBootOrder, bootDevice.BootOptionReference)
+	}
+
+	for _, bootOrder := range currentOrder {
+		if slices.Contains(newBootOrder, bootOrder) {
+			continue
+		}
+		if slices.ContainsFunc(removedBootOption, func(removed *redfish.BootOption) bool {
+			return removed.BootOptionReference == bootOrder
+		}) {
+			continue
+		}
+		newBootOrder = append(newBootOrder, bootOrder)
+	}
+
+	return newBootOrder
 }
 
 func enqueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {

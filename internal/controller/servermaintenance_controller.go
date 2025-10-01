@@ -457,27 +457,35 @@ func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, lo
 		if err != nil {
 			return false, fmt.Errorf("failed to get boot order: %w", err)
 		}
+		// if the boot order lenght is less than 2, we cannot change pxe as first boot
+		if len(bootOrder) < 2 {
+			return false, nil
+		}
 		bootOptions, err := bmcClient.GetBootOptions(ctx, server.Spec.SystemURI)
 		if err != nil {
 			return false, fmt.Errorf("failed to get boot options: %w", err)
 		}
 
-		pxeBoot := ""
-		for _, bootOption := range bootOptions {
-			if strings.Contains(strings.ToLower(bootOption.DisplayName), "pxe") {
-				pxeBoot = bootOption.BootOptionReference
-				if strings.EqualFold(bootOrder[0], bootOption.BootOptionReference) {
-					// already set to pxe boot
-					return false, nil
+		var isDiskBootOption = func(bootOption *redfish.BootOption) bool {
+			diskIndicators := []string{"/HD(", "/Sata(", "/NVMe(", "/Scsi(", "/USB("}
+			for _, indicator := range diskIndicators {
+				if strings.Contains(bootOption.UefiDevicePath, indicator) {
+					return true
 				}
-				break
 			}
+			return false
 		}
+
+		var isPxeBootOption = func(bootOption *redfish.BootOption) bool {
+			return strings.Contains(strings.ToLower(bootOption.DisplayName), "pxe")
+		}
+
+		bootOrderChanged := rearrangeBootOrder(bootOrder, bootOptions, isPxeBootOption, isDiskBootOption)
 
 		if maintenance.Status.DefaultBootOrder == nil {
 			// note in this option, the server will always boot into pxe until changed again
 			// the job needs to be completed, else any other BIOS config job triggered will fail as exsisting job is not completed
-			if err := bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, redfish.Boot{BootOrder: []string{pxeBoot}}); err != nil {
+			if err := bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, redfish.Boot{BootOrder: bootOrderChanged}); err != nil {
 				return false, fmt.Errorf("failed to set PXE boot once: %w", err)
 			}
 			// save the current boot order to revert back after maintenance

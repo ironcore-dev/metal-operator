@@ -446,7 +446,6 @@ var _ = Describe("BMC Reset", func() {
 			DeleteAllMetalResources(ctx, ns.Name)
 		})
 		It("Should create ready conditions when there are bmc connection errors", func(ctx SpecContext) {
-			metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
 			By("Creating a BMCSecret")
 			bmcSecret := &metalv1alpha1.BMCSecret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -458,6 +457,7 @@ var _ = Describe("BMC Reset", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+			metalBmc.UnitTestMockUps.SimulateUnvailableBMC["foo"] = true
 
 			By("Creating a BMC resource")
 			bmc := &metalv1alpha1.BMC{
@@ -493,7 +493,7 @@ var _ = Describe("BMC Reset", func() {
 				)),
 			)
 
-			metalBmc.UnitTestMockUps.SimulateUnvailableBMC = false
+			metalBmc.UnitTestMockUps.SimulateUnvailableBMC["foo"] = false
 
 			By("Ensuring right conditions are present, after bmc becomes responsive again")
 			Eventually(Object(bmc)).Should(

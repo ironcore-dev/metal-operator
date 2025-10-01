@@ -26,7 +26,7 @@ type RedfishLocalBMC struct {
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
 func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error) {
-	if UnitTestMockUps.SimulateUnvailableBMC {
+	if UnitTestMockUps.SimulateUnvailableBMC[options.Username] {
 		err := &gofishCommon.Error{
 			HTTPReturnedStatusCode: 503,
 		}
@@ -71,14 +71,14 @@ func (r *RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
 		defer mockRWMutex.Unlock()
 
 		// Apply pending BIOS settings after a delay (mock for testing).
-		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
-			time.Sleep(50 * time.Millisecond)
-			for key, data := range UnitTestMockUps.PendingBIOSSetting {
-				if _, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
-					UnitTestMockUps.BIOSSettingAttr[key] = data
+		if len(UnitTestMockUps.PendingBIOSSetting[r.options.Username]) > 0 {
+			time.Sleep(150 * time.Millisecond)
+			for key, data := range UnitTestMockUps.PendingBIOSSetting[r.options.Username] {
+				if _, ok := UnitTestMockUps.BIOSSettingAttr[r.options.Username][key]; ok {
+					UnitTestMockUps.BIOSSettingAttr[r.options.Username][key] = data
 				}
 			}
-			UnitTestMockUps.ResetPendingBIOSSetting()
+			delete(UnitTestMockUps.PendingBIOSSetting, r.options.Username)
 		}
 	}()
 	return nil
@@ -99,15 +99,16 @@ func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(ctx context.Context, sys
 	mockRWMutex.RLock()
 	defer mockRWMutex.RUnlock()
 
-	pending := UnitTestMockUps.PendingBIOSSetting
-	if len(pending) == 0 {
+	if attr, ok := UnitTestMockUps.PendingBIOSSetting[r.options.Username]; !ok || len(attr) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pending))
-	for key, data := range pending {
+	result := make(redfish.SettingsAttributes, len(UnitTestMockUps.PendingBIOSSetting[r.options.Username]))
+
+	for key, data := range UnitTestMockUps.PendingBIOSSetting[r.options.Username] {
 		result[key] = data["value"]
 	}
+
 	return result, nil
 }
 
@@ -116,16 +117,23 @@ func (r *RedfishLocalBMC) SetBiosAttributesOnReset(ctx context.Context, systemUU
 	mockRWMutex.Lock()
 	defer mockRWMutex.Unlock()
 
-	UnitTestMockUps.ResetPendingBIOSSetting()
-	for key, value := range attributes {
-		if attrData, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
-			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
-				attrData["value"] = value
+	if value, ok := UnitTestMockUps.BIOSSettingAttr[r.options.Username]; !ok || len(value) == 0 {
+		UnitTestMockUps.BIOSSettingAttr[r.options.Username] = UnitTestMockUps.BIOSSettingAttr["default"]
+	}
+	if _, ok := UnitTestMockUps.PendingBIOSSetting[r.options.Username]; !ok {
+		UnitTestMockUps.PendingBIOSSetting[r.options.Username] = map[string]map[string]any{}
+	}
+	for key, attrData := range attributes {
+		if AttributesData, ok := UnitTestMockUps.BIOSSettingAttr[r.options.Username][key]; ok {
+			if reboot, ok := AttributesData["reboot"]; ok && !reboot.(bool) {
+				// if reboot not needed, set the attribute immediately.
+				AttributesData["value"] = attrData
 			} else {
-				UnitTestMockUps.PendingBIOSSetting[key] = map[string]interface{}{
-					"type":   attrData["type"],
-					"reboot": attrData["reboot"],
-					"value":  value,
+				// if reboot needed, set the attribute at next power on.
+				UnitTestMockUps.PendingBIOSSetting[r.options.Username][key] = map[string]any{
+					"type":   AttributesData["type"],
+					"reboot": AttributesData["reboot"],
+					"value":  attrData,
 				}
 			}
 		}
@@ -143,15 +151,19 @@ func (r *RedfishLocalBMC) GetBiosAttributeValues(ctx context.Context, systemUUID
 	defer mockRWMutex.RUnlock()
 
 	// The rest of the function now operates on a consistent, locked view of the data.
-	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get filtered BIOS attributes: %w", err)
+	if attr, ok := UnitTestMockUps.BIOSSettingAttr[r.options.Username]; !ok || len(attr) == 0 {
+		UnitTestMockUps.BIOSSettingAttr[r.options.Username] = UnitTestMockUps.BIOSSettingAttr["default"]
 	}
-
+	filteredAttr, err := r.getFilteredBiosRegistryAttributes(false, false)
+	if err != nil {
+		return nil, err
+	}
 	result := make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
-		if attrData, ok := UnitTestMockUps.BIOSSettingAttr[name]; ok && filtered[name].AttributeName != "" {
-			result[name] = attrData["value"]
+		if _, ok := filteredAttr[name]; ok {
+			if AttributesData, ok := UnitTestMockUps.BIOSSettingAttr[r.options.Username][name]; ok {
+				result[name] = AttributesData["value"]
+			}
 		}
 	}
 	return result, nil
@@ -159,12 +171,12 @@ func (r *RedfishLocalBMC) GetBiosAttributeValues(ctx context.Context, systemUUID
 
 // getFilteredBiosRegistryAttributes returns filtered BIOS registry attributes.
 func (r *RedfishLocalBMC) getFilteredBiosRegistryAttributes(readOnly, immutable bool) (map[string]RegistryEntryAttributes, error) {
-	if len(UnitTestMockUps.BIOSSettingAttr) == 0 {
-		return nil, fmt.Errorf("no BIOS setting attributes found")
+	if attr, ok := UnitTestMockUps.BIOSSettingAttr[r.options.Username]; !ok || len(attr) == 0 {
+		return nil, fmt.Errorf("no bmc setting attributes found")
 	}
 
 	filtered := make(map[string]RegistryEntryAttributes)
-	for name, attrData := range UnitTestMockUps.BIOSSettingAttr {
+	for name, attrData := range UnitTestMockUps.BIOSSettingAttr[r.options.Username] {
 		filtered[name] = RegistryEntryAttributes{
 			AttributeName: name,
 			Immutable:     immutable,
@@ -178,6 +190,11 @@ func (r *RedfishLocalBMC) getFilteredBiosRegistryAttributes(readOnly, immutable 
 
 // CheckBiosAttributes validates BIOS attributes.
 func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool, error) {
+	if attr, ok := UnitTestMockUps.BIOSSettingAttr[r.options.Username]; !ok || len(attr) == 0 {
+		mockRWMutex.Lock()
+		UnitTestMockUps.BIOSSettingAttr[r.options.Username] = UnitTestMockUps.BIOSSettingAttr["default"]
+		mockRWMutex.Unlock()
+	}
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err
@@ -187,31 +204,33 @@ func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) 
 
 // GetBiosVersion retrieves the BIOS version.
 func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
-	if UnitTestMockUps.BIOSVersion == "" {
+	if value, ok := UnitTestMockUps.BIOSVersion[r.options.Username]; !ok || value == "" {
+		mockRWMutex.Lock()
+		defer mockRWMutex.Unlock()
 		var err error
-		UnitTestMockUps.BIOSVersion, err = r.RedfishBMC.GetBiosVersion(ctx, systemUUID)
+		UnitTestMockUps.BIOSVersion[r.options.Username], err = r.RedfishBMC.GetBiosVersion(ctx, systemUUID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get BIOS version: %w", err)
 		}
 	}
-	return UnitTestMockUps.BIOSVersion, nil
+	return UnitTestMockUps.BIOSVersion[r.options.Username], nil
 }
 
 // UpgradeBiosVersion initiates a BIOS upgrade.
 func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
 	mockRWMutex.Lock()
-	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
-	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
-	defer mockRWMutex.Unlock()
-
+	UnitTestMockUps.BIOSUpgradeTaskIndex[r.options.Username] = 0
+	// note, ImageURI is mocked for testing upgrading to version
+	UnitTestMockUps.BIOSUpgradingVersion[r.options.Username] = params.ImageURI
+	mockRWMutex.Unlock()
+	// this go routine mocks the upgrade progress
 	go func() {
 		mockRWMutex.Lock()
 		defer mockRWMutex.Unlock()
-
 		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
+		for UnitTestMockUps.BIOSUpgradeTaskIndex[r.options.Username] < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
 			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BIOSUpgradeTaskIndex++
+			UnitTestMockUps.BIOSUpgradeTaskIndex[r.options.Username] = UnitTestMockUps.BIOSUpgradeTaskIndex[r.options.Username] + 1
 		}
 	}()
 	return "dummyTask", false, nil
@@ -222,13 +241,17 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, 
 	mockRWMutex.Lock()
 	defer mockRWMutex.Unlock()
 
-	index := UnitTestMockUps.BIOSUpgradeTaskIndex
+	if UnitTestMockUps.BIOSUpgradeTaskIndex[r.options.Username] > len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
+		UnitTestMockUps.BIOSUpgradeTaskIndex[r.options.Username] = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
+	}
+
+	index := UnitTestMockUps.BIOSUpgradeTaskIndex[r.options.Username]
 	if index >= len(UnitTestMockUps.BIOSUpgradeTaskStatus) {
 		index = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
 	}
 	task := &UnitTestMockUps.BIOSUpgradeTaskStatus[index]
 	if task.TaskState == redfish.CompletedTaskState {
-		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
+		UnitTestMockUps.BIOSVersion[r.options.Username] = UnitTestMockUps.BIOSUpgradingVersion[r.options.Username]
 	}
 	return task, nil
 }
@@ -239,14 +262,14 @@ func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetTy
 		mockRWMutex.Lock()
 		defer mockRWMutex.Unlock()
 
-		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
+		if len(UnitTestMockUps.PendingBMCSetting[r.options.Username]) > 0 {
 			time.Sleep(150 * time.Millisecond)
-			for key, data := range UnitTestMockUps.PendingBMCSetting {
-				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
-					UnitTestMockUps.BMCSettingAttr[key] = data
+			for key, data := range UnitTestMockUps.PendingBMCSetting[r.options.Username] {
+				if _, ok := UnitTestMockUps.BMCSettingAttr[r.options.Username][key]; ok {
+					UnitTestMockUps.BMCSettingAttr[r.options.Username][key] = data
 				}
 			}
-			UnitTestMockUps.ResetPendingBMCSetting()
+			delete(UnitTestMockUps.PendingBMCSetting, r.options.Username)
 		}
 	}()
 	return nil
@@ -254,12 +277,20 @@ func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetTy
 
 // SetBMCAttributesImmediately sets BMC attributes, applying them immediately or on reset.
 func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) error {
+	mockRWMutex.Lock()
+	defer mockRWMutex.Unlock()
+	if value, ok := UnitTestMockUps.BMCSettingAttr[r.options.Username]; !ok || len(value) == 0 {
+		UnitTestMockUps.BMCSettingAttr[r.options.Username] = UnitTestMockUps.BMCSettingAttr["default"]
+	}
+	if _, ok := UnitTestMockUps.PendingBMCSetting[r.options.Username]; !ok {
+		UnitTestMockUps.PendingBMCSetting[r.options.Username] = map[string]map[string]any{}
+	}
 	for key, value := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
+		if attrData, ok := UnitTestMockUps.BMCSettingAttr[r.options.Username][key]; ok {
 			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
 				attrData["value"] = value
 			} else {
-				UnitTestMockUps.PendingBMCSetting[key] = map[string]interface{}{
+				UnitTestMockUps.PendingBMCSetting[r.options.Username][key] = map[string]interface{}{
 					"type":   attrData["type"],
 					"reboot": attrData["reboot"],
 					"value":  value,
@@ -276,6 +307,12 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string
 		return nil, nil
 	}
 
+	if attr, ok := UnitTestMockUps.BMCSettingAttr[r.options.Username]; !ok || len(attr) == 0 {
+		mockRWMutex.Lock()
+		UnitTestMockUps.BMCSettingAttr[r.options.Username] = UnitTestMockUps.BMCSettingAttr["default"]
+		mockRWMutex.Unlock()
+	}
+
 	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get filtered BMC attributes: %w", err)
@@ -283,7 +320,7 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string
 
 	result := make(redfish.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[name]; ok && filtered[name].AttributeName != "" {
+		if attrData, ok := UnitTestMockUps.BMCSettingAttr[r.options.Username][name]; ok && filtered[name].AttributeName != "" {
 			result[name] = attrData["value"]
 		}
 	}
@@ -292,7 +329,7 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string
 
 // GetBMCPendingAttributeValues returns pending BMC attribute values.
 func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
-	pending := UnitTestMockUps.PendingBMCSetting
+	pending := UnitTestMockUps.PendingBMCSetting[r.options.Username]
 	if len(pending) == 0 {
 		return redfish.SettingsAttributes{}, nil
 	}
@@ -306,12 +343,12 @@ func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(ctx context.Context, syst
 
 // getFilteredBMCRegistryAttributes returns filtered BMC registry attributes.
 func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(readOnly, immutable bool) (map[string]redfish.Attribute, error) {
-	if len(UnitTestMockUps.BMCSettingAttr) == 0 {
+	if attr, ok := UnitTestMockUps.BMCSettingAttr[r.options.Username]; !ok || len(attr) == 0 {
 		return nil, fmt.Errorf("no BMC setting attributes found")
 	}
 
 	filtered := make(map[string]redfish.Attribute)
-	for name, attrData := range UnitTestMockUps.BMCSettingAttr {
+	for name, attrData := range UnitTestMockUps.BMCSettingAttr[r.options.Username] {
 		filtered[name] = redfish.Attribute{
 			AttributeName: name,
 			Immutable:     immutable,
@@ -325,6 +362,11 @@ func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(readOnly, immutable b
 
 // CheckBMCAttributes validates BMC attributes.
 func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (bool, error) {
+	if attr, ok := UnitTestMockUps.BMCSettingAttr[r.options.Username]; !ok || len(attr) == 0 {
+		mockRWMutex.Lock()
+		UnitTestMockUps.BMCSettingAttr[r.options.Username] = UnitTestMockUps.BMCSettingAttr["default"]
+		mockRWMutex.Unlock()
+	}
 	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err
@@ -334,31 +376,33 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.Settings
 
 // GetBMCVersion retrieves the BMC version.
 func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
-	if UnitTestMockUps.BMCVersion == "" {
+	if ver, ok := UnitTestMockUps.BMCVersion[r.options.Username]; ver == "" || !ok {
+		mockRWMutex.Lock()
+		defer mockRWMutex.Unlock()
 		var err error
-		UnitTestMockUps.BMCVersion, err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
+		UnitTestMockUps.BMCVersion[r.options.Username], err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
 		if err != nil {
-			return "", fmt.Errorf("failed to get BMC version: %w", err)
+			return "", err
 		}
 	}
-	return UnitTestMockUps.BMCVersion, nil
+	return UnitTestMockUps.BMCVersion[r.options.Username], nil
 }
 
 // UpgradeBMCVersion initiates a BMC upgrade.
 func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
 	mockRWMutex.Lock()
-	UnitTestMockUps.BMCUpgradeTaskIndex = 0
-	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
-	defer mockRWMutex.Unlock()
+	UnitTestMockUps.BMCUpgradeTaskIndex[r.options.Username] = 0
+	UnitTestMockUps.BMCUpgradingVersion[r.options.Username] = params.ImageURI
+	mockRWMutex.Unlock()
 
 	go func() {
 		mockRWMutex.Lock()
 		defer mockRWMutex.Unlock()
 
 		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+		for UnitTestMockUps.BMCUpgradeTaskIndex[r.options.Username] < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
 			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BMCUpgradeTaskIndex++
+			UnitTestMockUps.BMCUpgradeTaskIndex[r.options.Username] = UnitTestMockUps.BMCUpgradeTaskIndex[r.options.Username] + 1
 		}
 	}()
 	return "dummyTask", false, nil
@@ -368,14 +412,16 @@ func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer st
 func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
 	mockRWMutex.Lock()
 	defer mockRWMutex.Unlock()
-
-	index := UnitTestMockUps.BMCUpgradeTaskIndex
+	if _, ok := UnitTestMockUps.BMCUpgradeTaskIndex[r.options.Username]; !ok {
+		UnitTestMockUps.BMCUpgradeTaskIndex[r.options.Username] = 0
+	}
+	index := UnitTestMockUps.BMCUpgradeTaskIndex[r.options.Username]
 	if index >= len(UnitTestMockUps.BMCUpgradeTaskStatus) {
 		index = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
 	}
 	task := &UnitTestMockUps.BMCUpgradeTaskStatus[index]
 	if task.TaskState == redfish.CompletedTaskState {
-		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
+		UnitTestMockUps.BMCVersion[r.options.Username] = UnitTestMockUps.BMCUpgradingVersion[r.options.Username]
 	}
 	return task, nil
 }

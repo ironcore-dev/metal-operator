@@ -28,16 +28,36 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		BeforeEach(func(ctx SpecContext) {
 			upgradeServerBiosVersion = "P80 v1.45 (12/06/2017)"
 			By("Creating a BMCSecret")
-			bmcSecret := &metalv1alpha1.BMCSecret{
+			bmcSecret01 := &metalv1alpha1.BMCSecret{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
 				},
 				Data: map[string][]byte{
-					metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+					metalv1alpha1.BMCSecretUsernameKeyName: []byte("server01"),
 					metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
 				},
 			}
-			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+			Expect(k8sClient.Create(ctx, bmcSecret01)).To(Succeed())
+			bmcSecret02 := &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-",
+				},
+				Data: map[string][]byte{
+					metalv1alpha1.BMCSecretUsernameKeyName: []byte("server02"),
+					metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret02)).To(Succeed())
+			bmcSecret03 := &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-",
+				},
+				Data: map[string][]byte{
+					metalv1alpha1.BMCSecretUsernameKeyName: []byte("server03"),
+					metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret03)).To(Succeed())
 
 			By("Creating a Server01")
 			server01 = &metalv1alpha1.Server{
@@ -57,7 +77,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 						},
 						Address: "127.0.0.1",
 						BMCSecretRef: v1.LocalObjectReference{
-							Name: bmcSecret.Name,
+							Name: bmcSecret01.Name,
 						},
 					},
 				},
@@ -82,7 +102,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 						},
 						Address: "127.0.0.1",
 						BMCSecretRef: v1.LocalObjectReference{
-							Name: bmcSecret.Name,
+							Name: bmcSecret02.Name,
 						},
 					},
 				},
@@ -107,7 +127,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 						},
 						Address: "127.0.0.1",
 						BMCSecretRef: v1.LocalObjectReference{
-							Name: bmcSecret.Name,
+							Name: bmcSecret03.Name,
 						},
 					},
 				},

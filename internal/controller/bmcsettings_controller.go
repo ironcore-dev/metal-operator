@@ -844,7 +844,7 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByServerRefs(
 	host := obj.(*metalv1alpha1.Server)
 
 	// return early if hosts are not required states
-	if host.Status.State != metalv1alpha1.ServerStateMaintenance {
+	if host.Status.State != metalv1alpha1.ServerStateMaintenance || host.Spec.ServerMaintenanceRef == nil {
 		return nil
 	}
 

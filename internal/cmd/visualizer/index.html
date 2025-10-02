@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes 3D Server Rack Visualizer</title>
+    <style>
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #1a1a1a; color: #fff; }
+        canvas { display: block; }
+        #tooltip {
+            position: absolute;
+            display: none;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 8px;
+            color: #fff;
+            pointer-events: none;
+            white-space: pre;
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid #444;
+        }
+        #header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 5px #000;
+        }
+    </style>
+</head>
+<body>
+<div id="header">Server Visualizer</div>
+<div id="tooltip"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+    // main.js (embedded)
+    document.addEventListener('DOMContentLoaded', () => {
+        let scene, camera, renderer, controls, cameraTargetSet = false;
+        let INTERSECTED;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const serverObjects = [];
+        const tooltip = document.getElementById('tooltip');
+        const rackGroup = new THREE.Group(); // Group to hold all rack and server objects
+
+        // --- Constants for Visualization ---
+        const RACK_WIDTH = 10;
+        const RACK_DEPTH = 15;
+        const RACK_SPACING = 5;
+        const SERVER_HEIGHT = 0.8; // Height of 1U
+        const SERVER_MARGIN = 0.1; // Margin between servers
+        const REFRESH_INTERVAL = 5000; // 5 seconds
+
+        function init() {
+            // --- Scene Setup ---
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+            scene.fog = new THREE.Fog(0x1a1a1a, 50, 200);
+            scene.add(rackGroup);
+
+            // --- Camera Setup ---
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(20, 30, 60);
+
+            // --- Renderer Setup ---
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // --- Lighting ---
+            const ambientLight = new THREE.AmbientLight(0xcccccc, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(-30, 50, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            // --- Controls ---
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 10;
+            controls.maxDistance = 200;
+            controls.maxPolarAngle = Math.PI / 2;
+
+            // The camera target will now be set dynamically in visualizeServers().
+
+            // --- Ground Plane ---
+            const planeGeometry = new THREE.PlaneGeometry(500, 500);
+            const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+            const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.y = -0.5;
+            plane.receiveShadow = true;
+            scene.add(plane);
+
+            // --- Event Listeners ---
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousemove', onMouseMove, false);
+
+            // --- Data Fetching ---
+            fetchServers(); // Initial fetch
+            setInterval(fetchServers, REFRESH_INTERVAL); // Refresh periodically
+
+            animate();
+        }
+
+        function clearScene() {
+            // Clear previous objects before redrawing
+            while(rackGroup.children.length > 0){
+                const child = rackGroup.children[0];
+                // Dispose of geometry and material to free up GPU memory
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+                rackGroup.remove(child);
+            }
+            rackGroup.position.set(0, 0, 0);
+            serverObjects.length = 0; // Clear the array for intersection checks
+        }
+
+        function fetchServers() {
+            fetch('/api/servers')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch server data');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    clearScene();
+                    if (data) {
+                        visualizeServers(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching servers:', error);
+                    // Display error message on screen
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.position = 'absolute';
+                    errorDiv.style.top = '50%';
+                    errorDiv.style.left = '50%';
+                    errorDiv.style.transform = 'translate(-50%, -50%)';
+                    errorDiv.style.color = 'red';
+                    errorDiv.style.fontSize = '18px';
+                    errorDiv.textContent = 'Could not fetch server data. Is kubectl proxy running and are servers available?';
+                    document.body.appendChild(errorDiv);
+                });
+        }
+
+        function visualizeServers(servers) {
+            const racks = {};
+            servers.forEach(server => {
+                if (!racks[server.rack]) {
+                    racks[server.rack] = [];
+                }
+                racks[server.rack].push(server);
+            });
+
+            Object.keys(racks).sort((a,b) => a - b).forEach((rackId, index) => {
+                const rackX = index * (RACK_WIDTH + RACK_SPACING);
+
+                // Create rack frame (optional, for visual context)
+                const rackHeight = 50; // A typical rack height
+                const frameMaterial = new THREE.LineBasicMaterial({ color: 0x555555 });
+                const points = [];
+                points.push(new THREE.Vector3(rackX - RACK_WIDTH / 2, 0, -RACK_DEPTH / 2));
+                points.push(new THREE.Vector3(rackX - RACK_WIDTH / 2, rackHeight, -RACK_DEPTH / 2));
+                points.push(new THREE.Vector3(rackX + RACK_WIDTH / 2, rackHeight, -RACK_DEPTH / 2));
+                points.push(new THREE.Vector3(rackX + RACK_WIDTH / 2, 0, -RACK_DEPTH / 2));
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const rackFrame = new THREE.Line(geometry, frameMaterial);
+                rackGroup.add(rackFrame);
+
+                // Add rack label
+                const loader = new THREE.FontLoader();
+                loader.load('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+                    const textGeo = new THREE.TextGeometry('Rack ' + rackId, {
+                        font: font,
+                        size: 2,
+                        height: 0.1,
+                    });
+                    const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                    const textMesh = new THREE.Mesh(textGeo, textMaterial);
+                    textMesh.position.set(rackX - RACK_WIDTH / 2, rackHeight + 2, -RACK_DEPTH / 2);
+                    rackGroup.add(textMesh);
+                });
+
+                racks[rackId].forEach(server => {
+                    const serverGeometry = new THREE.BoxGeometry(RACK_WIDTH, SERVER_HEIGHT, RACK_DEPTH);
+
+                    let color = 0x666666; // Default color (Off)
+                    if (server.power.toLowerCase() === 'on') {
+                        color = 0x00ff00; // Green for On
+                    }
+                    if (server.indicatorLED.toLowerCase() === 'blinking') {
+                        color = 0x0000ff; // Blue for Blinking
+                    }
+
+                    const serverMaterial = new THREE.MeshStandardMaterial({
+                        color: color,
+                        roughness: 0.6,
+                        metalness: 0.2
+                    });
+
+                    const serverMesh = new THREE.Mesh(serverGeometry, serverMaterial);
+                    serverMesh.castShadow = true;
+                    serverMesh.receiveShadow = true;
+
+                    // Position server in the rack
+                    const serverY = (server.heightUnit * (SERVER_HEIGHT + SERVER_MARGIN));
+                    serverMesh.position.set(rackX, serverY, 0);
+
+                    // Store server data in the mesh for tooltip
+                    serverMesh.userData = server;
+
+                    rackGroup.add(serverMesh);
+                    serverObjects.push(serverMesh);
+                });
+            });
+
+            // After populating the group, adjust its position and the camera target.
+            if (rackGroup.children.length > 0) {
+                // 1. Calculate the bounding box of the entire group.
+                const boundingBox = new THREE.Box3().setFromObject(rackGroup);
+
+                // 2. Calculate the vector needed to move the group's lower-left-front corner to the origin.
+                const offset = boundingBox.min.clone().negate();
+
+                // 3. Apply this offset to the entire group of racks and servers.
+                rackGroup.position.copy(offset);
+
+                // 4. On the first run, set the camera to look at the new center of the scene.
+                if (!cameraTargetSet) {
+                    const newCenter = new THREE.Vector3();
+                    // Get the center of the original box and apply the same offset to find the new center point.
+                    boundingBox.getCenter(newCenter).add(offset);
+
+                    controls.target.copy(newCenter);
+                    controls.update(); // Important: update controls after changing the target
+                    cameraTargetSet = true; // Set flag to prevent this from running again on refresh
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            event.preventDefault();
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            tooltip.style.left = (event.clientX + 15) + 'px';
+            tooltip.style.top = (event.clientY + 15) + 'px';
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Blinking effect for servers with indicatorLED
+            const time = Date.now() * 0.005;
+            serverObjects.forEach(obj => {
+                if (obj.userData.indicatorLED && obj.userData.indicatorLED.toLowerCase() === 'blinking') {
+                    obj.material.emissive.setHex( (time * 5) % 2 > 1 ? 0x0000ff : 0x000000 );
+                }
+            });
+
+            // --- Intersection / Tooltip Logic ---
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(serverObjects);
+
+            if (intersects.length > 0) {
+                if (INTERSECTED != intersects[0].object) {
+                    if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.currentHex);
+                    INTERSECTED = intersects[0].object;
+                    INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+                    INTERSECTED.material.emissive.setHex(0x555555);
+
+                    tooltip.style.display = 'block';
+                    const server = INTERSECTED.userData;
+                    tooltip.innerHTML = `Name: ${server.name}
+Rack: ${server.rack}
+Height Unit: ${server.heightUnit}
+Power: ${server.power}
+Indicator LED: ${server.indicatorLED || 'N/A'}
+State: ${server.state || 'N/A'}`;
+                }
+            } else {
+                if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.currentHex);
+                INTERSECTED = null;
+                tooltip.style.display = 'none';
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+    });
+</script>
+</body>
+</html>

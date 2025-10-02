@@ -29,16 +29,36 @@ var _ = Describe("BMCVersionSet Controller", func() {
 	BeforeEach(func(ctx SpecContext) {
 		upgradeServerBMCVersion = "1.46.455b66-rev4"
 		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
+		bmcSecret01 := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
-				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("BMC01"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
 			},
 		}
-		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Create(ctx, bmcSecret01)).To(Succeed())
+		bmcSecret02 := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("BMC02"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret02)).To(Succeed())
+		bmcSecret03 := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("BMC03"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret03)).To(Succeed())
 
 		By("Creating a bmc01")
 		bmc01 = &metalv1alpha1.BMC{
@@ -59,7 +79,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					Port: 8000,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
-					Name: bmcSecret.Name,
+					Name: bmcSecret01.Name,
 				},
 			},
 		}
@@ -84,7 +104,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					Port: 8000,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
-					Name: bmcSecret.Name,
+					Name: bmcSecret02.Name,
 				},
 			},
 		}
@@ -109,7 +129,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					Port: 8000,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
-					Name: bmcSecret.Name,
+					Name: bmcSecret03.Name,
 				},
 			},
 		}

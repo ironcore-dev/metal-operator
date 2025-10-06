@@ -121,6 +121,12 @@ type BMC interface {
 
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
+
+	// GetCriticalSystemEventLogs retrieves critical system event logs (SEL) for the system.
+	GetCriticalSystemEventLogs(ctx context.Context, systemURI string) ([]EventLogEntry, error)
+
+	// ClearSystemEventLogs clears the system event logs (SEL) for the system.
+	ClearSystemEventLogs(ctx context.Context, systemURI string) error
 }
 
 // OEMManagerInterface defines methods for OEM-specific BMC management.
@@ -294,6 +300,16 @@ type Processor struct {
 	TotalCores int32
 	// TotalThreads specifies the total number of threads in the processor.
 	TotalThreads int32
+}
+
+type EventLogEntry struct {
+	Name        string
+	Description string
+	EntryType   string
+	ID          string
+	Created     string
+	Severity    redfish.EventSeverity
+	Message     string
 }
 
 // SystemInfo represents basic information about the system.

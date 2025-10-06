@@ -27,6 +27,7 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -72,6 +73,11 @@ const (
 	powerOpOff = "PowerOff"
 	// powerOpNoOP is the no operation
 	powerOpNoOP = "NoOp"
+)
+
+const (
+	// ServerHealthyConditionType is the condition type for server health
+	ServerHealthyConditionType = "Healthy"
 )
 
 // ServerReconciler reconciles a Server object
@@ -202,6 +208,13 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcClient, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
+	logs, err := bmcClient.GetCriticalSystemEventLogs(ctx, server.Spec.SystemURI)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get system event logs: %w", err)
+	}
+	if err := r.handleCriticalSystemEventLogs(ctx, logs, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to handle critical system event logs: %w", err)
+	}
 	log.V(1).Info("Handled annotation operations")
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
@@ -305,6 +318,49 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 	default:
 		return false, nil
 	}
+}
+
+func (r *ServerReconciler) handleCriticalSystemEventLogs(ctx context.Context, logs []bmc.EventLogEntry, server *metalv1alpha1.Server) error {
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	healthCondition := &metav1.Condition{}
+	found, err := acc.FindSlice(server.Status.Conditions, ServerHealthyConditionType, healthCondition)
+	if err != nil {
+		return err
+	}
+	if len(logs) == 0 {
+		if found && healthCondition.Status == metav1.ConditionFalse {
+			serverBase := server.DeepCopy()
+			if err := acc.UpdateSlice(
+				&server.Status.Conditions,
+				ServerHealthyConditionType,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason("NoCriticalLogs"),
+				conditionutils.UpdateMessage("No critical system event logs found"),
+			); err != nil {
+				return fmt.Errorf("failed to patch condition %s: %w", corev1.ConditionTrue, err)
+			}
+			if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return fmt.Errorf("failed to patch BMC conditions: %w", err)
+			}
+		}
+		return nil
+	}
+	for _, logEntry := range logs {
+		serverBase := server.DeepCopy()
+		if err := acc.UpdateSlice(
+			&server.Status.Conditions,
+			ServerHealthyConditionType,
+			conditionutils.UpdateStatus(corev1.ConditionFalse),
+			conditionutils.UpdateReason(logEntry.Name),
+			conditionutils.UpdateMessage(logEntry.Message),
+		); err != nil {
+			return fmt.Errorf("failed to patch condition %s: %w", corev1.ConditionFalse, err)
+		}
+		if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return fmt.Errorf("failed to patch BMC conditions: %w", err)
+		}
+	}
+	return nil
 }
 
 func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {

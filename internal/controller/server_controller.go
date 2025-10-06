@@ -28,7 +28,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -545,7 +544,7 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
 	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+	server.Spec.BootConfigurationRef = &corev1.ObjectReference{
 		Namespace:  config.Namespace,
 		Name:       config.Name,
 		UID:        config.UID,
@@ -662,8 +661,8 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 		}
 		bootConfig.Annotations[InternalAnnotationTypeKeyName] = InternalAnnotationTypeValue
 		bootConfig.Annotations[IsDefaultServerBootConfigOSImageKeyName] = "true"
-		bootConfig.Spec.ServerRef = v1.LocalObjectReference{Name: server.Name}
-		bootConfig.Spec.IgnitionSecretRef = &v1.LocalObjectReference{Name: server.Name}
+		bootConfig.Spec.ServerRef = corev1.LocalObjectReference{Name: server.Name}
+		bootConfig.Spec.IgnitionSecretRef = &corev1.LocalObjectReference{Name: server.Name}
 		bootConfig.Spec.Image = r.ProbeOSImage
 		return nil
 	})
@@ -685,7 +684,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 		return fmt.Errorf("failed to generate SSH keypair: %w", err)
 	}
 
-	sshSecret := &v1.Secret{
+	sshSecret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Secret",
@@ -714,7 +713,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
 	}
 
-	ignitionSecret := &v1.Secret{
+	ignitionSecret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Secret",

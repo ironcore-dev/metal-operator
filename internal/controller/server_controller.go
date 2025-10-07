@@ -207,11 +207,8 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcClient, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
-	logs, err := bmcClient.GetCriticalSystemEventLogs(ctx, server.Spec.SystemURI)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get system event logs: %w", err)
-	}
-	if err := r.handleCriticalSystemEventLogs(ctx, logs, server); err != nil {
+
+	if err := r.handleCriticalSystemEventLogs(ctx, bmcClient, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to handle critical system event logs: %w", err)
 	}
 	log.V(1).Info("Handled annotation operations")
@@ -319,7 +316,11 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 	}
 }
 
-func (r *ServerReconciler) handleCriticalSystemEventLogs(ctx context.Context, logs []bmc.EventLogEntry, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) handleCriticalSystemEventLogs(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+	logs, err := bmcClient.GetCriticalSystemEventLogs(ctx, server.Spec.SystemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system event logs: %w", err)
+	}
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	healthCondition := &metav1.Condition{}
 	found, err := acc.FindSlice(server.Status.Conditions, ServerHealthyConditionType, healthCondition)

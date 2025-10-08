@@ -314,10 +314,10 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	}
 
 	// check if the maintenance is granted
-	if ok, failed := r.checkIfMaintenanceGranted(ctx, log, bmcSetting, bmcClient); !ok {
+	if ok, state := r.checkIfMaintenanceGranted(ctx, log, bmcSetting, bmcClient); !ok {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
 		return ctrl.Result{}, err
-	} else if failed == metalv1alpha1.ServerMaintenanceStateFailed {
+	} else if state == metalv1alpha1.ServerMaintenanceStateFailed {
 		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed)
 		return ctrl.Result{}, err
 	}
@@ -525,7 +525,7 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 				log.V(1).Error(err, "failed to get referred server's Manitenance", "Server", server.Name, "ServerMaintenanceRef", serverMaintenanceRef)
 				notInMaintenanceState[server.Name] = ""
 			}
-			// fail imediately if any of the server maintenance request failed, as we can not proceed further
+			// fail immediately if any of the server maintenance request failed, as we can not proceed further
 			if serverMaintenance.Status.State == metalv1alpha1.ServerMaintenanceStateFailed {
 				return false, metalv1alpha1.ServerMaintenanceStateFailed
 			}

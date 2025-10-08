@@ -93,7 +93,7 @@ func rearrangeBootOrder(
 		}
 	}
 
-	var newBootOrder []string
+	newBootOrder := make([]string, 0, len(currentOrder))
 	// Add high priority boot devices first
 	for _, bootDevice := range highPrioirtyBootDevices {
 		newBootOrder = append(newBootOrder, bootDevice.BootOptionReference)

@@ -111,7 +111,7 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 			return ctrl.Result{}, err
 		}
 
-		if changed, _, err := r.hasBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
+		if changed, _, err := r.isBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
 			return ctrl.Result{}, err
 		} else if changed {
 			return r.moveToPrepareMaintenanceState(ctx, log, serverMaintenance, server)
@@ -189,9 +189,9 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 		return ctrl.Result{}, nil
 	}
 
-	config := &metalv1alpha1.ServerBootConfiguration{}
+	var config *metalv1alpha1.ServerBootConfiguration
 	changed := false
-	if changed, config, err = r.hasBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
+	if changed, config, err = r.isBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
 		return ctrl.Result{}, err
 	} else if changed || config == nil {
 		// turn server power off before applying new boot configuration
@@ -338,8 +338,10 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 	if requeue, err := r.revertMaintenanceBootConfig(ctx, log, server, serverMaintenance); err != nil {
 		return ctrl.Result{}, err
 	} else if requeue {
+		log.V(1).Info("Wait for boot order to be reverted on server", "Server", server.Name)
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
+	log.V(1).Info("Boot order reverted on server", "Server", server.Name)
 	// make sure the server is powered on before removing maintenance
 	// this will ensure the server is booted into default boot order
 	if server.Spec.Power != metalv1alpha1.PowerOn && server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
@@ -445,20 +447,38 @@ func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, lo
 
 	switch maintenance.Spec.ServerBootConfigurationTemplate.Boottype {
 	case metalv1alpha1.BootTypeOneOff:
-		// note: with this option, the next server boot up will exter pxe boot.
+		// note: with this option, the next server boot up will enter pxe boot.
 		// if Maintenance Spec.ServerPower is PowerOn, server will be powered on and will boot into pxe
 		// if Maintenance Spec.ServerPower is PowerOff, server will be powered off and will boot into pxe on next power on
 		// we do not need to save the default boot order as the server will boot into default boot order on next boot up
 		if err := bmcClient.SetPXEBootOnce(ctx, server.Spec.SystemURI); err != nil {
 			return false, fmt.Errorf("failed to set PXE boot once: %w", err)
 		}
+		log.V(1).Info("Configured PXE boot once for server",
+			"Server", server.Name)
+		status := &metalv1alpha1.ServerMaintenanceBootOrder{
+			State: metalv1alpha1.BootOrderOneOffPxeBootSuccess,
+		}
+		if err := r.patchBootOrderStatus(ctx, log, maintenance, status); err != nil {
+			return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+		}
+		// end state, continue with maintenance
+		return false, nil
 	case metalv1alpha1.BootTypePersistent:
 		bootOrder, err := bmcClient.GetBootOrder(ctx, server.Spec.SystemURI)
 		if err != nil {
 			return false, fmt.Errorf("failed to get boot order: %w", err)
 		}
-		// if the boot order lenght is less than 2, we cannot change pxe as first boot
+		// if the boot order length is less than 2, we cannot change pxe as first boot
 		if len(bootOrder) < 2 {
+			log.V(1).Info("boot order for server can not be changed as it has less than 2 boot options", "bootOrder", bootOrder)
+			status := &metalv1alpha1.ServerMaintenanceBootOrder{
+				State: metalv1alpha1.BootOrderConfigNoOp,
+			}
+			if err := r.patchBootOrderStatus(ctx, log, maintenance, status); err != nil {
+				return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+			}
+			// end state, continue with maintenance
 			return false, nil
 		}
 		bootOptions, err := bmcClient.GetBootOptions(ctx, server.Spec.SystemURI)
@@ -482,35 +502,64 @@ func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, lo
 
 		bootOrderChanged := rearrangeBootOrder(bootOrder, bootOptions, isPxeBootOption, isDiskBootOption)
 
-		if maintenance.Status.DefaultBootOrder == nil {
+		if reflect.DeepEqual(bootOrder, bootOrderChanged) {
+			// boot order is already set to pxe first, nothing to do
+			log.V(1).Info("boot order for server is set to pxe first",
+				"Server", server.Name,
+				"BootOrder", bootOrder)
+			status := &metalv1alpha1.ServerMaintenanceBootOrder{}
+			if maintenance.Status.BootOrderStatus == nil {
+				status = &metalv1alpha1.ServerMaintenanceBootOrder{
+					State: metalv1alpha1.BootOrderConfigNoOp,
+				}
+			} else {
+				status = maintenance.Status.BootOrderStatus.DeepCopy()
+				status.State = metalv1alpha1.BootOrderConfigSuccess
+			}
+			if err := r.patchBootOrderStatus(ctx, log, maintenance, status); err != nil {
+				return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+			}
+			// end state, continue with maintenance
+			return false, nil
+		}
+
+		if maintenance.Status.BootOrderStatus == nil {
 			// note in this option, the server will always boot into pxe until changed again
 			// the job needs to be completed, else any other BIOS config job triggered will fail as exsisting job is not completed
 			if err := bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, redfish.Boot{BootOrder: bootOrderChanged}); err != nil {
 				return false, fmt.Errorf("failed to set PXE boot once: %w", err)
 			}
+			log.V(1).Info("Configured boot order for server",
+				"Server", server.Name,
+				"BootType", maintenance.Spec.ServerBootConfigurationTemplate.Boottype,
+				"BootOrder", bootOrderChanged)
 			// save the current boot order to revert back after maintenance
-			maintenanceBase := maintenance.DeepCopy()
-			maintenance.Status.DefaultBootOrder = bootOrder
-			if err := r.Status().Patch(ctx, maintenance, client.MergeFrom(maintenanceBase)); err != nil {
+			status := &metalv1alpha1.ServerMaintenanceBootOrder{
+				DefaultBootOrder: bootOrder,
+				State:            metalv1alpha1.BootOrderConfigInProgress,
+			}
+			if err := r.patchBootOrderStatus(ctx, log, maintenance, status); err != nil {
 				return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
 			}
-			log.V(1).Info("Saved default boot order for server", "Server", server.Name, "BootOrder", bootOrder)
+			log.V(1).Info("Saved default boot order for server to revert post maintenance", "Server", server.Name, "BootOrder", bootOrder)
+			// requeue to give time to the server to actually do the work and verify it
+			return true, nil
 		}
 		// we need to complete the job to set the boot order correctly. Turn the server power on
 		if server.Spec.Power != metalv1alpha1.PowerOn && server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
 			if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOn); err != nil {
 				return false, err
 			}
+			log.V(1).Info("Requested server power On to complete boot order change",
+				"Server", server.Name)
 			// requeue to give time to the server to power off
 			return true, nil
 		}
+		log.V(1).Info("wait for boot order to be set on server", "Server", server.Name)
+		return true, nil
 	default:
 		return false, fmt.Errorf("unknown boot type: %s", maintenance.Spec.ServerBootConfigurationTemplate.Boottype)
 	}
-	log.V(1).Info("Configured boot order for server",
-		"Server", server.Name,
-		"BootType", maintenance.Spec.ServerBootConfigurationTemplate.Boottype)
-	return false, nil
 }
 
 func (r *ServerMaintenanceReconciler) revertMaintenanceBootConfig(
@@ -520,48 +569,111 @@ func (r *ServerMaintenanceReconciler) revertMaintenanceBootConfig(
 	serverMaintenance *metalv1alpha1.ServerMaintenance,
 ) (bool, error) {
 	// we need to revert the boot order only if it was changed by the maintenance
-	if serverMaintenance.Status.DefaultBootOrder == nil {
-		return false, nil
-	}
-	// if the server is not off, we need to turn it off first to change the boot order
-	// this will help schedule the job to change the boot order for the server
-	// note: if the server is already off, this will be a no-op
-	if server.Spec.Power != metalv1alpha1.PowerOff && server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
-		if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff); err != nil {
-			return false, err
+	if serverMaintenance.Status.BootOrderStatus != nil && serverMaintenance.Status.BootOrderStatus.DefaultBootOrder != nil {
+		bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+		if err != nil {
+			return false, fmt.Errorf("failed to create BMC client: %w", err)
 		}
-		// requeue to give time to the server to power off
-		return true, nil
-	}
-
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
-	if err != nil {
-		return false, fmt.Errorf("failed to create BMC client: %w", err)
-	}
-	defer bmcClient.Logout()
-
-	err = bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, redfish.Boot{
-		BootOrder: serverMaintenance.Status.DefaultBootOrder,
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to revert boot order: %w", err)
-	}
-
-	// save the current boot order to revert back after maintenance
-	maintenanceBase := serverMaintenance.DeepCopy()
-	serverMaintenance.Status.DefaultBootOrder = nil
-	if err := r.Status().Patch(ctx, serverMaintenance, client.MergeFrom(maintenanceBase)); err != nil {
-		return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
-	}
-	log.V(1).Info("revert to default boot order", "Server", server.Name, "BootOrder", nil)
-
-	if server.Spec.Power != metalv1alpha1.PowerOn && server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
-		if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOn); err != nil {
-			return false, err
+		defer bmcClient.Logout()
+		bootOrder, err := bmcClient.GetBootOrder(ctx, server.Spec.SystemURI)
+		if err != nil {
+			return false, fmt.Errorf("failed to get boot order: %w", err)
 		}
-		// requeue to give time to the server to power off
-		return true, nil
+		if serverMaintenance.Status.BootOrderStatus.State == metalv1alpha1.BootOrderConfigSuccess {
+			// if the server is not off, we need to turn it off first to change the boot order
+			// this will help schedule the job to change the boot order for the server
+			// note: if the server is already off, this will be a no-op
+			if server.Spec.Power != metalv1alpha1.PowerOff || server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+				if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOff); err != nil {
+					return false, err
+				}
+				// requeue to give time to the server to power off
+				return true, nil
+			}
+
+			// sanitize the boot order to remove any invalid boot options
+			// this case can happen if the bios settings were changed boot options during maintenance
+			// we remove only the invalid boot options and keep the rest in same order
+			// because the settings will take care of new added boot device and apend it to end
+			currentBootDeviceMap := make(map[string]struct{})
+			for _, bootDevice := range bootOrder {
+				currentBootDeviceMap[bootDevice] = struct{}{}
+			}
+			var sanitizedBootOrder []string
+			for _, bootDevice := range serverMaintenance.Status.BootOrderStatus.DefaultBootOrder {
+				if _, ok := currentBootDeviceMap[bootDevice]; !ok {
+					log.V(1).Info("Removing invalid boot option from default boot order",
+						"Server", server.Name,
+						"BootDevice", bootDevice)
+					continue
+				}
+				sanitizedBootOrder = append(sanitizedBootOrder, bootDevice)
+			}
+
+			err = bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, redfish.Boot{
+				BootOrder: sanitizedBootOrder,
+			})
+			if err != nil {
+				return false, fmt.Errorf("failed to revert boot order: %w", err)
+			}
+			// save the current boot order to revert back after maintenance
+			status := &metalv1alpha1.ServerMaintenanceBootOrder{
+				DefaultBootOrder: serverMaintenance.Status.BootOrderStatus.DefaultBootOrder,
+				State:            metalv1alpha1.BootOrderConfigSuccessRevertInProgress,
+			}
+			if err := r.patchBootOrderStatus(ctx, log, serverMaintenance, status); err != nil {
+				return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+			}
+			log.V(1).Info("Patched revert to default boot order", "Server", server.Name, "BootOrder", nil)
+			// requeue to give time to the server to actually do the work and verify it
+			return true, nil
+		}
+
+		if serverMaintenance.Status.BootOrderStatus.State == metalv1alpha1.BootOrderConfigSuccessRevertInProgress {
+			if server.Spec.Power != metalv1alpha1.PowerOn || server.Status.PowerState != metalv1alpha1.ServerOnPowerState {
+				if err := r.setAndPatchServerPowerState(ctx, log, server, metalv1alpha1.PowerOn); err != nil {
+					return false, err
+				}
+				// requeue to give time to the server to power on
+				return true, nil
+			}
+
+			revertCompleted := false
+			if reflect.DeepEqual(bootOrder, serverMaintenance.Status.BootOrderStatus.DefaultBootOrder) {
+				revertCompleted = true
+			} else {
+				// sometimes, changing biosSettings leads to change in number of boot options
+				// hence, we need check the default boot order and ignore extra from current boot order
+				for idx, bootDevice := range serverMaintenance.Status.BootOrderStatus.DefaultBootOrder {
+					// cases where boot option is disabled in bios settings
+					if idx >= len(bootOrder) {
+						break
+					}
+					if bootDevice != bootOrder[idx] {
+						log.V(1).Info("boot order for server is not yet reverted to default. Waiting...",
+							"Server", server.Name,
+							"CurrentBootOrder", bootOrder,
+							"DefaultBootOrder", serverMaintenance.Status.BootOrderStatus.DefaultBootOrder)
+						return true, nil
+					}
+				}
+				revertCompleted = true
+			}
+			if revertCompleted {
+				log.V(1).Info("boot order for server has been reverted to default",
+					"Server", server.Name,
+					"BootOrder", bootOrder)
+				if err := r.patchBootOrderStatus(ctx, log, serverMaintenance, nil); err != nil {
+					return false, fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+				}
+				// end state, continue with maintenance complete
+				return false, nil
+			}
+			log.V(1).Info("wait for boot order to be reverted on server", "Server", server.Name)
+			return true, nil
+		}
 	}
+
 	log.V(1).Info("boot override during maintenance is reverted", "Server", serverMaintenance.Name)
 	return false, nil
 }
@@ -586,6 +698,16 @@ func (r *ServerMaintenanceReconciler) removeBootConfigRefFromServer(
 		return err
 	}
 	log.V(1).Info("Removed maintenance boot configuration ref from server", "Server", server.Name)
+	return nil
+}
+
+func (r *ServerMaintenanceReconciler) patchBootOrderStatus(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance, bootOrderStatus *metalv1alpha1.ServerMaintenanceBootOrder) error {
+	maintenanceBase := maintenance.DeepCopy()
+	maintenance.Status.BootOrderStatus = bootOrderStatus
+	if err := r.Status().Patch(ctx, maintenance, client.MergeFrom(maintenanceBase)); err != nil {
+		return fmt.Errorf("failed to patch maintenance default boot order: %w", err)
+	}
+	log.V(1).Info("Patched maintenance boot order status", "ServerMaintenance", maintenance.Name, "BootOrderStatus", bootOrderStatus)
 	return nil
 }
 
@@ -649,7 +771,7 @@ func (r *ServerMaintenanceReconciler) getMaintenanceBootConfigurationRef(
 	return config, nil
 }
 
-func (r *ServerMaintenanceReconciler) hasBootConfigurationChanged(
+func (r *ServerMaintenanceReconciler) isBootConfigurationChanged(
 	ctx context.Context,
 	log logr.Logger,
 	serverMaintenance *metalv1alpha1.ServerMaintenance,

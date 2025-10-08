@@ -15,7 +15,6 @@ spec:
           - --mac-prefixes-file=/etc/macdb/macdb.yaml
           - --probe-image=ghcr.io/ironcore-dev/metalprobe:latest
           - --probe-os-image=ghcr.io/ironcore-dev/os-images/gardenlinux:1443.10
-          - --insecure=false
           - --registry-url=http://127.0.0.1:30000
           - --registry-port=30000
           - --enforce-first-boot

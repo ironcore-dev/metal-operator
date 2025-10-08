@@ -243,10 +243,10 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 		}
 
 		// check if the maintenance is granted
-		if ok, failed := r.checkIfMaintenanceGranted(ctx, log, bmcClient, bmcVersion); !ok {
+		if ok, state := r.checkIfMaintenanceGranted(ctx, log, bmcClient, bmcVersion); !ok {
 			log.V(1).Info("Waiting for maintenance to be granted before continuing with updating bmc version")
 			return ctrl.Result{}, err
-		} else if failed == metalv1alpha1.ServerMaintenanceStateFailed {
+		} else if state == metalv1alpha1.ServerMaintenanceStateFailed {
 			err := r.updateBMCVersionStatus(ctx, log, bmcVersion, metalv1alpha1.BMCVersionStateFailed, nil, nil, nil)
 			return ctrl.Result{}, err
 		}
@@ -446,7 +446,7 @@ func (r *BMCVersionReconciler) checkIfMaintenanceGranted(
 				notInMaintenanceState[server.Name] = ""
 			}
 			if serverMaintenance.Status.State == metalv1alpha1.ServerMaintenanceStateFailed {
-				// fail imediately if any of the server maintenance request failed, as we can not proceed further
+				// fail immediately if any of the server maintenance request failed, as we can not proceed further
 				return false, metalv1alpha1.ServerMaintenanceStateFailed
 			}
 			// this gives us the waiting time for the server to be prepared for maintenance by ServerMaintenance controller

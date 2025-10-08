@@ -83,10 +83,43 @@ const (
 type ServerMaintenanceStatus struct {
 	// State specifies the current state of the server maintenance.
 	State ServerMaintenanceState `json:"state,omitempty"`
+
+	// BootOrder specifies the boot order of the server before maintenance.
+	// +optional
+	BootOrderStatus *ServerMaintenanceBootOrder `json:"bootOrderStatus,omitempty"`
+}
+
+type ServerMaintenanceBootOrder struct {
 	// DefaultBootOrder specifies the default boot order of the server before maintenance.
 	// +optional
 	DefaultBootOrder []string `json:"defaultBootOrder,omitempty"`
+
+	State ServerMaintenanceBootOrderState `json:"state,omitempty"`
 }
+
+// ServerMaintenanceState specifies the current state of the server maintenance.
+type ServerMaintenanceBootOrderState string
+
+const (
+
+	// BootOrderConfigNoOp specifies that the server bootOrder is as expected.
+	BootOrderConfigNoOp ServerMaintenanceBootOrderState = "NoOp"
+
+	// BootOrderConfigInProgress specifies that the server bootOrder configuration is InProgress.
+	BootOrderConfigInProgress ServerMaintenanceBootOrderState = "InProgress"
+
+	// BootOrderConfigSuccess specifies that the server bootOrder configuration is Completed.
+	BootOrderConfigSuccess ServerMaintenanceBootOrderState = "Completed"
+
+	// BootOrderConfigSuccessRevertInProgress specifies that the server bootOrder revert to default is InProgress.
+	BootOrderConfigSuccessRevertInProgress ServerMaintenanceBootOrderState = "RevertInProgress"
+
+	// BootOrderConfigRevertSuccess specifies that the server bootOrder configuration is Completed.
+	BootOrderConfigRevertSuccess ServerMaintenanceBootOrderState = "RevertCompleted"
+
+	// BootOrderOneOffPxeBootSuccess specifies that the server bootOrder configuration is set to boot pxe once.
+	BootOrderOneOffPxeBootSuccess ServerMaintenanceBootOrderState = "PxeOneOffBootSuccess"
+)
 
 // ServerMaintenanceState specifies the current state of the server maintenance.
 type ServerMaintenanceState string

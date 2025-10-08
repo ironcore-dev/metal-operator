@@ -155,12 +155,21 @@ spec:
           status:
             description: ServerMaintenanceStatus defines the observed state of a ServerMaintenance
             properties:
-              defaultBootOrder:
-                description: DefaultBootOrder specifies the default boot order of
-                  the server before maintenance.
-                items:
-                  type: string
-                type: array
+              bootOrderStatus:
+                description: BootOrder specifies the boot order of the server before
+                  maintenance.
+                properties:
+                  defaultBootOrder:
+                    description: DefaultBootOrder specifies the default boot order
+                      of the server before maintenance.
+                    items:
+                      type: string
+                    type: array
+                  state:
+                    description: ServerMaintenanceState specifies the current state
+                      of the server maintenance.
+                    type: string
+                type: object
               state:
                 description: State specifies the current state of the server maintenance.
                 type: string

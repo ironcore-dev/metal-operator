@@ -71,20 +71,22 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	if err := system.SetBoot(setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
-	netData := `{"networkInterfaces":[{"name":"dummy0","ipAddress":"127.0.0.2","macAddress":"aa:bb:cc:dd:ee:ff"}]`
-	curlCmd := fmt.Sprintf(
-		`apk add curl && curl -H 'Content-Type: application/json' \
--d '{"SystemUUID":"%s","data":%s}}' \
--X POST %s`,
-		system.UUID, netData, registryURL)
-	cmd := []string{
-		"/bin/sh",
-		"-c",
-		curlCmd,
-	}
-	if err := r.createJob(context.TODO(), r.KubeClient.client, cmd, r.namespace, system.UUID); err != nil {
-		return fmt.Errorf("failed to create job for system %s: %w", system.UUID, err)
-	}
+	//	netData := `{"networkInterfaces":[{"name":"dummy0","ipAddress":"127.0.0.2","macAddress":"aa:bb:cc:dd:ee:ff"}]`
+	//	curlCmd := fmt.Sprintf(
+	//		`apk add curl && curl -H 'Content-Type: application/json' \
+	//
+	// -d '{"SystemUUID":"%s","data":%s}}' \
+	// -X POST %s`,
+	//
+	//		system.UUID, netData, registryURL)
+	//	cmd := []string{
+	//		"/bin/sh",
+	//		"-c",
+	//		curlCmd,
+	//	}
+	//	if err := r.createJob(context.TODO(), r.KubeClient.client, cmd, r.namespace, system.UUID); err != nil {
+	//		return fmt.Errorf("failed to create job for system %s: %w", system.UUID, err)
+	//	}
 	return nil
 }
 

@@ -27,6 +27,7 @@ go.work
 *.swp
 *.swo
 *~
+._*
 .idea/
 node_modules/
 docs/.vitepress/cache/*

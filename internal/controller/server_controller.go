@@ -928,10 +928,11 @@ func (r *ServerReconciler) patchServerURI(ctx context.Context, log logr.Logger, 
 }
 
 func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
-	if server.Spec.Power == "" {
-		// no desired power state set
-		return nil
-	}
+	return nil
+	// if server.Spec.Power == "" {
+	// 	// no desired power state set
+	// 	return nil
+	// }
 
 	powerOp := powerOpNoOP
 	if server.Status.PowerState != metalv1alpha1.ServerOnPowerState &&

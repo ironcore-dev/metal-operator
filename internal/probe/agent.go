@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -133,6 +134,11 @@ func (a *Agent) registerServer(ctx context.Context) error {
 		Data:       *a.Server, // Dereference the pointer to Server.
 	}
 
+	// Write payload to JSON file
+	if err := a.writePayloadToFile(payload); err != nil {
+		a.log.Error(err, "Failed to write payload to file")
+	}
+
 	return wait.ExponentialBackoffWithContext(
 		ctx,
 		wait.Backoff{
@@ -168,4 +174,22 @@ func (a *Agent) registerServer(ctx context.Context) error {
 			return true, nil
 		},
 	)
+}
+
+// writePayloadToFile writes the registration payload to a JSON file
+func (a *Agent) writePayloadToFile(payload registry.RegistrationPayload) error {
+	jsonData, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		a.log.Error(err, "failed to marshal payload to JSON")
+		return err
+	}
+
+	err = os.WriteFile("payload.json", jsonData, 0644)
+	if err != nil {
+		a.log.Error(err, "failed to write payload to file")
+		return err
+	}
+
+	a.log.Info("Payload written to payload.json")
+	return nil
 }

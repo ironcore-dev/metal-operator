@@ -13,7 +13,16 @@ import (
 func collectSystemInfoData() (registry.DMI, error) {
 	product, err := ghw.Product()
 	if err != nil {
-		return registry.DMI{}, err
+		// return registry.DMI{}, err
+		product = &ghw.ProductInfo{
+			Vendor:       "Unknown",
+			Name:         "Unknown",
+			Version:      "Unknown",
+			SerialNumber: "Unknown",
+			UUID:         "Unknown",
+			SKU:          "Unknown",
+			Family:       "Unknown",
+		}
 	}
 	bios, err := ghw.BIOS()
 	if err != nil {
@@ -21,7 +30,15 @@ func collectSystemInfoData() (registry.DMI, error) {
 	}
 	baseboard, err := ghw.Baseboard()
 	if err != nil {
-		return registry.DMI{}, err
+		// return registry.DMI{}, err
+		// Create default baseboard info when ghw.Baseboard() fails
+		baseboard = &ghw.BaseboardInfo{
+			Vendor:       "Unknown",
+			Product:      "Unknown",
+			Version:      "Unknown",
+			SerialNumber: "Unknown",
+			AssetTag:     "Unknown",
+		}
 	}
 	dmi := registry.DMI{
 		BIOSInformation: registry.BIOSInformation{

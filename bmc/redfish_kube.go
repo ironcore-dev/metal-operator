@@ -30,7 +30,7 @@ type KubeClient struct {
 
 // RedfishKubeBMC is an implementation of the BMC interface for Redfish.
 type RedfishKubeBMC struct {
-	*RedfishBMC
+	*RedfishLocalBMC
 	*KubeClient
 }
 
@@ -45,8 +45,11 @@ func NewRedfishKubeBMCClient(
 	if err != nil {
 		return nil, err
 	}
+	if UnitTestMockUps == nil {
+		InitMockUp()
+	}
 	redfishKubeBMC := &RedfishKubeBMC{
-		RedfishBMC: bmc,
+		RedfishLocalBMC: &RedfishLocalBMC{RedfishBMC: bmc},
 		KubeClient: &KubeClient{
 			client:    c,
 			namespace: ns,

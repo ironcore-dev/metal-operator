@@ -24,6 +24,9 @@ type RedfishLocalBMC struct {
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
 func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error) {
+	if UnitTestMockUps == nil {
+		InitMockUp()
+	}
 	if UnitTestMockUps.SimulateUnvailableBMC {
 		err := &gofishCommon.Error{
 			HTTPReturnedStatusCode: 503,

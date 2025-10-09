@@ -290,16 +290,44 @@ type NetworkInterface struct {
 	// +required
 	Name string `json:"name"`
 
-	// IP is the IP address assigned to the network interface.
-	// The type is specified as string and is schemaless.
-	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Schemaless
-	// +required
-	IP IP `json:"ip"`
+	// IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface.
+	// +optional
+	IPs []IP `json:"ips,omitempty"`
 
 	// MACAddress is the MAC address of the network interface.
 	// +required
 	MACAddress string `json:"macAddress"`
+
+	// CarrierStatus is the operational carrier status of the network interface.
+	// +optional
+	CarrierStatus string `json:"carrierStatus,omitempty"`
+
+	// Neighbors contains the LLDP neighbors discovered on this interface.
+	// +optional
+	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`
+}
+
+// LLDPNeighbor defines the details of an LLDP neighbor.
+type LLDPNeighbor struct {
+	// MACAddress is the MAC address of the LLDP neighbor.
+	// +optional
+	MACAddress string `json:"macAddress,omitempty"`
+
+	// PortID is the port identifier of the LLDP neighbor.
+	// +optional
+	PortID string `json:"portID,omitempty"`
+
+	// PortDescription is the port description of the LLDP neighbor.
+	// +optional
+	PortDescription string `json:"portDescription,omitempty"`
+
+	// SystemName is the system name of the LLDP neighbor.
+	// +optional
+	SystemName string `json:"systemName,omitempty"`
+
+	// SystemDescription is the system description of the LLDP neighbor.
+	// +optional
+	SystemDescription string `json:"systemDescription,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive

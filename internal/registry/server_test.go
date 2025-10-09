@@ -22,9 +22,9 @@ var _ = Describe("RegistryServer", func() {
 			Data: registry.Server{
 				NetworkInterfaces: []registry.NetworkInterface{
 					{
-						Name:       "foo",
-						IPAddress:  "1.1.1.1",
-						MACAddress: "abcd",
+						Name:        "foo",
+						IpAddresses: []string{"1.1.1.1"},
+						MACAddress:  "abcd",
 					},
 				},
 			},
@@ -48,9 +48,9 @@ var _ = Describe("RegistryServer", func() {
 		Expect(server).To(Equal(&registry.Server{
 			NetworkInterfaces: []registry.NetworkInterface{
 				{
-					Name:       "foo",
-					IPAddress:  "1.1.1.1",
-					MACAddress: "abcd",
+					Name:        "foo",
+					IpAddresses: []string{"1.1.1.1"},
+					MACAddress:  "abcd",
 				},
 			},
 		}))

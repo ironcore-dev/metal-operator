@@ -383,7 +383,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	if err := system.SetBoot(setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
-	netData := `{"networkInterfaces":[{"name":"dummy0","ipAddress":"127.0.0.2","macAddress":"aa:bb:cc:dd:ee:ff"}]`
+	netData := `{"networkInterfaces":[{"name":"dummy0","ipAddresses":["127.0.0.2"],"macAddress":"aa:bb:cc:dd:ee:ff"}]`
 	curlCmd := fmt.Sprintf(
 		`apk add curl && curl -H 'Content-Type: application/json' \
 -d '{"SystemUUID":"%s","data":%s}}' \

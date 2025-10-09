@@ -14,11 +14,12 @@ import (
 )
 
 func collectStorageInfoData() ([]registry.BlockDevice, error) {
-	var blockDevices []registry.BlockDevice
 	blockStorage, err := ghw.Block()
 	if err != nil {
-		return blockDevices, fmt.Errorf("failed to get block devices: %w", err)
+		return nil, fmt.Errorf("failed to get block devices: %w", err)
 	}
+
+	blockDevices := make([]registry.BlockDevice, 0, len(blockStorage.Disks))
 	for _, b := range blockStorage.Disks {
 		rota, err := ToBool(fmt.Sprintf("/sys/class/block/%s/queue/rotational", b.Name))
 		if err != nil {

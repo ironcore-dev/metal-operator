@@ -8,10 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ironcore-dev/metal-operator/internal/api/registry"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"os/exec"
 	"time"
+
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func collectLLDPInfo(ctx context.Context, interval, duration time.Duration) (registry.LLDP, error) {

@@ -6,8 +6,9 @@
 package probe
 
 import (
-	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"log"
+
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 )
 
 // collectSystemInfoData is the implementation for Darwin.

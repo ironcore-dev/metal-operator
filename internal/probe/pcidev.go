@@ -15,7 +15,7 @@ func collectPCIDevicesInfoData() ([]registry.PCIDevice, error) {
 	if err != nil {
 		return []registry.PCIDevice{}, fmt.Errorf("could not get PCI info: %w", err)
 	}
-	
+
 	pciDevs := []registry.PCIDevice{}
 	for _, p := range pci.Devices {
 		nid := -1

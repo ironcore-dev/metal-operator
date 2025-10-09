@@ -27,7 +27,8 @@ func main() {
 	flag.StringVar(&registryURL, "registry-url", "", "Registry URL where the probe will register itself.")
 	flag.StringVar(&serverUUID, "server-uuid", "", "Agent UUID to register with the registry.")
 	flag.DurationVar(&duration, "duration", 5*time.Second, "Duration of time to wait between checks.")
-	flag.DurationVar(&LLDPSyncInterval, "lldp-sync-interval", 5*time.Second, "Duration of time to wait between networkctl lldp runs.")
+	flag.DurationVar(&LLDPSyncInterval, "lldp-sync-interval", 5*time.Second,
+		"Duration of time to wait between networkctl lldp runs.")
 	flag.DurationVar(&LLDPSyncDuration, "lldp-sync-duration", 30*time.Second, "Timeout for the networkctl lldp run.")
 
 	opts := zap.Options{

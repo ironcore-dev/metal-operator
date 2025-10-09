@@ -16,7 +16,7 @@ func IsSLAAC(ip string) bool {
 }
 
 // collectNetworkData collects the IP and MAC addresses of the host's network interfaces,
-// ignoring loopback and tunnel (tun) devices.
+// including all interfaces with their up/down status.
 func collectNetworkData() ([]registry.NetworkInterface, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -25,19 +25,50 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 
 	networkInterfaces := make([]registry.NetworkInterface, 0, len(interfaces))
 	for _, iface := range interfaces {
-		// Skip loopback, interfaces without a MAC address, tun devices, docker interface
+		// Skip only loopback, tun devices, and docker interface
+		// But include all other interfaces regardless of up/down status
 		if iface.Flags&net.FlagLoopback != 0 ||
-			iface.HardwareAddr.String() == "" ||
 			strings.HasPrefix(iface.Name, "tun") ||
-			strings.HasPrefix(iface.Name, "docker0") ||
-			iface.Flags&net.FlagUp == 0 { // Filter out interfaces that are down
+			strings.HasPrefix(iface.Name, "docker0") {
 			continue
+		}
+
+		// Determine if interface is up or down
+		status := "down"
+		if iface.Flags&net.FlagRunning != 0 {
+			status = "up"
 		}
 
 		addrs, err := iface.Addrs()
 		if err != nil {
-			return nil, err
+			// If we can't get addresses, still include the interface with empty IP
+			networkInterface := registry.NetworkInterface{
+				Name:          iface.Name,
+				IPAddress:     "",
+				IPv6Addresses: []string{},
+				MACAddress:    iface.HardwareAddr.String(),
+				Status:        status,
+			}
+			networkInterfaces = append(networkInterfaces, networkInterface)
+			continue
 		}
+
+		// If interface has no addresses, still include it
+		if len(addrs) == 0 {
+			networkInterface := registry.NetworkInterface{
+				Name:          iface.Name,
+				IPAddress:     "",
+				IPv6Addresses: []string{},
+				MACAddress:    iface.HardwareAddr.String(),
+				Status:        status,
+			}
+			networkInterfaces = append(networkInterfaces, networkInterface)
+			continue
+		}
+
+		// Collect IPv4 and IPv6 addresses separately
+		var ipv4Address string
+		var ipv6Addresses []string
 
 		for _, addr := range addrs {
 			var ip net.IP
@@ -52,18 +83,26 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 				continue
 			}
 
-			// Filter out SLAAC addresses
-			if ip.To4() == nil && IsSLAAC(ip.String()) {
-				continue
+			if ip.To4() != nil {
+				// IPv4 address
+				if ipv4Address == "" { // Take only the first IPv4 address
+					ipv4Address = ip.String()
+				}
+			} else {
+				// IPv6 address - now including SLAAC addresses
+				ipv6Addresses = append(ipv6Addresses, ip.String())
 			}
-
-			networkInterface := registry.NetworkInterface{
-				Name:       iface.Name,
-				IPAddress:  ip.String(),
-				MACAddress: iface.HardwareAddr.String(),
-			}
-			networkInterfaces = append(networkInterfaces, networkInterface)
 		}
+
+		// Create network interface with all collected addresses
+		networkInterface := registry.NetworkInterface{
+			Name:          iface.Name,
+			IPAddress:     ipv4Address,
+			IPv6Addresses: ipv6Addresses,
+			MACAddress:    iface.HardwareAddr.String(),
+			Status:        status,
+		}
+		networkInterfaces = append(networkInterfaces, networkInterface)
 	}
 
 	return networkInterfaces, nil

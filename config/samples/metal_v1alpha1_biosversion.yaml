@@ -6,11 +6,11 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: biosversion-sample
 spec:
-  version: "U59 v2.34 (10/04/2024)"
+  version: "P80 v1.45 (12/06/2017)"
   image:
-    URI: "https://foo-2.34_10_04_2024.signed.flash"
+    URI: "P80 v1.45 (12/06/2017)"
     transferProtocol: "HTTPS"
   updatePolicy: Normal
   serverRef:
-    name: endpoint-sample-hpe-system-0
+    name: endpoint-sample-system-0
   serverMaintenancePolicy: OwnerApproval

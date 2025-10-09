@@ -11,11 +11,12 @@ import (
 )
 
 func collectCPUInfoData() ([]registry.CPUInfo, error) {
-	var cpuInfos []registry.CPUInfo
 	cpuInfo, err := ghw.CPU()
 	if err != nil {
-		return cpuInfos, fmt.Errorf("failed to get CPU info: %w", err)
+		return nil, fmt.Errorf("failed to get CPU info: %w", err)
 	}
+
+	cpuInfos := make([]registry.CPUInfo, 0, len(cpuInfo.Processors))
 	for _, processor := range cpuInfo.Processors {
 		cpuInfos = append(cpuInfos, registry.CPUInfo{
 			ID:                   processor.ID,

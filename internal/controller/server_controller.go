@@ -825,14 +825,61 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	// update network interfaces
 	nics := make([]metalv1alpha1.NetworkInterface, 0, len(serverDetails.NetworkInterfaces))
 	for _, s := range serverDetails.NetworkInterfaces {
-		nics = append(nics, metalv1alpha1.NetworkInterface{
+		nic := metalv1alpha1.NetworkInterface{
 			Name:       s.Name,
-			IP:         metalv1alpha1.MustParseIP(s.IPAddress),
 			MACAddress: s.MACAddress,
-		})
+			Status:     s.Status,
+		} // Only set IP field if a valid IP address is present
+		if s.IPAddress != "" {
+			ip := metalv1alpha1.MustParseIP(s.IPAddress)
+			nic.IP = &ip
+		}
+		// Convert IPv6 addresses from registry format to CRD format
+		var ipv6Addresses []metalv1alpha1.IP
+		for _, ipv6Addr := range s.IPv6Addresses {
+			if ipv6Addr != "" {
+				// Parse and validate the IPv6 address
+				ip, err := metalv1alpha1.ParseIP(ipv6Addr)
+				if err != nil {
+					log.V(1).Info("Invalid IPv6 address, skipping", "interface", s.Name, "ipv6", ipv6Addr, "error", err)
+					continue
+				}
+				ipv6Addresses = append(ipv6Addresses, ip)
+			}
+		}
+		// Only set IPv6 field if the array is not empty
+		if len(ipv6Addresses) > 0 {
+			nic.IPv6 = ipv6Addresses
+		}
+
+		nics = append(nics, nic)
 	}
 	server.Status.NetworkInterfaces = nics
 
+	// update LLDP interfaces
+	lldpInterfaces := make([]metalv1alpha1.LLDPInterface, 0, len(serverDetails.LLDP))
+	for _, lldpIface := range serverDetails.LLDP {
+		neighbors := make([]metalv1alpha1.LLDPNeighbor, 0, len(lldpIface.Neighbors))
+		for _, neighbor := range lldpIface.Neighbors {
+			neighbors = append(neighbors, metalv1alpha1.LLDPNeighbor{
+				MACAddress:          neighbor.ChassisID,
+				PortID:              neighbor.PortID,
+				PortDescription:     neighbor.PortDescription,
+				SystemName:          neighbor.SystemName,
+				SystemDescription:   neighbor.SystemDescription,
+				EnabledCapabilities: neighbor.EnabledCapabilities,
+			})
+		}
+		lldpInterfaces = append(lldpInterfaces, metalv1alpha1.LLDPInterface{
+			InterfaceIndex:            lldpIface.InterfaceIndex,
+			InterfaceName:             lldpIface.InterfaceName,
+			InterfaceAlternativeNames: lldpIface.InterfaceAlternativeNames,
+			Neighbors:                 neighbors,
+		})
+	}
+	server.Status.LLDPInterfaces = lldpInterfaces
+
+	log.V(1).Info("Found server information in registry", "nics", nics, "lldpInterfaces", lldpInterfaces)
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to patch server status: %w", err)
 	}

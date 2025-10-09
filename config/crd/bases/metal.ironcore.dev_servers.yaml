@@ -446,6 +446,59 @@ spec:
                 description: IndicatorLED specifies the current state of the server's
                   indicator LED.
                 type: string
+              lldpInterfaces:
+                description: LLDPInterfaces is a list of LLDP-enabled network interfaces
+                  with their neighbors.
+                items:
+                  description: LLDPInterface defines the details of an LLDP-enabled
+                    network interface.
+                  properties:
+                    interfaceAlternativeNames:
+                      description: InterfaceAlternativeNames contains alternative
+                        names for the interface.
+                      items:
+                        type: string
+                      type: array
+                    interfaceIndex:
+                      description: InterfaceIndex is the index of the network interface.
+                      type: integer
+                    interfaceName:
+                      description: InterfaceName is the name of the network interface.
+                      type: string
+                    neighbors:
+                      description: Neighbors contains the LLDP neighbors discovered
+                        on this interface.
+                      items:
+                        description: LLDPNeighbor defines the details of an LLDP neighbor.
+                        properties:
+                          enabledCapabilities:
+                            description: EnabledCapabilities represents the enabled
+                              capabilities of the LLDP neighbor.
+                            type: integer
+                          macAddress:
+                            description: MACAddress is the MAC address of the LLDP
+                              neighbor.
+                            type: string
+                          portDescription:
+                            description: PortDescription is the port description of
+                              the LLDP neighbor.
+                            type: string
+                          portID:
+                            description: PortID is the port identifier of the LLDP
+                              neighbor.
+                            type: string
+                          systemDescription:
+                            description: SystemDescription is the system description
+                              of the LLDP neighbor.
+                            type: string
+                          systemName:
+                            description: SystemName is the system name of the LLDP
+                              neighbor.
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
               manufacturer:
                 description: Manufacturer is the name of the server manufacturer.
                 type: string
@@ -463,14 +516,24 @@ spec:
                         IP is the IP address assigned to the network interface.
                         The type is specified as string and is schemaless.
                       type: string
+                    ipv6:
+                      description: IPv6 is an array of IPv6 addresses assigned to
+                        the network interface.
+                      items:
+                        format: ip
+                        type: string
+                      type: array
                     macAddress:
                       description: MACAddress is the MAC address of the network interface.
                       type: string
                     name:
                       description: Name is the name of the network interface.
                       type: string
+                    status:
+                      description: Status is the operational status of the network
+                        interface.
+                      type: string
                   required:
-                  - ip
                   - macAddress
                   - name
                   type: object

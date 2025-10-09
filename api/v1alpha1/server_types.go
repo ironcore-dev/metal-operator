@@ -232,6 +232,10 @@ type ServerStatus struct {
 	// +optional
 	Storages []Storage `json:"storages,omitempty"`
 
+	// LLDPInterfaces is a list of LLDP-enabled network interfaces with their neighbors.
+	// +optional
+	LLDPInterfaces []LLDPInterface `json:"lldpInterfaces,omitempty"`
+
 	// Conditions represents the latest available observations of the server's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
@@ -288,12 +292,66 @@ type NetworkInterface struct {
 	// The type is specified as string and is schemaless.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless
-	// +required
-	IP IP `json:"ip"`
+	// +optional
+	IP *IP `json:"ip,omitempty"`
+
+	// IPv6 is an array of IPv6 addresses assigned to the network interface.
+	// +optional
+	IPv6 []IP `json:"ipv6,omitempty"`
 
 	// MACAddress is the MAC address of the network interface.
 	// +required
 	MACAddress string `json:"macAddress"`
+
+	// Status is the operational status of the network interface.
+	// +optional
+	Status string `json:"status,omitempty"`
+}
+
+// LLDPNeighbor defines the details of an LLDP neighbor.
+type LLDPNeighbor struct {
+	// MACAddress is the MAC address of the LLDP neighbor.
+	// +optional
+	MACAddress string `json:"macAddress,omitempty"`
+
+	// PortID is the port identifier of the LLDP neighbor.
+	// +optional
+	PortID string `json:"portID,omitempty"`
+
+	// PortDescription is the port description of the LLDP neighbor.
+	// +optional
+	PortDescription string `json:"portDescription,omitempty"`
+
+	// SystemName is the system name of the LLDP neighbor.
+	// +optional
+	SystemName string `json:"systemName,omitempty"`
+
+	// SystemDescription is the system description of the LLDP neighbor.
+	// +optional
+	SystemDescription string `json:"systemDescription,omitempty"`
+
+	// EnabledCapabilities represents the enabled capabilities of the LLDP neighbor.
+	// +optional
+	EnabledCapabilities int `json:"enabledCapabilities,omitempty"`
+}
+
+// LLDPInterface defines the details of an LLDP-enabled network interface.
+type LLDPInterface struct {
+	// InterfaceIndex is the index of the network interface.
+	// +optional
+	InterfaceIndex int `json:"interfaceIndex,omitempty"`
+
+	// InterfaceName is the name of the network interface.
+	// +optional
+	InterfaceName string `json:"interfaceName,omitempty"`
+
+	// InterfaceAlternativeNames contains alternative names for the interface.
+	// +optional
+	InterfaceAlternativeNames []string `json:"interfaceAlternativeNames,omitempty"`
+
+	// Neighbors contains the LLDP neighbors discovered on this interface.
+	// +optional
+	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive

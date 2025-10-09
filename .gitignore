@@ -7,6 +7,7 @@
 *.dylib
 bin/*
 Dockerfile.cross
+.DS_Store
 
 # Test binary, built with `go test -c`
 *.test
@@ -26,6 +27,7 @@ go.work
 *.swp
 *.swo
 *~
+._*
 .idea/
 node_modules/
 docs/.vitepress/cache/*

@@ -1,0 +1,3407 @@
+{
+  "systemUUID": "38947555-7742-3448-3784-823347823834",
+  "data": {
+    "systemInfo": {
+      "biosInformation": {
+        "vendor": "Dell Inc.",
+        "version": "2.5.4",
+        "date": "01/16/2025"
+      },
+      "systemInformation": {
+        "manufacturer": "Dell Inc.",
+        "productName": "PowerEdge R760",
+        "version": "",
+        "serialNumber": "3XG8QY3",
+        "uuid": "4c4c4544-0058-4710-8038-b3c04f515933",
+        "skuNumber": "SKU=0A6B;ModelName=PowerEdge R760",
+        "family": "PowerEdge"
+      },
+      "boardInformation": {
+        "manufacturer": "Dell Inc.",
+        "product": "0NH8MJ",
+        "version": "A02",
+        "serialNumber": ".3XG8QY3.CNIVC0036D0399.",
+        "assetTag": "unknown"
+      }
+    },
+    "cpu": [
+      {
+        "id": 0,
+        "totalCores": 32,
+        "totalHardwareThreads": 64,
+        "vendor": "GenuineIntel",
+        "model": "Intel(R) Xeon(R) Gold 6448Y",
+        "capabilities": [
+          "fpu",
+          "vme",
+          "de",
+          "pse",
+          "tsc",
+          "msr",
+          "pae",
+          "mce",
+          "cx8",
+          "apic",
+          "sep",
+          "mtrr",
+          "pge",
+          "mca",
+          "cmov",
+          "pat",
+          "pse36",
+          "clflush",
+          "dts",
+          "acpi",
+          "mmx",
+          "fxsr",
+          "sse",
+          "sse2",
+          "ss",
+          "ht",
+          "tm",
+          "pbe",
+          "syscall",
+          "nx",
+          "pdpe1gb",
+          "rdtscp",
+          "lm",
+          "constant_tsc",
+          "art",
+          "arch_perfmon",
+          "pebs",
+          "bts",
+          "rep_good",
+          "nopl",
+          "xtopology",
+          "nonstop_tsc",
+          "cpuid",
+          "aperfmperf",
+          "tsc_known_freq",
+          "pni",
+          "pclmulqdq",
+          "dtes64",
+          "monitor",
+          "ds_cpl",
+          "vmx",
+          "smx",
+          "est",
+          "tm2",
+          "ssse3",
+          "sdbg",
+          "fma",
+          "cx16",
+          "xtpr",
+          "pdcm",
+          "pcid",
+          "dca",
+          "sse4_1",
+          "sse4_2",
+          "x2apic",
+          "movbe",
+          "popcnt",
+          "tsc_deadline_timer",
+          "aes",
+          "xsave",
+          "avx",
+          "f16c",
+          "rdrand",
+          "lahf_lm",
+          "abm",
+          "3dnowprefetch",
+          "cpuid_fault",
+          "epb",
+          "cat_l3",
+          "cat_l2",
+          "cdp_l3",
+          "cdp_l2",
+          "ssbd",
+          "mba",
+          "ibrs",
+          "ibpb",
+          "stibp",
+          "ibrs_enhanced",
+          "tpr_shadow",
+          "flexpriority",
+          "ept",
+          "vpid",
+          "ept_ad",
+          "fsgsbase",
+          "tsc_adjust",
+          "bmi1",
+          "avx2",
+          "smep",
+          "bmi2",
+          "erms",
+          "invpcid",
+          "cqm",
+          "rdt_a",
+          "avx512f",
+          "avx512dq",
+          "rdseed",
+          "adx",
+          "smap",
+          "avx512ifma",
+          "clflushopt",
+          "clwb",
+          "intel_pt",
+          "avx512cd",
+          "sha_ni",
+          "avx512bw",
+          "avx512vl",
+          "xsaveopt",
+          "xsavec",
+          "xgetbv1",
+          "xsaves",
+          "cqm_llc",
+          "cqm_occup_llc",
+          "cqm_mbm_total",
+          "cqm_mbm_local",
+          "split_lock_detect",
+          "avx_vnni",
+          "avx512_bf16",
+          "wbnoinvd",
+          "dtherm",
+          "ida",
+          "arat",
+          "pln",
+          "pts",
+          "hfi",
+          "vnmi",
+          "avx512vbmi",
+          "umip",
+          "pku",
+          "ospke",
+          "waitpkg",
+          "avx512_vbmi2",
+          "gfni",
+          "vaes",
+          "vpclmulqdq",
+          "avx512_vnni",
+          "avx512_bitalg",
+          "avx512_vpopcntdq",
+          "la57",
+          "rdpid",
+          "bus_lock_detect",
+          "cldemote",
+          "movdiri",
+          "movdir64b",
+          "enqcmd",
+          "fsrm",
+          "md_clear",
+          "serialize",
+          "tsxldtrk",
+          "pconfig",
+          "arch_lbr",
+          "ibt",
+          "amx_bf16",
+          "avx512_fp16",
+          "amx_tile",
+          "amx_int8",
+          "flush_l1d",
+          "arch_capabilities"
+        ]
+      },
+      {
+        "id": 1,
+        "totalCores": 32,
+        "totalHardwareThreads": 64,
+        "vendor": "GenuineIntel",
+        "model": "Intel(R) Xeon(R) Gold 6448Y",
+        "capabilities": [
+          "fpu",
+          "vme",
+          "de",
+          "pse",
+          "tsc",
+          "msr",
+          "pae",
+          "mce",
+          "cx8",
+          "apic",
+          "sep",
+          "mtrr",
+          "pge",
+          "mca",
+          "cmov",
+          "pat",
+          "pse36",
+          "clflush",
+          "dts",
+          "acpi",
+          "mmx",
+          "fxsr",
+          "sse",
+          "sse2",
+          "ss",
+          "ht",
+          "tm",
+          "pbe",
+          "syscall",
+          "nx",
+          "pdpe1gb",
+          "rdtscp",
+          "lm",
+          "constant_tsc",
+          "art",
+          "arch_perfmon",
+          "pebs",
+          "bts",
+          "rep_good",
+          "nopl",
+          "xtopology",
+          "nonstop_tsc",
+          "cpuid",
+          "aperfmperf",
+          "tsc_known_freq",
+          "pni",
+          "pclmulqdq",
+          "dtes64",
+          "monitor",
+          "ds_cpl",
+          "vmx",
+          "smx",
+          "est",
+          "tm2",
+          "ssse3",
+          "sdbg",
+          "fma",
+          "cx16",
+          "xtpr",
+          "pdcm",
+          "pcid",
+          "dca",
+          "sse4_1",
+          "sse4_2",
+          "x2apic",
+          "movbe",
+          "popcnt",
+          "tsc_deadline_timer",
+          "aes",
+          "xsave",
+          "avx",
+          "f16c",
+          "rdrand",
+          "lahf_lm",
+          "abm",
+          "3dnowprefetch",
+          "cpuid_fault",
+          "epb",
+          "cat_l3",
+          "cat_l2",
+          "cdp_l3",
+          "cdp_l2",
+          "ssbd",
+          "mba",
+          "ibrs",
+          "ibpb",
+          "stibp",
+          "ibrs_enhanced",
+          "tpr_shadow",
+          "flexpriority",
+          "ept",
+          "vpid",
+          "ept_ad",
+          "fsgsbase",
+          "tsc_adjust",
+          "bmi1",
+          "avx2",
+          "smep",
+          "bmi2",
+          "erms",
+          "invpcid",
+          "cqm",
+          "rdt_a",
+          "avx512f",
+          "avx512dq",
+          "rdseed",
+          "adx",
+          "smap",
+          "avx512ifma",
+          "clflushopt",
+          "clwb",
+          "intel_pt",
+          "avx512cd",
+          "sha_ni",
+          "avx512bw",
+          "avx512vl",
+          "xsaveopt",
+          "xsavec",
+          "xgetbv1",
+          "xsaves",
+          "cqm_llc",
+          "cqm_occup_llc",
+          "cqm_mbm_total",
+          "cqm_mbm_local",
+          "split_lock_detect",
+          "avx_vnni",
+          "avx512_bf16",
+          "wbnoinvd",
+          "dtherm",
+          "ida",
+          "arat",
+          "pln",
+          "pts",
+          "hfi",
+          "vnmi",
+          "avx512vbmi",
+          "umip",
+          "pku",
+          "ospke",
+          "waitpkg",
+          "avx512_vbmi2",
+          "gfni",
+          "vaes",
+          "vpclmulqdq",
+          "avx512_vnni",
+          "avx512_bitalg",
+          "avx512_vpopcntdq",
+          "la57",
+          "rdpid",
+          "bus_lock_detect",
+          "cldemote",
+          "movdiri",
+          "movdir64b",
+          "enqcmd",
+          "fsrm",
+          "md_clear",
+          "serialize",
+          "tsxldtrk",
+          "pconfig",
+          "arch_lbr",
+          "ibt",
+          "amx_bf16",
+          "avx512_fp16",
+          "amx_tile",
+          "amx_int8",
+          "flush_l1d",
+          "arch_capabilities"
+        ]
+      }
+    ],
+    "networkInterfaces": [
+      {
+        "name": "ens3f0np0",
+        "ipAddress": "10.180.130.64",
+        "ipv6Addresses": [
+          "fe80::1623:f2ff:fec0:f680"
+        ],
+        "macAddress": "14:23:f2:c0:f6:80",
+        "status": "up"
+      },
+      {
+        "name": "eno12399",
+        "ipAddress": "",
+        "ipv6Addresses": [
+          "fe80::262:bff:fe9d:4e26"
+        ],
+        "macAddress": "00:62:0b:9d:4e:26",
+        "status": "up"
+      },
+      {
+        "name": "ens3f1np1",
+        "ipAddress": "",
+        "ipv6Addresses": [],
+        "macAddress": "14:23:f2:c0:f6:81",
+        "status": "down"
+      },
+      {
+        "name": "eno12409",
+        "ipAddress": "",
+        "ipv6Addresses": [],
+        "macAddress": "00:62:0b:9d:4e:27",
+        "status": "down"
+      },
+      {
+        "name": "eno12419",
+        "ipAddress": "",
+        "ipv6Addresses": [],
+        "macAddress": "00:62:0b:9d:4e:28",
+        "status": "down"
+      },
+      {
+        "name": "ens6f0np0",
+        "ipAddress": "",
+        "ipv6Addresses": [
+          "fe80::1623:f2ff:fec0:f940"
+        ],
+        "macAddress": "14:23:f2:c0:f9:40",
+        "status": "up"
+      },
+      {
+        "name": "eno12429",
+        "ipAddress": "",
+        "ipv6Addresses": [],
+        "macAddress": "00:62:0b:9d:4e:29",
+        "status": "down"
+      },
+      {
+        "name": "ens6f1np1",
+        "ipAddress": "",
+        "ipv6Addresses": [],
+        "macAddress": "14:23:f2:c0:f9:41",
+        "status": "down"
+      }
+    ],
+    "lldp": [
+      {
+        "InterfaceIndex": 7,
+        "InterfaceName": "ens6f0np0",
+        "InterfaceAlternativeNames": [
+          "enp139s0f0np0",
+          "enx1423f2c0f940"
+        ],
+        "Neighbors": [
+          {
+            "ChassisID": "44:ae:25:78:db:41",
+            "RawChassisID": [
+              4,
+              68,
+              174,
+              37,
+              120,
+              219,
+              65
+            ],
+            "PortID": "Eth1/17",
+            "RawPortID": [
+              7,
+              69,
+              116,
+              104,
+              49,
+              47,
+              49,
+              55
+            ],
+            "PortDescription": "topology/pod-1/protpaths-2115-2116/pathep-[openstack-baremetal-node008-bb097]",
+            "SystemName": "qa-de-1-aci-2116-bb097",
+            "SystemDescription": "topology/pod-1/node-2116",
+            "EnabledCapabilities": 20
+          }
+        ]
+      },
+      {
+        "InterfaceIndex": 3,
+        "InterfaceName": "eno12399",
+        "InterfaceAlternativeNames": [
+          "enp34s0f0",
+          "enx00620b9d4e26"
+        ],
+        "Neighbors": [
+          {
+            "ChassisID": "a0:3d:6e:a4:24:34",
+            "RawChassisID": [
+              4,
+              160,
+              61,
+              110,
+              164,
+              36,
+              52
+            ],
+            "PortID": "Ethernet1/21",
+            "RawPortID": [
+              5,
+              69,
+              116,
+              104,
+              101,
+              114,
+              110,
+              101,
+              116,
+              49,
+              47,
+              50,
+              49
+            ],
+            "PortDescription": "*** node008-bb097 L1 ***",
+            "SystemName": "qa-de-1-sw109a-bb097.net.sap.corp",
+            "SystemDescription": "Cisco Nexus Operating System (NX-OS) Software 9.3(6)\\nTAC support: http://www.cisco.com/tac\\nCopyright (c) 2002-2020, Cisco Systems, Inc. All rights reserved.",
+            "EnabledCapabilities": 20
+          }
+        ]
+      },
+      {
+        "InterfaceIndex": 2,
+        "InterfaceName": "ens3f0np0",
+        "InterfaceAlternativeNames": [
+          "enp55s0f0np0",
+          "enx1423f2c0f680"
+        ],
+        "Neighbors": [
+          {
+            "ChassisID": "44:ae:25:b1:fb:09",
+            "RawChassisID": [
+              4,
+              68,
+              174,
+              37,
+              177,
+              251,
+              9
+            ],
+            "PortID": "Eth1/17",
+            "RawPortID": [
+              7,
+              69,
+              116,
+              104,
+              49,
+              47,
+              49,
+              55
+            ],
+            "PortDescription": "topology/pod-1/protpaths-2115-2116/pathep-[openstack-baremetal-node008-bb097]",
+            "SystemName": "qa-de-1-aci-2115-bb097",
+            "SystemDescription": "topology/pod-1/node-2115",
+            "EnabledCapabilities": 20
+          }
+        ]
+      }
+    ],
+    "storage": [
+      {
+        "path": "unknown",
+        "name": "loop0",
+        "rotational": false,
+        "removable": false,
+        "readOnly": true,
+        "vendor": "unknown",
+        "model": "unknown",
+        "serial": "unknown",
+        "wwid": "unknown",
+        "physicalBlockSize": 512,
+        "logicalBlockSize": 512,
+        "hWSectorSize": 512,
+        "sizeBytes": 334815232,
+        "numaNodeID": 0
+      },
+      {
+        "path": "unknown",
+        "name": "nvme0c0n1",
+        "rotational": false,
+        "removable": false,
+        "readOnly": false,
+        "vendor": "unknown",
+        "model": "unknown",
+        "serial": "unknown",
+        "wwid": "unknown",
+        "physicalBlockSize": 512,
+        "logicalBlockSize": 512,
+        "hWSectorSize": 512,
+        "sizeBytes": 480036519936,
+        "numaNodeID": 0
+      },
+      {
+        "path": "pci-0000:01:00.0-nvme-1",
+        "name": "nvme0n1",
+        "rotational": false,
+        "removable": false,
+        "readOnly": false,
+        "vendor": "unknown",
+        "model": "Dell BOSS-N1",
+        "serial": "CN0WW56VFCP0035U0167",
+        "wwid": "eui.005043e705000001",
+        "physicalBlockSize": 512,
+        "logicalBlockSize": 512,
+        "hWSectorSize": 512,
+        "sizeBytes": 480036519936,
+        "numaNodeID": 0
+      },
+      {
+        "path": "unknown",
+        "name": "nvme1c1n1",
+        "rotational": false,
+        "removable": false,
+        "readOnly": false,
+        "vendor": "unknown",
+        "model": "unknown",
+        "serial": "unknown",
+        "wwid": "unknown",
+        "physicalBlockSize": 512,
+        "logicalBlockSize": 512,
+        "hWSectorSize": 512,
+        "sizeBytes": 1600321314816,
+        "numaNodeID": 0
+      },
+      {
+        "path": "pci-0000:c9:00.0-nvme-1",
+        "name": "nvme1n1",
+        "rotational": false,
+        "removable": false,
+        "readOnly": false,
+        "vendor": "unknown",
+        "model": "Dell Ent NVMe PM1735a MU 1.6TB",
+        "serial": "S6UVNC0W515409",
+        "wwid": "eui.36555630575154090025384300000002",
+        "physicalBlockSize": 512,
+        "logicalBlockSize": 512,
+        "hWSectorSize": 512,
+        "sizeBytes": 1600321314816,
+        "numaNodeID": 0
+      },
+      {
+        "path": "pci-0000:00:14.0-usb-0:10.4.2:1.0-scsi-0:0:0:0",
+        "name": "sr0",
+        "rotational": true,
+        "removable": true,
+        "readOnly": false,
+        "vendor": "Linux",
+        "model": "Virtual_CD_DVD",
+        "serial": "1028_123456",
+        "wwid": "unknown",
+        "physicalBlockSize": 2048,
+        "logicalBlockSize": 2048,
+        "hWSectorSize": 2048,
+        "sizeBytes": 430964736,
+        "numaNodeID": 0
+      }
+    ],
+    "memory": [
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A1",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A36",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A2",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A6A",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A3",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A20",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A4",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A2C",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A5",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A34",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A6",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A22",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A7",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A12",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "1",
+        "deviceLocator": "A8",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A76",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B1",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068B4D",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B2",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068B44",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B3",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068A51",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B4",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068B6D",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B5",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068B28",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B6",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068B7C",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B7",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068AFF",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      },
+      {
+        "size": 34358689792,
+        "deviceSet": "3",
+        "deviceLocator": "B8",
+        "bankLocator": "",
+        "memoryType": "Unknown",
+        "speed": "4800 MT/s",
+        "vendor": "00AD063200AD",
+        "serialNumber": "29068B4B",
+        "assetTag": "02231922",
+        "partNumber": "HMCG94AEBRA109N",
+        "configuredMemorySpeed": "4800 MT/s",
+        "minimumVoltage": "1.10 V",
+        "maximumVoltage": "1.10 V",
+        "configuredVoltage": "1.10 V"
+      }
+    ],
+    "nics": [
+      {
+        "name": "eno12399",
+        "mac": "00:62:0b:9d:4e:26",
+        "pciAddress": "0000:22:00.0",
+        "speed": "1000Mb/s",
+        "linkModes": [
+          "10baseT/Half",
+          "10baseT/Full",
+          "100baseT/Half",
+          "100baseT/Full",
+          "1000baseT/Half",
+          "1000baseT/Full"
+        ],
+        "supportedPorts": [
+          "TP"
+        ],
+        "firmwareVersion": "FFV23.21.6 bc 5720-v1.39"
+      },
+      {
+        "name": "eno12409",
+        "mac": "00:62:0b:9d:4e:27",
+        "pciAddress": "0000:22:00.1",
+        "speed": "Unknown!",
+        "linkModes": [
+          "10baseT/Half",
+          "10baseT/Full",
+          "100baseT/Half",
+          "100baseT/Full",
+          "1000baseT/Half",
+          "1000baseT/Full"
+        ],
+        "supportedPorts": [
+          "TP"
+        ],
+        "firmwareVersion": "FFV23.21.6 bc 5720-v1.39"
+      },
+      {
+        "name": "eno12419",
+        "mac": "00:62:0b:9d:4e:28",
+        "pciAddress": "0000:23:00.0",
+        "speed": "Unknown!",
+        "linkModes": [
+          "10baseT/Half",
+          "10baseT/Full",
+          "100baseT/Half",
+          "100baseT/Full",
+          "1000baseT/Half",
+          "1000baseT/Full"
+        ],
+        "supportedPorts": [
+          "TP"
+        ],
+        "firmwareVersion": "FFV23.21.6 bc 5720-v1.39"
+      },
+      {
+        "name": "eno12429",
+        "mac": "00:62:0b:9d:4e:29",
+        "pciAddress": "0000:23:00.1",
+        "speed": "Unknown!",
+        "linkModes": [
+          "10baseT/Half",
+          "10baseT/Full",
+          "100baseT/Half",
+          "100baseT/Full",
+          "1000baseT/Half",
+          "1000baseT/Full"
+        ],
+        "supportedPorts": [
+          "TP"
+        ],
+        "firmwareVersion": "FFV23.21.6 bc 5720-v1.39"
+      },
+      {
+        "name": "ens3f0np0",
+        "mac": "14:23:f2:c0:f6:80",
+        "pciAddress": "0000:37:00.0",
+        "speed": "100000Mb/s",
+        "linkModes": [
+          "25000baseSR/Full",
+          "100000baseSR4/Full",
+          "50000baseSR2/Full",
+          "50000baseSR/Full",
+          "100000baseSR2/Full",
+          "200000baseSR4/Full"
+        ],
+        "supportedPorts": [
+          "FIBRE"
+        ],
+        "firmwareVersion": "232.0.156.9/pkg 23.21.13.39"
+      },
+      {
+        "name": "ens3f1np1",
+        "mac": "14:23:f2:c0:f6:81",
+        "pciAddress": "0000:37:00.1",
+        "speed": "Unknown!",
+        "linkModes": [
+          "25000baseCR/Full",
+          "25000baseKR/Full",
+          "25000baseSR/Full",
+          "50000baseCR2/Full",
+          "50000baseKR2/Full",
+          "100000baseKR4/Full",
+          "100000baseSR4/Full",
+          "100000baseCR4/Full",
+          "100000baseLR4_ER4/Full",
+          "50000baseSR2/Full",
+          "50000baseKR/Full",
+          "50000baseSR/Full",
+          "50000baseCR/Full",
+          "50000baseLR_ER_FR/Full",
+          "100000baseKR2/Full",
+          "100000baseSR2/Full",
+          "100000baseCR2/Full",
+          "100000baseLR2_ER2_FR2/Full",
+          "200000baseKR4/Full",
+          "200000baseSR4/Full",
+          "200000baseLR4_ER4_FR4/Full",
+          "200000baseCR4/Full"
+        ],
+        "supportedPorts": [
+          "FIBRE"
+        ],
+        "firmwareVersion": "232.0.156.9/pkg 23.21.13.39"
+      },
+      {
+        "name": "ens6f0np0",
+        "mac": "14:23:f2:c0:f9:40",
+        "pciAddress": "0000:8b:00.0",
+        "speed": "100000Mb/s",
+        "linkModes": [
+          "25000baseSR/Full",
+          "100000baseSR4/Full",
+          "50000baseSR2/Full",
+          "50000baseSR/Full",
+          "100000baseSR2/Full",
+          "200000baseSR4/Full"
+        ],
+        "supportedPorts": [
+          "FIBRE"
+        ],
+        "firmwareVersion": "232.0.156.9/pkg 23.21.13.39"
+      },
+      {
+        "name": "ens6f1np1",
+        "mac": "14:23:f2:c0:f9:41",
+        "pciAddress": "0000:8b:00.1",
+        "speed": "Unknown!",
+        "linkModes": [
+          "25000baseCR/Full",
+          "25000baseKR/Full",
+          "25000baseSR/Full",
+          "50000baseCR2/Full",
+          "50000baseKR2/Full",
+          "100000baseKR4/Full",
+          "100000baseSR4/Full",
+          "100000baseCR4/Full",
+          "100000baseLR4_ER4/Full",
+          "50000baseSR2/Full",
+          "50000baseKR/Full",
+          "50000baseSR/Full",
+          "50000baseCR/Full",
+          "50000baseLR_ER_FR/Full",
+          "100000baseKR2/Full",
+          "100000baseSR2/Full",
+          "100000baseCR2/Full",
+          "100000baseLR2_ER2_FR2/Full",
+          "200000baseKR4/Full",
+          "200000baseSR4/Full",
+          "200000baseLR4_ER4_FR4/Full",
+          "200000baseCR4/Full"
+        ],
+        "supportedPorts": [
+          "FIBRE"
+        ],
+        "firmwareVersion": "232.0.156.9/pkg 23.21.13.39"
+      }
+    ],
+    "pciDevices": [
+      {
+        "address": "0000:00:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2"
+      },
+      {
+        "address": "0000:00:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4"
+      },
+      {
+        "address": "0000:00:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3"
+      },
+      {
+        "address": "0000:00:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23"
+      },
+      {
+        "address": "0000:00:0a.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bba"
+      },
+      {
+        "address": "0000:00:0c.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bbc"
+      },
+      {
+        "address": "0000:00:0e.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bbe"
+      },
+      {
+        "address": "0000:00:14.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Emmitsburg (C740 Family) USB 3.2 Gen 1 xHCI Controller",
+        "productID": "1bcd"
+      },
+      {
+        "address": "0000:00:14.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bce"
+      },
+      {
+        "address": "0000:00:14.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bfe"
+      },
+      {
+        "address": "0000:00:15.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bff"
+      },
+      {
+        "address": "0000:00:16.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1be0"
+      },
+      {
+        "address": "0000:00:18.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Sapphire Rapids SATA AHCI Controller",
+        "productID": "1bf2"
+      },
+      {
+        "address": "0000:00:19.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Sapphire Rapids SATA AHCI Controller",
+        "productID": "1bd2"
+      },
+      {
+        "address": "0000:00:1f.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1b81"
+      },
+      {
+        "address": "0000:00:1f.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bc9"
+      },
+      {
+        "address": "0000:00:1f.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "1bca"
+      },
+      {
+        "address": "0000:01:00.0",
+        "vendor": "Marvell Technology Group Ltd.",
+        "vendorID": "1b4b",
+        "product": "88NR2241 Non-Volatile memory controller",
+        "productID": "2241"
+      },
+      {
+        "address": "0000:03:00.0",
+        "vendor": "PLDA",
+        "vendorID": "1556",
+        "product": "PCI Express Bridge",
+        "productID": "be00"
+      },
+      {
+        "address": "0000:04:00.0",
+        "vendor": "Matrox Electronics Systems Ltd.",
+        "vendorID": "102b",
+        "product": "Integrated Matrox G200eW3 Graphics Controller",
+        "productID": "0536"
+      },
+      {
+        "address": "0000:0c:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2"
+      },
+      {
+        "address": "0000:0c:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4"
+      },
+      {
+        "address": "0000:0c:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3"
+      },
+      {
+        "address": "0000:0c:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23"
+      },
+      {
+        "address": "0000:21:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2"
+      },
+      {
+        "address": "0000:21:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4"
+      },
+      {
+        "address": "0000:21:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3"
+      },
+      {
+        "address": "0000:21:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23"
+      },
+      {
+        "address": "0000:21:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352a"
+      },
+      {
+        "address": "0000:21:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352b"
+      },
+      {
+        "address": "0000:22:00.0",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+        "productID": "165f"
+      },
+      {
+        "address": "0000:22:00.1",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+        "productID": "165f"
+      },
+      {
+        "address": "0000:23:00.0",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+        "productID": "165f"
+      },
+      {
+        "address": "0000:23:00.1",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+        "productID": "165f"
+      },
+      {
+        "address": "0000:36:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2"
+      },
+      {
+        "address": "0000:36:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4"
+      },
+      {
+        "address": "0000:36:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3"
+      },
+      {
+        "address": "0000:36:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23"
+      },
+      {
+        "address": "0000:36:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352a"
+      },
+      {
+        "address": "0000:37:00.0",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "BCM57508 NetXtreme-E 10Gb/25Gb/40Gb/50Gb/100Gb/200Gb Ethernet",
+        "productID": "1750"
+      },
+      {
+        "address": "0000:37:00.1",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "BCM57508 NetXtreme-E 10Gb/25Gb/40Gb/50Gb/100Gb/200Gb Ethernet",
+        "productID": "1750"
+      },
+      {
+        "address": "0000:48:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2"
+      },
+      {
+        "address": "0000:48:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4"
+      },
+      {
+        "address": "0000:48:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3"
+      },
+      {
+        "address": "0000:48:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23"
+      },
+      {
+        "address": "0000:48:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352a"
+      },
+      {
+        "address": "0000:48:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352b"
+      },
+      {
+        "address": "0000:48:05.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352c"
+      },
+      {
+        "address": "0000:48:07.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352d"
+      },
+      {
+        "address": "0000:60:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2"
+      },
+      {
+        "address": "0000:60:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4"
+      },
+      {
+        "address": "0000:60:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3"
+      },
+      {
+        "address": "0000:60:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23"
+      },
+      {
+        "address": "0000:75:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2"
+      },
+      {
+        "address": "0000:75:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4"
+      },
+      {
+        "address": "0000:75:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3"
+      },
+      {
+        "address": "0000:75:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23"
+      },
+      {
+        "address": "0000:75:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b25"
+      },
+      {
+        "address": "0000:75:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake MSM",
+        "productID": "09a6"
+      },
+      {
+        "address": "0000:75:03.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake PMON MSM",
+        "productID": "09a7"
+      },
+      {
+        "address": "0000:7e:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3250"
+      },
+      {
+        "address": "0000:7e:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3251"
+      },
+      {
+        "address": "0000:7e:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3252"
+      },
+      {
+        "address": "0000:7e:00.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake IEH",
+        "productID": "0998"
+      },
+      {
+        "address": "0000:7e:00.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3255"
+      },
+      {
+        "address": "0000:7e:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3240"
+      },
+      {
+        "address": "0000:7e:01.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3241"
+      },
+      {
+        "address": "0000:7e:01.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3242"
+      },
+      {
+        "address": "0000:7e:02.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3240"
+      },
+      {
+        "address": "0000:7e:02.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3241"
+      },
+      {
+        "address": "0000:7e:02.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3242"
+      },
+      {
+        "address": "0000:7e:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3240"
+      },
+      {
+        "address": "0000:7e:03.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3241"
+      },
+      {
+        "address": "0000:7e:03.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3242"
+      },
+      {
+        "address": "0000:7e:05.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3245"
+      },
+      {
+        "address": "0000:7e:05.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3246"
+      },
+      {
+        "address": "0000:7e:05.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3247"
+      },
+      {
+        "address": "0000:7e:06.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3245"
+      },
+      {
+        "address": "0000:7e:06.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3246"
+      },
+      {
+        "address": "0000:7e:06.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3247"
+      },
+      {
+        "address": "0000:7e:07.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3245"
+      },
+      {
+        "address": "0000:7e:07.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3246"
+      },
+      {
+        "address": "0000:7e:07.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3247"
+      },
+      {
+        "address": "0000:7e:0c.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a"
+      },
+      {
+        "address": "0000:7e:0d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a"
+      },
+      {
+        "address": "0000:7e:0e.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a"
+      },
+      {
+        "address": "0000:7e:0f.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a"
+      },
+      {
+        "address": "0000:7e:1a.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880"
+      },
+      {
+        "address": "0000:7e:1b.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880"
+      },
+      {
+        "address": "0000:7e:1c.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880"
+      },
+      {
+        "address": "0000:7e:1d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880"
+      },
+      {
+        "address": "0000:7f:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:00.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:00.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:00.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:00.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:01.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:02.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:03.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c"
+      },
+      {
+        "address": "0000:7f:0a.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0a.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0a.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0a.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0a.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0a.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0a.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0a.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0b.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0c.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:0d.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d"
+      },
+      {
+        "address": "0000:7f:1d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake CHA Registers",
+        "productID": "344f"
+      },
+      {
+        "address": "0000:7f:1d.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake CHA Registers",
+        "productID": "3457"
+      },
+      {
+        "address": "0000:7f:1e.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3258"
+      },
+      {
+        "address": "0000:7f:1e.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3259"
+      },
+      {
+        "address": "0000:7f:1e.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325a"
+      },
+      {
+        "address": "0000:7f:1e.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325b"
+      },
+      {
+        "address": "0000:7f:1e.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325c"
+      },
+      {
+        "address": "0000:7f:1e.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325d"
+      },
+      {
+        "address": "0000:7f:1e.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325e"
+      },
+      {
+        "address": "0000:7f:1e.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325f"
+      },
+      {
+        "address": "0000:80:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:80:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:80:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:80:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:8a:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:8a:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:8a:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:8a:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:8a:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352a",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:8b:00.0",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "BCM57508 NetXtreme-E 10Gb/25Gb/40Gb/50Gb/100Gb/200Gb Ethernet",
+        "productID": "1750",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:8b:00.1",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "vendorID": "14e4",
+        "product": "BCM57508 NetXtreme-E 10Gb/25Gb/40Gb/50Gb/100Gb/200Gb Ethernet",
+        "productID": "1750",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:9e:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:9e:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:9e:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:9e:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:b3:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:b3:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:b3:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:b3:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352a",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352b",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:05.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c8:07.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "352d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:c9:00.0",
+        "vendor": "Samsung Electronics Co Ltd",
+        "vendorID": "144d",
+        "product": "NVMe SSD Controller PM173Xa",
+        "productID": "a825",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:e0:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:e0:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:e0:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:e0:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:f2:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Memory Map/VT-d",
+        "productID": "09a2",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:f2:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake Mesh 2 PCIe",
+        "productID": "09a4",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:f2:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake RAS",
+        "productID": "09a3",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:f2:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b23",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:f2:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "0b25",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:f2:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake MSM",
+        "productID": "09a6",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:f2:03.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake PMON MSM",
+        "productID": "09a7",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3250",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3251",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3252",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:00.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake IEH",
+        "productID": "0998",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:00.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3255",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3240",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:01.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3241",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:01.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3242",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:02.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3240",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:02.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3241",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:02.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3242",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3240",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:03.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3241",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:03.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3242",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:05.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3245",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:05.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3246",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:05.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3247",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:06.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3245",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:06.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3246",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:06.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3247",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:07.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3245",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:07.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3246",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:07.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3247",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:0c.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:0d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:0e.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:0f.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324a",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:1a.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:1b.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:1c.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:fe:1d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake DDRIO Registers",
+        "productID": "2880",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:00.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:01.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:02.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:03.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0a.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0b.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0c.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:0d.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "324d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1d.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake CHA Registers",
+        "productID": "344f",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1d.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "Ice Lake CHA Registers",
+        "productID": "3457",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.0",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3258",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.1",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "3259",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.2",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325a",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.3",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325b",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.4",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325c",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.5",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325d",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.6",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325e",
+        "numaNodeID": 1
+      },
+      {
+        "address": "0000:ff:1e.7",
+        "vendor": "Intel Corporation",
+        "vendorID": "8086",
+        "product": "unknown",
+        "productID": "325f",
+        "numaNodeID": 1
+      }
+    ]
+  }
+}

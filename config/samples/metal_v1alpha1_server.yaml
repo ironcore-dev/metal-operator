@@ -7,10 +7,10 @@ metadata:
     app.kubernetes.io/part-of: metal-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: metal-operator
-  name: server-sample
+  name: endpoint-sample-system-0
 spec:
   uuid: "12345"
   bmcRef:
-    name: sample-bmc
-  power: Off
+    name: bmc-sample
+  power: "Off"
   indicatorLED: Blinking

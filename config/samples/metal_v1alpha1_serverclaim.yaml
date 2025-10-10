@@ -10,13 +10,11 @@ metadata:
   name: serverclaim-sample
 spec:
   serverRef:
-    name: sample-server
+    name: endpoint-sample-system-0 
 #  serverSelector:
 #    matchLabels:
-#      az: a1
-#      cpu: 100
-#      foo: bar
+#      manufacturer: "Contoso"
   image: os-image:latest
   ignitionSecretRef:
-    name: my-ignition
-  power: On
+    name: ignition-sample
+  power: "On"

@@ -7,13 +7,13 @@ metadata:
   name: bmcversionset-sample
 spec:
   bmcVersionTemplate:
-    version: "U59 v2.34 (10/04/2024)"
+    version: "3.45.455b66-rev4"
     image:
-      URI: "https://foo-2.34_10_04_2024.signed.flash"
+      URI: "3.45.455b66-rev4"
       transferProtocol: "HTTPS"
     updatePolicy: Normal
     serverMaintenancePolicy: OwnerApproval
   bmcSelector:
     matchLabels: 
-      manufacturer: "dell"
+      manufacturer: "Contoso"
   

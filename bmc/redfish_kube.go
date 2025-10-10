@@ -24,13 +24,13 @@ const (
 var _ BMC = (*RedfishKubeBMC)(nil)
 
 type KubeClient struct {
-	client    client.Client
+	kclient   client.Client
 	namespace string
 }
 
 // RedfishKubeBMC is an implementation of the BMC interface for Redfish.
 type RedfishKubeBMC struct {
-	*RedfishBMC
+	*RedfishLocalBMC
 	*KubeClient
 }
 
@@ -45,10 +45,13 @@ func NewRedfishKubeBMCClient(
 	if err != nil {
 		return nil, err
 	}
+	if UnitTestMockUps == nil {
+		InitMockUp()
+	}
 	redfishKubeBMC := &RedfishKubeBMC{
-		RedfishBMC: bmc,
+		RedfishLocalBMC: &RedfishLocalBMC{RedfishBMC: bmc},
 		KubeClient: &KubeClient{
-			client:    c,
+			kclient:   c,
 			namespace: ns,
 		},
 	}
@@ -83,7 +86,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 		"-c",
 		curlCmd,
 	}
-	if err := r.createJob(context.TODO(), r.KubeClient.client, cmd, r.namespace, system.UUID); err != nil {
+	if err := r.createJob(context.TODO(), r.kclient, cmd, r.namespace, system.UUID); err != nil {
 		return fmt.Errorf("failed to create job for system %s: %w", system.UUID, err)
 	}
 	return nil

@@ -31,11 +31,11 @@ kind: BMCSettings
 metadata:
   name: bmcsettings-sample
 spec:
-  BMCRef:
-    name: sample-BMC
+  bmcRef:
+    name: sample-bmc
   version: 2.10.3
   settings:
-    OtherSettings: "123"
+    otherSettings: "123"
     someother: Disabled
-  ServerMaintenancePolicy: OwnerApproval
+  serverMaintenancePolicy: OwnerApproval
 ```

@@ -41,6 +41,5 @@ spec:
     PxeDev2EnDis: Enabled
     OtherSettings: "123"
     someother: Disabled
-ServerMaintenancePolicy: OwnerApproval
-
+  serverMaintenancePolicy: OwnerApproval
 ```

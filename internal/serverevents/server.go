@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package serverevents
 
 import (
@@ -79,7 +82,6 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 	alertsGauge.WithLabelValues(hostname, vendor, "Warning").Set(float64(totalWarnings))
 	alertsGauge.WithLabelValues(hostname, vendor, "Critical").Set(float64(totalCriticals))
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Alert data received"))
 }
 
 func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +119,6 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("Metric", "id", mv.MetricId, "property", mv.MetricProperty, "value", mv.MetricValue, "timestamp", mv.Timestamp)
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Metrics report data received"))
 }
 
 // Start starts the server on the specified address and adds logging for key events.

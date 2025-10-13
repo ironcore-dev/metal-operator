@@ -24,6 +24,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
+	"github.com/ironcore-dev/metal-operator/internal/serverevents"
 	"github.com/stmcginnis/gofish/redfish"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
@@ -164,6 +165,19 @@ func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *
 		}
 		log.V(1).Info("BIOS settings was deleted")
 	}
+
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
+	}
+	if err := bmcClient.DeleteEventSubscription(ctx, fmt.Sprintf("https://localhost:8888/%s/%s/metrics", server.Status.Manufacturer, server.Spec.UUID)); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to delete metrics event subscription: %w", err)
+	}
+	log.V(1).Info("Deleted metrics event subscription")
+	if err := bmcClient.DeleteEventSubscription(ctx, fmt.Sprintf("https://localhost:8888/%s/%s/alerts", server.Status.Manufacturer, server.Spec.UUID)); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to delete alerts event subscription: %w", err)
+	}
+	log.V(1).Info("Deleted alerts event subscription")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
@@ -384,6 +398,14 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
 	}
 	log.V(1).Info("Removed Server from Registry")
+
+	if err := serverevents.SubscribeMetricsReport(ctx, server.Status.Manufacturer, server.Spec.UUID, bmcClient); err != nil {
+		return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
+	}
+
+	if err := serverevents.SubscribeEvents(ctx, server.Status.Manufacturer, server.Spec.UUID, bmcClient); err != nil {
+		return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
+	}
 
 	log.V(1).Info("Setting Server state set to available")
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {

@@ -965,3 +965,68 @@ func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string,
 
 	return oem.GetTaskMonitorDetails(ctx, respTask)
 }
+
+type subscriptionPayload struct {
+	Destination         string                           `json:"Destination,omitempty"`
+	EventTypes          []redfish.EventType              `json:"EventTypes,omitempty"`
+	EventFormatType     redfish.EventFormatType          `json:"EventFormatType,omitempty"`
+	RegistryPrefixes    []string                         `json:"RegistryPrefixes,omitempty"`
+	ResourceTypes       []string                         `json:"ResourceTypes,omitempty"`
+	DeliveryRetryPolicy redfish.DeliveryRetryPolicy      `json:"DeliveryRetryPolicy,omitempty"`
+	HTTPHeaders         map[string]string                `json:"HttpHeaders,omitempty"`
+	Oem                 interface{}                      `json:"Oem,omitempty"`
+	Protocol            redfish.EventDestinationProtocol `json:"Protocol,omitempty"`
+	Context             string                           `json:"Context,omitempty"`
+}
+
+func (r *RedfishBMC) CreateEventSubscription(
+	ctx context.Context,
+	destination string,
+	eventFormatType redfish.EventFormatType,
+	retry redfish.DeliveryRetryPolicy,
+) error {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return fmt.Errorf("event service is not enabled")
+	}
+
+	payload := &subscriptionPayload{
+		Destination:         destination,
+		EventFormatType:     eventFormatType, // event or metricreport
+		Protocol:            redfish.RedfishEventDestinationProtocol,
+		DeliveryRetryPolicy: retry,
+		Context:             "metal3-operator",
+	}
+	client := ev.GetClient()
+	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
+	if len(ev.ResourceTypes) == 0 {
+		payload.EventTypes = []redfish.EventType{}
+	} else {
+		payload.RegistryPrefixes = []string{""} // Filters by the prefix of the event's MessageId, which points to a Message Registry: [Base, ResourceEvent, iLOEvents]
+		payload.ResourceTypes = []string{""}    // Filters by the schema name (Resource Type) of the event's OriginOfCondition:	[Chassis, ComputerSystem, Power]
+	}
+	_, err = client.Post(ev.Subscriptions, payload)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r RedfishBMC) DeleteEventSubscription(ctx context.Context, destination string) error {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return fmt.Errorf("event service is not enabled")
+	}
+	if err := ev.DeleteEventSubscription(destination); err != nil {
+		return fmt.Errorf("failed to delete event subscription: %w", err)
+	}
+	return nil
+}

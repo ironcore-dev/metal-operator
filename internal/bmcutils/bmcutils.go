@@ -5,12 +5,20 @@ package bmcutils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	BmcSecretUsernameKey = "username"
+	BmcSecretPasswordKey = "password"
 )
 
 func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {
@@ -25,15 +33,30 @@ func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metal
 
 func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
 	// TODO: use constants for secret keys
-	username, ok := secret.Data["username"]
-	if !ok {
-		return "", "", fmt.Errorf("no username found in the BMC secret")
+	username, err := getValueFromSecret(secret, BmcSecretUsernameKey)
+	if err != nil {
+		return "", "", err
 	}
-	password, ok := secret.Data["password"]
-	if !ok {
-		return "", "", fmt.Errorf("no password found in the BMC secret")
+	password, err := getValueFromSecret(secret, BmcSecretPasswordKey)
+	if err != nil {
+		return "", "", err
 	}
-	return string(username), string(password), nil
+	return username, password, nil
+}
+
+func getValueFromSecret(secret *metalv1alpha1.BMCSecret, key string) (string, error) {
+	if secret == nil {
+		return "", errors.New("secret cannot be nil")
+	}
+	value, ok := secret.Data[key]
+	if ok {
+		return string(value), nil
+	}
+	valueStr, ok := secret.StringData[key]
+	if ok {
+		return valueStr, nil
+	}
+	return "", fmt.Errorf("cannot find value in BMCSecret '%s' for key '%s' in data nor in stringData", secret.Name, key)
 }
 
 func GetBMCFromBMCName(ctx context.Context, c client.Client, bmcName string) (*metalv1alpha1.BMC, error) {
@@ -154,17 +177,17 @@ func CreateBMCClient(
 	case metalv1alpha1.ProtocolRedfish:
 		bmcClient, err = bmc.NewRedfishBMCClient(ctx, bmcOptions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	case metalv1alpha1.ProtocolRedfishLocal:
 		bmcClient, err = bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	case metalv1alpha1.ProtocolRedfishKube:
 		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, c, DefaultKubeNamespace)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Redfish client: %w", err)
+			return nil, err
 		}
 	default:
 		return nil, fmt.Errorf("unsupported BMC protocol %s", bmcProtocol)
@@ -174,4 +197,58 @@ func CreateBMCClient(
 
 func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmc.Name, "system", index)
+}
+
+func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+	// If Redfish reset fails, try SSH-based reset for known manufacturers
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			return nil
+		},
+		Timeout: timeout,
+	}
+	resetCMD := ""
+	switch manufacturer {
+	case string(bmc.ManufacturerDell):
+		resetCMD = "racreset"
+	case string(bmc.ManufacturerHPE):
+		resetCMD = "cd /map1 && reset"
+	case string(bmc.ManufacturerLenovo):
+		resetCMD = "resetsp"
+	default:
+		return fmt.Errorf("unsupported BMC manufacturer %s for bmc reset", manufacturer)
+	}
+	client, err := ssh.Dial("tcp", net.JoinHostPort(ip, "22"), config)
+	if err != nil {
+		return fmt.Errorf("failed to dial ssh: %w", err)
+	}
+	defer func() {
+		_ = client.Close()
+	}()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create ssh session: %w", err)
+	}
+	defer func() {
+		_ = session.Close()
+	}()
+	// cancel reset cmd after 5 minutes
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(resetCMD)
+	}()
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("timeout waiting for BMC reset command to complete: %w", ctx.Err())
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("failed to run reset command: %w", err)
+		}
+	}
+	return nil
 }

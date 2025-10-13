@@ -1,4 +1,5 @@
 import { withMermaid } from "vitepress-plugin-mermaid";
+import { fileURLToPath, URL } from 'node:url'
 
 // https://vitepress.dev/reference/site-config
 export default withMermaid({
@@ -6,6 +7,18 @@ export default withMermaid({
   description: "Kubernetes Operator to manage Bare Metal Servers",
   base: "/metal-operator/",
   head: [['link', { rel: 'icon', href: 'https://raw.githubusercontent.com/ironcore-dev/ironcore/refs/heads/main/docs/assets/logo_borderless.svg' }]],
+  vite: {
+      resolve: {
+          alias: [
+              {
+                  find: /^.*\/VPFooter\.vue$/,
+                  replacement: fileURLToPath(
+                      new URL('./theme/components/VPFooter.vue', import.meta.url)
+                  )
+              },
+          ]
+      }
+  },
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
@@ -20,14 +33,11 @@ export default withMermaid({
       text: 'Edit this page on GitHub'
     },
 
-    footer: {
-      copyright: 'Copyright © Linux Foundation Europe. IronCore is a project of Linux Foundation Europe. For applicable' +
-          ' policies including privacy policy, terms of use and trademark usage guidelines, please see ' +
-          '<a href=https://linuxfoundation.eu>https://linuxfoundation.eu</a>. Linux is a registered trademark of ' +
-          'Linus Torvalds.'
+    logo: {
+        src: 'https://raw.githubusercontent.com/ironcore-dev/ironcore/refs/heads/main/docs/assets/logo_borderless.svg',
+        width: 24,
+        height: 24
     },
-
-    logo: { src: 'https://raw.githubusercontent.com/ironcore-dev/ironcore/refs/heads/main/docs/assets/logo_borderless.svg', width: 24, height: 24 },
 
     search: {
       provider: 'local'
@@ -56,9 +66,9 @@ export default withMermaid({
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
           { text: 'ServerMaintenance', link: '/concepts/servermaintenance' },
           { text: 'BIOSSettings', link: '/concepts/biossettings' },
+          { text: 'BIOSSettingsSet', link: '/concepts/biossettingsset' },
           { text: 'BIOSVersion', link: '/concepts/biosversion' },
           { text: 'BIOSVersionSet', link: '/concepts/biosversionset' },
-          { text: 'BIOSSettingsSet', link: '/concepts/biossettingsset' },
         ]
       },
       {

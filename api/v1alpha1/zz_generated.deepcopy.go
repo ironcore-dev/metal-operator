@@ -804,6 +804,10 @@ func (in *BMCSpec) DeepCopy() *BMCSpec {
 func (in *BMCStatus) DeepCopyInto(out *BMCStatus) {
 	*out = *in
 	in.IP.DeepCopyInto(&out.IP)
+	if in.LastResetTime != nil {
+		in, out := &in.LastResetTime, &out.LastResetTime
+		*out = (*in).DeepCopy()
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))

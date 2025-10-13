@@ -13,9 +13,9 @@ spec:
       - name: abc
         priority: 10
         settings:
-          abc: Enabled
+          abc: "Disabled"
   serverSelector:
     matchLabels: 
-      manufacturer: "dell"
+      manufacturer: "Contoso"
 
 

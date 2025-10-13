@@ -59,7 +59,7 @@ var _ = Describe("Server Webhook", func() {
 			By("Patching the server to have force delete annotation")
 			Eventually(Update(server, func() {
 				server.Annotations = map[string]string{
-					metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress,
+					metalv1alpha1.OperationAnnotationForceUpdate: metalv1alpha1.ForceUpdateOrDeleteInProgressOperationAnnotation,
 				}
 			})).Should(Succeed())
 

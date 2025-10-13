@@ -229,7 +229,7 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
 			biosVersion.Status.Conditions = nil
 			annotations := biosVersion.GetAnnotations()
-			delete(annotations, metalv1alpha1.OperationAnnotation)
+			delete(annotations, metalv1alpha1.OperationAnnotationRetry)
 			biosVersion.SetAnnotations(annotations)
 			if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 				return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)

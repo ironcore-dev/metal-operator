@@ -1000,7 +1000,7 @@ func (r *BiosSettingsReconciler) handleFailedState(
 		// todo: add FlowState reset after the #403 is merged
 		biosSettings.Status.Conditions = nil
 		annotations := biosSettings.GetAnnotations()
-		delete(annotations, metalv1alpha1.OperationAnnotation)
+		delete(annotations, metalv1alpha1.OperationAnnotationRetry)
 		biosSettings.SetAnnotations(annotations)
 		if err := r.Status().Patch(ctx, biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for retrying: %w", err)

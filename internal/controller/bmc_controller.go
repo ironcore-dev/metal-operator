@@ -247,12 +247,12 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 }
 
 func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
-	operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
+	operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotationReset]
 	if !ok {
 		return false, nil
 	}
 	switch operation {
-	case metalv1alpha1.OperationAnnotationForceReset:
+	case metalv1alpha1.ForceResetOperationAnnotation:
 		log.V(1).Info("Handling operation", "Operation", operation)
 		if err := r.resetBMC(ctx, log, bmcObj, bmcUserResetReason, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
@@ -260,7 +260,7 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 		log.V(0).Info("Handled operation", "Operation", operation)
 	}
 	bmcBase := bmcObj.DeepCopy()
-	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
+	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotationReset)
 	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return false, fmt.Errorf("failed to remove operation annotation: %w", err)
 	}

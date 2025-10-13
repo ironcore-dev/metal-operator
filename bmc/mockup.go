@@ -25,7 +25,8 @@ type RedfishMockUps struct {
 	BMCUpgradeTaskIndex  int
 	BMCUpgradeTaskStatus []redfish.Task
 
-	Accounts map[string]*redfish.ManagerAccount
+	Accounts              map[string]*redfish.ManagerAccount
+	SimulateUnvailableBMC bool
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -143,6 +144,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 			Password: "userpass",
 		},
 	}
+	r.SimulateUnvailableBMC = false
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {

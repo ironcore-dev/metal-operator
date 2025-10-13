@@ -229,9 +229,10 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCReconciler{
-			Client:   k8sManager.GetClient(),
-			Scheme:   k8sManager.GetScheme(),
-			Insecure: true,
+			Client:           k8sManager.GetClient(),
+			Scheme:           k8sManager.GetScheme(),
+			Insecure:         true,
+			ManagerNamespace: ns.Name,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{

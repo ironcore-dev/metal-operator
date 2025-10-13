@@ -64,6 +64,11 @@ func (r *ServerMaintenanceReconciler) reconcileExists(ctx context.Context, log l
 }
 
 func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
+	if shouldIgnoreReconciliation(serverMaintenance) {
+		log.V(1).Info("Skipped ServerMaintenance reconciliation")
+		return ctrl.Result{}, nil
+	}
+
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
 		if apierrors.IsNotFound(err) {

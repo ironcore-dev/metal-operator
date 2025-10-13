@@ -10,6 +10,7 @@ import (
 
 	"github.com/ironcore-dev/metal-operator/bmc/common"
 	gofishCommon "github.com/stmcginnis/gofish/common"
+
 	"github.com/stmcginnis/gofish/redfish"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -23,6 +24,15 @@ type RedfishLocalBMC struct {
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
 func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error) {
+	if UnitTestMockUps == nil {
+		InitMockUp()
+	}
+	if UnitTestMockUps.SimulateUnvailableBMC {
+		err := &gofishCommon.Error{
+			HTTPReturnedStatusCode: 503,
+		}
+		return nil, err
+	}
 	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {
 		return nil, err

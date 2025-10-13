@@ -224,6 +224,10 @@ type BMCStatus struct {
 	// +optional
 	PowerState BMCPowerState `json:"powerState,omitempty"`
 
+	// LastResetTime is the timestamp of the last reset operation performed on the BMC.
+	// +optional
+	LastResetTime *metav1.Time `json:"lastResetTime,omitempty"`
+
 	// Conditions represents the latest available observations of the BMC's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type

@@ -98,7 +98,6 @@ kubectl apply -f https://raw.githubusercontent.com/<org>/metal-operator/<tag or 
 ```
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
 

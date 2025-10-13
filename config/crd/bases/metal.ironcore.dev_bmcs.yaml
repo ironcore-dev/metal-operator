@@ -340,6 +340,11 @@ spec:
                   IP is the IP address of the BMC.
                   The type is specified as string and is schemaless.
                 type: string
+              lastResetTime:
+                description: LastResetTime is the timestamp of the last reset operation
+                  performed on the BMC.
+                format: date-time
+                type: string
               macAddress:
                 description: |-
                   MACAddress is the MAC address of the BMC.

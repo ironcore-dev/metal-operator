@@ -1,0 +1,23 @@
+# permissions for end users to view accounts.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: account-viewer-role
+rules:
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - accounts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - accounts/status
+  verbs:
+  - get

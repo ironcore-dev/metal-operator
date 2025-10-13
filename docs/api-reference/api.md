@@ -2591,7 +2591,7 @@ ServerMaintenancePolicy
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Oneoff&#34;</p></td>
+<tbody><tr><td><p>&#34;OneOff&#34;</p></td>
 <td><p>BootTypeOneOff indicates that the server should boot into this configuration one time.</p>
 </td>
 </tr><tr><td><p>&#34;Persistent&#34;</p></td>
@@ -3787,9 +3787,9 @@ BootType
 <td>
 <em>(Optional)</em>
 <p>BootType specifies the type of boot configuration.
-It can be either &ldquo;Oneoff&rdquo; or &ldquo;Persistent&rdquo;. If not specified, it defaults to &ldquo;Persistent&rdquo;.
+It can be either &ldquo;OneOff&rdquo; or &ldquo;Persistent&rdquo;. If not specified, it defaults to &ldquo;Persistent&rdquo;.
 &ldquo;Persistent&rdquo; will set the configuration reboot the server before setting the server to the desired power state mentioned in spec.</p>
-<p>&ldquo;Oneoff&rdquo; will set the configuration to boot once. next boot-up will boot into default boot order.
+<p>&ldquo;OneOff&rdquo; will set the configuration to boot once. next boot-up will boot into default boot order.
 if power state mentioned in spec is &ldquo;PowerOn&rdquo;, server will be powered on and will boot into the configuration.
 if power state is &ldquo;PowerOff&rdquo;, server will be powered off and will boot into the configuration on next power on.</p>
 </td>
@@ -4484,7 +4484,9 @@ ServerMaintenanceBootOrder
 </td>
 <td>
 <em>(Optional)</em>
-<p>BootOrder specifies the boot order of the server before maintenance.</p>
+<p>BootOrderStatus specifies the boot order of the server before maintenance.
+is used to store the boot order of server before it is changed for maintenance.
+used only with BootType Persistent.</p>
 </td>
 </tr>
 </tbody>

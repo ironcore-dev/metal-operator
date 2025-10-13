@@ -215,7 +215,7 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 	// implication of skipping is that the server will still continue to run the OS during Maintenance
 	// might be subjected to reboots
 	val, found := serverMaintenance.GetAnnotations()[metalv1alpha1.OperationSkipBootConfiguration]
-	if config == nil && (!found || val != metalv1alpha1.OperationBootConfigurationSkip) {
+	if config == nil && (!found || val != metalv1alpha1.SkipBootConfiguration) {
 		log.V(1).Info("No ServerBootConfigurationTemplate boot configuration", "Server", server.Name)
 		_, err = r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed)
 		return ctrl.Result{}, err
@@ -445,7 +445,7 @@ func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, lo
 	}
 	defer bmcClient.Logout()
 
-	switch maintenance.Spec.ServerBootConfigurationTemplate.Boottype {
+	switch maintenance.Spec.ServerBootConfigurationTemplate.BootType {
 	case metalv1alpha1.BootTypeOneOff:
 		// note: with this option, the next server boot up will enter pxe boot.
 		// if Maintenance Spec.ServerPower is PowerOn, server will be powered on and will boot into pxe
@@ -531,7 +531,7 @@ func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, lo
 			}
 			log.V(1).Info("Configured boot order for server",
 				"Server", server.Name,
-				"BootType", maintenance.Spec.ServerBootConfigurationTemplate.Boottype,
+				"BootType", maintenance.Spec.ServerBootConfigurationTemplate.BootType,
 				"BootOrder", bootOrderChanged)
 			// save the current boot order to revert back after maintenance
 			status := &metalv1alpha1.ServerMaintenanceBootOrder{
@@ -558,7 +558,7 @@ func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, lo
 		log.V(1).Info("wait for boot order to be set on server", "Server", server.Name)
 		return true, nil
 	default:
-		return false, fmt.Errorf("unknown boot type: %s", maintenance.Spec.ServerBootConfigurationTemplate.Boottype)
+		return false, fmt.Errorf("unknown boot type: %s", maintenance.Spec.ServerBootConfigurationTemplate.BootType)
 	}
 }
 

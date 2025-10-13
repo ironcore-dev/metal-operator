@@ -24,17 +24,17 @@ type ServerBootConfigurationTemplate struct {
 	Name string `json:"name"`
 
 	// BootType specifies the type of boot configuration.
-	// It can be either "Oneoff" or "Persistent". If not specified, it defaults to "Persistent".
+	// It can be either "OneOff" or "Persistent". If not specified, it defaults to "Persistent".
 	// "Persistent" will set the configuration reboot the server before setting the server to the desired power state mentioned in spec.
 	//
-	// "Oneoff" will set the configuration to boot once. next boot-up will boot into default boot order.
+	// "OneOff" will set the configuration to boot once. next boot-up will boot into default boot order.
 	// if power state mentioned in spec is "PowerOn", server will be powered on and will boot into the configuration.
 	// if power state is "PowerOff", server will be powered off and will boot into the configuration on next power on.
 	//
-	// +kubebuilder:validation:Enum=Oneoff;Persistent
+	// +kubebuilder:validation:Enum=OneOff;Persistent
 	// +optional
 	// +kubebuilder:default=Persistent
-	Boottype BootType `json:"bootType,omitempty"`
+	BootType BootType `json:"bootType,omitempty"`
 
 	// Parameters specify the parameters to be used for rendering the boot configuration.
 	// +required
@@ -45,7 +45,7 @@ type BootType string
 
 const (
 	// BootTypeOneOff indicates that the server should boot into this configuration one time.
-	BootTypeOneOff BootType = "Oneoff"
+	BootTypeOneOff BootType = "OneOff"
 	// BootTypePersistent indicates that the server should boot into this configuration continuously.
 	BootTypePersistent BootType = "Persistent"
 )
@@ -84,7 +84,9 @@ type ServerMaintenanceStatus struct {
 	// State specifies the current state of the server maintenance.
 	State ServerMaintenanceState `json:"state,omitempty"`
 
-	// BootOrder specifies the boot order of the server before maintenance.
+	// BootOrderStatus specifies the boot order of the server before maintenance.
+	// is used to store the boot order of server before it is changed for maintenance.
+	// used only with BootType Persistent.
 	// +optional
 	BootOrderStatus *ServerMaintenanceBootOrder `json:"bootOrderStatus,omitempty"`
 }

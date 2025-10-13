@@ -27,8 +27,8 @@ const (
 
 	// OperationSkipBootConfiguration indicates which boot configuration operation should be skipped.
 	OperationSkipBootConfiguration = "metal.ironcore.dev/operation-skip-boot-configuration"
-	// OperationBootConfigurationSkip skips the boot configuration if set to this value.
-	OperationBootConfigurationSkip = "skip"
+	// SkipBootConfiguration skips the boot configuration if set to this value.
+	SkipBootConfiguration = "skip"
 	// OperationAnnotationForceReset forces a reset before next operation
 	OperationAnnotationForceReset = "ForceReset"
 )

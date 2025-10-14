@@ -965,3 +965,55 @@ func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string,
 
 	return oem.GetTaskMonitorDetails(ctx, respTask)
 }
+
+func (r *RedfishBMC) GetCriticalSystemEventLogs(ctx context.Context, systemURI string) ([]EventLogEntry, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get systems: %w", err)
+	}
+	ls, err := system.LogServices()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get event logs: %w", err)
+	}
+	eventLogs := make([]EventLogEntry, 0)
+	for _, l := range ls {
+		if l.LogEntryType == redfish.SELLogEntryTypes {
+			entries, err := l.Entries()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get event log entries: %w", err)
+			}
+			for _, entry := range entries {
+				if entry.Severity == redfish.CriticalEventSeverity {
+					eventLogs = append(eventLogs, EventLogEntry{
+						ID:          entry.ID,
+						Name:        entry.Name,
+						Created:     entry.Created,
+						Description: entry.Description,
+						Message:     entry.Message,
+						Severity:    entry.Severity,
+					})
+				}
+			}
+		}
+	}
+	return eventLogs, nil
+}
+
+func (r *RedfishBMC) ClearSystemEventLogs(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	ls, err := system.LogServices()
+	if err != nil {
+		return fmt.Errorf("failed to get event logs: %w", err)
+	}
+	for _, l := range ls {
+		if l.LogEntryType == redfish.SELLogEntryTypes {
+			if err := l.ClearLog(); err != nil {
+				return fmt.Errorf("failed to clear event log entries: %w", err)
+			}
+		}
+	}
+	return nil
+}

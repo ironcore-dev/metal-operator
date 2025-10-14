@@ -121,6 +121,12 @@ type BMC interface {
 
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
+
+	// CreateEventSubscription creates an event subscription for the manager.q
+	CreateEventSubscription(ctx context.Context, destination string, eventType redfish.EventFormatType, protocol redfish.DeliveryRetryPolicy) error
+
+	// DeleteEventSubscription deletes an event subscription for the manager.
+	DeleteEventSubscription(ctx context.Context, destination string) error
 }
 
 // OEMManagerInterface defines methods for OEM-specific BMC management.

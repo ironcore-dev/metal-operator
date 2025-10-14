@@ -29,7 +29,7 @@ spec:
     serverMaintenancePolicy: OwnerApproval
     settings:
       foo: bar
-  ServerSelector:
+  serverSelector:
     matchLabels: 
       manufacturer: "dell"
 ```

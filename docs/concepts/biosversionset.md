@@ -31,7 +31,7 @@ spec:
       transferProtocol: "HTTPS"
     updatePolicy: Normal
     serverMaintenancePolicy: OwnerApproval
-  ServerSelector:
+  serverSelector:
     matchLabels: 
       manufacturer: "dell"
 ```

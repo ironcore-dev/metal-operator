@@ -5,5 +5,17 @@ metadata:
     app.kubernetes.io/name: metal-operator
     app.kubernetes.io/managed-by: kustomize
   name: servermaintenance-sample
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  serverRef:
+    name: node005-ap046-system-0
+  policy: metalv1alpha1.ServerMaintenancePolicyEnforced
+  serverPower: metalv1alpha1.PowerOn
+  serverBootConfigurationTemplate: 
+    name: "test-boot"
+    spec: 
+      ignitionSecretRef:
+        name: ignition-secret
+      serverRef: 
+        name: server-system-0
+      image: "ghcr.io//foo/linux:C.X"

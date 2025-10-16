@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -233,11 +232,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
 	log.V(1).Info("Updated Server status")
-
-	if err := r.applyBootOrder(ctx, log, bmcClient, server); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
-	}
-	log.V(1).Info("Updated Server BIOS boot order")
 
 	requeue, err := r.ensureServerStateTransition(ctx, log, bmcClient, server)
 	if requeue && err == nil {
@@ -1015,34 +1009,6 @@ func (r *ServerReconciler) invalidateRegistryEntryForServer(log logr.Logger, ser
 			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
-	return nil
-}
-
-func (r *ServerReconciler) applyBootOrder(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
-	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
-		log.V(1).Info("Server has no BMC connection configured")
-		return nil
-	}
-
-	order, err := bmcClient.GetBootOrder(ctx, server.Spec.SystemURI)
-	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
-	}
-
-	sort.Slice(server.Spec.BootOrder, func(i, j int) bool {
-		return server.Spec.BootOrder[i].Priority < server.Spec.BootOrder[j].Priority
-	})
-	newOrder := []string{}
-	change := false
-	for i, boot := range server.Spec.BootOrder {
-		newOrder = append(newOrder, boot.Device)
-		if order[i] != boot.Device {
-			change = true
-		}
-	}
-	if change {
-		return bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, newOrder)
-	}
 	return nil
 }
 

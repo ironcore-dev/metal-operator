@@ -284,6 +284,13 @@ spec:
               powerState:
                 description: PowerState represents the current power state of the
                   BMC.
+                enum:
+                - "On"
+                - "Off"
+                - Paused
+                - PoweringOn
+                - PoweringOff
+                - Unmanaged
                 type: string
               serialNumber:
                 description: SerialNumber is the serial number of the BMC.

@@ -34,6 +34,7 @@ var _ = Describe("Console Access", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
+				Power: metalv1alpha1.PowerUnmanaged,
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{},
 					Address:  "10.0.0.1",
@@ -92,6 +93,7 @@ var _ = Describe("Console Access", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
+				Power: metalv1alpha1.PowerUnmanaged,
 				BMCRef: &corev1.LocalObjectReference{
 					Name: bmc.Name,
 				},

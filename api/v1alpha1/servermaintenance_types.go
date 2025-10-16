@@ -39,7 +39,8 @@ type ServerMaintenanceSpec struct {
 	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
 
 	// ServerPower specifies the power state of the server during maintenance.
-	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Enum=On;Off;Paused;PoweringOn;PoweringOff;Unmanaged
 	ServerPower Power `json:"serverPower,omitempty"`
 
 	// ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.

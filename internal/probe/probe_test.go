@@ -29,5 +29,9 @@ var _ = Describe("ProbeAgent", func() {
 		server := &registry.Server{}
 		Expect(json.NewDecoder(resp.Body).Decode(server)).NotTo(HaveOccurred())
 		Expect(server.NetworkInterfaces).NotTo(BeEmpty())
+		Expect(server.SystemInfo.BIOSInformation).NotTo(BeNil())
+		Expect(server.SystemInfo.BoardInformation).NotTo(BeNil())
+		Expect(server.SystemInfo.SystemInformation).NotTo(BeNil())
+		Expect(server.CPU).NotTo(BeEmpty())
 	})
 })

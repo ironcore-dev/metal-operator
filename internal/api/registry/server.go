@@ -13,5 +13,12 @@ type NetworkInterface struct {
 
 // Server represents a server with a list of network interfaces.
 type Server struct {
+	SystemInfo        DMI                `json:"systemInfo,omitempty"`
+	CPU               []CPUInfo          `json:"cpu,omitempty"`
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
+	LLDP              []LLDPInterface    `json:"lldp,omitempty"`
+	Storage           []BlockDevice      `json:"storage,omitempty"`
+	Memory            []MemoryDevice     `json:"memory,omitempty"`
+	NICs              []NIC              `json:"nics,omitempty"`
+	PCIDevices        []PCIDevice        `json:"pciDevices,omitempty"`
 }

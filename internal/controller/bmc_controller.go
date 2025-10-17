@@ -252,12 +252,15 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 		return false, nil
 	}
 	switch operation {
-	case metalv1alpha1.OperationAnnotationForceReset:
+	case metalv1alpha1.ForceResetBMCOperationAnnotation:
 		log.V(1).Info("Handling operation", "Operation", operation)
 		if err := r.resetBMC(ctx, log, bmcObj, bmcUserResetReason, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
 		log.V(0).Info("Handled operation", "Operation", operation)
+	default:
+		log.V(1).Info("Unknown operation annotation, ignoring", "Operation", operation)
+		return false, nil
 	}
 	bmcBase := bmcObj.DeepCopy()
 	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)

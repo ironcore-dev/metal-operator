@@ -24,7 +24,7 @@ func shouldIgnoreReconciliation(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.OperationAnnotationIgnore || val == metalv1alpha1.OperationAnnotationIgnoreChildAndSelf
+	return val == metalv1alpha1.IgnoreOperationAnnotation || val == metalv1alpha1.IgnoreChildAndSelfOperationAnnotation
 }
 
 // shouldChildIgnoreReconciliation checks if the object Child should ignore reconciliation.
@@ -34,13 +34,13 @@ func shouldChildIgnoreReconciliation(parentObj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.OperationAnnotationIgnoreChild || val == metalv1alpha1.OperationAnnotationIgnoreChildAndSelf
+	return val == metalv1alpha1.IgnoreChildOperationAnnotation || val == metalv1alpha1.IgnoreChildAndSelfOperationAnnotation
 }
 
 // isChildIgnoredThroughSets checks if the object's child is marked ignore operation through parent.
 func isChildIgnoredThroughSets(childObj client.Object) bool {
 	annotations := childObj.GetAnnotations()
-	valPropagated, found := annotations[metalv1alpha1.PropagatedOperationAnnotation]
+	valPropagated, found := annotations[metalv1alpha1.OperationAnnotationPropagated]
 	if !found {
 		return false
 	}
@@ -48,7 +48,7 @@ func isChildIgnoredThroughSets(childObj client.Object) bool {
 	if !found {
 		return false
 	}
-	return valChildIgnore == metalv1alpha1.OperationAnnotationIgnore && valPropagated == metalv1alpha1.OperationAnnotationIgnoreChild
+	return valChildIgnore == metalv1alpha1.IgnoreOperationAnnotation && valPropagated == metalv1alpha1.IgnoreChildOperationAnnotation
 }
 
 // shouldRetryReconciliation checks if the object should retry reconciliation from failed state.
@@ -57,7 +57,31 @@ func shouldRetryReconciliation(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.OperationAnnotationRetry
+	return val == metalv1alpha1.RetryFailedOperationAnnotation
+}
+
+// shouldChildRetryReconciliation checks if the object Child should retry reconciliation.
+// if Parent has OperationAnnotation set to retry-child, Child should also retry reconciliation.
+func shouldChildRetryReconciliation(parentObj client.Object) bool {
+	val, found := parentObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
+	if !found {
+		return false
+	}
+	return val == metalv1alpha1.RetryChildOperationAnnotation || val == metalv1alpha1.RetryChildAndSelfOperationAnnotation
+}
+
+// isChildRetryThroughSets checks if the object's child is marked retry operation through parent.
+func isChildRetryThroughSets(childObj client.Object) bool {
+	annotations := childObj.GetAnnotations()
+	valPropagated, found := annotations[metalv1alpha1.OperationAnnotationPropagated]
+	if !found {
+		return false
+	}
+	valChildRetry, found := annotations[metalv1alpha1.OperationAnnotation]
+	if !found {
+		return false
+	}
+	return valChildRetry == metalv1alpha1.RetryFailedOperationAnnotation && valPropagated == metalv1alpha1.RetryChildOperationAnnotation
 }
 
 // GenerateRandomPassword generates a random password of the given length.

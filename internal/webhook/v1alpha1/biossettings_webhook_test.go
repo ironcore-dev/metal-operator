@@ -197,7 +197,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			biosSettingsV1Updated.Spec.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Priority: 1, Settings: map[string]string{"test": "value"}}}
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().To(HaveOccurred())
 			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
-			biosSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotationForceUpdate: metalv1alpha1.ForceUpdateInProgressOperationAnnotation}
+			biosSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.ForceUpdateInProgressOperationAnnotation}
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().ToNot(HaveOccurred())
 
 			Eventually(UpdateStatus(biosSettingsV1, func() {

@@ -130,7 +130,7 @@ func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
 				if isChildIgnoredThroughSets(&bmcVersion) {
 					annotations := bmcVersion.GetAnnotations()
 					log.V(1).Info("Ignore operation deleted on child object", "BMCVersion", bmcVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotationIgnore)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
 					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
 					bmcVersion.SetAnnotations(annotations)
 				}
@@ -156,7 +156,7 @@ func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
 		if !isChildIgnoredThroughSets(&bmcVersion) && !shouldIgnoreReconciliation(&bmcVersion) {
 			bmcVersionBase := bmcVersion.DeepCopy()
 			annotations := bmcVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotationIgnore] = metalv1alpha1.IgnoreOperationAnnotation
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.IgnoreOperationAnnotation
 			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.IgnoreChildOperationAnnotation
 			if err := r.Patch(ctx, &bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations: %w", err))
@@ -190,7 +190,7 @@ func (r *BMCVersionSetReconciler) handleRetryAnnotationPropagation(
 				if isChildRetryThroughSets(&bmcVersion) {
 					annotations := bmcVersion.GetAnnotations()
 					log.V(1).Info("Retry operation deleted on child object", "BMCVersion", bmcVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotationRetry)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
 					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
 					bmcVersion.SetAnnotations(annotations)
 				}
@@ -216,7 +216,7 @@ func (r *BMCVersionSetReconciler) handleRetryAnnotationPropagation(
 		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateFailed && !isChildRetryThroughSets(&bmcVersion) && !shouldRetryReconciliation(&bmcVersion) {
 			bmcVersionBase := bmcVersion.DeepCopy()
 			annotations := bmcVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotationRetry] = metalv1alpha1.RetryOperationAnnotation
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.RetryFailedOperationAnnotation
 			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.RetryChildOperationAnnotation
 			if err := r.Patch(ctx, &bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations: %w", err))

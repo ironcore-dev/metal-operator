@@ -3,13 +3,12 @@
 
 package v1alpha1
 
+import "github.com/stmcginnis/gofish/redfish"
+
 // establishing general rule for constants naming for Annotations
 // "Key" for Annotation constants should be named as <OperationAnnotation><Action>
 // e.g.
-// OperationAnnotationReset
-// OperationAnnotationIgnore
-// OperationAnnotationPropagated
-// OperationAnnotationForceUpdate
+// OperationAnnotation
 // "Value" for Annotation constants should be named as <Action>OperationAnnotation
 // e.g.
 // IgnoreOperationAnnotation
@@ -18,18 +17,15 @@ package v1alpha1
 // RetryOperationAnnotation
 
 const (
-	// OperationAnnotationReset indicates operation should be performed outside the current spec definition flow.
+	// OperationAnnotation indicates operation should be performed outside the current spec definition flow.
 	// This annotation performs Operation on the Server.
-	OperationAnnotationReset = "metal.ironcore.dev/operation-reset"
-	// ForceResetOperationAnnotation forces a reset before next operation
-	ForceResetOperationAnnotation = "ForceReset"
+	OperationAnnotation = "metal.ironcore.dev/operation"
 
-	// OperationAnnotationIgnore indicates which operation should be performed outside the current spec definition flow.
-	OperationAnnotationIgnore = "metal.ironcore.dev/operation-ignore"
 	// IgnoreOperationAnnotation skips the reconciliation of a resource if OperationAnnotation is set to this.
-	IgnoreOperationAnnotation = "ignore"
+	IgnoreOperationAnnotation = "ignore-reconciliation"
 
-	// OperationAnnotationPropagated indicates which operation should be performed outside the current spec definition flow.
+	// OperationAnnotationPropagated indicates OperationAnnotation operation is being propagated to Child resources from its Parent.
+	// This annotation is set by the operator when parent resource propagates Operation on child resources.
 	OperationAnnotationPropagated = "metal.ironcore.dev/operation-propagated"
 	// IgnoreChildOperationAnnotation skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
 	IgnoreChildOperationAnnotation = "ignore-child"
@@ -43,15 +39,37 @@ const (
 	// AnnotationInstanceType is used to specify the type of Server.
 	AnnotationInstanceType = "metal.ironcore.dev/instance-type"
 
-	// OperationAnnotationForceUpdate is used to indicate that the spec should be forcefully updated.
-	OperationAnnotationForceUpdate = "metal.ironcore.dev/force-update-resource"
 	// ForceUpdateOrDeleteInProgressOperationAnnotation allows update/Delete of a resource even if it is in progress.
-	ForceUpdateOrDeleteInProgressOperationAnnotation = "ForceUpdateOrDeleteInProgress"
+	ForceUpdateOrDeleteInProgressOperationAnnotation = "force-update-delete-InProgress"
 	// ForceUpdateInProgressOperationAnnotation allows update of a resource even if it is in progress.
-	ForceUpdateInProgressOperationAnnotation = "ForceUpdateInProgress"
+	ForceUpdateInProgressOperationAnnotation = "force-update-InProgress"
 
-	// OperationAnnotationRetry indicates which operation should be performed outside the current spec definition flow.
-	OperationAnnotationRetry = "metal.ironcore.dev/operation-retry"
-	// RetryOperationAnnotation restarts the reconciliation of a resource from failed state -> initial state.
-	RetryOperationAnnotation = "retry"
+	// RetryFailedOperationAnnotation restarts the reconciliation of a resource from failed state -> initial state.
+	RetryFailedOperationAnnotation = "retry-failed-state-resource"
+)
+
+const (
+	// GracefulShutdownServerPower indicates to gracefully restart the baremetal server power.
+	GracefulRestartServerPower = "graceful-restart-server-power"
+	// HardRestartServerPower indicates to hard restart the baremetal server power.
+	HardRestartServerPower = "hard-restart-server-power"
+	// PowerOffServerPower indicates to power cycle the baremetal server.
+	PowerCycleServerPower = "power-cycle-server-power"
+	// ForceOffServerPower indicates to force powerOff the baremetal server power.
+	ForceOffServerPower = "force-off-server-power"
+	// ForceOnServerPower indicates to force powerOn the baremetal server power.
+	ForceOnServerPower = "force-on-server-power"
+)
+
+var AnnotationToRedfishMapping = map[string]redfish.ResetType{
+	GracefulRestartServerPower: redfish.OnResetType,
+	HardRestartServerPower:     redfish.ForceRestartResetType,
+	PowerCycleServerPower:      redfish.PowerCycleResetType,
+	ForceOffServerPower:        redfish.ForceOffResetType,
+	ForceOnServerPower:         redfish.ForceOnResetType,
+}
+
+const (
+	// ForceResetBMCOperationAnnotation forces a reset of BMC before next operation
+	ForceResetBMCOperationAnnotation = "force-reset-BMC"
 )

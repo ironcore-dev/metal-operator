@@ -348,7 +348,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		Eventually(Update(biosVersion, func() {
 			biosVersion.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotationRetry: metalv1alpha1.RetryOperationAnnotation,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.RetryFailedOperationAnnotation,
 			}
 		})).Should(Succeed())
 

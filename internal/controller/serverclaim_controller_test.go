@@ -555,7 +555,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "server-",
 				Annotations: map[string]string{
-					metalv1alpha1.OperationAnnotationIgnore: metalv1alpha1.IgnoreOperationAnnotation,
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.IgnoreOperationAnnotation,
 				},
 				Labels: map[string]string{"foo": "bar"},
 			},

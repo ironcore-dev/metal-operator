@@ -134,7 +134,7 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 				if isChildIgnoredThroughSets(&biosVersion) {
 					annotations := biosVersion.GetAnnotations()
 					log.V(1).Info("Ignore operation deleted on child object", "BIOSVersion", biosVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotationIgnore)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
 					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
 					biosVersion.SetAnnotations(annotations)
 				}
@@ -160,7 +160,7 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 		if !isChildIgnoredThroughSets(&biosVersion) && !shouldIgnoreReconciliation(&biosVersion) {
 			biosVersionBase := biosVersion.DeepCopy()
 			annotations := biosVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotationIgnore] = metalv1alpha1.IgnoreOperationAnnotation
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.IgnoreOperationAnnotation
 			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.IgnoreChildOperationAnnotation
 			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))
@@ -194,7 +194,7 @@ func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(
 				if isChildRetryThroughSets(&biosVersion) {
 					annotations := biosVersion.GetAnnotations()
 					log.V(1).Info("Retry operation deleted on child object", "BIOSVersion", biosVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotationRetry)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
 					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
 					biosVersion.SetAnnotations(annotations)
 				}
@@ -220,7 +220,7 @@ func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(
 		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateFailed && !isChildRetryThroughSets(&biosVersion) && !shouldRetryReconciliation(&biosVersion) {
 			biosVersionBase := biosVersion.DeepCopy()
 			annotations := biosVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotationRetry] = metalv1alpha1.RetryOperationAnnotation
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.RetryFailedOperationAnnotation
 			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.RetryChildOperationAnnotation
 			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))

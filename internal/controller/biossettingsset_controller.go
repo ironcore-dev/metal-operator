@@ -142,7 +142,7 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
 				if isChildIgnoredThroughSets(&biosSettings) {
 					annotations := biosSettings.GetAnnotations()
 					log.V(1).Info("Ignore operation deleted on child object", "BIOSSettings", biosSettings.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotationIgnore)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
 					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
 					biosSettings.SetAnnotations(annotations)
 				}
@@ -167,7 +167,7 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
 		if !isChildIgnoredThroughSets(&biosSettings) && !shouldIgnoreReconciliation(&biosSettings) {
 			biosSettingsBase := biosSettings.DeepCopy()
 			annotations := biosSettings.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotationIgnore] = metalv1alpha1.IgnoreOperationAnnotation
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.IgnoreOperationAnnotation
 			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.IgnoreChildOperationAnnotation
 			if err := r.Patch(ctx, &biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations: %w", err))
@@ -201,7 +201,7 @@ func (r *BIOSSettingsSetReconciler) handleRetryAnnotationPropagation(
 				if isChildRetryThroughSets(&biosSettings) {
 					annotations := biosSettings.GetAnnotations()
 					log.V(1).Info("Retry operation deleted on child object", "BIOSSettings", biosSettings.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotationRetry)
+					delete(annotations, metalv1alpha1.OperationAnnotation)
 					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
 					biosSettings.SetAnnotations(annotations)
 				}
@@ -227,7 +227,7 @@ func (r *BIOSSettingsSetReconciler) handleRetryAnnotationPropagation(
 		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed && !isChildRetryThroughSets(&biosSettings) && !shouldRetryReconciliation(&biosSettings) {
 			biosSettingsBase := biosSettings.DeepCopy()
 			annotations := biosSettings.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotationRetry] = metalv1alpha1.RetryOperationAnnotation
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.RetryFailedOperationAnnotation
 			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.RetryChildOperationAnnotation
 			if err := r.Patch(ctx, &biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations: %w", err))

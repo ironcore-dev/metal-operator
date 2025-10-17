@@ -259,7 +259,7 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
 			bmcVersion.Status.Conditions = nil
 			annotations := bmcVersion.GetAnnotations()
-			delete(annotations, metalv1alpha1.OperationAnnotationRetry)
+			delete(annotations, metalv1alpha1.OperationAnnotation)
 			bmcVersion.SetAnnotations(annotations)
 			if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion status for retrying: %w", err)

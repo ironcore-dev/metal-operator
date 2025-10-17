@@ -415,7 +415,7 @@ func (r *BMCSettingsReconciler) handleFailedState(
 		bmcSettingsBase := bmcSetting.DeepCopy()
 		bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
 		annotations := bmcSetting.GetAnnotations()
-		delete(annotations, metalv1alpha1.OperationAnnotationRetry)
+		delete(annotations, metalv1alpha1.OperationAnnotation)
 		bmcSetting.SetAnnotations(annotations)
 		if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingsBase)); err != nil {
 			return fmt.Errorf("failed to patch BMCSettings status for retrying: %w", err)

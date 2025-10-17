@@ -10,7 +10,7 @@ import (
 
 // ShouldAllowForceUpdateInProgress checks if the object should force allow update.
 func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
-	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotationForceUpdate]
+	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !found {
 		return false
 	}
@@ -18,7 +18,7 @@ func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
 }
 
 func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
-	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotationForceUpdate]
+	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !found {
 		return false
 	}

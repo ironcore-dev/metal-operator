@@ -14,7 +14,7 @@ import (
 )
 
 func collectStorageInfoData() ([]registry.BlockDevice, error) {
-	var blockDevices []registry.BlockDevice
+	blockDevices := make([]registry.BlockDevice, 0)
 	blockStorage, err := ghw.Block()
 	if err != nil {
 		return blockDevices, fmt.Errorf("failed to get block devices: %w", err)
@@ -61,7 +61,6 @@ func collectStorageInfoData() ([]registry.BlockDevice, error) {
 func ToString(path string) (string, error) {
 	contents, err := os.ReadFile(path)
 	if err != nil {
-		//return "", errors.Wrapf(err, "unable to read file %s", path)
 		return "", fmt.Errorf("unable to read file %s: %w", path, err)
 	}
 
@@ -74,13 +73,11 @@ func ToString(path string) (string, error) {
 func ToInt(path string) (int, error) {
 	fileString, err := ToString(path)
 	if err != nil {
-		//return 0, errors.Wrapf(err, "unable to read string from file %s ", path)
 		return 0, fmt.Errorf("unable to read string from file %s: %w", path, err)
 	}
 
 	num, err := strconv.Atoi(fileString)
 	if err != nil {
-		//return 0, errors.Wrapf(err, "unable to convert %s file to int", fileString)
 		return 0, fmt.Errorf("unable to convert %s file to int: %w", fileString, err)
 	}
 
@@ -90,7 +87,6 @@ func ToInt(path string) (int, error) {
 func ToBool(path string) (bool, error) {
 	num, err := ToInt(path)
 	if err != nil {
-		//return false, errors.Wrapf(err, "unable to read int from file %s ", path)
 		return false, fmt.Errorf("unable to read int from file %s: %w", path, err)
 	}
 

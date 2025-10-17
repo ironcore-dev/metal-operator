@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package probe
 
 import (
@@ -11,7 +14,7 @@ func collectMemoryInfoData() ([]registry.MemoryDevice, error) {
 		return []registry.MemoryDevice{}, err
 	}
 
-	mem := []registry.MemoryDevice{}
+	mem := make([]registry.MemoryDevice, 0)
 
 	for _, m := range sm.MemoryDevices {
 		if m.Size == 0 {

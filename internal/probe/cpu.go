@@ -11,7 +11,7 @@ import (
 )
 
 func collectCPUInfoData() ([]registry.CPUInfo, error) {
-	var cpuInfos []registry.CPUInfo
+	cpuInfos := make([]registry.CPUInfo, 0)
 	cpuInfo, err := ghw.CPU()
 	if err != nil {
 		return cpuInfos, fmt.Errorf("failed to get CPU info: %w", err)

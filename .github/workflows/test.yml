@@ -22,5 +22,6 @@ jobs:
 
       - name: Running Tests
         run: |
+          sudo apt-get update && sudo apt-get install -y psutils
           go mod tidy
           make test

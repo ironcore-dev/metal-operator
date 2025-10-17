@@ -8,10 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ironcore-dev/metal-operator/internal/api/registry"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"os/exec"
 	"time"
+
+	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func collectLLDPInfo(ctx context.Context, interval, duration time.Duration) (registry.LLDP, error) {
@@ -22,6 +23,7 @@ func collectLLDPInfo(ctx context.Context, interval, duration time.Duration) (reg
 		//TODO: exit or just skip?
 		return lldp, fmt.Errorf("networkctl is not present: %w", err)
 	}
+
 	if err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (done bool, err error) {
 		cmd := exec.Command(tool, "lldp", "--json=short")
 		cmd.Stdout = &out

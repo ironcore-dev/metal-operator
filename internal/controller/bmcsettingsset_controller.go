@@ -24,20 +24,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// BMCSettingsSetReconciler reconciles a BMCSettingsSet object
 type BMCSettingsSetReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-const bmcSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
+const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettingssets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettingssets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettingssets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
-
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 func (r *BMCSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{}
@@ -47,7 +47,6 @@ func (r *BMCSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	log.V(1).Info("Reconciling bmcSettingsSet")
 
 	return r.reconcileExist(ctx, log, bmcSettingsSet)
-	// return ctrl.Result{}, nil
 }
 
 func (r *BMCSettingsSetReconciler) reconcileExist(
@@ -55,16 +54,12 @@ func (r *BMCSettingsSetReconciler) reconcileExist(
 	log logr.Logger,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) (ctrl.Result, error) {
-	// Handle deletion - object not exist trigger reconcile delete
 	if !bmcSettingsSet.DeletionTimestamp.IsZero() {
 		log.V(1).Info("Object is being deleted")
-
 		return r.delete(ctx, log, bmcSettingsSet)
-
 	}
 	log.V(1).Info("Object exists and is not being deleted")
 	return r.reconcile(ctx, log, bmcSettingsSet)
-	// return ctrl.Result{}, nil
 }
 
 func (r *BMCSettingsSetReconciler) reconcile(
@@ -76,7 +71,7 @@ func (r *BMCSettingsSetReconciler) reconcile(
 		log.V(1).Info("Skipped BMCSettingsSet reconciliation")
 		return ctrl.Result{}, nil
 	}
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcSettingsSet, bmcSettingsSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcSettingsSet, BMCSettingsSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -93,7 +88,7 @@ func (r *BMCSettingsSetReconciler) delete(
 	log logr.Logger,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(bmcSettingsSet, bmcSettingsSetFinalizer) {
+	if !controllerutil.ContainsFinalizer(bmcSettingsSet, BMCSettingsSetFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
@@ -113,8 +108,8 @@ func (r *BMCSettingsSetReconciler) delete(
 		}
 	}
 	if len(ownedBMCSettings.Items) != len(delTableBMCSettings) || int32(len(ownedBMCSettings.Items)) != bmcSettingsSet.Status.AvailableBMCSettings {
-		currentSatus := r.getOwnedBMCSettingsSetStatus(ownedBMCSettings)
-		err = r.updateStatus(ctx, log, currentSatus, bmcSettingsSet)
+		currentStatus := r.getOwnedBMCSettingsSetStatus(ownedBMCSettings)
+		err = r.updateStatus(ctx, log, currentStatus, bmcSettingsSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
 		}
@@ -124,7 +119,7 @@ func (r *BMCSettingsSetReconciler) delete(
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcSettingsSet, bmcSettingsSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcSettingsSet, BMCSettingsSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -141,7 +136,6 @@ func (r *BMCSettingsSetReconciler) getOwnedBMCSettings(
 		return nil, err
 	}
 	return bmcSettingsList, nil
-
 }
 
 func (r *BMCSettingsSetReconciler) getOwnedBMCSettingsSetStatus(
@@ -196,8 +190,6 @@ func (r *BMCSettingsSetReconciler) getBMCsBySelector(
 
 }
 
-//handleBMCSettings
-
 func (r *BMCSettingsSetReconciler) handleBMCSettings(
 	ctx context.Context,
 	log logr.Logger,
@@ -219,7 +211,7 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCSettings resource %w", err)
 	}
 
-	if err := r.patchBMCSettingsFromTemplate(ctx, log, &bmcSettingsSet.Spec.BMCSettingsTemplate, ownedBMCSettings); err != nil {
+	if err := r.patchBMCSettingsFromTemplate(ctx, log, &bmcSettingsSet.Spec.BMCSettingsTemplate, ownedBMCSettings, bmcSettingsSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCSettings from template %w", err)
 	}
 
@@ -273,7 +265,15 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 			}
 			//create/patch new Settings
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCSettings, func() error {
-				newBMCSettings.Spec.BMCSettingsTemplate = *bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
+				filteredTemplate := *bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
+				// Filter ServerMaintenanceRefs for this specific BMC/server
+				filteredRefs, err := r.filterServerMaintenanceRefsForBMC(ctx, filteredTemplate.ServerMaintenanceRefs, bmc.Name)
+				if err != nil {
+					return fmt.Errorf("failed to filter ServerMaintenance refs for BMC %s: %w", bmc.Name, err)
+				}
+				filteredTemplate.ServerMaintenanceRefs = filteredRefs
+
+				newBMCSettings.Spec.BMCSettingsTemplate = filteredTemplate
 				newBMCSettings.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}
 
 				return controllerutil.SetControllerReference(bmcSettingsSet, newBMCSettings, r.Client.Scheme())
@@ -323,6 +323,7 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 	log logr.Logger,
 	bmcSettingsTemplate *metalv1alpha1.BMCSettingsTemplate,
 	bmcSettingsList *metalv1alpha1.BMCSettingsList,
+	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) error {
 	if len(bmcSettingsList.Items) == 0 {
 		log.V(1).Info("No BMCSettings found, skipping spec template update")
@@ -333,26 +334,61 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
 			continue
 		}
-		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcSettings, func() error {
+		bmcSettingsCopy := bmcSettings.DeepCopy()
 
-			if bmcSettingsTemplate.ServerMaintenanceRefs != nil {
-				bmcSettings.Spec.BMCSettingsTemplate = *bmcSettingsTemplate.DeepCopy()
-			} else {
-				serverMaintenanceRefs := bmcSettings.Spec.ServerMaintenanceRefs
-				bmcSettings.Spec.BMCSettingsTemplate = *bmcSettingsTemplate.DeepCopy()
-				bmcSettings.Spec.ServerMaintenanceRefs = serverMaintenanceRefs
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcSettingsCopy, func() error {
+			if err := controllerutil.SetControllerReference(bmcSettingsSet, bmcSettingsCopy, r.Client.Scheme()); err != nil {
+				return fmt.Errorf("failed to set controller reference: %w", err)
 			}
+
+			filteredTemplateRefs, err := r.filterServerMaintenanceRefsForBMC(ctx, bmcSettingsTemplate.ServerMaintenanceRefs, bmcSettingsCopy.Spec.BMCRef.Name)
+			if err != nil {
+				return fmt.Errorf("failed to filter ServerMaintenance refs for BMC %s: %w", bmcSettingsCopy.Spec.BMCRef.Name, err)
+			}
+
+			//generated merged refs from filtered template and current refs from bmcsettings
+			mergedRefs := r.mergeServerMaintenanceRefs(
+				filteredTemplateRefs,
+				bmcSettingsCopy.Spec.ServerMaintenanceRefs,
+			)
+
+			//avoid unnecessary updates
+			if r.refsAreEqual(bmcSettingsCopy.Spec.ServerMaintenanceRefs, mergedRefs) &&
+				r.templatesAreEqual(&bmcSettingsCopy.Spec.BMCSettingsTemplate, bmcSettingsTemplate) {
+				log.V(2).Info("No changes needed for BMCSettings", "BMCSettings", bmcSettingsCopy.Name)
+				return nil
+			}
+			log.V(2).Info("Updating BMCSettings with template",
+				"BMCSettings", bmcSettingsCopy.Name,
+				"templateRefs", len(bmcSettingsTemplate.ServerMaintenanceRefs),
+				"filteredTemplateRefs", len(filteredTemplateRefs),
+				"currentRefs", len(bmcSettingsCopy.Spec.ServerMaintenanceRefs),
+				"mergedRefs", len(mergedRefs))
+
+			bmcSettingsCopy.Spec.BMCSettingsTemplate = *bmcSettingsTemplate.DeepCopy()
+			bmcSettingsCopy.Spec.ServerMaintenanceRefs = mergedRefs
+
+			log.V(2).Info("Merged ServerMaintenanceRefs",
+				"BMCSettings", bmcSettingsCopy.Name,
+				"finalRefs", len(mergedRefs))
+
 			return nil
 		})
+
 		if err != nil {
-			errs = append(errs, err)
+			log.Error(err, "Failed to patch BMCSettings", "BMCSettings", bmcSettings.Name)
+			errs = append(errs, fmt.Errorf("failed to patch BMCSettings %s: %w", bmcSettings.Name, err))
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BMCSettings with updated spec",
-				"BMCSettings", bmcSettings.Name, "Operation", opResult)
+				"BMCSettings", bmcSettingsCopy.Name, "Operation", opResult)
 		}
 	}
-	return errors.Join(errs...)
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(
@@ -375,7 +411,7 @@ func (r *BMCSettingsSetReconciler) enqueueByBMC(
 		if err != nil {
 			log.Error(err, "Failed to parse BMCSelector", "BMCSettingsSet", bmcSettingsSet.Name)
 			return nil
-		} // bmc labes match selector add to queue
+		}
 		if selector.Matches(labels.Set(bmc.GetLabels())) {
 			reqs = append(reqs, ctrl.Request{
 				NamespacedName: client.ObjectKey{
@@ -403,6 +439,164 @@ func (r *BMCSettingsSetReconciler) enqueueByBMC(
 	}
 
 	return reqs
+}
+
+func (r *BMCSettingsSetReconciler) mergeServerMaintenanceRefs(
+	templateRefs, currentRefs []metalv1alpha1.ServerMaintenanceRefItem,
+) []metalv1alpha1.ServerMaintenanceRefItem {
+	currentMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
+	for _, ref := range currentRefs {
+		if ref.ServerMaintenanceRef != nil {
+			currentMap[ref.ServerMaintenanceRef.Name] = ref
+		}
+	}
+	for _, templateRef := range templateRefs {
+		if templateRef.ServerMaintenanceRef != nil {
+			currentMap[templateRef.ServerMaintenanceRef.Name] = templateRef
+		}
+	}
+	result := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(currentMap))
+	for _, ref := range currentMap {
+		result = append(result, ref)
+	}
+
+	return result
+}
+
+func (r *BMCSettingsSetReconciler) refsAreEqual(
+	current, merged []metalv1alpha1.ServerMaintenanceRefItem,
+) bool {
+	if len(current) != len(merged) {
+		return false
+	}
+
+	currentMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
+	for _, ref := range current {
+		if ref.ServerMaintenanceRef != nil {
+			currentMap[ref.ServerMaintenanceRef.Name] = ref
+		}
+	}
+
+	mergedMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
+	for _, ref := range merged {
+		if ref.ServerMaintenanceRef != nil {
+			mergedMap[ref.ServerMaintenanceRef.Name] = ref
+		}
+	}
+
+	if len(currentMap) != len(mergedMap) {
+		return false
+	}
+
+	for name, currentRef := range currentMap {
+		mergedRef, exists := mergedMap[name]
+		if !exists {
+			return false
+		}
+
+		if currentRef.ServerMaintenanceRef.UID != mergedRef.ServerMaintenanceRef.UID ||
+			currentRef.ServerMaintenanceRef.Namespace != mergedRef.ServerMaintenanceRef.Namespace {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (r *BMCSettingsSetReconciler) templatesAreEqual(
+	current, template *metalv1alpha1.BMCSettingsTemplate,
+) bool {
+	if current.Version != template.Version {
+		return false
+	}
+
+	if len(current.SettingsMap) != len(template.SettingsMap) {
+		return false
+	}
+
+	for key, currentValue := range current.SettingsMap {
+		templateValue, exists := template.SettingsMap[key]
+		if !exists || currentValue != templateValue {
+			return false
+		}
+	}
+
+	return current.ServerMaintenancePolicy == template.ServerMaintenancePolicy
+}
+
+func (r *BMCSettingsSetReconciler) filterServerMaintenanceRefsForBMC(
+	ctx context.Context,
+	templateRefs []metalv1alpha1.ServerMaintenanceRefItem,
+	bmcName string,
+) ([]metalv1alpha1.ServerMaintenanceRefItem, error) {
+	if len(templateRefs) == 0 {
+		return templateRefs, nil
+	}
+
+	associatedServers, err := r.getServersForBMC(ctx, bmcName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get servers for BMC %s: %w", bmcName, err)
+	}
+
+	if len(associatedServers) == 0 {
+		return []metalv1alpha1.ServerMaintenanceRefItem{}, nil
+	}
+
+	serverNames := make(map[string]struct{})
+	for _, server := range associatedServers {
+		serverNames[server.Name] = struct{}{}
+	}
+
+	var filteredRefs []metalv1alpha1.ServerMaintenanceRefItem
+	for _, ref := range templateRefs {
+		if ref.ServerMaintenanceRef == nil {
+			continue
+		}
+
+		serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+		if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
+			serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
+
+			if serverMaintenance.Name == ref.ServerMaintenanceRef.Name &&
+				serverMaintenance.Namespace == ref.ServerMaintenanceRef.Namespace {
+				if serverMaintenance.Spec.ServerRef != nil {
+					_, isOurServer := serverNames[serverMaintenance.Spec.ServerRef.Name]
+					return isOurServer, nil
+				}
+			}
+			return false, nil
+		}); err != nil {
+			return nil, fmt.Errorf("failed to filter ServerMaintenance for ref %s: %w", ref.ServerMaintenanceRef.Name, err)
+		}
+
+		// found a matching ServerMaintenance that affects our servers
+		if len(serverMaintenancesList.Items) > 0 {
+			serverMaintenance := &serverMaintenancesList.Items[0]
+			if ref.ServerMaintenanceRef.UID != "" && ref.ServerMaintenanceRef.UID == serverMaintenance.UID {
+				filteredRefs = append(filteredRefs, ref)
+			} else if ref.ServerMaintenanceRef.UID == "" {
+				filteredRefs = append(filteredRefs, ref)
+			}
+		}
+	}
+
+	return filteredRefs, nil
+}
+
+func (r *BMCSettingsSetReconciler) getServersForBMC(
+	ctx context.Context,
+	bmcName string,
+) ([]metalv1alpha1.Server, error) {
+	// Get servers that reference this BMC via BMCRef
+	serverList := &metalv1alpha1.ServerList{}
+	if err := clientutils.ListAndFilter(ctx, r.Client, serverList, func(object client.Object) (bool, error) {
+		server := object.(*metalv1alpha1.Server)
+		return server.Spec.BMCRef != nil && server.Spec.BMCRef.Name == bmcName, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to filter servers by BMCRef for BMC %s: %w", bmcName, err)
+	}
+
+	return serverList.Items, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

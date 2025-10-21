@@ -154,7 +154,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 			BMCVersionV1Updated.Spec.Version = "P72"
 			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV1Updated)).Error().To(HaveOccurred())
 			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
-			BMCVersionV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
+			BMCVersionV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV1Updated)).Error().ToNot(HaveOccurred())
 
 			Eventually(UpdateStatus(BMCVersionV1, func() {

@@ -16,6 +16,6 @@ spec:
           abc: "Disabled"
   serverSelector:
     matchLabels: 
-      manufacturer: "Contoso"
+      foo: "bar"
 
 

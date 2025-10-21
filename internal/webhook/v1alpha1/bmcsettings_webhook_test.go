@@ -141,7 +141,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 			bmcSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().To(HaveOccurred())
 			By("Updating an bmcSettings V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
-			bmcSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.ForceUpdateInProgressOperationAnnotation}
+			bmcSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().ToNot(HaveOccurred())
 
 			Eventually(UpdateStatus(BMCSettingsV1, func() {

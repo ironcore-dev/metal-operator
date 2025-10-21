@@ -4,13 +4,20 @@
 package controller
 
 import (
+	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
+	"slices"
 
+	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -24,7 +31,11 @@ func shouldIgnoreReconciliation(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.IgnoreOperationAnnotation || val == metalv1alpha1.IgnoreChildAndSelfOperationAnnotation
+	return slices.Contains([]string{
+		metalv1alpha1.OperationAnnotationIgnore,
+		metalv1alpha1.OperationAnnotationIgnoreChildAndSelf,
+		metalv1alpha1.OperationAnnotationIgnorePropagated,
+	}, val)
 }
 
 // shouldChildIgnoreReconciliation checks if the object Child should ignore reconciliation.
@@ -34,21 +45,17 @@ func shouldChildIgnoreReconciliation(parentObj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.IgnoreChildOperationAnnotation || val == metalv1alpha1.IgnoreChildAndSelfOperationAnnotation
+	return val == metalv1alpha1.OperationAnnotationIgnoreChild || val == metalv1alpha1.OperationAnnotationIgnoreChildAndSelf
 }
 
 // isChildIgnoredThroughSets checks if the object's child is marked ignore operation through parent.
 func isChildIgnoredThroughSets(childObj client.Object) bool {
 	annotations := childObj.GetAnnotations()
-	valPropagated, found := annotations[metalv1alpha1.OperationAnnotationPropagated]
-	if !found {
-		return false
-	}
 	valChildIgnore, found := annotations[metalv1alpha1.OperationAnnotation]
 	if !found {
 		return false
 	}
-	return valChildIgnore == metalv1alpha1.IgnoreOperationAnnotation && valPropagated == metalv1alpha1.IgnoreChildOperationAnnotation
+	return valChildIgnore == metalv1alpha1.OperationAnnotationIgnorePropagated
 }
 
 // shouldRetryReconciliation checks if the object should retry reconciliation from failed state.
@@ -57,7 +64,7 @@ func shouldRetryReconciliation(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.RetryFailedOperationAnnotation
+	return val == metalv1alpha1.OperationAnnotationRetryFailed || val == metalv1alpha1.OperationAnnotationRetryFailedPropagated
 }
 
 // shouldChildRetryReconciliation checks if the object Child should retry reconciliation.
@@ -67,21 +74,17 @@ func shouldChildRetryReconciliation(parentObj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.RetryChildOperationAnnotation || val == metalv1alpha1.RetryChildAndSelfOperationAnnotation
+	return val == metalv1alpha1.OperationAnnotationRetryChild || val == metalv1alpha1.OperationAnnotationRetryChildAndSelf
 }
 
 // isChildRetryThroughSets checks if the object's child is marked retry operation through parent.
 func isChildRetryThroughSets(childObj client.Object) bool {
 	annotations := childObj.GetAnnotations()
-	valPropagated, found := annotations[metalv1alpha1.OperationAnnotationPropagated]
-	if !found {
-		return false
-	}
 	valChildRetry, found := annotations[metalv1alpha1.OperationAnnotation]
 	if !found {
 		return false
 	}
-	return valChildRetry == metalv1alpha1.RetryFailedOperationAnnotation && valPropagated == metalv1alpha1.RetryChildOperationAnnotation
+	return valChildRetry == metalv1alpha1.OperationAnnotationRetryFailedPropagated
 }
 
 // GenerateRandomPassword generates a random password of the given length.
@@ -130,4 +133,102 @@ func enqueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 		return !reflect.DeepEqual(oldCopy, e.ObjectNew)
 	}
 	return true
+}
+
+func handleIgnoreAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	kClient client.Client,
+	parentObj client.Object,
+	ownedObjects client.ObjectList,
+) error {
+	var errs []error
+	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
+		childObj, ok := obj.(client.Object)
+		if !ok {
+			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
+			return nil
+		}
+		// if the child is being deleted, we don't need to propagate
+		if !childObj.GetDeletionTimestamp().IsZero() {
+			return nil
+		}
+		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+			annotations := childObj.GetAnnotations()
+
+			if !shouldChildIgnoreReconciliation(parentObj) && isChildIgnoredThroughSets(childObj) && annotations != nil {
+				delete(annotations, metalv1alpha1.OperationAnnotation)
+				childObj.SetAnnotations(annotations)
+			}
+			// should not overwrite the already ignored annotation on child
+			// should not overwrite if the annotation already present on the child
+			_, OperationAnnotationChildfound := annotations[metalv1alpha1.OperationAnnotation]
+			if shouldChildIgnoreReconciliation(parentObj) && !OperationAnnotationChildfound {
+				if annotations == nil {
+					annotations = make(map[string]string)
+				}
+				annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnorePropagated
+				childObj.SetAnnotations(annotations)
+			}
+			return nil
+		})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to propagate ignore annotation to child %s: %w", childObj.GetName(), err))
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched Child's annotations for ignore operation", "ChildResource", childObj.GetName(), "Operation", opResult)
+		}
+		return nil
+	})
+	return errors.Join(errs...)
+}
+
+func handleRetryAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	kClient client.Client,
+	parentObj client.Object,
+	ownedObjects client.ObjectList,
+) error {
+	var errs []error
+	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
+		childObj, ok := obj.(client.Object)
+		if !ok {
+			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
+			return nil
+		}
+		// if the child is being deleted, we don't need to propagate
+		if !childObj.GetDeletionTimestamp().IsZero() {
+			return nil
+		}
+		log.V(1).Info("Child's annotations check", "ChildResource", childObj.GetName())
+
+		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+			annotations := childObj.GetAnnotations()
+
+			if !shouldChildRetryReconciliation(parentObj) && isChildRetryThroughSets(childObj) && annotations != nil {
+				delete(annotations, metalv1alpha1.OperationAnnotation)
+				childObj.SetAnnotations(annotations)
+			}
+			// should not overwrite the already present retry annotation on child
+			// should not overwrite if the annotation already present on the child
+			_, OperationAnnotationChildfound := annotations[metalv1alpha1.OperationAnnotation]
+			if shouldChildRetryReconciliation(parentObj) && !OperationAnnotationChildfound {
+				if annotations == nil {
+					annotations = make(map[string]string)
+				}
+				annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationRetryFailedPropagated
+				childObj.SetAnnotations(annotations)
+			}
+			return nil
+		})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to propagate retry annotation to child %s: %w", childObj.GetName(), err))
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched Child's annotations to retry annotation", "ChildResource", childObj.GetName(), "Operation", opResult)
+		}
+		return nil
+	})
+	return errors.Join(errs...)
 }

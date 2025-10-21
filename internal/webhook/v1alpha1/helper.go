@@ -14,7 +14,7 @@ func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.ForceUpdateInProgressOperationAnnotation || val == metalv1alpha1.ForceUpdateOrDeleteInProgressOperationAnnotation
+	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress || val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
 }
 
 func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
@@ -22,5 +22,5 @@ func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.ForceUpdateOrDeleteInProgressOperationAnnotation
+	return val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
 }

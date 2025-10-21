@@ -356,7 +356,7 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		Eventually(Update(bmcVersion, func() {
 			bmcVersion.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.RetryFailedOperationAnnotation,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
 			}
 		})).Should(Succeed())
 

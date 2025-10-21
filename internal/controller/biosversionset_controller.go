@@ -123,51 +123,7 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 		log.V(1).Info("No BIOSVersion found, skipping ignore annotation propagation")
 		return nil
 	}
-	if !shouldChildIgnoreReconciliation(biosVersionSet) {
-		// if the Set object does not have the ignore annotation anymore,
-		// we should remove the ignore annotation on the child
-		var errs []error
-		for _, biosVersion := range ownedBiosVersions.Items {
-			// if the Child object is ignored through sets, we should remove the ignore annotation on the child
-			// ad the Set object does not have the ignore annotation anymore
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
-				if isChildIgnoredThroughSets(&biosVersion) {
-					annotations := biosVersion.GetAnnotations()
-					log.V(1).Info("Ignore operation deleted on child object", "BIOSVersion", biosVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotation)
-					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
-					biosVersion.SetAnnotations(annotations)
-				}
-				return nil
-			})
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations Propogartion removal: %w for: %v", err, biosVersion.Name))
-			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched BIOSVersion's annotations to remove Ignore", "BIOSVersion", biosVersion.Name, "Operation", opResult)
-			}
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
-		return nil
-	}
-
-	var errs []error
-	for _, biosVersion := range ownedBiosVersions.Items {
-		// should not overwrite the already ignored annotation on child
-		// should not overwrite if the annotation already present on the child
-		if !isChildIgnoredThroughSets(&biosVersion) && !shouldIgnoreReconciliation(&biosVersion) {
-			biosVersionBase := biosVersion.DeepCopy()
-			annotations := biosVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.IgnoreOperationAnnotation
-			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.IgnoreChildOperationAnnotation
-			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))
-			}
-		}
-	}
-	return errors.Join(errs...)
+	return handleIgnoreAnnotationPropagation(ctx, log, r.Client, biosVersionSet, ownedBiosVersions)
 }
 
 func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(
@@ -183,51 +139,7 @@ func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(
 		log.V(1).Info("No BIOSVersion found, skipping retry annotation propagation")
 		return nil
 	}
-	if !shouldChildRetryReconciliation(biosVersionSet) {
-		// if the Set object does not have the retry annotation anymore,
-		// we should remove the retry annotation on the child
-		var errs []error
-		for _, biosVersion := range ownedBiosVersion.Items {
-			// if the Child object is Retried through sets, we should remove the retry annotation on the child
-			// ad the Set object does not have the retry annotation anymore
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
-				if isChildRetryThroughSets(&biosVersion) {
-					annotations := biosVersion.GetAnnotations()
-					log.V(1).Info("Retry operation deleted on child object", "BIOSVersion", biosVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotation)
-					delete(annotations, metalv1alpha1.OperationAnnotationPropagated)
-					biosVersion.SetAnnotations(annotations)
-				}
-				return nil
-			})
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations Propogartion removal: %w for: %v", err, biosVersion.Name))
-			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched BIOSVersion's annotations to remove Retry", "BIOSVersion", biosVersion.Name, "Operation", opResult)
-			}
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
-		return nil
-	}
-	var errs []error
-	for _, biosVersion := range ownedBiosVersion.Items {
-		// should not overwrite the already retried annotation on child
-		// should not overwrite if the annotation already present on the child
-		// should only apply on the failed resources
-		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateFailed && !isChildRetryThroughSets(&biosVersion) && !shouldRetryReconciliation(&biosVersion) {
-			biosVersionBase := biosVersion.DeepCopy()
-			annotations := biosVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.RetryFailedOperationAnnotation
-			annotations[metalv1alpha1.OperationAnnotationPropagated] = metalv1alpha1.RetryChildOperationAnnotation
-			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))
-			}
-		}
-	}
-	return errors.Join(errs...)
+	return handleRetryAnnotationPropagation(ctx, log, r.Client, biosVersionSet, ownedBiosVersion)
 }
 
 func (r *BIOSVersionSetReconciler) reconcile(

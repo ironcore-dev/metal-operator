@@ -6,46 +6,48 @@ package v1alpha1
 import "github.com/stmcginnis/gofish/redfish"
 
 // establishing general rule for constants naming for Annotations
-// "Key" for Annotation constants should be named as <OperationAnnotation><Action>
+// "Key" for Annotation constants should be named OperationAnnotation.
+// we do not want to handle multiple annotation keys for outside the spec flow operations.
+// "Value" for Annotation constants should be named as OperationAnnotation<ActionType>
 // e.g.
-// OperationAnnotation
-// "Value" for Annotation constants should be named as <Action>OperationAnnotation
-// e.g.
-// IgnoreOperationAnnotation
-// IgnoreChildOperationAnnotation
-// IgnoreChildAndSelfOperationAnnotation
-// RetryOperationAnnotation
+// OperationAnnotationIgnore
+// OperationAnnotationIgnoreChild
+// OperationAnnotationIgnoreChildAndSelf
+// OperationAnnotationRetry
 
 const (
 	// OperationAnnotation indicates operation should be performed outside the current spec definition flow.
 	// This annotation performs Operation on the Server.
 	OperationAnnotation = "metal.ironcore.dev/operation"
 
-	// IgnoreOperationAnnotation skips the reconciliation of a resource if OperationAnnotation is set to this.
-	IgnoreOperationAnnotation = "ignore-reconciliation"
+	// OperationAnnotationIgnore skips the reconciliation of a resource if OperationAnnotation is set to this.
+	OperationAnnotationIgnore = "ignore-reconciliation"
 
-	// OperationAnnotationPropagated indicates OperationAnnotation operation is being propagated to Child resources from its Parent.
-	// This annotation is set by the operator when parent resource propagates Operation on child resources.
-	OperationAnnotationPropagated = "metal.ironcore.dev/operation-propagated"
-	// IgnoreChildOperationAnnotation skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
-	IgnoreChildOperationAnnotation = "ignore-child"
-	// IgnoreChildAndSelfOperationAnnotation skips the reconciliation of a resource's Child ans self if OperationAnnotation is set to this.
-	IgnoreChildAndSelfOperationAnnotation = "ignore-child-and-self"
-	// RetryChildOperationAnnotation restarts the reconciliation of a resource's Child if OperationAnnotation is set to this, from failed state -> initial state.
-	RetryChildOperationAnnotation = "retry-child"
-	// RetryChildAndSelfOperationAnnotation restarts the reconciliation of a resource's Child ans self if OperationAnnotation is set to this, from failed state -> initial state..
-	RetryChildAndSelfOperationAnnotation = "retry-child-and-self"
+	// OperationAnnotationIgnorePropagated skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
+	OperationAnnotationIgnorePropagated = "ignore-reconciliation-propagated"
+
+	// OperationAnnotationIgnoreChild skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
+	OperationAnnotationIgnoreChild = "ignore-child-reconciliation"
+	// OperationAnnotationIgnoreChildAndSelf skips the reconciliation of a resource's Child ans self if OperationAnnotation is set to this.
+	OperationAnnotationIgnoreChildAndSelf = "ignore-child-and-self-reconciliation"
+	// OperationAnnotationRetryChild restarts the reconciliation of a resource's Child if OperationAnnotation is set to this, from failed state -> initial state.
+	OperationAnnotationRetryChild = "retry-child-reconciliation"
+	// OperationAnnotationRetryChildAndSelf restarts the reconciliation of a resource's Child ans self if OperationAnnotation is set to this, from failed state -> initial state..
+	OperationAnnotationRetryChildAndSelf = "retry-child-and-self-reconciliation"
 
 	// AnnotationInstanceType is used to specify the type of Server.
 	AnnotationInstanceType = "metal.ironcore.dev/instance-type"
 
-	// ForceUpdateOrDeleteInProgressOperationAnnotation allows update/Delete of a resource even if it is in progress.
-	ForceUpdateOrDeleteInProgressOperationAnnotation = "force-update-delete-InProgress"
-	// ForceUpdateInProgressOperationAnnotation allows update of a resource even if it is in progress.
-	ForceUpdateInProgressOperationAnnotation = "force-update-InProgress"
+	// OperationAnnotationForceUpdateOrDeleteInProgress allows update/Delete of a resource even if it is in progress.
+	OperationAnnotationForceUpdateOrDeleteInProgress = "allow-in-progress-delete"
+	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
+	OperationAnnotationForceUpdateInProgress = "allow-in-progress-update"
 
-	// RetryFailedOperationAnnotation restarts the reconciliation of a resource from failed state -> initial state.
-	RetryFailedOperationAnnotation = "retry-failed-state-resource"
+	// OperationAnnotationRetryFailed restarts the reconciliation of a resource from failed state -> initial state.
+	OperationAnnotationRetryFailed = "retry-failed-state-resource"
+
+	// OperationAnnotationRetryFailedPropagated restarts the reconciliation of a resource's child from failed state -> initial state.
+	OperationAnnotationRetryFailedPropagated = "retry-failed-state-resource-propagated"
 )
 
 const (

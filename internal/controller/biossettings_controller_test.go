@@ -670,7 +670,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		Eventually(Update(biosSettings, func() {
 			biosSettings.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.RetryFailedOperationAnnotation,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
 			}
 		})).Should(Succeed())
 

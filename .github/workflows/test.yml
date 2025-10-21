@@ -20,7 +20,67 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Running Tests
+      - name: Create custom Dockerfile for Ubuntu 25.04 with systemd
         run: |
-          go mod tidy
-          make test
+          cat > Dockerfile.systemd << 'EOF'
+          FROM ubuntu:25.04
+
+          # Install systemd and dependencies
+          RUN apt-get update && \
+              apt-get install -y systemd git curl ca-certificates make build-essential ethtool pciutils && \
+              apt-get clean && \
+              rm -rf /var/lib/apt/lists/*
+
+          # Install Go
+          RUN curl -L https://go.dev/dl/go1.23.3.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+          ENV PATH="/usr/local/go/bin:${PATH}"
+
+          # Enable systemd services (networkd should be included in systemd)
+          RUN systemctl enable systemd-networkd || echo "systemd-networkd not available"
+
+          # Create entrypoint script
+          RUN echo '#!/bin/bash' > /entrypoint.sh && \
+              echo 'exec /lib/systemd/systemd --system' >> /entrypoint.sh && \
+              chmod +x /entrypoint.sh
+
+          ENTRYPOINT ["/entrypoint.sh"]
+          EOF
+
+      - name: Build custom Ubuntu container with systemd
+        run: |
+          docker build -f Dockerfile.systemd -t ubuntu-systemd:25.04 .
+
+      - name: Start container with systemd and run tests
+        run: |
+          # Start container with systemd as PID 1, mounting source code
+          CONTAINER_ID=$(docker run -d --privileged \
+            --tmpfs /tmp:exec --tmpfs /run --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw --cgroupns=host \
+            -v $PWD:/workspace \
+            ubuntu-systemd:25.04)
+          echo "Started container: $CONTAINER_ID"
+
+          # Wait a moment for systemd to initialize
+          sleep 5
+
+          # Run tests inside the container
+          docker exec $CONTAINER_ID bash -c "
+            cd /workspace
+            echo '=== Environment Check ==='
+            go version
+            systemctl --version
+            networkctl --version
+            systemctl status systemd-networkd || echo 'systemd-networkd not running'
+
+            echo '=== Running Tests ==='
+            # Disable VCS stamping and set proper temp dir with exec permissions
+            export GOFLAGS='-buildvcs=false'
+            export TMPDIR=/workspace/tmp
+            mkdir -p /workspace/tmp
+            go mod tidy
+            make test
+          "
+
+          # Cleanup
+          docker stop $CONTAINER_ID || true
+          docker rm $CONTAINER_ID || true

@@ -2577,6 +2577,57 @@ ServerMaintenancePolicy
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BootOrder">BootOrder
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
+</p>
+<div>
+<p>BootOrder represents the boot order of the server.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name of the boot device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>priority</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+<p>Priority is the priority of the boot device.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>device</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Device is the device to boot from.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.BootType">BootType
 (<code>string</code> alias)</h3>
 <p>
@@ -3496,9 +3547,37 @@ Kubernetes core/v1.ObjectReference
 <em>(Optional)</em>
 <p>BootConfigurationRef is a reference to a BootConfiguration object that specifies
 the boot configuration for this server. This field is optional and can be omitted
-if no boot configuration is specified.
-This is used during initial provisioning of the server automatically.
-This is also used during maintenance if Maintenance needs server to be taken offline</p>
+if no boot configuration is specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maintenanceBootConfigurationRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
+the boot configuration for this server during maintenance. This field is optional and can be omitted</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bootOrder</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BootOrder">
+[]BootOrder
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BootOrder specifies the boot order of the server.
+Deprecated: currently not supported.</p>
 </td>
 </tr>
 <tr>
@@ -4677,9 +4756,37 @@ Kubernetes core/v1.ObjectReference
 <em>(Optional)</em>
 <p>BootConfigurationRef is a reference to a BootConfiguration object that specifies
 the boot configuration for this server. This field is optional and can be omitted
-if no boot configuration is specified.
-This is used during initial provisioning of the server automatically.
-This is also used during maintenance if Maintenance needs server to be taken offline</p>
+if no boot configuration is specified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maintenanceBootConfigurationRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectreference-v1-core">
+Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
+the boot configuration for this server during maintenance. This field is optional and can be omitted</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bootOrder</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BootOrder">
+[]BootOrder
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BootOrder specifies the boot order of the server.
+Deprecated: currently not supported.</p>
 </td>
 </tr>
 <tr>

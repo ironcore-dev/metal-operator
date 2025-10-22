@@ -18,6 +18,12 @@ const (
 
 	// PowerOff indicates that the device is powered off.
 	PowerOff Power = "Off"
+
+	// TopologyHeightUnit is the annotation key for the height unit of a server in a rack.
+	TopologyHeightUnit = "topology.metal.ironcore.dev/heightunit"
+
+	// TopologyRack is the annotation key for the rack of a server.
+	TopologyRack = "topology.metal.ironcore.dev/rack"
 )
 
 // ServerPowerState defines the possible power states for a server.
@@ -57,6 +63,16 @@ type BMCAccess struct {
 	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.
 	// +required
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
+}
+
+// BootOrder represents the boot order of the server.
+type BootOrder struct {
+	// Name is the name of the boot device.
+	Name string `json:"name"`
+	// Priority is the priority of the boot device.
+	Priority int `json:"priority"`
+	// Device is the device to boot from.
+	Device string `json:"device"`
 }
 
 // ServerSpec defines the desired state of a Server.
@@ -105,10 +121,18 @@ type ServerSpec struct {
 	// BootConfigurationRef is a reference to a BootConfiguration object that specifies
 	// the boot configuration for this server. This field is optional and can be omitted
 	// if no boot configuration is specified.
-	// This is used during initial provisioning of the server automatically.
-	// This is also used during maintenance if Maintenance needs server to be taken offline
 	// +optional
 	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
+
+	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
+	// the boot configuration for this server during maintenance. This field is optional and can be omitted
+	// +optional
+	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
+
+	// BootOrder specifies the boot order of the server.
+	// Deprecated: currently not supported.
+	// +optional
+	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 
 	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.

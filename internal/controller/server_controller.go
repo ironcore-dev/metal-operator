@@ -198,6 +198,14 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		return ctrl.Result{}, err
 	}
 
+	// temp until we remove the unused field: handle deprecated BootOrder field
+	if len(server.Spec.BootOrder) > 0 {
+		serverBase := server.DeepCopy()
+		server.Spec.BootOrder = nil
+		err := r.Patch(ctx, server, client.MergeFrom(serverBase))
+		return ctrl.Result{}, err
+	}
+
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcClient, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}

@@ -172,7 +172,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 
 			By("Ensuring that the BootConfig resource has been created/ marked ready")
 			var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeNil())))
+			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(2)))
 			for _, serverMaintaince := range serverMaintenanceList.Items {
 				if metav1.IsControlledBy(&serverMaintaince, bmcVersion02) || metav1.IsControlledBy(&serverMaintaince, bmcVersion03) {
 					By(fmt.Sprintf("Marking the maintenance %v ", serverMaintaince.Name))
@@ -274,7 +274,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 
 			By("Ensuring that the BootConfig resource has been created/ marked ready")
 			var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeNil())))
+			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(2)))
 			for _, serverMaintaince := range serverMaintenanceList.Items {
 				if metav1.IsControlledBy(&serverMaintaince, bmcVersion02) || metav1.IsControlledBy(&serverMaintaince, bmcVersion03) {
 					By(fmt.Sprintf("Marking the maintenance %v ", serverMaintaince.Name))

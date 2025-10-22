@@ -130,6 +130,7 @@ type ServerSpec struct {
 	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
 	// BootOrder specifies the boot order of the server.
+	// Deprecated: currently not supported.
 	// +optional
 	BootOrder []BootOrder `json:"bootOrder,omitempty"`
 

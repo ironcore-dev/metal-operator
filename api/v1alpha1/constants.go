@@ -24,6 +24,11 @@ const (
 	OperationAnnotationForceUpdateOrDeleteInProgress = "ForceUpdateOrDeleteInProgress"
 	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
 	OperationAnnotationForceUpdateInProgress = "ForceUpdateInProgress"
+
+	// OperationSkipBootConfiguration indicates which boot configuration operation should be skipped.
+	OperationSkipBootConfiguration = "metal.ironcore.dev/operation-skip-boot-configuration"
+	// SkipBootConfiguration skips the boot configuration if set to this value.
+	SkipBootConfiguration = "skip"
 	// OperationAnnotationForceReset forces a reset before next operation
 	OperationAnnotationForceReset = "ForceReset"
 )

@@ -52,11 +52,14 @@ const (
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme               *runtime.Scheme
-	Insecure             bool
+	Scheme   *runtime.Scheme
+	Insecure bool
+	// BMCFailureResetDelay defines the duration after which a BMC will be reset upon repeated connection failures.
 	BMCFailureResetDelay time.Duration
 	BMCOptions           bmc.Options
 	ManagerNamespace     string
+	// BMCResetWaitTime defines the duration to wait after a BMC reset before attempting reconciliation again.
+	BMCResetWaitTime time.Duration
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -110,10 +113,20 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
 	}
-	if r.shouldSkipReconciliation(bmcObj) {
+	if r.shouldSkipReconciliation(bmcObj, r.BMCResetWaitTime) {
 		log.V(1).Info("Skipped BMC reconciliation")
+		// any further request to BMC reset, will be ignored during this period
+		if operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]; ok && operation == metalv1alpha1.OperationAnnotationForceReset {
+			log.V(1).Info("Ignoring force reset operation", "Operation", operation)
+			bmcBase := bmcObj.DeepCopy()
+			metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
+			if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to remove operation annotation: %w", err)
+			}
+			log.V(1).Info("Removed operation annotation", "Operation", operation)
+		}
 		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
+			RequeueAfter: r.BMCResetWaitTime,
 		}, nil
 	}
 	if r.shouldResetBMC(bmcObj) {
@@ -123,7 +136,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		}
 		log.V(1).Info("BMC reset initiated", "BMC", bmcObj.Name)
 		return ctrl.Result{
-			RequeueAfter: 10 * time.Second,
+			RequeueAfter: r.BMCResetWaitTime,
 		}, nil
 	}
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcObj); err != nil || modified {
@@ -301,7 +314,7 @@ func (r *BMCReconciler) updateReadyConditionOnBMCFailure(ctx context.Context, bm
 	return err
 }
 
-func (r *BMCReconciler) shouldSkipReconciliation(bmcObj *metalv1alpha1.BMC) bool {
+func (r *BMCReconciler) shouldSkipReconciliation(bmcObj *metalv1alpha1.BMC, delay time.Duration) bool {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	condition := &metav1.Condition{}
 	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
@@ -310,7 +323,7 @@ func (r *BMCReconciler) shouldSkipReconciliation(bmcObj *metalv1alpha1.BMC) bool
 	}
 	if condition.Status == metav1.ConditionTrue {
 		// give bmc some time to start the reset process
-		if time.Since(condition.LastTransitionTime.Time) < 5*time.Second {
+		if time.Since(condition.LastTransitionTime.Time) < delay {
 			return true
 		}
 	}
@@ -372,6 +385,11 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 	}
 	if !ok && !createIfNotFound {
 		// condition not found and not allowed to create
+		return nil
+	}
+	if ok && !createIfNotFound {
+		// if found and not allowed to update
+		// can not replace the user reset condition everytime the reconile happens
 		return nil
 	}
 	bmcBase := bmcObj.DeepCopy()

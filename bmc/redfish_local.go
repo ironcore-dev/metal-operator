@@ -12,6 +12,7 @@ import (
 	gofishCommon "github.com/stmcginnis/gofish/common"
 
 	"github.com/stmcginnis/gofish/redfish"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -212,6 +213,8 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, 
 
 // ResetManager resets the BMC with a delay for pending settings.
 func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating BMC reset", "UUID", UUID, "ResetType", resetType)
 	go func() {
 		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
 			time.Sleep(150 * time.Millisecond)

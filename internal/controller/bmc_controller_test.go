@@ -520,6 +520,11 @@ var _ = Describe("BMC Reset", func() {
 			Eventually(Object(bmc)).Should(
 				HaveField("Status.Conditions", HaveLen(2)),
 			)
+			By("waiting BMC reset to take place")
+			Eventually(Object(bmc)).Should(
+				HaveField("Annotations", BeNil()),
+			)
+			By("Ensuring right conditions are present, after bmc reset is done")
 			Eventually(Object(bmc)).Should(
 				HaveField("Status.Conditions", ContainElement(
 					SatisfyAll(

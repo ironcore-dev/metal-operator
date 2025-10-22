@@ -247,6 +247,10 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 			return ctrl.Result{}, err
 		}
 
+		if ok, err := r.handleBMCReset(ctx, log, bmcVersion, bmc, resetBMCCondition); !ok || err != nil {
+			return ctrl.Result{}, err
+		}
+
 		return r.handleUpgradeInProgressState(ctx, log, bmcVersion, bmcClient, bmc)
 	case metalv1alpha1.BMCVersionStateCompleted:
 		// clean up maintenance crd and references and mark completed if version matches.
@@ -305,37 +309,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 		return r.checkBMCUpgradeStatus(ctx, log, bmcVersion, bmcClient, BMC, bmcVersion.Status.UpgradeTask.URI, completedCondition, acc)
 	}
 
-	rebootCondition, err := r.getCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeRebootBMC)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if rebootCondition.Status != metav1.ConditionTrue {
-		log.V(1).Info("Reboot BMC")
-		err = bmcClient.ResetManager(ctx, BMC.Spec.BMCUUID, redfish.GracefulRestartResetType)
-		if err != nil {
-			log.V(1).Error(err, "failed to reset BMC")
-			return ctrl.Result{}, err
-		}
-
-		if err := acc.Update(
-			rebootCondition,
-			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason("RebootOfBMCTriggered"),
-			conditionutils.UpdateMessage("BMC reboot has been triggered"),
-		); err != nil {
-			log.V(1).Error(err, "failed to update the conditions status. retrying...")
-			return ctrl.Result{}, err
-		}
-		err = r.updateBMCVersionStatus(
-			ctx,
-			log,
-			bmcVersion,
-			bmcVersion.Status.State,
-			bmcVersion.Status.UpgradeTask,
-			rebootCondition,
-			acc,
-		)
+	if ok, err := r.handleBMCReset(ctx, log, bmcVersion, BMC, bmcVersionUpgradeRebootBMC); !ok || err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -548,6 +522,91 @@ func (r *BMCVersionReconciler) getReferredSecret(
 	}
 
 	return secret.StringData[metalv1alpha1.BMCSecretUsernameKeyName], secret.StringData[metalv1alpha1.BMCSecretPasswordKeyName], nil
+}
+
+func (r *BMCVersionReconciler) handleBMCReset(
+	ctx context.Context,
+	log logr.Logger,
+	bmcVersion *metalv1alpha1.BMCVersion,
+	BMC *metalv1alpha1.BMC,
+	conditionType string,
+) (bool, error) {
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	// reset BMC if not already done
+	resetBMC, err := r.getCondition(acc, bmcVersion.Status.Conditions, conditionType)
+	if err != nil {
+		return false, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
+	}
+
+	if resetBMC.Status != metav1.ConditionTrue {
+		annotations := BMC.GetAnnotations()
+		// once the server is powered on, reset the BMC to make sure its in stable state
+		// this avoids problems with some BMCs that hang up in subsequent operations
+		if resetBMC.Reason != resetBMCReason {
+			if annotations != nil {
+				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
+					if op == metalv1alpha1.OperationAnnotationForceReset {
+						log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
+						if err := acc.Update(
+							resetBMC,
+							conditionutils.UpdateStatus(corev1.ConditionFalse),
+							conditionutils.UpdateReason(resetBMCReason),
+							conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
+						); err != nil {
+							return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
+						}
+						// patch condition to reset issued
+						return false, r.updateBMCVersionStatus(ctx, log, bmcVersion, bmcVersion.Status.State, nil, resetBMC, acc)
+					} else {
+						return false, fmt.Errorf("unknown annotation on BMC object for operation annotation %v", op)
+					}
+				}
+			}
+			log.V(1).Info("Setting annotation on BMC resource to trigger with BMC reset")
+
+			BMCBase := BMC.DeepCopy()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationForceReset
+			BMC.SetAnnotations(annotations)
+			if err := r.Patch(ctx, BMC, client.MergeFrom(BMCBase)); err != nil {
+				return false, err
+			}
+
+			if err := acc.Update(
+				resetBMC,
+				conditionutils.UpdateStatus(corev1.ConditionFalse),
+				conditionutils.UpdateReason(resetBMCReason),
+				conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
+			); err != nil {
+				return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
+			}
+			// patch condition to reset issued
+			return false, r.updateBMCVersionStatus(ctx, log, bmcVersion, bmcVersion.Status.State, nil, resetBMC, acc)
+		}
+
+		// we need to wait until the BMC resource annotation is removed
+		if annotations != nil {
+			if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
+				if op == metalv1alpha1.OperationAnnotationForceReset {
+					log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
+					return false, nil
+				}
+			}
+		}
+
+		if err := acc.Update(
+			resetBMC,
+			conditionutils.UpdateStatus(corev1.ConditionTrue),
+			conditionutils.UpdateReason(resetBMCReason),
+			conditionutils.UpdateMessage("BMC reset to stabilize BMC of the server is completed"),
+		); err != nil {
+			return false, fmt.Errorf("failed to update power on server condition: %w", err)
+		}
+		return false, r.updateBMCVersionStatus(ctx, log, bmcVersion, bmcVersion.Status.State, nil, resetBMC, acc)
+	}
+	return true, nil
 }
 
 func (r *BMCVersionReconciler) getServers(

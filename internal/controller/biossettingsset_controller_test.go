@@ -17,7 +17,9 @@ import (
 
 var _ = Describe("BIOSSettingsSet Controller", func() {
 	Context("When reconciling a resource", func() {
-		ns := SetupTest()
+		var redfishMockServerAddr = []string{":8000", ":8001", ":8002"}
+		var redfishMockServerPorts = []int{8000, 8001, 8002}
+		ns := SetupTest(redfishMockServerAddr)
 
 		var server01 *metalv1alpha1.Server
 		var server02 *metalv1alpha1.Server
@@ -50,7 +52,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					BMC: &metalv1alpha1.BMCAccess{
 						Protocol: metalv1alpha1.Protocol{
 							Name: metalv1alpha1.ProtocolRedfishLocal,
-							Port: 8000,
+							Port: int32(redfishMockServerPorts[0]),
 						},
 						Address: "127.0.0.1",
 						BMCSecretRef: v1.LocalObjectReference{
@@ -75,7 +77,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					BMC: &metalv1alpha1.BMCAccess{
 						Protocol: metalv1alpha1.Protocol{
 							Name: metalv1alpha1.ProtocolRedfishLocal,
-							Port: 8000,
+							Port: int32(redfishMockServerPorts[1]),
 						},
 						Address: "127.0.0.1",
 						BMCSecretRef: v1.LocalObjectReference{
@@ -100,7 +102,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					BMC: &metalv1alpha1.BMCAccess{
 						Protocol: metalv1alpha1.Protocol{
 							Name: metalv1alpha1.ProtocolRedfishLocal,
-							Port: 8000,
+							Port: int32(redfishMockServerPorts[2]),
 						},
 						Address: "127.0.0.1",
 						BMCSecretRef: v1.LocalObjectReference{
@@ -124,12 +126,14 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					GenerateName: "test-biossettings-set-",
 					Namespace:    ns.Name,
 				},
+				// settings mocked at
+				// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 				Spec: metalv1alpha1.BIOSSettingsSetSpec{
 					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
 						Version:                 defaultMockUpServerBiosVersion,
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-							{Settings: map[string]string{"fooreboot": "144"}, Priority: 1, Name: "one"},
+							{Settings: map[string]string{"ProcCores": "2"}, Priority: 1, Name: "one"},
 						},
 					},
 					ServerSelector: metav1.LabelSelector{
@@ -205,12 +209,14 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					GenerateName: "test-biossettings-set-",
 					Namespace:    ns.Name,
 				},
+				// settings mocked at
+				// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 				Spec: metalv1alpha1.BIOSSettingsSetSpec{
 					BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
 						Version:                 defaultMockUpServerBiosVersion,
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-							{Settings: map[string]string{"abc": "foo-bar"}, Priority: 10, Name: "foo-bar"},
+							{Settings: map[string]string{"AdminPhone": "foo-bar"}, Priority: 10, Name: "foo-bar"},
 						},
 					},
 					ServerSelector: metav1.LabelSelector{

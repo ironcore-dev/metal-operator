@@ -20,7 +20,9 @@ import (
 
 var _ = Describe("BMCVersionSet Controller", func() {
 	Context("When reconciling a resource", func() {
-		ns := SetupTest()
+		var redfishMockServerAddr = []string{":8000", ":8001", ":8002"}
+		var redfishMockServerPorts = []int{8000, 8001, 8002}
+		ns := SetupTest(redfishMockServerAddr)
 
 		var bmc01 *metalv1alpha1.BMC
 		var bmc02 *metalv1alpha1.BMC
@@ -57,7 +59,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					},
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(redfishMockServerPorts[0]),
 					},
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
@@ -82,7 +84,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					},
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(redfishMockServerPorts[1]),
 					},
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
@@ -107,7 +109,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					},
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(redfishMockServerPorts[2]),
 					},
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,

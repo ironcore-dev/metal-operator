@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	//+kubebuilder:scaffold:imports
 )
@@ -117,6 +119,7 @@ func deleteAndList(ctx context.Context, obj client.Object, objList client.Object
 }
 
 var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
@@ -163,7 +166,7 @@ var _ = BeforeSuite(func() {
 	bmc.InitMockUp()
 })
 
-func SetupTest() *corev1.Namespace {
+func SetupTest(redfishMockServers []string) *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
@@ -336,12 +339,26 @@ func SetupTest() *corev1.Namespace {
 
 		mockCtx, cancel := context.WithCancel(context.Background())
 		DeferCleanup(cancel)
-		mockServer := server.NewMockServer(GinkgoLogr, ":8000")
-
-		go func() {
-			defer GinkgoRecover()
-			Expect(mockServer.Start(mockCtx)).To(Succeed(), "failed to start mock Redfish server")
-		}()
+		if len(redfishMockServers) > 0 {
+			for _, serverAddr := range redfishMockServers {
+				By(fmt.Sprintf("Starting the mock Redfish servers %v", serverAddr))
+				mockServer := server.NewMockServer(GinkgoLogr, serverAddr)
+				go func() {
+					defer GinkgoRecover()
+					Expect(
+						mockServer.Start(mockCtx)).To(Succeed(),
+						fmt.Sprintf("failed to start mock Redfish server %v", serverAddr),
+					)
+				}()
+			}
+		} else {
+			By("Starting the default mock Redfish server")
+			mockServer := server.NewMockServer(GinkgoLogr, ":8000")
+			go func() {
+				defer GinkgoRecover()
+				Expect(mockServer.Start(mockCtx)).To(Succeed(), "failed to start mock Redfish server")
+			}()
+		}
 
 		go func() {
 			defer GinkgoRecover()

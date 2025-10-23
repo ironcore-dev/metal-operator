@@ -19,7 +19,7 @@ import (
 )
 
 var _ = Describe("BMC Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
@@ -244,7 +244,7 @@ var _ = Describe("BMC Controller", func() {
 })
 
 var _ = Describe("BMC Validation", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
@@ -390,7 +390,7 @@ var _ = Describe("BMC Validation", func() {
 })
 
 var _ = Describe("BMC Reset", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)
@@ -440,7 +440,7 @@ var _ = Describe("BMC Reset", func() {
 	})
 
 	var _ = Describe("BMC Conditions", func() {
-		ns := SetupTest()
+		ns := SetupTest(nil)
 
 		AfterEach(func(ctx SpecContext) {
 			DeleteAllMetalResources(ctx, ns.Name)

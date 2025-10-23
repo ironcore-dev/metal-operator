@@ -20,7 +20,7 @@ import (
 )
 
 var _ = Describe("ServerClaim Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var server *metalv1alpha1.Server
 
@@ -447,7 +447,7 @@ var _ = Describe("ServerClaim Controller", func() {
 })
 
 var _ = Describe("ServerClaim Validation", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var claim *metalv1alpha1.ServerClaim
 	var claimWithSelector *metalv1alpha1.ServerClaim
@@ -548,7 +548,7 @@ var _ = Describe("ServerClaim Validation", func() {
 })
 
 var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	makeServer := func(ctx context.Context) {
 		server := metalv1alpha1.Server{

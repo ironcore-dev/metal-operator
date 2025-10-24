@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"time"
@@ -35,6 +36,11 @@ func collectLLDPInfo(ctx context.Context, interval, duration time.Duration) (reg
 			return false, nil
 		}
 		if err := json.Unmarshal(out.Bytes(), &lldp); err != nil {
+			var syntaxErr *json.SyntaxError
+			if errors.As(err, &syntaxErr) {
+				// @afritzler: ignoring for now as networkctl lldp --json doesn't work on systemd versions < 257
+				return true, nil
+			}
 			return false, fmt.Errorf("can't unmarshal networkctl output: %w", err)
 		}
 		return true, nil

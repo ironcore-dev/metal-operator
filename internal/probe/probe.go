@@ -28,6 +28,7 @@ type Agent struct {
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
 func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
 	return &Agent{
+		log:              log,
 		SystemUUID:       systemUUID,
 		RegistryURL:      registryURL,
 		Duration:         duration,

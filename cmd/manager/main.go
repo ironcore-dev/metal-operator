@@ -75,6 +75,7 @@ func main() { // nolint: gocyclo
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
 		serverResyncInterval               time.Duration
+		maintenanceResyncInterval          time.Duration
 		powerPollingInterval               time.Duration
 		powerPollingTimeout                time.Duration
 		resourcePollingInterval            time.Duration
@@ -82,6 +83,7 @@ func main() { // nolint: gocyclo
 		discoveryTimeout                   time.Duration
 		biosSettingsApplyTimeout           time.Duration
 		bmcFailureResetDelay               time.Duration
+		bmcResetResyncInterval             time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 	)
@@ -103,6 +105,10 @@ func main() { // nolint: gocyclo
 		"Defines the interval at which the server is polled.")
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
 		"Reset the BMC after this duration of consecutive failures. 0 to disable.")
+	flag.DurationVar(&bmcResetResyncInterval, "bmc-reset-resync-interval", 2*time.Minute,
+		"Defines the interval at which the bmc is polled/skipped reconcile when bmc has been reset.")
+	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
+		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
@@ -314,6 +320,7 @@ func main() { // nolint: gocyclo
 		Scheme:               mgr.GetScheme(),
 		Insecure:             insecure,
 		BMCFailureResetDelay: bmcFailureResetDelay,
+		BMCResetWaitTime:     bmcResetResyncInterval,
 		ManagerNamespace:     managerNamespace,
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
@@ -383,7 +390,7 @@ func main() { // nolint: gocyclo
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
-		ResyncInterval:   serverResyncInterval,
+		ResyncInterval:   maintenanceResyncInterval,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -408,7 +415,7 @@ func main() { // nolint: gocyclo
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
-		ResyncInterval:   serverResyncInterval,
+		ResyncInterval:   maintenanceResyncInterval,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -431,7 +438,7 @@ func main() { // nolint: gocyclo
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
-		ResyncInterval:   serverResyncInterval,
+		ResyncInterval:   maintenanceResyncInterval,
 		Insecure:         insecure,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
@@ -456,7 +463,7 @@ func main() { // nolint: gocyclo
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
-		ResyncInterval:   serverResyncInterval,
+		ResyncInterval:   maintenanceResyncInterval,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

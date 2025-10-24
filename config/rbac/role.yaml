@@ -31,6 +31,15 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
+  - BMC
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
   - biossettings
   - biossettingssets
   - biosversions

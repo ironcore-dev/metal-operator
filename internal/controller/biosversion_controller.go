@@ -217,6 +217,10 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 			return false, nil
 		}
 
+		if ok, err := r.handleBMCReset(ctx, log, bmcClient, biosVersion, server); !ok || err != nil {
+			return false, err
+		}
+
 		return r.handleUpgradeInProgressState(ctx, log, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateCompleted:
 		// clean up maintenance crd and references and mark completed if version matches.
@@ -388,6 +392,71 @@ func (r *BIOSVersionReconciler) handleUpgradeInProgressState(
 
 	log.V(1).Info("Unknown Conditions found", "BIOSVersion Conditions", biosVersion.Status.Conditions)
 	return false, nil
+}
+
+func (r *BIOSVersionReconciler) handleBMCReset(
+	ctx context.Context,
+	log logr.Logger,
+	bmcClient bmc.BMC,
+	biosVersion *metalv1alpha1.BIOSVersion,
+	server *metalv1alpha1.Server,
+) (bool, error) {
+
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	// reset BMC if not already done
+	resetBMC, err := r.getCondition(acc, biosVersion.Status.Conditions, resetBMCCondition)
+	if err != nil {
+		return false, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
+	}
+
+	if resetBMC.Status != metav1.ConditionTrue {
+		// once the server is powered on, reset the BMC to make sure its in stable state
+		// this avoids problems with some BMCs that hang up in subsequent operations
+		if resetBMC.Reason != resetBMCReason {
+			if err := resetBMCOfServer(ctx, log, r.Client, server, bmcClient); err == nil {
+				// mark reset to be issued, wait for next reconcile
+				if err := acc.Update(
+					resetBMC,
+					conditionutils.UpdateStatus(corev1.ConditionFalse),
+					conditionutils.UpdateReason(resetBMCReason),
+					conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
+				); err != nil {
+					return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
+				}
+				return false, r.updateBiosVersionStatus(ctx, log, biosVersion, biosVersion.Status.State, nil, resetBMC, acc)
+			} else {
+				log.V(1).Error(err, "failed to reset BMC of the server")
+				return false, err
+			}
+		} else if server.Spec.BMCRef != nil {
+			// we need to wait until the BMC resource annotation is removed
+			key := types.NamespacedName{Name: server.Spec.BMCRef.Name}
+			BMC := &metalv1alpha1.BMC{}
+			if err := r.Get(ctx, key, BMC); err != nil {
+				log.V(1).Error(err, "failed to get referred server's Manager")
+				return false, err
+			}
+			annotations := BMC.GetAnnotations()
+			if annotations != nil {
+				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
+					if op == metalv1alpha1.OperationAnnotationForceReset {
+						log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
+						return false, nil
+					}
+				}
+			}
+		}
+		if err := acc.Update(
+			resetBMC,
+			conditionutils.UpdateStatus(corev1.ConditionTrue),
+			conditionutils.UpdateReason(resetBMCReason),
+			conditionutils.UpdateMessage("BMC reset to stabilize BMC of the server is completed"),
+		); err != nil {
+			return false, fmt.Errorf("failed to update power on server condition: %w", err)
+		}
+		return false, r.updateBiosVersionStatus(ctx, log, biosVersion, biosVersion.Status.State, nil, resetBMC, acc)
+	}
+	return true, nil
 }
 
 func (r *BIOSVersionReconciler) getBiosVersionFromBMC(
@@ -862,7 +931,7 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 	return err
 }
 
-func (r *BIOSVersionReconciler) enqueueBiosVersionByRefs(
+func (r *BIOSVersionReconciler) enqueueBiosVersionByServerRefs(
 	ctx context.Context,
 	obj client.Object,
 ) []ctrl.Request {
@@ -905,12 +974,66 @@ func (r *BIOSVersionReconciler) enqueueBiosVersionByRefs(
 	}
 	return nil
 }
+func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	host := obj.(*metalv1alpha1.BMC)
+
+	serverList := &metalv1alpha1.ServerList{}
+	if err := clientutils.ListAndFilter(ctx, r.Client, serverList, func(object client.Object) (bool, error) {
+		server := object.(*metalv1alpha1.Server)
+		return server.Spec.BMCRef != nil && server.Spec.BMCRef.Name == host.Name, nil
+	}); err != nil {
+		log.V(1).Error(err, "failed to list Server created by this BMC resources", "BMC", host.Name)
+		return nil
+	}
+
+	serverMap := make(map[string]struct{})
+	for _, server := range serverList.Items {
+		serverMap[server.Name] = struct{}{}
+	}
+
+	biosVersionList := &metalv1alpha1.BIOSVersionList{}
+	if err := clientutils.ListAndFilter(ctx, r.Client, biosVersionList, func(object client.Object) (bool, error) {
+		biosVersion := object.(*metalv1alpha1.BIOSVersion)
+		if _, exists := serverMap[biosVersion.Spec.ServerRef.Name]; !exists {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		log.V(1).Error(err, "failed to list Server created by this BMC resources", "BMC", host.Name)
+		return nil
+	}
+
+	reqs := make([]ctrl.Request, 0)
+	for _, biosVersion := range biosVersionList.Items {
+		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+			acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+			resetBMC, err := r.getCondition(acc, biosVersion.Status.Conditions, resetBMCCondition)
+			if err != nil {
+				log.V(1).Error(err, "failed to get reset BMC condition")
+				continue
+			}
+			if resetBMC.Status == metav1.ConditionTrue {
+				continue
+			}
+			// enqueue only if the BMC reset is requested for this BMC
+			if resetBMC.Reason == resetBMCReason {
+				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: biosVersion.Namespace, Name: biosVersion.Name}})
+			}
+		}
+	}
+	return reqs
+}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BIOSVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSVersion{}).
 		Owns(&metalv1alpha1.ServerMaintenance{}).
-		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosVersionByRefs)).
+		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosVersionByServerRefs)).
+		Watches(&metalv1alpha1.BMC{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByBMC)).
 		Complete(r)
 }

@@ -14,7 +14,7 @@ import (
 )
 
 var _ = Describe("Endpoints Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		DeleteAllMetalResources(ctx, ns.Name)

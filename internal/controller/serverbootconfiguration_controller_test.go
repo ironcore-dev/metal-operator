@@ -13,7 +13,7 @@ import (
 )
 
 var _ = Describe("ServerBootConfiguration Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var server *metalv1alpha1.Server
 

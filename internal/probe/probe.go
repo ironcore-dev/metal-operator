@@ -16,30 +16,77 @@ import (
 )
 
 type Agent struct {
-	SystemUUID  string
-	RegistryURL string
-	Duration    time.Duration
-	Server      *registry.Server // Pointer to Server for late initialization.
-	log         logr.Logger
+	SystemUUID       string
+	RegistryURL      string
+	Duration         time.Duration
+	Server           *registry.Server // Pointer to Server for late initialization.
+	log              logr.Logger
+	LLDPSyncInterval time.Duration
+	LLDPSyncDuration time.Duration
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration time.Duration) *Agent {
+func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
 	return &Agent{
-		SystemUUID:  systemUUID,
-		RegistryURL: registryURL,
-		Duration:    duration,
+		SystemUUID:       systemUUID,
+		RegistryURL:      registryURL,
+		Duration:         duration,
+		LLDPSyncInterval: LLDPSyncInterval,
+		LLDPSyncDuration: LLDPSyncDuration,
 	}
 }
 
 // Init initializes the Agent's Server field with network interface data.
-func (a *Agent) Init() error {
+func (a *Agent) Init(ctx context.Context) error {
 	interfaces, err := collectNetworkData()
 	if err != nil {
 		return err
 	}
+	systeminfo, err := collectSystemInfoData()
+	if err != nil {
+		return err
+	}
 
-	a.Server = &registry.Server{NetworkInterfaces: interfaces}
+	cpuInfos, err := collectCPUInfoData()
+	if err != nil {
+		return err
+	}
+
+	LLDPInfo, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
+	if err != nil {
+		return err
+	}
+
+	blockDevices, err := collectStorageInfoData()
+	if err != nil {
+		return err
+	}
+
+	memoryDevices, err := collectMemoryInfoData()
+	if err != nil {
+		return err
+	}
+
+	nics, err := collectNICInfoData()
+	if err != nil {
+		return err
+	}
+
+	pciDevices, err := collectPCIDevicesInfoData()
+	if err != nil {
+		return err
+	}
+
+	a.Server = &registry.Server{
+		SystemInfo:        systeminfo,
+		CPU:               cpuInfos,
+		NetworkInterfaces: interfaces,
+		LLDP:              LLDPInfo.Interfaces,
+		Storage:           blockDevices,
+		Memory:            memoryDevices,
+		NICs:              nics,
+		PCIDevices:        pciDevices,
+	}
 	return nil
 }
 
@@ -50,7 +97,7 @@ func (a *Agent) Start(ctx context.Context) error {
 
 	// Ensure the Agent is initialized.
 	if a.Server == nil {
-		if err := a.Init(); err != nil {
+		if err := a.Init(ctx); err != nil {
 			a.log.Error(err, "failed to initialize agent")
 			return err
 		}

@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/ironcore-dev/controller-utils v0.10.0
 	github.com/jaypipes/ghw v0.19.1
-	github.com/onsi/ginkgo/v2 v2.26.0
+	github.com/onsi/ginkgo/v2 v2.27.1
 	github.com/onsi/gomega v1.38.2
 	github.com/safchain/ethtool v0.6.2
 	github.com/siderolabs/go-smbios v0.3.3

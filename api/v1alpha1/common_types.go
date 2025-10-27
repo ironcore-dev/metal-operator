@@ -12,6 +12,8 @@ import (
 )
 
 // IP is an IP address.
+// +kubebuilder:validation:Type=string
+// +kubebuilder:validation:Format=ip
 type IP struct {
 	netip.Addr `json:"-"`
 }

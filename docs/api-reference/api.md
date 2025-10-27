@@ -2628,6 +2628,28 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.BootType">BootType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerBootConfigurationTemplate">ServerBootConfigurationTemplate</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OneOff&#34;</p></td>
+<td><p>BootTypeOneOff indicates that the server should boot into this configuration one time.</p>
+</td>
+</tr><tr><td><p>&#34;Persistent&#34;</p></td>
+<td><p>BootTypePersistent indicates that the server should boot into this configuration continuously.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.ConsoleProtocol">ConsoleProtocol
 </h3>
 <p>
@@ -3554,7 +3576,8 @@ the boot configuration for this server during maintenance. This field is optiona
 </td>
 <td>
 <em>(Optional)</em>
-<p>BootOrder specifies the boot order of the server.</p>
+<p>BootOrder specifies the boot order of the server.
+Deprecated: currently not supported.</p>
 </td>
 </tr>
 <tr>
@@ -3829,6 +3852,25 @@ string
 </td>
 <td>
 <p>Name specifies the name of the boot configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bootType</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.BootType">
+BootType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BootType specifies the type of boot configuration.
+It can be either &ldquo;OneOff&rdquo; or &ldquo;Persistent&rdquo;. If not specified, it defaults to &ldquo;Persistent&rdquo;.
+&ldquo;Persistent&rdquo; will set the configuration reboot the server before setting the server to the desired power state mentioned in spec.</p>
+<p>&ldquo;OneOff&rdquo; will set the configuration to boot once. next boot-up will boot into default boot order.
+if power state mentioned in spec is &ldquo;PowerOn&rdquo;, server will be powered on and will boot into the configuration.
+if power state is &ldquo;PowerOff&rdquo;, server will be powered off and will boot into the configuration on next power on.</p>
 </td>
 </tr>
 <tr>
@@ -4248,6 +4290,82 @@ ServerMaintenanceStatus
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceBootOrder">ServerMaintenanceBootOrder
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceStatus">ServerMaintenanceStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>defaultBootOrder</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DefaultBootOrder specifies the default boot order of the server before maintenance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceBootOrderState">
+ServerMaintenanceBootOrderState
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceBootOrderState">ServerMaintenanceBootOrderState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceBootOrder">ServerMaintenanceBootOrder</a>)
+</p>
+<div>
+<p>ServerMaintenanceState specifies the current state of the server maintenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;InProgress&#34;</p></td>
+<td><p>BootOrderConfigInProgress specifies that the server bootOrder configuration is InProgress.</p>
+</td>
+</tr><tr><td><p>&#34;NoOp&#34;</p></td>
+<td><p>BootOrderConfigNoOp specifies that the server bootOrder is as expected.</p>
+</td>
+</tr><tr><td><p>&#34;RevertCompleted&#34;</p></td>
+<td><p>BootOrderConfigRevertSuccess specifies that the server bootOrder configuration is Completed.</p>
+</td>
+</tr><tr><td><p>&#34;Completed&#34;</p></td>
+<td><p>BootOrderConfigSuccess specifies that the server bootOrder configuration is Completed.</p>
+</td>
+</tr><tr><td><p>&#34;RevertInProgress&#34;</p></td>
+<td><p>BootOrderConfigSuccessRevertInProgress specifies that the server bootOrder revert to default is InProgress.</p>
+</td>
+</tr><tr><td><p>&#34;PxeOneOffBootSuccess&#34;</p></td>
+<td><p>BootOrderOneOffPxeBootSuccess specifies that the server bootOrder configuration is set to boot pxe once.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenancePolicy">ServerMaintenancePolicy
 (<code>string</code> alias)</h3>
 <p>
@@ -4400,6 +4518,9 @@ ServerBootConfigurationTemplate
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
 <td><p>ServerMaintenanceStatePending specifies that the server maintenance is pending.</p>
 </td>
+</tr><tr><td><p>&#34;Preparing&#34;</p></td>
+<td><p>ServerMaintenanceStatePreparing specifies that the server is in maintenance.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceStatus">ServerMaintenanceStatus
@@ -4429,6 +4550,22 @@ ServerMaintenanceState
 </td>
 <td>
 <p>State specifies the current state of the server maintenance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bootOrderStatus</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceBootOrder">
+ServerMaintenanceBootOrder
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BootOrderStatus specifies the boot order of the server before maintenance.
+is used to store the boot order of server before it is changed for maintenance.
+used only with BootType Persistent.</p>
 </td>
 </tr>
 </tbody>
@@ -4648,7 +4785,8 @@ the boot configuration for this server during maintenance. This field is optiona
 </td>
 <td>
 <em>(Optional)</em>
-<p>BootOrder specifies the boot order of the server.</p>
+<p>BootOrder specifies the boot order of the server.
+Deprecated: currently not supported.</p>
 </td>
 </tr>
 <tr>

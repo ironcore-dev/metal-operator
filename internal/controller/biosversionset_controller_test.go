@@ -165,6 +165,20 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
 			))
 
+			By("Ensuring that the Maintenance resource has been created")
+			var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+
+			serverMaintenance02 := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      biosVersion02.Name,
+				},
+			}
+			Eventually(Get(serverMaintenance02)).Should(Succeed())
+
+			_ = MarkBootConfigReady(ctx, k8sClient, serverMaintenance02.Name, ns.Name)
+
 			By("Checking the biosVersion01 have completed")
 			Eventually(Object(biosVersion02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
@@ -179,6 +193,16 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					BlockOwnerDeletion: ptr.To(true),
 				})),
 			))
+
+			serverMaintenance03 := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      biosVersion03.Name,
+				},
+			}
+			Eventually(Get(serverMaintenance03)).Should(Succeed())
+
+			_ = MarkBootConfigReady(ctx, k8sClient, serverMaintenance03.Name, ns.Name)
 
 			By("Checking the biosVersion02 have completed")
 			Eventually(Object(biosVersion03)).Should(SatisfyAll(
@@ -253,7 +277,21 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
 			))
 
-			By("Checking the biosVersion01 have completed")
+			By("Ensuring that the Maintenance resource has been created")
+			var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+			Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+
+			serverMaintenance02 := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      biosVersion02.Name,
+				},
+			}
+			Eventually(Get(serverMaintenance02)).Should(Succeed())
+
+			_ = MarkBootConfigReady(ctx, k8sClient, serverMaintenance02.Name, ns.Name)
+
+			By("Checking the biosVersion02 have completed")
 			Eventually(Object(biosVersion02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -266,7 +304,17 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				})),
 			))
 
-			By("Checking the biosVersion02 have completed")
+			serverMaintenance03 := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      biosVersion03.Name,
+				},
+			}
+			Eventually(Get(serverMaintenance03)).Should(Succeed())
+
+			_ = MarkBootConfigReady(ctx, k8sClient, serverMaintenance03.Name, ns.Name)
+
+			By("Checking the biosVersion03 have completed")
 			Eventually(Object(biosVersion03)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -312,6 +360,8 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			Eventually(Get(biosVersion02)).Should(Succeed())
 			Eventually(Get(biosVersion03)).Should(Succeed())
 
+			// we do not mark boot config ready for biosVersion02 once again, as
+			// as the biosVersion will already be applied on it
 			By("Checking the biosVersion01 have completed")
 			Eventually(Object(biosVersion02)).Should(
 				HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
@@ -347,6 +397,11 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 3)),
 				HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
 			))
+
+			// we do not mark boot config ready for biosVersion01, as
+			// the server in unit testing all point to same mockup server
+			// and Hence, the biosSettings will already be applied on it when other biosSettings are applied.
+			// _ = MarkBootConfigReady(ctx, k8sClient, <>.Name, ns.Name)
 
 			By("Checking the biosVersion01 have completed")
 			Eventually(Object(biosVersion01)).Should(

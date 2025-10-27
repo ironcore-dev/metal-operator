@@ -320,6 +320,14 @@ func (r *RedfishBMC) GetBootOrder(ctx context.Context, systemURI string) ([]stri
 	return system.Boot.BootOrder, nil
 }
 
+func (r *RedfishBMC) GetBootOptions(ctx context.Context, systemURI string) ([]*redfish.BootOption, error) {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return nil, err
+	}
+	return system.BootOptions()
+}
+
 func (r *RedfishBMC) GetBiosVersion(ctx context.Context, systemURI string) (string, error) {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
@@ -474,21 +482,30 @@ func (r *RedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID st
 }
 
 // SetBootOrder sets bios boot order
-func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrder []string) error {
+func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrder redfish.Boot) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return err
 	}
-	return system.SetBoot(
-		redfish.Boot{
-			BootSourceOverrideEnabled: redfish.ContinuousBootSourceOverrideEnabled,
-			BootSourceOverrideTarget:  redfish.NoneBootSourceOverrideTarget,
-			BootOrder:                 bootOrder,
-		},
-	)
+	var tSystem struct {
+		Settings common.Settings `json:"@Redfish.Settings"`
+	}
+	// Unfortunately, some vendors (like Dell) support setting through different url.
+	// Hence we need to set it through this url.
+	err = json.Unmarshal(system.RawData, &tSystem)
+	if err != nil {
+		return err
+	}
+	if tSystem.Settings.SettingsObject.String() == "" {
+		return system.SetBoot(bootOrder)
+	}
+	return system.SetBoot(bootOrder)
 }
 
-func (r *RedfishBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (map[string]RegistryEntryAttributes, error) {
+func (r *RedfishBMC) getFilteredBiosRegistryAttributes(
+	readOnly bool,
+	immutable bool,
+) (map[string]RegistryEntryAttributes, error) {
 	registries, err := r.client.Service.Registries()
 	if err != nil {
 		return nil, err

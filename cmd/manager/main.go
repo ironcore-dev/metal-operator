@@ -366,6 +366,15 @@ func main() { // nolint: gocyclo
 	if err = (&controller.ServerMaintenanceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+		Insecure:       insecure,
+		ResyncInterval: serverResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerMaintenance")
 		os.Exit(1)

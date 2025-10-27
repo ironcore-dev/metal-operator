@@ -68,6 +68,9 @@ type BMC interface {
 	// GetBootOrder retrieves the boot order for the system.
 	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
 
+	// GetBootOptions retrieves the boot options for the system.
+	GetBootOptions(ctx context.Context, systemURI string) ([]*redfish.BootOption, error)
+
 	// GetBiosAttributeValues retrieves BIOS attribute values for the system.
 	GetBiosAttributeValues(ctx context.Context, systemURI string, attributes []string) (redfish.SettingsAttributes, error)
 
@@ -99,7 +102,7 @@ type BMC interface {
 	GetBMCVersion(ctx context.Context, UUID string) (string, error)
 
 	// SetBootOrder sets the boot order for the system.
-	SetBootOrder(ctx context.Context, systemURI string, order []string) error
+	SetBootOrder(ctx context.Context, systemURI string, order redfish.Boot) error
 
 	// GetStorages retrieves storage information for the system.
 	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)

@@ -189,6 +189,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
 		))
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
 
 		ensureBiosVersionConditionTransisition(acc, biosVersion, server)
 
@@ -297,6 +298,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 			}),
 		))
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
 
 		ensureBiosVersionConditionTransisition(acc, biosVersion, server)
 
@@ -355,6 +357,8 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Eventually(Object(biosVersion)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateInProgress),
 		)
+
+		MarkBootConfigReady(ctx, k8sClient, biosVersion.Name, ns.Name)
 
 		Eventually(Object(biosVersion)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),

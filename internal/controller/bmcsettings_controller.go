@@ -314,11 +314,13 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	}
 
 	// check if the maintenance is granted
-	if ok, state := r.checkIfMaintenanceGranted(ctx, log, bmcSetting, bmcClient); !ok {
-		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
-		return ctrl.Result{}, err
-	} else if state == metalv1alpha1.ServerMaintenanceStateFailed {
+	state := r.getMaintenanceStateIfApproved(ctx, log, bmcSetting, bmcClient)
+	if state == metalv1alpha1.ServerMaintenanceStateFailed {
 		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed)
+		return ctrl.Result{}, err
+	}
+	if state != metalv1alpha1.ServerMaintenanceStateInMaintenance {
+		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
 		return ctrl.Result{}, err
 	}
 
@@ -494,25 +496,25 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 	return currentBMCVersion, diff, nil
 }
 
-func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
+func (r *BMCSettingsReconciler) getMaintenanceStateIfApproved(
 	ctx context.Context,
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	bmcClient bmc.BMC,
-) (bool, metalv1alpha1.ServerMaintenanceState) {
+) metalv1alpha1.ServerMaintenanceState {
 	if bmcSetting.Spec.ServerMaintenanceRefs == nil {
-		return false, ""
+		return ""
 	}
 
 	servers, err := r.getServers(ctx, log, bmcSetting, bmcClient)
 	if err != nil {
 		log.V(1).Error(err, "Failed to get ref. servers to determine maintenance state ")
-		return false, ""
+		return ""
 	}
 
 	if len(bmcSetting.Spec.ServerMaintenanceRefs) != len(servers) {
 		log.V(1).Info("Not all servers have Maintenance", "ServerMaintenanceRefs", bmcSetting.Spec.ServerMaintenanceRefs, "Servers", servers)
-		return false, ""
+		return ""
 	}
 
 	notInMaintenanceState := make(map[string]metalv1alpha1.ServerMaintenanceState, len(servers))
@@ -527,7 +529,9 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 			}
 			// fail immediately if any of the server maintenance request failed, as we can not proceed further
 			if serverMaintenance.Status.State == metalv1alpha1.ServerMaintenanceStateFailed {
-				return false, metalv1alpha1.ServerMaintenanceStateFailed
+				// atleast one server maintenance failed
+				log.V(1).Info("ServerMaintenance request failed", "Server", server.Name, "ServerMaintenance", serverMaintenance.Name)
+				return metalv1alpha1.ServerMaintenanceStateFailed
 			}
 			// this gives us the waiting time for the server to be prepared for maintenance by ServerMaintenance controller
 			if serverMaintenance.Status.State != metalv1alpha1.ServerMaintenanceStateInMaintenance {
@@ -557,10 +561,12 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 		log.V(1).Info("Some servers not yet in maintenance",
 			"Required maintenances on servers", bmcSetting.Spec.ServerMaintenanceRefs,
 			"Servers not in maintence", notInMaintenanceState)
-		return false, metalv1alpha1.ServerMaintenanceStatePreapareMaintenance
+		// some servers are not yet in maintenance
+		return metalv1alpha1.ServerMaintenanceStatePending
 	}
 
-	return true, metalv1alpha1.ServerMaintenanceStateInMaintenance
+	// all servers are in maintenance
+	return metalv1alpha1.ServerMaintenanceStateInMaintenance
 }
 
 func (r *BMCSettingsReconciler) requestMaintenanceOnServers(

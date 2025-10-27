@@ -131,8 +131,8 @@ const (
 	ServerMaintenanceStatePending ServerMaintenanceState = "Pending"
 	// ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
-	// ServerMaintenanceStatePreapareMaintenance specifies that the server is in maintenance.
-	ServerMaintenanceStatePreapareMaintenance ServerMaintenanceState = "PrepareForMaintenance"
+	// ServerMaintenanceStatePreparing specifies that the server is in maintenance.
+	ServerMaintenanceStatePreparing ServerMaintenanceState = "Preparing"
 	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
 	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
 )

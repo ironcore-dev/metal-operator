@@ -4518,8 +4518,8 @@ ServerBootConfigurationTemplate
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
 <td><p>ServerMaintenanceStatePending specifies that the server maintenance is pending.</p>
 </td>
-</tr><tr><td><p>&#34;PrepareForMaintenance&#34;</p></td>
-<td><p>ServerMaintenanceStatePreapareMaintenance specifies that the server is in maintenance.</p>
+</tr><tr><td><p>&#34;Preparing&#34;</p></td>
+<td><p>ServerMaintenanceStatePreparing specifies that the server is in maintenance.</p>
 </td>
 </tr></tbody>
 </table>

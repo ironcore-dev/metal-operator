@@ -96,7 +96,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
 		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreapareMaintenance),
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreparing),
 		))
 
 		By("Checking the Server is in maintenance")
@@ -247,7 +247,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		))
 		By("Checking the ServerMaintenance state is PrepareMaintenance")
 		Eventually(Object(serverMaintenance01)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreapareMaintenance),
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreparing),
 		))
 		MarkBootConfigReady(ctx, k8sClient, server.Spec.BootConfigurationRef.Name, server.Spec.BootConfigurationRef.Namespace)
 
@@ -276,7 +276,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Checking the second ServerMaintenance is now PreparingMaintenance")
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreapareMaintenance),
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePreparing),
 		))
 
 		By("Checking the ServerMaintenanceRef and BootConfigurationRef")

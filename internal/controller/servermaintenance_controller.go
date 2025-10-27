@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,6 +42,11 @@ type ServerMaintenanceReconciler struct {
 	Insecure       bool
 	ResyncInterval time.Duration
 	BMCOptions     bmc.Options
+}
+
+type bootConfigChangedStatus struct {
+	changed    bool
+	bootConfig *metalv1alpha1.ServerBootConfiguration
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
@@ -91,9 +97,8 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, log logr.Lo
 	}
 	// set the servermaintenance state to pending if it is not set
 	if serverMaintenance.Status.State == "" {
-		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStatePending); err != nil || modified {
-			return ctrl.Result{}, err
-		}
+		err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStatePending)
+		return ctrl.Result{}, err
 	}
 	return r.ensureServerMaintenanceStateTransition(ctx, log, serverMaintenance)
 }
@@ -102,7 +107,7 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 	switch serverMaintenance.Status.State {
 	case metalv1alpha1.ServerMaintenanceStatePending:
 		return r.handlePendingState(ctx, log, serverMaintenance)
-	case metalv1alpha1.ServerMaintenanceStatePreapareMaintenance:
+	case metalv1alpha1.ServerMaintenanceStatePreparing:
 		return r.handlePrepareMaintenanceState(ctx, log, serverMaintenance)
 	case metalv1alpha1.ServerMaintenanceStateInMaintenance:
 		log.V(1).Info("Server is under maintenance", "ServerMaintenance", serverMaintenance.Name)
@@ -111,9 +116,9 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 			return ctrl.Result{}, err
 		}
 
-		if changed, _, err := r.isBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
+		if configStatus, err := r.isBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
 			return ctrl.Result{}, err
-		} else if changed {
+		} else if configStatus.changed {
 			return r.moveToPrepareMaintenanceState(ctx, log, serverMaintenance, server)
 		}
 		err = r.setAndPatchServerPowerState(ctx, log, server, serverMaintenance.Spec.ServerPower)
@@ -190,10 +195,11 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 	}
 
 	var config *metalv1alpha1.ServerBootConfiguration
-	changed := false
-	if changed, config, err = r.isBootConfigurationChanged(ctx, log, serverMaintenance); err != nil {
+	configState, err := r.isBootConfigurationChanged(ctx, log, serverMaintenance)
+	if err != nil {
 		return ctrl.Result{}, err
-	} else if changed || config == nil {
+	}
+	if configState.changed || configState.bootConfig == nil {
 		// turn server power off before applying new boot configuration
 		// this will help schedule the job to change the boot order for the server
 		// note: if the server is already off, this will be a no-op
@@ -209,15 +215,17 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+	} else {
+		config = configState.bootConfig
 	}
 
 	// Note: this is to check skip of BootConfiguration
 	// implication of skipping is that the server will still continue to run the OS during Maintenance
 	// might be subjected to reboots
-	val, found := serverMaintenance.GetAnnotations()[metalv1alpha1.OperationSkipBootConfiguration]
+	val, found := serverMaintenance.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if config == nil && (!found || val != metalv1alpha1.SkipBootConfiguration) {
 		log.V(1).Info("No ServerBootConfigurationTemplate boot configuration", "Server", server.Name)
-		_, err = r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed)
+		err = r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed)
 		return ctrl.Result{}, err
 	}
 
@@ -227,10 +235,8 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 			return ctrl.Result{}, nil
 		}
 		if config.Status.State == metalv1alpha1.ServerBootConfigurationStateError {
-			if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed); err != nil || modified {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{}, nil
+			err = r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed)
+			return ctrl.Result{}, err
 		}
 		if config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady {
 			log.V(1).Info("Server maintenance boot configuration is ready", "Server", server.Name)
@@ -247,7 +253,7 @@ func (r *ServerMaintenanceReconciler) handlePrepareMaintenanceState(ctx context.
 			return ctrl.Result{}, err
 		}
 	}
-	_, err = r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance)
+	err = r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance)
 	return ctrl.Result{}, err
 }
 
@@ -432,10 +438,8 @@ func (r *ServerMaintenanceReconciler) moveToPrepareMaintenanceState(
 		return ctrl.Result{}, err
 	}
 
-	if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStatePreapareMaintenance); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{}, nil
+	err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStatePreparing)
+	return ctrl.Result{}, err
 }
 
 func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) (bool, error) {
@@ -502,7 +506,7 @@ func (r *ServerMaintenanceReconciler) configureBootOrder(ctx context.Context, lo
 
 		bootOrderChanged := rearrangeBootOrder(bootOrder, bootOptions, isPxeBootOption, isDiskBootOption)
 
-		if reflect.DeepEqual(bootOrder, bootOrderChanged) {
+		if slices.Equal(bootOrder, bootOrderChanged) {
 			// boot order is already set to pxe first, nothing to do
 			log.V(1).Info("boot order for server is set to pxe first",
 				"Server", server.Name,
@@ -594,7 +598,7 @@ func (r *ServerMaintenanceReconciler) revertMaintenanceBootConfig(
 			// sanitize the boot order to remove any invalid boot options
 			// this case can happen if the bios settings were changed boot options during maintenance
 			// we remove only the invalid boot options and keep the rest in same order
-			// because the settings will take care of new added boot device and apend it to end
+			// because the settings will take care of new added boot device and append it to end
 			currentBootDeviceMap := make(map[string]struct{})
 			for _, bootDevice := range bootOrder {
 				currentBootDeviceMap[bootDevice] = struct{}{}
@@ -616,9 +620,9 @@ func (r *ServerMaintenanceReconciler) revertMaintenanceBootConfig(
 			if err != nil {
 				return false, fmt.Errorf("failed to revert boot order: %w", err)
 			}
-			// save the current boot order to revert back after maintenance
+			// save the current expected (sanitized) boot order to revert back after maintenance
 			status := &metalv1alpha1.ServerMaintenanceBootOrder{
-				DefaultBootOrder: serverMaintenance.Status.BootOrderStatus.DefaultBootOrder,
+				DefaultBootOrder: sanitizedBootOrder,
 				State:            metalv1alpha1.BootOrderConfigSuccessRevertInProgress,
 			}
 			if err := r.patchBootOrderStatus(ctx, log, serverMaintenance, status); err != nil {
@@ -639,7 +643,7 @@ func (r *ServerMaintenanceReconciler) revertMaintenanceBootConfig(
 			}
 
 			revertCompleted := false
-			if reflect.DeepEqual(bootOrder, serverMaintenance.Status.BootOrderStatus.DefaultBootOrder) {
+			if slices.Equal(bootOrder, serverMaintenance.Status.BootOrderStatus.DefaultBootOrder) {
 				revertCompleted = true
 			} else {
 				// sometimes, changing biosSettings leads to change in number of boot options
@@ -720,16 +724,16 @@ func (r *ServerMaintenanceReconciler) removeMaintenanceRefFromServer(ctx context
 	return nil
 }
 
-func (r *ServerMaintenanceReconciler) patchMaintenanceState(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance, state metalv1alpha1.ServerMaintenanceState) (bool, error) {
+func (r *ServerMaintenanceReconciler) patchMaintenanceState(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance, state metalv1alpha1.ServerMaintenanceState) error {
 	if serverMaintenance.Status.State == state {
-		return false, nil
+		return nil
 	}
 	base := serverMaintenance.DeepCopy()
 	serverMaintenance.Status.State = state
 	if err := r.Status().Patch(ctx, serverMaintenance, client.MergeFrom(base)); err != nil {
-		return false, fmt.Errorf("failed to patch serverMaintenance state: %w", err)
+		return fmt.Errorf("failed to patch serverMaintenance state: %w", err)
 	}
-	return true, nil
+	return nil
 }
 
 func (r *ServerMaintenanceReconciler) patchServerClaimAnnotation(ctx context.Context, log logr.Logger, serverClaim *metalv1alpha1.ServerClaim, set map[string]string) error {
@@ -775,20 +779,26 @@ func (r *ServerMaintenanceReconciler) isBootConfigurationChanged(
 	ctx context.Context,
 	log logr.Logger,
 	serverMaintenance *metalv1alpha1.ServerMaintenance,
-) (bool, *metalv1alpha1.ServerBootConfiguration, error) {
+) (*bootConfigChangedStatus, error) {
+	status := bootConfigChangedStatus{
+		changed: false,
+	}
 	config, err := r.getMaintenanceBootConfigurationRef(ctx, log, serverMaintenance)
+	status.bootConfig = config
 	if err != nil {
-		return false, config, err
+		return &status, err
 	}
 	if config == nil {
-		return false, config, nil
+		return &status, nil
 	}
 	if reflect.DeepEqual(config.Spec, serverMaintenance.Spec.ServerBootConfigurationTemplate.Spec) {
 		// no changes
 		log.V(1).Info("No changes in ServerBootConfigurationTemplate")
-		return false, config, nil
+		return &status, nil
 	}
-	return true, config, nil
+	status.changed = true
+	log.V(1).Info("Detected changes in ServerBootConfigurationTemplate")
+	return &status, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

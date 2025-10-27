@@ -1054,7 +1054,7 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 	}
 
 	if value, ok := metalv1alpha1.AnnotationToRedfishMapping[operation]; !ok {
-		log.V(1).Info("Unsupported operation annotation, Ignoring", "Operation", operation)
+		log.V(1).Info("Unsupported operation annotation", "Operation", operation, "SupportedOperations", metalv1alpha1.AnnotationToRedfishMapping)
 		return false, nil
 	} else {
 		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)

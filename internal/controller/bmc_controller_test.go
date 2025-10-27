@@ -430,7 +430,7 @@ var _ = Describe("BMC Reset", func() {
 		By("Resetting the BMC")
 		Eventually(Update(bmc, func() {
 			bmc.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.ForceResetBMCOperationAnnotation,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.GracefulRestartBMCPower,
 			}
 		})).Should(Succeed())
 		By("Ensuring that the reset annotation has been removed")
@@ -511,7 +511,7 @@ var _ = Describe("BMC Reset", func() {
 			By("resetting the BMC")
 			Eventually(Update(bmc, func() {
 				bmc.Annotations = map[string]string{
-					metalv1alpha1.OperationAnnotation: metalv1alpha1.ForceResetBMCOperationAnnotation,
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.GracefulRestartBMCPower,
 				}
 			},
 			)).Should(Succeed())

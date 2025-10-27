@@ -1,0 +1,19 @@
+{
+    "@odata.type": "#MessageRegistryFile.v1_1_4.MessageRegistryFile",
+    "Id": "BiosAttributeRegistry.v1_0_0",
+    "Name": "BIOS Attribute Registry File",
+    "Description": "BIOS Attribute Registry File locations",
+    "Languages": [
+        "en"
+    ],
+    "Registry": "BiosAttributeRegistry1.0",
+    "Location": [
+        {
+            "Language": "en",
+            "PublicationUri": "https://redfish.dmtf.org/schemas/v1/AttributeRegistry.v1_3_9.json",
+            "Uri": "/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0.json"
+        }
+    ],
+    "@odata.id": "/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

@@ -6,6 +6,9 @@
     "Members": [
         {
             "@odata.id": "/redfish/v1/Registries/Base.1.5.0"
+        },
+        {
+            "@odata.id": "/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0"
         }
     ],
     "@odata.id": "/redfish/v1/Registries",

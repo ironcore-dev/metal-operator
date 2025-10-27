@@ -16,7 +16,7 @@ import (
 )
 
 var _ = Describe("ServerMaintenance Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var server *metalv1alpha1.Server
 

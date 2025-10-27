@@ -23,7 +23,7 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 		return nil, err
 	}
 
-	var networkInterfaces []registry.NetworkInterface
+	networkInterfaces := make([]registry.NetworkInterface, 0, len(interfaces))
 	for _, iface := range interfaces {
 		// Skip only loopback, tun devices, and docker interface
 		// But include all other interfaces regardless of up/down status

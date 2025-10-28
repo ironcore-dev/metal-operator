@@ -47,7 +47,6 @@ spec:
           metadata:
             type: object
           spec:
-            description: BMCSettingsSpec defines the desired state of BMCSettings.
             properties:
               BMCRef:
                 description: BMCRef is a reference to a specific BMC to apply setting

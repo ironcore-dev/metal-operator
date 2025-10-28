@@ -352,12 +352,6 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 				bmcSettingsCopy.Spec.ServerMaintenanceRefs,
 			)
 
-			//avoid unnecessary updates
-			if r.refsAreEqual(bmcSettingsCopy.Spec.ServerMaintenanceRefs, mergedRefs) &&
-				r.templatesAreEqual(&bmcSettingsCopy.Spec.BMCSettingsTemplate, bmcSettingsTemplate) {
-				log.V(2).Info("No changes needed for BMCSettings", "BMCSettings", bmcSettingsCopy.Name)
-				return nil
-			}
 			log.V(2).Info("Updating BMCSettings with template",
 				"BMCSettings", bmcSettingsCopy.Name,
 				"templateRefs", len(bmcSettingsTemplate.ServerMaintenanceRefs),
@@ -463,67 +457,6 @@ func (r *BMCSettingsSetReconciler) mergeServerMaintenanceRefs(
 	return result
 }
 
-func (r *BMCSettingsSetReconciler) refsAreEqual(
-	current, merged []metalv1alpha1.ServerMaintenanceRefItem,
-) bool {
-	if len(current) != len(merged) {
-		return false
-	}
-
-	currentMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
-	for _, ref := range current {
-		if ref.ServerMaintenanceRef != nil {
-			currentMap[ref.ServerMaintenanceRef.Name] = ref
-		}
-	}
-
-	mergedMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
-	for _, ref := range merged {
-		if ref.ServerMaintenanceRef != nil {
-			mergedMap[ref.ServerMaintenanceRef.Name] = ref
-		}
-	}
-
-	if len(currentMap) != len(mergedMap) {
-		return false
-	}
-
-	for name, currentRef := range currentMap {
-		mergedRef, exists := mergedMap[name]
-		if !exists {
-			return false
-		}
-
-		if currentRef.ServerMaintenanceRef.UID != mergedRef.ServerMaintenanceRef.UID ||
-			currentRef.ServerMaintenanceRef.Namespace != mergedRef.ServerMaintenanceRef.Namespace {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (r *BMCSettingsSetReconciler) templatesAreEqual(
-	current, template *metalv1alpha1.BMCSettingsTemplate,
-) bool {
-	if current.Version != template.Version {
-		return false
-	}
-
-	if len(current.SettingsMap) != len(template.SettingsMap) {
-		return false
-	}
-
-	for key, currentValue := range current.SettingsMap {
-		templateValue, exists := template.SettingsMap[key]
-		if !exists || currentValue != templateValue {
-			return false
-		}
-	}
-
-	return current.ServerMaintenancePolicy == template.ServerMaintenancePolicy
-}
-
 func (r *BMCSettingsSetReconciler) filterServerMaintenanceRefsForBMC(
 	ctx context.Context,
 	templateRefs []metalv1alpha1.ServerMaintenanceRefItem,
@@ -546,32 +479,39 @@ func (r *BMCSettingsSetReconciler) filterServerMaintenanceRefsForBMC(
 	for _, server := range associatedServers {
 		serverNames[server.Name] = struct{}{}
 	}
+	templateRefMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
+	for _, ref := range templateRefs {
+		if ref.ServerMaintenanceRef != nil {
+			key := fmt.Sprintf("%s/%s", ref.ServerMaintenanceRef.Namespace, ref.ServerMaintenanceRef.Name)
+			templateRefMap[key] = ref
+		}
+	}
+
+	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
+		serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
+
+		key := fmt.Sprintf("%s/%s", serverMaintenance.Namespace, serverMaintenance.Name)
+		_, isInTemplateRefs := templateRefMap[key]
+
+		if !isInTemplateRefs {
+			return false, nil
+		}
+
+		if serverMaintenance.Spec.ServerRef != nil {
+			_, isOurServer := serverNames[serverMaintenance.Spec.ServerRef.Name]
+			return isOurServer, nil
+		}
+
+		return false, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to filter ServerMaintenance: %w", err)
+	}
 
 	var filteredRefs []metalv1alpha1.ServerMaintenanceRefItem
-	for _, ref := range templateRefs {
-		if ref.ServerMaintenanceRef == nil {
-			continue
-		}
-
-		serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
-		if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
-			serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
-
-			if serverMaintenance.Name == ref.ServerMaintenanceRef.Name &&
-				serverMaintenance.Namespace == ref.ServerMaintenanceRef.Namespace {
-				if serverMaintenance.Spec.ServerRef != nil {
-					_, isOurServer := serverNames[serverMaintenance.Spec.ServerRef.Name]
-					return isOurServer, nil
-				}
-			}
-			return false, nil
-		}); err != nil {
-			return nil, fmt.Errorf("failed to filter ServerMaintenance for ref %s: %w", ref.ServerMaintenanceRef.Name, err)
-		}
-
-		// found a matching ServerMaintenance that affects our servers
-		if len(serverMaintenancesList.Items) > 0 {
-			serverMaintenance := &serverMaintenancesList.Items[0]
+	for _, serverMaintenance := range serverMaintenancesList.Items {
+		key := fmt.Sprintf("%s/%s", serverMaintenance.Namespace, serverMaintenance.Name)
+		if ref, exists := templateRefMap[key]; exists {
 			if ref.ServerMaintenanceRef.UID != "" && ref.ServerMaintenanceRef.UID == serverMaintenance.UID {
 				filteredRefs = append(filteredRefs, ref)
 			} else if ref.ServerMaintenanceRef.UID == "" {

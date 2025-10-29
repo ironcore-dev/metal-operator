@@ -112,7 +112,8 @@ func main() { // nolint: gocyclo
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
 	flag.StringVar(&eventURL, "event-url", "", "The URL of the server events endpoint for alerts and metrics.")
 	flag.IntVar(&eventPort, "event-port", 10001, "The port to use for the server events endpoint for alerts and metrics.")
-	flag.StringVar(&eventProtocol, "event-protocol", "http", "The protocol to use for the server events endpoint for alerts and metrics.")
+	flag.StringVar(&eventProtocol, "event-protocol", "http",
+		"The protocol to use for the server events endpoint for alerts and metrics.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")

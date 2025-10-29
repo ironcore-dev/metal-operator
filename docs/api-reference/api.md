@@ -4822,6 +4822,30 @@ ServerState
 </tr>
 <tr>
 <td>
+<code>metricsReportSubscriptionLink</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MetricsReportSubscriptionLink is the link to the metrics report subscription for the server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>eventsSubscriptionLink</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>EventsSubscriptionLink is the link to the events subscription for the server.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>networkInterfaces</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.NetworkInterface">

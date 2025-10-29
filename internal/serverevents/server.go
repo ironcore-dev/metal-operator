@@ -34,6 +34,30 @@ var (
 	metricsReportCollectors map[string]*prometheus.GaugeVec
 )
 
+type MetricsReport struct {
+	MetricsValues []MetricsValue `json:"MetricsValues"`
+}
+
+type MetricsValue struct {
+	MetricId       string      `json:"MetricId"`
+	MetricProperty string      `json:"MetricProperty"`
+	MetricValue    string      `json:"MetricValue"`
+	Timestamp      string      `json:"Timestamp"`
+	Oem            interface{} `json:"Oem"`
+}
+
+type EventData struct {
+	Events []Event `json:"Alerts"`
+	Name   string  `json:"Name"`
+}
+
+type Event struct {
+	EventID        string `json:"EventId"`
+	Message        string `json:"Message"`
+	Severity       string `json:"Severity"`
+	EventTimestamp string `json:"EventTimestamp"`
+}
+
 func init() {
 	// Register custom metrics with the global prometheus registry
 	metrics.Registry.MustRegister(alertsGauge)
@@ -92,12 +116,12 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 	// expected path: /serverevents/metricsreport/{vendor}/{hostname}
 	hostname := path.Base(r.URL.Path)
 	vendor := path.Base(path.Dir(r.URL.Path))
-	s.log.Info("receieved metrics report", "uuid", hostname)
+	s.log.Info("receieved metrics report", "hostname", hostname)
 	metricsReport := MetricsReport{}
 	if err := json.NewDecoder(r.Body).Decode(&metricsReport); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	for _, mv := range metricsReport.Data.MetricsValues {
+	for _, mv := range metricsReport.MetricsValues {
 		if _, ok := metricsReportCollectors[mv.MetricId]; !ok {
 			gauge := prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{

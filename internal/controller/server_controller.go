@@ -83,6 +83,7 @@ type ServerReconciler struct {
 	ManagerNamespace        string
 	ProbeImage              string
 	RegistryURL             string
+	EventURL                string
 	ProbeOSImage            string
 	RegistryResyncInterval  time.Duration
 	EnforceFirstBoot        bool
@@ -170,21 +171,14 @@ func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
 	}
-	if err := bmcClient.DeleteEventSubscription(ctx, fmt.Sprintf("https://localhost:8888/%s/%s/metrics", server.Status.Manufacturer, server.Spec.UUID)); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to delete metrics event subscription: %w", err)
+	if err := r.deleteEventSubscription(ctx, log, bmcClient, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to delete event subscription: %w", err)
 	}
-	log.V(1).Info("Deleted metrics event subscription")
-	if err := bmcClient.DeleteEventSubscription(ctx, fmt.Sprintf("https://localhost:8888/%s/%s/alerts", server.Status.Manufacturer, server.Spec.UUID)); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to delete alerts event subscription: %w", err)
-	}
-	log.V(1).Info("Deleted alerts event subscription")
-
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer has been removed")
-
 	log.V(1).Info("Deleted server")
 	return ctrl.Result{}, nil
 }
@@ -399,12 +393,8 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Removed Server from Registry")
 
-	if err := serverevents.SubscribeMetricsReport(ctx, server.Status.Manufacturer, server.Spec.UUID, bmcClient); err != nil {
-		return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
-	}
-
-	if err := serverevents.SubscribeEvents(ctx, server.Status.Manufacturer, server.Spec.UUID, bmcClient); err != nil {
-		return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
+	if modified, err := r.handleEventSubscriptions(ctx, log, bmcClient, server); err != nil || modified {
+		return false, err
 	}
 
 	log.V(1).Info("Setting Server state set to available")
@@ -1087,6 +1077,53 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 		return false, fmt.Errorf("failed to patch server annotations: %w", err)
 	}
 	return true, nil
+}
+
+func (r *ServerReconciler) handleEventSubscriptions(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+	if r.EventURL == "" {
+		return false, nil
+	}
+	metricsReportLink := ""
+	eventLink := ""
+
+	if server.Status.MetricsReportSubscriptionLink != "" && server.Status.EventsSubscriptionLink != "" {
+		return false, nil
+	}
+	metricsReportLink, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, server.Status.Manufacturer, server.Spec.UUID, bmcClient)
+	if err != nil {
+		return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
+	}
+	eventLink, err = serverevents.SubscribeEvents(ctx, r.EventURL, server.Status.Manufacturer, server.Spec.UUID, bmcClient)
+	if err != nil {
+		return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
+	}
+	serverBase := server.DeepCopy()
+	server.Status.MetricsReportSubscriptionLink = metricsReportLink
+	server.Status.EventsSubscriptionLink = eventLink
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+	}
+	log.V(1).Info("Subscribed to server events and metrics")
+	return true, nil
+}
+
+func (r *ServerReconciler) deleteEventSubscription(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+	if r.EventURL == "" {
+		return nil
+	}
+	if server.Status.MetricsReportSubscriptionLink != "" {
+		if err := bmcClient.DeleteEventSubscription(ctx, server.Status.MetricsReportSubscriptionLink); err != nil {
+			return fmt.Errorf("failed to unsubscribe from server metrics report: %w", err)
+		}
+		log.V(1).Info("Unsubscribed from server metrics report")
+	}
+	if server.Status.EventsSubscriptionLink != "" {
+		if err := bmcClient.DeleteEventSubscription(ctx, server.Status.EventsSubscriptionLink); err != nil {
+			return fmt.Errorf("failed to unsubscribe from server events: %w", err)
+		}
+		log.V(1).Info("Unsubscribed from server events")
+	}
+	return nil
 }
 
 func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, server *metalv1alpha1.Server) bool {

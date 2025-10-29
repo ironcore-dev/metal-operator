@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -984,16 +985,15 @@ func (r *RedfishBMC) CreateEventSubscription(
 	destination string,
 	eventFormatType redfish.EventFormatType,
 	retry redfish.DeliveryRetryPolicy,
-) error {
+) (string, error) {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {
-		return fmt.Errorf("failed to get event service: %w", err)
+		return "", fmt.Errorf("failed to get event service: %w", err)
 	}
 	if !ev.ServiceEnabled {
-		return fmt.Errorf("event service is not enabled")
+		return "", fmt.Errorf("event service is not enabled")
 	}
-
 	payload := &subscriptionPayload{
 		Destination:         destination,
 		EventFormatType:     eventFormatType, // event or metricreport
@@ -1009,14 +1009,20 @@ func (r *RedfishBMC) CreateEventSubscription(
 		payload.RegistryPrefixes = []string{""} // Filters by the prefix of the event's MessageId, which points to a Message Registry: [Base, ResourceEvent, iLOEvents]
 		payload.ResourceTypes = []string{""}    // Filters by the schema name (Resource Type) of the event's OriginOfCondition:	[Chassis, ComputerSystem, Power]
 	}
-	_, err = client.Post(ev.Subscriptions, payload)
+	resp, err := client.Post(ev.Subscriptions, payload)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	// return subscription link from returned location
+	subscriptionLink := resp.Header.Get("Location")
+	urlParser, err := url.ParseRequestURI(subscriptionLink)
+	if err == nil {
+		subscriptionLink = urlParser.RequestURI()
+	}
+	return subscriptionLink, nil
 }
 
-func (r RedfishBMC) DeleteEventSubscription(ctx context.Context, destination string) error {
+func (r RedfishBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {
@@ -1025,7 +1031,14 @@ func (r RedfishBMC) DeleteEventSubscription(ctx context.Context, destination str
 	if !ev.ServiceEnabled {
 		return fmt.Errorf("event service is not enabled")
 	}
-	if err := ev.DeleteEventSubscription(destination); err != nil {
+	event, err := ev.GetEventSubscription(uri)
+	if err != nil {
+		return fmt.Errorf("failed to get event subscription: %w", err)
+	}
+	if event == nil {
+		return nil
+	}
+	if err := ev.DeleteEventSubscription(uri); err != nil {
 		return fmt.Errorf("failed to delete event subscription: %w", err)
 	}
 	return nil

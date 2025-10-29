@@ -11,39 +11,28 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-func SubscribeMetricsReport(ctx context.Context, vendor, hostname string, bmcClient bmc.BMC) error {
-	if err := bmcClient.CreateEventSubscription(
+func SubscribeMetricsReport(ctx context.Context, url, vendor, hostname string, bmcClient bmc.BMC) (string, error) {
+	link, err := bmcClient.CreateEventSubscription(
 		ctx,
-		fmt.Sprintf("https://localhost:8888/%s/%s/metrics", vendor, hostname),
+		fmt.Sprintf("%s/%s/%s/metrics", url, vendor, hostname),
 		redfish.MetricReportEventFormatType,
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
-	); err != nil {
-		return fmt.Errorf("failed to create event subscription: %w", err)
+	)
+	if err != nil {
+		return link, fmt.Errorf("failed to create event subscription: %w", err)
 	}
-	return nil
+	return link, nil
 }
 
-func UnsubscribeMetricsReport(ctx context.Context, vendor, hostname string, bmcClient bmc.BMC) error {
-	if err := bmcClient.DeleteEventSubscription(ctx, fmt.Sprintf("https://localhost:8888/%s/%s/metrics", vendor, hostname)); err != nil {
-		return fmt.Errorf("failed to delete event subscription: %w", err)
-	}
-	return nil
-}
-
-func SubscribeEvents(ctx context.Context, vendor, hostname string, bmcClient bmc.BMC) error {
-	if err := bmcClient.CreateEventSubscription(
+func SubscribeEvents(ctx context.Context, url, vendor, hostname string, bmcClient bmc.BMC) (string, error) {
+	link, err := bmcClient.CreateEventSubscription(
 		ctx,
-		fmt.Sprintf("https://localhost:8888/%s/%s/alerts", vendor, hostname),
+		fmt.Sprintf("%s/%s/%s/alerts", url, vendor, hostname),
 		redfish.EventEventFormatType,
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
-	); err != nil {
-		return fmt.Errorf("failed to create alert subscription: %w", err)
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create alert subscription: %w", err)
 	}
-	return nil
-}
-func UnsubscribeEvents(ctx context.Context, vendor, hostname string, bmcClient bmc.BMC) error {
-	if err := bmcClient.DeleteEventSubscription(ctx, fmt.Sprintf("https://localhost:8888/%s/%s/alerts", vendor, hostname)); err != nil {
-		return fmt.Errorf("failed to delete alert subscription: %w", err)
-	}
-	return nil
+	return link, nil
 }

@@ -216,6 +216,14 @@ type ServerStatus struct {
 	// +optional
 	State ServerState `json:"state,omitempty"`
 
+	// MetricsReportSubscriptionLink is the link to the metrics report subscription for the server.
+	// +optional
+	MetricsReportSubscriptionLink string `json:"metricsReportSubscriptionLink,omitempty"`
+
+	// EventsSubscriptionLink is the link to the events subscription for the server.
+	// +optional
+	EventsSubscriptionLink string `json:"eventsSubscriptionLink,omitempty"`
+
 	// NetworkInterfaces is a list of network interfaces associated with the server.
 	// +optional
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`

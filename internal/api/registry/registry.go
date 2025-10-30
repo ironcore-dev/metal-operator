@@ -3,8 +3,8 @@
 
 package registry
 
-// OSBootedCondition is the condition type for indicating a server has booted.
-const OSBootedCondition = "OSBooted"
+// BootStateReceivedCondition is the condition type for indicating a server has booted.
+const BootStateReceivedCondition = "BootStateReceived"
 
 // RegistrationPayload represents the payload to send to the `/register` endpoint,
 // including the systemUUID and the server details.

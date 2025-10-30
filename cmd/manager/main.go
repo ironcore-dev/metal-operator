@@ -515,9 +515,13 @@ func main() { // nolint: gocyclo
 	}
 
 	ctx := ctrl.SetupSignalHandler()
+	if err := controller.RegisterIndexFields(ctx, mgr.GetFieldIndexer()); err != nil {
+		setupLog.Error(err, "unable to register field indexers")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting registry server", "RegistryURL", registryURL)
-	registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort))
+	registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort), mgr.GetClient())
 	go func() {
 		if err := registryServer.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running registry server")

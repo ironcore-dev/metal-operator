@@ -157,9 +157,9 @@ func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
 		original := server.DeepCopy()
 		err := acc.UpdateSlice(
 			&server.Status.Conditions,
-			registry.OSBootedCondition,
+			registry.BootStateReceivedCondition,
 			conditionutils.UpdateStatus(metav1.ConditionTrue),
-			conditionutils.UpdateReason("BootStatePosted"),
+			conditionutils.UpdateReason("BootStateReceived"),
 			conditionutils.UpdateMessage("Server successfully posted boot state"),
 			conditionutils.UpdateObserved(&server),
 		)

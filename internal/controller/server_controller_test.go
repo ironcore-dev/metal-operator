@@ -698,7 +698,7 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
 	})
 
-	It("Should updated the OSBooted condition when the bootstate endpoint is called", func(ctx SpecContext) {
+	It("Should updated the BootStateReceived condition when the bootstate endpoint is called", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -743,6 +743,6 @@ var _ = Describe("Server Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.Body.Close()).To(Succeed())
 		Expect(response.StatusCode).To(Equal(http.StatusOK))
-		Eventually(Object(server)).Should(HaveField("Status.Conditions", ContainElement(HaveField("Type", registry.OSBootedCondition))))
+		Eventually(Object(server)).Should(HaveField("Status.Conditions", ContainElement(HaveField("Type", registry.BootStateReceivedCondition))))
 	})
 })

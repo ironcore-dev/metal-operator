@@ -66,10 +66,9 @@ type BMCSettingsStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.bmcSettings.version`
+// +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="BMCRef",type=string,JSONPath=`.spec.BMCRef.name`
-// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 
 // BMCSettings is the Schema for the BMCSettings API.
 type BMCSettings struct {

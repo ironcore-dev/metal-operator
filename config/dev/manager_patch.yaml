@@ -8,16 +8,6 @@ spec:
     spec:
       containers:
       - name: manager
-        args:
-          - --health-probe-bind-address=:8081
-          - --metrics-bind-address=127.0.0.1:8080
-          - --leader-elect
-          - --mac-prefixes-file=/etc/macdb/macdb.yaml
-          - --probe-image=ghcr.io/ironcore-dev/metalprobe:latest
-          - --probe-os-image=ghcr.io/ironcore-dev/os-images/gardenlinux:1443.10
-          - --registry-url=http://127.0.0.1:30000
-          - --registry-port=30000
-          - --enforce-first-boot
         ports:
         - containerPort: 30000
         volumeMounts:

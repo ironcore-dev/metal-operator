@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bmcsettings.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -21,7 +21,7 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.bmcSettings.version
+    - jsonPath: .spec.version
       name: BMCVersion
       type: string
     - jsonPath: .status.state
@@ -29,9 +29,6 @@ spec:
       type: string
     - jsonPath: .spec.BMCRef.name
       name: BMCRef
-      type: string
-    - jsonPath: .spec.serverRef.name
-      name: ServerRef
       type: string
     name: v1alpha1
     schema:

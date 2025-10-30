@@ -22,5 +22,5 @@ jobs:
 
       - name: Running Tests
         run: |
-          go mod tidy
-          make test
+          sudo --preserve-env=GOROOT,GOPATH,PATH go mod tidy
+          sudo --preserve-env=GOROOT,GOPATH,PATH make test

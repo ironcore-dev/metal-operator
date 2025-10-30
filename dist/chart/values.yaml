@@ -44,6 +44,10 @@ controllerManager:
   serviceAccountName: metal-operator-controller-manager
   hostNetwork: true
 
+registry:
+  enabled: false
+  port: 30000
+
 # [RBAC]: To enable RBAC (Permissions) configurations
 rbac:
   enable: true

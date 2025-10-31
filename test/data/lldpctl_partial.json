@@ -1,0 +1,21 @@
+{
+  "lldp": {
+    "interface": [
+      {
+        "eth0": {
+          "via": "LLDP",
+          "rid": "1",
+          "age": "0 day, 00:00:05",
+          "chassis": {
+            "neighbor1": {
+              "id": {
+                "type": "mac",
+                "value": "xx:xx:xx:xx:xx:xx"
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

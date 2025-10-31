@@ -9,9 +9,18 @@ on:
 
 jobs:
   test:
-    name: Run on Ubuntu
+    name: Run tests on Ubuntu
     runs-on: ubuntu-latest
     steps:
+      - name: Install lldpd
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lldpd
+
+      - name: Start lldpd
+        run: |
+          sudo systemctl start lldpd
+
       - name: Clone the code
         uses: actions/checkout@v5
 

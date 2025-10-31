@@ -23,6 +23,7 @@ path = [
     "package.json",
     "package-lock.json",
     "internal/cmd/visualizer/index.html",
+    "test/data/*.json"
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2024 SAP SE or an SAP affiliate company and IronCore contributors"

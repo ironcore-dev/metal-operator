@@ -1,0 +1,144 @@
+{
+    "lldp": {
+        "interface": {
+            "ens3f0np0": {
+                "via": "LLDP",
+                "rid": "1",
+                "age": "0 day, 00:28:48",
+                "chassis": {
+                    "chassis1": {
+                        "id": {
+                            "type": "mac",
+                                "value": "xx:xx:xx:xx:xx:xx"
+                        },
+                        "descr": "REDACTED",
+                        "mgmt-ip": "REDACTED_IP",
+                        "mgmt-iface": "83886080",
+                        "capability": [
+                            {
+                                "type": "Bridge",
+                                "enabled": true
+                            },
+                            {
+                                "type": "Router",
+                                "enabled": true
+                            }
+                        ]
+                    }
+                },
+                "port": {
+                    "id": {
+                        "type": "local",
+                        "value": "Eth1/17"
+                    },
+                    "descr": "REDACTED",
+                    "ttl": "120"
+                },
+                "vlan": {
+                    "vlan-id": "1963",
+                    "pvid": true
+                },
+                "unknown-tlvs": {
+                    "unknown-tlv": [
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "1",
+                            "len": "1",
+                            "value": "01"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "209",
+                            "len": "1",
+                            "value": "04"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "216",
+                            "len": "2",
+                            "value": "00,00"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "201",
+                            "len": "1",
+                            "value": "01"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "214",
+                            "len": "14",
+                            "value": "REDACTED"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "212",
+                            "len": "11",
+                            "value": "REDACTED"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "202",
+                            "len": "1",
+                            "value": "01"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "210",
+                            "len": "14",
+                            "value": "REDACTED"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "211",
+                            "len": "2",
+                            "value": "0F,7F"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "215",
+                            "len": "22",
+                            "value": "REDACTED"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "206",
+                            "len": "11",
+                            "value": "REDACTED"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "208",
+                            "len": "4",
+                            "value": "0A,30,28,40"
+                        },
+                        {
+                            "oui": "REDACTED_OUI",
+                            "subtype": "203",
+                            "len": "4",
+                            "value": "00,00,08,43"
+                        },
+                        {
+                            "oui": "00,01,42",
+                            "subtype": "205",
+                            "len": "2",
+                            "value": "00,01"
+                        },
+                        {
+                            "oui": "00,01,42",
+                            "subtype": "221",
+                            "len": "32",
+                            "value": "REDACTED"
+                        },
+                        {
+                            "oui": "00,01,42",
+                            "subtype": "207",
+                            "len": "123",
+                            "value": "REDACTED"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

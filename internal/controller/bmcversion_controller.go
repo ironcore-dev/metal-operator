@@ -219,6 +219,10 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmc, r.Insecure, r.BMCOptions)
 	if err != nil {
+		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
+			log.V(1).Info("BMC is not available, skipping", "BMC", bmc.Name, "error", err)
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
 		log.V(1).Error(err, "failed to create BMC client", "BMC", bmc.Name)
 		return ctrl.Result{}, err
 	}

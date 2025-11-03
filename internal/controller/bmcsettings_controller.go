@@ -268,6 +268,10 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 ) (ctrl.Result, error) {
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, BMC, r.Insecure, r.BMCOptions)
 	if err != nil {
+		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
+			log.V(1).Info("BMC is not available, skipping", "BMC", BMC.Name, "error", err)
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()

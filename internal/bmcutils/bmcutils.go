@@ -21,6 +21,14 @@ const (
 	BmcSecretPasswordKey = "password"
 )
 
+type BMCUnAvailableError struct {
+	Message string
+}
+
+func (e BMCUnAvailableError) Error() string {
+	return e.Message
+}
+
 func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {
 	if scheme != "" {
 		return scheme
@@ -151,7 +159,14 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
 
-	return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	var bmcConnectionNotAvailable error
+	if bmcObj.Status.State != metalv1alpha1.BMCStateEnabled && bmcObj.Status.State != "" {
+		bmcConnectionNotAvailable = BMCUnAvailableError{Message: fmt.Sprintf("BMC %s is not in enabled state: current state: %s", bmcObj.Name, bmcObj.Status.State)}
+	}
+	// still try to connect and get the latest error.
+	// This is used to auto reset BMC through BMC Resource controller.
+	BMC, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	return BMC, errors.Join(err, bmcConnectionNotAvailable)
 }
 
 func CreateBMCClient(

@@ -84,6 +84,7 @@ func main() { // nolint: gocyclo
 		biosSettingsApplyTimeout           time.Duration
 		bmcFailureResetDelay               time.Duration
 		bmcResetResyncInterval             time.Duration
+		bmcResetWaitingInterval            time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 	)
@@ -106,7 +107,9 @@ func main() { // nolint: gocyclo
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
 		"Reset the BMC after this duration of consecutive failures. 0 to disable.")
 	flag.DurationVar(&bmcResetResyncInterval, "bmc-reset-resync-interval", 2*time.Minute,
-		"Defines the interval at which the bmc is polled/skipped reconcile when bmc has been reset.")
+		"Defines the interval at which the bmc is polled when bmc reset is in-progress.")
+	flag.DurationVar(&bmcResetWaitingInterval, "bmc-reset-waiting-interval", 2*time.Minute,
+		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
@@ -316,12 +319,13 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
-		Client:               mgr.GetClient(),
-		Scheme:               mgr.GetScheme(),
-		Insecure:             insecure,
-		BMCFailureResetDelay: bmcFailureResetDelay,
-		BMCResetWaitTime:     bmcResetResyncInterval,
-		ManagerNamespace:     managerNamespace,
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		Insecure:               insecure,
+		BMCFailureResetDelay:   bmcFailureResetDelay,
+		BMCResetWaitTime:       bmcResetWaitingInterval,
+		BMCClientRetryInterval: bmcResetResyncInterval,
+		ManagerNamespace:       managerNamespace,
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},

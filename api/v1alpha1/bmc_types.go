@@ -224,6 +224,9 @@ const (
 
 	// BMCStateError indicates that there is an error with the BMC.
 	BMCStateError BMCState = "Error"
+
+	// BMCStatePending indicates that there is an error connecting with the BMC.
+	BMCStatePending BMCState = "PendingBMCConnection"
 )
 
 // +kubebuilder:object:root=true

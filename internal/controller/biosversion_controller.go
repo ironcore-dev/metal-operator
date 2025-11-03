@@ -190,6 +190,10 @@ func (r *BIOSVersionReconciler) ensureBiosVersionStateTransition(
 
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
+		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
+			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "server", server.Name, "error", err)
+			return true, nil
+		}
 		return false, fmt.Errorf("failed to get BMC client for server: %w", err)
 	}
 	defer bmcClient.Logout()

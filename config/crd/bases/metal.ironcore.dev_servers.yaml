@@ -200,7 +200,9 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               bootOrder:
-                description: BootOrder specifies the boot order of the server.
+                description: |-
+                  BootOrder specifies the boot order of the server.
+                  Deprecated: currently not supported.
                 items:
                   description: BootOrder represents the boot order of the server.
                   properties:

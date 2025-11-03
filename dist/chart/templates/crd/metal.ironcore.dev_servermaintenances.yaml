@@ -72,6 +72,20 @@ spec:
                 description: ServerBootConfigurationTemplate specifies the boot configuration
                   to be applied to the server during maintenance.
                 properties:
+                  bootType:
+                    default: Persistent
+                    description: |-
+                      BootType specifies the type of boot configuration.
+                      It can be either "OneOff" or "Persistent". If not specified, it defaults to "Persistent".
+                      "Persistent" will set the configuration reboot the server before setting the server to the desired power state mentioned in spec.
+
+                      "OneOff" will set the configuration to boot once. next boot-up will boot into default boot order.
+                      if power state mentioned in spec is "PowerOn", server will be powered on and will boot into the configuration.
+                      if power state is "PowerOff", server will be powered off and will boot into the configuration on next power on.
+                    enum:
+                    - OneOff
+                    - Persistent
+                    type: string
                   name:
                     description: Name specifies the name of the boot configuration.
                     type: string
@@ -147,6 +161,23 @@ spec:
           status:
             description: ServerMaintenanceStatus defines the observed state of a ServerMaintenance
             properties:
+              bootOrderStatus:
+                description: |-
+                  BootOrderStatus specifies the boot order of the server before maintenance.
+                  is used to store the boot order of server before it is changed for maintenance.
+                  used only with BootType Persistent.
+                properties:
+                  defaultBootOrder:
+                    description: DefaultBootOrder specifies the default boot order
+                      of the server before maintenance.
+                    items:
+                      type: string
+                    type: array
+                  state:
+                    description: ServerMaintenanceState specifies the current state
+                      of the server maintenance.
+                    type: string
+                type: object
               state:
                 description: State specifies the current state of the server maintenance.
                 type: string

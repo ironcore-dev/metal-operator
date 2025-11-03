@@ -203,6 +203,7 @@ var _ = Describe("BMCVersion Controller", func() {
 			}),
 		))
 
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
 		ensureBMCVersionConditionTransisition(ctx, acc, bmcVersion)
 
 		By("Ensuring that BMC upgrade has completed")
@@ -306,6 +307,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			}),
 		))
 
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
+
 		ensureBMCVersionConditionTransisition(ctx, acc, bmcVersion)
 
 		By("Ensuring that BMC upgrade has completed")
@@ -363,6 +366,17 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateInProgress),
 		)
+		By("Ensuring that the Maintenance resource has been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", HaveLen(1)))
+
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      serverMaintenanceList.Items[0].Name,
+			},
+		}
+		MarkBootConfigReady(ctx, k8sClient, serverMaintenance.Name, serverMaintenance.Namespace)
 
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),

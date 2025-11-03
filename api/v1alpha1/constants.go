@@ -24,6 +24,9 @@ const (
 	OperationAnnotationForceUpdateOrDeleteInProgress = "ForceUpdateOrDeleteInProgress"
 	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
 	OperationAnnotationForceUpdateInProgress = "ForceUpdateInProgress"
+
+	// SkipBootConfiguration skips the boot configuration if set to this value.
+	SkipBootConfiguration = "skip-boot-configuration-enforement"
 	// OperationAnnotationForceReset forces a reset before next operation
 	OperationAnnotationForceReset = "ForceReset"
 )

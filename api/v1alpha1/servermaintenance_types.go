@@ -23,10 +23,32 @@ type ServerBootConfigurationTemplate struct {
 	// +required
 	Name string `json:"name"`
 
+	// BootType specifies the type of boot configuration.
+	// It can be either "OneOff" or "Persistent". If not specified, it defaults to "Persistent".
+	// "Persistent" will set the configuration reboot the server before setting the server to the desired power state mentioned in spec.
+	//
+	// "OneOff" will set the configuration to boot once. next boot-up will boot into default boot order.
+	// if power state mentioned in spec is "PowerOn", server will be powered on and will boot into the configuration.
+	// if power state is "PowerOff", server will be powered off and will boot into the configuration on next power on.
+	//
+	// +kubebuilder:validation:Enum=OneOff;Persistent
+	// +optional
+	// +kubebuilder:default=Persistent
+	BootType BootType `json:"bootType,omitempty"`
+
 	// Parameters specify the parameters to be used for rendering the boot configuration.
 	// +required
 	Spec ServerBootConfigurationSpec `json:"spec"`
 }
+
+type BootType string
+
+const (
+	// BootTypeOneOff indicates that the server should boot into this configuration one time.
+	BootTypeOneOff BootType = "OneOff"
+	// BootTypePersistent indicates that the server should boot into this configuration continuously.
+	BootTypePersistent BootType = "Persistent"
+)
 
 // ServerMaintenanceSpec defines the desired state of a ServerMaintenance
 type ServerMaintenanceSpec struct {
@@ -61,7 +83,45 @@ const (
 type ServerMaintenanceStatus struct {
 	// State specifies the current state of the server maintenance.
 	State ServerMaintenanceState `json:"state,omitempty"`
+
+	// BootOrderStatus specifies the boot order of the server before maintenance.
+	// is used to store the boot order of server before it is changed for maintenance.
+	// used only with BootType Persistent.
+	// +optional
+	BootOrderStatus *ServerMaintenanceBootOrder `json:"bootOrderStatus,omitempty"`
 }
+
+type ServerMaintenanceBootOrder struct {
+	// DefaultBootOrder specifies the default boot order of the server before maintenance.
+	// +optional
+	DefaultBootOrder []string `json:"defaultBootOrder,omitempty"`
+
+	State ServerMaintenanceBootOrderState `json:"state,omitempty"`
+}
+
+// ServerMaintenanceState specifies the current state of the server maintenance.
+type ServerMaintenanceBootOrderState string
+
+const (
+
+	// BootOrderConfigNoOp specifies that the server bootOrder is as expected.
+	BootOrderConfigNoOp ServerMaintenanceBootOrderState = "NoOp"
+
+	// BootOrderConfigInProgress specifies that the server bootOrder configuration is InProgress.
+	BootOrderConfigInProgress ServerMaintenanceBootOrderState = "InProgress"
+
+	// BootOrderConfigSuccess specifies that the server bootOrder configuration is Completed.
+	BootOrderConfigSuccess ServerMaintenanceBootOrderState = "Completed"
+
+	// BootOrderConfigSuccessRevertInProgress specifies that the server bootOrder revert to default is InProgress.
+	BootOrderConfigSuccessRevertInProgress ServerMaintenanceBootOrderState = "RevertInProgress"
+
+	// BootOrderConfigRevertSuccess specifies that the server bootOrder configuration is Completed.
+	BootOrderConfigRevertSuccess ServerMaintenanceBootOrderState = "RevertCompleted"
+
+	// BootOrderOneOffPxeBootSuccess specifies that the server bootOrder configuration is set to boot pxe once.
+	BootOrderOneOffPxeBootSuccess ServerMaintenanceBootOrderState = "PxeOneOffBootSuccess"
+)
 
 // ServerMaintenanceState specifies the current state of the server maintenance.
 type ServerMaintenanceState string
@@ -71,6 +131,8 @@ const (
 	ServerMaintenanceStatePending ServerMaintenanceState = "Pending"
 	// ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
+	// ServerMaintenanceStatePreparing specifies that the server is in maintenance.
+	ServerMaintenanceStatePreparing ServerMaintenanceState = "Preparing"
 	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
 	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
 )

@@ -302,7 +302,18 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
-			bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+
+			if bmcVersionTemplate.ServerMaintenanceRefs != nil &&
+				len(bmcVersion.Spec.ServerMaintenanceRefs) == len(bmcVersionTemplate.ServerMaintenanceRefs) {
+				// find a better solution to handle corner cases
+				// like the spec provided is equal length but has wrong value.
+				// this will make bmcVersion create new serverMaintenance and hence this patch will be wrong
+				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+			} else {
+				serverMaintenanceRefs := bmcVersion.Spec.ServerMaintenanceRefs
+				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+				bmcVersion.Spec.ServerMaintenanceRefs = serverMaintenanceRefs
+			}
 			return nil
 		}) //nolint:errcheck
 		if err != nil {

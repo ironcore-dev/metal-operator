@@ -189,6 +189,8 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		}
 	}
 
+	r.BMCOptions.BMCName = server.Name
+
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)

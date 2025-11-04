@@ -42,6 +42,7 @@ type Options struct {
 	Username  string
 	Password  string
 	BasicAuth bool
+	BMCName   string // Name of the BMC resource for identification
 
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
@@ -67,12 +68,20 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(ctx context.Context, options Options) (*RedfishBMC, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Creating BMC client", "bmcName", options.BMCName, "endpoint", options.Endpoint)
+
 	clientConfig := gofish.ClientConfig{
 		Endpoint:  options.Endpoint,
 		Username:  options.Username,
 		Password:  options.Password,
 		Insecure:  true,
 		BasicAuth: options.BasicAuth,
+		HTTPClient: &http.Client{
+			Transport: roundTripperWithHeaders(ctx, http.DefaultTransport, map[string]string{
+				"X-BMC-Name": options.BMCName,
+			}),
+		},
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
@@ -94,6 +103,36 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (*RedfishBMC, err
 	bmc.options = options
 
 	return bmc, nil
+}
+
+func roundTripperWithHeaders(ctx context.Context, rt http.RoundTripper, headers map[string]string) http.RoundTripper {
+	return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		log := ctrl.LoggerFrom(ctx)
+
+		// Log the request details with special marking for Systems collection
+		isSystemsCollection := strings.HasSuffix(req.URL.Path, "/Systems") || strings.Contains(req.URL.Path, "/Systems/")
+		log.V(1).Info("Making Redfish request", "method", req.Method, "url", req.URL.String(), "isSystemsCollection", isSystemsCollection)
+
+		// Add custom headers
+		for k, v := range headers {
+			req.Header.Set(k, v)
+			log.V(1).Info("Added request header", "name", k, "value", v)
+		}
+
+		// Log all headers being sent for debugging
+		headerMap := make(map[string][]string)
+		for name, values := range req.Header {
+			headerMap[name] = values
+		}
+
+		return rt.RoundTrip(req)
+	})
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 // Logout closes the BMC client connection by logging out

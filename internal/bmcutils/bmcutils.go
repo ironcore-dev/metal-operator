@@ -151,6 +151,9 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
 
+	// Set the BMC name for identification
+	options.BMCName = bmcObj.Name
+
 	return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
 }
 

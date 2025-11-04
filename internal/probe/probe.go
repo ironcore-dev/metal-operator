@@ -55,8 +55,10 @@ func (a *Agent) Init(ctx context.Context) error {
 
 	LLDPInfo, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
 	if err != nil {
+		a.log.Error(err, "failed to collect LLDP info")
 		return err
 	}
+	a.log.Info("Collected LLDP info", "interfaces", len(LLDPInfo.Interfaces))
 
 	blockDevices, err := collectStorageInfoData()
 	if err != nil {
@@ -98,6 +100,7 @@ func (a *Agent) Start(ctx context.Context) error {
 
 	// Ensure the Agent is initialized.
 	if a.Server == nil {
+		a.log.Info("Initializing probe agent...")
 		if err := a.Init(ctx); err != nil {
 			a.log.Error(err, "failed to initialize agent")
 			return err
@@ -118,13 +121,43 @@ func (a *Agent) Start(ctx context.Context) error {
 			a.log.Info("Probe agent stopped.")
 			return nil
 		case <-ticker.C:
-			a.log.Info("Registering server ...")
+			// Only refresh LLDP info on subsequent runs, rest is static
+			if a.Server == nil {
+				a.log.Info("Server uninitialized; initializing probe agent...")
+				if err := a.Init(ctx); err != nil {
+					a.log.Error(err, "failed to initialize agent on tick")
+					// don't stop the agent on transient errors; continue to next tick
+					continue
+				}
+			} else {
+				a.log.Info("Refreshing LLDP info...")
+				if err := a.RefreshLLDP(ctx); err != nil {
+					a.log.Error(err, "failed to refresh LLDP info; continuing with previous data")
+				}
+			}
+			a.log.Info("Re-registering Server...")
 			if err := a.registerServer(ctx); err != nil {
-				a.log.Error(err, "failed to register server")
+				a.log.Error(err, "failed to re-register server")
 			}
 			a.log.Info("Server registered", "uuid", a.SystemUUID)
 		}
 	}
+}
+
+// RefreshLLDP updates only the LLDP portion of the Agent's Server data.
+// If LLDP collection fails, the previous LLDP data is retained.
+func (a *Agent) RefreshLLDP(ctx context.Context) error {
+	if a == nil || a.Server == nil {
+		return nil
+	}
+	lldp, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
+	if err != nil {
+		a.log.Error(err, "collectLLDPInfo failed")
+		return err
+	}
+	a.Server.LLDP = lldp.Interfaces
+	a.log.Info("Refreshed LLDP info", "interfaces", len(a.Server.LLDP))
+	return nil
 }
 
 // registerServer handles the server registration with exponential backoff on failure.

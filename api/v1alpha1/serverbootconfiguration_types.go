@@ -42,6 +42,12 @@ type ServerBootConfigurationStatus struct {
 	// State represents the current state of the boot configuration.
 	// +optional
 	State ServerBootConfigurationState `json:"state,omitempty"`
+
+	// Conditions represents the latest available observations of the ServerBootConfig's current state.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 //+kubebuilder:object:root=true

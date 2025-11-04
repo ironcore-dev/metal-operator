@@ -6,6 +6,7 @@
 *.so
 *.dylib
 bin/*
+dev/*
 Dockerfile.cross
 .DS_Store
 

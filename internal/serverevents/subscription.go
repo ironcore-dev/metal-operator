@@ -11,10 +11,10 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-func SubscribeMetricsReport(ctx context.Context, url, vendor, hostname string, bmcClient bmc.BMC) (string, error) {
+func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
-		fmt.Sprintf("%s/%s/%s/metrics", url, vendor, hostname),
+		fmt.Sprintf("%s/%s/metrics", url, hostname),
 		redfish.MetricReportEventFormatType,
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
 	)
@@ -24,10 +24,10 @@ func SubscribeMetricsReport(ctx context.Context, url, vendor, hostname string, b
 	return link, nil
 }
 
-func SubscribeEvents(ctx context.Context, url, vendor, hostname string, bmcClient bmc.BMC) (string, error) {
+func SubscribeEvents(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
-		fmt.Sprintf("%s/%s/%s/alerts", url, vendor, hostname),
+		fmt.Sprintf("%s/%s/alerts", url, hostname),
 		redfish.EventEventFormatType,
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
 	)

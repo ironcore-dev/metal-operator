@@ -442,20 +442,12 @@ spec:
                   - type
                   type: object
                 type: array
-              eventsSubscriptionLink:
-                description: EventsSubscriptionLink is the link to the events subscription
-                  for the server.
-                type: string
               indicatorLED:
                 description: IndicatorLED specifies the current state of the server's
                   indicator LED.
                 type: string
               manufacturer:
                 description: Manufacturer is the name of the server manufacturer.
-                type: string
-              metricsReportSubscriptionLink:
-                description: MetricsReportSubscriptionLink is the link to the metrics
-                  report subscription for the server.
                 type: string
               model:
                 description: Model is the model of the server.

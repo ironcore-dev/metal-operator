@@ -130,16 +130,16 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 				},
 				[]string{"hostname", "vendor"},
 			)
-			floatVal, err := strconv.ParseFloat(mv.MetricValue, 64)
-			if err != nil {
-				if mv.MetricValue == "Up" || mv.MetricValue == "Operational" {
-					floatVal = 1
-				}
-			}
-			gauge.WithLabelValues(hostname, vendor).Set(floatVal)
 			metricsReportCollectors[mv.MetricId] = gauge
 			metrics.Registry.MustRegister(gauge)
 		}
+		floatVal, err := strconv.ParseFloat(mv.MetricValue, 64)
+		if err != nil {
+			if mv.MetricValue == "Up" || mv.MetricValue == "Operational" {
+				floatVal = 1
+			}
+		}
+		metricsReportCollectors[mv.MetricId].WithLabelValues(hostname, vendor).Set(floatVal)
 		s.log.Info("Metric", "id", mv.MetricId, "property", mv.MetricProperty, "value", mv.MetricValue, "timestamp", mv.Timestamp)
 	}
 	w.WriteHeader(http.StatusOK)

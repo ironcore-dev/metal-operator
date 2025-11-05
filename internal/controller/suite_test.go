@@ -13,6 +13,8 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
@@ -160,6 +162,7 @@ var _ = BeforeSuite(func() {
 		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
 	}()
 
+	log.SetLogger(GinkgoLogr)
 	bmc.InitMockUp()
 })
 
@@ -225,6 +228,7 @@ func SetupTest() *corev1.Namespace {
 		Expect((&BMCReconciler{
 			Client:           k8sManager.GetClient(),
 			Scheme:           k8sManager.GetScheme(),
+			EventURL:         "http://localhost:8008",
 			Insecure:         true,
 			ManagerNamespace: ns.Name,
 		}).SetupWithManager(k8sManager)).To(Succeed())

@@ -24,6 +24,14 @@ var (
 	dataFS embed.FS
 )
 
+type Collection struct {
+	Members []Member `json:"Members"`
+}
+
+type Member struct {
+	OdataID string `json:"@odata.id"`
+}
+
 type MockServer struct {
 	log       logr.Logger
 	addr      string
@@ -56,6 +64,8 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 		s.handleRedfishPOST(w, r)
 	case http.MethodPatch:
 		s.handleRedfishPATCH(w, r)
+	case http.MethodDelete:
+		s.handleRedfishDelete(w, r)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
@@ -140,6 +150,47 @@ func resolvePath(urlPath string) string {
 	return path.Join("data", trimmed, "index.json")
 }
 
+func (s *MockServer) handleRedfishDelete(w http.ResponseWriter, r *http.Request) {
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+
+	urlPath := resolvePath(r.URL.Path)
+	s.mu.RLock()
+	defer s.mu.Unlock()
+	_, hasOverride := s.overrides[urlPath]
+	if hasOverride {
+		// remove the resource
+		delete(s.overrides, urlPath)
+	}
+	// get collection of the resource
+	collectionPath := path.Dir(urlPath)
+	cached, hasOverride := s.overrides[collectionPath]
+	var collection Collection
+	if hasOverride {
+		collection = cached.(Collection)
+	} else {
+		data, err := dataFS.ReadFile(collectionPath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.Unmarshal(data, &collection); err != nil {
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
+	}
+	// remove member from collection
+	newMembers := make([]Member, 0)
+	for _, member := range collection.Members {
+		if member.OdataID != r.URL.Path {
+			newMembers = append(newMembers, member)
+		}
+	}
+	s.log.Info("Removing member from collection", "members", newMembers, "collection", collectionPath)
+	collection.Members = newMembers
+	s.overrides[collectionPath] = collection
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
 	urlPath := resolvePath(r.URL.Path)
 
@@ -186,7 +237,6 @@ func mergeJSON(base, update map[string]interface{}) {
 
 func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -199,8 +249,62 @@ func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 		}
 	}(r.Body)
 
-	s.log.Info("POST body received", "body", string(body))
+	var update map[string]any
+	if err := json.Unmarshal(body, &update); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
 
+	s.log.Info("POST body received", "body", string(body))
+	urlPath := resolvePath(r.URL.Path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cached, hasOverride := s.overrides[urlPath]
+	var base Collection
+	if hasOverride {
+		s.log.Info("Using overridden data for POST", "path", urlPath)
+		base = cached.(Collection)
+	} else {
+		s.log.Info("Using embedded data for POST", "path", urlPath)
+		data, err := dataFS.ReadFile(urlPath)
+		if err != nil {
+			s.log.Error(err, "Failed to read embedded data for POST", "path", urlPath)
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.Unmarshal(data, &base); err != nil {
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
+	}
+	// If resource collection (has "Members"), add a new member
+	if len(base.Members) > 0 {
+		newID := fmt.Sprintf("%d", len(base.Members)+1)
+		location := path.Join(r.URL.Path, newID)
+		newMemberPath := resolvePath(location)
+		base.Members = append(base.Members, Member{
+			OdataID: location,
+		})
+		s.log.Info("Adding new member", "id", newID, "location", location, "memberPath", newMemberPath)
+		if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
+			w.Header().Set("Location", location)
+		}
+		s.overrides[urlPath] = base
+		s.overrides[newMemberPath] = update
+	} else {
+		base.Members = make([]Member, 0)
+		location := r.URL.JoinPath("1").String()
+		base.Members = []Member{
+			{
+				OdataID: r.URL.JoinPath("1").String(),
+			},
+		}
+		s.overrides[urlPath] = base
+		if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
+			w.Header().Set("Location", location)
+		}
+	}
+	s.log.Info("Storing updated data for POST", "path", urlPath, "data", update)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(`{"status": "created"}`))

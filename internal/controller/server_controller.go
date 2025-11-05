@@ -189,7 +189,13 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		}
 	}
 
-	r.BMCOptions.BMCName = server.Name
+	// Set BMC name for header identification - use the referenced BMC name, not the server name
+	if server.Spec.BMCRef != nil {
+		r.BMCOptions.BMCName = server.Spec.BMCRef.Name
+	} else {
+		// Fallback to server name if no BMC reference
+		r.BMCOptions.BMCName = server.Name
+	}
 
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {

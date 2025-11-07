@@ -26,7 +26,7 @@ var (
 
 func TestRegistry(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Registry Suite")
+	RunSpecs(t, "Probe Suite")
 }
 
 var _ = BeforeSuite(func() {

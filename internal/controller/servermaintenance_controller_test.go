@@ -83,14 +83,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},
@@ -121,14 +123,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},
@@ -157,12 +161,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance.Name),
 			HaveField("Spec.MaintenanceBootConfigurationRef", Not(BeNil())),
 		))
-		bootConfig := &metalv1alpha1.ServerBootConfiguration{}
-
-		Eventually(k8sClient.Get).WithArguments(ctx, types.NamespacedName{
-			Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
-			Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
-		}, bootConfig).Should(Succeed())
+		bootConfig := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
+				Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
+			},
+		}
+		Eventually(Object(bootConfig)).Should(SatisfyAll(
+			HaveField("Spec.ServerRef.Name", server.Name),
+			HaveField("Spec.Image", "some_image"),
+		))
 
 		By("Patching the boot configuration to a Ready state")
 		Eventually(UpdateStatus(bootConfig, func() {
@@ -209,14 +217,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},
@@ -230,14 +240,16 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
-				ServerRef:   &v1.LocalObjectReference{Name: server.Name},
-				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
-				ServerPower: metalv1alpha1.PowerOff,
-				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
-					Name: "test-boot",
-					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: v1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server.Name},
+							Image:     "some_image",
+						},
 					},
 				},
 			},
@@ -280,13 +292,21 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Deleting first ServerMaintenance to finish the maintenance on the server")
 		Eventually(k8sClient.Delete).WithArguments(ctx, serverMaintenance01).Should(Succeed())
 
+		By("Checking the second ServerMaintenance is now in maintenance")
 		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
 		))
 
-		By("Checking the second ServerMaintenance is now in maintenance")
-		Eventually(Object(serverMaintenance02)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		By("Setting the maintenance to completed")
+		Eventually(UpdateStatus(serverMaintenance02, func() {
+			serverMaintenance02.Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
+		})).Should(Succeed())
+
+		By("Checking the Server is not in maintenance and cleaned up")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+			HaveField("Spec.MaintenanceBootConfigurationRef", BeNil()),
 		))
 	})
 })

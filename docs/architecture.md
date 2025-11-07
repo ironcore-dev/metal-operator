@@ -83,6 +83,7 @@ flowchart LR
 - [**BIOSVersionSet**](concepts/biosversionset.md): Handles creation of multiple `BIOSVersion` by selecting physical server's through labels.
 - [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
+- [**ServerMaintenanceSet**](concepts/servermaintenanceset.md): Manages a set of ServerMaintenances.
 - [**BMCVersionSet**](concepts/bmcversionset.md): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.
 
 ### 2. Controllers

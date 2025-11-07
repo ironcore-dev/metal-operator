@@ -127,13 +127,13 @@ func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
-		log.Printf("Received method: %s, but only POST allowed", r.Method)
+		s.log.Info("Received unsupported HTTP method", "method", r.Method)
 		return
 	}
 	var bootstate registry.BootstatePayload
 	if err := json.NewDecoder(r.Body).Decode(&bootstate); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf("Failed to decode bootstate payload: %v", err)
+		s.log.Error(err, "Failed to decode bootstate payload")
 		return
 	}
 	log.Printf("Received boot state for system UUID: %s, Booted: %t\n", bootstate.SystemUUID, bootstate.Booted)
@@ -144,25 +144,26 @@ func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
 	var servers metalv1alpha1.ServerList
 	if err := s.k8sClient.List(r.Context(), &servers, client.MatchingFields{"spec.systemUUID": bootstate.SystemUUID}); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to list servers for system UUID %s: %v", bootstate.SystemUUID, err), http.StatusInternalServerError)
-		log.Printf("Failed to list servers for system UUID %s: %v", bootstate.SystemUUID, err)
+		s.log.Error(err, "Failed to list servers for system", "systemUUID", bootstate.SystemUUID)
 		return
 	}
 	if len(servers.Items) != 1 {
 		http.Error(w, fmt.Sprintf("No servers found for system UUID %s", bootstate.SystemUUID), http.StatusNotFound)
-		log.Printf("No servers found for system UUID: %s", bootstate.SystemUUID)
+		s.log.Info("Found unexpected number of server of system", "systemUUID", bootstate.SystemUUID, "count", len(servers.Items))
 		return
 	}
-	bootConfigRef := servers.Items[0].Spec.BootConfigurationRef
+	server := servers.Items[0]
+	bootConfigRef := server.Spec.BootConfigurationRef
 	if bootConfigRef == nil {
-		http.Error(w, fmt.Sprintf("Servers for system UUID %s has no ServerBootConfig", bootstate.SystemUUID), http.StatusNotFound)
-		log.Printf("Servers for system UUID %s has no ServerBootConfig", bootstate.SystemUUID)
+		http.Error(w, fmt.Sprintf("Servers for system UUID %s does not reference a ServerBootConfiguration", bootstate.SystemUUID), http.StatusNotFound)
+		s.log.Info("Server does not reference a ServerBootConfiguration", "server", server.Name)
 		return
 	}
 	bootConfigKey := client.ObjectKey{Namespace: bootConfigRef.Namespace, Name: bootConfigRef.Name}
 	var bootConfig metalv1alpha1.ServerBootConfiguration
 	if err := s.k8sClient.Get(r.Context(), bootConfigKey, &bootConfig); err != nil {
 		http.Error(w, fmt.Sprintf("No ServerBootConfig found for system UUID %s", bootstate.SystemUUID), http.StatusNotFound)
-		log.Printf("No ServerBootConfig found for system UUID: %s", bootstate.SystemUUID)
+		s.log.Error(err, "Failed to retrieve ServerBootConfiguration", "name", bootConfigKey.Name, "namespace", bootConfig.Namespace)
 		return
 	}
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
@@ -177,15 +178,15 @@ func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to update booted condition for ServerBootConfig %s: %v", bootConfig.Name, err), http.StatusInternalServerError)
-		log.Printf("Failed to update booted condition for ServerBootConfig %s: %v", bootConfig.Name, err)
+		s.log.Error(err, "Failed to update booted condition for ServerBootConfig", "name", bootConfigKey.Name, "namespace", bootConfig.Namespace)
 		return
 	}
 	if err := s.k8sClient.Status().Patch(r.Context(), &bootConfig, client.MergeFrom(original)); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to update boot state for ServerBootConfig %s: %v", bootConfig.Name, err), http.StatusInternalServerError)
-		log.Printf("Failed to update boot state for ServerBootConfig %s: %v", bootConfig.Name, err)
+		s.log.Error(err, "Failed to update boot state for ServerBootConfig", "name", bootConfigKey.Name, "namespace", bootConfig.Namespace)
 		return
 	}
-	log.Printf("Updated boot state for ServerBootConfig %s: %t", bootConfig.Name, bootstate.Booted)
+	s.log.Info("Updated boot state for ServerBootConfig", "name", bootConfigKey.Name, "namespace", bootConfig.Namespace)
 	w.WriteHeader(http.StatusOK)
 }
 

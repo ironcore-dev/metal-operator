@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -28,6 +29,12 @@ type BMCUnAvailableError struct {
 func (e BMCUnAvailableError) Error() string {
 	return e.Message
 }
+
+type BMCClientOptions string
+
+const (
+	BMCConnectivityCheckOption BMCClientOptions = "BMCConnectivityCheck"
+)
 
 func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {
 	if scheme != "" {
@@ -137,7 +144,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
-func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.Options) (bmc.BMC, error) {
+func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.Options, opts ...BMCClientOptions) (bmc.BMC, error) {
 	var address string
 
 	if bmcObj.Spec.EndpointRef != nil {
@@ -159,14 +166,13 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
 
-	var bmcConnectionNotAvailable error
-	if bmcObj.Status.State != metalv1alpha1.BMCStateEnabled && bmcObj.Status.State != "" {
-		bmcConnectionNotAvailable = BMCUnAvailableError{Message: fmt.Sprintf("BMC %s is not in enabled state: current state: %s", bmcObj.Name, bmcObj.Status.State)}
+	if !slices.Contains(opts, BMCConnectivityCheckOption) {
+		if bmcObj.Status.State != metalv1alpha1.BMCStateEnabled && bmcObj.Status.State != "" {
+			return nil, BMCUnAvailableError{Message: fmt.Sprintf("BMC %s is not in enabled state: current state: %s", bmcObj.Name, bmcObj.Status.State)}
+		}
 	}
-	// still try to connect and get the latest error.
-	// This is used to auto reset BMC through BMC Resource controller.
 	BMC, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
-	return BMC, errors.Join(err, bmcConnectionNotAvailable)
+	return BMC, err
 }
 
 func CreateBMCClient(

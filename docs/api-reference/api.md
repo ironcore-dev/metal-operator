@@ -1914,7 +1914,7 @@ the BMC configuration for this BMC.</p>
 </tr><tr><td><p>&#34;Error&#34;</p></td>
 <td><p>BMCStateError indicates that there is an error with the BMC.</p>
 </td>
-</tr><tr><td><p>&#34;PendingBMCConnection&#34;</p></td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
 <td><p>BMCStatePending indicates that there is an error connecting with the BMC.</p>
 </td>
 </tr></tbody>
@@ -2034,7 +2034,8 @@ BMCState
 </td>
 <td>
 <em>(Optional)</em>
-<p>State represents the current state of the BMC.</p>
+<p>State represents the current state of the BMC.
+kubebuilder:validation:Enum=Enabled;Error;Pending</p>
 </td>
 </tr>
 <tr>

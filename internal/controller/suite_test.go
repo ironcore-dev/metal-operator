@@ -74,9 +74,6 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))).Should(
 		HaveField("Items", BeEmpty()))
 
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))).Should(
-		HaveField("Items", BeEmpty()))
-
 	// Need to delete all the finalizer on the server in Maintenance before deleting it
 	serverList := &metalv1alpha1.ServerList{}
 	Eventually(
@@ -91,6 +88,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 			}
 		}).Should(Succeed())
 	Eventually(deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})).Should(
+		HaveField("Items", BeEmpty()))
+
+	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))).Should(
 		HaveField("Items", BeEmpty()))
 
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettingsSet{}, &metalv1alpha1.BIOSSettingsSetList{})).Should(
@@ -230,7 +230,7 @@ func SetupTest() *corev1.Namespace {
 			Scheme:                 k8sManager.GetScheme(),
 			Insecure:               true,
 			ManagerNamespace:       ns.Name,
-			BMCResetWaitTime:       50 * time.Millisecond,
+			BMCResetWaitTime:       500 * time.Millisecond,
 			BMCClientRetryInterval: 50 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

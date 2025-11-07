@@ -5,6 +5,7 @@ package controller
 
 import (
 	"maps"
+	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	metalBmc "github.com/ironcore-dev/metal-operator/bmc"
@@ -462,7 +463,7 @@ var _ = Describe("BMC Reset", func() {
 			By("Creating a BMC resource")
 			bmc := &metalv1alpha1.BMC{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-bmc-",
+					GenerateName: "test-bmc-reset-",
 				},
 				Spec: metalv1alpha1.BMCSpec{
 					Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -517,15 +518,8 @@ var _ = Describe("BMC Reset", func() {
 			)).Should(Succeed())
 
 			By("Ensuring right conditions are present, after user requested reset")
-			Eventually(Object(bmc)).Should(
+			Eventually(Object(bmc)).WithPolling(1 * time.Microsecond).MustPassRepeatedly(1).Should(SatisfyAll(
 				HaveField("Status.Conditions", HaveLen(2)),
-			)
-			By("waiting BMC reset to take place")
-			Eventually(Object(bmc)).Should(
-				HaveField("Annotations", BeNil()),
-			)
-			By("Ensuring right conditions are present, after bmc reset is done")
-			Eventually(Object(bmc)).Should(
 				HaveField("Status.Conditions", ContainElement(
 					SatisfyAll(
 						HaveField("Type", bmcResetConditionType),
@@ -533,7 +527,22 @@ var _ = Describe("BMC Reset", func() {
 						HaveField("Reason", bmcUserResetReason),
 					),
 				)),
+			))
+			By("BMC reset should remove the reset annotation")
+			Eventually(Object(bmc)).Should(
+				HaveField("Annotations", BeNil()),
 			)
+			By("Ensuring right conditions are present, after bmc reset is done")
+			Consistently(Object(bmc)).Should(
+				HaveField("Status.Conditions", ContainElement(
+					SatisfyAll(
+						HaveField("Type", bmcResetConditionType),
+						HaveField("Status", metav1.ConditionFalse),
+						HaveField("Reason", "ResetComplete"),
+					),
+				)),
+			)
+
 		})
 	})
 })

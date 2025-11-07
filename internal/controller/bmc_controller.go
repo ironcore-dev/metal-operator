@@ -122,21 +122,11 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		// any further request to BMC reset, will be ignored during this period
-		if operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]; ok && operation == metalv1alpha1.OperationAnnotationForceReset {
-			log.V(1).Info("Ignoring force reset operation as previous Reset operation in progress/waiting", "Operation", operation)
-			bmcBase := bmcObj.DeepCopy()
-			metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
-			if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to remove operation annotation: %w", err)
-			}
-			log.V(1).Info("Removed operation annotation", "Operation", operation)
-		}
 		return ctrl.Result{
 			RequeueAfter: r.BMCClientRetryInterval,
 		}, nil
 	}
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions, bmcutils.BMCConnectivityCheckOption)
 	if err != nil {
 		if r.shouldResetBMC(bmcObj) {
 			log.V(1).Info("BMC needs reset, resetting", "BMC", bmcObj.Name)
@@ -154,6 +144,12 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		}
 	}
 	defer bmcClient.Logout()
+
+	// if BMC reset was issued and is successful, ensure to remove previous reset annotation
+	if modified, err := r.handlePreviousBMCResetAnnotations(ctx, log, bmcObj); err != nil || modified {
+		return ctrl.Result{}, err
+	}
+
 	if modified, err := r.handleAnnotionOperations(ctx, log, bmcObj, bmcClient); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -168,7 +164,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	if err := r.updateBMCStatusDetails(ctx, log, bmcClient, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update BMC status: %w", err)
 	}
-	log.V(1).Info("Updated BMC status")
+	log.V(1).Info("Updated BMC status", "state", bmcObj.Status.State)
 
 	if err := r.discoverServers(ctx, log, bmcClient, bmcObj); err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to discover servers: %w", err)
@@ -281,13 +277,8 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
 		log.V(0).Info("Handled operation", "Operation", operation)
+		// reset initiated, remove annotation is post successful reset and re-connection
 	}
-	bmcBase := bmcObj.DeepCopy()
-	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
-	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-		return false, fmt.Errorf("failed to remove operation annotation: %w", err)
-	}
-	log.V(1).Info("Removed operation annotation", "Operation", operation)
 	return true, nil
 }
 
@@ -317,9 +308,6 @@ func (r *BMCReconciler) updateReadyConditionOnBMCFailure(ctx context.Context, bm
 				return fmt.Errorf("failed to set BMC error condition: %w", err)
 			}
 		}
-	} else if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
-		// no http error, and if only BMC disabled error state, ignore. As the state might not be updated yet.
-		return nil
 	} else {
 		if err := r.updateConditions(ctx, bmcObj, true, bmcReadyConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, fmt.Sprintf("BMC connection error: %v", err)); err != nil {
 			return fmt.Errorf("failed to set BMC error condition: %w", err)
@@ -342,6 +330,27 @@ func (r *BMCReconciler) waitForBMCReset(bmcObj *metalv1alpha1.BMC, delay time.Du
 		}
 	}
 	return false
+}
+
+func (r *BMCReconciler) handlePreviousBMCResetAnnotations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	condition := &metav1.Condition{}
+	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
+	if err != nil || !found {
+		return false, nil
+	}
+	if condition.Status == metav1.ConditionTrue {
+		if operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]; ok && operation == metalv1alpha1.OperationAnnotationForceReset {
+			bmcBase := bmcObj.DeepCopy()
+			metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
+			if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+				return false, fmt.Errorf("failed to remove operation annotation from previous reset: %w", err)
+			}
+			log.V(1).Info("Removed operation annotation from previous reset", "Operation", operation)
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *BMCReconciler) shouldResetBMC(bmcObj *metalv1alpha1.BMC) bool {
@@ -412,11 +421,6 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 	}
 	if !ok && !createIfNotFound {
 		// condition not found and not allowed to create
-		return nil
-	}
-	if ok && !createIfNotFound {
-		// if found and not allowed to update
-		// can not replace the user reset condition everytime the reconile happens
 		return nil
 	}
 	bmcBase := bmcObj.DeepCopy()

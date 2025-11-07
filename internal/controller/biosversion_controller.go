@@ -408,7 +408,7 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	// reset BMC if not already done
-	resetBMC, err := r.getCondition(acc, biosVersion.Status.Conditions, resetBMCCondition)
+	resetBMC, err := r.getCondition(acc, biosVersion.Status.Conditions, BMCConditionReset)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
 	}
@@ -416,13 +416,13 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 	if resetBMC.Status != metav1.ConditionTrue {
 		// once the server is powered on, reset the BMC to make sure its in stable state
 		// this avoids problems with some BMCs that hang up in subsequent operations
-		if resetBMC.Reason != resetBMCReason {
+		if resetBMC.Reason != BMCReasonReset {
 			if err := resetBMCOfServer(ctx, log, r.Client, server, bmcClient); err == nil {
 				// mark reset to be issued, wait for next reconcile
 				if err := acc.Update(
 					resetBMC,
 					conditionutils.UpdateStatus(corev1.ConditionFalse),
-					conditionutils.UpdateReason(resetBMCReason),
+					conditionutils.UpdateReason(BMCReasonReset),
 					conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
 				); err != nil {
 					return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
@@ -453,7 +453,7 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 		if err := acc.Update(
 			resetBMC,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(resetBMCReason),
+			conditionutils.UpdateReason(BMCReasonReset),
 			conditionutils.UpdateMessage("BMC reset to stabilize BMC of the server is completed"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update power on server condition: %w", err)
@@ -1015,7 +1015,7 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(
 	for _, biosVersion := range biosVersionList.Items {
 		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
 			acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-			resetBMC, err := r.getCondition(acc, biosVersion.Status.Conditions, resetBMCCondition)
+			resetBMC, err := r.getCondition(acc, biosVersion.Status.Conditions, BMCConditionReset)
 			if err != nil {
 				log.V(1).Error(err, "failed to get reset BMC condition")
 				continue
@@ -1024,7 +1024,7 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(
 				continue
 			}
 			// enqueue only if the BMC reset is requested for this BMC
-			if resetBMC.Reason == resetBMCReason {
+			if resetBMC.Reason == BMCReasonReset {
 				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: biosVersion.Namespace, Name: biosVersion.Name}})
 			}
 		}

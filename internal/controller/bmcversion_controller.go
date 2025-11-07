@@ -251,7 +251,7 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 			return ctrl.Result{}, err
 		}
 
-		if ok, err := r.handleBMCReset(ctx, log, bmcVersion, bmc, resetBMCCondition); !ok || err != nil {
+		if ok, err := r.handleBMCReset(ctx, log, bmcVersion, bmc, BMCConditionReset); !ok || err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -546,7 +546,7 @@ func (r *BMCVersionReconciler) handleBMCReset(
 		annotations := BMC.GetAnnotations()
 		// once the server is powered on, reset the BMC to make sure its in stable state
 		// this avoids problems with some BMCs that hang up in subsequent operations
-		if resetBMC.Reason != resetBMCReason {
+		if resetBMC.Reason != BMCReasonReset {
 			if annotations != nil {
 				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
 					if op == metalv1alpha1.OperationAnnotationForceReset {
@@ -554,7 +554,7 @@ func (r *BMCVersionReconciler) handleBMCReset(
 						if err := acc.Update(
 							resetBMC,
 							conditionutils.UpdateStatus(corev1.ConditionFalse),
-							conditionutils.UpdateReason(resetBMCReason),
+							conditionutils.UpdateReason(BMCReasonReset),
 							conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
 						); err != nil {
 							return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
@@ -581,7 +581,7 @@ func (r *BMCVersionReconciler) handleBMCReset(
 			if err := acc.Update(
 				resetBMC,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(resetBMCReason),
+				conditionutils.UpdateReason(BMCReasonReset),
 				conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
@@ -603,7 +603,7 @@ func (r *BMCVersionReconciler) handleBMCReset(
 		if err := acc.Update(
 			resetBMC,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(resetBMCReason),
+			conditionutils.UpdateReason(BMCReasonReset),
 			conditionutils.UpdateMessage("BMC reset to stabilize BMC of the server is completed"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update power on server condition: %w", err)

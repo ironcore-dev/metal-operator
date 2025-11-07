@@ -775,10 +775,18 @@ var _ = Describe("Server Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.Body.Close()).To(Succeed())
 		Expect(response.StatusCode).To(Equal(http.StatusOK))
-		Eventually(Object(server)).Should(HaveField("Status.Conditions", ContainElement(HaveField("Type", registry.BootStateReceivedCondition))))
+
+		bootConfig := metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      server.Spec.BootConfigurationRef.Name,
+				Namespace: server.Spec.BootConfigurationRef.Namespace,
+			},
+		}
+		Eventually(Object(&bootConfig)).Should(HaveField("Status.Conditions", ContainElement(HaveField("Type", registry.BootStateReceivedCondition))))
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Eventually(Get(bmcSecret)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })

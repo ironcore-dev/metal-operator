@@ -147,34 +147,45 @@ func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to list servers for system UUID %s: %v", bootstate.SystemUUID, err)
 		return
 	}
-	if len(servers.Items) == 0 {
+	if len(servers.Items) != 1 {
 		http.Error(w, fmt.Sprintf("No servers found for system UUID %s", bootstate.SystemUUID), http.StatusNotFound)
 		log.Printf("No servers found for system UUID: %s", bootstate.SystemUUID)
 		return
 	}
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	for _, server := range servers.Items {
-		original := server.DeepCopy()
-		err := acc.UpdateSlice(
-			&server.Status.Conditions,
-			registry.BootStateReceivedCondition,
-			conditionutils.UpdateStatus(metav1.ConditionTrue),
-			conditionutils.UpdateReason("BootStateReceived"),
-			conditionutils.UpdateMessage("Server successfully posted boot state"),
-			conditionutils.UpdateObserved(&server),
-		)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to update booted condition for server %s: %v", server.Name, err), http.StatusInternalServerError)
-			log.Printf("Failed to update booted condition for server %s: %v", server.Name, err)
-			return
-		}
-		if err := s.k8sClient.Status().Patch(r.Context(), &server, client.MergeFrom(original)); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to update boot state for server %s: %v", server.Name, err), http.StatusInternalServerError)
-			log.Printf("Failed to update boot state for server %s: %v", server.Name, err)
-			return
-		}
-		log.Printf("Updated boot state for server %s: %t", server.Name, bootstate.Booted)
+	bootConfigRef := servers.Items[0].Spec.BootConfigurationRef
+	if bootConfigRef == nil {
+		http.Error(w, fmt.Sprintf("Servers for system UUID %s has no ServerBootConfig", bootstate.SystemUUID), http.StatusNotFound)
+		log.Printf("Servers for system UUID %s has no ServerBootConfig", bootstate.SystemUUID)
+		return
 	}
+	bootConfigKey := client.ObjectKey{Namespace: bootConfigRef.Namespace, Name: bootConfigRef.Name}
+	var bootConfig metalv1alpha1.ServerBootConfiguration
+	if err := s.k8sClient.Get(r.Context(), bootConfigKey, &bootConfig); err != nil {
+		http.Error(w, fmt.Sprintf("No ServerBootConfig found for system UUID %s", bootstate.SystemUUID), http.StatusNotFound)
+		log.Printf("No ServerBootConfig found for system UUID: %s", bootstate.SystemUUID)
+		return
+	}
+	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	original := bootConfig.DeepCopy()
+	err := acc.UpdateSlice(
+		&bootConfig.Status.Conditions,
+		registry.BootStateReceivedCondition,
+		conditionutils.UpdateStatus(metav1.ConditionTrue),
+		conditionutils.UpdateReason("BootStateReceived"),
+		conditionutils.UpdateMessage("Server successfully posted boot state"),
+		conditionutils.UpdateObserved(&bootConfig),
+	)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to update booted condition for ServerBootConfig %s: %v", bootConfig.Name, err), http.StatusInternalServerError)
+		log.Printf("Failed to update booted condition for ServerBootConfig %s: %v", bootConfig.Name, err)
+		return
+	}
+	if err := s.k8sClient.Status().Patch(r.Context(), &bootConfig, client.MergeFrom(original)); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to update boot state for ServerBootConfig %s: %v", bootConfig.Name, err), http.StatusInternalServerError)
+		log.Printf("Failed to update boot state for ServerBootConfig %s: %v", bootConfig.Name, err)
+		return
+	}
+	log.Printf("Updated boot state for ServerBootConfig %s: %t", bootConfig.Name, bootstate.Booted)
 	w.WriteHeader(http.StatusOK)
 }
 

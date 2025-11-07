@@ -8,7 +8,7 @@ on:
     - '**/*.md'
 
 jobs:
-  test:
+  test-ubuntu:
     name: Run tests on Ubuntu
     runs-on: ubuntu-latest
     steps:
@@ -33,3 +33,20 @@ jobs:
         run: |
           sudo --preserve-env=GOROOT,GOPATH,PATH go mod tidy
           sudo --preserve-env=GOROOT,GOPATH,PATH make test
+
+  test-macos:
+    name: Run tests on MacOs
+    runs-on: macos-26
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Running Tests
+        run: |
+          go mod tidy
+          make test

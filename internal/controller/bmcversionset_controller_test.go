@@ -124,6 +124,48 @@ var _ = Describe("BMCVersionSet Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		bmc.UnitTestMockUps.ResetBMCVersionUpdate()
 
+		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+		Eventually(List(maintenanceList)).Should(Succeed())
+		for _, maintenance := range maintenanceList.Items {
+			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+		}
+
+		server01 := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc01),
+			},
+		}
+		Eventually(UpdateStatus(server01, func() {
+			server01.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc01)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
+		Eventually(Get(server01)).Should(Satisfy(apierrors.IsNotFound))
+
+		server02 := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc02),
+			},
+		}
+		Eventually(UpdateStatus(server02, func() {
+			server02.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc02)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
+		Eventually(Get(server02)).Should(Satisfy(apierrors.IsNotFound))
+
+		server03 := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc03),
+			},
+		}
+		Eventually(UpdateStatus(server03, func() {
+			server03.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc03)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
+		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
+
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
 	})
@@ -222,48 +264,6 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcVersion01)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcVersion02)).To(Succeed())
-
-		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-		Eventually(List(maintenanceList)).Should(Succeed())
-		for _, maintenance := range maintenanceList.Items {
-			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
-		}
-
-		server01 := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc01),
-			},
-		}
-		Eventually(UpdateStatus(server01, func() {
-			server01.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc01)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
-		Eventually(Get(server01)).Should(Satisfy(apierrors.IsNotFound))
-
-		server02 := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc02),
-			},
-		}
-		Eventually(UpdateStatus(server02, func() {
-			server02.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc02)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
-		Eventually(Get(server02)).Should(Satisfy(apierrors.IsNotFound))
-
-		server03 := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc03),
-			},
-		}
-		Eventually(UpdateStatus(server03, func() {
-			server03.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc03)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
-		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	It("Should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
@@ -462,47 +462,5 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			}
 			Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
 		}
-
-		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-		Eventually(List(maintenanceList)).Should(Succeed())
-		for _, maintenance := range maintenanceList.Items {
-			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
-		}
-
-		server01 := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc01),
-			},
-		}
-		Eventually(UpdateStatus(server01, func() {
-			server01.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc01)).To(Succeed())
-		Eventually(Get(server01)).Should(Satisfy(apierrors.IsNotFound))
-
-		server02 := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc02),
-			},
-		}
-		Eventually(UpdateStatus(server02, func() {
-			server02.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc02)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
-		Eventually(Get(server02)).Should(Satisfy(apierrors.IsNotFound))
-
-		server03 := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc03),
-			},
-		}
-		Eventually(UpdateStatus(server03, func() {
-			server03.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc03)).To(Succeed())
-		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })

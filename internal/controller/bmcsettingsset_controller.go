@@ -503,7 +503,6 @@ func (r *BMCSettingsSetReconciler) enqueueByBMC(
 	obj client.Object,
 ) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("bmc created/deleted/updated label event ")
 
 	bmc := obj.(*metalv1alpha1.BMC)
 	bmcSettingsSetList := &metalv1alpha1.BMCSettingsSetList{}

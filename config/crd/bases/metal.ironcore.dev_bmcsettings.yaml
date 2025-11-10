@@ -64,7 +64,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
                 x-kubernetes-validations:
-                - message: serverRef is immutable
+                - message: BMCRef is immutable
                   rule: self == oldSelf
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
@@ -135,6 +135,7 @@ spec:
                   should be applied.
                 type: string
             required:
+            - BMCRef
             - version
             type: object
           status:

@@ -36,8 +36,8 @@ type BMCSettingsSpec struct {
 	BMCSettingsTemplate `json:",inline"`
 
 	// BMCRef is a reference to a specific BMC to apply setting to.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BMCRef is immutable"
+	// +required
 	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
 }
 

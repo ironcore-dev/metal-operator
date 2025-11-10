@@ -455,7 +455,9 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 		It("Should correctly handle ServerMaintenanceRefs merging for existing and new BMCSettings", func(ctx SpecContext) {
 
 			bmcSetting := make(map[string]string)
+			newBMCSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
+			newBMCSetting["abc"] = "trigger-updated"
 
 			By("Changing both 'Model' and 'Manufacturer' labels for BMC2 to match the selector")
 			Eventually(Update(bmc02, func() {
@@ -473,7 +475,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			TransitionServerToReservedState(ctx, k8sClient, serverClaim02, server02, ns.Name)
 			Eventually(Object(server02)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
 
-			By("Creating 1 manual ServerMaintenance objects with OwnerApproval")
+			By("Creating  manual ServerMaintenance objects with OwnerApproval")
 			serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:    ns.Name,
@@ -552,7 +554,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 			))
 
-			By("Approving the maintenance")
+			By("Approving the maintenance to allow patchBMCSettingsFromTemplate to proceed")
 			Eventually(Update(serverClaim01, func() {
 				metautils.SetAnnotation(serverClaim01, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
 			})).Should(Succeed())
@@ -576,6 +578,34 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			Eventually(Object(bmcSettings02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+			))
+
+			By("Updating the BMCSettingsSet with a new SettingsMap")
+
+			Eventually(Update(bmcSettingsSet, func() {
+				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsMap = newBMCSetting
+			})).Should(Succeed())
+
+			By("Waiting for BMCSettings01 and BMCSettings02 to receive the updated template")
+			Eventually(Get(bmcSettings01)).Should(Succeed())
+			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "trigger-updated")),
+				HaveField("Spec.ServerMaintenanceRefs", ContainElement(templateRef01)),
+			))
+			Eventually(Get(bmcSettings02)).Should(Succeed())
+			Eventually(Object(bmcSettings02)).Should(SatisfyAll(
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "trigger-updated")),
+				HaveField("Spec.ServerMaintenanceRefs", Not(ContainElement(templateRef01))),
+			))
+
+			By("Verifying the updated values")
+			Eventually(Get(bmcSettings01)).Should(Succeed())
+			Eventually(Get(bmcSettings02)).Should(Succeed())
+
+			By("Verifying BMCSettingsSet status reflects the update")
+			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 2)),
 			))
 
 			By("Deleting the BMCSettings")

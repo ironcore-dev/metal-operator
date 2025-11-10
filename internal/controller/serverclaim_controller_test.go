@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -14,25 +15,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
-
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
 var _ = Describe("ServerClaim Controller", func() {
 	ns := SetupTest()
 
-	var server *metalv1alpha1.Server
+	var (
+		server    *metalv1alpha1.Server
+		bmcSecret *metalv1alpha1.BMCSecret
+	)
 
 	BeforeEach(func(ctx SpecContext) {
-		By("Ensuring clean state")
-		var serverList metalv1alpha1.ServerList
-		Eventually(ObjectList(&serverList)).Should(HaveField("Items", (BeEmpty())))
-		var claimList metalv1alpha1.ServerClaimList
-		Eventually(ObjectList(&claimList)).Should(HaveField("Items", (BeEmpty())))
-
 		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
+		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 			},
@@ -63,14 +60,20 @@ var _ = Describe("ServerClaim Controller", func() {
 				},
 			},
 		}
-		TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		EnsureCleanState()
 	})
 
-	It("should successfully claim a server in available state", func(ctx SpecContext) {
+	It("Should successfully claim a server in available state", func(ctx SpecContext) {
 		By("Creating an Ignition secret")
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -156,6 +159,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Deleting the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 
+		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+
 		By("Ensuring that the Server is available")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -214,6 +220,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Deleting the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 
+		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+
 		By("Ensuring that the Server is available")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -223,7 +232,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		))
 	})
 
-	It("should successfully claim a server by label selector", func(ctx SpecContext) {
+	It("Should successfully claim a server by label selector", func(ctx SpecContext) {
 		By("Patching Server labels")
 		Eventually(Update(server, func() {
 			server.Labels = map[string]string{
@@ -277,6 +286,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Deleting the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 
+		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+
 		By("Ensuring that the Server is available")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
@@ -287,7 +299,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		))
 	})
 
-	It("should not claim a server in a non-available state", func(ctx SpecContext) {
+	It("Should not claim a server in a non-available state", func(ctx SpecContext) {
 		By("Patching the Server to Initial state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateInitial
@@ -327,9 +339,15 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("should not claim a server with set claim ref", func(ctx SpecContext) {
+	It("Should not claim a server with set claim ref", func(ctx SpecContext) {
 		By("Patching the Server to available state")
 		Eventually(Update(server, func() {
 			server.Spec.ServerClaimRef = &v1.ObjectReference{
@@ -381,9 +399,15 @@ var _ = Describe("ServerClaim Controller", func() {
 			},
 		}
 		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("should not claim a server when labels do not match selector", func(ctx SpecContext) {
+	It("Should not claim a server when labels do not match selector", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -421,9 +445,15 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseUnbound),
 		))
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("should allow deletion of ServerClaim without a Server", func(ctx SpecContext) {
+	It("Should allow deletion of ServerClaim without a Server", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -453,7 +483,7 @@ var _ = Describe("ServerClaim Validation", func() {
 	var claimWithSelector *metalv1alpha1.ServerClaim
 
 	BeforeEach(func(ctx SpecContext) {
-		By("creating a new ServerClaim")
+		By("Creating a new ServerClaim")
 		claim = &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
@@ -462,12 +492,12 @@ var _ = Describe("ServerClaim Validation", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("updating the ServerRef to claim a Server")
+		By("Updating the ServerRef to claim a Server")
 		Eventually(Update(claim, func() {
 			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
 		})).Should(Succeed())
 
-		By("creating a new ServerClaim")
+		By("Creating a new ServerClaim")
 		claimWithSelector = &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
@@ -476,7 +506,7 @@ var _ = Describe("ServerClaim Validation", func() {
 		}
 		Expect(k8sClient.Create(ctx, claimWithSelector)).To(Succeed())
 
-		By("updating the ServerSelector to claim a Server")
+		By("Updating the ServerSelector to claim a Server")
 		Eventually(Update(claimWithSelector, func() {
 			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -487,27 +517,29 @@ var _ = Describe("ServerClaim Validation", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, claimWithSelector)).To(Succeed())
+		EnsureCleanState()
 	})
 
 	It("Should deny if the ServerRef changes", func() {
-		By("updating the ServerRef to claim a different Server")
+		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claim, func() {
 			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "bar"}
 		})).Should(HaveOccurred())
 
-		By("ensuring that the ServerRef did not change")
+		By("Ensuring that the ServerRef did not change")
 		Consistently(Object(claim)).Should(HaveField("Spec.ServerRef.Name", Equal("foo")))
 	})
 
 	It("Should allow a change of ServerClaim by not changing the ServerRef", func() {
-		By("updating the ServerRef to claim a different Server")
+		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claim, func() {
 			claim.Spec.Power = metalv1alpha1.PowerOn
 			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
 		})).Should(Succeed())
 
-		By("ensuring that the PowerState changed")
+		By("Ensuring that the PowerState changed")
 		Consistently(Object(claim)).Should(SatisfyAll(
 			HaveField("Spec.Power", Equal(metalv1alpha1.PowerOn)),
 			HaveField("Spec.ServerRef.Name", Equal("foo")),
@@ -515,7 +547,7 @@ var _ = Describe("ServerClaim Validation", func() {
 	})
 
 	It("Should deny if the ServerSelector changes", func() {
-		By("updating the ServerRef to claim a different Server")
+		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claimWithSelector, func() {
 			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -530,7 +562,7 @@ var _ = Describe("ServerClaim Validation", func() {
 	})
 
 	It("Should allow a change of ServerClaim by not changing the ServerSelector", func() {
-		By("updating the ServerRef to claim a different Server")
+		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claimWithSelector, func() {
 			claimWithSelector.Spec.Power = metalv1alpha1.PowerOn
 			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
@@ -540,7 +572,7 @@ var _ = Describe("ServerClaim Validation", func() {
 			}
 		})).Should(Succeed())
 
-		By("ensuring that the PowerState changed")
+		By("Ensuring that the PowerState changed")
 		Consistently(Object(claimWithSelector)).Should(SatisfyAll(
 			HaveField("Spec.Power", Equal(metalv1alpha1.PowerOn)),
 			HaveField("Spec.ServerSelector.MatchLabels", Equal(map[string]string{"foo": "bar"}))))
@@ -608,17 +640,24 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		}
 	}
 
-	BeforeEach(func(ctx SpecContext) {
-		var serverList metalv1alpha1.ServerList
-		Expect(k8sClient.List(ctx, &serverList)).To(Succeed())
-		Expect(serverList.Items).To(BeEmpty())
-	})
-
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		claimList := &metalv1alpha1.ServerClaimList{}
+		Eventually(List(claimList, client.InNamespace(ns.Name))).Should(Succeed())
+		for _, claim := range claimList.Items {
+			Expect(k8sClient.Delete(ctx, &claim)).To(Succeed())
+		}
+
+		serverList := &metalv1alpha1.ServerList{}
+		Eventually(List(serverList, client.MatchingLabels{
+			"foo": "bar",
+		})).Should(Succeed())
+		for _, server := range serverList.Items {
+			Expect(k8sClient.Delete(ctx, &server)).To(Succeed())
+		}
+		EnsureCleanState()
 	})
 
-	It("binds four out of ten server for four best effort claims", func(ctx SpecContext) {
+	It("Binds four out of ten server for four best effort claims", func(ctx SpecContext) {
 		for range 10 {
 			makeServer(ctx)
 		}
@@ -631,7 +670,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
 	})
 
-	It("binds four out of ten server for four label selector claims", func(ctx SpecContext) {
+	It("Binds four out of ten server for four label selector claims", func(ctx SpecContext) {
 		for range 10 {
 			makeServer(ctx)
 		}
@@ -644,7 +683,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
 	})
 
-	It("should not bind the same server to multiple best effort claims", func(ctx SpecContext) {
+	It("Should not bind the same server to multiple best effort claims", func(ctx SpecContext) {
 		By("Creating eight ServerClaims")
 		for range 8 {
 			makeClaim(ctx, nil)
@@ -656,7 +695,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(1))
 	})
 
-	It("should not bind the same server to multiple label selector claims", func(ctx SpecContext) {
+	It("Should not bind the same server to multiple label selector claims", func(ctx SpecContext) {
 		By("Creating eight ServerClaims")
 		for range 8 {
 			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))

@@ -5,6 +5,7 @@ package controller
 
 import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,20 +15,19 @@ import (
 )
 
 var _ = Describe("Endpoints Controller", func() {
-	ns := SetupTest()
+	_ = SetupTest()
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		EnsureCleanState()
 	})
 
-	It("should successfully create a BMC secret and BMC object from endpoint", func(ctx SpecContext) {
+	It("Should successfully create a BMC secret and BMC object from endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-endpoint-",
 			},
 			Spec: metalv1alpha1.EndpointSpec{
-				// emulator BMC mac address
 				MACAddress: "23:11:8A:33:CF:EA",
 				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
 			},
@@ -85,5 +85,15 @@ var _ = Describe("Endpoints Controller", func() {
 
 		By("Ensuring that all subsequent objects have been removed")
 		Eventually(Get(endpoint)).Should(Satisfy(apierrors.IsNotFound))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 })

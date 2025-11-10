@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -523,14 +525,19 @@ func main() { // nolint: gocyclo
 
 	ctx := ctrl.SetupSignalHandler()
 
-	setupLog.Info("starting registry server", "RegistryURL", registryURL)
-	registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort))
-	go func() {
+	// Run registry server as a runnable to ensure it stops when the manager stops
+	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		setupLog.Info("starting registry server", "RegistryURL", registryURL)
+		registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort))
 		if err := registryServer.Start(ctx); err != nil {
-			setupLog.Error(err, "problem running registry server")
-			os.Exit(1)
+			return fmt.Errorf("unable to start registry server: %w", err)
 		}
-	}()
+		<-ctx.Done()
+		return nil
+	})); err != nil {
+		setupLog.Error(err, "unable to add registry runnable to manager")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

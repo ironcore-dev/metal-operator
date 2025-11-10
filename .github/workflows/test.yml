@@ -32,4 +32,4 @@ jobs:
       - name: Running Tests
         run: |
           sudo --preserve-env=GOROOT,GOPATH,PATH go mod tidy
-          sudo --preserve-env=GOROOT,GOPATH,PATH make test
+          sudo --preserve-env=GOROOT,GOPATH,PATH make test-only

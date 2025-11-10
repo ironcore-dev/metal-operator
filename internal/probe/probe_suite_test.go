@@ -26,7 +26,7 @@ var (
 
 func TestRegistry(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Registry Suite")
+	RunSpecs(t, "Probe Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -46,7 +46,7 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 
 	// Initialize your probe server
-	probeAgent = probe.NewAgent(GinkgoLogr, systemUUID, registryURL, 100*time.Millisecond)
+	probeAgent = probe.NewAgent(GinkgoLogr, systemUUID, registryURL, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

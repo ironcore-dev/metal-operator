@@ -122,17 +122,14 @@ func (r *ServerReconciler) reconcileExists(ctx context.Context, log logr.Logger,
 	return r.reconcile(ctx, log, server)
 }
 
-func (r *ServerReconciler) shouldDelete(
-	log logr.Logger,
-	server *metalv1alpha1.Server,
-) bool {
+func (r *ServerReconciler) shouldDelete(log logr.Logger, server *metalv1alpha1.Server) bool {
 	if server.DeletionTimestamp.IsZero() {
 		return false
 	}
 
 	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
 		server.Status.State == metalv1alpha1.ServerStateMaintenance {
-		log.V(1).Info("postponing delete as server is in Maintenance state")
+		log.V(1).Info("Postponing delete as server is in Maintenance state")
 		return false
 	}
 	return true

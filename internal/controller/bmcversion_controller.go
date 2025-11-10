@@ -9,6 +9,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/ironcore-dev/controller-utils/clientutils"
+	"github.com/ironcore-dev/controller-utils/conditionutils"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/stmcginnis/gofish/common"
+	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,16 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/go-logr/logr"
-	"github.com/ironcore-dev/controller-utils/clientutils"
-	"github.com/ironcore-dev/controller-utils/conditionutils"
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
 )
 
 // BMCVersionReconciler reconciles a BMCVersion object
@@ -60,14 +58,7 @@ const (
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// Reconcile check BMCVersion object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.2/pkg/reconcile
 func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
 	log := ctrl.LoggerFrom(ctx)
 	bmcVersion := &metalv1alpha1.BMCVersion{}
 	if err := r.Get(ctx, req.NamespacedName, bmcVersion); err != nil {
@@ -78,26 +69,15 @@ func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return r.reconcileExists(ctx, log, bmcVersion)
 }
 
-// Determine whether reconciliation is required. It's not required if:
-// - object is being deleted;
-func (r *BMCVersionReconciler) reconcileExists(
-	ctx context.Context,
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) (ctrl.Result, error) {
-	// if object is being deleted - reconcile deletion
+func (r *BMCVersionReconciler) reconcileExists(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
 	if r.shouldDelete(log, bmcVersion) {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, bmcVersion)
 	}
-
 	return r.reconcile(ctx, log, bmcVersion)
 }
 
-func (r *BMCVersionReconciler) shouldDelete(
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) bool {
+func (r *BMCVersionReconciler) shouldDelete(log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) bool {
 	if bmcVersion.DeletionTimestamp.IsZero() {
 		return false
 	}
@@ -110,11 +90,7 @@ func (r *BMCVersionReconciler) shouldDelete(
 	return true
 }
 
-func (r *BMCVersionReconciler) delete(
-	ctx context.Context,
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) (ctrl.Result, error) {
+func (r *BMCVersionReconciler) delete(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(bmcVersion, BMCVersionFinalizer) {
 		return ctrl.Result{}, nil
 	}
@@ -133,11 +109,7 @@ func (r *BMCVersionReconciler) delete(
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCVersionReconciler) cleanupServerMaintenanceReferences(
-	ctx context.Context,
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) error {
+func (r *BMCVersionReconciler) cleanupServerMaintenanceReferences(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) error {
 	if bmcVersion.Spec.ServerMaintenanceRefs == nil {
 		return nil
 	}
@@ -188,11 +160,7 @@ func (r *BMCVersionReconciler) cleanupServerMaintenanceReferences(
 	return errors.Join(finalErr...)
 }
 
-func (r *BMCVersionReconciler) reconcile(
-	ctx context.Context,
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) (ctrl.Result, error) {
+func (r *BMCVersionReconciler) reconcile(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
 	if shouldIgnoreReconciliation(bmcVersion) {
 		log.V(1).Info("Skipped BMCVersion reconciliation")
 		return ctrl.Result{}, nil
@@ -203,34 +171,29 @@ func (r *BMCVersionReconciler) reconcile(
 	}
 
 	return r.ensureBMCVersionStateTransition(ctx, log, bmcVersion)
-
 }
 
-func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
-	ctx context.Context,
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) (ctrl.Result, error) {
-	bmc, err := r.getBMC(ctx, log, bmcVersion)
+func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
+	bmcObj, err := r.getBMCFromBMCVersion(ctx, bmcVersion)
 	if err != nil {
 		log.V(1).Info("Referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmc, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
-			log.V(1).Info("BMC is not available, skipping", "BMC", bmc.Name, "error", err)
+			log.V(1).Info("BMC is not available, skipping", "BMC", bmcObj.Name, "error", err)
 			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 		}
-		log.V(1).Error(err, "failed to create BMC client", "BMC", bmc.Name)
+		log.V(1).Error(err, "failed to create BMC client", "BMC", bmcObj.Name)
 		return ctrl.Result{}, err
 	}
 	defer bmcClient.Logout()
 
 	switch bmcVersion.Status.State {
 	case "", metalv1alpha1.BMCVersionStatePending:
-		return ctrl.Result{}, r.checkVersionAndTransistionState(ctx, log, bmcVersion, bmcClient, bmc)
+		return ctrl.Result{}, r.checkVersionAndTransistionState(ctx, log, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateInProgress:
 		servers, err := r.getServers(ctx, log, bmcClient, bmcVersion)
 		if err != nil {
@@ -251,14 +214,14 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 			return ctrl.Result{}, err
 		}
 
-		if ok, err := r.handleBMCReset(ctx, log, bmcVersion, bmc, BMCConditionReset); !ok || err != nil {
+		if ok, err := r.handleBMCReset(ctx, log, bmcVersion, bmcObj, BMCConditionReset); !ok || err != nil {
 			return ctrl.Result{}, err
 		}
 
-		return r.handleUpgradeInProgressState(ctx, log, bmcVersion, bmcClient, bmc)
+		return r.handleUpgradeInProgressState(ctx, log, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateCompleted:
 		// clean up maintenance crd and references and mark completed if version matches.
-		return ctrl.Result{}, r.checkVersionAndTransistionState(ctx, log, bmcVersion, bmcClient, bmc)
+		return ctrl.Result{}, r.checkVersionAndTransistionState(ctx, log, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateFailed:
 		if shouldRetryReconciliation(bmcVersion) {
 			log.V(1).Info("Retrying BMCVersion reconciliation")
@@ -274,7 +237,7 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(
 			}
 			return ctrl.Result{}, nil
 		}
-		log.V(1).Info("Failed to upgrade BMCVersion", "ctx", ctx, "BMCVersion", bmcVersion, "BMC", bmc.Name)
+		log.V(1).Info("Failed to upgrade BMCVersion", "ctx", ctx, "BMCVersion", bmcVersion, "BMC", bmcObj.Name)
 		return ctrl.Result{}, nil
 	}
 	log.V(1).Info("Unknown State found", "BMCVersion state", bmcVersion.Status.State)
@@ -372,12 +335,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCVersionReconciler) getBMCVersionFromBMC(
-	ctx context.Context,
-	bmcClient bmc.BMC,
-	BMC *metalv1alpha1.BMC,
-) (string, error) {
-	// fetch the current BMC version from the server bmc
+func (r *BMCVersionReconciler) getBMCVersionFromBMC(ctx context.Context, bmcClient bmc.BMC, BMC *metalv1alpha1.BMC) (string, error) {
 	currentBMCVersion, err := bmcClient.GetBMCVersion(ctx, BMC.Spec.BMCUUID)
 	if err != nil {
 		return currentBMCVersion, fmt.Errorf("failed to load BMC version: %w for BMC %v", err, BMC.Name)
@@ -386,13 +344,7 @@ func (r *BMCVersionReconciler) getBMCVersionFromBMC(
 	return currentBMCVersion, nil
 }
 
-func (r *BMCVersionReconciler) checkIfMaintenanceGranted(
-	ctx context.Context,
-	log logr.Logger,
-	bmcClient bmc.BMC,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) bool {
-
+func (r *BMCVersionReconciler) checkIfMaintenanceGranted(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcVersion *metalv1alpha1.BMCVersion) bool {
 	// todo length
 	if bmcVersion.Spec.ServerMaintenanceRefs == nil {
 		return true
@@ -622,19 +574,18 @@ func (r *BMCVersionReconciler) getServers(
 	if bmcVersion.Spec.BMCRef == nil {
 		return nil, fmt.Errorf("BMC reference not found")
 	}
-	BMC, err := r.getBMC(ctx, log, bmcVersion)
-
+	bmcObj, err := r.getBMCFromBMCVersion(ctx, bmcVersion)
 	if err != nil {
 		log.V(1).Error(err, "failed to get referred BMC")
 		return nil, err
 	}
 	bmcServers, err := bmcClient.GetSystems(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get servers from BMC %s: %w", BMC.Name, err)
+		return nil, fmt.Errorf("failed to get servers from BMC %s: %w", bmcObj.Name, err)
 	}
 	serversRefList := make([]*corev1.LocalObjectReference, len(bmcServers))
 	for i := range bmcServers {
-		serversRefList[i] = &corev1.LocalObjectReference{Name: bmcutils.GetServerNameFromBMCandIndex(i, BMC)}
+		serversRefList[i] = &corev1.LocalObjectReference{Name: bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)}
 	}
 	servers, err := r.getReferredServers(ctx, log, serversRefList)
 	if err != nil {
@@ -664,33 +615,20 @@ func (r *BMCVersionReconciler) getReferredServers(
 	return servers, errors.Join(errs...)
 }
 
-func (r *BMCVersionReconciler) getBMC(
-	ctx context.Context,
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) (*metalv1alpha1.BMC, error) {
-
-	var refName string
+func (r *BMCVersionReconciler) getBMCFromBMCVersion(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (*metalv1alpha1.BMC, error) {
 	if bmcVersion.Spec.BMCRef == nil {
-		return nil, fmt.Errorf("bmc ref not provided")
-	} else {
-		refName = bmcVersion.Spec.BMCRef.Name
+		return nil, fmt.Errorf("no BMC reference found for BMC version %s", bmcVersion.Name)
 	}
 
-	key := client.ObjectKey{Name: refName}
-	BMC := &metalv1alpha1.BMC{}
-	if err := r.Get(ctx, key, BMC); err != nil {
-		log.V(1).Error(err, "failed to get referred server's Manager")
-		return BMC, err
+	bmcObj := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, client.ObjectKey{Name: bmcVersion.Spec.BMCRef.Name}, bmcObj); err != nil {
+		return bmcObj, fmt.Errorf("failed to get referred server's Manager: %w", err)
 	}
 
-	return BMC, nil
+	return bmcObj, nil
 }
 
-func (r *BMCVersionReconciler) getServerMaintenanceRefForServer(
-	serverMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
-	serverMaintenanceUID types.UID,
-) (*corev1.ObjectReference, bool) {
+func (r *BMCVersionReconciler) getServerMaintenanceRefForServer(serverMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem, serverMaintenanceUID types.UID) (*corev1.ObjectReference, bool) {
 	for _, serverMaintenanceRef := range serverMaintenanceRefs {
 		if serverMaintenanceRef.ServerMaintenanceRef.UID == serverMaintenanceUID {
 			return serverMaintenanceRef.ServerMaintenanceRef, true
@@ -1141,7 +1079,7 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByBMCRefs(
 			continue
 		}
 		if bmcVersion.Spec.BMCRef == nil {
-			if referredBMC, err := r.getBMC(ctx, ctrl.LoggerFrom(ctx), &bmcVersion); err != nil && referredBMC.Name == BMC.Name {
+			if referredBMC, err := r.getBMCFromBMCVersion(ctx, &bmcVersion); err != nil && referredBMC.Name == BMC.Name {
 				return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: bmcVersion.Namespace, Name: bmcVersion.Name}}}
 			}
 		}

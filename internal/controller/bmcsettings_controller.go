@@ -836,10 +836,7 @@ func (r *BMCSettingsReconciler) updateBMCSettingsStatus(
 	return nil
 }
 
-func (r *BMCSettingsReconciler) enqueueBMCSettingsByServerRefs(
-	ctx context.Context,
-	obj client.Object,
-) []ctrl.Request {
+func (r *BMCSettingsReconciler) enqueueBMCSettingsByServerRefs(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 	host := obj.(*metalv1alpha1.Server)
 
@@ -856,11 +853,14 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByServerRefs(
 	var req []ctrl.Request
 
 	for _, bmcSetting := range bmcSettingsList.Items {
-		// if we dont have maintenance request on this bmcsetting we do not want to queue changes from servers.
+		// if we don't have maintenance request on this BMCSetting we do not want to queue changes from servers.
 		if bmcSetting.Spec.ServerMaintenanceRefs == nil {
 			continue
 		}
 		if bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateApplied || bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateFailed {
+			continue
+		}
+		if host.Spec.ServerMaintenanceRef == nil {
 			continue
 		}
 		serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, host.Spec.ServerMaintenanceRef.UID)

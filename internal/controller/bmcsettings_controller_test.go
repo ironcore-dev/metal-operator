@@ -23,12 +23,15 @@ import (
 var _ = Describe("BMCSettings Controller", func() {
 	ns := SetupTest(nil)
 
-	var server *metalv1alpha1.Server
-	var bmc *metalv1alpha1.BMC
+	var (
+		server    *metalv1alpha1.Server
+		bmc       *metalv1alpha1.BMC
+		bmcSecret *metalv1alpha1.BMCSecret
+	)
 
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
+		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
@@ -70,6 +73,11 @@ var _ = Describe("BMCSettings Controller", func() {
 		}
 		Eventually(Get(server)).Should(Succeed())
 
+		By("Ensuring that the Server is in an available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
 		By("Ensuring that the BMC has right state: enabled")
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
@@ -77,14 +85,21 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
 		bmcPkg.UnitTestMockUps.ResetBMCSettings()
+
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		EnsureCleanState()
 	})
 
-	It("should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
+	It("Should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 
-		By("Creating a bmcSetting")
+		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
@@ -107,9 +122,12 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
 	})
 
-	It("should move to completed if no BMCSettings changes to referred BMC", func(ctx SpecContext) {
+	It("Should move to completed if no BMCSettings changes to referred BMC", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 
 		By("Creating a bmcSetting")
@@ -145,7 +163,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 	})
 
-	It("should update the setting if BMCSettings changes requested in Available State", func(ctx SpecContext) {
+	It("Should update the setting if BMCSettings changes requested in Available State", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 		bmcSetting["abc"] = "changed-bmc-setting"
 
@@ -191,17 +209,48 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", BeNil()),
 		))
+
+		// cleanup
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 	})
 
-	It("should create maintenance and wait for its approval before applying settings", func(ctx SpecContext) {
-
+	It("Should create maintenance and wait for its approval before applying settings", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
-		bmcSetting["abc"] = "changed-to-req-server-maintenance-through-Ownerapproved"
+		bmcSetting["abc"] = "changed-to-req-server-maintenance-through-ownerapproved"
 
-		// put server in reserved state. and create a bmc setting in Ownerapproved which needs reboot.
+		// put server in reserved state. and create a bmc setting in owner approved which needs reboot.
 		// this is needed to check the states traversed.
-		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
+		By("Creating an Ignition secret")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: nil,
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+		By("Creating a ServerClaim")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             metalv1alpha1.PowerOn,
+				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server has been claimed")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		)
 
 		By("Creating a BMCSetting")
 		bmcSettings := &metalv1alpha1.BMCSettings{
@@ -217,6 +266,7 @@ var _ = Describe("BMCSettings Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
+
 		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 		))
@@ -283,9 +333,12 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", BeNil()),
 		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
-	It("should wait for upgrade and reconcile BMCSettings version is correct", func(ctx SpecContext) {
+	It("Should wait for upgrade and reconcile BMCSettings version is correct", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"
 
@@ -348,7 +401,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		}
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
-		By("Ensuring that the BMCSettings resource hasmoved to next state")
+		By("Ensuring that the BMCSettings resource has moved to next state")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
@@ -377,7 +430,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 	})
 
-	It("should allow retry using annotation", func(ctx SpecContext) {
+	It("Should allow retry using annotation", func(ctx SpecContext) {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
 		bmcSetting := make(map[string]string)
@@ -390,7 +443,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		})).Should(Succeed())
 
 		By("Creating a BMCSetting")
-		BMCSettings := &metalv1alpha1.BMCSettings{
+		bmcSettings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
@@ -402,25 +455,28 @@ var _ = Describe("BMCSettings Controller", func() {
 				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 			},
 		}
-		Expect(k8sClient.Create(ctx, BMCSettings)).To(Succeed())
+		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
 
 		By("Moving to Failed state")
-		Eventually(UpdateStatus(BMCSettings, func() {
-			BMCSettings.Status.State = metalv1alpha1.BMCSettingsStateFailed
+		Eventually(UpdateStatus(bmcSettings, func() {
+			bmcSettings.Status.State = metalv1alpha1.BMCSettingsStateFailed
 		})).Should(Succeed())
 
-		Eventually(Update(BMCSettings, func() {
-			BMCSettings.Annotations = map[string]string{
+		Eventually(Update(bmcSettings, func() {
+			bmcSettings.Annotations = map[string]string{
 				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
 			}
 		})).Should(Succeed())
 
-		Eventually(Object(BMCSettings)).Should(
+		Eventually(Object(bmcSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 		)
 
-		Eventually(Object(BMCSettings)).Should(
+		Eventually(Object(bmcSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		)
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
 	})
 })

@@ -25,18 +25,13 @@ var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest(nil)
 
 	var (
-		server *metalv1alpha1.Server
+		server    *metalv1alpha1.Server
+		bmcSecret *metalv1alpha1.BMCSecret
 	)
 
 	BeforeEach(func(ctx SpecContext) {
-		By("Ensuring clean state")
-		var serverList metalv1alpha1.ServerList
-		Eventually(ObjectList(&serverList)).Should(HaveField("Items", BeEmpty()))
-		var biosList metalv1alpha1.BIOSSettingsList
-		Eventually(ObjectList(&biosList)).Should(HaveField("Items", BeEmpty()))
-
 		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
+		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-",
@@ -68,15 +63,23 @@ var _ = Describe("BIOSSettings Controller", func() {
 				},
 			},
 		}
-		TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Ensuring that the Server is in available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).To(Succeed())
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
 		bmc.UnitTestMockUps.ResetBIOSSettings()
+
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		EnsureCleanState()
 	})
 
-	It("should successfully patch its reference to referred server", func(ctx SpecContext) {
+	It("Should successfully patch its reference to referred server", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string) // no setting to apply
@@ -173,7 +176,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef.Name", biosSettingsV2.Name),
 		)
-
 	})
 
 	It("should move to completed if no bios setting changes to referred server", func(ctx SpecContext) {
@@ -237,7 +239,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
+	It("Should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
 		biosSetting := make(map[string]string)
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
@@ -248,8 +250,35 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// Reserved state is needed to transition through the unit test step by step
 		// else, unit test finishes the state very fast without being able to check the transition
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
-		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
+		By("Creating an Ignition secret")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: nil,
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+		By("Creating a ServerClaim")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             metalv1alpha1.PowerOff,
+				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server has been claimed")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		)
 
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -352,6 +381,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
 		)
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, serverClaim)).Should(Succeed())
 	})
 
 	It("should create maintenance if setting update needs reboot", func(ctx SpecContext) {
@@ -365,9 +397,35 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// Reserved state is needed to transition through the unit test step by step
 		// else, unit test finishes the state very fast without being able to check the transition
 		// creating OwnerApproval through reserved state gives more control when to approve the maintenance
-		By("update the server powerstate to Off and reserved state")
-		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
+		By("Creating an Ignition secret")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: nil,
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+		By("Creating a ServerClaim")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             metalv1alpha1.PowerOff,
+				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server has been claimed")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		)
 
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -457,6 +515,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the Maintenance resource has been deleted")
 		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, serverClaim)).Should(Succeed())
 	})
 
 	It("should update setting if server is in available state", func(ctx SpecContext) {
@@ -532,7 +593,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 		)
 
-		// because of the mocking, the transistions are super fast here.
+		// because of the mocking, the transitions are superfast here.
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 			HaveField("Status.LastAppliedTime.IsZero()", false),
@@ -543,6 +604,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Deleting the BIOSSettings")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the bios ref is empty")
 		Eventually(Object(server)).Should(
@@ -560,9 +622,35 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		// Reserved state is needed to as Available state will turn off the power automatically.
 		// powerOn is needed to skip the change in power on system, Hence skip maintenance.
-		By("update the server powerstate to On and reserved state")
-		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
-		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
+		By("Creating an Ignition secret")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: nil,
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+		By("Creating a ServerClaim")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             metalv1alpha1.PowerOn,
+				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server has been claimed")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		)
 
 		By("Creating a BMCSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -642,6 +730,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Consistently(Object(server)).Should(
 			HaveField("Spec.BIOSSettingsRef", BeNil()),
 		)
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
 	It("should allow retry using annotation", func(ctx SpecContext) {
@@ -691,6 +782,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
+
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })
 
@@ -698,18 +792,13 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 	ns := SetupTest(nil)
 
 	var (
-		server *metalv1alpha1.Server
+		server    *metalv1alpha1.Server
+		bmcSecret *metalv1alpha1.BMCSecret
 	)
 
 	BeforeEach(func(ctx SpecContext) {
-		By("Ensuring clean state")
-		var serverList metalv1alpha1.ServerList
-		Eventually(ObjectList(&serverList)).Should(HaveField("Items", BeEmpty()))
-		var biosList metalv1alpha1.BIOSSettingsList
-		Eventually(ObjectList(&biosList)).Should(HaveField("Items", BeEmpty()))
-
 		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
+		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-",
@@ -741,15 +830,24 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				},
 			},
 		}
-		TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Ensure that the Server is in available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
 		bmc.UnitTestMockUps.ResetBIOSSettings()
+
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+
+		EnsureCleanState()
 	})
 
-	It("should successfully apply sequence of settings", func(ctx SpecContext) {
+	It("Should successfully apply sequence of settings", func(ctx SpecContext) {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -792,7 +890,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 	})
 
-	It("should fail if duplicate keys in names or settings found", func(ctx SpecContext) {
+	It("Should fail if duplicate keys in names or settings found", func(ctx SpecContext) {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -896,7 +994,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Expect(k8sClient.Delete(ctx, biosSettings2)).To(Succeed())
 	})
 
-	It("should successfully apply sequence of different settings and reconcile from applied state", func(ctx SpecContext) {
+	It("Should successfully apply sequence of different settings and reconcile from applied state", func(ctx SpecContext) {
 		By("Creating a BIOSSetting sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1137,6 +1235,19 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 
 		By("Deleting the BIOSSetting")
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+		// cleanup
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      biosSettings.Name,
+			},
+		}
+		Eventually(Get(serverMaintenance)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+		By("Ensure that the Server is in available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 	})
 })
 

@@ -147,6 +147,12 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.Options, opts ...BMCClientOptions) (bmc.BMC, error) {
 	var address string
 
+	if !slices.Contains(opts, BMCConnectivityCheckOption) {
+		if bmcObj.Status.State != metalv1alpha1.BMCStateEnabled && bmcObj.Status.State != "" {
+			return nil, BMCUnAvailableError{Message: fmt.Sprintf("BMC %s is not in enabled state: current state: %s", bmcObj.Name, bmcObj.Status.State)}
+		}
+	}
+
 	if bmcObj.Spec.EndpointRef != nil {
 		endpoint := &metalv1alpha1.Endpoint{}
 		if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.EndpointRef.Name}, endpoint); err != nil {
@@ -165,14 +171,8 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 	}
 
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
-
-	if !slices.Contains(opts, BMCConnectivityCheckOption) {
-		if bmcObj.Status.State != metalv1alpha1.BMCStateEnabled && bmcObj.Status.State != "" {
-			return nil, BMCUnAvailableError{Message: fmt.Sprintf("BMC %s is not in enabled state: current state: %s", bmcObj.Name, bmcObj.Status.State)}
-		}
-	}
-	BMC, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
-	return BMC, err
+	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	return bmcClient, err
 }
 
 func CreateBMCClient(

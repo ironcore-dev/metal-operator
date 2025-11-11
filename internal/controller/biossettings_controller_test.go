@@ -21,6 +21,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// added const field for go linting
+const (
+	testBarValue = "bar"
+)
+
 var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest()
 
@@ -180,7 +185,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
 		biosSetting := make(map[string]string)
-		biosSetting["abc"] = "bar"
+		biosSetting["abc"] = testBarValue
 
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{

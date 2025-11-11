@@ -465,25 +465,87 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				bmc02.Labels["metal.ironcore.dev/Manufacturer"] = "foo"
 			})).Should(Succeed())
 
-			By("Creating 2 ServerClaims and transitioning the Servers to Reserved state")
+			By("Patching 2 servers for available state")
+			Eventually(UpdateStatus(server01, func() {
+				server01.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+			Eventually(UpdateStatus(server02, func() {
+				server02.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
 
-			serverClaim01 := CreateServerClaim(ctx, k8sClient, *server01, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-			TransitionServerToReservedState(ctx, k8sClient, serverClaim01, server01, ns.Name)
-			Eventually(Object(server01)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
-
-			serverClaim02 := CreateServerClaim(ctx, k8sClient, *server02, ns.Name, nil, metalv1alpha1.PowerOff, "foo:bar")
-			TransitionServerToReservedState(ctx, k8sClient, serverClaim02, server02, ns.Name)
-			Eventually(Object(server02)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
-
-			By("Creating  manual ServerMaintenance objects with OwnerApproval")
-			serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
+			By("Creating an Ignition secret")
+			ignitionSecret := &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:    ns.Name,
-					GenerateName: "manual-maintenance-01-",
+					GenerateName: "test-",
+				},
+				Data: map[string][]byte{
+					"foo": []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, ignitionSecret)
+
+			By("Creating 2 ServerClaims object")
+			serverClaim01 := &metalv1alpha1.ServerClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-",
+				},
+				Spec: metalv1alpha1.ServerClaimSpec{
+					Power:             powerOpOff,
+					ServerRef:         &v1.LocalObjectReference{Name: server01.Name},
+					IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+					Image:             "foo:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, serverClaim01)).To(Succeed())
+
+			By("Ensuring that the Server is reserved by the ServerClaim")
+			Eventually(Object(server01)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+				HaveField("Spec.ServerClaimRef.Name", serverClaim01.Name),
+			))
+			serverClaim02 := &metalv1alpha1.ServerClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-",
+				},
+				Spec: metalv1alpha1.ServerClaimSpec{
+					Power:             powerOpOff,
+					ServerRef:         &v1.LocalObjectReference{Name: server02.Name},
+					IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+					Image:             "foo:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, serverClaim02)).To(Succeed())
+
+			By("Ensuring that the Server is reserved by the ServerClaim")
+			Eventually(Object(server02)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+				HaveField("Spec.ServerClaimRef.Name", serverClaim02.Name),
+			))
+
+			By("Creating an ServerMaintenance object")
+			serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-server-maintenance",
+					Namespace: ns.Name,
+					Annotations: map[string]string{
+						metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
+					},
 				},
 				Spec: metalv1alpha1.ServerMaintenanceSpec{
-					ServerRef: &v1.LocalObjectReference{Name: server01.Name},
-					Policy:    metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					ServerRef:   &v1.LocalObjectReference{Name: server01.Name},
+					Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					ServerPower: metalv1alpha1.PowerOff,
+					ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
+						Name: "test-boot",
+						Spec: metalv1alpha1.ServerBootConfigurationSpec{
+							ServerRef: v1.LocalObjectReference{Name: server01.Name},
+							Image:     "foo:latest",
+						},
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, serverMaintenance01)).To(Succeed())

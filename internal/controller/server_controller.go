@@ -403,7 +403,7 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 		}
 		log.V(1).Info("Server state set to power off")
 	}
-	log.V(1).Info("ensureInitialBootConfigurationIsDeleted")
+
 	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
 	}

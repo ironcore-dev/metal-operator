@@ -18,6 +18,8 @@ import (
 	k8sSchema "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -38,10 +40,12 @@ func TestMetalctl(t *testing.T) {
 	SetDefaultConsistentlyDuration(consistentlyDuration)
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Controller Suite")
+	RunSpecs(t, "cmdutils Suite")
 }
 
 var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
 	sourceEnv := &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -52,7 +56,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "bin", "k8s",
-			fmt.Sprintf("1.33.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.34.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	sourceCfg, err := sourceEnv.Start()
@@ -79,7 +83,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "bin", "k8s",
-			fmt.Sprintf("1.33.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.34.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	// cfg is defined in this file globally.

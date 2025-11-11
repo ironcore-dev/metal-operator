@@ -27,6 +27,11 @@ CONTAINER_TOOL ?= docker
 REDFISH_CONTAINER_NAME=redfish_mockup_server
 REDFISH_CONTAINER_VERSION=latest
 
+# Use the most portable option for core detection
+NPROCS := $(shell getconf _NPROCESSORS_ONLN)
+# Add a fallback just in case the command fails
+NPROCS ?= 4
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
@@ -76,7 +81,7 @@ check-gen: generate manifests docs helm fmt ## Run code generation, manifests ge
 
 .PHONY: test-only
 test-only: setup-envtest ## Run tests without generating manifests or code.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -p $(NPROCS) $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest test-only ## Run tests.
@@ -262,18 +267,19 @@ GEN_CRD_API_REFERENCE_DOCS ?= $(LOCALBIN)/gen-crd-api-reference-docs
 KUBEBUILDER ?= $(LOCALBIN)/kubebuilder
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
+METALCTL ?= $(LOCALBIN)/metalctl
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.18.0
+CONTROLLER_TOOLS_VERSION ?= v0.19.0
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d.%d",$$3, $$2}')
-GOLANGCI_LINT_VERSION ?= v2.1
-GOIMPORTS_VERSION ?= v0.31.0
+GOLANGCI_LINT_VERSION ?= v2.5
+GOIMPORTS_VERSION ?= v0.38.0
 GEN_CRD_API_REFERENCE_DOCS_VERSION ?= v0.3.0
-KUBEBUILDER_VERSION ?= v4.5.1
+KUBEBUILDER_VERSION ?= v4.9.0
 ADDLICENSE_VERSION ?= v1.1.1
 
 .PHONY: addlicense
@@ -331,6 +337,10 @@ $(GEN_CRD_API_REFERENCE_DOCS): $(LOCALBIN)
 kubebuilder: $(KUBEBUILDER) ## Download kubebuilder locally if necessary.
 $(KUBEBUILDER): $(LOCALBIN)
 	$(call go-install-tool,$(KUBEBUILDER),sigs.k8s.io/kubebuilder/v4,$(KUBEBUILDER_VERSION))
+
+.PHONY: metalctl
+metalctl: $(METALCTL) ## Build metalctl locally if necessary.
+	go build -o $(METALCTL) ./cmd/metalctl
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # Note: All paths are quoted to work in directories containing spaces or parentheses.

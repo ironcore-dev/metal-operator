@@ -29,7 +29,7 @@ var _ = Describe("Server Controller", func() {
 	ns := SetupTest()
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		EnsureCleanState()
 	})
 
 	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
@@ -242,7 +242,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond)
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -272,6 +272,10 @@ var _ = Describe("Server Controller", func() {
 			server.Spec.BIOSSettingsRef = &v1.LocalObjectReference{Name: biosSettings.Name}
 		})).Should(Succeed())
 
+		// cleanup
+		Expect(k8sClient.Delete(ctx, endpoint)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 	})
@@ -435,7 +439,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond)
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -495,6 +499,10 @@ var _ = Describe("Server Controller", func() {
 		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
 	It("Should reset a Server into initial state on discovery failure", func(ctx SpecContext) {
@@ -564,6 +572,10 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
 	It("Should reset a Server into initial state after maintenance is removed", func(ctx SpecContext) {
@@ -600,9 +612,11 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
-		By("Ensuring the server maintenance is created and set to server")
 
+		By("Ensuring that the Server is set to discovery")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
+
+		By("Creating the server maintenance")
 		maintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
@@ -613,12 +627,19 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, maintenance)).To(Succeed())
+
+		By("Ensuring that the server is set to maintenance")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
+
 		By("Deleting the server maintenance")
 		Expect(k8sClient.Delete(ctx, maintenance)).To(Succeed())
 
 		By("Ensuring that the server is reset to initial state")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
 	It("Should reset a claimed Server into Reserved state after maintenance is removed", func(ctx SpecContext) {
@@ -655,6 +676,8 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Updating the Server to available state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -672,6 +695,8 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the Server is set to reserved")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
 
 		By("Ensuring the server maintenance is created and set to server")
@@ -686,6 +711,8 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, maintenance)).To(Succeed())
+
+		By("Ensuring that the server is set to maintenance")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
 
 		By("Deleting the server maintenance")
@@ -693,5 +720,10 @@ var _ = Describe("Server Controller", func() {
 
 		By("Ensuring that the server is reset to reserved state")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, claim)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 })

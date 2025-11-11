@@ -1,0 +1,335 @@
+{
+  "lldp": {
+    "interface": [
+      {
+        "ens3f0np0": {
+          "via": "LLDP",
+          "rid": "2",
+          "age": "0 day, 00:00:54",
+          "chassis": {
+            "chassis1": {
+              "id": {
+                "type": "mac",
+                "value": "xx:xx:xx:xx:xx:xx"
+              },
+              "descr": "REDACTED",
+              "mgmt-ip": "REDACTED_IP",
+              "mgmt-iface": "83886080",
+              "capability": [
+                {
+                  "type": "Bridge",
+                  "enabled": true
+                },
+                {
+                  "type": "Router",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          "port": {
+            "id": {
+              "type": "local",
+              "value": "Eth1/17"
+            },
+            "descr": "REDACTED",
+            "ttl": "120"
+          },
+          "vlan": {
+            "vlan-id": "1963",
+            "pvid": true
+          },
+          "unknown-tlvs": {
+            "unknown-tlv": [
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "1",
+                "len": "1",
+                "value": "01"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "209",
+                "len": "1",
+                "value": "04"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "216",
+                "len": "2",
+                "value": "00,00"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "201",
+                "len": "1",
+                "value": "01"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "214",
+                "len": "14",
+                "value": "4E,39,4B,2D,43,39,33,33,36,43,2D,46,58,32"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "212",
+                "len": "11",
+                "value": "46,44,4F,32,35,30,32,30,58,48,5A"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "202",
+                "len": "1",
+                "value": "01"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "210",
+                "len": "14",
+                "value": "6E,39,30,30,30,2D,31,36,2E,31,28,34,68,29"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "211",
+                "len": "2",
+                "value": "0F,7F"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "215",
+                "len": "22",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "206",
+                "len": "11",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "208",
+                "len": "4",
+                "value": "0A,30,28,40"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "203",
+                "len": "4",
+                "value": "00,00,08,43"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "205",
+                "len": "2",
+                "value": "00,01"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "221",
+                "len": "32",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "207",
+                "len": "123",
+                "value": "REDACTED"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "ens6f0np0": {
+          "via": "LLDP",
+          "rid": "3",
+          "age": "0 day, 00:00:53",
+          "chassis": {
+            "chassis2": {
+              "id": {
+                "type": "mac",
+                "value": "xx:xx:xx:xx:xx:xx"
+              },
+              "descr": "REDACTED",
+              "mgmt-ip": "10.17.125.124",
+              "mgmt-iface": "83886080",
+              "capability": [
+                {
+                  "type": "Bridge",
+                  "enabled": true
+                },
+                {
+                  "type": "Router",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          "port": {
+            "id": {
+              "type": "local",
+              "value": "Eth1/17"
+            },
+            "descr": "topology/pod-1/protpaths-2115-2116/pathep-[openstack-baremetal-node008-bb097]",
+            "ttl": "120"
+          },
+          "vlan": {
+            "vlan-id": "1963",
+            "pvid": true
+          },
+          "unknown-tlvs": {
+            "unknown-tlv": [
+              {
+                "oui": "REDACTED_OUI",
+                "subtype": "1",
+                "len": "1",
+                "value": "01"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "209",
+                "len": "1",
+                "value": "04"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "216",
+                "len": "2",
+                "value": "00,00"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "201",
+                "len": "1",
+                "value": "01"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "214",
+                "len": "14",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "212",
+                "len": "11",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "202",
+                "len": "1",
+                "value": "01"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "210",
+                "len": "14",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "211",
+                "len": "2",
+                "value": "0F,7F"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "215",
+                "len": "22",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "206",
+                "len": "11",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "208",
+                "len": "4",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "203",
+                "len": "4",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "205",
+                "len": "2",
+                "value": "00,01"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "221",
+                "len": "32",
+                "value": "REDACTED"
+              },
+              {
+                "oui": "00,01,42",
+                "subtype": "207",
+                "len": "123",
+                "value": "REDACTED"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "eno12399": {
+          "via": "LLDP",
+          "rid": "1",
+          "age": "0 day, 00:01:01",
+          "chassis": {
+            "chassis3": {
+              "id": {
+                "type": "mac",
+                "value": "xx:xx:xx:xx:xx:xx"
+              },
+              "descr": "REDACTED",
+              "mgmt-ip": "10.17.125.125",
+              "mgmt-iface": "83886080",
+              "capability": [
+                {
+                  "type": "Bridge",
+                  "enabled": true
+                },
+                {
+                  "type": "Router",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          "port": {
+            "id": {
+              "type": "ifname",
+              "value": "Ethernet1/21"
+            },
+            "descr": "*** node008-bb097 L1 ***",
+            "ttl": "120"
+          },
+          "vlan": {
+            "vlan-id": "101",
+            "pvid": true
+          },
+          "unknown-tlvs": {
+            "unknown-tlv": {
+              "oui": "00,01,42",
+              "subtype": "1",
+              "len": "1",
+              "value": "01"
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+

@@ -384,8 +384,6 @@ func (r *BIOSVersionSetReconciler) updateStatus(
 
 func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("server created/deleted/updated label")
-
 	host := obj.(*metalv1alpha1.Server)
 
 	biosVersionSetList := &metalv1alpha1.BIOSVersionSetList{}

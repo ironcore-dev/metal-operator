@@ -307,7 +307,11 @@ func (r *ServerMaintenanceReconciler) getServerRef(ctx context.Context, serverMa
 }
 
 func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {
-	if server != nil && server.Spec.ServerMaintenanceRef != nil {
+	if server == nil {
+		return nil
+	}
+
+	if server.Spec.ServerMaintenanceRef != nil {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
 			log.Error(err, "failed to remove maintenance ref from server")
 		}

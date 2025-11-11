@@ -9,7 +9,7 @@ on:
 
 jobs:
   test-e2e:
-    name: Run on Ubuntu
+    name: Run test e2e on Ubuntu
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code

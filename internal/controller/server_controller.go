@@ -1050,16 +1050,21 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 		return false, nil
 	}
 
-	log.V(1).Info("Handling operation", "Operation", operation)
-	if err := bmcClient.Reset(ctx, server.Spec.SystemURI, redfish.ResetType(operation)); err != nil {
-		return false, fmt.Errorf("failed to reset server: %w", err)
-	}
-	log.V(1).Info("Operation completed", "Operation", operation)
-	serverBase := server.DeepCopy()
-	delete(annotations, metalv1alpha1.OperationAnnotation)
-	server.SetAnnotations(annotations)
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch server annotations: %w", err)
+	if value, ok := metalv1alpha1.AnnotationToRedfishMapping[operation]; !ok {
+		log.V(1).Info("Unsupported operation annotation", "Operation", operation, "SupportedOperations", metalv1alpha1.AnnotationToRedfishMapping)
+		return false, nil
+	} else {
+		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
+		if err := bmcClient.Reset(ctx, server.Spec.SystemURI, value); err != nil {
+			return false, fmt.Errorf("failed to reset server: %w", err)
+		}
+		log.V(1).Info("Operation completed", "Operation", operation, "RedfishResetType", value)
+		serverBase := server.DeepCopy()
+		delete(annotations, metalv1alpha1.OperationAnnotation)
+		server.SetAnnotations(annotations)
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server annotations: %w", err)
+		}
 	}
 	return true, nil
 }

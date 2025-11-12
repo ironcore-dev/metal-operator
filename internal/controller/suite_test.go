@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -99,7 +100,7 @@ var _ = BeforeSuite(func() {
 	bmc.InitMockUp()
 })
 
-func SetupTest(redfishMockServers []string) *corev1.Namespace {
+func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
@@ -280,12 +281,11 @@ func SetupTest(redfishMockServers []string) *corev1.Namespace {
 			return nil
 		}))).Should(Succeed())
 
-		DeferCleanup(cancel)
 		if len(redfishMockServers) > 0 {
 			for _, serverAddr := range redfishMockServers {
 				By(fmt.Sprintf("Starting the mock Redfish servers %v", serverAddr))
 				Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-					mockServer := server.NewMockServer(GinkgoLogr, serverAddr)
+					mockServer := server.NewMockServer(GinkgoLogr, serverAddr.String())
 					if err := mockServer.Start(ctx); err != nil {
 						return fmt.Errorf("failed to start mock Redfish server %v", serverAddr)
 					}

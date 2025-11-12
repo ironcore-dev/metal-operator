@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"net/netip"
 
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
@@ -22,15 +23,18 @@ import (
 
 var _ = Describe("BMCVersionSet Controller", func() {
 	var (
-		redfishMockServerAddr   = []string{":8000", ":8001", ":8002"}
-		redfishMockServerPorts  = []int{8000, 8001, 8002}
+		MockServerIPAddrs = []netip.AddrPort{
+			netip.MustParseAddrPort("127.0.0.1:8000"),
+			netip.MustParseAddrPort("127.0.0.1:8001"),
+			netip.MustParseAddrPort("127.0.0.1:8002"),
+		}
 		bmc01                   *metalv1alpha1.BMC
 		bmc02                   *metalv1alpha1.BMC
 		bmc03                   *metalv1alpha1.BMC
 		bmcSecret               *metalv1alpha1.BMCSecret
 		upgradeServerBMCVersion string
 	)
-	ns := SetupTest(redfishMockServerAddr)
+	ns := SetupTest(MockServerIPAddrs)
 
 	BeforeEach(func(ctx SpecContext) {
 		upgradeServerBMCVersion = "1.46.455b66-rev4"
@@ -57,12 +61,12 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.NewIP(MockServerIPAddrs[0].Addr()),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: int32(redfishMockServerPorts[0]),
+					Port: int32(MockServerIPAddrs[0].Port()),
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -82,12 +86,12 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.NewIP(MockServerIPAddrs[1].Addr()),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: int32(redfishMockServerPorts[1]),
+					Port: int32(MockServerIPAddrs[1].Port()),
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -107,12 +111,12 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.NewIP(MockServerIPAddrs[2].Addr()),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: int32(redfishMockServerPorts[2]),
+					Port: int32(MockServerIPAddrs[2].Port()),
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,

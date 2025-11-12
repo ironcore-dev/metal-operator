@@ -62,8 +62,8 @@ const (
 	// ForceOnServerPower indicates to force powerOn the baremetal server power.
 	ForceOnServerPower = "force-on-server"
 
-	// GracefulShutdownBMCPower indicates to gracefully restart the baremetal server's BMC's power.
-	GracefulRestartBMCPower = "graceful-restart-bmc"
+	// GracefulShutdownBMC indicates to gracefully restart the baremetal server's BMC's power.
+	GracefulRestartBMC = "graceful-restart-bmc"
 )
 
 var AnnotationToRedfishMapping = map[string]redfish.ResetType{
@@ -72,5 +72,5 @@ var AnnotationToRedfishMapping = map[string]redfish.ResetType{
 	PowerCycleServerPower:      redfish.PowerCycleResetType,
 	ForceOffServerPower:        redfish.ForceOffResetType,
 	ForceOnServerPower:         redfish.ForceOnResetType,
-	GracefulRestartBMCPower:    redfish.GracefulRestartResetType,
+	GracefulRestartBMC:         redfish.GracefulRestartResetType,
 }

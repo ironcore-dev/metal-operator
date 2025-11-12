@@ -381,6 +381,7 @@ type Storage struct {
 //+kubebuilder:printcolumn:name="UUID",type=string,JSONPath=`.spec.uuid`
 //+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
 //+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+//+kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
 //+kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
 //+kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
 //+kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`

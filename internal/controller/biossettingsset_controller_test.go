@@ -63,6 +63,10 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server01)).Should(Succeed())
+		By("Ensure that the Server is in available state")
+		Eventually(UpdateStatus(server01, func() {
+			server01.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 
 		By("Creating a second Server")
 		server02 = &metalv1alpha1.Server{
@@ -88,6 +92,9 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
+		Eventually(UpdateStatus(server02, func() {
+			server02.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 
 		By("Creating a third Server")
 		server03 = &metalv1alpha1.Server{
@@ -113,6 +120,9 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server03)).Should(Succeed())
+		Eventually(UpdateStatus(server03, func() {
+			server03.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 	})
 
 	AfterEach(func(ctx SpecContext) {

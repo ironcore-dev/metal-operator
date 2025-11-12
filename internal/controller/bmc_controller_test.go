@@ -19,7 +19,7 @@ import (
 )
 
 var _ = Describe("BMC Controller", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -435,7 +435,7 @@ var _ = Describe("BMC Validation", func() {
 })
 
 var _ = Describe("BMC Reset", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -501,7 +501,7 @@ var _ = Describe("BMC Reset", func() {
 })
 
 var _ = Describe("BMC Conditions", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()

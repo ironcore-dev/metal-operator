@@ -24,7 +24,6 @@ import (
 
 var _ = Describe("BMCVersion Controller", func() {
 	ns := SetupTest(nil)
-	ns.Name = "default"
 
 	var (
 		server                  *metalv1alpha1.Server

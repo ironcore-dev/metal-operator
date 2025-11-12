@@ -17,16 +17,15 @@ import (
 )
 
 var _ = Describe("BIOSSettingsSet Controller", func() {
-	var redfishMockServerAddr = []string{":8000", ":8001", ":8002"}
-	var redfishMockServerPorts = []int{8000, 8001, 8002}
-	ns := SetupTest(redfishMockServerAddr)
-
 	var (
-		server01  *metalv1alpha1.Server
-		server02  *metalv1alpha1.Server
-		server03  *metalv1alpha1.Server
-		bmcSecret *metalv1alpha1.BMCSecret
+		redfishMockServerAddr  = []string{":8000", ":8001", ":8002"}
+		redfishMockServerPorts = []int{8000, 8001, 8002}
+		server01               *metalv1alpha1.Server
+		server02               *metalv1alpha1.Server
+		server03               *metalv1alpha1.Server
+		bmcSecret              *metalv1alpha1.BMCSecret
 	)
+	ns := SetupTest(redfishMockServerAddr)
 
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")

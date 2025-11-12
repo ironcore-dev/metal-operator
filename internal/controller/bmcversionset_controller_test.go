@@ -21,17 +21,16 @@ import (
 )
 
 var _ = Describe("BMCVersionSet Controller", func() {
-	var redfishMockServerAddr = []string{":8000", ":8001", ":8002"}
-	var redfishMockServerPorts = []int{8000, 8001, 8002}
-	ns := SetupTest(redfishMockServerAddr)
-
 	var (
+		redfishMockServerAddr   = []string{":8000", ":8001", ":8002"}
+		redfishMockServerPorts  = []int{8000, 8001, 8002}
 		bmc01                   *metalv1alpha1.BMC
 		bmc02                   *metalv1alpha1.BMC
 		bmc03                   *metalv1alpha1.BMC
 		bmcSecret               *metalv1alpha1.BMCSecret
 		upgradeServerBMCVersion string
 	)
+	ns := SetupTest(redfishMockServerAddr)
 
 	BeforeEach(func(ctx SpecContext) {
 		upgradeServerBMCVersion = "1.46.455b66-rev4"

@@ -17,17 +17,16 @@ import (
 )
 
 var _ = Describe("BIOSVersionSet Controller", func() {
-	var redfishMockServerAddr = []string{":8000", ":8001", ":8002"}
-	var redfishMockServerPorts = []int{8000, 8001, 8002}
-	ns := SetupTest(redfishMockServerAddr)
-
 	var (
+		redfishMockServerAddr    = []string{":8000", ":8001", ":8002"}
+		redfishMockServerPorts   = []int{8000, 8001, 8002}
 		server01                 *metalv1alpha1.Server
 		server02                 *metalv1alpha1.Server
 		server03                 *metalv1alpha1.Server
 		bmcSecret                *metalv1alpha1.BMCSecret
 		upgradeServerBiosVersion string
 	)
+	ns := SetupTest(redfishMockServerAddr)
 
 	BeforeEach(func(ctx SpecContext) {
 		upgradeServerBiosVersion = "P80 v1.45 (12/06/2017)"

@@ -270,15 +270,28 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	if !ok {
 		return false, nil
 	}
-	switch operation {
-	case metalv1alpha1.OperationAnnotationForceReset:
-		log.V(1).Info("Handling operation", "Operation", operation)
+	var value redfish.ResetType
+	if value, ok = metalv1alpha1.AnnotationToRedfishMapping[operation]; !ok {
+		log.V(1).Info("Unknown operation annotation, ignoring", "Operation", operation, "Supported Operations", redfish.GracefulRestartResetType)
+		return false, nil
+	}
+	switch value {
+	case redfish.GracefulRestartResetType:
+		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
 		if err := r.resetBMC(ctx, log, bmcObj, bmcClient, bmcUserResetReason, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
 		log.V(0).Info("Handled operation", "Operation", operation)
-		// reset initiated, remove annotation is post successful reset and re-connection
+	default:
+		log.V(1).Info("Unsupported operation annotation", "Operation", operation, "RedfishResetType", value)
+		return false, nil
 	}
+	bmcBase := bmcObj.DeepCopy()
+	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
+	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return false, fmt.Errorf("failed to remove operation annotation: %w", err)
+	}
+	log.V(1).Info("Removed operation annotation", "Operation", operation)
 	return true, nil
 }
 
@@ -340,7 +353,7 @@ func (r *BMCReconciler) handlePreviousBMCResetAnnotations(ctx context.Context, l
 		return false, nil
 	}
 	if condition.Status == metav1.ConditionTrue {
-		if operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]; ok && operation == metalv1alpha1.OperationAnnotationForceReset {
+		if operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]; ok && operation == metalv1alpha1.GracefulRestartBMC {
 			bmcBase := bmcObj.DeepCopy()
 			metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)
 			if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {

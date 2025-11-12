@@ -170,7 +170,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			biosVersionV1Updated.Spec.Version = "P712"
 			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().To(HaveOccurred())
 			By("Updating an biosVersion V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
-			biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
+			biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().ToNot(HaveOccurred())
 
 			Eventually(UpdateStatus(biosVersionV1, func() {

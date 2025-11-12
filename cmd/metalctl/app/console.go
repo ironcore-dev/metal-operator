@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 
 	cmdclient "github.com/ironcore-dev/metal-operator/internal/cmd/client"
-	"github.com/ironcore-dev/metal-operator/internal/console"
+	"github.com/ironcore-dev/metal-operator/internal/cmd/console"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"

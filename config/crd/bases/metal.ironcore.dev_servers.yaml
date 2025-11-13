@@ -24,6 +24,9 @@ spec:
     - jsonPath: .status.model
       name: Model
       type: string
+    - jsonPath: .status.totalSystemMemory
+      name: Memory
+      type: string
     - jsonPath: .status.sku
       name: SKU
       priority: 100

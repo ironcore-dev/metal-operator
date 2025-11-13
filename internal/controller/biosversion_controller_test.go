@@ -20,7 +20,7 @@ import (
 )
 
 var _ = Describe("BIOSVersion Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var (
 		server                   *metalv1alpha1.Server
@@ -387,7 +387,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		Eventually(Update(biosVersion, func() {
 			biosVersion.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
 			}
 		})).Should(Succeed())
 
@@ -423,7 +423,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 
 	By("Ensuring that BIOSVersion has updated the taskStatus with taskURI")
 	Eventually(Object(biosVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", "dummyTask"),
+		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
 	)
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeCompleted'")

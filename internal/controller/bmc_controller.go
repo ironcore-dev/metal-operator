@@ -265,13 +265,21 @@ func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.L
 	if !ok {
 		return false, nil
 	}
-	switch operation {
-	case metalv1alpha1.OperationAnnotationForceReset:
-		log.V(1).Info("Handling operation", "Operation", operation)
+	var value redfish.ResetType
+	if value, ok = metalv1alpha1.AnnotationToRedfishMapping[operation]; !ok {
+		log.V(1).Info("Unknown operation annotation, ignoring", "Operation", operation, "Supported Operations", redfish.GracefulRestartResetType)
+		return false, nil
+	}
+	switch value {
+	case redfish.GracefulRestartResetType:
+		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
 		if err := r.resetBMC(ctx, log, bmcObj, bmcUserResetReason, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
 		log.V(0).Info("Handled operation", "Operation", operation)
+	default:
+		log.V(1).Info("Unsupported operation annotation", "Operation", operation, "RedfishResetType", value)
+		return false, nil
 	}
 	bmcBase := bmcObj.DeepCopy()
 	metautils.DeleteAnnotation(bmcObj, metalv1alpha1.OperationAnnotation)

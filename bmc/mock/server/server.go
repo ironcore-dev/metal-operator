@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,14 @@ type Collection struct {
 type Member struct {
 	OdataID string `json:"@odata.id"`
 }
+
+const (
+	LockedResourceState   = "Locked"
+	UnlockedResourceState = "Unlocked"
+	ResourceLockKey       = "resourceLock"
+	PowerOffState         = "Off"
+	PowerOnState          = "On"
+)
 
 type MockServer struct {
 	log       logr.Logger
@@ -54,8 +63,24 @@ func NewMockServer(log logr.Logger, addr string) *MockServer {
 	return server
 }
 
+// currently hardcoded until specific logic is required
+var currentSettingsNeedsNoReboot = []string{"AdminPhone"}
+
+// power states from data/Systems/437XR1138R2/index.json
+var powerOffStates = []string{"ForceOff", "GracefulShutdown", "PushPowerButton"}
+var powerOnStates = []string{"On", "ForceOn"}
+var powerResetStates = []string{"GracefulRestart", "ForceRestart", "Nmi", "PowerCycle"}
+
+// power states from data/Managers/BMC/index.json
+var powerResetBMCStates = []string{"GracefulRestart", "ForceRestart"}
+
+const (
+	BiosSettingsPathSufficx = "Bios/Settings"
+	AttributesKey           = "Attributes"
+)
+
 func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
 
 	switch r.Method {
 	case http.MethodGet:
@@ -72,7 +97,7 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
 
 	urlPath := resolvePath(r.URL.Path)
 	body, err := io.ReadAll(r.Body)
@@ -94,34 +119,46 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// Load existing resource: from override if exists, else embedded
-	var base map[string]any
-	if cached, ok := s.overrides[urlPath]; ok {
-		base = deepCopy(cached.(map[string]any))
-	} else {
-		data, err := dataFS.ReadFile(urlPath)
-		if err != nil {
+	base, err := fetchCurrentDataForPath(s, urlPath)
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "resource not found"):
 			http.NotFound(w, r)
 			return
-		}
-		if err := json.Unmarshal(data, &base); err != nil {
-			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+		case strings.Contains(err.Error(), "corrupt embedded JSON"):
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
-
 	// If it's a Collection (has "Members"), reject
 	if _, isCollection := base["Members"]; isCollection {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	err = handlebiosSettingsApply(s, r.URL.Path, update)
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "resource not found"):
+			http.NotFound(w, r)
+			return
+		case strings.Contains(err.Error(), "corrupt embedded JSON"):
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	// Merge update into the copy
 	mergeJSON(base, update)
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// Store the newly modified version
 	s.overrides[urlPath] = base
 
@@ -146,6 +183,9 @@ func resolvePath(urlPath string) string {
 
 	if trimmed == "" {
 		return "data/index.json"
+	}
+	if strings.HasSuffix(trimmed, ".json") {
+		return path.Join("data", trimmed)
 	}
 	return path.Join("data", trimmed, "index.json")
 }
@@ -236,7 +276,8 @@ func mergeJSON(base, update map[string]interface{}) {
 }
 
 func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -257,61 +298,345 @@ func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 
 	s.log.Info("POST body received", "body", string(body))
 	urlPath := resolvePath(r.URL.Path)
+
+	switch {
+	case strings.Contains(urlPath, "Actions/ComputerSystem.Reset"):
+		// Simulate a system reset action
+		err := handleSystemReset(s, r, urlPath, body)
+		if err != nil {
+			switch {
+			case strings.Contains(err.Error(), "resource not found"):
+				http.NotFound(w, r)
+				return
+			case strings.Contains(err.Error(), "corrupt embedded JSON"):
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			case strings.Contains(err.Error(), "resource locked"):
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			case strings.Contains(err.Error(), "unknown reset type"):
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			default:
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_, err = w.Write([]byte(`{"status": "Accepted"}`))
+		if err != nil {
+			s.log.Error(err, "Failed to write response")
+			return
+		}
+	case strings.Contains(urlPath, "Managers/BMC/Actions/Manager.Reset"):
+		// Simulate a BMC reset action
+		err := handleBMCReset(s, r, urlPath, body)
+		if err != nil {
+			switch {
+			case strings.Contains(err.Error(), "resource not found"):
+				http.NotFound(w, r)
+				return
+			case strings.Contains(err.Error(), "corrupt embedded JSON"):
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			case strings.Contains(err.Error(), "resource locked"):
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			case strings.Contains(err.Error(), "unknown reset type"):
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			default:
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_, err = w.Write([]byte(`{"status": "Accepted"}`))
+		if err != nil {
+			s.log.Error(err, "Failed to write response")
+			return
+		}
+	case strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
+		// Simulate a firmware update action
+	default:
+		// Handle resource creation in collections
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		cached, hasOverride := s.overrides[urlPath]
+		var base Collection
+		if hasOverride {
+			s.log.Info("Using overridden data for POST", "path", urlPath)
+			base = cached.(Collection)
+		} else {
+			s.log.Info("Using embedded data for POST", "path", urlPath)
+			data, err := dataFS.ReadFile(urlPath)
+			if err != nil {
+				s.log.Error(err, "Failed to read embedded data for POST", "path", urlPath)
+				http.NotFound(w, r)
+				return
+			}
+			if err := json.Unmarshal(data, &base); err != nil {
+				http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+				return
+			}
+		}
+		// If resource collection (has "Members"), add a new member
+		if len(base.Members) > 0 {
+			newID := fmt.Sprintf("%d", len(base.Members)+1)
+			location := path.Join(r.URL.Path, newID)
+			newMemberPath := resolvePath(location)
+			base.Members = append(base.Members, Member{
+				OdataID: location,
+			})
+			s.log.Info("Adding new member", "id", newID, "location", location, "memberPath", newMemberPath)
+			if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
+				w.Header().Set("Location", location)
+			}
+			s.overrides[urlPath] = base
+			s.overrides[newMemberPath] = update
+		} else {
+			base.Members = make([]Member, 0)
+			location := r.URL.JoinPath("1").String()
+			base.Members = []Member{
+				{
+					OdataID: r.URL.JoinPath("1").String(),
+				},
+			}
+			s.overrides[urlPath] = base
+			if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
+				w.Header().Set("Location", location)
+			}
+		}
+		s.log.Info("Storing updated data for POST", "path", urlPath, "data", update)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, err = w.Write([]byte(`{"status": "created"}`))
+		if err != nil {
+			s.log.Error(err, "Failed to write response")
+			return
+		}
+	}
+}
+
+func handleSystemReset(s *MockServer, r *http.Request, urlPath string, body []byte) error {
+	basePath := strings.TrimSuffix(r.URL.Path, "/Actions/ComputerSystem.Reset")
+	systemPath := resolvePath(basePath)
+	base, err := fetchCurrentDataForPath(s, systemPath)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if val, ok := base[ResourceLockKey]; ok && val == LockedResourceState {
+		s.mu.Unlock()
+		s.log.Info("System resource is locked, cannot perform reset", base)
+		return errors.New("system resource locked, cannot perform reset")
+	}
+	base[ResourceLockKey] = LockedResourceState
+	s.overrides[urlPath] = base
+	s.mu.Unlock()
+	s.log.Info("System resource locked for reset operation")
+	if slices.ContainsFunc(powerOffStates, func(s string) bool {
+		return strings.Contains(string(body), s)
+	}) {
+		go func() {
+			time.Sleep(150 * time.Millisecond)
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			base["PowerState"] = PowerOffState
+			delete(base, ResourceLockKey)
+			s.overrides[urlPath] = base
+			s.log.Info("Powered Off the system")
+		}()
+	} else if slices.ContainsFunc(powerOnStates, func(s string) bool {
+		return strings.Contains(string(body), s)
+	}) {
+		go func() {
+			time.Sleep(150 * time.Millisecond)
+			s.mu.Lock()
+			base["PowerState"] = PowerOnState
+			delete(base, ResourceLockKey)
+			s.overrides[urlPath] = base
+			s.mu.Unlock()
+			s.log.Info("Powered On the system")
+			err := handlePostPowerOnActions(s, basePath)
+			if err != nil {
+				s.log.Error(err, "Failed to handle post power-on actions")
+			}
+			s.log.Info("Handled system power-on actions")
+		}()
+	} else if slices.ContainsFunc(powerResetStates, func(s string) bool {
+		return strings.Contains(string(body), s)
+	}) {
+		go func() {
+			time.Sleep(150 * time.Millisecond)
+			s.mu.Lock()
+			base["PowerState"] = PowerOffState
+			// Store the newly modified version
+			s.overrides[urlPath] = base
+			s.mu.Unlock()
+			s.log.Info("Powered Off the system")
+			time.Sleep(50 * time.Millisecond)
+			s.mu.Lock()
+			base["PowerState"] = PowerOnState
+			delete(base, ResourceLockKey)
+			// Store the newly modified version
+			s.overrides[urlPath] = base
+			s.mu.Unlock()
+			s.log.Info("Powered On the system")
+			err := handlePostPowerOnActions(s, basePath)
+			if err != nil {
+				s.log.Error(err, "Failed to handle post power-on actions")
+			}
+			s.log.Info("Handled system power-on actions")
+		}()
+	} else {
+		return fmt.Errorf("unknown reset type in request body: %s", string(body))
+	}
+	return nil
+}
+func handlePostPowerOnActions(s *MockServer, basePath string) error {
+	// Handle Bios settings applicationn
+	biosPendingSettingsURL := path.Join(basePath, strings.Trim(BiosSettingsPathSufficx, "/"))
+	pendingSettingsFilePath := resolvePath(biosPendingSettingsURL)
+	// get the Pending Bios settings
+	pendingBiosSettingsBase, err := fetchCurrentDataForPath(s, pendingSettingsFilePath)
+	if err != nil {
+		return err
+	}
+	if data, ok := pendingBiosSettingsBase[AttributesKey]; ok {
+		// if pending settings exist, apply them to current settings
+		if pendingAttributes, ok := data.(map[string]any); ok && len(pendingAttributes) > 0 {
+			// save the pending Attributes
+			pendingAttributesCopy := deepCopy(pendingAttributes)
+			// get the current Bios settings
+			biosCurrentSettingsURL := path.Join(basePath, "Bios")
+			currentSettingsFilePath := resolvePath(biosCurrentSettingsURL)
+			currentBiosSettingsBase, err := fetchCurrentDataForPath(s, currentSettingsFilePath)
+			if err != nil {
+				return err
+			}
+			s.mu.Lock()
+			currentAttributesCopy := deepCopy(currentBiosSettingsBase[AttributesKey].(map[string]any))
+			mergeJSON(currentAttributesCopy, pendingAttributesCopy)
+			currentBiosSettingsBase[AttributesKey] = currentAttributesCopy
+			pendingBiosSettingsBase[AttributesKey] = map[string]any{}
+			s.overrides[currentSettingsFilePath] = currentBiosSettingsBase
+			s.overrides[pendingSettingsFilePath] = pendingBiosSettingsBase
+			s.mu.Unlock()
+			s.log.Info("Post power-on actions completed for system")
+		}
+	}
+	return nil
+}
+
+func handleBMCReset(s *MockServer, r *http.Request, urlPath string, body []byte) error {
+	// Placeholder for handling system reset logic
+	basePath := strings.TrimSuffix(r.URL.Path, "Actions/Manager.Reset")
+	systemPath := resolvePath(basePath)
+	base, err := fetchCurrentDataForPath(s, systemPath)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if val, ok := base[ResourceLockKey]; ok && val == LockedResourceState {
+		s.mu.Unlock()
+		return errors.New("BMC resource locked, cannot perform reset")
+	}
+	base[ResourceLockKey] = LockedResourceState
+	s.overrides[urlPath] = base
+	s.mu.Unlock()
+	if slices.ContainsFunc(powerResetBMCStates, func(s string) bool {
+		return strings.Contains(string(body), s)
+	}) {
+		go func() {
+			time.Sleep(150 * time.Millisecond)
+			s.mu.Lock()
+			base["PowerState"] = PowerOffState
+			// Store the newly modified version
+			s.overrides[urlPath] = base
+			s.log.Info("Powered Off the BMC")
+			s.mu.Unlock()
+			time.Sleep(150 * time.Millisecond)
+			s.mu.Lock()
+			base["PowerState"] = PowerOnState
+			delete(base, ResourceLockKey)
+			// Store the newly modified version
+			s.overrides[urlPath] = base
+			s.mu.Unlock()
+			s.log.Info("Powered On the BMC")
+		}()
+	} else {
+		return fmt.Errorf("unknown reset type in request body: %s", string(body))
+	}
+	return nil
+}
+
+func handlebiosSettingsApply(s *MockServer, settingsPath string, bodyUpdate map[string]any) error {
+	replace := map[string]any{}
+	switch {
+	case strings.Contains(settingsPath, BiosSettingsPathSufficx):
+		// Handle Bios Settings PATCH if needed
+		s.log.Info("Check if BIOS settings that do not require reboot are present", "settings", bodyUpdate)
+		if len(bodyUpdate[AttributesKey].(map[string]any)) > 0 {
+			// currently, hardcoded until specific logic is required
+			if updatedAttributes, ok := bodyUpdate[AttributesKey]; ok {
+				if updatedAttributesMap, ok := updatedAttributes.(map[string]any); ok {
+					for key, newData := range updatedAttributesMap {
+						if slices.Contains(currentSettingsNeedsNoReboot, key) {
+							// apply immediately
+							replace[key] = newData
+						}
+					}
+				}
+			}
+		}
+	default:
+		return nil
+	}
+
+	if len(replace) > 0 {
+		s.log.Info("Applying BIOS settings that do not require reboot", "settings", replace)
+		for key := range replace {
+			delete(bodyUpdate[AttributesKey].(map[string]any), key)
+		}
+		BiosURL := strings.TrimSuffix(settingsPath, "Settings")
+		biosPath := resolvePath(BiosURL)
+		// Load existing resource: from override if exists, else embedded
+		biosBase, err := fetchCurrentDataForPath(s, biosPath)
+		if err != nil {
+			return err
+		}
+		if biosAttributes, ok := biosBase[AttributesKey].(map[string]any); ok {
+			for key, value := range replace {
+				biosAttributes[key] = value
+			}
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.overrides[biosPath] = biosBase
+	}
+	return nil
+}
+
+func fetchCurrentDataForPath(s *MockServer, path string) (map[string]any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	cached, hasOverride := s.overrides[urlPath]
-	var base Collection
-	if hasOverride {
-		s.log.Info("Using overridden data for POST", "path", urlPath)
-		base = cached.(Collection)
+	base := make(map[string]any)
+	if cached, ok := s.overrides[path]; ok {
+		base = deepCopy(cached.(map[string]any))
 	} else {
-		s.log.Info("Using embedded data for POST", "path", urlPath)
-		data, err := dataFS.ReadFile(urlPath)
+		data, err := dataFS.ReadFile(path)
 		if err != nil {
-			s.log.Error(err, "Failed to read embedded data for POST", "path", urlPath)
-			http.NotFound(w, r)
-			return
+			return nil, fmt.Errorf("resource not found: %v", err)
 		}
 		if err := json.Unmarshal(data, &base); err != nil {
-			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
-			return
+			return nil, fmt.Errorf("corrupt embedded JSON: %v", err)
 		}
 	}
-	// If resource collection (has "Members"), add a new member
-	if len(base.Members) > 0 {
-		newID := fmt.Sprintf("%d", len(base.Members)+1)
-		location := path.Join(r.URL.Path, newID)
-		newMemberPath := resolvePath(location)
-		base.Members = append(base.Members, Member{
-			OdataID: location,
-		})
-		s.log.Info("Adding new member", "id", newID, "location", location, "memberPath", newMemberPath)
-		if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
-			w.Header().Set("Location", location)
-		}
-		s.overrides[urlPath] = base
-		s.overrides[newMemberPath] = update
-	} else {
-		base.Members = make([]Member, 0)
-		location := r.URL.JoinPath("1").String()
-		base.Members = []Member{
-			{
-				OdataID: r.URL.JoinPath("1").String(),
-			},
-		}
-		s.overrides[urlPath] = base
-		if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
-			w.Header().Set("Location", location)
-		}
-	}
-	s.log.Info("Storing updated data for POST", "path", urlPath, "data", update)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write([]byte(`{"status": "created"}`))
-	if err != nil {
-		s.log.Error(err, "Failed to write response")
-		return
-	}
+	s.overrides[path] = base
+	return base, nil
 }
 
 // Start starts the mock server and stops on ctx cancellation.

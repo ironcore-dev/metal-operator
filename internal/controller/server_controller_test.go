@@ -26,7 +26,7 @@ import (
 )
 
 var _ = Describe("Server Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()

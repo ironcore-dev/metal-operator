@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/ironcore-dev/metal-operator/internal/cmd/move"
 	"github.com/spf13/cobra"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -14,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	utils "github.com/ironcore-dev/metal-operator/cmdutils"
 )
 
 var (
@@ -26,24 +26,24 @@ var (
 )
 
 func NewMoveCommand() *cobra.Command {
-	move := &cobra.Command{
+	m := &cobra.Command{
 		Use:   "move",
 		Short: "Move metal-operator CRs from one cluster to another",
 		RunE:  runMove,
 	}
-	move.Flags().StringVar(&sourceKubeconfig, "source-kubeconfig", "", "Kubeconfig pointing to the source cluster")
-	move.Flags().StringVar(&targetKubeconfig, "target-kubeconfig", "", "Kubeconfig pointing to the target cluster")
-	move.Flags().StringVar(&namespace, "namespace", "",
+	m.Flags().StringVar(&sourceKubeconfig, "source-kubeconfig", "", "Kubeconfig pointing to the source cluster")
+	m.Flags().StringVar(&targetKubeconfig, "target-kubeconfig", "", "Kubeconfig pointing to the target cluster")
+	m.Flags().StringVar(&namespace, "namespace", "",
 		"namespace to filter CRs to migrate. Defaults to all namespaces if not specified")
-	move.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be moved without executing the migration")
-	move.Flags().BoolVar(&verbose, "verbose", false, "enable verbose logging for detailed output during migration")
-	_ = move.MarkFlagRequired("source-kubeconfig")
-	_ = move.MarkFlagRequired("target-kubeconfig")
+	m.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be moved without executing the migration")
+	m.Flags().BoolVar(&verbose, "verbose", false, "enable verbose logging for detailed output during migration")
+	_ = m.MarkFlagRequired("source-kubeconfig")
+	_ = m.MarkFlagRequired("target-kubeconfig")
 
 	if verbose {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
-	return move
+	return m
 }
 
 func makeClient(kubeconfig string) (client.Client, error) {
@@ -54,8 +54,8 @@ func makeClient(kubeconfig string) (client.Client, error) {
 	return client.New(cfg, client.Options{Scheme: scheme})
 }
 
-func makeClients() (utils.Clients, error) {
-	var clients utils.Clients
+func makeClients() (move.Clients, error) {
+	var clients move.Clients
 	var err error
 
 	clients.Source, err = makeClient(sourceKubeconfig)
@@ -90,5 +90,5 @@ func runMove(cmd *cobra.Command, args []string) error {
 			})
 		}
 	}
-	return utils.Move(ctx, clients, crsSchema, namespace, dryRun)
+	return move.Move(ctx, clients, crsSchema, namespace, dryRun)
 }

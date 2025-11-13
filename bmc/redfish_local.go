@@ -12,10 +12,13 @@ import (
 	gofishCommon "github.com/stmcginnis/gofish/common"
 
 	"github.com/stmcginnis/gofish/redfish"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
+
+const (
+	DummyMockTaskForUpgrade = "dummyTask"
+)
 
 // RedfishLocalBMC implements the BMC interface for Redfish.
 type RedfishLocalBMC struct {
@@ -38,137 +41,6 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 		return nil, fmt.Errorf("failed to create RedfishBMC client: %w", err)
 	}
 	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
-}
-
-// setSystemPowerState updates the power state of a system.
-func (r *RedfishLocalBMC) setSystemPowerState(ctx context.Context, systemURI string, state redfish.PowerState) error {
-	// Apply a 150ms delay before performing the power state change.
-	time.Sleep(150 * time.Millisecond)
-
-	system, err := r.getSystemFromUri(ctx, systemURI)
-	if err != nil {
-		return fmt.Errorf("failed to get system: %w", err)
-	}
-
-	system.PowerState = state
-	system.RawData = nil
-	if err := system.Patch(systemURI, system); err != nil {
-		return fmt.Errorf("failed to patch system to %s: %w", state, err)
-	}
-	return nil
-}
-
-// PowerOn powers on the system asynchronously.
-func (r *RedfishLocalBMC) PowerOn(ctx context.Context, systemURI string) error {
-	go func() {
-		if err := r.setSystemPowerState(ctx, systemURI, redfish.OnPowerState); err != nil {
-			log.FromContext(ctx).Error(err, "PowerOn failed", "systemURI", systemURI)
-			return
-		}
-
-		// Apply pending BIOS settings after a delay (mock for testing).
-		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
-			time.Sleep(50 * time.Millisecond)
-			for key, data := range UnitTestMockUps.PendingBIOSSetting {
-				if _, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
-					UnitTestMockUps.BIOSSettingAttr[key] = data
-				}
-			}
-			UnitTestMockUps.ResetPendingBIOSSetting()
-		}
-	}()
-	return nil
-}
-
-// PowerOff powers off the system asynchronously.
-func (r *RedfishLocalBMC) PowerOff(ctx context.Context, systemURI string) error {
-	go func() {
-		if err := r.setSystemPowerState(ctx, systemURI, redfish.OffPowerState); err != nil {
-			log.FromContext(ctx).Error(err, "PowerOff failed", "systemURI", systemURI)
-		}
-	}()
-	return nil
-}
-
-// GetBiosPendingAttributeValues returns pending BIOS attribute values.
-func (r *RedfishLocalBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
-	pending := UnitTestMockUps.PendingBIOSSetting
-	if len(pending) == 0 {
-		return redfish.SettingsAttributes{}, nil
-	}
-
-	result := make(redfish.SettingsAttributes, len(pending))
-	for key, data := range pending {
-		result[key] = data["value"]
-	}
-	return result, nil
-}
-
-// SetBiosAttributesOnReset sets BIOS attributes, applying them immediately or on next reset.
-func (r *RedfishLocalBMC) SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) error {
-	UnitTestMockUps.ResetPendingBIOSSetting()
-	for key, value := range attributes {
-		if attrData, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
-			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
-				attrData["value"] = value
-			} else {
-				UnitTestMockUps.PendingBIOSSetting[key] = map[string]interface{}{
-					"type":   attrData["type"],
-					"reboot": attrData["reboot"],
-					"value":  value,
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// GetBiosAttributeValues retrieves specific BIOS attribute values.
-func (r *RedfishLocalBMC) GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error) {
-	if len(attributes) == 0 {
-		return nil, nil
-	}
-
-	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get filtered BIOS attributes: %w", err)
-	}
-
-	result := make(redfish.SettingsAttributes, len(attributes))
-	for _, name := range attributes {
-		if attrData, ok := UnitTestMockUps.BIOSSettingAttr[name]; ok && filtered[name].AttributeName != "" {
-			result[name] = attrData["value"]
-		}
-	}
-	return result, nil
-}
-
-// getFilteredBiosRegistryAttributes returns filtered BIOS registry attributes.
-func (r *RedfishLocalBMC) getFilteredBiosRegistryAttributes(readOnly, immutable bool) (map[string]RegistryEntryAttributes, error) {
-	if len(UnitTestMockUps.BIOSSettingAttr) == 0 {
-		return nil, fmt.Errorf("no BIOS setting attributes found")
-	}
-
-	filtered := make(map[string]RegistryEntryAttributes)
-	for name, attrData := range UnitTestMockUps.BIOSSettingAttr {
-		filtered[name] = RegistryEntryAttributes{
-			AttributeName: name,
-			Immutable:     immutable,
-			ReadOnly:      readOnly,
-			Type:          attrData["type"].(string),
-			ResetRequired: attrData["reboot"].(bool),
-		}
-	}
-	return filtered, nil
-}
-
-// CheckBiosAttributes validates BIOS attributes.
-func (r *RedfishLocalBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool, error) {
-	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
-	if err != nil || len(filtered) == 0 {
-		return false, err
-	}
-	return r.checkAttribues(attrs, filtered)
 }
 
 // GetBiosVersion retrieves the BIOS version.
@@ -194,7 +66,7 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer s
 			UnitTestMockUps.BIOSUpgradeTaskIndex++
 		}
 	}()
-	return "dummyTask", false, nil
+	return DummyMockTaskForUpgrade, false, nil
 }
 
 // GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
@@ -329,7 +201,7 @@ func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer st
 			UnitTestMockUps.BMCUpgradeTaskIndex++
 		}
 	}()
-	return "dummyTask", false, nil
+	return DummyMockTaskForUpgrade, false, nil
 }
 
 // GetBMCUpgradeTask retrieves the status of a BMC upgrade task.

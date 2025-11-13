@@ -15,7 +15,7 @@ import (
 )
 
 var _ = Describe("Endpoints Controller", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()

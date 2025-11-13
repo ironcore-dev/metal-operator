@@ -23,7 +23,7 @@ import (
 )
 
 var _ = Describe("BMCVersion Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var (
 		server                  *metalv1alpha1.Server
@@ -428,7 +428,7 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 
 	By("Ensuring that BMCVersion has updated the task Status with task URI")
 	Eventually(Object(bmcVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", "dummyTask"),
+		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
 	)
 
 	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeCompleted'")

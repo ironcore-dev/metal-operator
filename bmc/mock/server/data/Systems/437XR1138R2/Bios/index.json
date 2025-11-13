@@ -7,13 +7,13 @@
         "AdminPhone": "",
         "BootMode": "Uefi",
         "EmbeddedSata": "Raid",
-        "NicBoot1": "NetworkBoot",
+        "NicBoot1": "Enabled",
         "NicBoot2": "Disabled",
         "PowerProfile": "MaxPerf",
-        "ProcCoreDisable": 0,
+        "ProcCores": "All",
         "ProcHyperthreading": "Enabled",
         "ProcTurboMode": "Enabled",
-        "UsbControl": "UsbEnabled"
+        "UsbControl": "Enabled"
     },
     "ResetBiosToDefaultsPending": true,
     "@Redfish.Settings": {

@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -188,6 +189,10 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
+		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
+			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
 	}
 	defer bmcClient.Logout()

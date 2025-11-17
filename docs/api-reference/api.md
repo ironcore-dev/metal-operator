@@ -2050,6 +2050,30 @@ Kubernetes meta/v1.Time
 </tr>
 <tr>
 <td>
+<code>metricsReportSubscriptionLink</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>eventsSubscriptionLink</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>EventsSubscriptionLink is the link to the events subscription of the bmc.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>conditions</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta">

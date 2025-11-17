@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/internal/serverevents"
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -72,6 +73,9 @@ func main() { // nolint: gocyclo
 		registryPort                       int
 		registryProtocol                   string
 		registryURL                        string
+		eventPort                          int
+		eventURL                           string
+		eventProtocol                      string
 		registryResyncInterval             time.Duration
 		webhookPort                        int
 		enforceFirstBoot                   bool
@@ -108,6 +112,10 @@ func main() { // nolint: gocyclo
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
+	flag.StringVar(&eventURL, "event-url", "", "The URL of the server events endpoint for alerts and metrics.")
+	flag.IntVar(&eventPort, "event-port", 10001, "The port to use for the server events endpoint for alerts and metrics.")
+	flag.StringVar(&eventProtocol, "event-protocol", "http",
+		"The protocol to use for the server events endpoint for alerts and metrics.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
@@ -177,6 +185,15 @@ func main() { // nolint: gocyclo
 			os.Exit(1)
 		}
 		registryURL = fmt.Sprintf("%s://%s:%d", registryProtocol, registryAddr, registryPort)
+	}
+
+	// set the correct event URL by getting the address from the environment
+	var eventAddr string
+	if eventURL == "" {
+		eventAddr = os.Getenv("EVENT_ADDRESS")
+		if eventAddr != "" {
+			eventURL = fmt.Sprintf("%s://%s:%d", eventProtocol, eventAddr, eventPort)
+		}
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -332,6 +349,7 @@ func main() { // nolint: gocyclo
 		ProbeImage:              probeImage,
 		ProbeOSImage:            probeOSImage,
 		RegistryURL:             registryURL,
+		EventURL:                eventURL,
 		RegistryResyncInterval:  registryResyncInterval,
 		ResyncInterval:          serverResyncInterval,
 		EnforceFirstBoot:        enforceFirstBoot,
@@ -530,6 +548,17 @@ func main() { // nolint: gocyclo
 	})); err != nil {
 		setupLog.Error(err, "unable to add registry runnable to manager")
 		os.Exit(1)
+	}
+
+	if eventAddr != "" {
+		setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
+		eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
+		go func() {
+			if err := eventServer.Start(ctx); err != nil {
+				setupLog.Error(err, "problem running event server")
+				os.Exit(1)
+			}
+		}()
 	}
 
 	setupLog.Info("starting manager")

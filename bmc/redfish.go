@@ -720,10 +720,7 @@ func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*r
 		}); err != nil {
 		return nil, fmt.Errorf("failed to wait for for server systems to be ready: %w", err)
 	}
-	if system.UUID != "" {
-		return system, nil
-	}
-	return nil, fmt.Errorf("no system found for %v", systemURI)
+	return system, nil
 }
 
 func (r *RedfishBMC) WaitForServerPowerState(ctx context.Context, systemURI string, powerState redfish.PowerState) error {

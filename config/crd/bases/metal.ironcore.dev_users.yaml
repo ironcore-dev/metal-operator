@@ -56,9 +56,8 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               bmcSecretRef:
-                description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                description: if not set, the operator will generate a secure password
+                  based on BMC manufacturer requirements.
                 properties:
                   name:
                     default: ""

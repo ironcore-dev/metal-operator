@@ -1262,7 +1262,7 @@ Kubernetes core/v1.LocalObjectReference
 <em>(Optional)</em>
 <p>AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
 This secret is used for administrative access to the BMC and may include elevated privileges.
-It will replqce the BMCSecretRef for administrative operations.</p>
+It will replace the BMCSecretRef for administrative operations.</p>
 </td>
 </tr>
 <tr>
@@ -1877,7 +1877,7 @@ Kubernetes core/v1.LocalObjectReference
 <em>(Optional)</em>
 <p>AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
 This secret is used for administrative access to the BMC and may include elevated privileges.
-It will replqce the BMCSecretRef for administrative operations.</p>
+It will replace the BMCSecretRef for administrative operations.</p>
 </td>
 </tr>
 <tr>
@@ -5487,6 +5487,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>if not set, the operator will generate a secure password based on BMC manufacturer requirements.</p>
 </td>
 </tr>
 <tr>
@@ -5607,6 +5608,7 @@ Kubernetes core/v1.LocalObjectReference
 </em>
 </td>
 <td>
+<p>if not set, the operator will generate a secure password based on BMC manufacturer requirements.</p>
 </td>
 </tr>
 <tr>

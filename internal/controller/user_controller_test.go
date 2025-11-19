@@ -98,7 +98,7 @@ var _ = Describe("User Controller", func() {
 		Expect(effectiveSecret.Data).To(HaveKeyWithValue("username", []byte("user")))
 		password := string(effectiveSecret.Data["password"])
 		// make sure that the password has a length of 30 (default max length for redfish mock server)
-		Expect(len(password)).To(Equal(30))
+		Expect(password).To(HaveLen(30))
 
 	})
 

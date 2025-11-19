@@ -52,26 +52,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-metal-ironcore-dev-v1alpha1-bmcsecret
-  failurePolicy: Fail
-  name: vbmcsecret-v1alpha1.kb.io
-  rules:
-  - apiGroups:
-    - metal.ironcore.dev
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - bmcsecrets
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /validate-metal-ironcore-dev-v1alpha1-bmcsettings
   failurePolicy: Fail
   name: vbmcsettings-v1alpha1.kb.io

@@ -58,7 +58,7 @@ type BMCSpec struct {
 
 	// AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
 	// This secret is used for administrative access to the BMC and may include elevated privileges.
-	// It will replqce the BMCSecretRef for administrative operations.
+	// It will replace the BMCSecretRef for administrative operations.
 	// +optional
 	AdminUserRef *v1.LocalObjectReference `json:"adminUserRef,omitempty"`
 

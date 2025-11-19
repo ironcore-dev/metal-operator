@@ -148,7 +148,6 @@ func (r *UserReconciler) patchUserStatus(ctx context.Context, log logr.Logger, u
 }
 
 func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (ctrl.Result, error) {
-	log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 	forceRotation := false
 	if user.GetAnnotations() != nil && user.GetAnnotations()[metalv1alpha1.OperationAnnotation] == metalv1alpha1.OperationAnnotationRotateCredentials {
 		log.Info("User has rotation annotation set, triggering password rotation", "User", user.Name)
@@ -170,7 +169,6 @@ func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Lo
 		log.V(1).Info("No rotation period set for BMC user, skipping password rotation", "User", user.Name)
 		return ctrl.Result{}, nil
 	}
-	log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 	if user.Status.LastRotation != nil && user.Status.LastRotation.Add(user.Spec.RotationPolicy.Duration).After(metav1.Now().Time) && !forceRotation {
 		log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 		return ctrl.Result{
@@ -187,10 +185,10 @@ func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Lo
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to generate new password for BMC user %s: %w", user.Name, err)
 	}
-	if err := r.createSecret(ctx, log, user, string(newPassword)); err != nil {
+	if err := r.createSecret(ctx, log, user, newPassword); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create BMCSecret: %w", err)
 	}
-	if err := bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, string(newPassword), r.Insecure); err != nil {
+	if err := bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, newPassword, r.Insecure); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create or update BMC account with new password: %w", err)
 	}
 	// Update the last rotation time
@@ -213,11 +211,11 @@ func (r *UserReconciler) handleMissingBMCSecretRef(ctx context.Context, log logr
 	if err != nil {
 		return fmt.Errorf("failed to generate new password for BMC account %s: %w", user.Name, err)
 	}
-	if err := r.createSecret(ctx, log, user, string(newPassword)); err != nil {
+	if err := r.createSecret(ctx, log, user, newPassword); err != nil {
 		return fmt.Errorf("failed to create BMCSecret: %w", err)
 	}
 	log.Info("Creating BMC account with new password", "Account", user.Name)
-	if err := bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, string(newPassword), r.Insecure); err != nil {
+	if err := bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, newPassword, r.Insecure); err != nil {
 		return fmt.Errorf("failed to create or update BMC account with new password: %w", err)
 	}
 	log.Info("BMC account created with new password", "Account", user.Name)
@@ -343,7 +341,7 @@ func (r *UserReconciler) updateEffectiveSecret(ctx context.Context, log logr.Log
 		log.Info("New BMCSecret is invalid, will not update effective BMCSecret", "User", user.Name, "NewBMCSecret", secret.Name)
 		return nil
 	}
-	if user.Status.EffectiveBMCSecretRef == nil && !invalidCredentials {
+	if user.Status.EffectiveBMCSecretRef == nil {
 		if err := r.setEffectiveSecretRef(ctx, log, user, secret); err != nil {
 			return fmt.Errorf("failed to update effective BMCSecret: %w", err)
 		}

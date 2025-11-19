@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1alpha1
@@ -6,26 +6,39 @@ package v1alpha1
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	// TODO (user): Add any additional imports if needed
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("BMCSecret Webhook", func() {
 	var (
-		obj       *metalv1alpha1.BMCSecret
-		oldObj    *metalv1alpha1.BMCSecret
+		BMCSecret *metalv1alpha1.BMCSecret
 		validator BMCSecretCustomValidator
 	)
 
 	BeforeEach(func() {
-		obj = &metalv1alpha1.BMCSecret{}
-		oldObj = &metalv1alpha1.BMCSecret{}
-		validator = BMCSecretCustomValidator{}
+		validator = BMCSecretCustomValidator{
+			Client: k8sClient,
+		}
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
-		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
-		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
-		// TODO (user): Add any setup logic common to all tests
+		BMCSecret = &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    "ns.Name",
+				GenerateName: "test-bmc-secret",
+			},
+			Data: map[string][]byte{
+				"username": []byte("admin"),
+				"password": []byte("adminpass"),
+			},
+			Immutable: &[]bool{true}[0],
+		}
+		By("Creating an BMCSecret")
+		Expect(k8sClient.Create(ctx, BMCSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, BMCSecret)
+		SetClient(k8sClient)
+
 	})
 
 	AfterEach(func() {
@@ -33,26 +46,23 @@ var _ = Describe("BMCSecret Webhook", func() {
 	})
 
 	Context("When creating or updating BMCSecret under Validating Webhook", func() {
-		// TODO (user): Add logic for validating webhooks
-		// Example:
-		// It("Should deny creation if a required field is missing", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = ""
-		//     Expect(validator.ValidateCreate(ctx, obj)).Error().To(HaveOccurred())
-		// })
-		//
-		// It("Should admit creation if all required fields are present", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = "valid_value"
-		//     Expect(validator.ValidateCreate(ctx, obj)).To(BeNil())
-		// })
-		//
-		// It("Should validate updates correctly", func() {
-		//     By("simulating a valid update scenario")
-		//     oldObj.SomeRequiredField = "updated_value"
-		//     obj.SomeRequiredField = "updated_value"
-		//     Expect(validator.ValidateUpdate(ctx, oldObj, obj)).To(BeNil())
-		// })
+		It("Should deny Update BMCSecret if Immutable is set to True", func(ctx SpecContext) {
+			By("Updating an BMCSecret with Immutable set to True")
+			BMCSecretUpdated := BMCSecret.DeepCopy()
+			BMCSecretUpdated.Data["username"] = []byte("newadmin")
+			Expect(validator.ValidateUpdate(ctx, BMCSecret, BMCSecretUpdated)).Error().To(HaveOccurred())
+		})
+
+		It("Should allow Update BMCSecret if Immutable is set to False", func(ctx SpecContext) {
+			By("Updating an BMCSecret with Immutable set to False")
+			BMCSecretMutable := BMCSecret.DeepCopy()
+			BMCSecretMutable.Immutable = &[]bool{false}[0]
+			Expect(k8sClient.Update(ctx, BMCSecretMutable)).To(Succeed())
+
+			BMCSecretUpdated := BMCSecretMutable.DeepCopy()
+			BMCSecretUpdated.Data["username"] = []byte("newadmin")
+			Expect(validator.ValidateUpdate(ctx, BMCSecretMutable, BMCSecretUpdated)).Error().NotTo(HaveOccurred())
+		})
 	})
 
 })

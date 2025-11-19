@@ -122,6 +122,9 @@ type BMC interface {
 	// GetAccounts retrieves all BMC user accounts.
 	GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error)
 
+	// GetAccountService retrieves the account service.
+	GetAccountService(ctx context.Context) (*redfish.AccountService, error)
+
 	// UpgradeBMCVersion upgrades the BMC version for the system.
 	UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error)
 

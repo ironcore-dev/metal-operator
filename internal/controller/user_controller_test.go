@@ -96,6 +96,10 @@ var _ = Describe("User Controller", func() {
 
 		By("Ensuring the effective bmcSecret has the correct data")
 		Expect(effectiveSecret.Data).To(HaveKeyWithValue("username", []byte("user")))
+		password := string(effectiveSecret.Data["password"])
+		// make sure that the password has a length of 30 (default max length for redfish mock server)
+		Expect(len(password)).To(Equal(30))
+
 	})
 
 	It("Should just create additional bmc users", func(ctx SpecContext) {

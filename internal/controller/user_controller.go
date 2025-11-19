@@ -92,7 +92,7 @@ func (r *UserReconciler) reconcile(ctx context.Context, log logr.Logger, user *m
 
 	if user.Spec.BMCSecretRef == nil {
 		log.Info("No BMCSecret reference set for User, creating a new one", "User", user.Name)
-		if err := r.handleMissingBMCSecretRef(ctx, log, bmcClient, user); err != nil {
+		if err := r.handleMissingBMCSecretRef(ctx, log, bmcClient, user, bmcObj); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to handle missing BMCSecret reference: %w", err)
 		}
 	}
@@ -123,7 +123,7 @@ func (r *UserReconciler) reconcile(ctx context.Context, log logr.Logger, user *m
 			return ctrl.Result{}, fmt.Errorf("failed to handle updated BMCSecret reference: %w", err)
 		}
 	}
-	return r.handleRotatingPassword(ctx, log, user, bmcClient)
+	return r.handleRotatingPassword(ctx, log, user, bmcObj, bmcClient)
 }
 
 func (r *UserReconciler) patchUserStatus(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, bmcClient bmc.BMC) error {
@@ -147,7 +147,7 @@ func (r *UserReconciler) patchUserStatus(ctx context.Context, log logr.Logger, u
 	return nil
 }
 
-func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, bmcClient bmc.BMC) (ctrl.Result, error) {
+func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (ctrl.Result, error) {
 	log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 	forceRotation := false
 	if user.GetAnnotations() != nil && user.GetAnnotations()[metalv1alpha1.OperationAnnotation] == metalv1alpha1.OperationAnnotationRotateCredentials {
@@ -179,7 +179,11 @@ func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Lo
 		}, nil
 	}
 	log.Info("Rotating BMC user password", "User", user.Name)
-	newPassword, err := GenerateRandomPassword(16)
+	accountService, err := bmcClient.GetAccountService(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get account service: %w", err)
+	}
+	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), accountService.MaxPasswordLength)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to generate new password for BMC user %s: %w", user.Name, err)
 	}
@@ -199,9 +203,13 @@ func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Lo
 	return ctrl.Result{}, nil
 }
 
-func (r *UserReconciler) handleMissingBMCSecretRef(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, user *metalv1alpha1.User) error {
+func (r *UserReconciler) handleMissingBMCSecretRef(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, user *metalv1alpha1.User, bmcObj *metalv1alpha1.BMC) error {
 	log.Info("No BMCSecret reference set for User, creating a new one", "User", user.Name)
-	newPassword, err := GenerateRandomPassword(16)
+	accountService, err := bmcClient.GetAccountService(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), accountService.MaxPasswordLength)
 	if err != nil {
 		return fmt.Errorf("failed to generate new password for BMC account %s: %w", user.Name, err)
 	}
@@ -242,13 +250,6 @@ func (r *UserReconciler) removeEffectiveSecret(ctx context.Context, log logr.Log
 
 func (r *UserReconciler) createSecret(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, password string) error {
 	log.Info("Creating BMCSecret for User", "User", user.Name)
-	if password == "" {
-		passwordBytes, err := GenerateRandomPassword(16)
-		if err != nil {
-			return fmt.Errorf("failed to generate new password for BMC account %s: %w", user.Name, err)
-		}
-		password = string(passwordBytes)
-	}
 	secret := &metalv1alpha1.BMCSecret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: user.Name + "-bmcsecret-",

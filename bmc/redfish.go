@@ -5,10 +5,12 @@ package bmc
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"slices"
 	"strings"
@@ -738,6 +740,14 @@ func (r *RedfishBMC) CreateOrUpdateAccount(
 	return nil
 }
 
+func (r *RedfishBMC) GetAccountService(ctx context.Context) (*redfish.AccountService, error) {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return service, fmt.Errorf("failed to get account service: %w", err)
+	}
+	return service, nil
+}
+
 func (r *RedfishBMC) GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error) {
 	service, err := r.client.GetService().AccountService()
 	if err != nil {
@@ -1011,4 +1021,107 @@ func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string,
 	}
 
 	return oem.GetTaskMonitorDetails(ctx, respTask)
+}
+
+const (
+	charLower = "abcdefghijklmnopqrstuvwxyz"
+	charUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	charDigit = "0123456789"
+)
+
+// ManufacturerPasswordConfig holds vendor-specific constraints, including max length and allowed special characters.
+type ManufacturerPasswordConfig struct {
+	SpecialChars string
+}
+
+// Vendor-specific constraints map.
+var manufacturerPasswordConfigs = map[Manufacturer]ManufacturerPasswordConfig{
+	ManufacturerDell: {
+		SpecialChars: "!#$%%&()*.?-@[]^_`{}|~+=",
+	},
+	ManufacturerHPE: {
+		SpecialChars: "~`!@#$%^&*()_-+={[}]|.?/",
+	},
+	ManufacturerLenovo: {
+		SpecialChars: ";@!$%-+=[]{}|/?~_",
+	},
+	"default": {
+		SpecialChars: "!@#$%&*()_-+=[]{}/?~|",
+	},
+}
+
+// GenerateSecurePassword generates a secure password for BMC accounts based on vendor-specific requirements.
+func GenerateSecurePassword(manufacturer Manufacturer, length int) (string, error) {
+	config, ok := manufacturerPasswordConfigs[manufacturer]
+	if !ok {
+		config = manufacturerPasswordConfigs["default"]
+	}
+
+	// Define the total character pool using the vendor-specific special characters.
+	allChars := charLower + charUpper + charDigit + config.SpecialChars
+
+	// Ensure the special character set is not empty (it shouldn't be with the defined constants)
+	if len(config.SpecialChars) == 0 {
+		return "", fmt.Errorf("vendor %s has an empty special character set, complexity cannot be guaranteed", manufacturer)
+	}
+
+	// Ensure minimum complexity (at least one of each type).
+	mustInclude := []string{charLower, charUpper, charDigit, config.SpecialChars}
+	if length < len(mustInclude) {
+		return "", fmt.Errorf("password length must be at least %d to meet complexity requirements", len(mustInclude))
+	}
+
+	passwordRunes := make([]rune, length)
+	currentIdx := 0
+
+	// A. Add mandatory characters (one from each group).
+	for i, charSet := range mustInclude {
+		if len(charSet) == 0 {
+			return "", fmt.Errorf("character set %d is empty, cannot generate secure password", i)
+		}
+		char, err := randomChar(charSet)
+		if err != nil {
+			return "", err
+		}
+		passwordRunes[currentIdx] = char
+		currentIdx++
+	}
+
+	// B. Fill the remainder randomly.
+	remainingLength := length - len(mustInclude)
+	for i := 0; i < remainingLength; i++ {
+		char, err := randomChar(allChars)
+		if err != nil {
+			return "", err
+		}
+		passwordRunes[currentIdx] = char
+		currentIdx++
+	}
+
+	// C. Shuffle to randomize positions.
+	if err := shuffleRunes(passwordRunes); err != nil {
+		return "", err
+	}
+
+	return string(passwordRunes), nil
+}
+
+func randomChar(charSet string) (rune, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charSet))))
+	if err != nil {
+		return 0, err
+	}
+	return rune(charSet[n.Int64()]), nil
+}
+
+func shuffleRunes(a []rune) error {
+	for i := len(a) - 1; i > 0; i-- {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return err
+		}
+		j := n.Int64()
+		a[i], a[j] = a[j], a[i]
+	}
+	return nil
 }

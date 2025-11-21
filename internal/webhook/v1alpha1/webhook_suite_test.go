@@ -19,6 +19,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 
 	// +kubebuilder:scaffold:imports
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
@@ -111,6 +112,7 @@ var _ = BeforeSuite(func() {
 		Metrics:        metricsserver.Options{BindAddress: "0"},
 	})
 	Expect(err).NotTo(HaveOccurred())
+	Expect(controller.RegisterIndexFields(ctx, mgr.GetFieldIndexer())).To(Succeed())
 
 	err = SetupEndpointWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())

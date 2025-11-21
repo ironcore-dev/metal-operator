@@ -39,6 +39,7 @@ FROM gcr.io/distroless/static:nonroot AS manager
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
 COPY --from=manager-builder /workspace/manager .
+COPY config/manager/ignition-template.yaml /etc/metal-operator/ignition-template.yaml
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

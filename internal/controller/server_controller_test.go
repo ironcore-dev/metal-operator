@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -25,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -192,12 +195,16 @@ var _ = Describe("Server Controller", func() {
 		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
 		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
 
-		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
-			Image:        "foo:latest",
-			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-			PasswordHash: passwordHash,
-		})
+		// Generate expected ignition data using the same template file the controller uses
+		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
+			ignition.Config{
+				Image:        "foo:latest",
+				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
+				PasswordHash: passwordHash,
+			},
+		)
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
@@ -386,12 +393,16 @@ var _ = Describe("Server Controller", func() {
 
 		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
 
-		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
-			Image:        "foo:latest",
-			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-			PasswordHash: passwordHash,
-		})
+		// Generate expected ignition data using the same template file the controller uses
+		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
+			ignition.Config{
+				Image:        "foo:latest",
+				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
+				PasswordHash: passwordHash,
+			},
+		)
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
@@ -793,6 +804,287 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(bmcSecret)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	Context("File-based Ignition Templates", func() {
+		var bmcSecret *metalv1alpha1.BMCSecret
+		var server *metalv1alpha1.Server
+
+		BeforeEach(func(ctx SpecContext) {
+			By("Creating a BMCSecret")
+			bmcSecret = &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-server-",
+				},
+				Data: map[string][]byte{
+					"username": []byte("foo"),
+					"password": []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+			By("Creating a Server with inline BMC configuration")
+			server = &metalv1alpha1.Server{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "server-",
+				},
+				Spec: metalv1alpha1.ServerSpec{
+					SystemUUID: "38947555-7742-3448-3784-823347823834",
+					BMC: &metalv1alpha1.BMCAccess{
+						Protocol: metalv1alpha1.Protocol{
+							Name: metalv1alpha1.ProtocolRedfishLocal,
+							Port: MockServerPort,
+						},
+						Address: MockServerIP,
+						BMCSecretRef: v1.LocalObjectReference{
+							Name: bmcSecret.Name,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, server)).To(Succeed())
+		})
+
+		AfterEach(func(ctx SpecContext) {
+			By("Cleaning up test resources")
+			if server != nil {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+			}
+			if bmcSecret != nil {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
+			}
+		})
+
+		It("Should use custom file template when available", func(ctx SpecContext) {
+			By("Creating a custom ignition template file")
+			customTemplate := `variant: fcos
+version: "1.4.0"
+systemd:
+  units:
+    - name: custom-metalprobe.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=Custom Metal Probe Service
+        [Service]
+        Restart=on-failure
+        RestartSec=30
+        ExecStartPre=/usr/bin/docker pull {{.Image}}
+        ExecStart=/usr/bin/docker run --network host --privileged --name custom-metalprobe {{.Image}} {{.Flags}}
+        ExecStop=/usr/bin/docker stop custom-metalprobe
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: custom-metal
+      password_hash: {{.PasswordHash}}
+      groups: [ "wheel", "docker" ]
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+
+			tmpFile, err := os.CreateTemp("", "ignition-template-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(os.Remove, tmpFile.Name())
+
+			_, err = tmpFile.WriteString(customTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a ServerReconciler with file path")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: tmpFile.Name(),
+			}
+
+			By("Generating ignition data with custom file")
+			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.4.0\""))
+			Expect(ignitionStr).To(ContainSubstring("custom-metalprobe.service"))
+			Expect(ignitionStr).To(ContainSubstring("Custom Metal Probe Service"))
+			Expect(ignitionStr).To(ContainSubstring("custom-metal"))
+			Expect(ignitionStr).To(ContainSubstring("RestartSec=30"))
+		})
+
+		It("Should fallback with error when file is missing", func(ctx SpecContext) {
+			By("Creating a ServerReconciler with non-existent file path")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: "/nonexistent/path/ignition.yaml",
+			}
+
+			By("Generating ignition data (should fail)")
+			_, err := reconciler.generateDefaultIgnitionDataForServer(
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
+		})
+
+		It("Should fail when file template is invalid", func(ctx SpecContext) {
+			By("Creating a file with invalid template")
+			invalidTemplate := `variant: fcos
+systemd:
+  units:
+    - name: broken-service
+      contents: {{.InvalidTemplateField}}`
+
+			tmpFile, err := os.CreateTemp("", "invalid-template-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(os.Remove, tmpFile.Name())
+
+			_, err = tmpFile.WriteString(invalidTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a ServerReconciler with invalid template file")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: tmpFile.Name(),
+			}
+
+			By("Generating ignition data (should fail)")
+			_, err = reconciler.generateDefaultIgnitionDataForServer(
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
+		})
+
+		It("Should use default ignition template from file", func(ctx SpecContext) {
+			By("Creating a default ignition template file")
+			defaultTemplate := `variant: fcos
+version: "1.3.0"
+systemd:
+  units:
+    - name: metalprobe.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=Metal Probe Service
+        [Service]
+        ExecStart=/usr/bin/docker run --name metalprobe {{.Image}} {{.Flags}}
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: metal
+      password_hash: {{.PasswordHash}}
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+
+			tmpFile, err := os.CreateTemp("", "default-ignition-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(os.Remove, tmpFile.Name())
+
+			_, err = tmpFile.WriteString(defaultTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a ServerReconciler with default file path")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: tmpFile.Name(),
+			}
+
+			By("Generating ignition data (should use default template)")
+			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			// Should contain default template content
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
+			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
+			Expect(ignitionStr).To(ContainSubstring("name: metal"))
+		})
+
+		It("Should create server with custom ignition template file end-to-end", func(ctx SpecContext) {
+			By("Creating a custom ignition template file")
+			customTemplate := `variant: fcos
+version: "1.5.0"
+systemd:
+  units:
+    - name: e2e-custom-probe.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=E2E Custom Probe Service
+        [Service]
+        Restart=always
+        ExecStart=/usr/bin/docker run --name e2e-probe {{.Image}} {{.Flags}}
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: e2e-user
+      password_hash: {{.PasswordHash}}
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+
+			tmpFile, err := os.CreateTemp("", "e2e-ignition-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(os.Remove, tmpFile.Name())
+
+			_, err = tmpFile.WriteString(customTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a reconciler with custom ignition template path")
+			customReconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "custom-probe:v1.0.0",
+				Insecure:              true,
+				DiscoveryIgnitionPath: tmpFile.Name(),
+			}
+
+			By("Generating ignition data with custom template")
+			ignitionData, err := customReconciler.generateDefaultIgnitionDataForServer(
+				"--registry-url=http://localhost:30000 --server-uuid=e2e-test-12345",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.5.0\""), "Should use custom template version")
+			Expect(ignitionStr).To(ContainSubstring("e2e-custom-probe.service"), "Should use custom service name")
+			Expect(ignitionStr).To(ContainSubstring("E2E Custom Probe Service"), "Should use custom description")
+			Expect(ignitionStr).To(ContainSubstring("e2e-user"), "Should use custom username")
+			Expect(ignitionStr).To(ContainSubstring("custom-probe:v1.0.0"), "Should include custom probe image")
+		})
+	})
 })
 
 func deleteRegistrySystemIfExists(systemUUID string) {
@@ -805,8 +1097,8 @@ func deleteRegistrySystemIfExists(systemUUID string) {
 		if err != nil {
 			return
 		}
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		httpClient := &http.Client{}
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return
 		}

@@ -723,7 +723,7 @@ func (r *BiosSettingsReconciler) SetTimeOutForApplyingSettings(
 				return false, fmt.Errorf("failed to update timeout during settings update condition: %w", err)
 			}
 			err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsFlowStateFailed, currentFlowStatus, timedOut)
-			return true, err
+			return true, errors.Join(err, r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, nil))
 		}
 	}
 	return false, nil
@@ -860,6 +860,20 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 		return fmt.Errorf("failed to get BIOS settings difference: %w", err)
 	}
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+	if len(settingsDiff) == 0 {
+		log.V(1).Info("No BIOS settings difference found to apply on server", "currentSettings Name", currentSettings.Name)
+		if err := acc.Update(
+			issueBiosUpdate,
+			conditionutils.UpdateStatus(corev1.ConditionTrue),
+			conditionutils.UpdateReason(issuedBIOSSettingUpdateReason),
+			conditionutils.UpdateMessage("BIOS Settings issue has been Skipped on the server as no difference found"),
+		); err != nil {
+			return fmt.Errorf("failed to update issued settings update condition: %w", err)
+		}
+		err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, currentFlowStatus.State, currentFlowStatus, issueBiosUpdate)
+		log.V(1).Info("Reconciled biosSettings at issue Settings to server state", "currentSettings Name", currentSettings.Name)
+		return err
+	}
 	// check if the pending tasks not present on the bios settings
 	pendingSettings, err := r.getPendingSettingsOnBIOS(ctx, log, bmcClient, server)
 	if err != nil {
@@ -872,6 +886,11 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 		if err != nil {
 			return fmt.Errorf("failed to set BMC settings: %w", err)
 		}
+	} else {
+		// this can only happen if we have issued the settings update
+		// or unexpected pending settings found because of spec update during Inprogress of settings
+		log.V(1).Info("pending settings found, checking if Unknown or InProgress State found in other FlowStatus", "pendingSettings", pendingSettings)
+		return fmt.Errorf("pending settings found on BIOS, cannot issue new settings update. pending settings: %v", pendingSettings)
 	}
 
 	// Get the latest pending settings and expect it to be zero different from the required settings.
@@ -912,7 +931,7 @@ func (r *BiosSettingsReconciler) applyBiosSettingOnServer(
 			return fmt.Errorf("failed to update unexpected pending settings found condition: %w", err)
 		}
 		err = r.updateBiosSettingsFlowStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsFlowStateFailed, currentFlowStatus, unexpectedPendingSettings)
-		return err
+		return errors.Join(err, r.updateBiosSettingsStatus(ctx, log, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, nil))
 	}
 
 	if err := acc.Update(
@@ -1018,13 +1037,13 @@ func (r *BiosSettingsReconciler) checkPendingSettingsDiff(
 	settingsDiff redfish.SettingsAttributes,
 ) redfish.SettingsAttributes {
 	// if settingsDiff is provided find the difference between settingsDiff and pending
-	log.V(1).Info("Checking for the difference in the pending settings than that of required")
 	unknownpendingSettings := make(redfish.SettingsAttributes, len(settingsDiff))
 	for name, value := range settingsDiff {
 		if pendingValue, ok := pendingSettings[name]; ok && value != pendingValue {
 			unknownpendingSettings[name] = pendingValue
 		}
 	}
+	log.V(1).Info("Difference between the pending settings and that of required", "unknownPendingSettings", unknownpendingSettings)
 	return unknownpendingSettings
 }
 
@@ -1034,13 +1053,11 @@ func (r *BiosSettingsReconciler) getPendingSettingsOnBIOS(
 	bmcClient bmc.BMC,
 	server *metalv1alpha1.Server,
 ) (pendingSettings redfish.SettingsAttributes, err error) {
-	log.V(1).Info("Fetching the pending settings on bios")
-
 	pendingSettings, err = bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemURI)
 	if err != nil {
 		return pendingSettings, err
 	}
-
+	log.V(1).Info("Fetched pending settings on bios", "pendingSettings", pendingSettings)
 	return pendingSettings, nil
 }
 
@@ -1098,7 +1115,11 @@ func (r *BiosSettingsReconciler) getCurrentSettingDifference(
 	}
 
 	if len(diff) > 0 {
-		log.V(1).Info("current BIOS settings on the server", "currentSettings", currentSettings)
+		log.V(1).Info("current BIOS settings on the server",
+			"currentSettings", currentSettings,
+			"currentSettingsKeys", keys,
+			"current Spec settings", currentPrioritySettings,
+			"difference", diff)
 	}
 
 	return diff, errors.Join(errs...)

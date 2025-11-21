@@ -61,6 +61,11 @@ spec:
         volumeMounts:
         - mountPath: /etc/macdb/
           name: macdb
+        {{- if .Values.ignition.override }}
+        - name: ignition-template
+          mountPath: /etc/metal-operator
+          readOnly: true
+        {{- end }}
         {{- if and .Values.webhook.enable .Values.certmanager.enable }}
         - name: webhook-cert
           mountPath: /tmp/k8s-webhook-server/serving-certs
@@ -87,6 +92,11 @@ spec:
       - name: macdb
         secret:
           secretName: macdb
+      {{- if .Values.ignition.override }}
+      - name: ignition-template
+        configMap:
+          name: {{ include "chart.name" . }}-ignition-template
+      {{- end }}
       {{- if and .Values.webhook.enable .Values.certmanager.enable }}
       - name: webhook-cert
         secret:

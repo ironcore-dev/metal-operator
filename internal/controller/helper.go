@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/stmcginnis/gofish/redfish"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -133,6 +135,61 @@ func enqueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 		return !reflect.DeepEqual(oldCopy, e.ObjectNew)
 	}
 	return true
+}
+
+func resetBMCOfServer(
+	ctx context.Context,
+	log logr.Logger,
+	kClient client.Client,
+	server *metalv1alpha1.Server,
+	bmcClient bmc.BMC,
+) error {
+	if server.Spec.BMCRef != nil {
+		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
+		BMC := &metalv1alpha1.BMC{}
+		if err := kClient.Get(ctx, key, BMC); err != nil {
+			log.V(1).Error(err, "failed to get referred server's Manager")
+			return err
+		}
+		annotations := BMC.GetAnnotations()
+		if annotations != nil {
+			if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
+				if op == metalv1alpha1.GracefulRestartBMC {
+					log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
+					return nil
+				} else {
+					return fmt.Errorf("unknown annotation on BMC object for operation annotation %v", op)
+				}
+			}
+		}
+		log.V(1).Info("Setting annotation on BMC resource to trigger with BMC reset")
+
+		BMCBase := BMC.DeepCopy()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.GracefulRestartBMC
+		BMC.SetAnnotations(annotations)
+		if err := kClient.Patch(ctx, BMC, client.MergeFrom(BMCBase)); err != nil {
+			return err
+		}
+		return nil
+	} else if server.Spec.BMC != nil {
+		// no BMC ref, but BMC details are inline in server spec
+		// we can directly reset BMC in this case, so just proceed
+		// as we have the BMCclient, get the 1st manager and reset it
+		bmc, err := bmcClient.GetManager("")
+		if err != nil {
+			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
+		}
+		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
+		err = bmcClient.ResetManager(ctx, bmc.ID, redfish.GracefulRestartResetType)
+		if err != nil {
+			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("no BMC reference or inline BMC details found in server spec to reset BMC")
 }
 
 func handleIgnoreAnnotationPropagation(

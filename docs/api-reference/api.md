@@ -1759,6 +1759,20 @@ BMCSettingsState
 <p>State represents the current state of the BMC configuration task.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions represents the latest available observations of the BMC Settings Resource state.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec
@@ -1900,6 +1914,9 @@ the BMC configuration for this BMC.</p>
 </tr><tr><td><p>&#34;Error&#34;</p></td>
 <td><p>BMCStateError indicates that there is an error with the BMC.</p>
 </td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>BMCStatePending indicates that there is an error connecting with the BMC.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.BMCStatus">BMCStatus
@@ -2017,7 +2034,8 @@ BMCState
 </td>
 <td>
 <em>(Optional)</em>
-<p>State represents the current state of the BMC.</p>
+<p>State represents the current state of the BMC.
+kubebuilder:validation:Enum=Enabled;Error;Pending</p>
 </td>
 </tr>
 <tr>

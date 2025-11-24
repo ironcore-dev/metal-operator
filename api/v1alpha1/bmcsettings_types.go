@@ -61,6 +61,12 @@ type BMCSettingsStatus struct {
 	// State represents the current state of the BMC configuration task.
 	// +optional
 	State BMCSettingsState `json:"state,omitempty"`
+
+	// Conditions represents the latest available observations of the BMC Settings Resource state.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +kubebuilder:object:root=true

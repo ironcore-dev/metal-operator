@@ -16,10 +16,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
+	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/stmcginnis/gofish/common"
+)
+
+const (
+	UserFinalizer = "metal.ironcore.dev/user-finalizer"
 )
 
 // UserReconciler reconciles a Account object
@@ -49,12 +54,12 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	if err := r.Get(ctx, req.NamespacedName, user); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
 	return r.reconcileExists(ctx, log, user)
 }
 
 func (r *UserReconciler) reconcileExists(ctx context.Context, log logr.Logger, user *metalv1alpha1.User) (ctrl.Result, error) {
 	if !user.DeletionTimestamp.IsZero() {
+		log.Info("User is being deleted, handling deletion", "User", user.Name)
 		return r.delete(ctx, log, user)
 	}
 	return r.reconcile(ctx, log, user)
@@ -72,15 +77,13 @@ func (r *UserReconciler) reconcile(ctx context.Context, log logr.Logger, user *m
 	}, bmcObj); err != nil {
 		return ctrl.Result{}, err
 	}
-	// Add this check once we use the user CRD also for BMC admin users
-	/*if bmcObj.Spec.AdminUserRef == nil {
-		return ctrl.Result{}, fmt.Errorf("BMC %s does not have an admin user reference set", bmcObj.Name)
-	}
-	*/
 	if err := r.updateEffectiveSecret(ctx, log, user, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update effective BMCSecret: %w", err)
 	}
-	bmcClient, err := r.getBMCClient(ctx, log, bmcObj, user)
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, user, UserFinalizer); err != nil || modified {
+		return ctrl.Result{}, err
+	}
+	bmcClient, err := r.getBMCClient(ctx, bmcObj)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 	}
@@ -115,7 +118,6 @@ func (r *UserReconciler) reconcile(ctx context.Context, log logr.Logger, user *m
 		if err = r.patchUserStatus(ctx, log, user, bmcClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update User status after creating BMC account: %w", err)
 		}
-
 	}
 	if user.Status.EffectiveBMCSecretRef != nil && user.Spec.BMCSecretRef.Name != user.Status.EffectiveBMCSecretRef.Name {
 		log.Info("BMCSecret reference has changed, updating BMC account", "User", user.Name)
@@ -163,7 +165,6 @@ func (r *UserReconciler) handleRotatingPassword(ctx context.Context, log logr.Lo
 			// If the password has expired, we need to rotate it
 			forceRotation = true
 		}
-
 	}
 	if user.Spec.RotationPolicy == nil && !forceRotation {
 		log.V(1).Info("No rotation period set for BMC user, skipping password rotation", "User", user.Name)
@@ -289,7 +290,8 @@ func (r *UserReconciler) setEffectiveSecretRef(ctx context.Context, log logr.Log
 	return nil
 }
 
-func (r *UserReconciler) getBMCClient(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, user *metalv1alpha1.User) (bmcClient bmc.BMC, err error) {
+func (r *UserReconciler) getBMCClient(ctx context.Context, bmcObj *metalv1alpha1.BMC) (bmc.BMC, error) {
+	/* will be needed when supporting admin user management
 	if bmcObj.Spec.AdminUserRef != nil && bmcObj.Spec.AdminUserRef.Name == user.Name {
 		if user.Spec.BMCSecretRef == nil {
 			// if this user is the admin user, we cannot create a BMC client without a BMCSecretRef (password)
@@ -313,16 +315,17 @@ func (r *UserReconciler) getBMCClient(ctx context.Context, log logr.Logger, bmcO
 			return bmcClient, fmt.Errorf("failed to create BMC client: %w", err)
 		}
 	} else {
-		bmcClient, err = bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
-		if err != nil {
-			return bmcClient, fmt.Errorf("failed to create BMC client: %w", err)
-		}
+	*/
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	if err != nil {
+		return bmcClient, fmt.Errorf("failed to create BMC client: %w", err)
 	}
-	return
+
+	return bmcClient, nil
 }
 
 func (r *UserReconciler) updateEffectiveSecret(ctx context.Context, log logr.Logger, user *metalv1alpha1.User, bmcObj *metalv1alpha1.BMC) error {
-	if user.Spec.BMCSecretRef == nil {
+	if user.Spec.BMCSecretRef == nil || user.Status.ID == "" {
 		return nil
 	}
 	secret := &metalv1alpha1.BMCSecret{}
@@ -392,12 +395,35 @@ func (r *UserReconciler) bmcConnectionTest(secret *metalv1alpha1.BMCSecret, bmcO
 }
 
 func (r *UserReconciler) delete(ctx context.Context, log logr.Logger, user *metalv1alpha1.User) (ctrl.Result, error) {
-	log.V(1).Info("Deleting User", "User", user.Name)
+	if user.Spec.BMCRef == nil {
+		log.Info("No BMC reference set for User, skipping deletion", "User", user.Name)
+		return ctrl.Result{}, nil
+	}
+	bmcObj := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: user.Namespace,
+		Name:      user.Spec.BMCRef.Name,
+	}, bmcObj); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	bmcClient, err := r.getBMCClient(ctx, bmcObj)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
+	}
+	defer bmcClient.Logout()
+	log.Info("Deleting BMC account for User", "User", user.Name)
+	if err := bmcClient.DeleteAccount(ctx, user.Spec.UserName, user.Status.ID); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to delete BMC account: %w", err)
+	}
 	if user.Status.EffectiveBMCSecretRef != nil {
-		log.V(1).Info("Removing effective BMCSecret reference from User", "User", user.Name)
+		log.Info("Removing effective BMCSecret reference from User", "User", user.Name)
 		if err := r.removeEffectiveSecret(ctx, log, user); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to remove effective BMCSecret reference: %w", err)
 		}
+
+	}
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, UserFinalizer); err != nil || modified {
+		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }

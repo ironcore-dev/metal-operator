@@ -777,11 +777,6 @@ func (in *BMCSpec) DeepCopyInto(out *BMCSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	out.BMCSecretRef = in.BMCSecretRef
-	if in.AdminUserRef != nil {
-		in, out := &in.AdminUserRef, &out.AdminUserRef
-		*out = new(v1.LocalObjectReference)
-		**out = **in
-	}
 	out.Protocol = in.Protocol
 	if in.ConsoleProtocol != nil {
 		in, out := &in.ConsoleProtocol, &out.ConsoleProtocol

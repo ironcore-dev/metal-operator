@@ -56,6 +56,8 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 		s.handleRedfishPOST(w, r)
 	case http.MethodPatch:
 		s.handleRedfishPATCH(w, r)
+	case http.MethodDelete:
+		s.handleRedfishDELETE(w, r)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
@@ -116,6 +118,23 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 	s.overrides[urlPath] = base
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *MockServer) handleRedfishDELETE(w http.ResponseWriter, r *http.Request) {
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+
+	urlPath := resolvePath(r.URL.Path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Load existing resource: from override if exists, else embedded
+	if _, ok := s.overrides[urlPath]; ok {
+		delete(s.overrides, urlPath)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	http.NotFound(w, r)
 }
 
 func deepCopy(m map[string]any) map[string]any {

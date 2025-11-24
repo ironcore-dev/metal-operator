@@ -217,6 +217,14 @@ func (r *RedfishLocalBMC) CreateOrUpdateAccount(
 	return nil
 }
 
+func (r *RedfishLocalBMC) DeleteAccount(ctx context.Context, userName, id string) error {
+	if _, ok := UnitTestMockUps.Accounts[userName]; ok {
+		delete(UnitTestMockUps.Accounts, userName)
+		return nil
+	}
+	return fmt.Errorf("account %s not found", userName)
+}
+
 // GetBiosVersion retrieves the BIOS version.
 func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BIOSVersion == "" {

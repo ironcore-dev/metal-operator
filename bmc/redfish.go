@@ -740,6 +740,29 @@ func (r *RedfishBMC) CreateOrUpdateAccount(
 	return nil
 }
 
+func (r *RedfishBMC) DeleteAccount(ctx context.Context, userName, id string) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	for _, a := range accounts {
+		// make sure we delete the correct account
+		if a.UserName == userName && a.ID == id {
+			service.PostWithResponse(a.ODataID, nil) // nolint: errcheck
+			_, err := r.client.Delete(service.ODataID + "/" + a.ID)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("account %s not found", userName)
+}
+
 func (r *RedfishBMC) GetAccountService(ctx context.Context) (*redfish.AccountService, error) {
 	service, err := r.client.GetService().AccountService()
 	if err != nil {

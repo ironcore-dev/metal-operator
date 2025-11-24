@@ -66,6 +66,9 @@ func DeleteAllMetalResources(ctx context.Context, namespace string) {
 	Eventually(deleteAndList(ctx, &metalv1alpha1.Endpoint{}, &metalv1alpha1.EndpointList{})).Should(
 		HaveField("Items", BeEmpty()))
 
+	Eventually(deleteAndList(ctx, &metalv1alpha1.User{}, &metalv1alpha1.UserList{})).Should(
+		HaveField("Items", BeEmpty()))
+
 	Eventually(deleteAndList(ctx, &metalv1alpha1.BMC{}, &metalv1alpha1.BMCList{})).Should(
 		HaveField("Items", BeEmpty()))
 
@@ -195,6 +198,7 @@ func SetupTest() *corev1.Namespace {
 			Metrics: metricsserver.Options{
 				BindAddress: "0",
 			},
+			Logger: GinkgoLogr,
 		})
 		Expect(err).ToNot(HaveOccurred())
 

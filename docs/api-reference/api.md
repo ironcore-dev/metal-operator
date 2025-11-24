@@ -1251,22 +1251,6 @@ required to access the BMC. This secret includes sensitive information such as u
 </tr>
 <tr>
 <td>
-<code>adminUserRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
-This secret is used for administrative access to the BMC and may include elevated privileges.
-It will replace the BMCSecretRef for administrative operations.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>protocol</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.Protocol">
@@ -1862,22 +1846,6 @@ Kubernetes core/v1.LocalObjectReference
 <td>
 <p>BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
 required to access the BMC. This secret includes sensitive information such as usernames and passwords.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>adminUserRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>AdminUserRef is a reference to the Kubernetes Secret object that contains the credentials to access the BMC.
-This secret is used for administrative access to the BMC and may include elevated privileges.
-It will replace the BMCSecretRef for administrative operations.</p>
 </td>
 </tr>
 <tr>

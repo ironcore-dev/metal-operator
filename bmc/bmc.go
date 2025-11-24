@@ -119,6 +119,9 @@ type BMC interface {
 	// CreateOrUpdateAccount creates or updates a BMC user account.
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 
+	// DeleteAccount deletes a BMC user account.
+	DeleteAccount(ctx context.Context, userName, id string) error
+
 	// GetAccounts retrieves all BMC user accounts.
 	GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error)
 

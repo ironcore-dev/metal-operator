@@ -5,8 +5,13 @@ package ignition
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/template"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Config holds the Docker image and flags.
@@ -22,50 +27,12 @@ var defaultIgnitionTemplate = `variant: fcos
 version: "1.3.0"
 systemd:
   units:
-    # Mount /dev/sda to /mnt/docker
-    - name: mnt-docker.mount
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Mount Docker Disk
-        After=run-rootfs.mount
-        Requires=run-rootfs.mount
-
-        [Mount]
-        What=/dev/sda
-        Where=/mnt/docker
-        Type=ext4
-        Options=defaults
-
-        [Install]
-        WantedBy=multi-user.target
-
-    # Bind /mnt/docker to /var/lib/docker
-    - name: var-lib-docker.mount
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Bind /mnt/docker to /var/lib/docker
-        After=mnt-docker.mount
-        Requires=mnt-docker.mount
-
-        [Mount]
-        What=/mnt/docker
-        Where=/var/lib/docker
-        Type=none
-        Options=bind
-
-        [Install]
-        WantedBy=multi-user.target
-
-    # Install Docker
     - name: docker-install.service
       enabled: true
       contents: |-
         [Unit]
         Description=Install Docker
         Before=metalprobe.service
-        After=var-lib-docker.mount
         [Service]
         Restart=on-failure
         RestartSec=20
@@ -75,7 +42,6 @@ systemd:
         ExecStart=/usr/bin/apt-get install docker.io docker-cli -y
         [Install]
         WantedBy=multi-user.target
-    # Ensure Docker starts after the bind mount
     - name: docker.service
       enabled: true
     - name: metalprobe.service
@@ -91,28 +57,10 @@ systemd:
         ExecStartPre=/usr/bin/docker pull {{.Image}}
         ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe {{.Image}} {{.Flags}}
         ExecStop=/usr/bin/docker stop metalprobe
-        TimeoutSec=900
         [Install]
         WantedBy=multi-user.target
 storage:
-  files:
-    - path: /etc/docker/daemon.json
-      mode: 0644
-      contents:
-        inline: |-
-          {
-            "insecure-registries": [
-              "k3d-registry.internal:5000",
-              "localhost:5000",
-              "127.0.0.1:5000"
-            ]
-          }
-  filesystems:
-    - name: docker
-      device: /dev/sda
-      format: ext4
-      wipeFilesystem: true
-      path: /var/lib/docker
+  files: []
 passwd:
   users:
     - name: metal
@@ -124,6 +72,45 @@ passwd:
 // GenerateDefaultIgnitionData renders the defaultIgnitionTemplate with the given Config.
 func GenerateDefaultIgnitionData(config Config) ([]byte, error) {
 	tmpl, err := template.New("defaultIgnition").Parse(defaultIgnitionTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("parsing template failed: %w", err)
+	}
+
+	var out bytes.Buffer
+	err = tmpl.Execute(&out, config)
+	if err != nil {
+		return nil, fmt.Errorf("executing template failed: %w", err)
+	}
+
+	return out.Bytes(), nil
+}
+
+// GenerateIgnitionDataFromConfigMap renders an ignition template from a ConfigMap with the given Config.
+func GenerateIgnitionDataFromConfigMap(ctx context.Context, client client.Client, namespace, configMapName, configMapKey string, config Config) ([]byte, error) {
+	if configMapName == "" || configMapKey == "" {
+		return nil, fmt.Errorf("ConfigMap name and key must be specified")
+	}
+
+	configMap := &v1.ConfigMap{}
+	err := client.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      configMapName,
+	}, configMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ConfigMap %s/%s: %w", namespace, configMapName, err)
+	}
+
+	templateContent, exists := configMap.Data[configMapKey]
+	if !exists {
+		return nil, fmt.Errorf("key %s not found in ConfigMap %s/%s", configMapKey, namespace, configMapName)
+	}
+
+	return generateIgnitionDataFromTemplate(templateContent, config)
+}
+
+// generateIgnitionDataFromTemplate is a helper function that renders any template with the given Config.
+func generateIgnitionDataFromTemplate(templateContent string, config Config) ([]byte, error) {
+	tmpl, err := template.New("ignition").Parse(templateContent)
 	if err != nil {
 		return nil, fmt.Errorf("parsing template failed: %w", err)
 	}

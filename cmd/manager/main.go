@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
@@ -20,11 +21,14 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -52,6 +56,15 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+// getCurrentNamespace reads the namespace from the service account token
+func getCurrentNamespace() (string, error) {
+	namespaceBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return "", fmt.Errorf("failed to read namespace from service account: %w", err)
+	}
+	return strings.TrimSpace(string(namespaceBytes)), nil
+}
+
 func main() { // nolint: gocyclo
 	var (
 		metricsAddr                        string
@@ -67,7 +80,6 @@ func main() { // nolint: gocyclo
 		enableHTTP2                        bool
 		macPrefixesFile                    string
 		insecure                           bool
-		managerNamespace                   string
 		probeImage                         string
 		probeOSImage                       string
 		registryPort                       int
@@ -77,6 +89,8 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
+		ignitionConfigMapName              string
+		ignitionConfigMapKey               string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
 		powerPollingInterval               time.Duration
@@ -115,12 +129,15 @@ func main() { // nolint: gocyclo
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
+	flag.StringVar(&ignitionConfigMapName, "ignition-configmap-name", "",
+		"Name of the ConfigMap containing the ignition template. If empty, uses hardcoded template.")
+	flag.StringVar(&ignitionConfigMapKey, "ignition-configmap-key", "ignition-template.yaml",
+		"Key in the ConfigMap containing the ignition template.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
-	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
 	flag.BoolVar(&insecure, "insecure", true, "If true, use http instead of https for connecting to a BMC.")
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -153,6 +170,14 @@ func main() { // nolint: gocyclo
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Auto-detect the current namespace
+	managerNamespace, err := getCurrentNamespace()
+	if err != nil {
+		setupLog.Error(err, "unable to detect current namespace, falling back to default")
+		managerNamespace = "default"
+	}
+	setupLog.Info("detected manager namespace", "namespace", managerNamespace)
 
 	if probeOSImage == "" {
 		setupLog.Error(nil, "probe OS image must be set")
@@ -281,8 +306,20 @@ func main() { // nolint: gocyclo
 		})
 	}
 
+	// Configure cache to watch ConfigMaps only in the manager namespace
+	cacheOptions := cache.Options{
+		ByObject: map[client.Object]cache.ByObject{
+			&corev1.ConfigMap{}: {
+				Namespaces: map[string]cache.Config{
+					managerNamespace: {},
+				},
+			},
+		},
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
+		Cache:                  cacheOptions,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
@@ -351,6 +388,8 @@ func main() { // nolint: gocyclo
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		IgnitionConfigMapName:   ignitionConfigMapName,
+		IgnitionConfigMapKey:    ignitionConfigMapKey,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

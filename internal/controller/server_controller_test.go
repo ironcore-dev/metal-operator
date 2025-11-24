@@ -789,4 +789,36 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(bmcSecret)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	Context("ConfigMap-based Ignition Templates", func() {
+		It("Should use hardcoded template when ConfigMap settings are empty", func(ctx SpecContext) {
+			By("Creating a ServerReconciler with empty ConfigMap settings")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				IgnitionConfigMapName: "", // Empty
+				IgnitionConfigMapKey:  "", // Empty
+			}
+
+			By("Generating ignition data (should use hardcoded template)")
+			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
+				ctx,
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			// Should contain hardcoded template content
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
+			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
+			Expect(ignitionStr).To(ContainSubstring("name: metal"))
+			Expect(ignitionStr).To(ContainSubstring("docker-install.service"))
+		})
+	})
 })

@@ -211,24 +211,9 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	if server.Status.State != metalv1alpha1.ServerStateInitial {
-		if server.Spec.ServerMaintenanceRef != nil {
-			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
-				return ctrl.Result{}, err
-			}
-		} else {
-			if server.Spec.ServerClaimRef != nil {
-				if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
-					return ctrl.Result{}, err
-				}
-			}
-			// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
-			// 		 back to available state.
-			if server.Spec.ServerClaimRef == nil && server.Status.State == metalv1alpha1.ServerStateReserved {
-				if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-					return ctrl.Result{}, err
-				}
-			}
+	if server.Status.State != metalv1alpha1.ServerStateInitial && server.Spec.ServerMaintenanceRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -409,11 +394,23 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 	if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
+	if server.Spec.ServerClaimRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
+			return true, err
+		}
+	}
 	log.V(1).Info("Reconciled available state")
 	return true, nil
 }
 
 func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
+	// 		 back to available state.
+	if server.Spec.ServerClaimRef == nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+			return true, err
+		}
+	}
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
 		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
 		return true, err
@@ -421,26 +418,24 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 	log.V(1).Info("Server boot configuration is ready")
 
 	// TODO: fix properly, we need to free up the server if the claim does not exist anymore
-	if server.Spec.ServerClaimRef != nil {
-		claim := &metalv1alpha1.ServerClaim{}
-		err := r.Get(ctx, client.ObjectKey{
-			Name:      server.Spec.ServerClaimRef.Name,
-			Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				log.V(1).Info(
-					"ServerClaim not found, removing ServerClaimRef",
-					"Server", server.Name,
-					"ServerClaim", server.Spec.ServerClaimRef.Name)
-				serverBase := server.DeepCopy()
-				server.Spec.ServerClaimRef = nil
-				if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-					return false, fmt.Errorf("failed to remove ServerClaimRef: %w", err)
-				}
-				return false, nil
+	claim := &metalv1alpha1.ServerClaim{}
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      server.Spec.ServerClaimRef.Name,
+		Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info(
+				"ServerClaim not found, removing ServerClaimRef",
+				"Server", server.Name,
+				"ServerClaim", server.Spec.ServerClaimRef.Name)
+			serverBase := server.DeepCopy()
+			server.Spec.ServerClaimRef = nil
+			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return false, fmt.Errorf("failed to remove ServerClaimRef: %w", err)
 			}
-			return false, fmt.Errorf("failed to get ServerClaim: %w", err)
+			return false, nil
 		}
+		return false, fmt.Errorf("failed to get ServerClaim: %w", err)
 	}
 
 	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk

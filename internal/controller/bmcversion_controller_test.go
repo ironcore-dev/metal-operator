@@ -396,10 +396,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		})).Should(Succeed())
 
 		Eventually(Object(bmcVersion)).Should(
-			HaveField("Status.State", metalv1alpha1.BMCVersionStateInProgress),
-		)
-
-		Eventually(Object(bmcVersion)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
 		)
 

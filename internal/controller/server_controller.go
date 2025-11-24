@@ -206,8 +206,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	// we like the server to have moved out of initial state before applying state transitions based on spec changes
-	// this allows server to update the system info first and be ready for further state transitions
 	if server.Status.State != metalv1alpha1.ServerStateInitial {
 		if server.Spec.ServerMaintenanceRef != nil {
 			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
@@ -239,16 +237,15 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Updated Server BIOS boot order")
 
-	// not checking the requeue flag here as we will requeue anyway after the ResyncInterval
 	_, err = r.ensureServerStateTransition(ctx, log, bmcClient, server)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
 	}
+	log.V(1).Info("Updating Server status after state transition")
 	// we need to update the ServerStatus after state transition to make sure it reflects the changes done
 	if err := r.updateServerStatus(ctx, log, bmcClient, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status after state transition")
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil

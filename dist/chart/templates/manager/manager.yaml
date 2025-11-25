@@ -35,6 +35,7 @@ spec:
         - {{ . }}
         {{- end }}
         {{- if .Values.ignition.enable }}
+        - "--manager-namespace={{ .Release.Namespace }}"
         - "--ignition-configmap-name={{ include "chart.name" . }}-{{ .Values.ignition.configMapName }}"
         - "--ignition-configmap-key={{ .Values.ignition.configMapKey }}"
         {{- end }}

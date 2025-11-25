@@ -795,6 +795,241 @@ var _ = Describe("Server Controller", func() {
 	})
 
 	Context("ConfigMap-based Ignition Templates", func() {
+		var bmcSecret *metalv1alpha1.BMCSecret
+		var server *metalv1alpha1.Server
+
+		BeforeEach(func(ctx SpecContext) {
+			By("Creating a BMCSecret")
+			bmcSecret = &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-server-",
+				},
+				Data: map[string][]byte{
+					"username": []byte("foo"),
+					"password": []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+			By("Creating a Server with inline BMC configuration")
+			server = &metalv1alpha1.Server{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "server-",
+				},
+				Spec: metalv1alpha1.ServerSpec{
+					UUID:       "38947555-7742-3448-3784-823347823834",
+					SystemUUID: "38947555-7742-3448-3784-823347823834",
+					BMC: &metalv1alpha1.BMCAccess{
+						Protocol: metalv1alpha1.Protocol{
+							Name: metalv1alpha1.ProtocolRedfishLocal,
+							Port: 8000,
+						},
+						Address: "127.0.0.1",
+						BMCSecretRef: v1.LocalObjectReference{
+							Name: bmcSecret.Name,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, server)).To(Succeed())
+		})
+
+		AfterEach(func(ctx SpecContext) {
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+		})
+
+		It("Should use custom ConfigMap template when available", func(ctx SpecContext) {
+			By("Creating a custom ignition ConfigMap")
+			customTemplate := `variant: fcos
+version: "1.4.0"
+systemd:
+  units:
+    - name: custom-metalprobe.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=Custom Metal Probe Service
+        [Service]
+        Restart=on-failure
+        RestartSec=30
+        ExecStartPre=/usr/bin/docker pull {{.Image}}
+        ExecStart=/usr/bin/docker run --network host --privileged --name custom-metalprobe {{.Image}} {{.Flags}}
+        ExecStop=/usr/bin/docker stop custom-metalprobe
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: custom-metal
+      password_hash: {{.PasswordHash}}
+      groups: [ "wheel", "docker" ]
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+
+			customConfigMap := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "custom-ignition-template",
+					Namespace: ns.Name,
+				},
+				Data: map[string]string{
+					"ignition.yaml": customTemplate,
+				},
+			}
+			Expect(k8sClient.Create(ctx, customConfigMap)).To(Succeed())
+
+			By("Creating a ServerReconciler with ConfigMap settings")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				IgnitionConfigMapName: "custom-ignition-template",
+				IgnitionConfigMapKey:  "ignition.yaml",
+			}
+
+			By("Generating ignition data with custom ConfigMap")
+			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
+				ctx,
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.4.0\""))
+			Expect(ignitionStr).To(ContainSubstring("custom-metalprobe.service"))
+			Expect(ignitionStr).To(ContainSubstring("Custom Metal Probe Service"))
+			Expect(ignitionStr).To(ContainSubstring("custom-metal"))
+			Expect(ignitionStr).To(ContainSubstring("RestartSec=30"))
+
+			By("Cleaning up the ConfigMap")
+			Expect(k8sClient.Delete(ctx, customConfigMap)).To(Succeed())
+		})
+
+		It("Should fallback to hardcoded template when ConfigMap is missing", func(ctx SpecContext) {
+			By("Creating a ServerReconciler with non-existent ConfigMap settings")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				IgnitionConfigMapName: "nonexistent-configmap",
+				IgnitionConfigMapKey:  "ignition.yaml",
+			}
+
+			By("Generating ignition data (should fallback to hardcoded template)")
+			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
+				ctx,
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			// Should contain hardcoded template content
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
+			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
+			Expect(ignitionStr).To(ContainSubstring("name: metal"))
+			Expect(ignitionStr).To(ContainSubstring("docker-install.service"))
+		})
+
+		It("Should fallback to hardcoded template when ConfigMap key is missing", func(ctx SpecContext) {
+			By("Creating a ConfigMap without the expected key")
+			configMapWithWrongKey := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "configmap-wrong-key",
+					Namespace: ns.Name,
+				},
+				Data: map[string]string{
+					"wrong-key": "some template content",
+				},
+			}
+			Expect(k8sClient.Create(ctx, configMapWithWrongKey)).To(Succeed())
+
+			By("Creating a ServerReconciler with ConfigMap that has wrong key")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				IgnitionConfigMapName: "configmap-wrong-key",
+				IgnitionConfigMapKey:  "ignition.yaml", // This key doesn't exist
+			}
+
+			By("Generating ignition data (should fallback to hardcoded template)")
+			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
+				ctx,
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			// Should contain hardcoded template content
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
+			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
+
+			By("Cleaning up the ConfigMap")
+			Expect(k8sClient.Delete(ctx, configMapWithWrongKey)).To(Succeed())
+		})
+
+		It("Should fallback to hardcoded template when ConfigMap template is invalid", func(ctx SpecContext) {
+			By("Creating a ConfigMap with invalid template")
+			invalidTemplate := `variant: fcos
+systemd:
+  units:
+    - name: broken-service
+      contents: {{.InvalidTemplateField}}`
+
+			invalidConfigMap := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "invalid-template-configmap",
+					Namespace: ns.Name,
+				},
+				Data: map[string]string{
+					"ignition.yaml": invalidTemplate,
+				},
+			}
+			Expect(k8sClient.Create(ctx, invalidConfigMap)).To(Succeed())
+
+			By("Creating a ServerReconciler with invalid ConfigMap template")
+			reconciler := &ServerReconciler{
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				IgnitionConfigMapName: "invalid-template-configmap",
+				IgnitionConfigMapKey:  "ignition.yaml",
+			}
+
+			By("Generating ignition data (should fallback to hardcoded template)")
+			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
+				ctx,
+				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			// Should contain hardcoded template content
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
+			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
+
+			By("Cleaning up the ConfigMap")
+			Expect(k8sClient.Delete(ctx, invalidConfigMap)).To(Succeed())
+		})
+
 		It("Should use hardcoded template when ConfigMap settings are empty", func(ctx SpecContext) {
 			By("Creating a ServerReconciler with empty ConfigMap settings")
 			reconciler := &ServerReconciler{

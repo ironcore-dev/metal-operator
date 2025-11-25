@@ -4,12 +4,12 @@ metadata:
   labels:
     app.kubernetes.io/name: metal-operator
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/manufacturer: DELL
-  name: bmcsettings-sample
+    app.kubernetes.io/manufacturer: HPE
+  name: bmcsettings-hpe-sample
 spec:
   BMCRef:
-    name: endpoint-sample
-  version: 1.45.455b66-rev4
+    name: endpoint-hpe-sample
+  version: iLO 6 v1.70
   settings:
-      abc: "3"
+      "PATCH /redfish/v1/managers/1/networkprotocol": '{"IPMI": {"ProtocolEnabled": true } }'
   serverMaintenancePolicy: Enforced

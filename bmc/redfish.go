@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/bmc/oem"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
@@ -220,7 +221,7 @@ func (r *RedfishBMC) GetManager(bmcUUID string) (*redfish.Manager, error) {
 	return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
 }
 
-func (r *RedfishBMC) getOEMManager(bmcUUID string) (OEMManagerInterface, error) {
+func (r *RedfishBMC) getOEMManager(bmcUUID string) (oem.OEMManagerInterface, error) {
 	manager, err := r.GetManager(bmcUUID)
 	if err != nil {
 		return nil, fmt.Errorf("not able to Manager %v", err)
@@ -361,7 +362,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(ctx context.Context, systemURI strin
 	return result, err
 }
 
-func (r *RedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes []string) (redfish.SettingsAttributes, error) {
+func (r *RedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -369,8 +370,7 @@ func (r *RedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, 
 	if err != nil {
 		return nil, err
 	}
-
-	return oemManager.GetOEMBMCSettingAttribute(attributes)
+	return oemManager.GetOEMBMCSettingAttribute(ctx, attributes)
 }
 
 func (r *RedfishBMC) GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (redfish.SettingsAttributes, error) {
@@ -441,7 +441,7 @@ func (r *RedfishBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUUID s
 		return nil, err
 	}
 
-	return oemManager.GetBMCPendingAttributeValues()
+	return oemManager.GetBMCPendingAttributeValues(ctx)
 }
 
 // SetBiosAttributesOnReset sets given bios attributes.
@@ -470,7 +470,7 @@ func (r *RedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID st
 	if err != nil {
 		return err
 	}
-	return oemManager.UpdateBMCAttributesApplyAt(attributes, common.ImmediateApplyTime)
+	return oemManager.UpdateBMCAttributesApplyAt(ctx, attributes, common.ImmediateApplyTime)
 }
 
 // SetBootOrder sets bios boot order
@@ -596,13 +596,13 @@ func (r *RedfishBMC) checkAttribues(attrs redfish.SettingsAttributes, filtered m
 	return reset, errors.Join(errs...)
 }
 
-func (r *RedfishBMC) CheckBMCAttributes(bmcUUID string, attrs redfish.SettingsAttributes) (bool, error) {
+func (r *RedfishBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string, attrs redfish.SettingsAttributes) (bool, error) {
 	oemManager, err := r.getOEMManager(bmcUUID)
 	if err != nil {
 		return false, err
 	}
 
-	return oemManager.CheckBMCAttributes(attrs)
+	return oemManager.CheckBMCAttributes(ctx, attrs)
 }
 
 func (r *RedfishBMC) getSystemManufacturer() (string, error) {

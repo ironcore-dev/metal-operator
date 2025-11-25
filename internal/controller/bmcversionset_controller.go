@@ -280,7 +280,15 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
-			bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+			if bmcVersionTemplate.ServerMaintenanceRefs != nil {
+				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+			} else {
+				// preserve existing serverMaintenanceRefs if not set in the template
+				// temporary solution to avoid accidental deletion of Refs and unit test failure until PR #515 is merged
+				existingServerMaintenanceRefs := bmcVersion.Spec.ServerMaintenanceRefs
+				bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+				bmcVersion.Spec.ServerMaintenanceRefs = existingServerMaintenanceRefs
+			}
 			return nil
 		}) //nolint:errcheck
 		if err != nil {

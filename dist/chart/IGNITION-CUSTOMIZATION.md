@@ -81,7 +81,7 @@ helm install my-metal-operator ./ --set ignition.enable=true
 
 2. Or create a custom values file:
 ```bash
-cp values-custom-example.yaml my-values.yaml
+cp values.yaml my-values.yaml
 # Edit my-values.yaml with your customizations
 ```
 

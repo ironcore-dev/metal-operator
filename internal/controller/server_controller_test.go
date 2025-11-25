@@ -562,6 +562,17 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
 		))
 
+		go func(ctx SpecContext) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					deleteRegistrySystemIfExists(server.Spec.SystemUUID)
+				}
+			}
+		}(ctx)
+
 		By("Patching the boot configuration to a Ready state")
 		Eventually(UpdateStatus(bootConfig, func() {
 			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
@@ -790,3 +801,22 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })
+
+func deleteRegistrySystemIfExists(systemUUID string) {
+	response, err := http.Get(registryURL + "/systems/" + systemUUID)
+	if err != nil {
+		return
+	}
+	if response.StatusCode == http.StatusOK {
+		req, err := http.NewRequest(http.MethodDelete, registryURL+"/systems/"+systemUUID, nil)
+		if err != nil {
+			return
+		}
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close() //nolint:errcheck
+	}
+}

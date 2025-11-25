@@ -123,6 +123,9 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Ensuring that the BiosVersion has been removed")
 		Eventually(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
@@ -223,6 +226,9 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Ensuring that the BiosVersion has been removed")
 		Eventually(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should upgrade servers BIOS when in reserved state", func(ctx SpecContext) {
@@ -361,6 +367,10 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))),
+		))
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {
@@ -402,6 +412,9 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, biosVersion)).To(Succeed())
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })
 
@@ -568,6 +581,9 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 		By("Ensuring that the BiosVersion has been removed")
 		Eventually(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })
 

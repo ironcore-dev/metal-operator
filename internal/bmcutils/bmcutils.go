@@ -30,10 +30,10 @@ func (e BMCUnAvailableError) Error() string {
 	return e.Message
 }
 
-type BMCClientOptions string
+type BMCClientOptions int
 
 const (
-	BMCConnectivityCheckOption BMCClientOptions = "BMCConnectivityCheck"
+	BMCConnectivityCheckOption BMCClientOptions = 1
 )
 
 func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {

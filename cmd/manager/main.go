@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
@@ -55,15 +54,6 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-// getCurrentNamespace reads the namespace from the service account token
-func getCurrentNamespace() (string, error) {
-	namespaceBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		return "", fmt.Errorf("failed to read namespace from service account: %w", err)
-	}
-	return strings.TrimSpace(string(namespaceBytes)), nil
-}
-
 func main() { // nolint: gocyclo
 	var (
 		metricsAddr                        string
@@ -79,6 +69,7 @@ func main() { // nolint: gocyclo
 		enableHTTP2                        bool
 		macPrefixesFile                    string
 		insecure                           bool
+		managerNamespace                   string
 		probeImage                         string
 		probeOSImage                       string
 		registryPort                       int
@@ -137,6 +128,7 @@ func main() { // nolint: gocyclo
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
+	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
 	flag.BoolVar(&insecure, "insecure", true, "If true, use http instead of https for connecting to a BMC.")
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -169,14 +161,6 @@ func main() { // nolint: gocyclo
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	// Auto-detect the current namespace
-	managerNamespace, err := getCurrentNamespace()
-	if err != nil {
-		setupLog.Error(err, "unable to detect current namespace, falling back to default")
-		managerNamespace = "default"
-	}
-	setupLog.Info("detected manager namespace", "namespace", managerNamespace)
 
 	if probeOSImage == "" {
 		setupLog.Error(nil, "probe OS image must be set")

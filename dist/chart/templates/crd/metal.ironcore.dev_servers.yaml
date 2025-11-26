@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servers.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -29,6 +29,9 @@ spec:
       type: string
     - jsonPath: .status.model
       name: Model
+      type: string
+    - jsonPath: .status.totalSystemMemory
+      name: Memory
       type: string
     - jsonPath: .status.sku
       name: SKU

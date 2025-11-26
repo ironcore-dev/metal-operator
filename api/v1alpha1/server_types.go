@@ -18,6 +18,12 @@ const (
 
 	// PowerOff indicates that the device is powered off.
 	PowerOff Power = "Off"
+
+	// TopologyHeightUnit is the annotation key for the height unit of a server in a rack.
+	TopologyHeightUnit = "topology.metal.ironcore.dev/heightunit"
+
+	// TopologyRack is the annotation key for the rack of a server.
+	TopologyRack = "topology.metal.ironcore.dev/rack"
 )
 
 // ServerPowerState defines the possible power states for a server.
@@ -375,6 +381,7 @@ type Storage struct {
 //+kubebuilder:printcolumn:name="UUID",type=string,JSONPath=`.spec.uuid`
 //+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
 //+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+//+kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
 //+kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
 //+kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
 //+kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`

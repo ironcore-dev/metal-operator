@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -121,17 +122,14 @@ func (r *ServerReconciler) reconcileExists(ctx context.Context, log logr.Logger,
 	return r.reconcile(ctx, log, server)
 }
 
-func (r *ServerReconciler) shouldDelete(
-	log logr.Logger,
-	server *metalv1alpha1.Server,
-) bool {
+func (r *ServerReconciler) shouldDelete(log logr.Logger, server *metalv1alpha1.Server) bool {
 	if server.DeletionTimestamp.IsZero() {
 		return false
 	}
 
 	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
 		server.Status.State == metalv1alpha1.ServerStateMaintenance {
-		log.V(1).Info("postponing delete as server is in Maintenance state")
+		log.V(1).Info("Postponing delete as server is in Maintenance state")
 		return false
 	}
 	return true
@@ -191,6 +189,10 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
 	if err != nil {
+		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
+			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
 	}
 	defer bmcClient.Logout()
@@ -209,24 +211,10 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	if server.Spec.ServerMaintenanceRef != nil {
+	if server.Status.State != metalv1alpha1.ServerStateInitial && server.Spec.ServerMaintenanceRef != nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
-	} else {
-		if server.Spec.ServerClaimRef != nil {
-			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
-				return ctrl.Result{}, err
-			}
-		}
-		// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
-		// 		 back to available state.
-		if server.Spec.ServerClaimRef == nil && server.Status.State == metalv1alpha1.ServerStateReserved {
-			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-				return ctrl.Result{}, err
-			}
-		}
-
 	}
 
 	if err := r.updateServerStatus(ctx, log, bmcClient, server); err != nil {
@@ -239,24 +227,15 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Updated Server BIOS boot order")
 
-	requeue, err := r.ensureServerStateTransition(ctx, log, bmcClient, server)
-	if requeue && err == nil {
-		// we need to update the ServerStatus after state transition to make sure it reflects the changes done
-		if err := r.updateServerStatus(ctx, log, bmcClient, server); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
-		}
-		log.V(1).Info("Updated Server status after state transition")
-		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
-	}
+	_, err = r.ensureServerStateTransition(ctx, log, bmcClient, server)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to ensure server state transition: %w", err)
 	}
-
+	log.V(1).Info("Updating Server status after state transition")
 	// we need to update the ServerStatus after state transition to make sure it reflects the changes done
 	if err := r.updateServerStatus(ctx, log, bmcClient, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status after state transition")
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
@@ -406,7 +385,7 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 		}
 		log.V(1).Info("Server state set to power off")
 	}
-	log.V(1).Info("ensureInitialBootConfigurationIsDeleted")
+
 	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
 	}
@@ -415,11 +394,23 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 	if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
+	if server.Spec.ServerClaimRef != nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
+			return true, err
+		}
+	}
 	log.V(1).Info("Reconciled available state")
 	return true, nil
 }
 
 func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
+	// 		 back to available state.
+	if server.Spec.ServerClaimRef == nil {
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+			return true, err
+		}
+	}
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
 		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
 		return true, err
@@ -427,26 +418,24 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 	log.V(1).Info("Server boot configuration is ready")
 
 	// TODO: fix properly, we need to free up the server if the claim does not exist anymore
-	if server.Spec.ServerClaimRef != nil {
-		claim := &metalv1alpha1.ServerClaim{}
-		err := r.Get(ctx, client.ObjectKey{
-			Name:      server.Spec.ServerClaimRef.Name,
-			Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				log.V(1).Info(
-					"ServerClaim not found, removing ServerClaimRef",
-					"Server", server.Name,
-					"ServerClaim", server.Spec.ServerClaimRef.Name)
-				serverBase := server.DeepCopy()
-				server.Spec.ServerClaimRef = nil
-				if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-					return false, fmt.Errorf("failed to remove ServerClaimRef: %w", err)
-				}
-				return false, nil
+	claim := &metalv1alpha1.ServerClaim{}
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      server.Spec.ServerClaimRef.Name,
+		Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info(
+				"ServerClaim not found, removing ServerClaimRef",
+				"Server", server.Name,
+				"ServerClaim", server.Spec.ServerClaimRef.Name)
+			serverBase := server.DeepCopy()
+			server.Spec.ServerClaimRef = nil
+			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return false, fmt.Errorf("failed to remove ServerClaimRef: %w", err)
 			}
-			return false, fmt.Errorf("failed to get ServerClaim: %w", err)
+			return false, nil
 		}
+		return false, fmt.Errorf("failed to get ServerClaim: %w", err)
 	}
 
 	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
@@ -1053,16 +1042,21 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, log log
 		return false, nil
 	}
 
-	log.V(1).Info("Handling operation", "Operation", operation)
-	if err := bmcClient.Reset(ctx, server.Spec.SystemURI, redfish.ResetType(operation)); err != nil {
-		return false, fmt.Errorf("failed to reset server: %w", err)
-	}
-	log.V(1).Info("Operation completed", "Operation", operation)
-	serverBase := server.DeepCopy()
-	delete(annotations, metalv1alpha1.OperationAnnotation)
-	server.SetAnnotations(annotations)
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch server annotations: %w", err)
+	if value, ok := metalv1alpha1.AnnotationToRedfishMapping[operation]; !ok {
+		log.V(1).Info("Unsupported operation annotation", "Operation", operation, "SupportedOperations", metalv1alpha1.AnnotationToRedfishMapping)
+		return false, nil
+	} else {
+		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
+		if err := bmcClient.Reset(ctx, server.Spec.SystemURI, value); err != nil {
+			return false, fmt.Errorf("failed to reset server: %w", err)
+		}
+		log.V(1).Info("Operation completed", "Operation", operation, "RedfishResetType", value)
+		serverBase := server.DeepCopy()
+		delete(annotations, metalv1alpha1.OperationAnnotation)
+		server.SetAnnotations(annotations)
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server annotations: %w", err)
+		}
 	}
 	return true, nil
 }

@@ -9,6 +9,8 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -20,17 +22,17 @@ import (
 )
 
 var _ = Describe("BIOSVersion Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var (
-		server                   *metalv1alpha1.Server
-		upgradeServerBiosVersion string
+		server    *metalv1alpha1.Server
+		bmcSecret *metalv1alpha1.BMCSecret
 	)
+	const upgradeServerBiosVersion string = "P80 v1.45 (12/06/2017)"
 
 	BeforeEach(func(ctx SpecContext) {
-		upgradeServerBiosVersion = "P80 v1.45 (12/06/2017)"
 		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
+		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-",
@@ -62,16 +64,24 @@ var _ = Describe("BIOSVersion Controller", func() {
 				},
 			},
 		}
-		TransitionServerFromInitialToAvailableState(ctx, k8sClient, server, ns.Name)
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Ensuring that the Server is in available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
 		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
+
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+
+		EnsureCleanState()
 	})
 
-	It("should successfully mark completed if no BIOS version change", func(ctx SpecContext) {
-
+	It("Should successfully mark completed if no BIOS version change", func(ctx SpecContext) {
 		By("Ensuring that the server has Available state")
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
@@ -115,7 +125,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
+	It("Should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
 		// note: ImageURI need to have the version string.
@@ -190,7 +200,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 			}),
 		))
 
-		ensureBiosVersionConditionTransisition(acc, biosVersion, server)
+		ensureBiosVersionConditionTransition(acc, biosVersion, server)
 
 		By("Ensuring that BIOS upgrade has completed")
 		Eventually(Object(biosVersion)).Should(
@@ -215,14 +225,41 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("should upgrade servers BIOS when in reserved state", func(ctx SpecContext) {
+	It("Should upgrade servers BIOS when in reserved state", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
 		// note: ImageURI need to have the version string.
 
 		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-		serverClaim := CreateServerClaim(ctx, k8sClient, *server, ns.Name, nil, metalv1alpha1.PowerOn, "foo:bar")
-		TransitionServerToReservedState(ctx, k8sClient, serverClaim, server, ns.Name)
+		By("Creating an Ignition secret")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: nil,
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+		By("Creating a ServerClaim")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             metalv1alpha1.PowerOn,
+				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server has been claimed")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		)
 
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
@@ -298,7 +335,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 			}),
 		))
 
-		ensureBiosVersionConditionTransisition(acc, biosVersion, server)
+		ensureBiosVersionConditionTransition(acc, biosVersion, server)
 
 		By("Ensuring that BIOS upgrade has completed")
 		Eventually(Object(biosVersion)).Should(
@@ -321,9 +358,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Ensuring that the BiosVersion has been removed")
 		Eventually(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
-	It("should allow retry using annotation", func(ctx SpecContext) {
+	It("Should allow retry using annotation", func(ctx SpecContext) {
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
@@ -348,7 +388,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		Eventually(Update(biosVersion, func() {
 			biosVersion.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
 			}
 		})).Should(Succeed())
 
@@ -359,14 +399,180 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Eventually(Object(biosVersion)).Should(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
 		)
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, biosVersion)).To(Succeed())
 	})
 })
 
-func ensureBiosVersionConditionTransisition(
-	acc *conditionutils.Accessor,
-	biosVersion *metalv1alpha1.BIOSVersion,
-	server *metalv1alpha1.Server,
-) {
+var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
+	ns := SetupTest(nil)
+
+	var (
+		server    *metalv1alpha1.Server
+		bmcObj    *metalv1alpha1.BMC
+		bmcSecret *metalv1alpha1.BMCSecret
+	)
+	const upgradeServerBiosVersion = "P80 v1.45 (12/06/2017)"
+	BeforeEach(func(ctx SpecContext) {
+		bmcSecret = &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-bmc-secret-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+		bmcObj = &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-",
+				Namespace:    ns.Name,
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "23:11:8A:33:CF:EA",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: 8000,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcObj)).To(Succeed())
+
+		By("Ensuring that the Server resource will be created")
+		server = &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmcObj),
+			},
+		}
+		Eventually(Get(server)).Should(Succeed())
+
+		By("Ensuring that the Server is in available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+	})
+
+	AfterEach(func(ctx SpecContext) {
+		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
+
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+
+		EnsureCleanState()
+	})
+	It("should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
+		// mocked at
+		// metal-operator/bmc/redfish_local.go mockedBIOS*
+		// note: ImageURI need to have the version string.
+
+		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+
+		By("Ensuring that the server has Available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		)
+		By("Creating a BIOSVersion")
+		biosVersion := &metalv1alpha1.BIOSVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BIOSVersionSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 upgradeServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
+
+		By("Ensuring that the biosVersion has entered Inprogress state")
+		Eventually(Object(biosVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateInProgress),
+		)
+
+		By("Ensuring that the Maintenance resource has been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      biosVersion.Name,
+			},
+		}
+		Eventually(Get(serverMaintenance)).Should(Succeed())
+
+		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
+		Eventually(Object(biosVersion)).Should(SatisfyAny(
+			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+				Kind:       "ServerMaintenance",
+				Name:       serverMaintenance.Name,
+				Namespace:  serverMaintenance.Namespace,
+				UID:        serverMaintenance.UID,
+				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
+			}),
+			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+				Kind:       "ServerMaintenance",
+				Name:       serverMaintenance.Name,
+				Namespace:  serverMaintenance.Namespace,
+				UID:        serverMaintenance.UID,
+				APIVersion: "metal.ironcore.dev/v1alpha1",
+			}),
+		))
+
+		By("Ensuring that Server in Maintenance state")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
+			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+				Kind:       "ServerMaintenance",
+				Name:       serverMaintenance.Name,
+				Namespace:  serverMaintenance.Namespace,
+				UID:        serverMaintenance.UID,
+				APIVersion: "metal.ironcore.dev/v1alpha1",
+			}),
+		))
+
+		ensureBiosVersionConditionTransition(acc, biosVersion, server)
+
+		By("Ensuring that BIOS upgrade has completed")
+		Eventually(Object(biosVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+		)
+
+		By("Ensuring that BIOSVersion has removed Maintenance")
+		Eventually(Object(biosVersion)).Should(
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		)
+		Consistently(Object(biosVersion)).Should(
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		)
+
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+
+		By("Deleting the BIOSVersion")
+		Expect(k8sClient.Delete(ctx, biosVersion)).To(Succeed())
+
+		By("Ensuring that the BiosVersion has been removed")
+		Eventually(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Consistently(Get(biosVersion)).Should(Satisfy(apierrors.IsNotFound))
+	})
+})
+
+func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) {
+	GinkgoHelper()
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeIssued'")
 	condIssue := &metav1.Condition{}
 	Eventually(
@@ -383,7 +589,7 @@ func ensureBiosVersionConditionTransisition(
 
 	By("Ensuring that BIOSVersion has updated the taskStatus with taskURI")
 	Eventually(Object(biosVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", "dummyTask"),
+		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
 	)
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeCompleted'")
@@ -430,30 +636,25 @@ func ensureBiosVersionConditionTransisition(
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeRebootServerPowerOn'")
 	rebootComplete := &metav1.Condition{}
-	Eventually(
-		func(g Gomega) int {
-			g.Expect(Get(biosVersion)()).To(Succeed())
-			return len(biosVersion.Status.Conditions)
-		}).Should(BeNumerically(">=", 4))
-	Eventually(
-		func(g Gomega) bool {
-			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, rebootComplete)).To(BeTrue())
-			return rebootComplete.Status == metav1.ConditionTrue
-		}).Should(BeTrue())
+	Eventually(func(g Gomega) int {
+		g.Expect(Get(biosVersion)()).To(Succeed())
+		return len(biosVersion.Status.Conditions)
+	}).Should(BeNumerically(">=", 4))
+	Eventually(func(g Gomega) bool {
+		g.Expect(Get(biosVersion)()).To(Succeed())
+		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, rebootComplete)).To(BeTrue())
+		return rebootComplete.Status == metav1.ConditionTrue
+	}).Should(BeTrue())
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeVerficationCondition'")
-	verficationComplete := &metav1.Condition{}
-	Eventually(
-		func(g Gomega) int {
-			g.Expect(Get(biosVersion)()).To(Succeed())
-			return len(biosVersion.Status.Conditions)
-		}).Should(BeNumerically(">=", 5))
-	Eventually(
-		func(g Gomega) bool {
-			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeVerficationCondition, verficationComplete)).To(BeTrue())
-			return verficationComplete.Status == metav1.ConditionTrue
-		}).Should(BeTrue())
-
+	verificationComplete := &metav1.Condition{}
+	Eventually(func(g Gomega) int {
+		g.Expect(Get(biosVersion)()).To(Succeed())
+		return len(biosVersion.Status.Conditions)
+	}).Should(BeNumerically(">=", 5))
+	Eventually(func(g Gomega) bool {
+		g.Expect(Get(biosVersion)()).To(Succeed())
+		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeVerficationCondition, verificationComplete)).To(BeTrue())
+		return verificationComplete.Status == metav1.ConditionTrue
+	}).Should(BeTrue())
 }

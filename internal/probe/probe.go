@@ -56,9 +56,10 @@ func (a *Agent) Init(ctx context.Context) error {
 	LLDPInfo, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
 	if err != nil {
 		a.log.Error(err, "failed to collect LLDP info")
-		return err
+		// LLDP is optional, continue without it
+	} else if len(LLDPInfo.Interfaces) > 0 {
+		a.log.Info("Collected LLDP info", "interfaces", len(LLDPInfo.Interfaces))
 	}
-	a.log.Info("Collected LLDP info", "interfaces", len(LLDPInfo.Interfaces))
 
 	blockDevices, err := collectStorageInfoData()
 	if err != nil {
@@ -153,10 +154,13 @@ func (a *Agent) RefreshLLDP(ctx context.Context) error {
 	lldp, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
 	if err != nil {
 		a.log.Error(err, "collectLLDPInfo failed")
-		return err
+		// LLDP is optional, retain previous data
+		return nil
 	}
 	a.Server.LLDP = lldp.Interfaces
-	a.log.Info("Refreshed LLDP info", "interfaces", len(a.Server.LLDP))
+	if len(a.Server.LLDP) > 0 {
+		a.log.Info("Refreshed LLDP info", "interfaces", len(a.Server.LLDP))
+	}
 	return nil
 }
 

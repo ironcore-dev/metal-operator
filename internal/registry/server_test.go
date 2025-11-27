@@ -23,7 +23,7 @@ var _ = Describe("RegistryServer", func() {
 				NetworkInterfaces: []registry.NetworkInterface{
 					{
 						Name:        "foo",
-						IpAddresses: []string{"1.1.1.1"},
+						IPAddresses: []string{"1.1.1.1"},
 						MACAddress:  "abcd",
 					},
 				},
@@ -49,7 +49,7 @@ var _ = Describe("RegistryServer", func() {
 			NetworkInterfaces: []registry.NetworkInterface{
 				{
 					Name:        "foo",
-					IpAddresses: []string{"1.1.1.1"},
+					IPAddresses: []string{"1.1.1.1"},
 					MACAddress:  "abcd",
 				},
 			},

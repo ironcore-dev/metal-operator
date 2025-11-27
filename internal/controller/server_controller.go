@@ -820,9 +820,9 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 			CarrierStatus: s.CarrierStatus,
 		}
 
-		// Process all IP addresses from the single IpAddresses slice
+		// Process all IP addresses from the single IPAddresses slice
 		var allIPs []metalv1alpha1.IP
-		for _, ipAddr := range s.IpAddresses {
+		for _, ipAddr := range s.IPAddresses {
 			if ipAddr != "" {
 				// Parse and validate the IP address
 				ip, err := metalv1alpha1.ParseIP(ipAddr)

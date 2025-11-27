@@ -44,7 +44,7 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 			// If we can't get addresses, still include the interface with empty IP
 			networkInterface := registry.NetworkInterface{
 				Name:          iface.Name,
-				IpAddresses:   []string{},
+				IPAddresses:   []string{},
 				MACAddress:    iface.HardwareAddr.String(),
 				CarrierStatus: status,
 			}
@@ -56,7 +56,7 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 		if len(addrs) == 0 {
 			networkInterface := registry.NetworkInterface{
 				Name:          iface.Name,
-				IpAddresses:   []string{},
+				IPAddresses:   []string{},
 				MACAddress:    iface.HardwareAddr.String(),
 				CarrierStatus: status,
 			}
@@ -87,7 +87,7 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 		// Create network interface with all collected addresses
 		networkInterface := registry.NetworkInterface{
 			Name:          iface.Name,
-			IpAddresses:   ipAddresses,
+			IPAddresses:   ipAddresses,
 			MACAddress:    iface.HardwareAddr.String(),
 			CarrierStatus: status,
 		}

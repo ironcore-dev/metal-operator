@@ -7,7 +7,8 @@ package registry
 // including its IP and MAC addresses.
 type NetworkInterface struct {
 	Name          string   `json:"name"`
-	IpAddresses   []string `json:"ipAddresses"`
+	IPAddress     string   `json:"ipAddress,omitempty"` // Deprecated: kept for backward compatibility, always nil
+	IPAddresses   []string `json:"ipAddresses"`
 	MACAddress    string   `json:"macAddress"`
 	CarrierStatus string   `json:"carrierStatus"`
 }

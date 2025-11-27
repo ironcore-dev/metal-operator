@@ -16,7 +16,6 @@ import (
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type HPE struct {
@@ -129,7 +128,6 @@ func (h *HPEILOManager) GetOEMBMCSettingAttribute(
 	ctx context.Context,
 	attributes map[string]string,
 ) (redfish.SettingsAttributes, error) {
-	log := ctrl.LoggerFrom(ctx)
 	c := h.Service.GetClient()
 	if c == nil {
 		return nil, fmt.Errorf("failed to get client from gofish service")
@@ -179,7 +177,6 @@ func (h *HPEILOManager) GetOEMBMCSettingAttribute(
 			result[key] = string(respRawBody)
 		}
 	}
-	log.V(1).Info("fetched data from BMC Settings ", "Result", result)
 	return result, errors.Join(errs...)
 }
 

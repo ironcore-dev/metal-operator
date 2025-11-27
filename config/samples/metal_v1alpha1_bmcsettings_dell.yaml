@@ -4,11 +4,12 @@ metadata:
   labels:
     app.kubernetes.io/name: metal-operator
     app.kubernetes.io/managed-by: kustomize
-  name: bmcsettings-sample
+    app.kubernetes.io/manufacturer: DELL
+  name: bmcsettings-dell-sample
 spec:
   BMCRef:
-    name: endpoint-sample
-  version: 1.45.455b66-rev4
+    name: endpoint-dell-sample
+  version: 1.45.4
   settings:
       abc: "3"
   serverMaintenancePolicy: Enforced

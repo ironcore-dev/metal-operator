@@ -3144,6 +3144,21 @@ string
 </tr>
 <tr>
 <td>
+<code>ip</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.IP">
+IP
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IP is the IP address assigned to the network interface.
+Deprecated: Use IPs instead. Kept for backward compatibility, always nil.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>ips</code><br/>
 <em>
 <a href="#metal.ironcore.dev/v1alpha1.IP">

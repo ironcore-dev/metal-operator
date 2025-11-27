@@ -465,6 +465,11 @@ spec:
                       description: CarrierStatus is the operational carrier status
                         of the network interface.
                       type: string
+                    ip:
+                      description: |-
+                        IP is the IP address assigned to the network interface.
+                        Deprecated: Use IPs instead. Kept for backward compatibility, always nil.
+                      type: string
                     ips:
                       description: IPs is a list of IP addresses (both IPv4 and IPv6)
                         assigned to the network interface.

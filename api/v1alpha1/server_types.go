@@ -290,6 +290,13 @@ type NetworkInterface struct {
 	// +required
 	Name string `json:"name"`
 
+	// IP is the IP address assigned to the network interface.
+	// Deprecated: Use IPs instead. Kept for backward compatibility, always nil.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Schemaless
+	// +optional
+	IP *IP `json:"ip,omitempty"`
+
 	// IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface.
 	// +optional
 	IPs []IP `json:"ips,omitempty"`

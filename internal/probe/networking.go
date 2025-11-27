@@ -40,8 +40,8 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 		}
 
 		addrs, err := iface.Addrs()
-		if err != nil {
-			// If we can't get addresses, still include the interface with empty IP
+		// If we can't get addresses or interface has no addresses, still include it with empty IP
+		if err != nil || len(addrs) == 0 {
 			networkInterface := registry.NetworkInterface{
 				Name:          iface.Name,
 				IPAddresses:   []string{},
@@ -50,21 +50,7 @@ func collectNetworkData() ([]registry.NetworkInterface, error) {
 			}
 			networkInterfaces = append(networkInterfaces, networkInterface)
 			continue
-		}
-
-		// If interface has no addresses, still include it
-		if len(addrs) == 0 {
-			networkInterface := registry.NetworkInterface{
-				Name:          iface.Name,
-				IPAddresses:   []string{},
-				MACAddress:    iface.HardwareAddr.String(),
-				CarrierStatus: status,
-			}
-			networkInterfaces = append(networkInterfaces, networkInterface)
-			continue
-		}
-
-		// Collect all IP addresses (both IPv4 and IPv6) in a single slice
+		} // Collect all IP addresses (both IPv4 and IPv6) in a single slice
 		var ipAddresses []string
 
 		for _, addr := range addrs {

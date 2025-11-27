@@ -836,11 +836,7 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 			}
 		}
 
-		// Set the IPs field with all collected IP addresses
-		if len(allIPs) > 0 {
-			nic.IPs = allIPs
-		}
-
+		nic.IPs = allIPs
 		nics = append(nics, nic)
 	}
 

@@ -202,6 +202,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
+		By("Ensuring that the Maintenance resource has been deleted")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
+		))
+
 		By("Deleting the BMCSettings")
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
 
@@ -211,9 +219,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		// cleanup
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should create maintenance and wait for its approval before applying settings", func(ctx SpecContext) {
@@ -336,6 +344,10 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))),
+		))
 	})
 
 	It("Should wait for upgrade and reconcile BMCSettings version is correct", func(ctx SpecContext) {
@@ -428,6 +440,10 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", BeNil()),
 		))
+
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {
@@ -478,5 +494,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })

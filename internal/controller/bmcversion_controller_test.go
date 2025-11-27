@@ -134,6 +134,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
@@ -231,6 +234,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should upgrade servers BMC when server in reserved state", func(ctx SpecContext) {
@@ -364,6 +370,10 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))),
+		))
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {

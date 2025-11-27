@@ -224,6 +224,15 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, biosVersion02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, biosVersion03)).To(Succeed())
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
@@ -385,5 +394,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, biosVersion01)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, biosVersion02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, biosVersion03)).To(Succeed())
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })

@@ -216,6 +216,15 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Eventually(Get(biosSettings03)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, biosSettings02)).To(Succeed())
 		Eventually(Get(biosSettings02)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
@@ -386,5 +395,14 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Eventually(Get(biosSettings02)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, biosSettings03)).To(Succeed())
 		Eventually(Get(biosSettings03)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })

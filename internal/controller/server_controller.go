@@ -814,14 +814,55 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	// update network interfaces
 	nics := make([]metalv1alpha1.NetworkInterface, 0, len(serverDetails.NetworkInterfaces))
 	for _, s := range serverDetails.NetworkInterfaces {
-		nics = append(nics, metalv1alpha1.NetworkInterface{
-			Name:       s.Name,
-			IP:         metalv1alpha1.MustParseIP(s.IPAddress),
-			MACAddress: s.MACAddress,
-		})
-	}
-	server.Status.NetworkInterfaces = nics
+		nic := metalv1alpha1.NetworkInterface{
+			Name:          s.Name,
+			MACAddress:    s.MACAddress,
+			CarrierStatus: s.CarrierStatus,
+		}
 
+		// Process all IP addresses from the single IPAddresses slice
+		var allIPs []metalv1alpha1.IP
+		for _, ipAddr := range s.IPAddresses {
+			if ipAddr != "" {
+				// Parse and validate the IP address
+				ip, err := metalv1alpha1.ParseIP(ipAddr)
+				if err != nil {
+					log.V(1).Error(err, "Invalid IP address, skipping", "interface", s.Name, "ip", ipAddr)
+					continue
+				}
+
+				// Add all valid IP addresses (both IPv4 and IPv6) to the slice
+				allIPs = append(allIPs, ip)
+			}
+		}
+
+		nic.IPs = allIPs
+		nics = append(nics, nic)
+	}
+
+	// Merge LLDP neighbors into corresponding network interfaces
+	for _, lldpIface := range serverDetails.LLDP {
+		// Find the matching network interface by name
+		for i := range nics {
+			if nics[i].Name == lldpIface.Name {
+				// Convert LLDP neighbors to the CRD format
+				neighbors := make([]metalv1alpha1.LLDPNeighbor, 0, len(lldpIface.Neighbors))
+				for _, neighbor := range lldpIface.Neighbors {
+					neighbors = append(neighbors, metalv1alpha1.LLDPNeighbor{
+						MACAddress:        neighbor.ChassisID,
+						PortID:            neighbor.PortID,
+						PortDescription:   neighbor.PortDescription,
+						SystemName:        neighbor.SystemName,
+						SystemDescription: neighbor.SystemDescription,
+					})
+				}
+				nics[i].Neighbors = neighbors
+				break
+			}
+		}
+	}
+
+	server.Status.NetworkInterfaces = nics
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to patch server status: %w", err)
 	}

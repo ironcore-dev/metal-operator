@@ -1280,6 +1280,21 @@ This field is optional and can be omitted if console access is not required.</p>
 </tr>
 <tr>
 <td>
+<code>userRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UserSpec">
+[]UserSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UserAccounts is a list of user accounts that can be used to access the BMC.
+Each account includes a name, role ID, description, and other relevant details.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>bmcSettingsRef</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core">
@@ -1874,6 +1889,21 @@ ConsoleProtocol
 <em>(Optional)</em>
 <p>ConsoleProtocol specifies the protocol to be used for console access to the BMC.
 This field is optional and can be omitted if console access is not required.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>userRefs</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UserSpec">
+[]UserSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UserAccounts is a list of user accounts that can be used to access the BMC.
+Each account includes a name, role ID, description, and other relevant details.</p>
 </td>
 </tr>
 <tr>
@@ -3209,6 +3239,25 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.PasswordPolicy">PasswordPolicy
+(<code>string</code> alias)</h3>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;External&#34;</p></td>
+<td><p>PasswordPolicyExternal indicates that the password policy is managed externally, such as by an external identity provider.</p>
+</td>
+</tr><tr><td><p>&#34;Internal&#34;</p></td>
+<td><p>PasswordPolicyInternal indicates that the password policy is managed internally, such as by the BMC itself.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="metal.ironcore.dev/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
@@ -5464,6 +5513,319 @@ int32
 <tbody><tr><td><p>&#34;Force&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.User">User
+</h3>
+<div>
+<p>User is the Schema for the users API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UserSpec">
+UserSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>userName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>rotationPeriod</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#duration-v1-meta">
+Kubernetes meta/v1.Duration
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSecretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>if not set, the operator will generate a secure password based on BMC manufacturer requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>enabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>useForBMCAccess</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>set if the user should be used by the BMC reconciler to access the system.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.UserStatus">
+UserStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.UserSpec">UserSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSpec">BMCSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.User">User</a>)
+</p>
+<div>
+<p>UserSpec defines the desired state of User</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>userName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>rotationPeriod</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#duration-v1-meta">
+Kubernetes meta/v1.Duration
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcSecretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>if not set, the operator will generate a secure password based on BMC manufacturer requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>bmcRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>enabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>useForBMCAccess</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>set if the user should be used by the BMC reconciler to access the system.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.UserStatus">UserStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.User">User</a>)
+</p>
+<div>
+<p>UserStatus defines the observed state of User</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>effectiveBMCSecretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastRotation</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>passwordExpiration</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>id</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
 </table>
 <hr/>
 <p><em>

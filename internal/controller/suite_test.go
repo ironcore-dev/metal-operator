@@ -127,6 +127,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Metrics: metricsserver.Options{
 				BindAddress: "0",
 			},
+			Logger: GinkgoLogr,
 		})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(RegisterIndexFields(mgrCtx, k8sManager.GetFieldIndexer())).To(Succeed())
@@ -245,6 +246,17 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			BMCOptions: bmc.Options{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&UserReconciler{
+			Client:   k8sManager.GetClient(),
+			Scheme:   k8sManager.GetScheme(),
+			Insecure: true,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

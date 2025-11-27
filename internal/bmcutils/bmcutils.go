@@ -160,19 +160,31 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		}
 		address = endpoint.Spec.IP.String()
 	}
-
 	if bmcObj.Spec.Endpoint != nil {
 		address = bmcObj.Spec.Endpoint.IP.String()
 	}
 
 	bmcSecret := &metalv1alpha1.BMCSecret{}
+	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
+	/* we need that once we support admin users
+	if bmcObj.Spec.AdminUserRef != nil {
+		user := &metalv1alpha1.User{}
+		if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.AdminUserRef.Name}, user); err != nil {
+			return nil, fmt.Errorf("failed to get admin user: %w", err)
+		}
+		if user.Status.EffectiveBMCSecretRef == nil {
+			return nil, fmt.Errorf("admin user %s has no effective BMC secret reference", user.Name)
+		}
+		if err := c.Get(ctx, client.ObjectKey{Name: user.Status.EffectiveBMCSecretRef.Name}, bmcSecret); err != nil {
+			return nil, fmt.Errorf("failed to get BMC secret: %w", err)
+		}
+		return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	}
+	*/
 	if err := c.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSecretRef.Name}, bmcSecret); err != nil {
 		return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 	}
-
-	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
-	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
-	return bmcClient, err
+	return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
 }
 
 func CreateBMCClient(

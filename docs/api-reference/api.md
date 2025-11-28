@@ -3037,6 +3037,84 @@ IP
 </tr>
 </tbody>
 </table>
+<h3 id="metal.ironcore.dev/v1alpha1.LLDPNeighbor">LLDPNeighbor
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.NetworkInterface">NetworkInterface</a>)
+</p>
+<div>
+<p>LLDPNeighbor defines the details of an LLDP neighbor.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>macAddress</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MACAddress is the MAC address of the LLDP neighbor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>portID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PortID is the port identifier of the LLDP neighbor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>portDescription</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PortDescription is the port description of the LLDP neighbor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SystemName is the system name of the LLDP neighbor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemDescription</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SystemDescription is the system description of the LLDP neighbor.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="metal.ironcore.dev/v1alpha1.NetworkInterface">NetworkInterface
 </h3>
 <p>
@@ -3074,8 +3152,23 @@ IP
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>IP is the IP address assigned to the network interface.
-The type is specified as string and is schemaless.</p>
+Deprecated: Use IPs instead. Kept for backward compatibility, always nil.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ips</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.IP">
+[]IP
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface.</p>
 </td>
 </tr>
 <tr>
@@ -3087,6 +3180,32 @@ string
 </td>
 <td>
 <p>MACAddress is the MAC address of the network interface.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>carrierStatus</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CarrierStatus is the operational carrier status of the network interface.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>neighbors</code><br/>
+<em>
+<a href="#metal.ironcore.dev/v1alpha1.LLDPNeighbor">
+[]LLDPNeighbor
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Neighbors contains the LLDP neighbors discovered on this interface.</p>
 </td>
 </tr>
 </tbody>

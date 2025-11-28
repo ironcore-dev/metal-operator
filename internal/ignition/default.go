@@ -5,8 +5,13 @@ package ignition
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/template"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Config holds the Docker image and flags.
@@ -67,6 +72,45 @@ passwd:
 // GenerateDefaultIgnitionData renders the defaultIgnitionTemplate with the given Config.
 func GenerateDefaultIgnitionData(config Config) ([]byte, error) {
 	tmpl, err := template.New("defaultIgnition").Parse(defaultIgnitionTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("parsing template failed: %w", err)
+	}
+
+	var out bytes.Buffer
+	err = tmpl.Execute(&out, config)
+	if err != nil {
+		return nil, fmt.Errorf("executing template failed: %w", err)
+	}
+
+	return out.Bytes(), nil
+}
+
+// GenerateIgnitionDataFromConfigMap renders an ignition template from a ConfigMap with the given Config.
+func GenerateIgnitionDataFromConfigMap(ctx context.Context, client client.Client, namespace, configMapName, configMapKey string, config Config) ([]byte, error) {
+	if configMapName == "" || configMapKey == "" {
+		return nil, fmt.Errorf("ConfigMap name and key must be specified")
+	}
+
+	configMap := &v1.ConfigMap{}
+	err := client.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      configMapName,
+	}, configMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ConfigMap %s/%s: %w", namespace, configMapName, err)
+	}
+
+	templateContent, exists := configMap.Data[configMapKey]
+	if !exists {
+		return nil, fmt.Errorf("key %s not found in ConfigMap %s/%s", configMapKey, namespace, configMapName)
+	}
+
+	return generateIgnitionDataFromTemplate(templateContent, config)
+}
+
+// generateIgnitionDataFromTemplate is a helper function that renders any template with the given Config.
+func generateIgnitionDataFromTemplate(templateContent string, config Config) ([]byte, error) {
+	tmpl, err := template.New("ignition").Parse(templateContent)
 	if err != nil {
 		return nil, fmt.Errorf("parsing template failed: %w", err)
 	}

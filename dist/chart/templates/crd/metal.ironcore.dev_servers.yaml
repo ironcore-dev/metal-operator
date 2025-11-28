@@ -467,19 +467,57 @@ spec:
                 items:
                   description: NetworkInterface defines the details of a network interface.
                   properties:
+                    carrierStatus:
+                      description: CarrierStatus is the operational carrier status
+                        of the network interface.
+                      type: string
                     ip:
                       description: |-
                         IP is the IP address assigned to the network interface.
-                        The type is specified as string and is schemaless.
+                        Deprecated: Use IPs instead. Kept for backward compatibility, always nil.
                       type: string
+                    ips:
+                      description: IPs is a list of IP addresses (both IPv4 and IPv6)
+                        assigned to the network interface.
+                      items:
+                        format: ip
+                        type: string
+                      type: array
                     macAddress:
                       description: MACAddress is the MAC address of the network interface.
                       type: string
                     name:
                       description: Name is the name of the network interface.
                       type: string
+                    neighbors:
+                      description: Neighbors contains the LLDP neighbors discovered
+                        on this interface.
+                      items:
+                        description: LLDPNeighbor defines the details of an LLDP neighbor.
+                        properties:
+                          macAddress:
+                            description: MACAddress is the MAC address of the LLDP
+                              neighbor.
+                            type: string
+                          portDescription:
+                            description: PortDescription is the port description of
+                              the LLDP neighbor.
+                            type: string
+                          portID:
+                            description: PortID is the port identifier of the LLDP
+                              neighbor.
+                            type: string
+                          systemDescription:
+                            description: SystemDescription is the system description
+                              of the LLDP neighbor.
+                            type: string
+                          systemName:
+                            description: SystemName is the system name of the LLDP
+                              neighbor.
+                            type: string
+                        type: object
+                      type: array
                   required:
-                  - ip
                   - macAddress
                   - name
                   type: object

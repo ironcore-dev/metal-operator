@@ -6,14 +6,17 @@ package oem
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type Lenovo struct {
@@ -121,4 +124,159 @@ func (r *Lenovo) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse 
 	}
 
 	return task, nil
+}
+
+type LenovoXCCManager struct {
+	BMC     *redfish.Manager
+	Service *gofish.Service
+}
+
+func (l *LenovoXCCManager) GetObjFromUri(
+	ctx context.Context,
+	uri string,
+	respObj any,
+) ([]string, error) {
+	resp, err := l.BMC.GetClient().Get(uri)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(rawBody, &respObj)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Header["Etag"], nil
+}
+
+func (l *LenovoXCCManager) GetOEMBMCSettingAttribute(
+	ctx context.Context,
+	attributes map[string]string,
+) (redfish.SettingsAttributes, error) {
+	log := ctrl.LoggerFrom(ctx)
+	c := l.Service.GetClient()
+	if c == nil {
+		return nil, fmt.Errorf("failed to get client from gofish service")
+	}
+	result := redfish.SettingsAttributes{}
+	errs := []error{}
+	for key, data := range attributes {
+		parts := strings.Fields(key)
+		if len(parts) != 2 {
+			errs = append(errs, fmt.Errorf("invalid attribute format: %s\n expected '<HTTP METHOD> <URI>'", key))
+		}
+		resp, err := c.Get(parts[1])
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to GET attribute %s to URL %s: %v", key, parts[1], err))
+			continue
+		}
+		okCodes := []int{http.StatusOK, http.StatusNoContent}
+		if !slices.Contains(okCodes, resp.StatusCode) {
+			errs = append(errs, fmt.Errorf("failed to GET attribute %s: received status code %d", parts[1], resp.StatusCode))
+			continue
+		}
+		respRawBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to read response body for url %s: %v\n %v", parts[1], err, resp))
+			continue
+		}
+		defer resp.Body.Close() // nolint: errcheck
+		var respData map[string]any
+		err = json.Unmarshal(respRawBody, &respData)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to unmarshal response body for GET url %s: %v\nbody: %v", parts[1], err, string(respRawBody)))
+			continue
+		}
+		var dataMap map[string]any
+		err = json.Unmarshal([]byte(data), &dataMap)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %v\nbody: %v", parts[1], err, data))
+			continue
+		}
+		// compare the returned JSON with the expected JSON
+		subJson := IsSubMap(respData, dataMap)
+		if subJson {
+			// matched
+			result[key] = data
+		} else {
+			// not matched
+			result[key] = string(respRawBody)
+		}
+	}
+	log.V(1).Info("fetched data from BMC Settings ", "Result", result)
+	return result, errors.Join(errs...)
+}
+
+func (l *LenovoXCCManager) CheckBMCAttributes(
+	ctx context.Context,
+	attributes redfish.SettingsAttributes,
+) (bool, error) {
+	// We do not have any option to check attributes for HPE iLO
+	return false, nil
+}
+
+func (l *LenovoXCCManager) UpdateBMCAttributesApplyAt(
+	ctx context.Context,
+	attrs redfish.SettingsAttributes,
+	applyTime common.ApplyTime,
+) error {
+	// apply the attributes through PATCH or POST call
+	// we can not paralaize the calls to HPE here due to limitation from server
+	if applyTime != common.ImmediateApplyTime {
+		return fmt.Errorf("does not support scheduled apply time for BMC attributes")
+	}
+	c := l.Service.GetClient()
+	if c == nil {
+		return fmt.Errorf("failed to get client from gofish service")
+	}
+	okCodes := []int{http.StatusOK, http.StatusAccepted, http.StatusNoContent, http.StatusCreated}
+	errs := []error{}
+	for attr, value := range attrs {
+		parts := strings.Fields(attr)
+		if len(parts) != 2 {
+			errs = append(errs, fmt.Errorf("invalid attribute format: %s\n expected '<HTTP METHOD> <URI>'", attr))
+		}
+		url := parts[1]
+		valueMap := map[string]any{}
+		err := json.Unmarshal([]byte(value.(string)), &valueMap)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %v\nbody: %v", parts[1], err, value))
+			continue
+		}
+		switch parts[0] {
+		case http.MethodPost:
+			resp, err := c.Post(url, valueMap)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to POST attribute %s to URL %s: %v", attr, url, err))
+				continue
+			}
+			if !slices.Contains(okCodes, resp.StatusCode) {
+				errs = append(errs, fmt.Errorf("failed to POST attribute %s: received status code %d", attr, resp.StatusCode))
+				continue
+			}
+		case http.MethodPatch:
+			resp, err := c.Patch(url, valueMap)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to PATCH attribute %s to URL %s: %v", attr, url, err))
+				continue
+			}
+			if !slices.Contains(okCodes, resp.StatusCode) {
+				errs = append(errs, fmt.Errorf("failed to POST attribute %s: received status code %d", attr, resp.StatusCode))
+				continue
+			}
+		default:
+			errs = append(errs, fmt.Errorf("unsupported HTTP method %s for attribute %s", parts[0], attr))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (l *LenovoXCCManager) GetBMCPendingAttributeValues(ctx context.Context) (redfish.SettingsAttributes, error) {
+	// We do not have any option to get pending attributes for Dell iDRAC
+	return redfish.SettingsAttributes{}, nil
 }

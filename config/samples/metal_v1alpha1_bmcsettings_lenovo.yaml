@@ -1,0 +1,15 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCSettings
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/manufacturer: Lenovo
+  name: bmcsettings-lenovo-sample
+spec:
+  BMCRef:
+    name: ndpoint-lenovo-sample
+  version: TEI3E4A 4.11 2024-04-25
+  settings:
+      "PATCH /redfish/v1/Managers/1/NetworkProtocol": '{ "NTP": {"ProtocolEnabled": false, "NTPServers": ["timehost1", "timehost2", "timehost3"] } }'
+  serverMaintenancePolicy: Enforced

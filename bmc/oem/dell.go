@@ -84,6 +84,7 @@ type DellManagerLinksOEM struct {
 }
 
 func (d *DellIdracManager) GetObjFromUri(
+	ctx context.Context,
 	uri string,
 	respObj any,
 ) ([]string, error) {
@@ -105,7 +106,7 @@ func (d *DellIdracManager) GetObjFromUri(
 	return resp.Header["Etag"], nil
 }
 
-func (d *DellIdracManager) getCurrentBMCSettingAttribute() ([]DellAttributes, error) {
+func (d *DellIdracManager) getCurrentBMCSettingAttribute(ctx context.Context) ([]DellAttributes, error) {
 
 	type temp struct {
 		DellOEMData DellManagerLinksOEM `json:"Dell"`
@@ -122,7 +123,7 @@ func (d *DellIdracManager) getCurrentBMCSettingAttribute() ([]DellAttributes, er
 	var errs []error
 	for _, data := range tempData.DellOEMData.DellLinkAttributes {
 		BMCDellAttribute := &DellAttributes{}
-		eTag, err := d.GetObjFromUri(data.String(), BMCDellAttribute)
+		eTag, err := d.GetObjFromUri(ctx, data.String(), BMCDellAttribute)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -140,6 +141,7 @@ func (d *DellIdracManager) getCurrentBMCSettingAttribute() ([]DellAttributes, er
 }
 
 func (d *DellIdracManager) getFilteredBMCRegistryAttributes(
+	ctx context.Context,
 	readOnly bool,
 	immutable bool,
 ) (
@@ -154,7 +156,7 @@ func (d *DellIdracManager) getFilteredBMCRegistryAttributes(
 	bmcRegistryAttribute := &redfish.AttributeRegistry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "ManagerAttributeRegistry") {
-			_, err = d.GetObjFromUri(registry.Location[0].URI, bmcRegistryAttribute)
+			_, err = d.GetObjFromUri(ctx, registry.Location[0].URI, bmcRegistryAttribute)
 			if err != nil {
 				return nil, err
 			}
@@ -173,10 +175,11 @@ func (d *DellIdracManager) getFilteredBMCRegistryAttributes(
 }
 
 func (d *DellIdracManager) GetOEMBMCSettingAttribute(
-	attributes []string,
+	ctx context.Context,
+	attributes map[string]string,
 ) (redfish.SettingsAttributes, error) {
 
-	BMCDellAttributes, err := d.getCurrentBMCSettingAttribute()
+	BMCDellAttributes, err := d.getCurrentBMCSettingAttribute(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +200,7 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 		}
 	}
 
-	filteredAttr, err := d.getFilteredBMCRegistryAttributes(false, false)
+	filteredAttr, err := d.getFilteredBMCRegistryAttributes(ctx, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +212,7 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 	// from the gives attributes to change, find the ones which can be changed and get current value for them
 	result := make(redfish.SettingsAttributes, len(attributes))
 	var errs []error
-	for _, name := range attributes {
+	for name := range attributes {
 		if entry, ok := filteredAttr[name]; ok {
 			// enumerations current setting comtains display name.
 			// need to be checked with the actual value rather than the display value
@@ -252,11 +255,12 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 }
 
 func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
+	ctx context.Context,
 	attrs redfish.SettingsAttributes,
 	applyTime common.ApplyTime,
 ) error {
 
-	BMCattributeValues, err := d.getCurrentBMCSettingAttribute()
+	BMCattributeValues, err := d.getCurrentBMCSettingAttribute(ctx)
 	if err != nil {
 		return err
 	}
@@ -328,9 +332,9 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 	return nil
 }
 
-func (d *DellIdracManager) GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error) {
+func (d *DellIdracManager) GetBMCPendingAttributeValues(ctx context.Context) (redfish.SettingsAttributes, error) {
 
-	BMCattributeValues, err := d.getCurrentBMCSettingAttribute()
+	BMCattributeValues, err := d.getCurrentBMCSettingAttribute(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +345,7 @@ func (d *DellIdracManager) GetBMCPendingAttributeValues() (redfish.SettingsAttri
 	}
 
 	for _, BMCattributeValue := range BMCattributeValues {
-		_, err := d.GetObjFromUri(BMCattributeValue.Settings.SettingsObject.String(), &tBMCSetting)
+		_, err := d.GetObjFromUri(ctx, BMCattributeValue.Settings.SettingsObject.String(), &tBMCSetting)
 		if err != nil {
 			return nil, err
 		}
@@ -357,8 +361,11 @@ func (d *DellIdracManager) GetBMCPendingAttributeValues() (redfish.SettingsAttri
 	return mergedPendingBMCAttributes, nil
 }
 
-func (d *DellIdracManager) CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error) {
-	filteredAttr, err := d.getFilteredBMCRegistryAttributes(false, false)
+func (d *DellIdracManager) CheckBMCAttributes(
+	ctx context.Context,
+	attributes redfish.SettingsAttributes,
+) (bool, error) {
+	filteredAttr, err := d.getFilteredBMCRegistryAttributes(ctx, false, false)
 	if err != nil {
 		return false, err
 	}

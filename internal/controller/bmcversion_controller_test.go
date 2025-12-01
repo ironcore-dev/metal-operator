@@ -189,14 +189,16 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
+				[]v1.ObjectReference{
+					{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
 						APIVersion: metalv1alpha1.GroupVersion.String(),
-					}}}),
+					},
+				},
+			),
 		)
 
 		By("Ensuring that Server in Maintenance state")
@@ -312,15 +314,16 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
+				[]v1.ObjectReference{
+					{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
 						APIVersion: metalv1alpha1.GroupVersion.String(),
-					}}}),
-		)
+					},
+				},
+			))
 
 		By("Ensuring that the bmcVersion has Inprogress state and waiting")
 		Eventually(Object(bmcVersion)).Should(
@@ -457,7 +460,7 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 	}).Should(BeNumerically(">=", 4))
 	Eventually(func(g Gomega) bool {
 		g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: bmcVersion.Name}, bmcVersion)).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeVerficationCondition, verificationComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeVerificationCondition, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 }

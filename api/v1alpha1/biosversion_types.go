@@ -66,7 +66,7 @@ type ImageSpec struct {
 	// ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
 	// to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
 	// +optional
-	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+	SecretRef *corev1.SecretReference `json:"secretRef,omitempty"`
 
 	// The network protocol that the server's update service uses to retrieve 'ImageURI'
 	// +optional

@@ -2583,8 +2583,8 @@ ServerMaintenancePolicy
 <td>
 <code>serverMaintenanceRefs</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
-[]ServerMaintenanceRefItem
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
+[]Kubernetes core/v1.ObjectReference
 </a>
 </em>
 </td>
@@ -2927,8 +2927,8 @@ net/netip.Prefix
 <td>
 <code>secretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
 </a>
 </em>
 </td>
@@ -4425,7 +4425,7 @@ ServerMaintenanceStatus
 <h3 id="metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>)
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BMCSettingsSpec">BMCSettingsSpec</a>)
 </p>
 <div>
 <p>ServerMaintenanceRefItem is a reference to a ServerMaintenance object.</p>

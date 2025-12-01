@@ -16,6 +16,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/stmcginnis/gofish/redfish"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -288,4 +289,25 @@ func handleRetryAnnotationPropagation(
 		return nil
 	})
 	return errors.Join(errs...)
+}
+
+func GetImageCredentialsForSecretRef(ctx context.Context, c client.Client, secretRef *corev1.SecretReference) (string, string, error) {
+	if secretRef == nil {
+		return "", "", fmt.Errorf("got nil secretRef")
+	}
+	secret := &corev1.Secret{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: secretRef.Namespace, Name: secretRef.Name}, secret); err != nil {
+		return "", "", err
+	}
+
+	username, ok := secret.Data[metalv1alpha1.BMCSecretUsernameKeyName]
+	if !ok {
+		return "", "", fmt.Errorf("no username found in secret")
+	}
+	password, ok := secret.Data[metalv1alpha1.BMCSecretPasswordKeyName]
+	if !ok {
+		return "", "", fmt.Errorf("no password found in secret")
+	}
+
+	return string(username), string(password), nil
 }

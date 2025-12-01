@@ -1043,10 +1043,8 @@ func (in *BMCVersionTemplate) DeepCopyInto(out *BMCVersionTemplate) {
 	in.Image.DeepCopyInto(&out.Image)
 	if in.ServerMaintenanceRefs != nil {
 		in, out := &in.ServerMaintenanceRefs, &out.ServerMaintenanceRefs
-		*out = make([]ServerMaintenanceRefItem, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+		*out = make([]v1.ObjectReference, len(*in))
+		copy(*out, *in)
 	}
 }
 
@@ -1185,7 +1183,7 @@ func (in *ImageSpec) DeepCopyInto(out *ImageSpec) {
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		*out = new(v1.LocalObjectReference)
+		*out = new(v1.SecretReference)
 		**out = **in
 	}
 }

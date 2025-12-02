@@ -170,6 +170,9 @@ spec:
                 x-kubernetes-validations:
                 - message: endpointRef is immutable
                   rule: self == oldSelf
+              hostname:
+                description: Hostname is the hostname of the BMC.
+                type: string
               protocol:
                 description: |-
                   Protocol specifies the protocol to be used for communicating with the BMC.

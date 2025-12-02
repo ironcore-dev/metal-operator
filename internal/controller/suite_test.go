@@ -161,13 +161,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCReconciler{
-			Client:                     k8sManager.GetClient(),
-			Scheme:                     k8sManager.GetScheme(),
-			Insecure:                   true,
-			ManagerNamespace:           ns.Name,
-			BMCResetWaitTime:           400 * time.Millisecond,
-			BMCClientRetryInterval:     25 * time.Millisecond,
-			DNSRecordTemplateConfigMap: "dns-record-template",
+			Client:                 k8sManager.GetClient(),
+			Scheme:                 k8sManager.GetScheme(),
+			Insecure:               true,
+			ManagerNamespace:       ns.Name,
+			BMCResetWaitTime:       400 * time.Millisecond,
+			BMCClientRetryInterval: 25 * time.Millisecond,
+			DNSRecordTemplatePath:  "../../test/data/dns_record_template.yaml",
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{

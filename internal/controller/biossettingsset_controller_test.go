@@ -13,18 +13,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"net/netip"
+
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
 var _ = Describe("BIOSSettingsSet Controller", func() {
-	ns := SetupTest()
-
 	var (
+		MockServerIPAddrs = []netip.AddrPort{
+			netip.MustParseAddrPort("127.0.0.1:8000"),
+			netip.MustParseAddrPort("127.0.0.1:8001"),
+			netip.MustParseAddrPort("127.0.0.1:8002"),
+		}
 		server01  *metalv1alpha1.Server
 		server02  *metalv1alpha1.Server
 		server03  *metalv1alpha1.Server
 		bmcSecret *metalv1alpha1.BMCSecret
 	)
+	ns := SetupTest(MockServerIPAddrs)
 
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")
@@ -53,9 +59,9 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(MockServerIPAddrs[0].Port()),
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIPAddrs[0].Addr().String(),
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -78,9 +84,9 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(MockServerIPAddrs[1].Port()),
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIPAddrs[1].Addr().String(),
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -103,9 +109,9 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(MockServerIPAddrs[2].Port()),
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIPAddrs[2].Addr().String(),
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -131,12 +137,14 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				GenerateName: "test-biossettings-set-",
 				Namespace:    ns.Name,
 			},
+			// settings mocked at
+			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSetSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
 					Version:                 defaultMockUpServerBiosVersion,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{Settings: map[string]string{"fooreboot": "144"}, Priority: 1, Name: "one"},
+						{Settings: map[string]string{"ProcCores": "2"}, Priority: 1, Name: "one"},
 					},
 				},
 				ServerSelector: metav1.LabelSelector{
@@ -208,6 +216,15 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Eventually(Get(biosSettings03)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, biosSettings02)).To(Succeed())
 		Eventually(Get(biosSettings02)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
@@ -217,12 +234,14 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				GenerateName: "test-biossettings-set-",
 				Namespace:    ns.Name,
 			},
+			// settings mocked at
+			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSetSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
 					Version:                 defaultMockUpServerBiosVersion,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{Settings: map[string]string{"abc": "foo-bar"}, Priority: 10, Name: "foo-bar"},
+						{Settings: map[string]string{"AdminPhone": "foo-bar"}, Priority: 10, Name: "foo-bar"},
 					},
 				},
 				ServerSelector: metav1.LabelSelector{
@@ -376,5 +395,14 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Eventually(Get(biosSettings02)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, biosSettings03)).To(Succeed())
 		Eventually(Get(biosSettings03)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })

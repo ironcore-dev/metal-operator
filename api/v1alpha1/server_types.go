@@ -291,15 +291,50 @@ type NetworkInterface struct {
 	Name string `json:"name"`
 
 	// IP is the IP address assigned to the network interface.
-	// The type is specified as string and is schemaless.
+	// Deprecated: Use IPs instead. Kept for backward compatibility, always nil.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless
-	// +required
-	IP IP `json:"ip"`
+	// +optional
+	IP *IP `json:"ip,omitempty"`
+
+	// IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface.
+	// +optional
+	IPs []IP `json:"ips,omitempty"`
 
 	// MACAddress is the MAC address of the network interface.
 	// +required
 	MACAddress string `json:"macAddress"`
+
+	// CarrierStatus is the operational carrier status of the network interface.
+	// +optional
+	CarrierStatus string `json:"carrierStatus,omitempty"`
+
+	// Neighbors contains the LLDP neighbors discovered on this interface.
+	// +optional
+	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`
+}
+
+// LLDPNeighbor defines the details of an LLDP neighbor.
+type LLDPNeighbor struct {
+	// MACAddress is the MAC address of the LLDP neighbor.
+	// +optional
+	MACAddress string `json:"macAddress,omitempty"`
+
+	// PortID is the port identifier of the LLDP neighbor.
+	// +optional
+	PortID string `json:"portID,omitempty"`
+
+	// PortDescription is the port description of the LLDP neighbor.
+	// +optional
+	PortDescription string `json:"portDescription,omitempty"`
+
+	// SystemName is the system name of the LLDP neighbor.
+	// +optional
+	SystemName string `json:"systemName,omitempty"`
+
+	// SystemDescription is the system description of the LLDP neighbor.
+	// +optional
+	SystemDescription string `json:"systemDescription,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive
@@ -381,6 +416,7 @@ type Storage struct {
 //+kubebuilder:printcolumn:name="UUID",type=string,JSONPath=`.spec.uuid`
 //+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
 //+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+//+kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
 //+kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
 //+kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
 //+kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`

@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -125,6 +126,7 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -160,7 +162,7 @@ var _ = BeforeSuite(func() {
 	bmc.InitMockUp()
 })
 
-func SetupTest() *corev1.Namespace {
+func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
@@ -188,6 +190,7 @@ func SetupTest() *corev1.Namespace {
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
+		Expect(RegisterIndexFields(mgrCtx, k8sManager.GetFieldIndexer())).To(Succeed())
 
 		prefixDB := &macdb.MacPrefixes{
 			MacPrefixes: []macdb.MacPrefix{
@@ -220,10 +223,12 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCReconciler{
-			Client:           k8sManager.GetClient(),
-			Scheme:           k8sManager.GetScheme(),
-			Insecure:         true,
-			ManagerNamespace: ns.Name,
+			Client:                 k8sManager.GetClient(),
+			Scheme:                 k8sManager.GetScheme(),
+			Insecure:               true,
+			ManagerNamespace:       ns.Name,
+			BMCResetWaitTime:       400 * time.Millisecond,
+			BMCClientRetryInterval: 25 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
@@ -338,7 +343,7 @@ func SetupTest() *corev1.Namespace {
 
 		By("Starting the registry server")
 		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			registryServer := registry.NewServer(GinkgoLogr, ":30000")
+			registryServer := registry.NewServer(GinkgoLogr, ":30000", k8sManager.GetClient())
 			if err := registryServer.Start(ctx); err != nil {
 				return fmt.Errorf("failed to start registry server: %w", err)
 			}
@@ -346,15 +351,29 @@ func SetupTest() *corev1.Namespace {
 			return nil
 		}))).Should(Succeed())
 
-		By("Starting the BMC mock server")
-		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			mockServer := server.NewMockServer(GinkgoLogr, ":8000")
-			if err := mockServer.Start(ctx); err != nil {
-				return fmt.Errorf("failed to start mock Redfish server: %w", err)
+		if len(redfishMockServers) > 0 {
+			for _, serverAddr := range redfishMockServers {
+				By(fmt.Sprintf("Starting the mock Redfish servers %v", serverAddr))
+				Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
+					mockServer := server.NewMockServer(GinkgoLogr, serverAddr.String())
+					if err := mockServer.Start(ctx); err != nil {
+						return fmt.Errorf("failed to start mock Redfish server %v", serverAddr)
+					}
+					<-ctx.Done()
+					return nil
+				}))).Should(Succeed())
 			}
-			<-ctx.Done()
-			return nil
-		}))).Should(Succeed())
+		} else {
+			By("Starting the default mock Redfish server")
+			Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
+				mockServer := server.NewMockServer(GinkgoLogr, ":8000")
+				if err := mockServer.Start(ctx); err != nil {
+					return fmt.Errorf("failed to start mock Redfish server: %w", err)
+				}
+				<-ctx.Done()
+				return nil
+			}))).Should(Succeed())
+		}
 
 		go func() {
 			defer GinkgoRecover()

@@ -23,7 +23,7 @@ import (
 )
 
 var _ = Describe("BMCVersion Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var (
 		server                  *metalv1alpha1.Server
@@ -134,6 +134,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
@@ -231,6 +234,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should upgrade servers BMC when server in reserved state", func(ctx SpecContext) {
@@ -364,6 +370,10 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))),
+		))
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {
@@ -391,13 +401,9 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		Eventually(Update(bmcVersion, func() {
 			bmcVersion.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
 			}
 		})).Should(Succeed())
-
-		Eventually(Object(bmcVersion)).Should(
-			HaveField("Status.State", metalv1alpha1.BMCVersionStateInProgress),
-		)
 
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
@@ -428,7 +434,7 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 
 	By("Ensuring that BMCVersion has updated the task Status with task URI")
 	Eventually(Object(bmcVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", "dummyTask"),
+		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
 	)
 
 	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeCompleted'")

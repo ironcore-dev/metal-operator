@@ -15,7 +15,7 @@ import (
 )
 
 var _ = Describe("Endpoints Controller", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -87,12 +87,14 @@ var _ = Describe("Endpoints Controller", func() {
 		Eventually(Get(endpoint)).Should(Satisfy(apierrors.IsNotFound))
 
 		// cleanup
-		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 			},
 		}
+		// we wait for the server to be created first and the then deleted
+		Eventually(Get(server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})

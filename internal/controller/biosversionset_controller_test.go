@@ -4,6 +4,8 @@
 package controller
 
 import (
+	"net/netip"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -17,15 +19,19 @@ import (
 )
 
 var _ = Describe("BIOSVersionSet Controller", func() {
-	ns := SetupTest()
-
 	var (
+		MockServerIPAddrs = []netip.AddrPort{
+			netip.MustParseAddrPort("127.0.0.1:8000"),
+			netip.MustParseAddrPort("127.0.0.1:8001"),
+			netip.MustParseAddrPort("127.0.0.1:8002"),
+		}
 		server01                 *metalv1alpha1.Server
 		server02                 *metalv1alpha1.Server
 		server03                 *metalv1alpha1.Server
 		bmcSecret                *metalv1alpha1.BMCSecret
 		upgradeServerBiosVersion string
 	)
+	ns := SetupTest(MockServerIPAddrs)
 
 	BeforeEach(func(ctx SpecContext) {
 		upgradeServerBiosVersion = "P80 v1.45 (12/06/2017)"
@@ -55,9 +61,9 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(MockServerIPAddrs[0].Port()),
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIPAddrs[0].Addr().String(),
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -80,9 +86,9 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(MockServerIPAddrs[1].Port()),
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIPAddrs[1].Addr().String(),
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -105,9 +111,9 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: int32(MockServerIPAddrs[2].Port()),
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIPAddrs[2].Addr().String(),
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -218,6 +224,15 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, biosVersion02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, biosVersion03)).To(Succeed())
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
@@ -379,5 +394,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, biosVersion01)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, biosVersion02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, biosVersion03)).To(Succeed())
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })

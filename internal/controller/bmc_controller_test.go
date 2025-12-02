@@ -5,6 +5,7 @@ package controller
 
 import (
 	"maps"
+	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	metalBmc "github.com/ironcore-dev/metal-operator/bmc"
@@ -19,7 +20,7 @@ import (
 )
 
 var _ = Describe("BMC Controller", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -435,7 +436,7 @@ var _ = Describe("BMC Validation", func() {
 })
 
 var _ = Describe("BMC Reset", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -478,7 +479,7 @@ var _ = Describe("BMC Reset", func() {
 		By("Resetting the BMC")
 		Eventually(Update(bmc, func() {
 			bmc.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceReset,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.GracefulRestartBMC,
 			}
 		})).Should(Succeed())
 
@@ -486,22 +487,23 @@ var _ = Describe("BMC Reset", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		))
-
-		// cleanup
-		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 			},
 		}
+		Eventually(Get(server)).Should(Succeed())
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })
 
 var _ = Describe("BMC Conditions", func() {
-	_ = SetupTest()
+	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -524,7 +526,7 @@ var _ = Describe("BMC Conditions", func() {
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
+				GenerateName: "test-bmc-reset-",
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -573,16 +575,14 @@ var _ = Describe("BMC Conditions", func() {
 		By("resetting the BMC")
 		Eventually(Update(bmc, func() {
 			bmc.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceReset,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.GracefulRestartBMC,
 			}
 		},
 		)).Should(Succeed())
 
 		By("Ensuring right conditions are present, after user requested reset")
-		Eventually(Object(bmc)).Should(
+		Eventually(Object(bmc)).WithPolling(1 * time.Microsecond).MustPassRepeatedly(1).Should(SatisfyAll(
 			HaveField("Status.Conditions", HaveLen(2)),
-		)
-		Eventually(Object(bmc)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
 					HaveField("Type", bmcResetConditionType),
@@ -590,16 +590,31 @@ var _ = Describe("BMC Conditions", func() {
 					HaveField("Reason", bmcUserResetReason),
 				),
 			)),
+		))
+		By("BMC reset should remove the reset annotation")
+		Eventually(Object(bmc)).Should(
+			HaveField("Annotations", BeNil()),
 		)
-
-		// cleanup
-		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		By("Ensuring right conditions are present, after bmc reset is done")
+		Eventually(Object(bmc)).Should(
+			HaveField("Status.Conditions", ContainElement(
+				SatisfyAll(
+					HaveField("Type", bmcResetConditionType),
+					HaveField("Status", metav1.ConditionFalse),
+					HaveField("Reason", "ResetComplete"),
+				),
+			)),
+		)
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 			},
 		}
+		Eventually(Get(server)).Should(Succeed())
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))

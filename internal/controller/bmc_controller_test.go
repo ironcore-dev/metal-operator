@@ -20,7 +20,7 @@ import (
 )
 
 var _ = Describe("BMC Controller", func() {
-	_ = SetupTest(nil)
+	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -265,6 +265,107 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("Should create a DNSRecord for the server if configured", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		bmcLabels := map[string]string{
+			"foo": "bar",
+		}
+
+		By("Creating the DNSRecord template configmap for the server")
+		configMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dns-record-template",
+				Namespace: ns.Name,
+			},
+			Data: map[string]string{
+				"template.yaml": `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+  {{- range $key, $value := .Labels }}
+    {{ $key }}: {{ $value }}
+  {{- end }}
+data:
+  hostname: "{{ .Hostname }}.region.cloud.com."
+  ip: "{{ .IP }}"
+  recordType: "A"
+  record: "ingress.region.cloud.com."
+  zoneName: "region.cloud.com."
+  ttl: "300"
+`,
+			},
+		}
+		Expect(k8sClient.Create(ctx, configMap)).To(Succeed())
+
+		By("Creating a BMC resource")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-",
+				Labels:       bmcLabels,
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "23:11:8A:33:CF:EA",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: 8000,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		By("Ensuring that the DNSRecord resource has been created for the server")
+		dnsRecord := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+				Namespace: ns.Name,
+			},
+		}
+		Eventually(Object(dnsRecord)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "BMC",
+				Name:               bmc.Name,
+				UID:                bmc.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Data", HaveKeyWithValue("hostname", bmcutils.GetServerNameFromBMCandIndex(0, bmc)+".region.cloud.com.")),
+			HaveField("Data", HaveKeyWithValue("ip", "127.0.0.1")),
+			HaveField("Data", HaveKeyWithValue("recordType", "A")),
+			HaveField("Data", HaveKeyWithValue("ttl", "300")),
+		))
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, configMap)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, dnsRecord)).To(Succeed())
+	})
+
 })
 
 var _ = Describe("BMC Validation", func() {

@@ -115,14 +115,6 @@ resources:
   controller: true
   domain: ironcore.dev
   group: metal
-  kind: User
-  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: ironcore.dev
-  group: metal
   kind: BMCVersion
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
@@ -151,6 +143,14 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: BMCVersionSet
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: BMCUser
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

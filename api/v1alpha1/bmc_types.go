@@ -66,11 +66,6 @@ type BMCSpec struct {
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
 
-	// UserAccounts is a list of user accounts that can be used to access the BMC.
-	// Each account includes a name, role ID, description, and other relevant details.
-	// +optional
-	UserRefs []UserSpec `json:"userRefs,omitempty"`
-
 	// BMCSettingRef is a reference to a BMCSettings object that specifies
 	// the BMC configuration for this BMC.
 	// +optional

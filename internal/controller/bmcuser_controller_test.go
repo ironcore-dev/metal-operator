@@ -8,15 +8,18 @@ import (
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	metalBMC "github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
-var _ = Describe("User Controller", func() {
-	ns := SetupTest()
+var _ = Describe("BMCUser Controller", func() {
+	_ = SetupTest(nil)
 
 	var bmc *metalv1alpha1.BMC
 	var bmcSecret *metalv1alpha1.BMCSecret
@@ -61,16 +64,25 @@ var _ = Describe("User Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Eventually(Get(server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
+		EnsureCleanState()
 	})
 
 	It("Should create a bmc user and secret", func(ctx SpecContext) {
 		By("Creating a User resource")
-		user := &metalv1alpha1.User{
+		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-user",
 			},
-			Spec: metalv1alpha1.UserSpec{
+			Spec: metalv1alpha1.BMCUserSpec{
 				UserName: "user",
 				RoleID:   "ReadOnly",
 				BMCRef: &v1.LocalObjectReference{
@@ -94,20 +106,40 @@ var _ = Describe("User Controller", func() {
 			},
 		}
 		Eventually(Get(effectiveSecret)).Should(Succeed())
+		Eventually(Object(effectiveSecret)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "BMCUser",
+				Name:               user.Name,
+				UID:                user.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+		))
 
 		By("Ensuring the effective bmcSecret has the correct data")
 		Expect(effectiveSecret.Data).To(HaveKeyWithValue("username", []byte("user")))
 		password := string(effectiveSecret.Data["password"])
 		// make sure that the password has a length of 30 (default max length for redfish mock server)
 		Expect(password).To(HaveLen(30))
+
+		// set delete option to Background to ensure the secret is deleted when the user is deleted
+		By("Deleting the User resource and ensuring the effective secret is deleted")
+
+		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+		By("Ensuring that the User resource has been deleted")
+		Eventually(Get(user)).Should(Satisfy(apierrors.IsNotFound))
+		By("Ensuring that the effective BMCSecret has been deleted")
+		Expect(k8sClient.Delete(ctx, effectiveSecret)).To(Succeed())
+		Eventually(Get(effectiveSecret)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	It("Should just create additional bmc users", func(ctx SpecContext) {
-		user01 := &metalv1alpha1.User{
+		user01 := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "user01",
 			},
-			Spec: metalv1alpha1.UserSpec{
+			Spec: metalv1alpha1.BMCUserSpec{
 				UserName: "user01",
 				RoleID:   "Readonly",
 				BMCRef: &v1.LocalObjectReference{
@@ -133,11 +165,11 @@ var _ = Describe("User Controller", func() {
 		Expect(effectiveSecret.Data).To(HaveKeyWithValue("password", Not(BeEmpty())))
 
 		By("Creating a second user with the same BMCRef")
-		user02 := &metalv1alpha1.User{
+		user02 := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "user02",
 			},
-			Spec: metalv1alpha1.UserSpec{
+			Spec: metalv1alpha1.BMCUserSpec{
 				UserName: "user02",
 				RoleID:   "Readonly",
 				BMCRef: &v1.LocalObjectReference{
@@ -175,11 +207,11 @@ var _ = Describe("User Controller", func() {
 		Eventually(Get(&user03Secret)).Should(Succeed())
 
 		By("Creating a second user with the same BMCRef")
-		user03 := &metalv1alpha1.User{
+		user03 := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "user03",
 			},
-			Spec: metalv1alpha1.UserSpec{
+			Spec: metalv1alpha1.BMCUserSpec{
 				UserName: "user03",
 				RoleID:   "Readonly",
 				BMCRef: &v1.LocalObjectReference{
@@ -200,14 +232,20 @@ var _ = Describe("User Controller", func() {
 			HaveField("Status.ID", Not(BeEmpty())),
 		))
 		By("Ensuring that the BMCSecret has been created")
+		Expect(k8sClient.Delete(ctx, user01)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, user02)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, user03)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, &user03Secret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, effectiveSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, effectiveSecret02)).To(Succeed())
 	})
 
 	It("Should rotate password if rotationPeriod is set", func(ctx SpecContext) {
-		adminUser := &metalv1alpha1.User{
+		adminUser := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "admin-user",
 			},
-			Spec: metalv1alpha1.UserSpec{
+			Spec: metalv1alpha1.BMCUserSpec{
 				UserName: "admin-user",
 				RoleID:   "Administrator",
 				BMCRef: &v1.LocalObjectReference{
@@ -239,17 +277,18 @@ var _ = Describe("User Controller", func() {
 		}
 		Eventually(Get(newSecret)).Should(Succeed())
 		Expect(newSecret.Data).To(Not(HaveKeyWithValue("password", []byte("bar"))))
-
+		Expect(k8sClient.Delete(ctx, adminUser)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, newSecret)).To(Succeed())
 	})
 
 	It("Should delete bmc user and secret on User deletion", func(ctx SpecContext) {
 		metalBMC.UnitTestMockUps.InitializeDefaults()
 		By("Creating a User resource")
-		user := &metalv1alpha1.User{
+		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "delete-user",
 			},
-			Spec: metalv1alpha1.UserSpec{
+			Spec: metalv1alpha1.BMCUserSpec{
 				UserName: "deleteUser",
 				RoleID:   "ReadOnly",
 				BMCRef: &v1.LocalObjectReference{
@@ -284,5 +323,8 @@ var _ = Describe("User Controller", func() {
 		By("Ensuring that the BMC user has been deleted")
 		Eventually(metalBMC.UnitTestMockUps.Accounts).ShouldNot(HaveKey("deleteUser"))
 
+		By("Ensuring that the effective BMCSecret has been deleted")
+		Expect(k8sClient.Delete(ctx, effectiveSecret)).To(Succeed())
 	})
+
 })

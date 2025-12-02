@@ -41,6 +41,8 @@ const (
 	OperationAnnotationRetryFailed = "retry-failed-state-resource"
 	// OperationAnnotationRetryFailedPropagated restarts the reconciliation of a resource's child from failed state -> initial state.
 	OperationAnnotationRetryFailedPropagated = "retry-failed-state-resource-propagated"
+	// OperationAnnotationRotateCredentials is used to indicate that credentials should be rotated.
+	OperationAnnotationRotateCredentials = "rotate-credentials"
 )
 
 const (

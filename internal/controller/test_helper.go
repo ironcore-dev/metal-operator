@@ -22,6 +22,9 @@ func EnsureCleanState() {
 		bmcSecretList := &metalv1alpha1.BMCSecretList{}
 		g.Eventually(ObjectList(bmcSecretList)).Should(HaveField("Items", HaveLen(0)))
 
+		bmcUserList := &metalv1alpha1.BMCUserList{}
+		g.Eventually(ObjectList(bmcUserList)).Should(HaveField("Items", HaveLen(0)))
+
 		claimList := &metalv1alpha1.ServerClaimList{}
 		g.Eventually(ObjectList(claimList)).Should(HaveField("Items", HaveLen(0)))
 

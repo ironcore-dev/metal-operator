@@ -50,6 +50,7 @@ rules:
   - bmcs
   - bmcsecrets
   - bmcsettings
+  - bmcusers
   - bmcversions
   - bmcversionsets
   - endpoints
@@ -69,7 +70,6 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - accounts/finalizers
   - biossettings/finalizers
   - biossettingssets/finalizers
   - biosversions/finalizers
@@ -77,6 +77,7 @@ rules:
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - bmcsettings/finalizers
+  - bmcusers/finalizers
   - bmcversions/finalizers
   - bmcversionsets/finalizers
   - endpoints/finalizers
@@ -89,7 +90,6 @@ rules:
 - apiGroups:
   - metal.ironcore.dev
   resources:
-  - accounts/status
   - biossettings/status
   - biossettingssets/status
   - biosversions/status
@@ -97,6 +97,7 @@ rules:
   - bmcs/status
   - bmcsecrets/status
   - bmcsettings/status
+  - bmcusers/status
   - bmcversions/status
   - bmcversionsets/status
   - endpoints/status

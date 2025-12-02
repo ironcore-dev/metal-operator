@@ -12,11 +12,6 @@ import (
 	"testing"
 	"time"
 
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
-	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +28,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
+	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -253,7 +254,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&UserReconciler{
+		Expect((&BMCUserReconciler{
 			Client:   k8sManager.GetClient(),
 			Scheme:   k8sManager.GetScheme(),
 			Insecure: true,

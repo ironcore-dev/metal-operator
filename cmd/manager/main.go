@@ -409,7 +409,7 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettings")
 		os.Exit(1)
 	}
-	if err = (&controller.UserReconciler{
+	if err = (&controller.BMCUserReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Insecure: insecure,

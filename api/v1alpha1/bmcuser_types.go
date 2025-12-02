@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1alpha1
@@ -8,8 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// UserSpec defines the desired state of User
-type UserSpec struct {
+// BMCUserSpec defines the desired state of BMCUser.
+type BMCUserSpec struct {
 	UserName       string           `json:"userName"`
 	RoleID         string           `json:"roleID"`
 	Description    string           `json:"description,omitempty"`
@@ -18,12 +18,13 @@ type UserSpec struct {
 	BMCSecretRef *v1.LocalObjectReference `json:"bmcSecretRef,omitempty"`
 	BMCRef       *v1.LocalObjectReference `json:"bmcRef,omitempty"`
 	Enabled      bool                     `json:"enabled"`
-	// set if the user should be used by the BMC reconciler to access the system.
-	UseForBMCAccess bool `json:"useForBMCAccess,omitempty"`
+	// set if the user should be used by the BMC controller to access the system.
+	// +kubebuilder:default=false
+	BMCControllerUser bool `json:"bmcControllerUser"`
 }
 
-// UserStatus defines the observed state of User
-type UserStatus struct {
+// BMCUserStatus defines the observed state of BMCUser.
+type BMCUserStatus struct {
 	EffectiveBMCSecretRef *v1.LocalObjectReference `json:"effectiveBMCSecretRef,omitempty"`
 	LastRotation          *metav1.Time             `json:"lastRotation,omitempty"`
 	PasswordExpiration    string                   `json:"passwordExpiration,omitempty"`
@@ -31,27 +32,27 @@ type UserStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
-// User is the Schema for the users API
-type User struct {
+// BMCUser is the Schema for the bmcusers API.
+type BMCUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   UserSpec   `json:"spec,omitempty"`
-	Status UserStatus `json:"status,omitempty"`
+	Spec   BMCUserSpec   `json:"spec,omitempty"`
+	Status BMCUserStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// UserList contains a list of User
-type UserList struct {
+// BMCUserList contains a list of BMCUser.
+type BMCUserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []User `json:"items"`
+	Items           []BMCUser `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&User{}, &UserList{})
+	SchemeBuilder.Register(&BMCUser{}, &BMCUserList{})
 }

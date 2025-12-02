@@ -173,12 +173,13 @@ func (r *RedfishKubeBMC) getFilteredBiosRegistryAttributes(readOnly, immutable b
 
 	filtered := make(map[string]RegistryEntryAttributes)
 	for name, attrData := range UnitTestMockUps.BIOSSettingAttr {
+		resetRequired := attrData["reboot"].(bool)
 		filtered[name] = RegistryEntryAttributes{
 			AttributeName: name,
 			Immutable:     immutable,
 			ReadOnly:      readOnly,
 			Type:          attrData["type"].(string),
-			ResetRequired: attrData["reboot"].(bool),
+			ResetRequired: &resetRequired,
 		}
 	}
 	return filtered, nil

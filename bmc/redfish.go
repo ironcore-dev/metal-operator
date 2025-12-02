@@ -65,6 +65,16 @@ var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
 }
 
+type InvalidBIOSSettingsError struct {
+	SettingName  string
+	SettingValue any
+	Message      string
+}
+
+func (e *InvalidBIOSSettingsError) Error() string {
+	return fmt.Sprintf("Settings Name: %s\nSettings Value: %v\nError: %s", e.SettingName, e.SettingValue, e.Message)
+}
+
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
 func NewRedfishBMCClient(ctx context.Context, options Options) (*RedfishBMC, error) {
 	clientConfig := gofish.ClientConfig{
@@ -527,48 +537,51 @@ func (r *RedfishBMC) checkAttribues(attrs redfish.SettingsAttributes, filtered m
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
-			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
+			err := &InvalidBIOSSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message:      "attribute not found or is immutable/hidden",
+			}
+			errs = append(errs, err)
 			continue
 		}
-		if entryAttribute.ResetRequired {
+		// if ResetRequired is nil, assume true
+		if entryAttribute.ResetRequired == nil || *entryAttribute.ResetRequired {
 			reset = true
 		}
 		switch strings.ToLower(entryAttribute.Type) {
 		case "integer":
 			if _, ok := value.(int); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 			}
 		case "string":
 			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 			}
 		case "enumeration":
 			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type (Non String). needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 				break
 			}
 			var validEnum bool
@@ -579,18 +592,33 @@ func (r *RedfishBMC) checkAttribues(attrs redfish.SettingsAttributes, filtered m
 				}
 			}
 			if !validEnum {
-				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message:      fmt.Sprintf("attributes value is unknown. Valid Attributes %v", entryAttribute.Value),
+				}
+				errs = append(errs, err)
+			}
+		case "boolean":
+			if _, ok := value.(bool); !ok {
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		default:
-			errs = append(
-				errs,
-				fmt.Errorf(
-					"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-					name,
-					value,
+			err := &InvalidBIOSSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 					entryAttribute.Type,
-					entryAttribute,
-				))
+				),
+			}
+			errs = append(errs, err)
 		}
 	}
 	return reset, errors.Join(errs...)
@@ -631,6 +659,8 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemURI string) ([]Stora
 		func(ctx context.Context) (bool, error) {
 			systemStorage, err = system.Storage()
 			if err != nil {
+				log := ctrl.LoggerFrom(ctx)
+				log.V(1).Info("Storage not ready yet", "error", err)
 				return false, nil
 			}
 			return true, nil

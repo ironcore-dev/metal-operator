@@ -172,7 +172,7 @@ type RegistryEntryAttributes struct {
 	MenuPath      string
 	MinLength     int
 	ReadOnly      bool
-	ResetRequired bool
+	ResetRequired *bool
 	Type          string
 	WriteOnly     bool
 	Value         []AllowedValues

@@ -346,7 +346,7 @@ func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.L
 }
 
 // loadDNSRecordTemplate loads the DNS record template from a mounted file, falling back to a default template
-func (r *BMCReconciler) loadDNSRecordTemplate(ctx context.Context, log logr.Logger) (string, error) {
+func (r *BMCReconciler) loadDNSRecordTemplate(log logr.Logger) (string, error) {
 	// Try to read from the mounted file
 	templateText, err := os.ReadFile(r.DNSRecordTemplatePath)
 	if err != nil {

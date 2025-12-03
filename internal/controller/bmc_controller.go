@@ -292,7 +292,7 @@ type DNSRecordTemplateData struct {
 // createDNSRecordForServer creates a DNS record resource from a YAML template loaded from ConfigMap
 func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, server *metalv1alpha1.Server) error {
 	// Load DNS record template from ConfigMap
-	templateText, err := r.loadDNSRecordTemplate(ctx, log)
+	templateText, err := r.loadDNSRecordTemplate(log)
 	if err != nil {
 		return err
 	}

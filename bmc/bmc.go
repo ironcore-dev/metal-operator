@@ -116,6 +116,18 @@ type BMC interface {
 	// WaitForServerPowerState waits for the server to reach the specified power state.
 	WaitForServerPowerState(ctx context.Context, systemURI string, powerState redfish.PowerState) error
 
+	// CreateOrUpdateAccount creates or updates a BMC user account.
+	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
+
+	// DeleteAccount deletes a BMC user account.
+	DeleteAccount(ctx context.Context, userName, id string) error
+
+	// GetAccounts retrieves all BMC user accounts.
+	GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error)
+
+	// GetAccountService retrieves the account service.
+	GetAccountService(ctx context.Context) (*redfish.AccountService, error)
+
 	// UpgradeBMCVersion upgrades the BMC version for the system.
 	UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error)
 

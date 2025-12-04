@@ -34,6 +34,9 @@ func EnsureCleanState() {
 		bmcVersionList := &metalv1alpha1.BMCVersionList{}
 		g.Eventually(ObjectList(bmcVersionList)).Should(HaveField("Items", HaveLen(0)))
 
+		bmcSettingsSetList := &metalv1alpha1.BMCSettingsSetList{}
+		g.Eventually(ObjectList(bmcSettingsSetList)).Should(HaveField("Items", HaveLen(0)))
+
 		biosSettingsSetList := &metalv1alpha1.BIOSSettingsSetList{}
 		g.Eventually(ObjectList(biosSettingsSetList)).Should(HaveField("Items", HaveLen(0)))
 

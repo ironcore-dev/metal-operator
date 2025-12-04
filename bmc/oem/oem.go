@@ -5,15 +5,15 @@ package oem
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"reflect"
 
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-// OEMManagerInterface defines methods for OEM-specific BMC management.
-type OEMManagerInterface interface {
+// ManagerInterface defines methods for OEM-specific Server Manager's operations in BMC.
+type ManagerInterface interface {
 	// GetOEMBMCSettingAttribute retrieves OEM-specific BMC setting attributes.
 	GetOEMBMCSettingAttribute(ctx context.Context, attributes map[string]string) (redfish.SettingsAttributes, error)
 
@@ -30,7 +30,7 @@ type OEMManagerInterface interface {
 	UpdateBMCAttributesApplyAt(ctx context.Context, attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
 }
 
-// OEMInterface defines methods for OEM-specific BMC operations.
+// OEMInterface defines methods for OEM-specific Server operations in BMC.
 type OEMInterface interface {
 	GetUpdateRequestBody(parameters *redfish.SimpleUpdateParameters) *SimpleUpdateRequestBody
 	GetUpdateTaskMonitorURI(response *http.Response) (string, error)
@@ -50,7 +50,7 @@ func IsSubMap(main, sub map[string]any) bool {
 				return false
 			}
 		default:
-			if fmt.Sprintf("%v", vMain) != fmt.Sprintf("%v", vSub) {
+			if !reflect.DeepEqual(vMain, vSub) {
 				return false
 			}
 		}

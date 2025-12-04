@@ -299,8 +299,8 @@ type Manager struct {
 	OemLinks        json.RawMessage
 }
 
-func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (oem.OEMManagerInterface, error) {
-	var OEMManager oem.OEMManagerInterface
+func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
+	var OEMManager oem.ManagerInterface
 	switch ooem.Manufacturer {
 	case string(ManufacturerDell):
 		OEMManager = &oem.DellIdracManager{

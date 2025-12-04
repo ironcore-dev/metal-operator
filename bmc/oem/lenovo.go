@@ -208,7 +208,7 @@ func (l *LenovoXCCManager) GetOEMBMCSettingAttribute(
 			result[key] = string(respRawBody)
 		}
 	}
-	log.V(1).Info("fetched data from BMC Settings ", "Result", result)
+	log.V(1).Info("Fetched data from BMC Settings ", "Result", result)
 	return result, errors.Join(errs...)
 }
 

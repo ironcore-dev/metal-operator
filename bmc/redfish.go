@@ -221,7 +221,7 @@ func (r *RedfishBMC) GetManager(bmcUUID string) (*redfish.Manager, error) {
 	return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
 }
 
-func (r *RedfishBMC) getOEMManager(bmcUUID string) (oem.OEMManagerInterface, error) {
+func (r *RedfishBMC) getOEMManager(bmcUUID string) (oem.ManagerInterface, error) {
 	manager, err := r.GetManager(bmcUUID)
 	if err != nil {
 		return nil, fmt.Errorf("not able to Manager %v", err)

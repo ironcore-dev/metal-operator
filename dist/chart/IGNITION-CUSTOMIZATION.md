@@ -1,10 +1,10 @@
 # Metal Operator Helm Chart - Ignition Template Customization
 
-This Helm chart allows you to optionally override the default hardcoded Ignition template used by the metal-operator for bare metal server provisioning.
+This Helm chart allows you to optionally override the default Ignition template used by the metal-operator for bare metal server provisioning.
 
 ## Overview
 
-The metal-operator uses [Ignition](https://coreos.github.io/ignition/) templates to configure bare metal servers during their first boot. By default, it uses a hardcoded template. You can optionally enable ConfigMap-based template customization to meet your specific requirements.
+The metal-operator uses [Ignition](https://coreos.github.io/ignition/) templates to configure bare metal servers during their first boot. The operator includes a default template file baked into the container at `/etc/metal-operator/ignition-template.yaml`. You can optionally override this template by mounting a ConfigMap at the same location.
 
 ## Configuration
 
@@ -14,15 +14,14 @@ The ignition configuration is controlled by the `ignition` section in `values.ya
 
 ```yaml
 ignition:
-  enable: false                         # Enable/disable ignition ConfigMap override (default: false)
-  configMapName: "ignition-template"    # Name suffix for the ConfigMap
-  configMapKey: "ignition-template.yaml"  # Key in the ConfigMap containing the template
-  template: |                           # The actual Ignition template content (only used when enable: true)
+  override: false       # Enable/disable ignition ConfigMap override (default: false)
+  template: |           # The actual Ignition template content (only used when override: true)
     # Your custom Ignition template here
 ```
 
-**Default Behavior**: When `ignition.enable: false` (default), the operator uses its built-in hardcoded template.
-**Override Behavior**: When `ignition.enable: true`, the operator uses the ConfigMap template and falls back to hardcoded if ConfigMap is unavailable.
+**Default Behavior**: When `ignition.override: false` (default), the operator uses the template file baked into the container image at `/etc/metal-operator/ignition-template.yaml`.
+
+**Override Behavior**: When `ignition.override: true`, a ConfigMap is created and mounted to `/etc/metal-operator/ignition-template.yaml`, replacing the default template file.
 
 ### Template Variables
 
@@ -37,7 +36,7 @@ Your custom template must include these template variables for proper operation:
 
 ```yaml
 ignition:
-  enable: true
+  override: true
   template: |
     variant: fcos
     version: "1.3.0"
@@ -64,19 +63,19 @@ ignition:
 
 ## Deployment
 
-### Using Default Hardcoded Template (Recommended)
+### Using Default Template (Recommended)
 
 ```bash
 helm install my-metal-operator ./
 ```
 
-This uses the built-in hardcoded template. No ConfigMap is created, and the operator works immediately.
+This uses the template file baked into the container image. No ConfigMap is created, and the operator works immediately with the default configuration.
 
 ### Using Custom Template Override
 
 1. Enable ignition customization:
 ```bash
-helm install my-metal-operator ./ --set ignition.enable=true
+helm install my-metal-operator ./ --set ignition.override=true
 ```
 
 2. Or create a custom values file:
@@ -159,16 +158,22 @@ passwd:
 
 ## Troubleshooting
 
-### ConfigMap Not Found
+### Template File Not Found
 
-If you see errors about ConfigMap not being found:
+If you see errors about template file not being found:
 
-1. Verify the ConfigMap was created:
+1. Verify the default file exists in the container:
 ```bash
-kubectl get configmap -n <namespace>
+kubectl exec -n <namespace> deployment/metal-operator-controller-manager -- ls -la /etc/metal-operator/
 ```
 
-2. Check the manager logs:
+2. If using ConfigMap override, verify it was created and mounted:
+```bash
+kubectl get configmap -n <namespace>
+kubectl describe deployment -n <namespace> metal-operator-controller-manager
+```
+
+3. Check the manager logs:
 ```bash
 kubectl logs -n <namespace> deployment/metal-operator-controller-manager
 ```
@@ -180,12 +185,17 @@ If ignition generation fails due to template syntax:
 1. Validate your template syntax offline
 2. Check that all required template variables are included
 3. Verify the Ignition format is valid
+4. If using a custom template, ensure the ConfigMap is properly mounted
 
-### Permission Issues
+### Volume Mount Issues
 
-If the controller cannot read the ConfigMap:
-1. Verify RBAC permissions include ConfigMap access
-2. Check that the ConfigMap is in the correct namespace
+If the ConfigMap override is not working:
+1. Verify the ConfigMap is mounted correctly:
+```bash
+kubectl describe pod -n <namespace> -l control-plane=controller-manager
+```
+2. Check that `ignition.override: true` is set in values
+3. Verify RBAC permissions include ConfigMap access
 
 ## Examples
 

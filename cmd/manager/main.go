@@ -20,14 +20,11 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -80,8 +77,7 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
-		ignitionConfigMapName              string
-		ignitionConfigMapKey               string
+		ignitionConfigPath                 string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
 		powerPollingInterval               time.Duration
@@ -120,10 +116,8 @@ func main() { // nolint: gocyclo
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
-	flag.StringVar(&ignitionConfigMapName, "ignition-configmap-name", "",
-		"Name of the ConfigMap containing the ignition template. If empty, uses hardcoded template.")
-	flag.StringVar(&ignitionConfigMapKey, "ignition-configmap-key", "ignition-template.yaml",
-		"Key in the ConfigMap containing the ignition template.")
+	flag.StringVar(&ignitionConfigPath, "ignition-config-path", "/etc/metal-operator/ignition-template.yaml",
+		"Path to the ignition template file.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
@@ -290,20 +284,8 @@ func main() { // nolint: gocyclo
 		})
 	}
 
-	// Configure cache to watch ConfigMaps only in the manager namespace
-	cacheOptions := cache.Options{
-		ByObject: map[client.Object]cache.ByObject{
-			&corev1.ConfigMap{}: {
-				Namespaces: map[string]cache.Config{
-					managerNamespace: {},
-				},
-			},
-		},
-	}
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		Cache:                  cacheOptions,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
@@ -372,8 +354,7 @@ func main() { // nolint: gocyclo
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		IgnitionConfigMapName:   ignitionConfigMapName,
-		IgnitionConfigMapKey:    ignitionConfigMapKey,
+		IgnitionConfigPath:      ignitionConfigPath,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

@@ -424,19 +424,26 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 		server := object.(*metalv1alpha1.Server)
 		var req []reconcile.Request
 
+		if server.Status.State == metalv1alpha1.ServerStateInitial {
+			return nil
+		}
+
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList); err != nil {
 			log.Error(err, "failed to list host serverMaintenances")
 			return nil
 		}
 		for _, maintenance := range maintenanceList.Items {
-			if server.Spec.ServerMaintenanceRef != nil && maintenance.Spec.ServerRef.Name == server.Spec.ServerMaintenanceRef.Name {
-				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
-				})
-				return req
+			if server.Spec.ServerMaintenanceRef != nil {
+				if server.Spec.ServerMaintenanceRef.Name == maintenance.Name {
+					req = append(req, reconcile.Request{
+						NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
+					})
+					return req
+				}
+				continue
 			}
-			if server.Spec.ServerMaintenanceRef == nil {
+			if maintenance.Spec.ServerRef.Name == server.Name {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
 				})

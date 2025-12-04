@@ -524,7 +524,7 @@ func (r *BIOSVersionReconciler) getCondition(acc *conditionutils.Accessor, condi
 func (r *BIOSVersionReconciler) getReferredServerMaintenance(
 	ctx context.Context,
 	log logr.Logger,
-	serverMaintenanceRef *corev1.ObjectReference,
+	serverMaintenanceRef *metalv1alpha1.ObjectReference,
 ) (*metalv1alpha1.ServerMaintenance, error) {
 	key := client.ObjectKey{Name: serverMaintenanceRef.Name, Namespace: r.ManagerNamespace}
 	serverMaintenance := &metalv1alpha1.ServerMaintenance{}
@@ -548,24 +548,6 @@ func (r *BIOSVersionReconciler) getReferredServer(
 		return server, err
 	}
 	return server, nil
-}
-
-func (r *BIOSVersionReconciler) getReferredSecret(
-	ctx context.Context,
-	log logr.Logger,
-	secretRef *corev1.LocalObjectReference,
-) (string, string, error) {
-	if secretRef == nil {
-		return "", "", nil
-	}
-	key := client.ObjectKey{Name: secretRef.Name}
-	secret := &corev1.Secret{}
-	if err := r.Get(ctx, key, secret); err != nil {
-		log.V(1).Error(err, "failed to get referred Secret obj", "secret name", secretRef.Name)
-		return "", "", err
-	}
-
-	return secret.StringData[metalv1alpha1.BMCSecretUsernameKeyName], secret.StringData[metalv1alpha1.BMCSecretPasswordKeyName], nil
 }
 
 func (r *BIOSVersionReconciler) updateBiosVersionStatus(
@@ -624,7 +606,7 @@ func (r *BIOSVersionReconciler) patchMaintenanceRequestRefOnBiosVersion(
 	if serverMaintenance == nil {
 		biosVersion.Spec.ServerMaintenanceRef = nil
 	} else {
-		biosVersion.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
+		biosVersion.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
 			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			Kind:       "ServerMaintenance",
 			Namespace:  serverMaintenance.Namespace,
@@ -837,11 +819,16 @@ func (r *BIOSVersionReconciler) issueBiosUpgrade(
 	issuedCondition *metav1.Condition,
 	acc *conditionutils.Accessor,
 ) error {
-	password, username, err := r.getReferredSecret(ctx, log, biosVersion.Spec.Image.SecretRef)
-	if err != nil {
-		log.V(1).Error(err, "failed to get secret ref for", "secretRef", biosVersion.Spec.Image.SecretRef.Name)
-		return err
+	var username, password string
+	if biosVersion.Spec.Image.SecretRef != nil {
+		var err error
+		password, username, err = GetImageCredentialsForSecretRef(ctx, r.Client, biosVersion.Spec.Image.SecretRef)
+		if err != nil {
+			log.V(1).Error(err, "failed to get secret ref for", "secretRef", biosVersion.Spec.Image.SecretRef.Name)
+			return err
+		}
 	}
+
 	var forceUpdate bool
 	if biosVersion.Spec.UpdatePolicy != nil && *biosVersion.Spec.UpdatePolicy == metalv1alpha1.UpdatePolicyForce {
 		forceUpdate = true

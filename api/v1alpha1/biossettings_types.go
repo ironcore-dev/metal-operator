@@ -23,11 +23,11 @@ type BIOSSettingsTemplate struct {
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
 	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 type SettingsFlowItem struct {
-	// Name identifies what this settings is doing
+	// Name is the name of the flow item
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1000

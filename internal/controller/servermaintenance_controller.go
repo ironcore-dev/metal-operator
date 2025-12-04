@@ -11,7 +11,6 @@ import (
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -227,7 +226,7 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 	}
 	log.V(1).Info("Created or patched Config", "Config", config.Name, "Operation", opResult)
 	serverBase := server.DeepCopy()
-	server.Spec.MaintenanceBootConfigurationRef = &v1.ObjectReference{
+	server.Spec.MaintenanceBootConfigurationRef = &metalv1alpha1.ObjectReference{
 		Namespace:  config.Namespace,
 		Name:       config.Name,
 		UID:        config.UID,
@@ -256,7 +255,7 @@ func (r *ServerMaintenanceReconciler) updateServerRef(ctx context.Context, log l
 		log.V(1).Info("Server is already in Maintenance", "Server", server.Name, "Maintenance", server.Spec.ServerMaintenanceRef.Name)
 		return nil
 	}
-	server.Spec.ServerMaintenanceRef = &v1.ObjectReference{
+	server.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
 		APIVersion: "metal.ironcore.dev/v1alpha1",
 		Kind:       "ServerMaintenance",
 		Namespace:  maintenance.Namespace,

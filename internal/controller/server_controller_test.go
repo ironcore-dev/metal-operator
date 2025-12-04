@@ -231,7 +231,7 @@ var _ = Describe("Server Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
-			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
 				Name:       server.Name,
@@ -423,7 +423,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
-			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
 				Name:       server.Name,

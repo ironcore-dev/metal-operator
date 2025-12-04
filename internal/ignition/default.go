@@ -5,13 +5,9 @@ package ignition
 
 import (
 	"bytes"
-	"context"
 	"fmt"
+	"os"
 	"text/template"
-
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Config holds the Docker image and flags.
@@ -22,90 +18,18 @@ type Config struct {
 	PasswordHash string
 }
 
-// defaultIgnitionTemplate is a Go template for the default Ignition configuration.
-var defaultIgnitionTemplate = `variant: fcos
-version: "1.3.0"
-systemd:
-  units:
-    - name: docker-install.service
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Install Docker
-        Before=metalprobe.service
-        [Service]
-        Restart=on-failure
-        RestartSec=20
-        Type=oneshot
-        RemainAfterExit=yes
-        ExecStart=/usr/bin/apt-get update
-        ExecStart=/usr/bin/apt-get install docker.io docker-cli -y
-        [Install]
-        WantedBy=multi-user.target
-    - name: docker.service
-      enabled: true
-    - name: metalprobe.service
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Run My Docker Container
-        [Service]
-        Restart=on-failure
-        RestartSec=20
-        ExecStartPre=-/usr/bin/docker stop metalprobe
-        ExecStartPre=-/usr/bin/docker rm metalprobe
-        ExecStartPre=/usr/bin/docker pull {{.Image}}
-        ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe {{.Image}} {{.Flags}}
-        ExecStop=/usr/bin/docker stop metalprobe
-        [Install]
-        WantedBy=multi-user.target
-storage:
-  files: []
-passwd:
-  users:
-    - name: metal
-      password_hash: {{.PasswordHash}}
-      groups: [ "wheel" ]
-      ssh_authorized_keys: [ {{.SSHPublicKey}} ]
-`
+// GenerateIgnitionDataFromFile renders an ignition template from a file with the given Config.
+func GenerateIgnitionDataFromFile(filePath string, config Config) ([]byte, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("file path must be specified")
+	}
 
-// GenerateDefaultIgnitionData renders the defaultIgnitionTemplate with the given Config.
-func GenerateDefaultIgnitionData(config Config) ([]byte, error) {
-	tmpl, err := template.New("defaultIgnition").Parse(defaultIgnitionTemplate)
+	templateContent, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("parsing template failed: %w", err)
+		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
-	var out bytes.Buffer
-	err = tmpl.Execute(&out, config)
-	if err != nil {
-		return nil, fmt.Errorf("executing template failed: %w", err)
-	}
-
-	return out.Bytes(), nil
-}
-
-// GenerateIgnitionDataFromConfigMap renders an ignition template from a ConfigMap with the given Config.
-func GenerateIgnitionDataFromConfigMap(ctx context.Context, client client.Client, namespace, configMapName, configMapKey string, config Config) ([]byte, error) {
-	if configMapName == "" || configMapKey == "" {
-		return nil, fmt.Errorf("ConfigMap name and key must be specified")
-	}
-
-	configMap := &v1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      configMapName,
-	}, configMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ConfigMap %s/%s: %w", namespace, configMapName, err)
-	}
-
-	templateContent, exists := configMap.Data[configMapKey]
-	if !exists {
-		return nil, fmt.Errorf("key %s not found in ConfigMap %s/%s", configMapKey, namespace, configMapName)
-	}
-
-	return generateIgnitionDataFromTemplate(templateContent, config)
+	return generateIgnitionDataFromTemplate(string(templateContent), config)
 }
 
 // generateIgnitionDataFromTemplate is a helper function that renders any template with the given Config.

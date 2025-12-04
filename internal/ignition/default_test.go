@@ -4,16 +4,11 @@
 package ignition
 
 import (
-	"context"
+	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestIgnition(t *testing.T) {
@@ -23,18 +18,10 @@ func TestIgnition(t *testing.T) {
 
 var _ = Describe("Ignition Template Generation", func() {
 	var (
-		ctx           context.Context
-		fakeClient    client.Client
-		testConfig    Config
-		testNamespace = "test-namespace"
+		testConfig Config
 	)
 
 	BeforeEach(func() {
-		ctx = context.Background()
-		scheme := runtime.NewScheme()
-		Expect(v1.AddToScheme(scheme)).To(Succeed())
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).Build()
-
 		testConfig = Config{
 			Image:        "test-image:latest",
 			Flags:        "--test-flag=value",
@@ -43,41 +30,8 @@ var _ = Describe("Ignition Template Generation", func() {
 		}
 	})
 
-	Context("GenerateDefaultIgnitionData", func() {
-		It("should generate valid ignition data from hardcoded template", func() {
-			data, err := GenerateDefaultIgnitionData(testConfig)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(data).NotTo(BeEmpty())
-
-			// Verify the template was rendered with our config values
-			ignitionStr := string(data)
-			Expect(ignitionStr).To(ContainSubstring("test-image:latest"))
-			Expect(ignitionStr).To(ContainSubstring("--test-flag=value"))
-			Expect(ignitionStr).To(ContainSubstring(testConfig.SSHPublicKey))
-			Expect(ignitionStr).To(ContainSubstring(testConfig.PasswordHash))
-			Expect(ignitionStr).To(ContainSubstring("variant: fcos"))
-			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
-		})
-
-		It("should succeed even with missing template fields", func() {
-			// The hardcoded template is robust and doesn't fail on missing fields
-			config := Config{
-				Image:        "",
-				Flags:        "",
-				SSHPublicKey: "",
-				PasswordHash: "",
-			}
-			data, err := GenerateDefaultIgnitionData(config)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(data).NotTo(BeEmpty())
-
-			ignitionStr := string(data)
-			Expect(ignitionStr).To(ContainSubstring("variant: fcos"))
-		})
-	})
-
-	Context("GenerateIgnitionDataFromConfigMap", func() {
-		It("should generate ignition data from ConfigMap template", func() {
+	Context("GenerateIgnitionDataFromFile", func() {
+		It("should generate ignition data from file template", func() {
 			customTemplate := `variant: fcos
 version: "1.4.0"
 systemd:
@@ -97,19 +51,17 @@ passwd:
       password_hash: {{.PasswordHash}}
       ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
 
-			configMap := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "custom-ignition",
-					Namespace: testNamespace,
-				},
-				Data: map[string]string{
-					"template": customTemplate,
-				},
-			}
-			Expect(fakeClient.Create(ctx, configMap)).To(Succeed())
+			tmpFile, err := os.CreateTemp("", "ignition-template-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(os.Remove(tmpFile.Name())).To(Succeed())
+			}()
 
-			data, err := GenerateIgnitionDataFromConfigMap(
-				ctx, fakeClient, testNamespace, "custom-ignition", "template", testConfig)
+			_, err = tmpFile.WriteString(customTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			data, err := GenerateIgnitionDataFromFile(tmpFile.Name(), testConfig)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(data).NotTo(BeEmpty())
 
@@ -120,29 +72,10 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("custom-user"))
 		})
 
-		It("should return error when ConfigMap does not exist", func() {
-			_, err := GenerateIgnitionDataFromConfigMap(
-				ctx, fakeClient, testNamespace, "nonexistent-configmap", "template", testConfig)
+		It("should return error when file does not exist", func() {
+			_, err := GenerateIgnitionDataFromFile("/nonexistent/path/file.yaml", testConfig)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to get ConfigMap"))
-		})
-
-		It("should return error when ConfigMap key does not exist", func() {
-			configMap := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: testNamespace,
-				},
-				Data: map[string]string{
-					"other-key": "some-data",
-				},
-			}
-			Expect(fakeClient.Create(ctx, configMap)).To(Succeed())
-
-			_, err := GenerateIgnitionDataFromConfigMap(
-				ctx, fakeClient, testNamespace, "test-configmap", "nonexistent-key", testConfig)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("key nonexistent-key not found"))
+			Expect(err.Error()).To(ContainSubstring("failed to read file"))
 		})
 
 		It("should return error when template is invalid", func() {
@@ -152,35 +85,25 @@ systemd:
     - name: broken-service
       contents: {{.InvalidTemplate}}`
 
-			configMap := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "invalid-template",
-					Namespace: testNamespace,
-				},
-				Data: map[string]string{
-					"template": invalidTemplate,
-				},
-			}
-			Expect(fakeClient.Create(ctx, configMap)).To(Succeed())
+			tmpFile, err := os.CreateTemp("", "invalid-template-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(os.Remove(tmpFile.Name())).To(Succeed())
+			}()
 
-			_, err := GenerateIgnitionDataFromConfigMap(
-				ctx, fakeClient, testNamespace, "invalid-template", "template", testConfig)
+			_, err = tmpFile.WriteString(invalidTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			_, err = GenerateIgnitionDataFromFile(tmpFile.Name(), testConfig)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("executing template failed"))
 		})
 
-		It("should return error when ConfigMap name is empty", func() {
-			_, err := GenerateIgnitionDataFromConfigMap(
-				ctx, fakeClient, testNamespace, "", "template", testConfig)
+		It("should return error when file path is empty", func() {
+			_, err := GenerateIgnitionDataFromFile("", testConfig)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ConfigMap name and key must be specified"))
-		})
-
-		It("should return error when ConfigMap key is empty", func() {
-			_, err := GenerateIgnitionDataFromConfigMap(
-				ctx, fakeClient, testNamespace, "test-configmap", "", testConfig)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ConfigMap name and key must be specified"))
+			Expect(err.Error()).To(ContainSubstring("file path must be specified"))
 		})
 	})
 

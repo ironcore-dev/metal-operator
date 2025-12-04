@@ -91,11 +91,9 @@ type ServerReconciler struct {
 	BMCOptions              bmc.Options
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
-	IgnitionConfigMapName   string
-	IgnitionConfigMapKey    string
+	IgnitionConfigPath      string
 }
 
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -645,7 +643,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", client.ObjectKeyFromObject(sshSecret))
 
 	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
-	ignitionData, err := r.generateDefaultIgnitionDataForServer(ctx, probeFlags, sshPublicKey, password)
+	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey, password)
 	if err != nil {
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
 	}
@@ -703,7 +701,7 @@ func generateSSHKeyPairAndPassword() ([]byte, []byte, []byte, error) {
 	return privateKeyPem, publicKeyAuthorized, password, nil
 }
 
-func (r *ServerReconciler) generateDefaultIgnitionDataForServer(ctx context.Context, flags string, sshPublicKey []byte, password []byte) ([]byte, error) {
+func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, sshPublicKey []byte, password []byte) ([]byte, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate password hash: %w", err)
@@ -716,30 +714,13 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(ctx context.Cont
 		PasswordHash: string(passwordHash),
 	}
 
-	// Try ConfigMap first, fallback to hardcoded template if ConfigMap is not available
-	if r.IgnitionConfigMapName != "" && r.IgnitionConfigMapKey != "" {
-		ignitionData, err := ignition.GenerateIgnitionDataFromConfigMap(
-			ctx,
-			r.Client,
-			r.ManagerNamespace,
-			r.IgnitionConfigMapName,
-			r.IgnitionConfigMapKey,
-			config,
-		)
-		if err != nil {
-			// Log the ConfigMap error but continue with hardcoded template
-			log := ctrl.LoggerFrom(ctx)
-			log.V(1).Info("ConfigMap not available, using hardcoded template",
-				"configmap", r.IgnitionConfigMapName, "error", err.Error())
-		} else {
-			return ignitionData, nil
-		}
-	}
-
-	// Fallback to hardcoded template
-	ignitionData, err := ignition.GenerateDefaultIgnitionData(config)
+	// Load ignition template from file
+	ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+		r.IgnitionConfigPath,
+		config,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate default ignition data: %w", err)
+		return nil, fmt.Errorf("failed to generate ignition data from file %s: %w", r.IgnitionConfigPath, err)
 	}
 
 	return ignitionData, nil

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -193,7 +194,32 @@ var _ = Describe("Server Controller", func() {
 		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
 		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
 
-		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+		// Create a temporary ignition template file for testing
+		tmpIgnitionFile, err := os.CreateTemp("", "ignition-test-*.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			Expect(os.Remove(tmpIgnitionFile.Name())).To(Succeed())
+		}()
+
+		defaultTemplate := `variant: fcos
+version: "1.3.0"
+systemd:
+  units:
+    - name: metalprobe.service
+      enabled: true
+      contents: |-
+        [Service]
+        ExecStart=/usr/bin/docker run {{.Image}} {{.Flags}}
+passwd:
+  users:
+    - name: metal
+      password_hash: {{.PasswordHash}}
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+		_, err = tmpIgnitionFile.WriteString(defaultTemplate)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(tmpIgnitionFile.Close()).To(Succeed())
+
+		ignitionData, err := ignition.GenerateIgnitionDataFromFile(tmpIgnitionFile.Name(), ignition.Config{
 			Image:        "foo:latest",
 			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
@@ -388,7 +414,32 @@ var _ = Describe("Server Controller", func() {
 
 		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
 
-		ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+		// Create a temporary ignition template file for testing
+		tmpIgnitionFile, err := os.CreateTemp("", "ignition-test-*.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			Expect(os.Remove(tmpIgnitionFile.Name())).To(Succeed())
+		}()
+
+		defaultTemplate := `variant: fcos
+version: "1.3.0"
+systemd:
+  units:
+    - name: metalprobe.service
+      enabled: true
+      contents: |-
+        [Service]
+        ExecStart=/usr/bin/docker run {{.Image}} {{.Flags}}
+passwd:
+  users:
+    - name: metal
+      password_hash: {{.PasswordHash}}
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+		_, err = tmpIgnitionFile.WriteString(defaultTemplate)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(tmpIgnitionFile.Close()).To(Succeed())
+
+		ignitionData, err := ignition.GenerateIgnitionDataFromFile(tmpIgnitionFile.Name(), ignition.Config{
 			Image:        "foo:latest",
 			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
@@ -846,8 +897,8 @@ var _ = Describe("Server Controller", func() {
 			Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		})
 
-		It("Should use custom ConfigMap template when available", func(ctx SpecContext) {
-			By("Creating a custom ignition ConfigMap")
+		It("Should use custom file template when available", func(ctx SpecContext) {
+			By("Creating a custom ignition template file")
 			customTemplate := `variant: fcos
 version: "1.4.0"
 systemd:
@@ -872,31 +923,28 @@ passwd:
       groups: [ "wheel", "docker" ]
       ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
 
-			customConfigMap := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "custom-ignition-template",
-					Namespace: ns.Name,
-				},
-				Data: map[string]string{
-					"ignition.yaml": customTemplate,
-				},
-			}
-			Expect(k8sClient.Create(ctx, customConfigMap)).To(Succeed())
+			tmpFile, err := os.CreateTemp("", "ignition-template-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(os.Remove(tmpFile.Name())).To(Succeed())
+			}()
 
-			By("Creating a ServerReconciler with ConfigMap settings")
+			_, err = tmpFile.WriteString(customTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a ServerReconciler with file path")
 			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				IgnitionConfigMapName: "custom-ignition-template",
-				IgnitionConfigMapKey:  "ignition.yaml",
+				Client:             k8sClient,
+				Scheme:             k8sClient.Scheme(),
+				RegistryURL:        registryURL,
+				ManagerNamespace:   ns.Name,
+				ProbeImage:         "foo:latest",
+				IgnitionConfigPath: tmpFile.Name(),
 			}
 
-			By("Generating ignition data with custom ConfigMap")
+			By("Generating ignition data with custom file")
 			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				ctx,
 				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
@@ -910,148 +958,110 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("Custom Metal Probe Service"))
 			Expect(ignitionStr).To(ContainSubstring("custom-metal"))
 			Expect(ignitionStr).To(ContainSubstring("RestartSec=30"))
-
-			By("Cleaning up the ConfigMap")
-			Expect(k8sClient.Delete(ctx, customConfigMap)).To(Succeed())
 		})
 
-		It("Should fallback to hardcoded template when ConfigMap is missing", func(ctx SpecContext) {
-			By("Creating a ServerReconciler with non-existent ConfigMap settings")
+		It("Should fallback with error when file is missing", func(ctx SpecContext) {
+			By("Creating a ServerReconciler with non-existent file path")
 			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				IgnitionConfigMapName: "nonexistent-configmap",
-				IgnitionConfigMapKey:  "ignition.yaml",
+				Client:             k8sClient,
+				Scheme:             k8sClient.Scheme(),
+				RegistryURL:        registryURL,
+				ManagerNamespace:   ns.Name,
+				ProbeImage:         "foo:latest",
+				IgnitionConfigPath: "/nonexistent/path/ignition.yaml",
 			}
 
-			By("Generating ignition data (should fallback to hardcoded template)")
-			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				ctx,
+			By("Generating ignition data (should fail)")
+			_, err := reconciler.generateDefaultIgnitionDataForServer(
 				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
 			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(ignitionData).NotTo(BeEmpty())
-
-			// Should contain hardcoded template content
-			ignitionStr := string(ignitionData)
-			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
-			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
-			Expect(ignitionStr).To(ContainSubstring("name: metal"))
-			Expect(ignitionStr).To(ContainSubstring("docker-install.service"))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
 		})
 
-		It("Should fallback to hardcoded template when ConfigMap key is missing", func(ctx SpecContext) {
-			By("Creating a ConfigMap without the expected key")
-			configMapWithWrongKey := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "configmap-wrong-key",
-					Namespace: ns.Name,
-				},
-				Data: map[string]string{
-					"wrong-key": "some template content",
-				},
-			}
-			Expect(k8sClient.Create(ctx, configMapWithWrongKey)).To(Succeed())
-
-			By("Creating a ServerReconciler with ConfigMap that has wrong key")
-			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				IgnitionConfigMapName: "configmap-wrong-key",
-				IgnitionConfigMapKey:  "ignition.yaml", // This key doesn't exist
-			}
-
-			By("Generating ignition data (should fallback to hardcoded template)")
-			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				ctx,
-				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
-				[]byte("testpassword"),
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(ignitionData).NotTo(BeEmpty())
-
-			// Should contain hardcoded template content
-			ignitionStr := string(ignitionData)
-			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
-			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
-
-			By("Cleaning up the ConfigMap")
-			Expect(k8sClient.Delete(ctx, configMapWithWrongKey)).To(Succeed())
-		})
-
-		It("Should fallback to hardcoded template when ConfigMap template is invalid", func(ctx SpecContext) {
-			By("Creating a ConfigMap with invalid template")
+		It("Should fail when file template is invalid", func(ctx SpecContext) {
+			By("Creating a file with invalid template")
 			invalidTemplate := `variant: fcos
 systemd:
   units:
     - name: broken-service
       contents: {{.InvalidTemplateField}}`
 
-			invalidConfigMap := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "invalid-template-configmap",
-					Namespace: ns.Name,
-				},
-				Data: map[string]string{
-					"ignition.yaml": invalidTemplate,
-				},
-			}
-			Expect(k8sClient.Create(ctx, invalidConfigMap)).To(Succeed())
+			tmpFile, err := os.CreateTemp("", "invalid-template-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(os.Remove(tmpFile.Name())).To(Succeed())
+			}()
 
-			By("Creating a ServerReconciler with invalid ConfigMap template")
+			_, err = tmpFile.WriteString(invalidTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a ServerReconciler with invalid template file")
 			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				IgnitionConfigMapName: "invalid-template-configmap",
-				IgnitionConfigMapKey:  "ignition.yaml",
+				Client:             k8sClient,
+				Scheme:             k8sClient.Scheme(),
+				RegistryURL:        registryURL,
+				ManagerNamespace:   ns.Name,
+				ProbeImage:         "foo:latest",
+				IgnitionConfigPath: tmpFile.Name(),
 			}
 
-			By("Generating ignition data (should fallback to hardcoded template)")
-			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				ctx,
+			By("Generating ignition data (should fail)")
+			_, err = reconciler.generateDefaultIgnitionDataForServer(
 				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
 			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(ignitionData).NotTo(BeEmpty())
-
-			// Should contain hardcoded template content
-			ignitionStr := string(ignitionData)
-			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
-			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
-
-			By("Cleaning up the ConfigMap")
-			Expect(k8sClient.Delete(ctx, invalidConfigMap)).To(Succeed())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
 		})
 
-		It("Should use hardcoded template when ConfigMap settings are empty", func(ctx SpecContext) {
-			By("Creating a ServerReconciler with empty ConfigMap settings")
+		It("Should use default ignition template from file", func(ctx SpecContext) {
+			By("Creating a default ignition template file")
+			defaultTemplate := `variant: fcos
+version: "1.3.0"
+systemd:
+  units:
+    - name: metalprobe.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=Metal Probe Service
+        [Service]
+        ExecStart=/usr/bin/docker run --name metalprobe {{.Image}} {{.Flags}}
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: metal
+      password_hash: {{.PasswordHash}}
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+
+			tmpFile, err := os.CreateTemp("", "default-ignition-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(os.Remove(tmpFile.Name())).To(Succeed())
+			}()
+
+			_, err = tmpFile.WriteString(defaultTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a ServerReconciler with default file path")
 			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				IgnitionConfigMapName: "", // Empty
-				IgnitionConfigMapKey:  "", // Empty
+				Client:             k8sClient,
+				Scheme:             k8sClient.Scheme(),
+				RegistryURL:        registryURL,
+				ManagerNamespace:   ns.Name,
+				ProbeImage:         "foo:latest",
+				IgnitionConfigPath: tmpFile.Name(),
 			}
 
-			By("Generating ignition data (should use hardcoded template)")
+			By("Generating ignition data (should use default template)")
 			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				ctx,
 				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
@@ -1059,12 +1069,11 @@ systemd:
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ignitionData).NotTo(BeEmpty())
 
-			// Should contain hardcoded template content
+			// Should contain default template content
 			ignitionStr := string(ignitionData)
 			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
 			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
 			Expect(ignitionStr).To(ContainSubstring("name: metal"))
-			Expect(ignitionStr).To(ContainSubstring("docker-install.service"))
 		})
 	})
 })

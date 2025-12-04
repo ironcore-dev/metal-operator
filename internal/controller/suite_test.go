@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
@@ -28,7 +27,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -61,65 +59,6 @@ func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
-}
-
-func DeleteAllMetalResources(ctx context.Context, namespace string) {
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerClaim{}, &metalv1alpha1.ServerClaimList{}, client.InNamespace(namespace))).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.Endpoint{}, &metalv1alpha1.EndpointList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMC{}, &metalv1alpha1.BMCList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))).Should(
-		HaveField("Items", BeEmpty()))
-
-	// Need to delete all the finalizer on the server in Maintenance before deleting it
-	serverList := &metalv1alpha1.ServerList{}
-	Eventually(
-		func(g Gomega) {
-			err := List(serverList)()
-			g.Expect(err).ToNot(HaveOccurred())
-			for _, s := range serverList.Items {
-				if s.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&s, ServerFinalizer) {
-					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &s, ServerFinalizer)
-					g.Expect(err).ToNot(HaveOccurred())
-				}
-			}
-		}).Should(Succeed())
-	Eventually(deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettingsSet{}, &metalv1alpha1.BIOSSettingsSetList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersion{}, &metalv1alpha1.BIOSVersionList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersionSet{}, &metalv1alpha1.BIOSVersionSetList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettings{}, &metalv1alpha1.BMCSettingsList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettingsSet{}, &metalv1alpha1.BMCSettingsSetList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersion{}, &metalv1alpha1.BMCVersionList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersionSet{}, &metalv1alpha1.BMCVersionList{})).Should(
-		HaveField("Items", BeEmpty()))
-}
-
-func deleteAndList(ctx context.Context, obj client.Object, objList client.ObjectList, namespaceOpt ...client.DeleteAllOfOption) func() (client.ObjectList, error) {
-	Expect(k8sClient.DeleteAllOf(ctx, obj, namespaceOpt...)).To(Succeed())
-	return ObjectList(objList)
 }
 
 var _ = BeforeSuite(func() {

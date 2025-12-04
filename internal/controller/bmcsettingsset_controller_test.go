@@ -7,24 +7,26 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	bmcPkg "github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 )
 
 var _ = Describe("BMCSettingsSet Controller", func() {
 	Context("When reconciling a resource", func() {
 
-		ns := SetupTest()
+		ns := SetupTest(nil)
 		var server01 *metalv1alpha1.Server
 		var server02 *metalv1alpha1.Server
+		var bmcSecret *metalv1alpha1.BMCSecret
 
 		var bmc01 *metalv1alpha1.BMC
 		var bmc02 *metalv1alpha1.BMC
@@ -34,7 +36,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 		BeforeEach(func(ctx SpecContext) {
 
 			By("Creating a BMCSecret")
-			bmcSecret := &metalv1alpha1.BMCSecret{
+			bmcSecret = &metalv1alpha1.BMCSecret{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
 				},
@@ -103,6 +105,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmc01)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			))
+
 			By("Ensuring that the Server resource will be created")
 			server02 = &metalv1alpha1.Server{
 				ObjectMeta: metav1.ObjectMeta{
@@ -115,11 +118,28 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmc02)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			))
-
 		})
 		AfterEach(func(ctx SpecContext) {
-			DeleteAllMetalResources(ctx, ns.Name)
-			bmcPkg.UnitTestMockUps.ResetBMCSettings()
+
+			By("Ensuring servers are available before deletion (if they exist)")
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(server01), server01); err == nil {
+				Eventually(UpdateStatus(server01, func() {
+					server01.Status.State = metalv1alpha1.ServerStateAvailable
+				})).Should(Succeed())
+			}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(server02), server02); err == nil {
+				Eventually(UpdateStatus(server02, func() {
+					server02.Status.State = metalv1alpha1.ServerStateAvailable
+				})).Should(Succeed())
+			}
+
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server01))).To(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server02))).To(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc01))).To(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc02))).To(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
+			By("Ensuring all resources are cleaned up")
+			EnsureCleanState()
 		})
 
 		It("Should successfully reconcile when BMCSettingsSet was generated, labels match and bmcsettings were generated", func(ctx SpecContext) {
@@ -194,6 +214,13 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Checking if the BMCSettingsSet was deleted")
 			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+
+			By("Deleting the BMCSetting resource")
+			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
+
+			By("Ensuring that the BMCSettings resource is removed")
+			Eventually(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+			Consistently(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
 
 		})
 
@@ -283,6 +310,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Checking if the BMCSettingsSet was deleted")
 			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+
 		})
 
 		It("Should successfully reconcile when label of bmc02 was changed", func(ctx SpecContext) {
@@ -368,6 +396,19 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Checking if the BMCSettingsSet was deleted")
 			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+
+			By("Deleting the BMCSetting resource")
+			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
+
+			By("Ensuring that the BMCSettings resource is removed")
+			Eventually(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+			Consistently(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+			Expect(k8sClient.Delete(ctx, bmcSettings02)).To(Succeed())
+
+			By("Ensuring that the BMCSettings resource is removed")
+			Eventually(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
+			Consistently(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
+
 		})
 		It("Should successfully reconcile when bmcsettingset was updated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
@@ -450,6 +491,25 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Checking if the BMCSettingsSet was deleted")
 			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+
+			By("Deleting the BMCSettings01 resource")
+			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
+			Eventually(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+
+			By("Deleting the BMCSettings02 resource")
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSettings02))).To(Succeed())
+			Eventually(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
+
+			By("Deleting all ServerMaintenance objects created during the test")
+			var maintList metalv1alpha1.ServerMaintenanceList
+			Expect(k8sClient.List(ctx, &maintList, client.InNamespace(ns.Name))).To(Succeed())
+			for i := range maintList.Items {
+				maint := &maintList.Items[i]
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, maint))).To(Succeed())
+				Eventually(Get(maint)).Should(Satisfy(apierrors.IsNotFound))
+			}
+
+			Expect(k8sClient.List(ctx, &maintList)).To(Succeed())
 		})
 
 		It("Should correctly handle ServerMaintenanceRefs merging for existing and new BMCSettings", func(ctx SpecContext) {
@@ -484,7 +544,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, ignitionSecret)
 
 			By("Creating 2 ServerClaims object")
 			serverClaim01 := &metalv1alpha1.ServerClaim{
@@ -670,11 +729,51 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 2)),
 			))
 
+			By("Approving the maintenance to allow patchBMCSettingsFromTemplate to proceed and to fulfill the requirmente to EnsureCleanState")
+			Eventually(Update(serverClaim01, func() {
+				metautils.SetAnnotation(serverClaim01, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
+			})).Should(Succeed())
+
+			Eventually(Object(bmcSettings01)).Should(SatisfyAny(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+			))
+
+			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+			))
+			Eventually(Update(serverClaim02, func() {
+				metautils.SetAnnotation(serverClaim02, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
+			})).Should(Succeed())
+
+			Eventually(Object(bmcSettings02)).Should(SatisfyAny(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+			))
+
+			Eventually(Object(bmcSettings02)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+			))
+
 			By("Deleting the BMCSettings")
 			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, bmcSettings02)).To(Succeed())
 			By("Deleting the BMCSettingsSet")
 			Expect(k8sClient.Delete(ctx, bmcSettingsSet)).To(Succeed())
+
+			By("Deleting all ServerMaintenance objects created during the test")
+			var maintList metalv1alpha1.ServerMaintenanceList
+			Expect(k8sClient.List(ctx, &maintList, client.InNamespace(ns.Name))).To(Succeed())
+			for i := range maintList.Items {
+				maint := &maintList.Items[i]
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, maint))).To(Succeed())
+				Eventually(Get(maint)).Should(Satisfy(apierrors.IsNotFound))
+			}
+
+			Expect(k8sClient.List(ctx, &maintList)).To(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, serverClaim01))).To(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, serverClaim02))).To(Succeed())
+
 		})
 	})
 })

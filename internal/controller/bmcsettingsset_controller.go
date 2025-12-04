@@ -100,9 +100,7 @@ func (r *BMCSettingsSetReconciler) delete(
 	delTableBMCSettings := map[string]struct{}{}
 	for _, bmcSettings := range ownedBMCSettings.Items {
 
-		if bmcSettings.Status.State != metalv1alpha1.BMCSettingsStateInProgress {
-			delTableBMCSettings[bmcSettings.Name] = struct{}{}
-		} else if len(bmcSettings.Spec.ServerMaintenanceRefs) == 0 {
+		if bmcSettings.Status.State != metalv1alpha1.BMCSettingsStateInProgress || len(bmcSettings.Spec.ServerMaintenanceRefs) == 0 {
 			// If no ServerMaintenanceRefs is set, the BMCSettings is not actively being processed
 			delTableBMCSettings[bmcSettings.Name] = struct{}{}
 		}

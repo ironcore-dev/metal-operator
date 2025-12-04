@@ -9,9 +9,9 @@ spec:
   bmcSettingsTemplate:
     version: 2.10.3 # version to apply settings to
     serverMaintenancePolicy : OwnerApproval
-    settings: 
-          foo: bar 
-          foo2: bar2
+    settings:
+      foo: bar
+      foo2: bar2
   bmcSelector:
     matchLabels:
       manufacturer: "dell"

@@ -22,11 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// added const field for go linting
-const (
-	testBarValue = "bar"
-)
-
 var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest(nil)
 

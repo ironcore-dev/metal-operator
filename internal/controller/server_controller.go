@@ -478,7 +478,7 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
 	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
 		Namespace:  config.Namespace,
 		Name:       config.Name,
 		UID:        config.UID,

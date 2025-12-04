@@ -374,7 +374,7 @@ func (r *BMCVersionReconciler) checkIfMaintenanceGranted(ctx context.Context, lo
 			}
 		} else {
 			// we still need to wait for server to enter maintenance
-			log.V(1).Info("Server not yet in maintenance", "Server")
+			log.V(1).Info("Server not yet in maintenance", "Server", server.Name)
 			notInMaintenanceState[server.Name] = false
 		}
 	}
@@ -589,13 +589,13 @@ func (r *BMCVersionReconciler) getBMCFromBMCVersion(ctx context.Context, bmcVers
 	return bmcObj, nil
 }
 
-func (r *BMCVersionReconciler) getServerMaintenanceRefForServer(serverMaintenanceRefs []corev1.ObjectReference, serverMaintenanceUID types.UID) (corev1.ObjectReference, bool) {
+func (r *BMCVersionReconciler) getServerMaintenanceRefForServer(serverMaintenanceRefs []metalv1alpha1.ObjectReference, serverMaintenanceUID types.UID) (metalv1alpha1.ObjectReference, bool) {
 	for _, serverMaintenanceRef := range serverMaintenanceRefs {
 		if serverMaintenanceRef.UID == serverMaintenanceUID {
 			return serverMaintenanceRef, true
 		}
 	}
-	return corev1.ObjectReference{}, false
+	return metalv1alpha1.ObjectReference{}, false
 }
 
 func (r *BMCVersionReconciler) patchBMCVersionStatusAndCondition(
@@ -642,7 +642,7 @@ func (r *BMCVersionReconciler) patchBMCVersionStatusAndCondition(
 func (r *BMCVersionReconciler) patchMaintenanceRequestRefOnBMCVersion(
 	ctx context.Context,
 	bmcVersion *metalv1alpha1.BMCVersion,
-	serverMaintenanceRefs []corev1.ObjectReference,
+	serverMaintenanceRefs []metalv1alpha1.ObjectReference,
 ) error {
 	bmcVersionsBase := bmcVersion.DeepCopy()
 
@@ -696,7 +696,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 	}
 
 	var errs []error
-	serverMaintenanceRefs := make([]corev1.ObjectReference, 0, len(servers))
+	serverMaintenanceRefs := make([]metalv1alpha1.ObjectReference, 0, len(servers))
 	for _, server := range servers {
 		if _, ok := serverWithMaintenances[server.Name]; ok {
 			continue
@@ -726,7 +726,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 
 		serverMaintenanceRefs = append(
 			serverMaintenanceRefs,
-			corev1.ObjectReference{
+			metalv1alpha1.ObjectReference{
 				APIVersion: metalv1alpha1.GroupVersion.String(),
 				Kind:       "ServerMaintenance",
 				Namespace:  serverMaintenance.Namespace,

@@ -39,7 +39,7 @@ type BMCSettingsSpec struct {
 type ServerMaintenanceRefItem struct {
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that the BMCSettings has requested for the referred server.
 	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 // BMCSettingsState specifies the current state of the server maintenance.

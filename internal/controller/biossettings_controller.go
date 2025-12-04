@@ -167,14 +167,12 @@ func (r *BiosSettingsReconciler) cleanupServerMaintenanceReferences(
 	if biosSettings.Spec.ServerMaintenanceRef == nil {
 		return nil
 	}
-	// try to get the serverMaintaince created
 	serverMaintenance, err := r.getReferredServerMaintenance(ctx, log, biosSettings.Spec.ServerMaintenanceRef)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to get referred serverMaintenance obj from biosSettings: %w", err)
 	}
 
 	var condition *metav1.Condition
-	// if we got the server ref. by and its not being deleted
 	if err == nil && serverMaintenance.DeletionTimestamp.IsZero() {
 		// created by the controller
 		if metav1.IsControlledBy(serverMaintenance, biosSettings) {
@@ -1349,7 +1347,7 @@ func (r *BiosSettingsReconciler) getReferredServer(
 func (r *BiosSettingsReconciler) getReferredServerMaintenance(
 	ctx context.Context,
 	log logr.Logger,
-	serverMaintenanceRef *corev1.ObjectReference,
+	serverMaintenanceRef *metalv1alpha1.ObjectReference,
 ) (*metalv1alpha1.ServerMaintenance, error) {
 	if serverMaintenanceRef == nil {
 		return nil, fmt.Errorf("nil ServerMaintenance reference")
@@ -1409,7 +1407,7 @@ func (r *BiosSettingsReconciler) patchMaintenanceRequestRefOnBiosSettings(
 	if serverMaintenance == nil {
 		biosSettings.Spec.ServerMaintenanceRef = nil
 	} else {
-		biosSettings.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
+		biosSettings.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
 			APIVersion: metalv1alpha1.GroupVersion.String(),
 			Kind:       "ServerMaintenance",
 			Namespace:  serverMaintenance.Namespace,

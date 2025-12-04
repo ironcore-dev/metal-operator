@@ -334,7 +334,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -485,7 +485,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -601,7 +601,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -966,7 +966,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,

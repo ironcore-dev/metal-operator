@@ -48,7 +48,7 @@ type BIOSVersionTemplate struct {
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
 	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.

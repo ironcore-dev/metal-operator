@@ -190,7 +190,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			})).Should(Succeed())
 			By("mock servermaintenance Creation maintenance")
 			Eventually(Update(biosSettingsV1, func() {
-				biosSettingsV1.Spec.ServerMaintenanceRef = &v1.ObjectReference{Name: "foobar-Maintenance"}
+				biosSettingsV1.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: "foobar-Maintenance"}
 			})).Should(Succeed())
 			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
 			biosSettingsV1Updated := biosSettingsV1.DeepCopy()

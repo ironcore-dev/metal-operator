@@ -189,7 +189,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
-				[]v1.ObjectReference{
+				[]metalv1alpha1.ObjectReference{
 					{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -204,7 +204,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -314,7 +314,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
-				[]v1.ObjectReference{
+				[]metalv1alpha1.ObjectReference{
 					{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
@@ -338,7 +338,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,

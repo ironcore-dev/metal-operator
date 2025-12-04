@@ -524,7 +524,7 @@ func (r *BIOSVersionReconciler) getCondition(acc *conditionutils.Accessor, condi
 func (r *BIOSVersionReconciler) getReferredServerMaintenance(
 	ctx context.Context,
 	log logr.Logger,
-	serverMaintenanceRef *corev1.ObjectReference,
+	serverMaintenanceRef *metalv1alpha1.ObjectReference,
 ) (*metalv1alpha1.ServerMaintenance, error) {
 	key := client.ObjectKey{Name: serverMaintenanceRef.Name, Namespace: r.ManagerNamespace}
 	serverMaintenance := &metalv1alpha1.ServerMaintenance{}
@@ -606,7 +606,7 @@ func (r *BIOSVersionReconciler) patchMaintenanceRequestRefOnBiosVersion(
 	if serverMaintenance == nil {
 		biosVersion.Spec.ServerMaintenanceRef = nil
 	} else {
-		biosVersion.Spec.ServerMaintenanceRef = &corev1.ObjectReference{
+		biosVersion.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
 			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			Kind:       "ServerMaintenance",
 			Namespace:  serverMaintenance.Namespace,

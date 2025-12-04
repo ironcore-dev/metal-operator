@@ -102,11 +102,11 @@ type ServerSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
 	// +optional
-	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
+	ServerClaimRef *ObjectReference `json:"serverClaimRef,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
 	// +optional
-	ServerMaintenanceRef *v1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
 	// BMCRef is a reference to the BMC object associated with this server.
 	// This field is optional and can be omitted if no BMC is associated with this server.
@@ -122,12 +122,12 @@ type ServerSpec struct {
 	// the boot configuration for this server. This field is optional and can be omitted
 	// if no boot configuration is specified.
 	// +optional
-	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
+	BootConfigurationRef *ObjectReference `json:"bootConfigurationRef,omitempty"`
 
 	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
 	// the boot configuration for this server during maintenance. This field is optional and can be omitted
 	// +optional
-	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
+	MaintenanceBootConfigurationRef *ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
 	// BootOrder specifies the boot order of the server.
 	// +optional

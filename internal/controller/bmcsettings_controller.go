@@ -752,7 +752,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		ServerMaintenanceRefs = append(
 			ServerMaintenanceRefs,
 			metalv1alpha1.ServerMaintenanceRefItem{
-				ServerMaintenanceRef: &corev1.ObjectReference{
+				ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
 					APIVersion: metalv1alpha1.GroupVersion.String(),
 					Kind:       "ServerMaintenance",
 					Namespace:  serverMaintenance.Namespace,
@@ -894,7 +894,7 @@ func (r *BMCSettingsReconciler) getReferredBMCSettings(
 func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(
 	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
 	serverMaintenanceUID types.UID,
-) *corev1.ObjectReference {
+) *metalv1alpha1.ObjectReference {
 	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
 		if serverMaintenanceRef.ServerMaintenanceRef.UID == serverMaintenanceUID {
 			return serverMaintenanceRef.ServerMaintenanceRef

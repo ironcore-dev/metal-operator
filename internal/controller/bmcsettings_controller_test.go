@@ -295,7 +295,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmcSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
+					ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,

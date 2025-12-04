@@ -6,12 +6,12 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
-	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
@@ -27,9 +27,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	//+kubebuilder:scaffold:imports
 )
@@ -59,65 +61,11 @@ func TestControllers(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
-func DeleteAllMetalResources(ctx context.Context, namespace string) {
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerClaim{}, &metalv1alpha1.ServerClaimList{}, client.InNamespace(namespace))).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.Endpoint{}, &metalv1alpha1.EndpointList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMC{}, &metalv1alpha1.BMCList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerMaintenance{}, &metalv1alpha1.ServerMaintenanceList{}, client.InNamespace(namespace))).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.ServerBootConfiguration{}, &metalv1alpha1.ServerBootConfigurationList{}, client.InNamespace(namespace))).Should(
-		HaveField("Items", BeEmpty()))
-
-	// Need to delete all the finalizer on the server in Maintenance before deleting it
-	serverList := &metalv1alpha1.ServerList{}
-	Eventually(
-		func(g Gomega) {
-			err := List(serverList)()
-			g.Expect(err).ToNot(HaveOccurred())
-			for _, s := range serverList.Items {
-				if s.Status.State == metalv1alpha1.ServerStateMaintenance && controllerutil.ContainsFinalizer(&s, ServerFinalizer) {
-					_, err := clientutils.PatchEnsureNoFinalizer(ctx, k8sClient, &s, ServerFinalizer)
-					g.Expect(err).ToNot(HaveOccurred())
-				}
-			}
-		}).Should(Succeed())
-	Eventually(deleteAndList(ctx, &metalv1alpha1.Server{}, &metalv1alpha1.ServerList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettingsSet{}, &metalv1alpha1.BIOSSettingsSetList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSSettings{}, &metalv1alpha1.BIOSSettingsList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersion{}, &metalv1alpha1.BIOSVersionList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BIOSVersionSet{}, &metalv1alpha1.BIOSVersionSetList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCSettings{}, &metalv1alpha1.BMCSettingsList{})).Should(
-		HaveField("Items", BeEmpty()))
-
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersion{}, &metalv1alpha1.BMCVersionList{})).Should(
-		HaveField("Items", BeEmpty()))
-	Eventually(deleteAndList(ctx, &metalv1alpha1.BMCVersionSet{}, &metalv1alpha1.BMCVersionList{})).Should(
-		HaveField("Items", BeEmpty()))
-}
-
-func deleteAndList(ctx context.Context, obj client.Object, objList client.ObjectList, namespaceOpt ...client.DeleteAllOfOption) func() (client.ObjectList, error) {
-	Expect(k8sClient.DeleteAllOf(ctx, obj, namespaceOpt...)).To(Succeed())
-	return ObjectList(objList)
-}
-
 var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
 	By("bootstrapping test environment")
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -150,20 +98,10 @@ var _ = BeforeSuite(func() {
 	// set komega client
 	SetClient(k8sClient)
 
-	By("Starting the registry server")
-	var mgrCtx context.Context
-	mgrCtx, cancel := context.WithCancel(context.Background())
-	DeferCleanup(cancel)
-	registryServer := registry.NewServer(GinkgoLogr, ":30000")
-	go func() {
-		defer GinkgoRecover()
-		Expect(registryServer.Start(mgrCtx)).To(Succeed(), "failed to start registry server")
-	}()
-
 	bmc.InitMockUp()
 })
 
-func SetupTest() *corev1.Namespace {
+func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 	ns := &corev1.Namespace{}
 
 	BeforeEach(func(ctx SpecContext) {
@@ -191,6 +129,7 @@ func SetupTest() *corev1.Namespace {
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
+		Expect(RegisterIndexFields(mgrCtx, k8sManager.GetFieldIndexer())).To(Succeed())
 
 		prefixDB := &macdb.MacPrefixes{
 			MacPrefixes: []macdb.MacPrefix{
@@ -223,10 +162,12 @@ func SetupTest() *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCReconciler{
-			Client:           k8sManager.GetClient(),
-			Scheme:           k8sManager.GetScheme(),
-			Insecure:         true,
-			ManagerNamespace: ns.Name,
+			Client:                 k8sManager.GetClient(),
+			Scheme:                 k8sManager.GetScheme(),
+			Insecure:               true,
+			ManagerNamespace:       ns.Name,
+			BMCResetWaitTime:       400 * time.Millisecond,
+			BMCClientRetryInterval: 25 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
@@ -334,14 +275,39 @@ func SetupTest() *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		mockCtx, cancel := context.WithCancel(context.Background())
-		DeferCleanup(cancel)
-		mockServer := server.NewMockServer(GinkgoLogr, ":8000")
+		By("Starting the registry server")
+		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			registryServer := registry.NewServer(GinkgoLogr, ":30000", k8sManager.GetClient())
+			if err := registryServer.Start(ctx); err != nil {
+				return fmt.Errorf("failed to start registry server: %w", err)
+			}
+			<-ctx.Done()
+			return nil
+		}))).Should(Succeed())
 
-		go func() {
-			defer GinkgoRecover()
-			Expect(mockServer.Start(mockCtx)).To(Succeed(), "failed to start mock Redfish server")
-		}()
+		if len(redfishMockServers) > 0 {
+			for _, serverAddr := range redfishMockServers {
+				By(fmt.Sprintf("Starting the mock Redfish servers %v", serverAddr))
+				Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
+					mockServer := server.NewMockServer(GinkgoLogr, serverAddr.String())
+					if err := mockServer.Start(ctx); err != nil {
+						return fmt.Errorf("failed to start mock Redfish server %v", serverAddr)
+					}
+					<-ctx.Done()
+					return nil
+				}))).Should(Succeed())
+			}
+		} else {
+			By("Starting the default mock Redfish server")
+			Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
+				mockServer := server.NewMockServer(GinkgoLogr, ":8000")
+				if err := mockServer.Start(ctx); err != nil {
+					return fmt.Errorf("failed to start mock Redfish server: %w", err)
+				}
+				<-ctx.Done()
+				return nil
+			}))).Should(Succeed())
+		}
 
 		go func() {
 			defer GinkgoRecover()

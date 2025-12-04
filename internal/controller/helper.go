@@ -4,13 +4,23 @@
 package controller
 
 import (
+	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
+	"slices"
 
+	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/stmcginnis/gofish/redfish"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -24,7 +34,11 @@ func shouldIgnoreReconciliation(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.OperationAnnotationIgnore || val == metalv1alpha1.OperationAnnotationIgnoreChildAndSelf
+	return slices.Contains([]string{
+		metalv1alpha1.OperationAnnotationIgnore,
+		metalv1alpha1.OperationAnnotationIgnoreChildAndSelf,
+		metalv1alpha1.OperationAnnotationIgnorePropagated,
+	}, val)
 }
 
 // shouldChildIgnoreReconciliation checks if the object Child should ignore reconciliation.
@@ -40,15 +54,11 @@ func shouldChildIgnoreReconciliation(parentObj client.Object) bool {
 // isChildIgnoredThroughSets checks if the object's child is marked ignore operation through parent.
 func isChildIgnoredThroughSets(childObj client.Object) bool {
 	annotations := childObj.GetAnnotations()
-	valPropagated, found := annotations[metalv1alpha1.PropagatedOperationAnnotation]
-	if !found {
-		return false
-	}
 	valChildIgnore, found := annotations[metalv1alpha1.OperationAnnotation]
 	if !found {
 		return false
 	}
-	return valChildIgnore == metalv1alpha1.OperationAnnotationIgnore && valPropagated == metalv1alpha1.OperationAnnotationIgnoreChild
+	return valChildIgnore == metalv1alpha1.OperationAnnotationIgnorePropagated
 }
 
 // shouldRetryReconciliation checks if the object should retry reconciliation from failed state.
@@ -57,7 +67,27 @@ func shouldRetryReconciliation(obj client.Object) bool {
 	if !found {
 		return false
 	}
-	return val == metalv1alpha1.OperationAnnotationRetry
+	return val == metalv1alpha1.OperationAnnotationRetryFailed || val == metalv1alpha1.OperationAnnotationRetryFailedPropagated
+}
+
+// shouldChildRetryReconciliation checks if the object Child should retry reconciliation.
+// if Parent has OperationAnnotation set to retry-child, Child should also retry reconciliation.
+func shouldChildRetryReconciliation(parentObj client.Object) bool {
+	val, found := parentObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
+	if !found {
+		return false
+	}
+	return val == metalv1alpha1.OperationAnnotationRetryChild || val == metalv1alpha1.OperationAnnotationRetryChildAndSelf
+}
+
+// isChildRetryThroughSets checks if the object's child is marked retry operation through parent.
+func isChildRetryThroughSets(childObj client.Object) bool {
+	annotations := childObj.GetAnnotations()
+	valChildRetry, found := annotations[metalv1alpha1.OperationAnnotation]
+	if !found {
+		return false
+	}
+	return valChildRetry == metalv1alpha1.OperationAnnotationRetryFailedPropagated
 }
 
 // GenerateRandomPassword generates a random password of the given length.
@@ -106,4 +136,178 @@ func enqueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 		return !reflect.DeepEqual(oldCopy, e.ObjectNew)
 	}
 	return true
+}
+
+func resetBMCOfServer(
+	ctx context.Context,
+	log logr.Logger,
+	kClient client.Client,
+	server *metalv1alpha1.Server,
+	bmcClient bmc.BMC,
+) error {
+	if server.Spec.BMCRef != nil {
+		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
+		BMC := &metalv1alpha1.BMC{}
+		if err := kClient.Get(ctx, key, BMC); err != nil {
+			log.V(1).Error(err, "failed to get referred server's Manager")
+			return err
+		}
+		annotations := BMC.GetAnnotations()
+		if annotations != nil {
+			if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
+				if op == metalv1alpha1.GracefulRestartBMC {
+					log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
+					return nil
+				} else {
+					return fmt.Errorf("unknown annotation on BMC object for operation annotation %v", op)
+				}
+			}
+		}
+		log.V(1).Info("Setting annotation on BMC resource to trigger with BMC reset")
+
+		BMCBase := BMC.DeepCopy()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.GracefulRestartBMC
+		BMC.SetAnnotations(annotations)
+		if err := kClient.Patch(ctx, BMC, client.MergeFrom(BMCBase)); err != nil {
+			return err
+		}
+		return nil
+	} else if server.Spec.BMC != nil {
+		// no BMC ref, but BMC details are inline in server spec
+		// we can directly reset BMC in this case, so just proceed
+		// as we have the BMCclient, get the 1st manager and reset it
+		bmc, err := bmcClient.GetManager("")
+		if err != nil {
+			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
+		}
+		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
+		err = bmcClient.ResetManager(ctx, bmc.ID, redfish.GracefulRestartResetType)
+		if err != nil {
+			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("no BMC reference or inline BMC details found in server spec to reset BMC")
+}
+
+func handleIgnoreAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	kClient client.Client,
+	parentObj client.Object,
+	ownedObjects client.ObjectList,
+) error {
+	var errs []error
+	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
+		childObj, ok := obj.(client.Object)
+		if !ok {
+			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
+			return nil
+		}
+		// if the child is being deleted, we don't need to propagate
+		if !childObj.GetDeletionTimestamp().IsZero() {
+			return nil
+		}
+		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+			annotations := childObj.GetAnnotations()
+
+			if !shouldChildIgnoreReconciliation(parentObj) && isChildIgnoredThroughSets(childObj) && annotations != nil {
+				delete(annotations, metalv1alpha1.OperationAnnotation)
+				childObj.SetAnnotations(annotations)
+			}
+			// should not overwrite the already ignored annotation on child
+			// should not overwrite if the annotation already present on the child
+			_, OperationAnnotationChildfound := annotations[metalv1alpha1.OperationAnnotation]
+			if shouldChildIgnoreReconciliation(parentObj) && !OperationAnnotationChildfound {
+				if annotations == nil {
+					annotations = make(map[string]string)
+				}
+				annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnorePropagated
+				childObj.SetAnnotations(annotations)
+			}
+			return nil
+		})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to propagate ignore annotation to child %s: %w", childObj.GetName(), err))
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched Child's annotations for ignore operation", "ChildResource", childObj.GetName(), "Operation", opResult)
+		}
+		return nil
+	})
+	return errors.Join(errs...)
+}
+
+func handleRetryAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	kClient client.Client,
+	parentObj client.Object,
+	ownedObjects client.ObjectList,
+) error {
+	var errs []error
+	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
+		childObj, ok := obj.(client.Object)
+		if !ok {
+			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
+			return nil
+		}
+		// if the child is being deleted, we don't need to propagate
+		if !childObj.GetDeletionTimestamp().IsZero() {
+			return nil
+		}
+		log.V(1).Info("Child's annotations check", "ChildResource", childObj.GetName())
+
+		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+			annotations := childObj.GetAnnotations()
+
+			if !shouldChildRetryReconciliation(parentObj) && isChildRetryThroughSets(childObj) && annotations != nil {
+				delete(annotations, metalv1alpha1.OperationAnnotation)
+				childObj.SetAnnotations(annotations)
+			}
+			// should not overwrite the already present retry annotation on child
+			// should not overwrite if the annotation already present on the child
+			_, OperationAnnotationChildfound := annotations[metalv1alpha1.OperationAnnotation]
+			if shouldChildRetryReconciliation(parentObj) && !OperationAnnotationChildfound {
+				if annotations == nil {
+					annotations = make(map[string]string)
+				}
+				annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationRetryFailedPropagated
+				childObj.SetAnnotations(annotations)
+			}
+			return nil
+		})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to propagate retry annotation to child %s: %w", childObj.GetName(), err))
+		}
+		if opResult != controllerutil.OperationResultNone {
+			log.V(1).Info("Patched Child's annotations to retry annotation", "ChildResource", childObj.GetName(), "Operation", opResult)
+		}
+		return nil
+	})
+	return errors.Join(errs...)
+}
+
+func GetImageCredentialsForSecretRef(ctx context.Context, c client.Client, secretRef *corev1.SecretReference) (string, string, error) {
+	if secretRef == nil {
+		return "", "", fmt.Errorf("got nil secretRef")
+	}
+	secret := &corev1.Secret{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: secretRef.Namespace, Name: secretRef.Name}, secret); err != nil {
+		return "", "", err
+	}
+
+	username, ok := secret.Data[metalv1alpha1.BMCSecretUsernameKeyName]
+	if !ok {
+		return "", "", fmt.Errorf("no username found in secret")
+	}
+	password, ok := secret.Data[metalv1alpha1.BMCSecretPasswordKeyName]
+	if !ok {
+		return "", "", fmt.Errorf("no password found in secret")
+	}
+
+	return string(username), string(password), nil
 }

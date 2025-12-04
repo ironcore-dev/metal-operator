@@ -194,7 +194,7 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, lo
 
 	if server.Spec.ServerClaimRef == nil {
 		serverBase := server.DeepCopy()
-		server.Spec.ServerClaimRef = &v1.ObjectReference{
+		server.Spec.ServerClaimRef = &metalv1alpha1.ObjectReference{
 			APIVersion: "metal.ironcore.dev/v1alpha1",
 			Kind:       "ServerClaim",
 			Namespace:  claim.Namespace,
@@ -270,7 +270,7 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log 
 	log.V(1).Info("Created or patched ServerBootConfiguration", "ServerBootConfiguration", config.Name, "Operation", opResult)
 
 	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
 		Namespace:  config.Namespace,
 		Name:       config.Name,
 		UID:        config.UID,

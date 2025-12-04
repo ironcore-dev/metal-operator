@@ -1,0 +1,15 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCSettings
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/manufacturer: HPE
+  name: bmcsettings-hpe-sample
+spec:
+  BMCRef:
+    name: endpoint-hpe-sample
+  version: iLO 6 v1.70
+  settings:
+      "PATCH /redfish/v1/managers/1/networkprotocol": '{"IPMI": {"ProtocolEnabled": true } }'
+  serverMaintenancePolicy: Enforced

@@ -78,7 +78,7 @@ spec:
                     items:
                       properties:
                         name:
-                          description: Name identifies what this settings is doing
+                          description: Name is the name of the flow item
                           maxLength: 1000
                           minLength: 1
                           type: string

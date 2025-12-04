@@ -90,6 +90,9 @@ func (r *BMCVersionSetReconciler) delete(
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCVersionSet Status %w", err)
 		}
+		if err := r.handleRetryAnnotationPropagation(ctx, log, bmcVersionSet); err != nil {
+			return ctrl.Result{}, err
+		}
 		log.Info("Waiting on the created BMCVersion to reach terminal status")
 		return ctrl.Result{}, nil
 	}
@@ -116,51 +119,23 @@ func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
 		log.V(1).Info("No BMCVersion found, skipping ignore annotation propagation")
 		return nil
 	}
-	if !shouldChildIgnoreReconciliation(bmcVersionSet) {
-		// if the Set object does not have the ignore annotation anymore,
-		// we should remove the ignore annotation on the child
-		var errs []error
-		for _, bmcVersion := range ownedBMCVersions.Items {
-			// if the Child object is ignored through sets, we should remove the ignore annotation on the child
-			// ad the Set object does not have the ignore annotation anymore
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
-				if isChildIgnoredThroughSets(&bmcVersion) {
-					annotations := bmcVersion.GetAnnotations()
-					log.V(1).Info("Ignore operation deleted on child object", "BMCVersion", bmcVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotation)
-					delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
-					bmcVersion.SetAnnotations(annotations)
-				}
-				return nil
-			})
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations Propogartion removal: %w for: %v", err, bmcVersion.Name))
-			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched BMCVersion's annotations to remove Ignore", "BMCVersion", bmcVersion.Name, "Operation", opResult)
-			}
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+	return handleIgnoreAnnotationPropagation(ctx, log, r.Client, bmcVersionSet, ownedBMCVersions)
+}
+
+func (r *BMCVersionSetReconciler) handleRetryAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	bmcVersionSet *metalv1alpha1.BMCVersionSet,
+) error {
+	ownedBMCVersion, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
+	if err != nil {
+		return err
+	}
+	if len(ownedBMCVersion.Items) == 0 {
+		log.V(1).Info("No BMCVersion found, skipping retry annotation propagation")
 		return nil
 	}
-
-	var errs []error
-	for _, bmcVersion := range ownedBMCVersions.Items {
-		// should not overwrite the ignored annotation written by others on child
-		// should not overwrite if the annotation is already written on the child
-		if !isChildIgnoredThroughSets(&bmcVersion) && !shouldIgnoreReconciliation(&bmcVersion) {
-			bmcVersionBase := bmcVersion.DeepCopy()
-			annotations := bmcVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.OperationAnnotationIgnoreChild
-			if err := r.Patch(ctx, &bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BMCVersion annotations: %w", err))
-			}
-		}
-	}
-	return errors.Join(errs...)
+	return handleRetryAnnotationPropagation(ctx, log, r.Client, bmcVersionSet, ownedBMCVersion)
 }
 
 func (r *BMCVersionSetReconciler) reconcile(
@@ -215,6 +190,9 @@ func (r *BMCVersionSetReconciler) reconcile(
 	err = r.updateStatus(ctx, log, currentStatus, bmcVersionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCVersionSet Status %w", err)
+	}
+	if err := r.handleRetryAnnotationPropagation(ctx, log, bmcVersionSet); err != nil {
+		return ctrl.Result{}, err
 	}
 	// wait for any updates from owned resources
 	return ctrl.Result{}, nil
@@ -349,17 +327,6 @@ func (r *BMCVersionSetReconciler) getOwnedBMCVersions(
 		return nil, err
 	}
 	return bmcVersionList, nil
-}
-
-func (r *BMCVersionSetReconciler) getBMCOwnedServers(
-	ctx context.Context,
-	bmc *metalv1alpha1.BMC,
-) (*metalv1alpha1.ServerList, error) {
-	serverList := &metalv1alpha1.ServerList{}
-	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmc, serverList); err != nil {
-		return nil, err
-	}
-	return serverList, nil
 }
 
 func (r *BMCVersionSetReconciler) getBMCBySelector(

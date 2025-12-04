@@ -15,6 +15,6 @@ spec:
   bmcSecretRef:
     name: bmcsecret-sample
   protocol:
-    name: RedfishKube
+    name: RedfishLocal
     port: 8000
 

@@ -190,14 +190,14 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			})).Should(Succeed())
 			By("mock servermaintenance Creation maintenance")
 			Eventually(Update(biosSettingsV1, func() {
-				biosSettingsV1.Spec.ServerMaintenanceRef = &v1.ObjectReference{Name: "foobar-Maintenance"}
+				biosSettingsV1.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: "foobar-Maintenance"}
 			})).Should(Succeed())
 			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
 			biosSettingsV1Updated := biosSettingsV1.DeepCopy()
 			biosSettingsV1Updated.Spec.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Priority: 1, Settings: map[string]string{"test": "value"}}}
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().To(HaveOccurred())
 			By("Updating an biosSettingsV1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
-			biosSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
+			biosSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, biosSettingsV1, biosSettingsV1Updated)).Error().ToNot(HaveOccurred())
 
 			Eventually(UpdateStatus(biosSettingsV1, func() {

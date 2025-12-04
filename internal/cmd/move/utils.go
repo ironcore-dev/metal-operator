@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package cmdutils
+package move
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

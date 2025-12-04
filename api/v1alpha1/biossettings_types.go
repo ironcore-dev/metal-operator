@@ -23,7 +23,7 @@ type BIOSSettingsTemplate struct {
 }
 
 type SettingsFlowItem struct {
-	// Name identifies what this settings is doing
+	// Name is the name of the flow item
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1000
@@ -48,7 +48,7 @@ type BIOSSettingsSpec struct {
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
 	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"

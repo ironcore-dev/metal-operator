@@ -46,7 +46,7 @@ type BMCVersionSpec struct {
 
 	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
 	// +optional
-	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
+	ServerMaintenanceRefs []ObjectReference `json:"serverMaintenanceRefs,omitempty"`
 
 	// BMCRef is a reference to a specific BMC to apply BMC upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bmcRef is immutable"

@@ -14,19 +14,15 @@ func collectLLDPInfo(ctx context.Context, interval, duration time.Duration) (reg
 	return registry.LLDP{
 		Interfaces: []registry.LLDPInterface{
 			{
-				InterfaceIndex:            0,
-				InterfaceName:             "en0",
-				InterfaceAlternativeNames: []string{"ethernet0"},
+				Name: "en0",
 				Neighbors: []registry.Neighbor{
 					{
-						ChassisID:           "00:11:22:33:44:55",
-						RawChassisID:        []int{0, 17, 34, 51, 68, 85},
-						PortID:              "1",
-						RawPortID:           []int{49},
-						PortDescription:     "Uplink Port",
-						SystemName:          "Switch-01",
-						SystemDescription:   "Example Switch Model",
-						EnabledCapabilities: 0x14,
+						ChassisID:         "00:11:22:33:44:55",
+						PortID:            "1",
+						PortDescription:   "Uplink Port",
+						SystemName:        "Switch-01",
+						SystemDescription: "Example Switch Model",
+						Capabilities:      []string{"bridge", "router"},
 					},
 				},
 			},

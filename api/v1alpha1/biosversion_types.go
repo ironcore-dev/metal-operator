@@ -45,16 +45,16 @@ type BIOSVersionTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
-	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
 type BIOSVersionSpec struct {
 	// BIOSVersionTemplate defines the template for Version to be applied on the servers.
 	BIOSVersionTemplate `json:",inline"`
+
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
+	// +optional
+	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"

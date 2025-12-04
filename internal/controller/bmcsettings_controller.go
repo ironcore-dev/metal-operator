@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 	"strconv"
 	"time"
 
@@ -44,6 +42,10 @@ type BMCSettingsReconciler struct {
 const (
 	BMCSettingFinalizer               = "metal.ironcore.dev/bmcsettings"
 	BMCResetPostSettingApplyCondition = "BMCResetPostSettingApply"
+	BMCPoweredOffCondition            = "BMCPoweredOff"
+	BMCPoweredOffReason               = "BMCPowerIsCurrentlyPoweredOff"
+	BMCVersionUpdatePendingCondition  = "BMCVersionUpdatePending"
+	BMCVersionUpgradePendingReason    = "BMCVersionUpgradeIsPending"
 )
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete
@@ -277,9 +279,36 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 	defer bmcClient.Logout()
 	switch bmcSetting.Status.State {
 	case "", metalv1alpha1.BMCSettingsStatePending:
-		//todo: check that in initial state there is no pending BMCSettings maintenance left behind,
-
-		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateInProgress, nil)
+		var state = metalv1alpha1.BMCSettingsStateInProgress
+		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+		versionCheckCondition, err := r.getCondition(acc, bmcSetting.Status.Conditions, BMCVersionUpdatePendingCondition)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BMCVersion update state %v", err)
+		}
+		if BMC.Status.FirmwareVersion != bmcSetting.Spec.Version {
+			log.V(1).Info("Pending BMC version upgrade.", "Current bmc Version", BMC.Status.FirmwareVersion, "Required version", bmcSetting.Spec.Version)
+			if err := acc.Update(
+				versionCheckCondition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason(BMCVersionUpgradePendingReason),
+				conditionutils.UpdateMessage(fmt.Sprintf("Waiting to update BMCVersion: %v, current BMCVersion: %v", bmcSetting.Spec.Version, BMC.Status.FirmwareVersion)),
+			); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+			}
+			state = metalv1alpha1.BMCSettingsStatePending
+		} else if versionCheckCondition.Status == metav1.ConditionTrue {
+			if err := acc.Update(
+				versionCheckCondition,
+				conditionutils.UpdateStatus(corev1.ConditionFalse),
+				conditionutils.UpdateReason("BMCVersionAreMatching"),
+				conditionutils.UpdateMessage(fmt.Sprintf("BMCVersion matches: %v", bmcSetting.Spec.Version)),
+			); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+			}
+		} else {
+			versionCheckCondition = nil
+		}
+		err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, state, versionCheckCondition)
 		return ctrl.Result{}, err
 	case metalv1alpha1.BMCSettingsStateInProgress:
 		return r.handleSettingInProgressState(ctx, log, bmcSetting, BMC, bmcClient)
@@ -299,7 +328,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	BMC *metalv1alpha1.BMC,
 	bmcClient bmc.BMC,
 ) (ctrl.Result, error) {
-	currentBMCVersion, settingsDiff, err := r.getBMCVersionAndSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
+	settingsDiff, err := r.getBMCSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
 
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC settings: %w", err)
@@ -309,11 +338,6 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 		// move status to completed
 		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateApplied, nil)
 		return ctrl.Result{}, err
-	}
-
-	if currentBMCVersion != bmcSetting.Spec.Version {
-		log.V(1).Info("Pending BMC version upgrade.", "Current bmc Version", currentBMCVersion, "Required version", bmcSetting.Spec.Version)
-		return ctrl.Result{}, nil
 	}
 
 	if req, err := r.requestMaintenanceOnServers(ctx, log, bmcSetting, bmcClient); err != nil || req {
@@ -331,7 +355,6 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	if ok, err := r.handleBMCReset(ctx, log, bmcSetting, BMC, BMCConditionReset); !ok || err != nil {
 		return ctrl.Result{}, err
 	}
-
 	return r.updateSettingsAndVerify(ctx, log, bmcSetting, BMC, settingsDiff, bmcClient)
 }
 
@@ -353,10 +376,40 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 
 	if resetBMC.Reason != BMCReasonReset {
 		// apply the BMC Settings if not done.
-		if BMC.Status.PowerState != metalv1alpha1.OnPowerState {
-			log.V(1).Info("BMC is not turned On. Can not proceed")
-			err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, nil)
+		if BMC.Status.PowerState != "" && BMC.Status.PowerState != metalv1alpha1.OnPowerState {
+			acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+			log.V(1).Info("BMC is not Powered On. Can not proceed", "PowerState", BMC.Status.PowerState)
+			BMCPoweredOffCondition, err := r.getCondition(acc, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
+			}
+			if err := acc.Update(
+				BMCPoweredOffCondition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason(BMCPoweredOffReason),
+				conditionutils.UpdateMessage(fmt.Sprintf("BMC in not Powered On, Power State: %v", BMC.Status.PowerState)),
+			); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+			}
+			err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
 			return ctrl.Result{}, err
+		} else {
+			BMCPoweredOffCondition, err := r.getCondition(acc, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
+			}
+			if BMCPoweredOffCondition.Status == metav1.ConditionTrue {
+				if err := acc.Update(
+					BMCPoweredOffCondition,
+					conditionutils.UpdateStatus(corev1.ConditionFalse),
+					conditionutils.UpdateReason("BMCPoweredBackOn"),
+					conditionutils.UpdateMessage(fmt.Sprintf("BMC in Powered On, Power State: %v", BMC.Status.PowerState)),
+				); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+				}
+				err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCondition)
+				return ctrl.Result{}, err
+			}
 		}
 
 		pendingAttr, err := bmcClient.GetBMCPendingAttributeValues(ctx, BMC.Spec.BMCUUID)
@@ -365,7 +418,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 		}
 
 		if len(pendingAttr) == 0 {
-			resetBMCReq, err := bmcClient.CheckBMCAttributes(BMC.Spec.BMCUUID, settingsDiff)
+			resetBMCReq, err := bmcClient.CheckBMCAttributes(ctx, BMC.Spec.BMCUUID, settingsDiff)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to check BMC settings provided: %w", err)
 			}
@@ -391,7 +444,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 	}
 
 	// verify setting already applied
-	_, settingsDiff, err = r.getBMCVersionAndSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
+	settingsDiff, err = r.getBMCSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
 
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC settings: %w", err)
@@ -417,7 +470,7 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(
 		return err
 	}
 
-	_, settingsDiff, err := r.getBMCVersionAndSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
+	settingsDiff, err := r.getBMCSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
 
 	if err != nil {
 		log.V(1).Error(err, "unable to fetch and check BMCSettings")
@@ -559,20 +612,19 @@ func (r *BMCSettingsReconciler) getCondition(acc *conditionutils.Accessor, condi
 	return condition, nil
 }
 
-func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
+func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 	ctx context.Context,
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 	bmcClient bmc.BMC,
-) (currentBMCVersion string, diff redfish.SettingsAttributes, err error) {
-	keys := slices.Collect(maps.Keys(bmcSetting.Spec.SettingsMap))
-
-	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.BMCUUID, keys)
+) (diff redfish.SettingsAttributes, err error) {
+	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.BMCUUID, bmcSetting.Spec.SettingsMap)
 	if err != nil {
-		log.V(1).Error(err, "failed to get with BMC setting")
-		return currentBMCVersion, diff, fmt.Errorf("failed to get BMC settings: %w", err)
+		return diff, fmt.Errorf("failed to get BMC settings: %w", err)
 	}
+
+	log.V(1).Info("Current BMC settings fetched", "Settings", currentSettings)
 
 	diff = redfish.SettingsAttributes{}
 	var errs []error
@@ -610,16 +662,10 @@ func (r *BMCSettingsReconciler) getBMCVersionAndSettingsDifference(
 	}
 
 	if len(errs) > 0 {
-		return currentBMCVersion, diff, fmt.Errorf("failed to find diff for some BMC settings: %v", errs)
+		return diff, fmt.Errorf("failed to find diff for some BMC settings: %v", errs)
 	}
 
-	// fetch the current BMC version from the server bmc
-	currentBMCVersion, err = bmcClient.GetBMCVersion(ctx, BMC.Spec.BMCUUID)
-	if err != nil {
-		return currentBMCVersion, diff, fmt.Errorf("failed to load BMC version: %w for BMC %v", err, BMC.Name)
-	}
-
-	return currentBMCVersion, diff, nil
+	return diff, nil
 }
 
 func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
@@ -752,7 +798,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		ServerMaintenanceRefs = append(
 			ServerMaintenanceRefs,
 			metalv1alpha1.ServerMaintenanceRefItem{
-				ServerMaintenanceRef: &corev1.ObjectReference{
+				ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
 					APIVersion: metalv1alpha1.GroupVersion.String(),
 					Kind:       "ServerMaintenance",
 					Namespace:  serverMaintenance.Namespace,
@@ -894,7 +940,7 @@ func (r *BMCSettingsReconciler) getReferredBMCSettings(
 func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(
 	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
 	serverMaintenanceUID types.UID,
-) *corev1.ObjectReference {
+) *metalv1alpha1.ObjectReference {
 	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
 		if serverMaintenanceRef.ServerMaintenanceRef.UID == serverMaintenanceUID {
 			return serverMaintenanceRef.ServerMaintenanceRef

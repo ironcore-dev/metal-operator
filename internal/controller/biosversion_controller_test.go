@@ -175,14 +175,14 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
 		Eventually(Object(biosVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
 				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -194,7 +194,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -303,14 +303,14 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
 		Eventually(Object(biosVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
 				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -332,7 +332,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -530,14 +530,14 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
 		Eventually(Object(biosVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
 				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -549,7 +549,7 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,

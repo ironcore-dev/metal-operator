@@ -28,6 +28,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
+const (
+	BMCVersionFinalizer                    = "metal.ironcore.dev/bmcversion"
+	bmcVersionUpgradeIssued                = "VersionUpgradeIssued"
+	bmcVersionUpgradeCompleted             = "VersionUpgradeCompleted"
+	bmcVersionUpgradeRebootBMC             = "VersionUpgradeReboot"
+	bmcVersionUpgradeVerificationCondition = "VersionUpgradeVerification"
+	bmcUpgradeIssuedReason                 = "UpgradeIssued"
+	bmcFailedUpgradeIssueReason            = "IssueBMCUpgradeFailed"
+	bmcTaskCompletedReason                 = "TaskCompleted"
+	bmcUpgradeTaskFailedReason             = "UpgradeTaskFailed"
+	bmcVerifiedVersionUpdateReason         = "VerifiedBMCVersionUpdate"
+)
+
 // BMCVersionReconciler reconciles a BMCVersion object
 type BMCVersionReconciler struct {
 	client.Client
@@ -37,14 +50,6 @@ type BMCVersionReconciler struct {
 	BMCOptions       bmc.Options
 	ResyncInterval   time.Duration
 }
-
-const (
-	BMCVersionFinalizer                   = "metal.ironcore.dev/bmcversion"
-	bmcVersionUpgradeIssued               = "BMCVersionUpgradeIssued"
-	bmcVersionUpgradeCompleted            = "BMCVersionUpgradeCompleted"
-	bmcVersionUpgradeRebootBMC            = "BMCVersionUpgradeReboot"
-	bmcVersionUpgradeVerficationCondition = "BMCVersionUpgradeVerification"
-)
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions/status,verbs=get;update;patch
@@ -71,7 +76,6 @@ func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 func (r *BMCVersionReconciler) reconcileExists(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
 	if r.shouldDelete(log, bmcVersion) {
-		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, log, bmcVersion)
 	}
 	return r.reconcile(ctx, log, bmcVersion)
@@ -84,13 +88,14 @@ func (r *BMCVersionReconciler) shouldDelete(log logr.Logger, bmcVersion *metalv1
 
 	if controllerutil.ContainsFinalizer(bmcVersion, BMCVersionFinalizer) &&
 		bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-		log.V(1).Info("postponing delete as Version update is in progress")
+		log.V(1).Info("Postponing deletion as BMC version update is in progress")
 		return false
 	}
 	return true
 }
 
 func (r *BMCVersionReconciler) delete(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
+	log.V(1).Info("Deleting BMCVersion")
 	if !controllerutil.ContainsFinalizer(bmcVersion, BMCVersionFinalizer) {
 		return ctrl.Result{}, nil
 	}
@@ -105,16 +110,17 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, log logr.Logger, bmcV
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("BMCVersion is deleted")
+	log.V(1).Info("Deleted BMCVersion")
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCVersionReconciler) cleanupServerMaintenanceReferences(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) error {
+func (r *BMCVersionReconciler) removeServerMaintenances(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) error {
 	if bmcVersion.Spec.ServerMaintenanceRefs == nil {
 		return nil
 	}
-	// try to get the serverMaintenances created
-	serverMaintenances, errs := r.getReferredServerMaintenances(ctx, log, bmcVersion.Spec.ServerMaintenanceRefs)
+
+	log.V(1).Info("Removing orphan server Maintenances")
+	serverMaintenances, errs := r.getServerMaintenances(ctx, log, bmcVersion)
 
 	var finalErr []error
 	var missingServerMaintenanceRef []error
@@ -130,29 +136,25 @@ func (r *BMCVersionReconciler) cleanupServerMaintenanceReferences(ctx context.Co
 	}
 
 	if len(missingServerMaintenanceRef) != len(bmcVersion.Spec.ServerMaintenanceRefs) {
-		// delete the serverMaintenance if not marked for deletion already
+		// delete the ServerMaintenance if not marked for deletion already
 		for _, serverMaintenance := range serverMaintenances {
 			if serverMaintenance.DeletionTimestamp.IsZero() && metav1.IsControlledBy(serverMaintenance, bmcVersion) {
-				log.V(1).Info("Deleting server maintenance", "ServerMaintenance", serverMaintenance.Name, "State", serverMaintenance.Status.State)
+				log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
 				if err := r.Delete(ctx, serverMaintenance); err != nil {
-					log.V(1).Info("Failed to delete server maintenance", "ServerMaintenance", serverMaintenance.Name)
+					log.V(1).Info("Failed to delete ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
 					finalErr = append(finalErr, err)
 				}
 			} else {
 				log.V(1).Info(
-					"ServerMaintenance not deleted",
-					"ServerMaintenance", serverMaintenance.Name,
-					"State", serverMaintenance.Status.State,
-					"Owner", serverMaintenance.OwnerReferences,
-				)
+					"Skipping deletion of ServerMaintenance as it has a different owner",
+					"ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance),
+					"State", serverMaintenance.Status.State)
 			}
 		}
 	}
 
 	if len(finalErr) == 0 {
-		// all serverMaintenance are deleted
-		err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, log, bmcVersion, nil)
-		if err != nil {
+		if err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, bmcVersion, nil); err != nil {
 			return fmt.Errorf("failed to clean up serverMaintenance ref in bmcVersion status: %w", err)
 		}
 		log.V(1).Info("ServerMaintenance ref all cleaned up")
@@ -193,39 +195,37 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 
 	switch bmcVersion.Status.State {
 	case "", metalv1alpha1.BMCVersionStatePending:
-		return ctrl.Result{}, r.checkVersionAndTransistionState(ctx, log, bmcVersion, bmcClient, bmcObj)
+		return ctrl.Result{}, r.removeServerMaintenanceRefAndResetConditions(ctx, log, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateInProgress:
-		servers, err := r.getServers(ctx, log, bmcClient, bmcVersion)
+		servers, err := r.getServersForBMCVersion(ctx, log, bmcClient, bmcVersion)
 		if err != nil {
-			log.V(1).Error(err, "Failed to get ref. servers to determine maintenance state ")
 			return ctrl.Result{}, err
 		}
 
 		if len(bmcVersion.Spec.ServerMaintenanceRefs) != len(servers) {
-			log.V(1).Info("Not all servers have Maintenance", "ServerMaintenanceRefs", bmcVersion.Spec.ServerMaintenanceRefs, "Servers", servers)
-			if requeue, err := r.requestMaintenanceOnServers(ctx, log, bmcClient, bmcVersion); err != nil || requeue {
-				return ctrl.Result{}, err
+			requeue, err := r.requestMaintenanceOnServers(ctx, log, bmcClient, bmcVersion)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to request maintenance on servers: %v", err)
+			}
+			if requeue {
+				return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 			}
 		}
 
-		// check if the maintenance is granted
 		if ok := r.checkIfMaintenanceGranted(ctx, log, bmcClient, bmcVersion); !ok {
-			log.V(1).Info("Waiting for maintenance to be granted before continuing with updating bmc version")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to wait for maintenance to be granted")
 		}
 
-		if ok, err := r.handleBMCReset(ctx, log, bmcVersion, bmcObj, BMCConditionReset); !ok || err != nil {
-			return ctrl.Result{}, err
+		if ok, err := r.resetBMC(ctx, log, bmcVersion, bmcObj, BMCConditionReset); !ok || err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to reset bmc %s: %w", client.ObjectKeyFromObject(bmcObj), err)
 		}
 
 		return r.handleUpgradeInProgressState(ctx, log, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateCompleted:
-		// clean up maintenance crd and references and mark completed if version matches.
-		return ctrl.Result{}, r.checkVersionAndTransistionState(ctx, log, bmcVersion, bmcClient, bmcObj)
+		return ctrl.Result{}, r.removeServerMaintenanceRefAndResetConditions(ctx, log, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateFailed:
 		if shouldRetryReconciliation(bmcVersion) {
 			log.V(1).Info("Retrying BMCVersion reconciliation")
-
 			bmcVersionBase := bmcVersion.DeepCopy()
 			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
 			bmcVersion.Status.Conditions = nil
@@ -237,10 +237,10 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 			}
 			return ctrl.Result{}, nil
 		}
-		log.V(1).Info("Failed to upgrade BMCVersion", "ctx", ctx, "BMCVersion", bmcVersion, "BMC", bmcObj.Name)
+		log.V(1).Info("Failed to upgrade BMC via BMCVersion", "BMCVersion", bmcVersion.Name, "BMC", bmcObj.Name)
 		return ctrl.Result{}, nil
 	}
-	log.V(1).Info("Unknown State found", "BMCVersion state", bmcVersion.Status.State)
+	log.V(1).Info("Unknown State found", "State", bmcVersion.Status.State)
 	return ctrl.Result{}, nil
 }
 
@@ -260,7 +260,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 	if issuedCondition.Status != metav1.ConditionTrue {
 		log.V(1).Info("Issuing upgrade of BMC version")
 		if BMC.Status.PowerState != metalv1alpha1.OnPowerState {
-			log.V(1).Info("BMC is still powered off. waiting", "BMC", BMC.Name, "BMC power state", BMC.Status.PowerState)
+			log.V(1).Info("BMC is still powered off. waiting", "BMC", BMC.Name, "PowerState", BMC.Status.PowerState)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, r.issueBMCUpgrade(ctx, log, bmcVersion, bmcClient, BMC, issuedCondition, acc)
@@ -276,16 +276,16 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 		return r.checkBMCUpgradeStatus(ctx, log, bmcVersion, bmcClient, BMC, bmcVersion.Status.UpgradeTask.URI, completedCondition, acc)
 	}
 
-	if ok, err := r.handleBMCReset(ctx, log, bmcVersion, BMC, bmcVersionUpgradeRebootBMC); !ok || err != nil {
+	if ok, err := r.resetBMC(ctx, log, bmcVersion, BMC, bmcVersionUpgradeRebootBMC); !ok || err != nil {
 		return ctrl.Result{}, err
 	}
 
-	VerificationCondition, err := r.getCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeVerficationCondition)
+	condition, err := r.getCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeVerificationCondition)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if VerificationCondition.Status != metav1.ConditionTrue {
+	if condition.Status != metav1.ConditionTrue {
 		log.V(1).Info("Verify BMC Version update")
 
 		currentBMCVersion, err := r.getBMCVersionFromBMC(ctx, bmcClient, BMC)
@@ -295,9 +295,9 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 		if currentBMCVersion != bmcVersion.Spec.Version {
 			// todo: add timeout
 			log.V(1).Info("BMC version not updated", "current BMC Version", currentBMCVersion, "Required Version", bmcVersion.Spec.Version)
-			if VerificationCondition.Reason == "" {
+			if condition.Reason == "" {
 				if err := acc.Update(
-					VerificationCondition,
+					condition,
 					conditionutils.UpdateStatus(corev1.ConditionFalse),
 					conditionutils.UpdateReason("VerifyBMCVersionUpdate"),
 					conditionutils.UpdateMessage("waiting for BMC Version update"),
@@ -311,27 +311,27 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 		}
 
 		if err := acc.Update(
-			VerificationCondition,
+			condition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason("VerifedBMCVersionUpdate"),
+			conditionutils.UpdateReason(bmcVerifiedVersionUpdateReason),
 			conditionutils.UpdateMessage("BMC Version updated"),
 		); err != nil {
 			log.V(1).Error(err, "failed to update the conditions status. retrying...")
 			return ctrl.Result{}, err
 		}
-		err = r.updateBMCVersionStatus(
+		err = r.patchBMCVersionStatusAndCondition(
 			ctx,
 			log,
 			bmcVersion,
 			metalv1alpha1.BMCVersionStateCompleted,
 			bmcVersion.Status.UpgradeTask,
-			VerificationCondition,
+			condition,
 			acc,
 		)
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("Unknown Conditions found", "BMCVersion Conditions", bmcVersion.Status.Conditions)
+	log.V(1).Info("Unknown Conditions found", "Condition", condition.Type)
 	return ctrl.Result{}, nil
 }
 
@@ -350,7 +350,7 @@ func (r *BMCVersionReconciler) checkIfMaintenanceGranted(ctx context.Context, lo
 		return true
 	}
 
-	servers, err := r.getServers(ctx, log, bmcClient, bmcVersion)
+	servers, err := r.getServersForBMCVersion(ctx, log, bmcClient, bmcVersion)
 	if err != nil {
 		log.V(1).Error(err, "Failed to get ref. servers to determine maintenance state ")
 		return false
@@ -366,33 +366,28 @@ func (r *BMCVersionReconciler) checkIfMaintenanceGranted(ctx context.Context, lo
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
 			serverMaintenanceRef, ok := r.getServerMaintenanceRefForServer(bmcVersion.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.UID)
 			if server.Spec.ServerMaintenanceRef == nil || !ok || server.Spec.ServerMaintenanceRef.UID != serverMaintenanceRef.UID {
-				// server in maintenance for other tasks. or
-				// server maintenance ref is wrong in either server or bmcVersion
-				// wait for update on the server obj
-				log.V(1).Info("Server is already in maintenance for other tasks",
-					"Server", server.Name,
-					"ServerMaintenanceRef", server.Spec.ServerMaintenanceRef,
-					"BMCVersionMaintenaceRef", serverMaintenanceRef,
-				)
+				// We hit a server in maintenance waiting for other tasks to complete.
+				// Alternatively, the server maintenance reference is wrong. Either server or bmcVersion
+				// wait for update on the server obj.
+				log.V(1).Info("Server is already in maintenance", "Server", server.Name)
 				notInMaintenanceState[server.Name] = false
 			}
 		} else {
 			// we still need to wait for server to enter maintenance
-			// wait for update on the server obj
-			log.V(1).Info("Server not yet in maintenance", "Server", server.Name, "State", server.Status.State, "MaintenanceRef", server.Spec.ServerMaintenanceRef)
+			log.V(1).Info("Server not yet in maintenance", "Server", server.Name)
 			notInMaintenanceState[server.Name] = false
 		}
 	}
 
 	if len(notInMaintenanceState) > 0 {
-		log.V(1).Info("Some servers not yet in maintenance", "req maintenances on servers", bmcVersion.Spec.ServerMaintenanceRefs)
+		log.V(1).Info("Found a least one server not in maintenance")
 		return false
 	}
 
 	return true
 }
 
-func (r *BMCVersionReconciler) checkVersionAndTransistionState(
+func (r *BMCVersionReconciler) removeServerMaintenanceRefAndResetConditions(
 	ctx context.Context,
 	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
@@ -405,13 +400,13 @@ func (r *BMCVersionReconciler) checkVersionAndTransistionState(
 	}
 	state := metalv1alpha1.BMCVersionStateInProgress
 	if currentBMCVersion == bmcVersion.Spec.Version {
-		if err := r.cleanupServerMaintenanceReferences(ctx, log, bmcVersion); err != nil {
+		if err := r.removeServerMaintenances(ctx, log, bmcVersion); err != nil {
 			return err
 		}
-		log.V(1).Info("Done with BMC version upgrade", "ctx", ctx, "current BMC Version", currentBMCVersion, "BMC", BMC.Name)
+		log.V(1).Info("Upgraded BMC version", "BMCVersion", currentBMCVersion, "BMC", BMC.Name)
 		state = metalv1alpha1.BMCVersionStateCompleted
 	}
-	err = r.updateBMCVersionStatus(ctx, log, bmcVersion, state, nil, nil, nil)
+	err = r.patchBMCVersionStatusAndCondition(ctx, log, bmcVersion, state, nil, nil, nil)
 	return err
 }
 
@@ -435,76 +430,47 @@ func (r *BMCVersionReconciler) getCondition(acc *conditionutils.Accessor, condit
 	return condition, nil
 }
 
-func (r *BMCVersionReconciler) getReferredServerMaintenances(
-	ctx context.Context,
-	log logr.Logger,
-	serverMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
-) ([]*metalv1alpha1.ServerMaintenance, []error) {
-	serverMaintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(serverMaintenanceRefs))
+func (r *BMCVersionReconciler) getServerMaintenances(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) ([]*metalv1alpha1.ServerMaintenance, []error) {
+	refs := bmcVersion.Spec.ServerMaintenanceRefs
+	maintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(refs))
 	var errs []error
-	cnt := 0
-	for _, serverMaintenanceRef := range serverMaintenanceRefs {
-		key := client.ObjectKey{Name: serverMaintenanceRef.ServerMaintenanceRef.Name, Namespace: r.ManagerNamespace}
+	for _, ref := range refs {
+		key := client.ObjectKey{Name: ref.Name, Namespace: r.ManagerNamespace}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{}
 		if err := r.Get(ctx, key, serverMaintenance); err != nil {
-			log.V(1).Error(err, "failed to get referred serverMaintenance obj", serverMaintenanceRef.ServerMaintenanceRef.Name)
+			log.V(1).Error(err, "failed to get referred serverMaintenance obj", ref.Name)
 			errs = append(errs, err)
 			continue
 		}
-		serverMaintenances = append(serverMaintenances, serverMaintenance)
-		cnt = cnt + 1
+		maintenances = append(maintenances, serverMaintenance)
 	}
 
 	if len(errs) > 0 {
-		return serverMaintenances, errs
+		return maintenances, errs
 	}
 
-	return serverMaintenances, nil
+	return maintenances, nil
 }
 
-func (r *BMCVersionReconciler) getReferredSecret(
-	ctx context.Context,
-	log logr.Logger,
-	secretRef *corev1.LocalObjectReference,
-) (string, string, error) {
-	if secretRef == nil {
-		return "", "", nil
-	}
-	key := client.ObjectKey{Name: secretRef.Name}
-	secret := &corev1.Secret{}
-	if err := r.Get(ctx, key, secret); err != nil {
-		log.V(1).Error(err, "failed to get referred Secret obj", "secret name", secretRef.Name)
-		return "", "", err
-	}
-
-	return secret.StringData[metalv1alpha1.BMCSecretUsernameKeyName], secret.StringData[metalv1alpha1.BMCSecretPasswordKeyName], nil
-}
-
-func (r *BMCVersionReconciler) handleBMCReset(
-	ctx context.Context,
-	log logr.Logger,
-	bmcVersion *metalv1alpha1.BMCVersion,
-	BMC *metalv1alpha1.BMC,
-	conditionType string,
-) (bool, error) {
+func (r *BMCVersionReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion, bmcObj *metalv1alpha1.BMC, conditionType string) (bool, error) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	// reset BMC if not already done
-	resetBMC, err := r.getCondition(acc, bmcVersion.Status.Conditions, conditionType)
+	condition, err := r.getCondition(acc, bmcVersion.Status.Conditions, conditionType)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
 	}
 
-	if resetBMC.Status != metav1.ConditionTrue {
-		annotations := BMC.GetAnnotations()
-		// once the server is powered on, reset the BMC to make sure its in stable state
-		// this avoids problems with some BMCs that hang up in subsequent operations
-		if resetBMC.Reason != BMCReasonReset {
+	if condition.Status != metav1.ConditionTrue {
+		annotations := bmcObj.GetAnnotations()
+		// Once the server is powered on, reset the BMC to make sure it is in stable state.
+		// This avoids problems with some BMCs that hang up in subsequent operations.
+		if condition.Reason != BMCReasonReset {
 			if annotations != nil {
 				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
 					if op == metalv1alpha1.GracefulRestartBMC {
 						log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
 						if err := acc.Update(
-							resetBMC,
+							condition,
 							conditionutils.UpdateStatus(corev1.ConditionFalse),
 							conditionutils.UpdateReason(BMCReasonReset),
 							conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
@@ -512,7 +478,7 @@ func (r *BMCVersionReconciler) handleBMCReset(
 							return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
 						}
 						// patch condition to reset issued
-						return false, r.updateBMCVersionStatus(ctx, log, bmcVersion, bmcVersion.Status.State, nil, resetBMC, acc)
+						return false, r.patchBMCVersionStatusAndCondition(ctx, log, bmcVersion, bmcVersion.Status.State, nil, condition, acc)
 					} else {
 						return false, fmt.Errorf("unknown annotation on BMC object for operation annotation %v", op)
 					}
@@ -520,18 +486,18 @@ func (r *BMCVersionReconciler) handleBMCReset(
 			}
 			log.V(1).Info("Setting annotation on BMC resource to trigger with BMC reset")
 
-			BMCBase := BMC.DeepCopy()
+			bmcBase := bmcObj.DeepCopy()
 			if annotations == nil {
 				annotations = map[string]string{}
 			}
 			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.GracefulRestartBMC
-			BMC.SetAnnotations(annotations)
-			if err := r.Patch(ctx, BMC, client.MergeFrom(BMCBase)); err != nil {
+			bmcObj.SetAnnotations(annotations)
+			if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 				return false, err
 			}
 
 			if err := acc.Update(
-				resetBMC,
+				condition,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
 				conditionutils.UpdateReason(BMCReasonReset),
 				conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
@@ -539,7 +505,7 @@ func (r *BMCVersionReconciler) handleBMCReset(
 				return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
 			}
 			// patch condition to reset issued
-			return false, r.updateBMCVersionStatus(ctx, log, bmcVersion, bmcVersion.Status.State, nil, resetBMC, acc)
+			return false, r.patchBMCVersionStatusAndCondition(ctx, log, bmcVersion, bmcVersion.Status.State, nil, condition, acc)
 		}
 
 		// we need to wait until the BMC resource annotation is removed
@@ -553,19 +519,19 @@ func (r *BMCVersionReconciler) handleBMCReset(
 		}
 
 		if err := acc.Update(
-			resetBMC,
+			condition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
 			conditionutils.UpdateReason(BMCReasonReset),
 			conditionutils.UpdateMessage("BMC reset to stabilize BMC of the server is completed"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update power on server condition: %w", err)
 		}
-		return false, r.updateBMCVersionStatus(ctx, log, bmcVersion, bmcVersion.Status.State, nil, resetBMC, acc)
+		return false, r.patchBMCVersionStatusAndCondition(ctx, log, bmcVersion, bmcVersion.Status.State, nil, condition, acc)
 	}
 	return true, nil
 }
 
-func (r *BMCVersionReconciler) getServers(
+func (r *BMCVersionReconciler) getServersForBMCVersion(
 	ctx context.Context,
 	log logr.Logger,
 	bmcClient bmc.BMC,
@@ -587,18 +553,14 @@ func (r *BMCVersionReconciler) getServers(
 	for i := range bmcServers {
 		serversRefList[i] = &corev1.LocalObjectReference{Name: bmcutils.GetServerNameFromBMCandIndex(i, bmcObj)}
 	}
-	servers, err := r.getReferredServers(ctx, log, serversRefList)
+	servers, err := r.getServersForRefs(ctx, log, serversRefList)
 	if err != nil {
 		return servers, fmt.Errorf("errors occurred during fetching servers from BMC: %v", err)
 	}
 	return servers, nil
 }
 
-func (r *BMCVersionReconciler) getReferredServers(
-	ctx context.Context,
-	log logr.Logger,
-	serverRefList []*corev1.LocalObjectReference,
-) ([]*metalv1alpha1.Server, error) {
+func (r *BMCVersionReconciler) getServersForRefs(ctx context.Context, log logr.Logger, serverRefList []*corev1.LocalObjectReference) ([]*metalv1alpha1.Server, error) {
 	var errs []error
 	servers := make([]*metalv1alpha1.Server, len(serverRefList))
 	for idx, serverRef := range serverRefList {
@@ -611,7 +573,6 @@ func (r *BMCVersionReconciler) getReferredServers(
 		}
 		servers[idx] = server
 	}
-
 	return servers, errors.Join(errs...)
 }
 
@@ -622,22 +583,22 @@ func (r *BMCVersionReconciler) getBMCFromBMCVersion(ctx context.Context, bmcVers
 
 	bmcObj := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, client.ObjectKey{Name: bmcVersion.Spec.BMCRef.Name}, bmcObj); err != nil {
-		return bmcObj, fmt.Errorf("failed to get referred server's Manager: %w", err)
+		return bmcObj, err
 	}
 
 	return bmcObj, nil
 }
 
-func (r *BMCVersionReconciler) getServerMaintenanceRefForServer(serverMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem, serverMaintenanceUID types.UID) (*corev1.ObjectReference, bool) {
+func (r *BMCVersionReconciler) getServerMaintenanceRefForServer(serverMaintenanceRefs []metalv1alpha1.ObjectReference, serverMaintenanceUID types.UID) (metalv1alpha1.ObjectReference, bool) {
 	for _, serverMaintenanceRef := range serverMaintenanceRefs {
-		if serverMaintenanceRef.ServerMaintenanceRef.UID == serverMaintenanceUID {
-			return serverMaintenanceRef.ServerMaintenanceRef, true
+		if serverMaintenanceRef.UID == serverMaintenanceUID {
+			return serverMaintenanceRef, true
 		}
 	}
-	return nil, false
+	return metalv1alpha1.ObjectReference{}, false
 }
 
-func (r *BMCVersionReconciler) updateBMCVersionStatus(
+func (r *BMCVersionReconciler) patchBMCVersionStatusAndCondition(
 	ctx context.Context,
 	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
@@ -646,6 +607,7 @@ func (r *BMCVersionReconciler) updateBMCVersionStatus(
 	condition *metav1.Condition,
 	acc *conditionutils.Accessor,
 ) error {
+	log.V(1).Info("Patching BMCVersion status")
 	if bmcVersion.Status.State == state && condition == nil && upgradeTask == nil {
 		return nil
 	}
@@ -673,20 +635,14 @@ func (r *BMCVersionReconciler) updateBMCVersionStatus(
 		return fmt.Errorf("failed to patch BMCVersion status: %w", err)
 	}
 
-	log.V(1).Info("Updated BMCVersion state ",
-		"State", state,
-		"Conditions", bmcVersion.Status.Conditions,
-		"Upgrade Task status", bmcVersion.Status.UpgradeTask,
-	)
-
+	log.V(1).Info("Patched BMCVersion status", "State", state)
 	return nil
 }
 
 func (r *BMCVersionReconciler) patchMaintenanceRequestRefOnBMCVersion(
 	ctx context.Context,
-	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
-	serverMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
+	serverMaintenanceRefs []metalv1alpha1.ObjectReference,
 ) error {
 	bmcVersionsBase := bmcVersion.DeepCopy()
 
@@ -697,38 +653,29 @@ func (r *BMCVersionReconciler) patchMaintenanceRequestRefOnBMCVersion(
 	}
 
 	if err := r.Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionsBase)); err != nil {
-		log.V(1).Error(err, "failed to patch BMCVersion ref")
 		return err
 	}
 
 	return nil
 }
 
-func (r *BMCVersionReconciler) requestMaintenanceOnServers(
-	ctx context.Context,
-	log logr.Logger,
-	bmcClient bmc.BMC,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) (bool, error) {
-
-	servers, err := r.getServers(ctx, log, bmcClient, bmcVersion)
+func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcVersion *metalv1alpha1.BMCVersion) (bool, error) {
+	servers, err := r.getServersForBMCVersion(ctx, log, bmcClient, bmcVersion)
 	if err != nil {
 		log.V(1).Error(err, "Failed to get ref. servers to request maintenance on servers")
 		return false, err
 	}
 
-	// if Server maintenance ref is already given. no further action required.
+	// If ServerMaintenance ref is already set, ignoring.
 	if bmcVersion.Spec.ServerMaintenanceRefs != nil && len(bmcVersion.Spec.ServerMaintenanceRefs) == len(servers) {
 		return false, nil
 	}
 
-	// if user gave some server with serverMaintenance but not all
-	// we want to request maintenance for the missing servers only.
-	// find the servers which has maintenance and do not create maintenance for them.
+	// Ensure all affected Servers have a ServerMaintenance requested.
 	serverWithMaintenances := make(map[string]bool, len(servers))
 	if bmcVersion.Spec.ServerMaintenanceRefs != nil {
-		// we fetch all the references already in the Spec (self created/provided by user)
-		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcVersion.Spec.ServerMaintenanceRefs)
+		// We fetch all the references already in the Spec (self created/provided by user)
+		serverMaintenances, err := r.getServerMaintenances(ctx, log, bmcVersion)
 		if err != nil {
 			return false, errors.Join(err...)
 		}
@@ -737,9 +684,9 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 		}
 	}
 
-	// we also fetch all the references owned by this Resource.
+	// We also fetch all the references owned by this Resource.
 	// This is needed in case we are reconciling before we have patched the references.
-	// possible when we reconcile after CreateOrPatch, before ref have been written
+	// Possible when we reconcile after CreateOrPatch and before the ref has been written.
 	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
 	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmcVersion, serverMaintenancesList); err != nil {
 		return false, err
@@ -749,7 +696,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 	}
 
 	var errs []error
-	serverMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
+	serverMaintenanceRefs := make([]metalv1alpha1.ObjectReference, 0, len(servers))
 	for _, server := range servers {
 		if _, ok := serverWithMaintenances[server.Name]; ok {
 			continue
@@ -771,34 +718,32 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(
 			return controllerutil.SetControllerReference(bmcVersion, serverMaintenance, r.Client.Scheme())
 		})
 		if err != nil {
-			log.V(1).Error(err, "failed to create or patch serverMaintenance", "Server", server.Name)
+			log.V(1).Error(err, "failed to create or patch ServerMaintenance for Server", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance), "Server", server.Name)
 			errs = append(errs, err)
 			continue
 		}
-		log.V(1).Info("Created serverMaintenance", "ServerMaintenance", serverMaintenance.Name, "ServerMaintenance label", serverMaintenance.Labels, "Operation", opResult)
+		log.V(1).Info("Created ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance), "Operation", opResult)
 
 		serverMaintenanceRefs = append(
 			serverMaintenanceRefs,
-			metalv1alpha1.ServerMaintenanceRefItem{
-				ServerMaintenanceRef: &corev1.ObjectReference{
-					APIVersion: metalv1alpha1.GroupVersion.String(),
-					Kind:       "ServerMaintenance",
-					Namespace:  serverMaintenance.Namespace,
-					Name:       serverMaintenance.Name,
-					UID:        serverMaintenance.UID,
-				}})
+			metalv1alpha1.ObjectReference{
+				APIVersion: metalv1alpha1.GroupVersion.String(),
+				Kind:       "ServerMaintenance",
+				Namespace:  serverMaintenance.Namespace,
+				Name:       serverMaintenance.Name,
+				UID:        serverMaintenance.UID,
+			})
 	}
 
 	if len(errs) > 0 {
 		return false, errors.Join(errs...)
 	}
 
-	err = r.patchMaintenanceRequestRefOnBMCVersion(ctx, log, bmcVersion, serverMaintenanceRefs)
-	if err != nil {
-		return false, fmt.Errorf("failed to patch serverMaintenance ref in bmcVersion status: %w", err)
+	if err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, bmcVersion, serverMaintenanceRefs); err != nil {
+		return false, fmt.Errorf("failed to patch serverMaintenance ref in BMCVersion status: %w", err)
 	}
 
-	log.V(1).Info("Patched serverMaintenanceMap on BMCVersion")
+	log.V(1).Info("Patched ServerMaintenanceMap on BMCVersion")
 
 	return true, nil
 }
@@ -820,10 +765,10 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		return bmcClient.GetBMCUpgradeTask(ctx, bmc.Status.Manufacturer, bmcUpgradeTaskUri)
 	}()
 	if err != nil {
-		log.V(1).Error(err, "failed to get the task details of bmc upgrade task", "task uri", bmcUpgradeTaskUri)
+		log.V(1).Error(err, "failed to get the task details of BMC upgrade task", "TaskURI", bmcUpgradeTaskUri)
 		return ctrl.Result{}, err
 	}
-	log.V(1).Info("bmc upgrade task current status", "Task status", taskCurrentStatus)
+	log.V(1).Info("BMC upgrade task current status", "TaskStatus", taskCurrentStatus)
 
 	upgradeCurrentTaskStatus := &metalv1alpha1.Task{
 		URI:             bmcVersion.Status.UpgradeTask.URI,
@@ -832,7 +777,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		PercentComplete: int32(taskCurrentStatus.PercentComplete),
 	}
 
-	// use checkpoint incase the job has stalled and we need to requeue
+	// use checkpoint in case the job has stalled and we need to requeue
 	transition := &conditionutils.FieldsTransition{
 		IncludeStatus:  true,
 		IncludeReason:  true,
@@ -855,13 +800,13 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		if err := acc.Update(
 			completedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason("BMCUpgradeTaskFailed"),
+			conditionutils.UpdateReason(bmcUpgradeTaskFailedReason),
 			conditionutils.UpdateMessage(message),
 		); err != nil {
 			log.V(1).Error(err, "failed to update the conditions status. reconcile again ")
 			return ctrl.Result{}, err
 		}
-		err = r.updateBMCVersionStatus(
+		err = r.patchBMCVersionStatusAndCondition(
 			ctx,
 			log,
 			bmcVersion,
@@ -877,13 +822,13 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		if err := acc.Update(
 			completedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason("taskCompleted"),
+			conditionutils.UpdateReason(bmcTaskCompletedReason),
 			conditionutils.UpdateMessage("BMC successfully upgraded to: "+bmcVersion.Spec.Version),
 		); err != nil {
 			log.V(1).Error(err, "failed to update the conditions status. reconcile again")
 			return ctrl.Result{}, err
 		}
-		err = r.updateBMCVersionStatus(
+		err = r.patchBMCVersionStatusAndCondition(
 			ctx,
 			log,
 			bmcVersion,
@@ -899,7 +844,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 	if err := acc.Update(
 		completedCondition,
 		conditionutils.UpdateStatus(corev1.ConditionFalse),
-		conditionutils.UpdateReason(string(taskCurrentStatus.TaskState)),
+		conditionutils.UpdateReason(taskCurrentStatus.TaskState),
 		conditionutils.UpdateMessage(
 			fmt.Sprintf("BMC upgrade in state: %v: PercentageCompleted %v",
 				taskCurrentStatus.TaskState,
@@ -916,7 +861,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 	// todo: Fail the state after certain timeout
-	err = r.updateBMCVersionStatus(
+	err = r.patchBMCVersionStatusAndCondition(
 		ctx,
 		log,
 		bmcVersion,
@@ -937,11 +882,15 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 	issuedCondition *metav1.Condition,
 	acc *conditionutils.Accessor,
 ) error {
-	password, username, err := r.getReferredSecret(ctx, log, bmcVersion.Spec.Image.SecretRef)
-	if err != nil {
-		log.V(1).Error(err, "failed to get secret ref for", "secretRef", bmcVersion.Spec.Image.SecretRef.Name)
-		return err
+	var username, password string
+	if bmcVersion.Spec.Image.SecretRef != nil {
+		var err error
+		password, username, err = GetImageCredentialsForSecretRef(ctx, r.Client, bmcVersion.Spec.Image.SecretRef)
+		if err != nil {
+			return err
+		}
 	}
+
 	var forceUpdate bool
 	if bmcVersion.Spec.UpdatePolicy != nil && *bmcVersion.Spec.UpdatePolicy == metalv1alpha1.UpdatePolicyForce {
 		forceUpdate = true
@@ -967,12 +916,12 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 		if errCond = acc.Update(
 			issuedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
-			conditionutils.UpdateReason("IssueBMCUpgradeFailed"),
+			conditionutils.UpdateReason(bmcFailedUpgradeIssueReason),
 			conditionutils.UpdateMessage("Fatal error occurred. Upgrade might still go through on server."),
 		); errCond != nil {
 			log.V(1).Error(errCond, "failed to update the conditions status")
 		}
-		err := r.updateBMCVersionStatus(
+		err := r.patchBMCVersionStatusAndCondition(
 			ctx,
 			log,
 			bmcVersion,
@@ -992,21 +941,21 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 	if errCond = acc.Update(
 		issuedCondition,
 		conditionutils.UpdateStatus(corev1.ConditionTrue),
-		conditionutils.UpdateReason("UpgradeIssued"),
+		conditionutils.UpdateReason(bmcUpgradeIssuedReason),
 		conditionutils.UpdateMessage(fmt.Sprintf("Task to upgrade has been created %v", taskMonitor)),
 	); errCond != nil {
 		log.V(1).Error(errCond, "failed to update the conditions status... retrying")
 		if errCond = acc.Update(
 			issuedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason("UpgradeIssued"),
+			conditionutils.UpdateReason(bmcUpgradeIssuedReason),
 			conditionutils.UpdateMessage(fmt.Sprintf("Task to upgrade has been created %v", taskMonitor)),
 		); errCond != nil {
 			state = metalv1alpha1.BMCVersionStateFailed
 			log.V(1).Error(errCond, "failed to update the conditions status, failing the upgrade process! BMC might still be updated to new version")
 		}
 	}
-	err = r.updateBMCVersionStatus(
+	err = r.patchBMCVersionStatusAndCondition(
 		ctx,
 		log,
 		bmcVersion,
@@ -1018,10 +967,7 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 	return errors.Join(errCond, err)
 }
 
-func (r *BMCVersionReconciler) enqueueBMCVersionByServerRefs(
-	ctx context.Context,
-	obj client.Object,
-) []ctrl.Request {
+func (r *BMCVersionReconciler) enqueueBMCVersionByServerRefs(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 	host := obj.(*metalv1alpha1.Server)
 
@@ -1038,7 +984,7 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByServerRefs(
 	var req []ctrl.Request
 
 	for _, bmcVersion := range bmcVersionList.Items {
-		// if we dont have maintenance request on this bmcVersion we do not want to queue changes from servers.
+		// if we don't have maintenance request on this bmcVersion we do not want to enqueue changes from servers.
 		if bmcVersion.Spec.ServerMaintenanceRefs == nil {
 			continue
 		}
@@ -1046,7 +992,7 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByServerRefs(
 			continue
 		}
 		serverMaintenanceRef, ok := r.getServerMaintenanceRefForServer(bmcVersion.Spec.ServerMaintenanceRefs, host.Spec.ServerMaintenanceRef.UID)
-		if ok && serverMaintenanceRef != nil {
+		if ok && serverMaintenanceRef.Name != "" {
 			req = append(req, ctrl.Request{
 				NamespacedName: types.NamespacedName{Namespace: bmcVersion.Namespace, Name: bmcVersion.Name},
 			})
@@ -1055,13 +1001,10 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByServerRefs(
 	return req
 }
 
-func (r *BMCVersionReconciler) enqueueBMCVersionByBMCRefs(
-	ctx context.Context,
-	obj client.Object,
-) []ctrl.Request {
+func (r *BMCVersionReconciler) enqueueBMCVersionByBMCRefs(ctx context.Context, obj client.Object) []ctrl.Request {
 
 	log := ctrl.LoggerFrom(ctx)
-	BMC := obj.(*metalv1alpha1.BMC)
+	bmcObj := obj.(*metalv1alpha1.BMC)
 	bmcVersionList := &metalv1alpha1.BMCVersionList{}
 	if err := r.List(ctx, bmcVersionList); err != nil {
 		log.Error(err, "failed to list BMCVersionList")
@@ -1069,7 +1012,7 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByBMCRefs(
 	}
 
 	for _, bmcVersion := range bmcVersionList.Items {
-		if bmcVersion.Spec.BMCRef != nil && bmcVersion.Spec.BMCRef.Name == BMC.Name {
+		if bmcVersion.Spec.BMCRef != nil && bmcVersion.Spec.BMCRef.Name == bmcObj.Name {
 			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateCompleted || bmcVersion.Status.State == metalv1alpha1.BMCVersionStateFailed {
 				return nil
 			}
@@ -1079,7 +1022,7 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByBMCRefs(
 			continue
 		}
 		if bmcVersion.Spec.BMCRef == nil {
-			if referredBMC, err := r.getBMCFromBMCVersion(ctx, &bmcVersion); err != nil && referredBMC.Name == BMC.Name {
+			if referredBMC, err := r.getBMCFromBMCVersion(ctx, &bmcVersion); err != nil && referredBMC != nil && referredBMC.Name == bmcObj.Name {
 				return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: bmcVersion.Namespace, Name: bmcVersion.Name}}}
 			}
 		}

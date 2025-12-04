@@ -61,7 +61,6 @@
         "Immutable": false,
         "MenuPath": "./EmbeddedSataSettingsRef",
         "ReadOnly": false,
-        "ResetRequired": true,
         "Type": "Enumeration",
         "Value": [
           {

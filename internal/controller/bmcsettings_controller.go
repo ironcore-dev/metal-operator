@@ -37,6 +37,7 @@ type BMCSettingsReconciler struct {
 	Insecure         bool
 	Scheme           *runtime.Scheme
 	BMCOptions       bmc.Options
+	Conditions       *conditionutils.Accessor
 }
 
 const (
@@ -280,14 +281,13 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 	switch bmcSetting.Status.State {
 	case "", metalv1alpha1.BMCSettingsStatePending:
 		var state = metalv1alpha1.BMCSettingsStateInProgress
-		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-		versionCheckCondition, err := r.getCondition(acc, bmcSetting.Status.Conditions, BMCVersionUpdatePendingCondition)
+		versionCheckCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCVersionUpdatePendingCondition)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BMCVersion update state %v", err)
 		}
 		if BMC.Status.FirmwareVersion != bmcSetting.Spec.Version {
 			log.V(1).Info("Pending BMC version upgrade.", "Current bmc Version", BMC.Status.FirmwareVersion, "Required version", bmcSetting.Spec.Version)
-			if err := acc.Update(
+			if err := r.Conditions.Update(
 				versionCheckCondition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
 				conditionutils.UpdateReason(BMCVersionUpgradePendingReason),
@@ -297,7 +297,7 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 			}
 			state = metalv1alpha1.BMCSettingsStatePending
 		} else if versionCheckCondition.Status == metav1.ConditionTrue {
-			if err := acc.Update(
+			if err := r.Conditions.Update(
 				versionCheckCondition,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
 				conditionutils.UpdateReason("BMCVersionAreMatching"),
@@ -366,10 +366,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 	settingsDiff redfish.SettingsAttributes,
 	bmcClient bmc.BMC,
 ) (ctrl.Result, error) {
-
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-
-	resetBMC, err := r.getCondition(acc, bmcSetting.Status.Conditions, BMCResetPostSettingApplyCondition)
+	resetBMC, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCResetPostSettingApplyCondition)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
 	}
@@ -377,13 +374,12 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 	if resetBMC.Reason != BMCReasonReset {
 		// apply the BMC Settings if not done.
 		if BMC.Status.PowerState != "" && BMC.Status.PowerState != metalv1alpha1.OnPowerState {
-			acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 			log.V(1).Info("BMC is not Powered On. Can not proceed", "PowerState", BMC.Status.PowerState)
-			BMCPoweredOffCondition, err := r.getCondition(acc, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
+			BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
 			}
-			if err := acc.Update(
+			if err := r.Conditions.Update(
 				BMCPoweredOffCondition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
 				conditionutils.UpdateReason(BMCPoweredOffReason),
@@ -394,12 +390,12 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 			err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
 			return ctrl.Result{}, err
 		} else {
-			BMCPoweredOffCondition, err := r.getCondition(acc, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
+			BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
 			}
 			if BMCPoweredOffCondition.Status == metav1.ConditionTrue {
-				if err := acc.Update(
+				if err := r.Conditions.Update(
 					BMCPoweredOffCondition,
 					conditionutils.UpdateStatus(corev1.ConditionFalse),
 					conditionutils.UpdateReason("BMCPoweredBackOn"),
@@ -492,10 +488,8 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 	BMC *metalv1alpha1.BMC,
 	conditionType string,
 ) (bool, error) {
-
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	// reset BMC if not already done
-	resetBMC, err := r.getCondition(acc, bmcSettings.Status.Conditions, conditionType)
+	resetBMC, err := GetCondition(r.Conditions, bmcSettings.Status.Conditions, conditionType)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
 	}
@@ -507,7 +501,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
 					if op == metalv1alpha1.GracefulRestartBMC {
 						log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
-						if err := acc.Update(
+						if err := r.Conditions.Update(
 							resetBMC,
 							conditionutils.UpdateStatus(corev1.ConditionFalse),
 							conditionutils.UpdateReason(BMCReasonReset),
@@ -534,7 +528,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 				return false, err
 			}
 
-			if err := acc.Update(
+			if err := r.Conditions.Update(
 				resetBMC,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
 				conditionutils.UpdateReason(BMCReasonReset),
@@ -556,7 +550,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 			}
 		}
 
-		if err := acc.Update(
+		if err := r.Conditions.Update(
 			resetBMC,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
 			conditionutils.UpdateReason(BMCReasonReset),
@@ -590,26 +584,6 @@ func (r *BMCSettingsReconciler) handleFailedState(
 	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bmc settings maintenance
 	log.V(1).Info("Failed to update BMC setting", "ctx", ctx, "bmcSetting", bmcSetting, "BMC", BMC)
 	return nil
-}
-
-func (r *BMCSettingsReconciler) getCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
-	condition := &metav1.Condition{}
-	condFound, err := acc.FindSlice(conditions, conditionType, condition)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
-	}
-	if !condFound {
-		condition.Type = conditionType
-		if err := acc.Update(
-			condition,
-			conditionutils.UpdateStatus(corev1.ConditionFalse),
-		); err != nil {
-			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
-		}
-	}
-
-	return condition, nil
 }
 
 func (r *BMCSettingsReconciler) getBMCSettingsDifference(
@@ -1007,8 +981,7 @@ func (r *BMCSettingsReconciler) updateBMCSettingsStatus(
 	bmcSetting.Status.State = state
 
 	if condition != nil {
-		acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-		if err := acc.UpdateSlice(
+		if err := r.Conditions.UpdateSlice(
 			&bmcSetting.Status.Conditions,
 			condition.Type,
 			conditionutils.UpdateStatus(condition.Status),

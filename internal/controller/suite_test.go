@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
@@ -227,6 +228,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

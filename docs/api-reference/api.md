@@ -1293,6 +1293,18 @@ Kubernetes core/v1.LocalObjectReference
 the BMC configuration for this BMC.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>hostname</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Hostname is the hostname of the BMC.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1889,6 +1901,18 @@ Kubernetes core/v1.LocalObjectReference
 <em>(Optional)</em>
 <p>BMCSettingRef is a reference to a BMCSettings object that specifies
 the BMC configuration for this BMC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostname</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Hostname is the hostname of the BMC.</p>
 </td>
 </tr>
 </tbody>

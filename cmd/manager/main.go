@@ -89,6 +89,7 @@ func main() { // nolint: gocyclo
 		bmcResetWaitingInterval            time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
+		dnsRecordTemplatePath              string
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -145,6 +146,9 @@ func main() { // nolint: gocyclo
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.DurationVar(&biosSettingsApplyTimeout, "bios-setting-timeout", 2*time.Hour,
 		"Timeout for BIOS Settings Controller")
+	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
+		"Path to the DNS record template file used for creating DNS records for Servers.")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -328,6 +332,7 @@ func main() { // nolint: gocyclo
 		BMCResetWaitTime:       bmcResetWaitingInterval,
 		BMCClientRetryInterval: bmcResetResyncInterval,
 		ManagerNamespace:       managerNamespace,
+		DNSRecordTemplatePath:  dnsRecordTemplatePath,
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},

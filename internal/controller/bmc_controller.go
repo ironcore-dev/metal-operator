@@ -4,14 +4,19 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/go-logr/logr"
@@ -63,6 +68,8 @@ type BMCReconciler struct {
 	BMCResetWaitTime time.Duration
 	// BMCClientRetryInterval defines the duration to requeue reconciliation after a BMC client error/reset/unavailablility.
 	BMCClientRetryInterval time.Duration
+	// DNSRecordTemplatePath is the path to the file containing the DNSRecord template.
+	DNSRecordTemplatePath string
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -258,11 +265,100 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 			continue
 		}
 		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
+
+		// Create DNS record for the server if template path is configured
+		if r.ManagerNamespace != "" && r.DNSRecordTemplatePath != "" {
+			if err := r.createDNSRecordForServer(ctx, log, bmcObj, server); err != nil && !apierrors.IsNotFound(err) {
+				log.Error(err, "failed to create DNS record for server", "Server", server.Name)
+				errs = append(errs, fmt.Errorf("failed to create DNS record for server %s: %w", server.Name, err))
+			}
+		}
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("errors occurred during server discovery: %v", errs)
 	}
 	return nil
+}
+
+// DNSRecordTemplateData contains the data used to render the DNS record YAML template
+type DNSRecordTemplateData struct {
+	Name      string
+	Namespace string
+	metalv1alpha1.BMCSpec
+	metalv1alpha1.BMCStatus
+	Labels map[string]string
+}
+
+// createDNSRecordForServer creates a DNS record resource from a YAML template loaded from ConfigMap
+func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, server *metalv1alpha1.Server) error {
+	// Load DNS record template from ConfigMap
+	templateText, err := r.loadDNSRecordTemplate(log)
+	if err != nil {
+		return err
+	}
+
+	// Prepare template data
+	templateData := DNSRecordTemplateData{
+		Namespace: r.ManagerNamespace,
+		Name:      bmcObj.Name,
+		BMCSpec:   bmcObj.Spec,
+		BMCStatus: bmcObj.Status,
+		Labels:    bmcObj.Labels,
+	}
+
+	// Render the template
+	tmpl, err := template.New("dnsRecord").Parse(templateText)
+	if err != nil {
+		return fmt.Errorf("failed to parse DNS record template: %w", err)
+	}
+
+	var renderedYAML bytes.Buffer
+	if err := tmpl.Execute(&renderedYAML, templateData); err != nil {
+		return fmt.Errorf("failed to render DNS record template: %w", err)
+	}
+
+	// Unmarshal the rendered YAML into an unstructured object
+	dnsRecord := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal(renderedYAML.Bytes(), dnsRecord); err != nil {
+		return fmt.Errorf("failed to unmarshal DNS record YAML: %w", err)
+	}
+
+	// Set owner reference for garbage collection
+	if err := controllerutil.SetControllerReference(bmcObj, dnsRecord, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference on DNS record: %w", err)
+	}
+
+	// Create or patch the DNS record
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, dnsRecord, func() error {
+		// Preserve any existing fields and only update spec/labels
+		if dnsRecord.GetResourceVersion() != "" {
+			// Preserve the resource version if it already exists
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create or patch DNS record: %w", err)
+	}
+
+	log.Info("Created or patched DNS record", "Record", server.Name, "Operation", opResult)
+	return nil
+}
+
+// loadDNSRecordTemplate loads the DNS record template from a mounted file, falling back to a default template
+func (r *BMCReconciler) loadDNSRecordTemplate(log logr.Logger) (string, error) {
+	// Try to read from the mounted file
+	templateText, err := os.ReadFile(r.DNSRecordTemplatePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read DNS record template file: %w", err)
+	}
+
+	if len(templateText) == 0 {
+		return "", fmt.Errorf("DNS record template file is empty: %s", r.DNSRecordTemplatePath)
+	}
+
+	log.Info("Loaded DNS record template from file", "Path", r.DNSRecordTemplatePath)
+	return string(templateText), nil
 }
 
 func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {

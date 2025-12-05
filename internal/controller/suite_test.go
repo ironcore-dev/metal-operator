@@ -65,7 +65,6 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -168,6 +167,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ManagerNamespace:       ns.Name,
 			BMCResetWaitTime:       400 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
+			DNSRecordTemplatePath:  "../../test/data/dns_record_template.yaml",
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{

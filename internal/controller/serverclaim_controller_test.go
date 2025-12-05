@@ -62,6 +62,10 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 
+		By("Ensuring that the Server is in an available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())

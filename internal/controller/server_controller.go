@@ -91,6 +91,7 @@ type ServerReconciler struct {
 	BMCOptions              bmc.Options
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
+	Conditions              *conditionutils.Accessor
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -975,8 +976,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *metalv1alpha1.Server) error {
 	original := server.DeepCopy()
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	err := acc.UpdateSlice(
+	err := r.Conditions.UpdateSlice(
 		&server.Status.Conditions,
 		PoweringOnCondition,
 		conditionutils.UpdateStatus(metav1.ConditionTrue),

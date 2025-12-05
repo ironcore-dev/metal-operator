@@ -329,6 +329,7 @@ func main() { // nolint: gocyclo
 		BMCResetWaitTime:       bmcResetWaitingInterval,
 		BMCClientRetryInterval: bmcResetResyncInterval,
 		ManagerNamespace:       managerNamespace,
+		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},
@@ -349,6 +350,7 @@ func main() { // nolint: gocyclo
 		EnforceFirstBoot:        enforceFirstBoot,
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
+		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -392,12 +394,13 @@ func main() { // nolint: gocyclo
 			os.Exit(1)
 		}
 	}
-	if err = (&controller.BiosSettingsReconciler{
+	if err = (&controller.BIOSSettingsReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
 		ResyncInterval:   maintenanceResyncInterval,
+		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -448,6 +451,7 @@ func main() { // nolint: gocyclo
 		ManagerNamespace: managerNamespace,
 		ResyncInterval:   maintenanceResyncInterval,
 		Insecure:         insecure,
+		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -472,6 +476,7 @@ func main() { // nolint: gocyclo
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
 		ResyncInterval:   maintenanceResyncInterval,
+		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

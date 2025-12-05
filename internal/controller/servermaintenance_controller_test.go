@@ -56,8 +56,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
 	})
 
@@ -110,6 +108,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
 	It("Should wait to put a Server into maintenance until approval", func(ctx SpecContext) {
@@ -255,6 +255,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting the ServerClaim")
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
 	It("Should wait for other maintenance to complete before starting a new one", func(ctx SpecContext) {
@@ -364,5 +367,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
 			HaveField("Spec.MaintenanceBootConfigurationRef", BeNil()),
 		))
+
+		Expect(k8sClient.Delete(ctx, serverMaintenance02)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 })

@@ -662,7 +662,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 		return rebootComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
-	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeVerficationCondition'")
+	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeVerificationCondition'")
 	verificationComplete := &metav1.Condition{}
 	Eventually(func(g Gomega) int {
 		g.Expect(Get(biosVersion)()).To(Succeed())
@@ -670,7 +670,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	}).Should(BeNumerically(">=", 5))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(biosVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeVerficationCondition, verificationComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeVerificationCondition, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 }

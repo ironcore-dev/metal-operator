@@ -13,11 +13,14 @@ import (
 	"slices"
 
 	"github.com/go-logr/logr"
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -27,6 +30,39 @@ import (
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
 )
+
+// GetCondition finds a condition in a condition slice.
+func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
+	condition := &metav1.Condition{}
+	condFound, err := acc.FindSlice(conditions, conditionType, condition)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
+	}
+	if !condFound {
+		condition.Type = conditionType
+		if err := acc.Update(
+			condition,
+			conditionutils.UpdateStatus(corev1.ConditionFalse),
+		); err != nil {
+			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
+		}
+	}
+
+	return condition, nil
+}
+
+// GetServerByName returns a Server object by its name or an error in case the object can not be found.
+func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
+	server := &metalv1alpha1.Server{}
+	if err := c.Get(ctx, client.ObjectKey{Name: serverName}, server); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get server: %w", err)
+		}
+		return nil, fmt.Errorf("server not found")
+	}
+	return server, nil
+}
 
 // shouldIgnoreReconciliation checks if the object should be ignored during reconciliation.
 func shouldIgnoreReconciliation(obj client.Object) bool {

@@ -101,7 +101,11 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 }
 
 func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (result ctrl.Result, err error) {
-	server, err := r.getServerRef(ctx, serverMaintenance)
+	if serverMaintenance.Spec.ServerRef == nil {
+		return ctrl.Result{}, fmt.Errorf("server reference is nil")
+	}
+
+	server, err := GetServerByName(ctx, r.Client, serverMaintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -171,7 +175,11 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 }
 
 func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
-	server, err := r.getServerRef(ctx, serverMaintenance)
+	if serverMaintenance.Spec.ServerRef == nil {
+		return ctrl.Result{}, fmt.Errorf("server reference is nil")
+	}
+
+	server, err := GetServerByName(ctx, r.Client, serverMaintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -280,7 +288,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 	if serverMaintenance.Spec.ServerRef == nil {
 		return ctrl.Result{}, nil
 	}
-	server, err := r.getServerRef(ctx, serverMaintenance)
+	server, err := GetServerByName(ctx, r.Client, serverMaintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -292,17 +300,6 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
-}
-
-func (r *ServerMaintenanceReconciler) getServerRef(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance) (*metalv1alpha1.Server, error) {
-	server := &metalv1alpha1.Server{}
-	if err := r.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get server: %w", err)
-		}
-		return nil, fmt.Errorf("server not found")
-	}
-	return server, nil
 }
 
 func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) error {

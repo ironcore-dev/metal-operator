@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -422,6 +423,7 @@ func main() { // nolint: gocyclo
 		ManagerNamespace: managerNamespace,
 		Insecure:         insecure,
 		ResyncInterval:   maintenanceResyncInterval,
+		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

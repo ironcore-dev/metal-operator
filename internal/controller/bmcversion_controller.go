@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	BMCVersionFinalizer                    = "metal.ironcore.dev/bmcversion"
+	bmcVersionFinalizer                    = "metal.ironcore.dev/bmcversion"
 	bmcVersionUpgradeIssued                = "VersionUpgradeIssued"
 	bmcVersionUpgradeCompleted             = "VersionUpgradeCompleted"
 	bmcVersionUpgradeRebootBMC             = "VersionUpgradeReboot"
@@ -86,7 +86,7 @@ func (r *BMCVersionReconciler) shouldDelete(log logr.Logger, bmcVersion *metalv1
 		return false
 	}
 
-	if controllerutil.ContainsFinalizer(bmcVersion, BMCVersionFinalizer) &&
+	if controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) &&
 		bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
 		log.V(1).Info("Postponing deletion as BMC version update is in progress")
 		return false
@@ -96,7 +96,7 @@ func (r *BMCVersionReconciler) shouldDelete(log logr.Logger, bmcVersion *metalv1
 
 func (r *BMCVersionReconciler) delete(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
 	log.V(1).Info("Deleting BMCVersion")
-	if !controllerutil.ContainsFinalizer(bmcVersion, BMCVersionFinalizer) {
+	if !controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
@@ -106,7 +106,7 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, log logr.Logger, bmcV
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcVersion, BMCVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcVersion, bmcVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -168,7 +168,7 @@ func (r *BMCVersionReconciler) reconcile(ctx context.Context, log logr.Logger, b
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcVersion, BMCVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcVersion, bmcVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -252,7 +252,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 	BMC *metalv1alpha1.BMC,
 ) (ctrl.Result, error) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	issuedCondition, err := r.getCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeIssued)
+	issuedCondition, err := GetCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeIssued)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -266,7 +266,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 		return ctrl.Result{}, r.issueBMCUpgrade(ctx, log, bmcVersion, bmcClient, BMC, issuedCondition, acc)
 	}
 
-	completedCondition, err := r.getCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeCompleted)
+	completedCondition, err := GetCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeCompleted)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -280,7 +280,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 		return ctrl.Result{}, err
 	}
 
-	condition, err := r.getCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeVerificationCondition)
+	condition, err := GetCondition(acc, bmcVersion.Status.Conditions, bmcVersionUpgradeVerificationCondition)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -410,26 +410,6 @@ func (r *BMCVersionReconciler) removeServerMaintenanceRefAndResetConditions(
 	return err
 }
 
-func (r *BMCVersionReconciler) getCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
-	condition := &metav1.Condition{}
-	condFound, err := acc.FindSlice(conditions, conditionType, condition)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
-	}
-	if !condFound {
-		condition.Type = conditionType
-		if err := acc.Update(
-			condition,
-			conditionutils.UpdateStatus(corev1.ConditionFalse),
-		); err != nil {
-			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
-		}
-	}
-
-	return condition, nil
-}
-
 func (r *BMCVersionReconciler) getServerMaintenances(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion) ([]*metalv1alpha1.ServerMaintenance, []error) {
 	refs := bmcVersion.Spec.ServerMaintenanceRefs
 	maintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(refs))
@@ -455,7 +435,7 @@ func (r *BMCVersionReconciler) getServerMaintenances(ctx context.Context, log lo
 func (r *BMCVersionReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcVersion *metalv1alpha1.BMCVersion, bmcObj *metalv1alpha1.BMC, conditionType string) (bool, error) {
 	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	// reset BMC if not already done
-	condition, err := r.getCondition(acc, bmcVersion.Status.Conditions, conditionType)
+	condition, err := GetCondition(acc, bmcVersion.Status.Conditions, conditionType)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
 	}

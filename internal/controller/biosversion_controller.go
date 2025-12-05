@@ -40,20 +40,22 @@ type BIOSVersionReconciler struct {
 }
 
 const (
-	biosVersionFinalizer                    = "metal.ironcore.dev/biosversion"
-	biosVersionUpgradeIssued                = "BIOSVersionUpgradeIssued"
-	biosVersionUpgradeCompleted             = "BIOSVersionUpgradeCompleted"
-	biosVersionUpgradeRebootServerPowerOn   = "BIOSVersionUpgradePowerOn"
-	biosVersionUpgradeRebootServerPowerOff  = "BIOSVersionUpgradePowerOff"
-	biosVersionUpgradeVerificationCondition = "BIOSVersionUpgradeVerification"
-	biosUpgradeIssuedReason                 = "UpgradeIssued"
-	biosUpgradeIssueReason                  = "IssueBIOSUpgradeFailed"
-	rebootPowerOffReason                    = "RebootPowerOff"
-	rebootPowerOnReason                     = "RebootPowerOn"
-	biosVersionVerifiedReason               = "VerifiedBIOSVersionUpdate"
-	biosVersionVerifyReason                 = "VerifyBIOSVersionUpdate"
-	biosUpgradeTaskFailedReason             = "BiosUpgradeTaskFailed"
-	biosVersionUpgradeTaskCompletedReason   = "taskCompleted"
+	BIOSVersionFinalizer = "metal.ironcore.dev/biosversion"
+
+	ConditionBIOSUpgradeIssued       = "BIOSUpgradeIssued"
+	ConditionBIOSUpgradeCompleted    = "BIOSUpgradeCompleted"
+	ConditionBIOSUpgradePowerOn      = "BIOSUpgradePowerOn"
+	ConditionBIOSUpgradePowerOff     = "BIOSUpgradePowerOff"
+	ConditionBIOSUpgradeVerification = "BIOSUpgradeVerification"
+
+	ReasonUpgradeIssued           = "UpgradeIssued"
+	ReasonUpgradeIssueFailed      = "UpgradeIssueFailed"
+	ReasonRebootPowerOff          = "RebootPowerOff"
+	ReasonRebootPowerOn           = "RebootPowerOn"
+	ReasonBIOSVersionVerified     = "BIOSVersionVerified"
+	ReasonBIOSVersionVerification = "BIOSVersionVerificationFailed"
+	ReasonUpgradeTaskFailed       = "UpgradeTaskFailed"
+	ReasonUpgradeTaskCompleted    = "UpgradeTaskCompleted"
 )
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversions,verbs=get;list;watch;create;update;patch;delete
@@ -88,7 +90,7 @@ func (r *BIOSVersionReconciler) shouldDelete(log logr.Logger, biosVersion *metal
 		return false
 	}
 
-	if controllerutil.ContainsFinalizer(biosVersion, biosVersionFinalizer) &&
+	if controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) &&
 		biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
 		log.V(1).Info("Postponing deletion as BIOS version update is in progress")
 		return false
@@ -101,12 +103,12 @@ func (r *BIOSVersionReconciler) delete(ctx context.Context, log logr.Logger, bio
 	log.V(1).Info("Deleting BIOSVersion")
 	defer log.V(1).Info("Deleted BIOSVersion")
 
-	if !controllerutil.ContainsFinalizer(biosVersion, biosVersionFinalizer) {
+	if !controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersion, biosVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersion, BIOSVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -149,7 +151,7 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersion, biosVersionFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersion, BIOSVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -236,7 +238,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 }
 
 func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
-	issuedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, biosVersionUpgradeIssued)
+	issuedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeIssued)
 	if err != nil {
 		return false, err
 	}
@@ -250,7 +252,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		return false, r.upgradeBIOSVersion(ctx, log, bmcClient, biosVersion, server, issuedCondition)
 	}
 
-	completedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, biosVersionUpgradeCompleted)
+	completedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted)
 	if err != nil {
 		return false, err
 	}
@@ -260,7 +262,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		return r.checkUpdateBiosUpgradeStatus(ctx, log, bmcClient, biosVersion, server, completedCondition)
 	}
 
-	rebootPowerOffCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, biosVersionUpgradeRebootServerPowerOff)
+	rebootPowerOffCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradePowerOff)
 	if err != nil {
 		return false, err
 	}
@@ -275,7 +277,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		if err := r.Conditions.Update(
 			rebootPowerOffCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(rebootPowerOffReason),
+			conditionutils.UpdateReason(ReasonRebootPowerOff),
 			conditionutils.UpdateMessage("Powered off the server"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update reboot power off condition: %w", err)
@@ -284,7 +286,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		return false, r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, rebootPowerOffCondition)
 	}
 
-	rebootPowerOnCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, biosVersionUpgradeRebootServerPowerOn)
+	rebootPowerOnCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradePowerOn)
 	if err != nil {
 		return false, err
 	}
@@ -299,7 +301,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		if err := r.Conditions.Update(
 			rebootPowerOnCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(rebootPowerOnReason),
+			conditionutils.UpdateReason(ReasonRebootPowerOn),
 			conditionutils.UpdateMessage("Powered on the server"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update reboot power on condition: %w", err)
@@ -308,7 +310,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		return false, r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, rebootPowerOnCondition)
 	}
 
-	condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, biosVersionUpgradeVerificationCondition)
+	condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeVerification)
 	if err != nil {
 		return false, err
 	}
@@ -327,7 +329,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 				if err := r.Conditions.Update(
 					condition,
 					conditionutils.UpdateStatus(corev1.ConditionFalse),
-					conditionutils.UpdateReason(biosVersionVerifyReason),
+					conditionutils.UpdateReason(ReasonBIOSVersionVerification),
 					conditionutils.UpdateMessage("waiting for BIOS Version update"),
 				); err != nil {
 					return false, fmt.Errorf("failed to update the verification condition: %w", err)
@@ -340,7 +342,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(biosVersionVerifiedReason),
+			conditionutils.UpdateReason(ReasonBIOSVersionVerified),
 			conditionutils.UpdateMessage("BIOS Version updated"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update conditions: %w", err)
@@ -615,7 +617,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		if err := r.Conditions.Update(
 			completedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(biosUpgradeTaskFailedReason),
+			conditionutils.UpdateReason(ReasonUpgradeTaskFailed),
 			conditionutils.UpdateMessage(message),
 		); err != nil {
 			return false, fmt.Errorf("failed to update conditions: %w", err)
@@ -628,7 +630,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		if err := r.Conditions.Update(
 			completedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(biosVersionUpgradeTaskCompletedReason),
+			conditionutils.UpdateReason(ReasonUpgradeTaskCompleted),
 			conditionutils.UpdateMessage("BIOS version successfully upgraded to: "+biosVersion.Spec.Version),
 		); err != nil {
 			return false, fmt.Errorf("failed to update conditions: %w", err)
@@ -703,7 +705,7 @@ func (r *BIOSVersionReconciler) upgradeBIOSVersion(
 		if errCond := r.Conditions.Update(
 			issuedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
-			conditionutils.UpdateReason(biosUpgradeIssueReason),
+			conditionutils.UpdateReason(ReasonUpgradeIssueFailed),
 			conditionutils.UpdateMessage("Fatal error occurred. Upgrade might still go through on server."),
 		); errCond != nil {
 			log.V(1).Error(errCond, "failed to update conditions")
@@ -720,14 +722,14 @@ func (r *BIOSVersionReconciler) upgradeBIOSVersion(
 	if errCond := r.Conditions.Update(
 		issuedCondition,
 		conditionutils.UpdateStatus(corev1.ConditionTrue),
-		conditionutils.UpdateReason(biosUpgradeIssuedReason),
+		conditionutils.UpdateReason(ReasonUpgradeIssued),
 		conditionutils.UpdateMessage(fmt.Sprintf("Task to upgrade has been created %v", taskMonitor)),
 	); errCond != nil {
 		log.V(1).Error(errCond, "failed to update conditions")
 		if errCond := r.Conditions.Update(
 			issuedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(biosUpgradeIssuedReason),
+			conditionutils.UpdateReason(ReasonUpgradeIssued),
 			conditionutils.UpdateMessage(fmt.Sprintf("Task to upgrade has been created %v", taskMonitor)),
 		); errCond != nil {
 			log.V(1).Error(errCond, "failed to update conditions")

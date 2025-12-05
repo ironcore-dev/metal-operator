@@ -40,11 +40,11 @@ func EnsureCleanState() {
 		biosSettings := &metalv1alpha1.BIOSSettingsList{}
 		g.Eventually(ObjectList(biosSettings)).Should(HaveField("Items", HaveLen(0)))
 
-		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-		g.Eventually(ObjectList(maintenanceList)).Should(HaveField("Items", HaveLen(0)))
-
 		serverList := &metalv1alpha1.ServerList{}
 		g.Eventually(ObjectList(serverList)).Should(HaveField("Items", HaveLen(0)))
+
+		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+		g.Eventually(ObjectList(maintenanceList)).Should(HaveField("Items", HaveLen(0)))
 
 		return nil
 	}).Should(Succeed())

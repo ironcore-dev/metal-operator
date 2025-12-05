@@ -283,6 +283,7 @@ type SystemInfo struct {
 	SerialNumber      string
 	SKU               string
 	IndicatorLED      string
+	BIOSVersion       string
 }
 
 // Manager represents the manager information.

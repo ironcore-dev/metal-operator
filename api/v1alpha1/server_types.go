@@ -18,6 +18,12 @@ const (
 
 	// PowerOff indicates that the device is powered off.
 	PowerOff Power = "Off"
+
+	// TopologyHeightUnit is the annotation key for the height unit of a server in a rack.
+	TopologyHeightUnit = "topology.metal.ironcore.dev/heightunit"
+
+	// TopologyRack is the annotation key for the rack of a server.
+	TopologyRack = "topology.metal.ironcore.dev/rack"
 )
 
 // ServerPowerState defines the possible power states for a server.
@@ -96,11 +102,11 @@ type ServerSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
 	// +optional
-	ServerClaimRef *v1.ObjectReference `json:"serverClaimRef,omitempty"`
+	ServerClaimRef *ObjectReference `json:"serverClaimRef,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
 	// +optional
-	ServerMaintenanceRef *v1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
 	// BMCRef is a reference to the BMC object associated with this server.
 	// This field is optional and can be omitted if no BMC is associated with this server.
@@ -116,12 +122,12 @@ type ServerSpec struct {
 	// the boot configuration for this server. This field is optional and can be omitted
 	// if no boot configuration is specified.
 	// +optional
-	BootConfigurationRef *v1.ObjectReference `json:"bootConfigurationRef,omitempty"`
+	BootConfigurationRef *ObjectReference `json:"bootConfigurationRef,omitempty"`
 
 	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
 	// the boot configuration for this server during maintenance. This field is optional and can be omitted
 	// +optional
-	MaintenanceBootConfigurationRef *v1.ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
+	MaintenanceBootConfigurationRef *ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
 	// BootOrder specifies the boot order of the server.
 	// +optional
@@ -285,15 +291,50 @@ type NetworkInterface struct {
 	Name string `json:"name"`
 
 	// IP is the IP address assigned to the network interface.
-	// The type is specified as string and is schemaless.
+	// Deprecated: Use IPs instead. Kept for backward compatibility, always nil.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless
-	// +required
-	IP IP `json:"ip"`
+	// +optional
+	IP *IP `json:"ip,omitempty"`
+
+	// IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface.
+	// +optional
+	IPs []IP `json:"ips,omitempty"`
 
 	// MACAddress is the MAC address of the network interface.
 	// +required
 	MACAddress string `json:"macAddress"`
+
+	// CarrierStatus is the operational carrier status of the network interface.
+	// +optional
+	CarrierStatus string `json:"carrierStatus,omitempty"`
+
+	// Neighbors contains the LLDP neighbors discovered on this interface.
+	// +optional
+	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`
+}
+
+// LLDPNeighbor defines the details of an LLDP neighbor.
+type LLDPNeighbor struct {
+	// MACAddress is the MAC address of the LLDP neighbor.
+	// +optional
+	MACAddress string `json:"macAddress,omitempty"`
+
+	// PortID is the port identifier of the LLDP neighbor.
+	// +optional
+	PortID string `json:"portID,omitempty"`
+
+	// PortDescription is the port description of the LLDP neighbor.
+	// +optional
+	PortDescription string `json:"portDescription,omitempty"`
+
+	// SystemName is the system name of the LLDP neighbor.
+	// +optional
+	SystemName string `json:"systemName,omitempty"`
+
+	// SystemDescription is the system description of the LLDP neighbor.
+	// +optional
+	SystemDescription string `json:"systemDescription,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive
@@ -375,6 +416,7 @@ type Storage struct {
 //+kubebuilder:printcolumn:name="UUID",type=string,JSONPath=`.spec.uuid`
 //+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
 //+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+//+kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
 //+kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
 //+kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
 //+kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`

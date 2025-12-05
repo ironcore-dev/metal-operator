@@ -163,14 +163,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			})).Should(Succeed())
 			By("mock servermaintenance Creation maintenance")
 			Eventually(Update(biosVersionV1, func() {
-				biosVersionV1.Spec.ServerMaintenanceRef = &v1.ObjectReference{Name: "foobar-Maintenance"}
+				biosVersionV1.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: "foobar-Maintenance"}
 			})).Should(Succeed())
 			By("Updating an biosVersion V1 spec, should fail to update when inProgress")
 			biosVersionV1Updated := biosVersionV1.DeepCopy()
 			biosVersionV1Updated.Spec.Version = "P712"
 			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().To(HaveOccurred())
 			By("Updating an biosVersion V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
-			biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.ForceUpdateAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
+			biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().ToNot(HaveOccurred())
 
 			Eventually(UpdateStatus(biosVersionV1, func() {

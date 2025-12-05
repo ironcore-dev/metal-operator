@@ -94,6 +94,9 @@ func (r *BIOSVersionSetReconciler) delete(
 			log.Error(err, "failed to update current Status")
 			return ctrl.Result{}, fmt.Errorf("failed to update current BIOSVersionSet Status: %w", err)
 		}
+		if err := r.handleRetryAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+			return ctrl.Result{}, err
+		}
 		log.Info("Waiting on the created BIOSVersion to reach terminal status")
 		return ctrl.Result{}, nil
 	}
@@ -120,51 +123,23 @@ func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
 		log.V(1).Info("No BIOSVersion found, skipping ignore annotation propagation")
 		return nil
 	}
-	if !shouldChildIgnoreReconciliation(biosVersionSet) {
-		// if the Set object does not have the ignore annotation anymore,
-		// we should remove the ignore annotation on the child
-		var errs []error
-		for _, biosVersion := range ownedBiosVersions.Items {
-			// if the Child object is ignored through sets, we should remove the ignore annotation on the child
-			// ad the Set object does not have the ignore annotation anymore
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
-				if isChildIgnoredThroughSets(&biosVersion) {
-					annotations := biosVersion.GetAnnotations()
-					log.V(1).Info("Ignore operation deleted on child object", "BIOSVersion", biosVersion.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotation)
-					delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
-					biosVersion.SetAnnotations(annotations)
-				}
-				return nil
-			})
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations Propogartion removal: %w for: %v", err, biosVersion.Name))
-			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched BIOSVersion's annotations to remove Ignore", "BIOSVersion", biosVersion.Name, "Operation", opResult)
-			}
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+	return handleIgnoreAnnotationPropagation(ctx, log, r.Client, biosVersionSet, ownedBiosVersions)
+}
+
+func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	biosVersionSet *metalv1alpha1.BIOSVersionSet,
+) error {
+	ownedBiosVersion, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
+	if err != nil {
+		return err
+	}
+	if len(ownedBiosVersion.Items) == 0 {
+		log.V(1).Info("No BIOSVersion found, skipping retry annotation propagation")
 		return nil
 	}
-
-	var errs []error
-	for _, biosVersion := range ownedBiosVersions.Items {
-		// should not overwrite the already ignored annotation on child
-		// should not overwrite if the annotation already present on the child
-		if !isChildIgnoredThroughSets(&biosVersion) && !shouldIgnoreReconciliation(&biosVersion) {
-			biosVersionBase := biosVersion.DeepCopy()
-			annotations := biosVersion.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.OperationAnnotationIgnoreChild
-			if err := r.Patch(ctx, &biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSVersion annotations: %w", err))
-			}
-		}
-	}
-	return errors.Join(errs...)
+	return handleRetryAnnotationPropagation(ctx, log, r.Client, biosVersionSet, ownedBiosVersion)
 }
 
 func (r *BIOSVersionSetReconciler) reconcile(
@@ -219,6 +194,10 @@ func (r *BIOSVersionSetReconciler) reconcile(
 	err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BIOSVersionSet Status: %w", err)
+	}
+
+	if err := r.handleRetryAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+		return ctrl.Result{}, err
 	}
 	// wait for any updates from owned resources
 	return ctrl.Result{}, nil
@@ -405,8 +384,6 @@ func (r *BIOSVersionSetReconciler) updateStatus(
 
 func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("server created/deleted/updated label")
-
 	host := obj.(*metalv1alpha1.Server)
 
 	biosVersionSetList := &metalv1alpha1.BIOSVersionSetList{}

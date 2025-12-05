@@ -1,0 +1,267 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#AttributeRegistry.AttributeRegistry",
+  "@odata.id": "/redfish/v1/Systems/437XR1138R2/Bios/BiosAttributeRegistry",
+  "@odata.type": "#AttributeRegistry.v1_3_6.AttributeRegistry",
+  "Description": "This registry defines a representation of BIOS Attribute instances",
+  "Id": "BiosAttributeRegistry.v1_0_3",
+  "Language": "en",
+  "Name": "BIOS Attribute Registry",
+  "OwningEntity": "Iron core",
+  "RegistryEntries": {
+    "Attributes": [
+      {
+        "AttributeName": "AdminPhone",
+        "CurrentValue": null,
+        "DisplayName": "Admin Phone",
+        "DisplayOrder": 200,
+        "HelpText": "Indicates the Admin phone number.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./AdminPhoneRef",
+        "MaxLength": 40,
+        "MinLength": 0,
+        "ReadOnly": false,
+        "ResetRequired": false,
+        "Type": "String",
+        "ValueExpression": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "BootMode",
+        "CurrentValue": null,
+        "DisplayName": "Boot Mode",
+        "DisplayOrder": 6100,
+        "HelpText": "Determines whether the BIOS attempts to boot the OS via the method defined by the Unified Extensible Firmware Interface (UEFI) specification or via the legacy (BIOS) method.    Selecting BIOS ensures compatibility with older operating systems that do not support the UEFI method. Many newer operating systems are UEFI-aware, and some of them may also support legacy boot methods.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./BootSettingsRef",
+        "ReadOnly": false,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "BIOS",
+            "ValueName": "Bios"
+          },
+          {
+            "ValueDisplayName": "UEFI",
+            "ValueName": "Uefi"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "EmbeddedSata",
+        "CurrentValue": null,
+        "DisplayName": "EmbeddedSata Mode",
+        "DisplayOrder": 6000,
+        "HelpText": "If the system contains NVMe drives that you want to configure in a RAID array, you must set both this field and the Embedded SATA field on the SATA Settings menu to RAID Mode. You may also need to change the Boot Mode setting to UEFI. Otherwise, you should set this field to Non-RAID Mode.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./EmbeddedSataSettingsRef",
+        "ReadOnly": false,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "Non RAID",
+            "ValueName": "NonRaid"
+          },
+          {
+            "ValueDisplayName": "RAID",
+            "ValueName": "Raid"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+     {
+        "AttributeName": "UsbControl",
+        "CurrentValue": null,
+        "DisplayName": "Generic USB Boot",
+        "DisplayOrder": 6103,
+        "HelpText": "When set to Enabled, a Generic USB Boot is enabled",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./USBBootSettingsRef",
+        "ReadOnly": false,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "Enabled",
+            "ValueName": "Enabled"
+          },
+          {
+            "ValueDisplayName": "Disabled",
+            "ValueName": "Disabled"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "ProcTurboMode",
+        "CurrentValue": null,
+        "DisplayName": "Turbo Boost",
+        "DisplayOrder": 9603,
+        "HelpText": "Governs the Boost Technology.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./SysProfileSettingsRef",
+        "ReadOnly": true,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "Enabled",
+            "ValueName": "Enabled"
+          },
+          {
+            "ValueDisplayName": "Disabled",
+            "ValueName": "Disabled"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "ProcHyperthreading",
+        "CurrentValue": null,
+        "DisplayName": "ProcHyperthreading Technology",
+        "DisplayOrder": 5803,
+        "HelpText": "When set to Enabled, the BIOS will enable processor ProcHyperthreading Technology.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./ProcSettingsRef",
+        "ReadOnly": false,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "Enabled",
+            "ValueName": "Enabled"
+          },
+          {
+            "ValueDisplayName": "Disabled",
+            "ValueName": "Disabled"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "PowerProfile",
+        "CurrentValue": null,
+        "DisplayName": "CPU Power Management",
+        "DisplayOrder": 9601,
+        "HelpText": "Allows selection of CPU power management methodology.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./SysProfileSettingsRef",
+        "ReadOnly": false,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "System DBPM (DAPC)",
+            "ValueName": "SysDbpm"
+          },
+          {
+            "ValueDisplayName": "OS DBPM",
+            "ValueName": "OsDbpm"
+          },
+          {
+            "ValueDisplayName": "Maximum Performance",
+            "ValueName": "MaxPerf"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "NicBoot1",
+        "CurrentValue": null,
+        "DisplayName": "Embedded NicBoot1",
+        "DisplayOrder": 9214,
+        "HelpText": "Enables or disables the embedded NIC.",
+        "Hidden": true,
+        "Immutable": false,
+        "MenuPath": "./IntegratedDevicesRef",
+        "ReadOnly": false,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "Enabled",
+            "ValueName": "Enabled"
+          },
+          {
+            "ValueDisplayName": "Disabled (OS)",
+            "ValueName": "DisabledOs"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "NicBoot2",
+        "CurrentValue": null,
+        "DisplayName": "Embedded NicBoot2",
+        "DisplayOrder": 9215,
+        "HelpText": "Enables or disables the embedded NIC.",
+        "Hidden": true,
+        "Immutable": false,
+        "MenuPath": "./IntegratedDevicesRef",
+        "ReadOnly": false,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "Enabled", 
+            "ValueName": "Enabled"
+          },
+          {
+            "ValueDisplayName": "Disabled (OS)",
+            "ValueName": "DisabledOs"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+            {
+        "AttributeName": "ProcCores",
+        "CurrentValue": null,
+        "DisplayName": "Number of Cores per Processor",
+        "DisplayOrder": 5845,
+        "HelpText": "Controls the number of enabled cores in the processor. Under certain circumstances, you may see limited performance improvements to Boost Technology and benefit from potentially larger shared caches if you reduce the number of enabled cores. Most computing environments tend to benefit more from larger number of processing cores, so you must carefully weigh the disabling of cores to gain nominal performance enhancements.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./ProcSettingsRef",
+        "ReadOnly": false,
+        "ResetRequired": true,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "All",
+            "ValueName": "All"
+          },
+          {
+            "ValueDisplayName": "1",
+            "ValueName": "1"
+          },
+          {
+            "ValueDisplayName": "2",
+            "ValueName": "2"
+          },
+          {
+            "ValueDisplayName": "3",
+            "ValueName": "3"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      }
+    ]
+  }
+}

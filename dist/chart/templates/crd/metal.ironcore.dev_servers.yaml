@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servers.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -29,6 +29,9 @@ spec:
       type: string
     - jsonPath: .status.model
       name: Model
+      type: string
+    - jsonPath: .status.totalSystemMemory
+      name: Memory
       type: string
     - jsonPath: .status.sku
       name: SKU
@@ -166,45 +169,27 @@ spec:
                   if no boot configuration is specified.
                 properties:
                   apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
+                    description: APIVersion is the API version of the referenced object.
                     type: string
                   kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    description: Kind is the kind of the referenced object.
                     type: string
                   name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    description: Name is the name of the referenced object.
                     type: string
                   namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    description: UID is the uid of the referenced object.
                     type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                - namespace
+                - uid
                 type: object
-                x-kubernetes-map-type: atomic
               bootOrder:
                 description: BootOrder specifies the boot order of the server.
                 items:
@@ -235,45 +220,27 @@ spec:
                   the boot configuration for this server during maintenance. This field is optional and can be omitted
                 properties:
                   apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
+                    description: APIVersion is the API version of the referenced object.
                     type: string
                   kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    description: Kind is the kind of the referenced object.
                     type: string
                   name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    description: Name is the name of the referenced object.
                     type: string
                   namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    description: UID is the uid of the referenced object.
                     type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                - namespace
+                - uid
                 type: object
-                x-kubernetes-map-type: atomic
               power:
                 description: Power specifies the desired power state of the server.
                 type: string
@@ -283,45 +250,27 @@ spec:
                   This field is optional and can be omitted if no claim is associated with this server.
                 properties:
                   apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
+                    description: APIVersion is the API version of the referenced object.
                     type: string
                   kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    description: Kind is the kind of the referenced object.
                     type: string
                   name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    description: Name is the name of the referenced object.
                     type: string
                   namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    description: UID is the uid of the referenced object.
                     type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                - namespace
+                - uid
                 type: object
-                x-kubernetes-map-type: atomic
                 x-kubernetes-validations:
                 - message: serverClaimRef cannot be switched directly
                   rule: self == null || oldSelf == null || self == oldSelf
@@ -330,45 +279,27 @@ spec:
                   object that maintains this server.
                 properties:
                   apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
+                    description: APIVersion is the API version of the referenced object.
                     type: string
                   kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    description: Kind is the kind of the referenced object.
                     type: string
                   name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    description: Name is the name of the referenced object.
                     type: string
                   namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    description: UID is the uid of the referenced object.
                     type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                - namespace
+                - uid
                 type: object
-                x-kubernetes-map-type: atomic
               systemURI:
                 description: SystemURI is the unique URI for the server resource in
                   REDFISH API.
@@ -464,19 +395,57 @@ spec:
                 items:
                   description: NetworkInterface defines the details of a network interface.
                   properties:
+                    carrierStatus:
+                      description: CarrierStatus is the operational carrier status
+                        of the network interface.
+                      type: string
                     ip:
                       description: |-
                         IP is the IP address assigned to the network interface.
-                        The type is specified as string and is schemaless.
+                        Deprecated: Use IPs instead. Kept for backward compatibility, always nil.
                       type: string
+                    ips:
+                      description: IPs is a list of IP addresses (both IPv4 and IPv6)
+                        assigned to the network interface.
+                      items:
+                        format: ip
+                        type: string
+                      type: array
                     macAddress:
                       description: MACAddress is the MAC address of the network interface.
                       type: string
                     name:
                       description: Name is the name of the network interface.
                       type: string
+                    neighbors:
+                      description: Neighbors contains the LLDP neighbors discovered
+                        on this interface.
+                      items:
+                        description: LLDPNeighbor defines the details of an LLDP neighbor.
+                        properties:
+                          macAddress:
+                            description: MACAddress is the MAC address of the LLDP
+                              neighbor.
+                            type: string
+                          portDescription:
+                            description: PortDescription is the port description of
+                              the LLDP neighbor.
+                            type: string
+                          portID:
+                            description: PortID is the port identifier of the LLDP
+                              neighbor.
+                            type: string
+                          systemDescription:
+                            description: SystemDescription is the system description
+                              of the LLDP neighbor.
+                            type: string
+                          systemName:
+                            description: SystemName is the system name of the LLDP
+                              neighbor.
+                            type: string
+                        type: object
+                      type: array
                   required:
-                  - ip
                   - macAddress
                   - name
                   type: object

@@ -10,6 +10,20 @@ go install https://github.com/ironcore-dev/metal-operator/cmd/metalctl@latest
 
 ## Commands
 
+### visualizer, vis
+
+The `metalctl visualalizer` (or `metalctl vis`) command allows you to visualize the topology of your bare metal `Server`s.
+
+To run the visualizer run
+
+```bash
+metalctl visualizer --kubeconfig="path-to-kubeconfig.yaml"
+```
+
+In order to access the 3D visualization, open your browser and navigate to `http://localhost:8080`.
+
+You can configure the port by setting the `--port` flag.
+
 ### console
 
 The `metalctl console` command allows you to access the serial console of a `Server`.

@@ -38,11 +38,11 @@ spec:
   version: 2.10.3
   image:
     URI: "http://foo.com/dell-idrac-bmc-2.10.3.bin"
-    transferProtocol: "http"
+    transferProtocol: "HTTP"
     imageSecretRef:
       name: sample-secret
   updatePolicy: Force
-  BMCRef:
+  bmcRef:
     name: BMC-sample
   serverMaintenancePolicy: Enforced
 ```

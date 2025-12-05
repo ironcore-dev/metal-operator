@@ -19,6 +19,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 
 	// +kubebuilder:scaffold:imports
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
@@ -72,7 +73,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s",
-			fmt.Sprintf("1.33.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.34.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook")},
@@ -111,6 +112,7 @@ var _ = BeforeSuite(func() {
 		Metrics:        metricsserver.Options{BindAddress: "0"},
 	})
 	Expect(err).NotTo(HaveOccurred())
+	Expect(controller.RegisterIndexFields(ctx, mgr.GetFieldIndexer())).To(Succeed())
 
 	err = SetupEndpointWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())

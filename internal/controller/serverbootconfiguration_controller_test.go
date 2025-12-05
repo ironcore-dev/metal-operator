@@ -13,7 +13,7 @@ import (
 )
 
 var _ = Describe("ServerBootConfiguration Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var server *metalv1alpha1.Server
 
@@ -32,10 +32,11 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		EnsureCleanState()
 	})
 
-	It("should successfully add the boot configuration ref to server", func(ctx SpecContext) {
+	It("Should successfully add the boot configuration ref to server", func(ctx SpecContext) {
 		By("By creating a server boot configuration")
 		config := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{

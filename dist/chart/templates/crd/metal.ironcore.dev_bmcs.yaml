@@ -6,27 +6,12 @@ metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
   annotations:
-    {{- if .Values.certmanager.enable }}
-    cert-manager.io/inject-ca-from: "{{ .Release.Namespace }}/serving-cert"
-    {{- end }}
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bmcs.metal.ironcore.dev
 spec:
-  {{- if .Values.webhook.enable }}
-  conversion:
-    strategy: Webhook
-    webhook:
-      clientConfig:
-        service:
-          namespace: {{ .Release.Namespace }}
-          name: webhook-service
-          path: /convert
-      conversionReviewVersions:
-      - v1
-  {{- end }}
   group: metal.ironcore.dev
   names:
     kind: BMC
@@ -313,7 +298,10 @@ spec:
                 description: SKU is the stock keeping unit identifier for the BMC.
                 type: string
               state:
-                description: State represents the current state of the BMC.
+                default: Pending
+                description: |-
+                  State represents the current state of the BMC.
+                  kubebuilder:validation:Enum=Enabled;Error;Pending
                 type: string
             type: object
         type: object

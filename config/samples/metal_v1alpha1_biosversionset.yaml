@@ -7,12 +7,12 @@ metadata:
   name: biosversionset-sample
 spec:
   biosVersionTemplate:
-    version: "U59 v2.34 (10/04/2024)"
+    version: "P80 v1.46 (12/06/2017)"
     image:
-      URI: "https://foo-2.34_10_04_2024.signed.flash"
+      URI: "P80 v1.46 (12/06/2017)"
       transferProtocol: "HTTPS"
     updatePolicy: Normal
-  ServerSelector:
+    serverMaintenancePolicy: OwnerApproval
+  serverSelector:
     matchLabels: 
-      manufacturer: "dell"
-  serverMaintenancePolicy: OwnerApproval
+      manufacturer: "Contoso"

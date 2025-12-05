@@ -11,11 +11,11 @@ on:
 
 jobs:
   test-e2e:
-    name: Run on Ubuntu
+    name: Run test chart on Ubuntu
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Go
         uses: actions/setup-go@v6

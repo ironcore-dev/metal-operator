@@ -74,7 +74,7 @@ func (r *BIOSSettingsSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
-	// handle propogartion of ignore annotation to child when parent is being deleted
+	// handle propagation of ignore annotation to child when parent is being deleted
 	// so that the deleted annotations can be passed to children before parent is deleted
 	if err := r.handleIgnoreAnnotationPropagation(ctx, log, biosSettingsSet); err != nil {
 		return ctrl.Result{}, err
@@ -99,6 +99,11 @@ func (r *BIOSSettingsSetReconciler) delete(
 		err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BIOSSettingsSet Status %w", err)
+		}
+		// handle propagation of retry annotation to child when parent is being deleted
+		// so that the deleted annotations can be passed to children before parent is deleted
+		if err := r.handleRetryAnnotationPropagation(ctx, log, biosSettingsSet); err != nil {
+			return ctrl.Result{}, err
 		}
 		log.Info("Waiting on the created BIOSSettings to reach terminal status")
 		return ctrl.Result{}, nil
@@ -126,50 +131,24 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(
 		log.V(1).Info("No BIOSSettings found, skipping ignore annotation propagation")
 		return nil
 	}
-	if !shouldChildIgnoreReconciliation(biosSettingsSet) {
-		// if the Set object does not have the ignore annotation anymore,
-		// we should remove the ignore annotation on the child
-		var errs []error
-		for _, biosSettings := range ownedBiosSettings.Items {
-			// if the Child object is ignored through sets, we should remove the ignore annotation on the child
-			// ad the Set object does not have the ignore annotation anymore
-			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
-				if isChildIgnoredThroughSets(&biosSettings) {
-					annotations := biosSettings.GetAnnotations()
-					log.V(1).Info("Ignore operation deleted on child object", "BIOSSettings", biosSettings.Name)
-					delete(annotations, metalv1alpha1.OperationAnnotation)
-					delete(annotations, metalv1alpha1.PropagatedOperationAnnotation)
-					biosSettings.SetAnnotations(annotations)
-				}
-				return nil
-			})
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations Propogartion removal: %w for: %v", err, biosSettings.Name))
-			}
-			if opResult != controllerutil.OperationResultNone {
-				log.V(1).Info("Patched BIOSSettings's annotations to remove Ignore", "BIOSSettings", biosSettings.Name, "Operation", opResult)
-			}
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+	return handleIgnoreAnnotationPropagation(ctx, log, r.Client, biosSettingsSet, ownedBiosSettings)
+}
+
+func (r *BIOSSettingsSetReconciler) handleRetryAnnotationPropagation(
+	ctx context.Context,
+	log logr.Logger,
+	biosSettingsSet *metalv1alpha1.BIOSSettingsSet,
+) error {
+	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, biosSettingsSet)
+	if err != nil {
+		return err
+	}
+	if len(ownedBiosSettings.Items) == 0 {
+		log.V(1).Info("No BIOSSettings found, skipping retry annotation propagation")
 		return nil
 	}
-	var errs []error
-	for _, biosSettings := range ownedBiosSettings.Items {
-		// should not overwrite the already ignored annotation on child
-		// should not overwrite if the annotation already present on the child
-		if !isChildIgnoredThroughSets(&biosSettings) && !shouldIgnoreReconciliation(&biosSettings) {
-			biosSettingsBase := biosSettings.DeepCopy()
-			annotations := biosSettings.GetAnnotations()
-			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.OperationAnnotationIgnore
-			annotations[metalv1alpha1.PropagatedOperationAnnotation] = metalv1alpha1.OperationAnnotationIgnoreChild
-			if err := r.Patch(ctx, &biosSettings, client.MergeFrom(biosSettingsBase)); err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch BIOSSettings annotations: %w", err))
-			}
-		}
-	}
-	return errors.Join(errs...)
+	log.V(1).Info("Propagating retry annotation to owned BIOSSettings resources")
+	return handleRetryAnnotationPropagation(ctx, log, r.Client, biosSettingsSet, ownedBiosSettings)
 }
 
 func (r *BIOSSettingsSetReconciler) reconcile(
@@ -230,6 +209,10 @@ func (r *BIOSSettingsSetReconciler) handleBiosSettings(
 	err = r.updateStatus(ctx, log, currentStatus, biosSettingsSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BIOSSettingsSet Status %w", err)
+	}
+	// handle retry annotation - remove the annotation after retrying reconciliation
+	if err := r.handleRetryAnnotationPropagation(ctx, log, biosSettingsSet); err != nil {
+		return ctrl.Result{}, err
 	}
 	// wait for any updates from owned resources
 	return ctrl.Result{}, nil
@@ -418,8 +401,6 @@ func (r *BIOSSettingsSetReconciler) updateStatus(
 
 func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("server created/deleted/updated label")
-
 	host := obj.(*metalv1alpha1.Server)
 
 	biosSettingsSetList := &metalv1alpha1.BIOSSettingsSetList{}

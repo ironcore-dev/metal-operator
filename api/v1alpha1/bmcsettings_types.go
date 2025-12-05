@@ -39,7 +39,7 @@ type BMCSettingsSpec struct {
 type ServerMaintenanceRefItem struct {
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that the BMCSettings has requested for the referred server.
 	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 // BMCSettingsState specifies the current state of the server maintenance.
@@ -61,15 +61,20 @@ type BMCSettingsStatus struct {
 	// State represents the current state of the BMC configuration task.
 	// +optional
 	State BMCSettingsState `json:"state,omitempty"`
+
+	// Conditions represents the latest available observations of the BMC Settings Resource state.
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.bmcSettings.version`
+// +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="BMCRef",type=string,JSONPath=`.spec.BMCRef.name`
-// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 
 // BMCSettings is the Schema for the BMCSettings API.
 type BMCSettings struct {

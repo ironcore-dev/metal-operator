@@ -6,10 +6,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: bmcsettings-sample
 spec:
-  serverRef:
-    name: endpoint-sample-system-0
-  bmcSettingsSpec:
-    version: 7.00.00.171
-    settings:
-      ThermalSettings.1.FanSpeedOffset: "3"
-  serverMaintenancePolicyType: Enforced
+  BMCRef:
+    name: endpoint-sample
+  version: 1.45.455b66-rev4
+  settings:
+      abc: "3"
+  serverMaintenancePolicy: Enforced

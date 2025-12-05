@@ -2,6 +2,7 @@ apiVersion: metal.ironcore.dev/v1alpha1
 kind: BMC
 metadata:
   labels:
+    manufacturer: "Contoso"
     app.kubernetes.io/name: bmc
     app.kubernetes.io/instance: bmc-sample
     app.kubernetes.io/part-of: metal-operator
@@ -9,10 +10,11 @@ metadata:
     app.kubernetes.io/created-by: metal-operator
   name: bmc-sample
 spec:
-  endpointRef:
-    name: endpoint-sample
+  access:
+    ip: 127.0.0.1
   bmcSecretRef:
-    name: bmc-sample
+    name: bmcsecret-sample
   protocol:
-    name: Redfish
-    port: 8080
+    name: RedfishLocal
+    port: 8000
+

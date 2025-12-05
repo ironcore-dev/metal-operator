@@ -41,6 +41,6 @@ spec:
     URI: "https://foo-2.34_10_04_2024.signed.flash"
     transferProtocol: "HTTPS"
   serverRef:
-    name: endpoint-sample-hpe-system-0
+    name: endpoint-sample-system-0
   serverMaintenancePolicy: OwnerApproval
 ```

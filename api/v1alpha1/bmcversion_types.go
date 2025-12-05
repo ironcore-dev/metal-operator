@@ -40,7 +40,7 @@ type BMCVersionTemplate struct {
 
 	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
 	// +optional
-	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
+	ServerMaintenanceRefs []ObjectReference `json:"serverMaintenanceRefs,omitempty"`
 }
 
 // BMCVersionSpec defines the desired state of BMCVersion.

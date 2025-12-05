@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.25.1 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25.4 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -43,10 +43,13 @@ USER 65532:65532
 
 ENTRYPOINT ["/manager"]
 
-FROM gcr.io/distroless/static:nonroot AS probe
+FROM debian:testing-slim AS probe
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
 COPY --from=probe-builder /workspace/metalprobe .
-USER 65532:65532
-
-ENTRYPOINT ["/metalprobe"]
+COPY hack/metalprobe_launch.sh /launch.sh
+RUN chmod +x /launch.sh
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates bash curl iproute2 iputils-ping net-tools ethtool lldpd && \
+    rm -rf /var/lib/apt/lists/*
+ENTRYPOINT ["/launch.sh"]

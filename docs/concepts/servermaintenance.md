@@ -56,8 +56,6 @@ spec:
         name: server-foo
       ignitionSecretRef:
         name: bios-update-ignition
-status:
-  state: Pending
 ```
 
 If `policy: OwnerApproval` and no `ok-to-maintenance` label exists on the `ServerClaim`, this `ServerMaintenance` 

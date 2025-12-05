@@ -5,14 +5,35 @@ package bmcutils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	BmcSecretUsernameKey = "username"
+	BmcSecretPasswordKey = "password"
+)
+
+type BMCUnAvailableError struct {
+	Message string
+}
+
+func (e BMCUnAvailableError) Error() string {
+	return e.Message
+}
+
+type BMCClientOptions int
+
+const (
+	BMCConnectivityCheckOption BMCClientOptions = 1
 )
 
 func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {
@@ -27,15 +48,30 @@ func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metal
 
 func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
 	// TODO: use constants for secret keys
-	username, ok := secret.Data["username"]
-	if !ok {
-		return "", "", fmt.Errorf("no username found in the BMC secret")
+	username, err := getValueFromSecret(secret, BmcSecretUsernameKey)
+	if err != nil {
+		return "", "", err
 	}
-	password, ok := secret.Data["password"]
-	if !ok {
-		return "", "", fmt.Errorf("no password found in the BMC secret")
+	password, err := getValueFromSecret(secret, BmcSecretPasswordKey)
+	if err != nil {
+		return "", "", err
 	}
-	return string(username), string(password), nil
+	return username, password, nil
+}
+
+func getValueFromSecret(secret *metalv1alpha1.BMCSecret, key string) (string, error) {
+	if secret == nil {
+		return "", errors.New("secret cannot be nil")
+	}
+	value, ok := secret.Data[key]
+	if ok {
+		return string(value), nil
+	}
+	valueStr, ok := secret.StringData[key]
+	if ok {
+		return valueStr, nil
+	}
+	return "", fmt.Errorf("cannot find value in BMCSecret '%s' for key '%s' in data nor in stringData", secret.Name, key)
 }
 
 func GetBMCFromBMCName(ctx context.Context, c client.Client, bmcName string) (*metalv1alpha1.BMC, error) {
@@ -108,8 +144,14 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
-func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.Options) (bmc.BMC, error) {
+func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.Options, opts ...BMCClientOptions) (bmc.BMC, error) {
 	var address string
+
+	if !slices.Contains(opts, BMCConnectivityCheckOption) {
+		if bmcObj.Status.State != metalv1alpha1.BMCStateEnabled && bmcObj.Status.State != "" {
+			return nil, BMCUnAvailableError{Message: fmt.Sprintf("BMC %s is not in enabled state: current state: %s", bmcObj.Name, bmcObj.Status.State)}
+		}
+	}
 
 	if bmcObj.Spec.EndpointRef != nil {
 		endpoint := &metalv1alpha1.Endpoint{}
@@ -129,8 +171,8 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 	}
 
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
-
-	return CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	return bmcClient, err
 }
 
 func CreateBMCClient(

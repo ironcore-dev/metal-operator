@@ -91,6 +91,7 @@ type ServerReconciler struct {
 	BMCOptions              bmc.Options
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
+	IgnitionConfigPath      string
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -706,14 +707,20 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, ss
 		return nil, fmt.Errorf("failed to generate password hash: %w", err)
 	}
 
-	ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+	config := ignition.Config{
 		Image:        r.ProbeImage,
 		Flags:        flags,
 		SSHPublicKey: string(sshPublicKey),
 		PasswordHash: string(passwordHash),
-	})
+	}
+
+	// Load ignition template from file
+	ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+		r.IgnitionConfigPath,
+		config,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate default ignition data: %w", err)
+		return nil, fmt.Errorf("failed to generate ignition data from file %s: %w", r.IgnitionConfigPath, err)
 	}
 
 	return ignitionData, nil

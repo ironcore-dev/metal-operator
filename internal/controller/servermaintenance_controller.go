@@ -69,13 +69,16 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, log logr.Lo
 		return ctrl.Result{}, nil
 	}
 
-	server := &metalv1alpha1.Server{}
-	if err := r.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+	server, err := r.getServerRef(ctx, serverMaintenance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if server == nil {
+		log.V(1).Info("Server not found, nothing to do", "ServerMaintenance", serverMaintenance.Name)
+		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed); err != nil || modified {
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, fmt.Errorf("failed to get server: %w", err)
-
+		return ctrl.Result{}, nil
 	}
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, serverMaintenance, ServerMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
@@ -184,6 +187,13 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	server, err := r.getServerRef(ctx, serverMaintenance)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+	if server == nil {
+		log.V(1).Info("Server not found, nothing to do", "ServerMaintenance", serverMaintenance.Name)
+		if modified, err := r.patchMaintenanceState(ctx, serverMaintenance, metalv1alpha1.ServerMaintenanceStateFailed); err != nil || modified {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 	config, err := r.applyServerBootConfiguration(ctx, log, serverMaintenance, server)
 	if err != nil {
@@ -333,6 +343,9 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 func (r *ServerMaintenanceReconciler) getServerRef(ctx context.Context, serverMaintenance *metalv1alpha1.ServerMaintenance) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, client.ObjectKey{Name: serverMaintenance.Spec.ServerRef.Name}, server); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return server, nil

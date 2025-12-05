@@ -62,10 +62,10 @@ func TestControllers(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(false)))
 
 	By("bootstrapping test environment")
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(false)))
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -152,9 +152,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				},
 			},
 		}
-
-		err = RegisterIndexFields(ctx, k8sManager.GetFieldIndexer())
-		Expect(err).ToNot(HaveOccurred(), "failed to register index fields")
 
 		// register reconciler here
 		Expect((&EndpointReconciler{

@@ -18,7 +18,7 @@ import (
 )
 
 var _ = Describe("ServerMaintenanceSet Controller", func() {
-	ns := SetupTest()
+	ns := SetupTest(nil)
 
 	var servermaintenanceset *metalv1alpha1.ServerMaintenanceSet
 	var server01 *metalv1alpha1.Server
@@ -91,7 +91,7 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		DeleteAllMetalResources(ctx, ns.Name)
+		EnsureCleanState()
 	})
 	It("should successfully reconcile the resource", func(ctx SpecContext) {
 		By("Reconciling the created resource")
@@ -290,9 +290,23 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 			HaveField("Status.Completed", BeNumerically("==", 2)),
 		))
 
+		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
+
+		By("Checking if the status has been updated to zero maintenances")
+		Eventually(Object(servermaintenanceset), "10s").Should(SatisfyAll(
+			HaveField("Status.Maintenances", BeNumerically("==", 0)),
+			HaveField("Status.Pending", BeNumerically("==", 0)),
+			HaveField("Status.InMaintenance", BeNumerically("==", 0)),
+			HaveField("Status.Failed", BeNumerically("==", 0)),
+			HaveField("Status.Completed", BeNumerically("==", 0)),
+		))
+
 		By("Deleting the resource")
 		Expect(k8sClient.Delete(ctx, servermaintenanceset)).To(Succeed())
 
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
 	It("should successfully react to server label changes", func(ctx SpecContext) {
@@ -339,7 +353,10 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 			HaveField("Status.Completed", BeNumerically("==", 0)),
 		))
 
-		By("Deleting the resource")
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, server01)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, server02)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, servermaintenanceset)).To(Succeed())
 	})
 })

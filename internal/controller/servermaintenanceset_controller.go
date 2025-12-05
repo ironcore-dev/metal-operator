@@ -87,11 +87,6 @@ func (r *ServerMaintenanceSetReconciler) reconcile(ctx context.Context, log logr
 		return ctrl.Result{}, err
 	}
 
-	if len(servers.Items) == 0 {
-		log.V(0).Info("No servers found")
-		return ctrl.Result{}, nil
-	}
-
 	maintenancelist, err := r.getOwnedMaintenances(ctx, maintenanceSet)
 	if err != nil {
 		return ctrl.Result{}, err

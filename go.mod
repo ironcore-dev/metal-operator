@@ -10,7 +10,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/safchain/ethtool v0.7.0
 	github.com/siderolabs/go-smbios v0.3.3
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	github.com/stmcginnis/gofish v0.20.0
 	golang.org/x/crypto v0.45.0
 	gopkg.in/yaml.v3 v3.0.1

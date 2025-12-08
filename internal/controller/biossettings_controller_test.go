@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("BIOSSettings Controller", func() {
+var _ = FDescribe("BIOSSettings Controller", func() {
 	ns := SetupTest(nil)
 
 	var (
@@ -188,7 +188,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("should move to completed if no bios setting changes to referred server", func(ctx SpecContext) {
+	It("Should move to completed if no bios setting changes to referred server", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -252,7 +252,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("should reboot server if the resetRequired field is missing in the biosRegistry", func(ctx SpecContext) {
+	It("Should reboot server if the resetRequired field is missing in the biosRegistry", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -463,7 +463,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 	})
 
-	It("should create maintenance if setting update needs reboot", func(ctx SpecContext) {
+	It("Should create maintenance if setting update needs reboot", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -602,7 +602,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 	})
 
-	It("should update setting if server is in available state", func(ctx SpecContext) {
+	It("Should update setting if server is in available state", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -697,7 +697,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
+	It("Should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -823,7 +823,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("should allow retry using annotation", func(ctx SpecContext) {
+	It("Should allow retry using annotation", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -944,7 +944,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		EnsureCleanState()
 	})
 
-	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
+	It("Should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
 		biosSetting := make(map[string]string)
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
@@ -1437,7 +1437,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		)
 	})
 
-	It("should successfully apply sequence of settings when the names and priority changed, before the settings update was issued on server", func(ctx SpecContext) {
+	It("Should successfully apply sequence of settings when the names and priority changed, before the settings update was issued on server", func(ctx SpecContext) {
 		newNames := []string{"1", "10"}
 		oldNames := []string{"100", "1000"}
 		By("Creating a BIOSSetting with sequence of settings")

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -193,37 +194,16 @@ var _ = Describe("Server Controller", func() {
 		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
 		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
 
-		// Create a temporary ignition template file for testing
-		tmpIgnitionFile, err := os.CreateTemp("", "ignition-test-*.yaml")
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			Expect(os.Remove(tmpIgnitionFile.Name())).To(Succeed())
-		}()
-
-		defaultTemplate := `variant: fcos
-version: "1.3.0"
-systemd:
-  units:
-    - name: metalprobe.service
-      enabled: true
-      contents: |-
-        [Service]
-        ExecStart=/usr/bin/docker run {{.Image}} {{.Flags}}
-passwd:
-  users:
-    - name: metal
-      password_hash: {{.PasswordHash}}
-      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
-		_, err = tmpIgnitionFile.WriteString(defaultTemplate)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(tmpIgnitionFile.Close()).To(Succeed())
-
-		ignitionData, err := ignition.GenerateIgnitionDataFromFile(tmpIgnitionFile.Name(), ignition.Config{
-			Image:        "foo:latest",
-			Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-			SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-			PasswordHash: passwordHash,
-		})
+		// Generate expected ignition data using the same template file the controller uses
+		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
+			ignition.Config{
+				Image:        "foo:latest",
+				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
+				PasswordHash: passwordHash,
+			},
+		)
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
@@ -885,11 +865,6 @@ passwd:
 			Expect(k8sClient.Create(ctx, server)).To(Succeed())
 		})
 
-		AfterEach(func(ctx SpecContext) {
-			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
-		})
-
 		It("Should use custom file template when available", func(ctx SpecContext) {
 			By("Creating a custom ignition template file")
 			customTemplate := `variant: fcos
@@ -1067,6 +1042,66 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
 			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
 			Expect(ignitionStr).To(ContainSubstring("name: metal"))
+		})
+
+		It("Should create server with custom ignition template file end-to-end", func(ctx SpecContext) {
+			By("Creating a custom ignition template file")
+			customTemplate := `variant: fcos
+version: "1.5.0"
+systemd:
+  units:
+    - name: e2e-custom-probe.service
+      enabled: true
+      contents: |-
+        [Unit]
+        Description=E2E Custom Probe Service
+        [Service]
+        Restart=always
+        ExecStart=/usr/bin/docker run --name e2e-probe {{.Image}} {{.Flags}}
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: e2e-user
+      password_hash: {{.PasswordHash}}
+      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
+
+			tmpFile, err := os.CreateTemp("", "e2e-ignition-*.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(os.Remove(tmpFile.Name())).To(Succeed())
+			}()
+
+			_, err = tmpFile.WriteString(customTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			By("Creating a reconciler with custom ignition template path")
+			customReconciler := &ServerReconciler{
+				Client:             k8sClient,
+				Scheme:             k8sClient.Scheme(),
+				RegistryURL:        registryURL,
+				ManagerNamespace:   ns.Name,
+				ProbeImage:         "custom-probe:v1.0.0",
+				Insecure:           true,
+				IgnitionConfigPath: tmpFile.Name(),
+			}
+
+			By("Generating ignition data with custom template")
+			ignitionData, err := customReconciler.generateDefaultIgnitionDataForServer(
+				"--registry-url=http://localhost:30000 --server-uuid=e2e-test-12345",
+				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
+				[]byte("testpassword"),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ignitionData).NotTo(BeEmpty())
+
+			ignitionStr := string(ignitionData)
+			Expect(ignitionStr).To(ContainSubstring("version: \"1.5.0\""), "Should use custom template version")
+			Expect(ignitionStr).To(ContainSubstring("e2e-custom-probe.service"), "Should use custom service name")
+			Expect(ignitionStr).To(ContainSubstring("E2E Custom Probe Service"), "Should use custom description")
+			Expect(ignitionStr).To(ContainSubstring("e2e-user"), "Should use custom username")
+			Expect(ignitionStr).To(ContainSubstring("custom-probe:v1.0.0"), "Should include custom probe image")
 		})
 	})
 })

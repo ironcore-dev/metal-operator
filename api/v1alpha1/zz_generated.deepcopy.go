@@ -809,6 +809,13 @@ func (in *BMCSettingsSetStatus) DeepCopy() *BMCSettingsSetStatus {
 func (in *BMCSettingsSpec) DeepCopyInto(out *BMCSettingsSpec) {
 	*out = *in
 	in.BMCSettingsTemplate.DeepCopyInto(&out.BMCSettingsTemplate)
+	if in.ServerMaintenanceRefs != nil {
+		in, out := &in.ServerMaintenanceRefs, &out.ServerMaintenanceRefs
+		*out = make([]ServerMaintenanceRefItem, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.BMCRef != nil {
 		in, out := &in.BMCRef, &out.BMCRef
 		*out = new(v1.LocalObjectReference)
@@ -856,13 +863,6 @@ func (in *BMCSettingsTemplate) DeepCopyInto(out *BMCSettingsTemplate) {
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
-		}
-	}
-	if in.ServerMaintenanceRefs != nil {
-		in, out := &in.ServerMaintenanceRefs, &out.ServerMaintenanceRefs
-		*out = make([]ServerMaintenanceRefItem, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }

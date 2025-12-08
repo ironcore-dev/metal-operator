@@ -263,17 +263,9 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 					}}
 			}
 
-			serverMaintenanceRefsProvided, err := r.getProvidedServerMaintenanceRefs(ctx, &bmc, bmcSettingsSet)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get provided ServerMaintenanceRefs for BMC %s: %w", bmc.Name, err))
-				continue
-			}
-
 			//create/patch new Settings
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCSettings, func() error {
 				newBMCSettings.Spec.BMCSettingsTemplate = *bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
-				// patch ServerMaintenance referenced by BMC's Servers
-				newBMCSettings.Spec.ServerMaintenanceRefs = serverMaintenanceRefsProvided
 				newBMCSettings.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}
 				return controllerutil.SetControllerReference(bmcSettingsSet, newBMCSettings, r.Client.Scheme())
 			})
@@ -339,62 +331,8 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 			continue
 		}
 
-		bmc, exists := bmcNameMap[bmcSettings.Spec.BMCRef.Name]
-		if !exists {
-			errs = append(errs, fmt.Errorf("BMC %s not found for BMCSettings %s", bmcSettings.Spec.BMCRef.Name, bmcSettings.Name))
-			continue
-		}
-
-		serverMaintenanceRefsProvided, err := r.getProvidedServerMaintenanceRefs(ctx, &bmc, bmcSettingsSet)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get ServerMaintenanceRefs for BMC %s: %w", bmc.Name, err))
-			continue
-		}
-
-		serverMaintenancesRefsCreated, err := r.getCreatedServerMaintenanceRefs(ctx, &bmcSettings)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get owned ServerMaintenance for BMCSettings %s: %w", bmcSettings.Name, err))
-			continue
-		}
-
-		var serverMaintenanceRefsMerged []metalv1alpha1.ServerMaintenanceRefItem
-		if len(serverMaintenancesRefsCreated) > 0 && len(serverMaintenanceRefsProvided) > 0 {
-			// merge provided and created serverMaintenanceRefs
-			serverMaintenanceRefMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
-			for _, ref := range serverMaintenanceRefsProvided {
-				if ref.ServerMaintenanceRef != nil {
-					serverMaintenanceRefMap[ref.ServerMaintenanceRef.Name] = ref
-				}
-			}
-			for _, ref := range serverMaintenancesRefsCreated {
-				if ref.ServerMaintenanceRef != nil {
-					serverMaintenanceRefMap[ref.ServerMaintenanceRef.Name] = ref
-				}
-			}
-			for _, ref := range serverMaintenanceRefMap {
-				serverMaintenanceRefsMerged = append(serverMaintenanceRefsMerged, ref)
-			}
-
-			// check if the length is as expected
-			servers, err := r.getServersForBMC(ctx, &bmc)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get servers for BMC %s to verify serverMaintenanceRef: %w", bmc.Name, err))
-				continue
-			}
-			if len(serverMaintenanceRefsMerged) > len(servers) {
-				errs = append(errs, fmt.Errorf("number of ServerMaintenanceRefs %d exceeds number of Servers %d for BMC %s",
-					len(serverMaintenanceRefsMerged), len(servers), bmc.Name))
-				continue
-			}
-		} else if len(serverMaintenanceRefsProvided) > 0 {
-			serverMaintenanceRefsMerged = serverMaintenanceRefsProvided
-		} else {
-			serverMaintenanceRefsMerged = serverMaintenancesRefsCreated
-		}
-
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcSettings, func() error {
 			bmcSettings.Spec.BMCSettingsTemplate = *bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
-			bmcSettings.Spec.ServerMaintenanceRefs = serverMaintenanceRefsMerged
 			return nil
 		})
 		if err != nil {
@@ -405,95 +343,6 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		}
 	}
 	return errors.Join(errs...)
-}
-func (r *BMCSettingsSetReconciler) getProvidedServerMaintenanceRefs(
-	ctx context.Context,
-	bmc *metalv1alpha1.BMC,
-	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
-) ([]metalv1alpha1.ServerMaintenanceRefItem, error) {
-	serverMaintenanceRefMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
-	for _, ref := range bmcSettingsSet.Spec.BMCSettingsTemplate.ServerMaintenanceRefs {
-		if ref.ServerMaintenanceRef != nil {
-			serverMaintenanceRefMap[ref.ServerMaintenanceRef.Name] = ref
-		}
-	}
-
-	servers, err := r.getServersForBMC(ctx, bmc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get servers for BMC %s: %w", bmc.Name, err)
-	}
-
-	serverMap := make(map[string]struct{})
-	for _, serverName := range servers {
-		serverMap[serverName] = struct{}{}
-	}
-
-	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
-	err = clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
-		serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
-		if serverMaintenance.Spec.ServerRef == nil {
-			return false, nil
-		}
-		if _, exists := serverMap[serverMaintenance.Spec.ServerRef.Name]; !exists {
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list ServerMaintenance for BMC's servers. Error %w", err)
-	}
-
-	serverMaintenanceRefs := []metalv1alpha1.ServerMaintenanceRefItem{}
-	for _, serverMaintenance := range serverMaintenancesList.Items {
-		if ref, exists := serverMaintenanceRefMap[serverMaintenance.Name]; exists {
-			serverMaintenanceRefs = append(serverMaintenanceRefs, ref)
-		}
-	}
-	return serverMaintenanceRefs, nil
-}
-
-func (r *BMCSettingsSetReconciler) getCreatedServerMaintenanceRefs(
-	ctx context.Context,
-	bmcSettings *metalv1alpha1.BMCSettings,
-) ([]metalv1alpha1.ServerMaintenanceRefItem, error) {
-	serverMaintenanceRefMap := make(map[string]metalv1alpha1.ServerMaintenanceRefItem)
-	for _, ref := range bmcSettings.Spec.ServerMaintenanceRefs {
-		if ref.ServerMaintenanceRef != nil {
-			serverMaintenanceRefMap[ref.ServerMaintenanceRef.Name] = ref
-		}
-	}
-
-	serverMaintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmcSettings, serverMaintenanceList); err != nil {
-		return nil, err
-	}
-
-	serverMaintenanceRefs := []metalv1alpha1.ServerMaintenanceRefItem{}
-	for _, serverMaintenance := range serverMaintenanceList.Items {
-		if ref, exists := serverMaintenanceRefMap[serverMaintenance.Name]; exists {
-			serverMaintenanceRefs = append(serverMaintenanceRefs, ref)
-		}
-	}
-	return serverMaintenanceRefs, nil
-}
-
-func (r *BMCSettingsSetReconciler) getServersForBMC(
-	ctx context.Context,
-	bmc *metalv1alpha1.BMC,
-) ([]string, error) {
-	serverList := &metalv1alpha1.ServerList{}
-	if err := r.List(ctx, serverList); err != nil {
-		return nil, fmt.Errorf("failed to list servers: %w", err)
-	}
-
-	var bmcServers []string
-	for _, server := range serverList.Items {
-		if server.Spec.BMCRef != nil && server.Spec.BMCRef.Name == bmc.Name {
-			bmcServers = append(bmcServers, server.Name)
-		}
-	}
-
-	return bmcServers, nil
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(

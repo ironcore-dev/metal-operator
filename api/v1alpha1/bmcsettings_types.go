@@ -23,17 +23,17 @@ type BMCSettingsTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-
-	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
-	// server that needs to be updated with the BMC settings.
-	// +optional
-	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
 }
 
 // BMCSettingsSpec defines the desired state of BMCSettings.
 
 type BMCSettingsSpec struct {
 	BMCSettingsTemplate `json:",inline"`
+
+	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
+	// server that needs to be updated with the BMC settings.
+	// +optional
+	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
 
 	// BMCRef is a reference to a specific BMC to apply setting to.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BMCRef is immutable"

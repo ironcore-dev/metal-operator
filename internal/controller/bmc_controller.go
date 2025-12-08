@@ -63,6 +63,7 @@ type BMCReconciler struct {
 	BMCResetWaitTime time.Duration
 	// BMCClientRetryInterval defines the duration to requeue reconciliation after a BMC client error/reset/unavailablility.
 	BMCClientRetryInterval time.Duration
+	Conditions             *conditionutils.Accessor
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -330,9 +331,8 @@ func (r *BMCReconciler) updateReadyConditionOnBMCFailure(ctx context.Context, bm
 }
 
 func (r *BMCReconciler) waitForBMCReset(bmcObj *metalv1alpha1.BMC, delay time.Duration) bool {
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	condition := &metav1.Condition{}
-	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
+	found, err := r.Conditions.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
 	if err != nil || !found {
 		return false
 	}
@@ -346,9 +346,8 @@ func (r *BMCReconciler) waitForBMCReset(bmcObj *metalv1alpha1.BMC, delay time.Du
 }
 
 func (r *BMCReconciler) handlePreviousBMCResetAnnotations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	condition := &metav1.Condition{}
-	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
+	found, err := r.Conditions.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
 	if err != nil || !found {
 		return false, nil
 	}
@@ -370,14 +369,13 @@ func (r *BMCReconciler) shouldResetBMC(bmcObj *metalv1alpha1.BMC) bool {
 	if r.BMCFailureResetDelay == 0 {
 		return false
 	}
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	bmcResetCondition := &metav1.Condition{}
-	found, err := acc.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, bmcResetCondition)
+	found, err := r.Conditions.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, bmcResetCondition)
 	if err != nil || (found && bmcResetCondition.Status == metav1.ConditionTrue) {
 		return false
 	}
 	readyCondition := &metav1.Condition{}
-	found, err = acc.FindSlice(bmcObj.Status.Conditions, bmcReadyConditionType, readyCondition)
+	found, err = r.Conditions.FindSlice(bmcObj.Status.Conditions, bmcReadyConditionType, readyCondition)
 	if err != nil || !found {
 		return false
 	}
@@ -426,9 +424,8 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *m
 }
 
 func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alpha1.BMC, createIfNotFound bool, conditionType string, status corev1.ConditionStatus, reason, message string) error {
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 	condition := &metav1.Condition{}
-	ok, err := acc.FindSlice(bmcObj.Status.Conditions, conditionType, condition)
+	ok, err := r.Conditions.FindSlice(bmcObj.Status.Conditions, conditionType, condition)
 	if err != nil {
 		return fmt.Errorf("failed to find condition %s: %w", conditionType, err)
 	}
@@ -437,7 +434,7 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 		return nil
 	}
 	bmcBase := bmcObj.DeepCopy()
-	if err := acc.UpdateSlice(
+	if err := r.Conditions.UpdateSlice(
 		&bmcObj.Status.Conditions,
 		conditionType,
 		conditionutils.UpdateStatus(status),

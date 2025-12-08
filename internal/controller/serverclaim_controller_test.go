@@ -138,7 +138,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the server has a correct boot configuration ref")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
@@ -271,7 +271,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", &v1.ObjectReference{
+			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerClaim",
 				Name:       claim.Name,
@@ -350,7 +350,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	It("Should not claim a server with set claim ref", func(ctx SpecContext) {
 		By("Patching the Server to available state")
 		Eventually(Update(server, func() {
-			server.Spec.ServerClaimRef = &v1.ObjectReference{
+			server.Spec.ServerClaimRef = &metalv1alpha1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerClaim",
 				Namespace:  ns.Name,
@@ -375,7 +375,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the Server has no claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", &v1.ObjectReference{
+			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerClaim",
 				Namespace:  ns.Name,

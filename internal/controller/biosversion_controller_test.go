@@ -175,14 +175,14 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
 		Eventually(Object(biosVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
 				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -194,7 +194,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -303,14 +303,14 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
 		Eventually(Object(biosVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
 				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -332,7 +332,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -530,14 +530,14 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 
 		By("Ensuring that the Maintenance resource has been referenced by biosVersion")
 		Eventually(Object(biosVersion)).Should(SatisfyAny(
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
 				UID:        serverMaintenance.UID,
 				APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
 			}),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -549,7 +549,7 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -599,7 +599,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeIssued, condIssue)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeIssued, condIssue)).To(BeTrue())
 			return condIssue.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -618,7 +618,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, condComplete)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted, condComplete)).To(BeTrue())
 			return condComplete.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -639,7 +639,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, rebootStart)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted, rebootStart)).To(BeTrue())
 			return rebootStart.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -658,11 +658,11 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	}).Should(BeNumerically(">=", 4))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(biosVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeCompleted, rebootComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted, rebootComplete)).To(BeTrue())
 		return rebootComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
-	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeVerficationCondition'")
+	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeVerificationCondition'")
 	verificationComplete := &metav1.Condition{}
 	Eventually(func(g Gomega) int {
 		g.Expect(Get(biosVersion)()).To(Succeed())
@@ -670,7 +670,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	}).Should(BeNumerically(">=", 5))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(biosVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, biosVersionUpgradeVerficationCondition, verificationComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeVerification, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 }

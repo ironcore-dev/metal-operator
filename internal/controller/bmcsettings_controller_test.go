@@ -299,7 +299,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmcSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
+					ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
@@ -388,7 +388,11 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings resource state is correct State inVersionUpgrade")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStatePending),
+			HaveField("Status.Conditions", Not(ContainElement(SatisfyAll(
+				HaveField("Type", BMCVersionUpdatePendingCondition),
+				HaveField("Status", metav1.ConditionTrue),
+			)))),
 		))
 
 		By("Ensuring that the serverMaintenance not ref. while waiting for upgrade")
@@ -404,6 +408,10 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Ensuring that the BMCSettings resource has completed Upgrade and setting update, and moved the state")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+			HaveField("Status.Conditions", Not(ContainElement(SatisfyAll(
+				HaveField("Type", BMCVersionUpdatePendingCondition),
+				HaveField("Status", metav1.ConditionFalse),
+			)))),
 		))
 
 		By("Ensuring that the Maintenance resource has been created")

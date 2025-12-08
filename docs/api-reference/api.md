@@ -624,8 +624,8 @@ ServerMaintenancePolicy
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -1141,8 +1141,8 @@ ServerMaintenancePolicy
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -2788,8 +2788,8 @@ ServerMaintenancePolicy
 <td>
 <code>serverMaintenanceRefs</code><br/>
 <em>
-<a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">
-[]ServerMaintenanceRefItem
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+[]ObjectReference
 </a>
 </em>
 </td>
@@ -3132,8 +3132,8 @@ net/netip.Prefix
 <td>
 <code>secretRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core">
-Kubernetes core/v1.LocalObjectReference
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
 </a>
 </em>
 </td>
@@ -3411,6 +3411,81 @@ string
 <td>
 <em>(Optional)</em>
 <p>Neighbors contains the LLDP neighbors discovered on this interface.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metal.ironcore.dev/v1alpha1.ObjectReference">ObjectReference
+</h3>
+<p>
+(<em>Appears on:</em><a href="#metal.ironcore.dev/v1alpha1.BIOSSettingsTemplate">BIOSSettingsTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BIOSVersionTemplate">BIOSVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.BMCVersionTemplate">BMCVersionTemplate</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerMaintenanceRefItem">ServerMaintenanceRefItem</a>, <a href="#metal.ironcore.dev/v1alpha1.ServerSpec">ServerSpec</a>)
+</p>
+<div>
+<p>ObjectReference is the namespaced name reference to an object.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>APIVersion is the API version of the referenced object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Kind is the kind of the referenced object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Namespace is the namespace of the referenced object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name of the referenced object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>UID is the uid of the referenced object.</p>
 </td>
 </tr>
 </tbody>
@@ -3799,8 +3874,8 @@ IndicatorLED
 <td>
 <code>serverClaimRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -3814,8 +3889,8 @@ This field is optional and can be omitted if no claim is associated with this se
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -3858,8 +3933,8 @@ This field is optional and can be omitted if no BMC access is specified.</p>
 <td>
 <code>bootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -3874,8 +3949,8 @@ if no boot configuration is specified.</p>
 <td>
 <code>maintenanceBootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -4647,8 +4722,8 @@ ServerMaintenanceStatus
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -4907,8 +4982,8 @@ IndicatorLED
 <td>
 <code>serverClaimRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -4922,8 +4997,8 @@ This field is optional and can be omitted if no claim is associated with this se
 <td>
 <code>serverMaintenanceRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -4966,8 +5041,8 @@ This field is optional and can be omitted if no BMC access is specified.</p>
 <td>
 <code>bootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -4982,8 +5057,8 @@ if no boot configuration is specified.</p>
 <td>
 <code>maintenanceBootConfigurationRef</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectreference-v1-core">
-Kubernetes core/v1.ObjectReference
+<a href="#metal.ironcore.dev/v1alpha1.ObjectReference">
+ObjectReference
 </a>
 </em>
 </td>
@@ -5271,7 +5346,7 @@ string
 </em>
 </td>
 <td>
-<p>Name identifies what this settings is doing</p>
+<p>Name is the name of the flow item</p>
 </td>
 </tr>
 <tr>

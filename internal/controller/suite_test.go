@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
@@ -153,6 +154,8 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}
 
+		accessor := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+
 		// register reconciler here
 		Expect((&EndpointReconciler{
 			Client:      k8sManager.GetClient(),
@@ -168,6 +171,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ManagerNamespace:       ns.Name,
 			BMCResetWaitTime:       400 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
+			Conditions:             accessor,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
@@ -182,6 +186,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
+			Conditions:              accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -207,12 +212,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&BiosSettingsReconciler{
+		Expect((&BIOSSettingsReconciler{
 			Client:           k8sManager.GetClient(),
 			ManagerNamespace: ns.Name,
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -227,6 +233,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -245,6 +252,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -258,6 +266,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

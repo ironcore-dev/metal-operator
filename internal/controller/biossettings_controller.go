@@ -539,16 +539,8 @@ func (r *BIOSSettingsReconciler) handleBMCReset(ctx context.Context, log logr.Lo
 	return true, nil
 }
 
-func (r *BIOSSettingsReconciler) applySettingUpdate(
-	ctx context.Context,
-	log logr.Logger,
-	bmcClient bmc.BMC,
-	settings *metalv1alpha1.BIOSSettings,
-	flowItem *metalv1alpha1.SettingsFlowItem,
-	flowStatus *metalv1alpha1.BIOSSettingsFlowStatus,
-	server *metalv1alpha1.Server,
-) (bool, error) {
-	if modified, err := r.SetTimeOutForApplyingSettings(ctx, log, settings, flowStatus); modified || err != nil {
+func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, settings *metalv1alpha1.BIOSSettings, flowItem *metalv1alpha1.SettingsFlowItem, flowStatus *metalv1alpha1.BIOSSettingsFlowStatus, server *metalv1alpha1.Server) (bool, error) {
+	if modified, err := r.setTimeoutForAppliedSettings(ctx, log, settings, flowStatus); modified || err != nil {
 		return false, err
 	}
 	turnOnServer, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionServerPowerOn)
@@ -681,13 +673,8 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(
 	return true, nil
 }
 
-func (r *BIOSSettingsReconciler) SetTimeOutForApplyingSettings(
-	ctx context.Context,
-	log logr.Logger,
-	biosSettings *metalv1alpha1.BIOSSettings,
-	currentFlowStatus *metalv1alpha1.BIOSSettingsFlowStatus,
-) (bool, error) {
-	timeoutCheck, err := GetCondition(r.Conditions, currentFlowStatus.Conditions, BIOSSettingConditionUpdateStartTime)
+func (r *BIOSSettingsReconciler) setTimeoutForAppliedSettings(ctx context.Context, log logr.Logger, settings *metalv1alpha1.BIOSSettings, flowStatus *metalv1alpha1.BIOSSettingsFlowStatus) (bool, error) {
+	timeoutCheck, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingConditionUpdateStartTime)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for TimeOut during setting update %v", err)
 	}
@@ -700,15 +687,14 @@ func (r *BIOSSettingsReconciler) SetTimeOutForApplyingSettings(
 		); err != nil {
 			return false, fmt.Errorf("failed to update starting setting update condition: %w", err)
 		}
-		err = r.updateFlowStatus(ctx, biosSettings, currentFlowStatus.State, currentFlowStatus, timeoutCheck)
-		return true, err
+		return true, r.updateFlowStatus(ctx, settings, flowStatus.State, flowStatus, timeoutCheck)
 	} else {
 		startTime := timeoutCheck.LastTransitionTime.Time
 		if time.Now().After(startTime.Add(r.TimeoutExpiry)) {
-			log.V(1).Info("Timedout while updating the biosSettings")
-			timedOut, err := GetCondition(r.Conditions, currentFlowStatus.Conditions, BIOSSettingConditionUpdateTimedOut)
+			log.V(1).Info("Timeout while updating the biosSettings")
+			timedOut, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingConditionUpdateTimedOut)
 			if err != nil {
-				return false, fmt.Errorf("failed to get Condition for Timeout of BIOSSettings update %v", err)
+				return false, fmt.Errorf("failed to get Condition for Timeout of BIOSSettings update %w", err)
 			}
 			if err := r.Conditions.Update(
 				timedOut,
@@ -718,8 +704,8 @@ func (r *BIOSSettingsReconciler) SetTimeOutForApplyingSettings(
 			); err != nil {
 				return false, fmt.Errorf("failed to update timeout during settings update condition: %w", err)
 			}
-			err = r.updateFlowStatus(ctx, biosSettings, metalv1alpha1.BIOSSettingsFlowStateFailed, currentFlowStatus, timedOut)
-			return true, errors.Join(err, r.updateStatus(ctx, biosSettings, metalv1alpha1.BIOSSettingsStateFailed, nil))
+			err = r.updateFlowStatus(ctx, settings, metalv1alpha1.BIOSSettingsFlowStateFailed, flowStatus, timedOut)
+			return true, errors.Join(err, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil))
 		}
 	}
 	return false, nil

@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = FDescribe("BIOSSettings Controller", func() {
+var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest(nil)
 
 	var (

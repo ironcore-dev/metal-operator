@@ -287,7 +287,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.FlowState", ContainElement(SatisfyAll(
 				HaveField("Conditions", ContainElement(SatisfyAll(
-					HaveField("Type", BIOSSettingssConditionRebootPostUpdate),
+					HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
 					HaveField("Reason", BIOSSettingsReasonRebootNeeded),
 					HaveField("Status", metav1.ConditionFalse)),
 				)),
@@ -1575,7 +1575,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 				),
 			)),
 			HaveField("Conditions", ContainElement(
-				HaveField("Type", BIOSSettingssConditionRebootPostUpdate),
+				HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
 			)),
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
@@ -1696,7 +1696,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 				HaveField("Conditions", SatisfyAll(
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", BIOSSettingssConditionRebootPostUpdate),
+							HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
 							HaveField("Status", metav1.ConditionTrue),
 						),
 					),
@@ -1712,7 +1712,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 				HaveField("Conditions", SatisfyAll(
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", BIOSSettingssConditionRebootPostUpdate),
+							HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
 							HaveField("Status", metav1.ConditionFalse),
 						),
 					),

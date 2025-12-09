@@ -3610,6 +3610,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>UUID is the unique identifier for the server.
 Deprecated in favor of systemUUID.</p>
 </td>
@@ -3622,7 +3623,6 @@ string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>SystemUUID is the unique identifier for the server.</p>
 </td>
 </tr>
@@ -4718,6 +4718,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>UUID is the unique identifier for the server.
 Deprecated in favor of systemUUID.</p>
 </td>
@@ -4730,7 +4731,6 @@ string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>SystemUUID is the unique identifier for the server.</p>
 </td>
 </tr>

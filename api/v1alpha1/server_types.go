@@ -79,12 +79,12 @@ type BootOrder struct {
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
 	// Deprecated in favor of systemUUID.
-	// +required
-	UUID string `json:"uuid"`
+	// +optional
+	UUID string `json:"uuid,omitempty"`
 
 	// SystemUUID is the unique identifier for the server.
-	// +optional
-	SystemUUID string `json:"systemUUID,omitempty"`
+	// +required
+	SystemUUID string `json:"systemUUID"`
 
 	// SystemURI is the unique URI for the server resource in REDFISH API.
 	SystemURI string `json:"systemURI,omitempty"`

@@ -26,7 +26,9 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 				},
 			},
-			Spec: metalv1alpha1.ServerSpec{},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 	})

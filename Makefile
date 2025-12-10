@@ -158,7 +158,7 @@ check: generate manifests add-license fmt lint test # Generate manifests, code, 
 
 .PHONY: docs
 docs: crd-ref-docs ## Run go generate to generate API reference documentation.
-	$(CRD_REF_DOCS) --source-path=./api/v1alpha1 --config=./hack/api-reference/config.json --renderer=markdown --output-path=./docs/api-reference/api.md
+	$(CRD_REF_DOCS) --source-path=./api/v1alpha1 --config=./hack/api-reference/config.yaml --renderer=markdown --output-path=./docs/api-reference/api.md
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.

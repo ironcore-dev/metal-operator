@@ -45,39 +45,53 @@ func (a *Agent) Init(ctx context.Context) error {
 	}
 	systeminfo, err := collectSystemInfoData()
 	if err != nil {
-		return err
+		a.log.Info("System info collection skipped (DMI/SMBIOS not accessible)", "error", err.Error())
+		// Continue without system info - use empty struct
+		systeminfo = registry.DMI{}
 	}
 
 	cpuInfos, err := collectCPUInfoData()
 	if err != nil {
-		return err
+		a.log.Info("CPU info collection skipped", "error", err.Error())
+		// Continue without CPU info
+		cpuInfos = []registry.CPUInfo{}
 	}
 
 	LLDPInfo, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
 	if err != nil {
-		a.log.Error(err, "failed to collect LLDP info")
-		return err
+		a.log.Info("LLDP info collection skipped (lldpctl not available or failed)", "error", err.Error())
+		// Continue without LLDP info - it's optional
+		LLDPInfo = registry.LLDP{}
+	} else {
+		a.log.Info("Collected LLDP info", "interfaces", len(LLDPInfo.Interfaces))
 	}
-	a.log.Info("Collected LLDP info", "interfaces", len(LLDPInfo.Interfaces))
 
 	blockDevices, err := collectStorageInfoData()
 	if err != nil {
-		return err
+		a.log.Info("Storage info collection skipped", "error", err.Error())
+		// Continue without storage info
+		blockDevices = []registry.BlockDevice{}
 	}
 
 	memoryDevices, err := collectMemoryInfoData()
 	if err != nil {
-		return err
+		a.log.Info("Memory info collection skipped", "error", err.Error())
+		// Continue without memory info
+		memoryDevices = []registry.MemoryDevice{}
 	}
 
 	nics, err := collectNICInfoData()
 	if err != nil {
-		return err
+		a.log.Info("NIC info collection skipped", "error", err.Error())
+		// Continue without NIC info
+		nics = []registry.NIC{}
 	}
 
 	pciDevices, err := collectPCIDevicesInfoData()
 	if err != nil {
-		return err
+		a.log.Info("PCI devices info collection skipped", "error", err.Error())
+		// Continue without PCI device info
+		pciDevices = []registry.PCIDevice{}
 	}
 
 	a.Server = &registry.Server{

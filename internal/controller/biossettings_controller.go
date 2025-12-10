@@ -317,13 +317,13 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 	allNames := map[string]struct{}{}
 	allSettingsNames := map[string]struct{}{}
 	duplicateName := make([]string, 0, len(settings.Spec.SettingsFlow))
-	duplicateSettingsNames := make([]string, 0, len(settings.Spec.SettingsFlow))
-	for _, settings := range settings.Spec.SettingsFlow {
-		if _, ok := allNames[settings.Name]; ok {
-			duplicateName = append(duplicateName, settings.Name)
+	var duplicateSettingsNames []string
+	for _, flowItem := range settings.Spec.SettingsFlow {
+		if _, ok := allNames[flowItem.Name]; ok {
+			duplicateName = append(duplicateName, flowItem.Name)
 		}
-		allNames[settings.Name] = struct{}{}
-		for key := range settings.Settings {
+		allNames[flowItem.Name] = struct{}{}
+		for key := range flowItem.Settings {
 			if _, ok := allSettingsNames[key]; ok {
 				duplicateSettingsNames = append(duplicateSettingsNames, key)
 			}
@@ -868,13 +868,10 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, log logr
 			pendingSettingsDiff[name] = pendingValue
 		}
 	}
-	if len(pendingSettingsDiff) > 0 {
-		log.V(1).Info("Difference between the pending settings and that of required", "SettingsDiff", pendingSettingsDiff)
-	}
 
 	// all required settings should in pending settings.
 	if len(pendingSettingsDiff) > 0 {
-		log.V(1).Info("Unknown pending BIOS settings found", "Unknown pending settings", pendingSettingsDiff)
+		log.V(1).Info("Difference between the pending settings and that of required", "SettingsDiff", pendingSettingsDiff)
 		unexpectedPendingSettings, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionUnknownPendingSettings)
 		if err != nil {
 			return fmt.Errorf("failed to get Condition for unexpected pending BIOSSetting state %v", err)
@@ -976,12 +973,7 @@ func (r *BIOSSettingsReconciler) getPendingBIOSSettings(ctx context.Context, bmc
 	if server == nil {
 		return redfish.SettingsAttributes{}, fmt.Errorf("server is nil")
 	}
-
-	pendingSettings, err := bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemURI)
-	if err != nil {
-		return nil, err
-	}
-	return pendingSettings, nil
+	return bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemURI)
 }
 
 func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings map[string]string, server *metalv1alpha1.Server) (redfish.SettingsAttributes, error) {
@@ -1060,7 +1052,7 @@ func (r *BIOSSettingsReconciler) isServerInPowerState(server *metalv1alpha1.Serv
 
 func (r *BIOSSettingsReconciler) isServerInMaintenance(log logr.Logger, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) bool {
 	if settings.Spec.ServerMaintenanceRef == nil {
-		return true
+		return false
 	}
 
 	if server.Status.State == metalv1alpha1.ServerStateMaintenance {

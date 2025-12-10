@@ -6,7 +6,7 @@
 
 ## metal.ironcore.dev/v1alpha1
 
-Package v1alpha1 contains API Schema definitions for the settings.gardener.cloud API group
+Package v1alpha1 contains API Schema definitions for the metal.ironcore.dev API group
 
 Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API group
 
@@ -196,7 +196,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `state` _[BIOSSettingsState](#biossettingsstate)_ | State represents the current state of the bios configuration task. |  |  |
-| `flowState` _[BIOSSettingsFlowStatus](#biossettingsflowstatus) array_ |  |  |  |
+| `flowState` _[BIOSSettingsFlowStatus](#biossettingsflowstatus) array_ | FlowState is a list of individual BIOSSettings operation flows. |  |  |
 | `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOSSettings's current state. |  |  |
 

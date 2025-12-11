@@ -10,6 +10,7 @@ on:
 
 jobs:
   update_release_draft:
+    name: Run release drafter
     permissions:
       # write permission is required to create a github release
       contents: write

@@ -204,6 +204,8 @@ spec:
                   type: object
                 type: array
               flowState:
+                description: FlowState is a list of individual BIOSSettings operation
+                  flows.
                 items:
                   properties:
                     conditions:

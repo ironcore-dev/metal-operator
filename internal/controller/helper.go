@@ -31,6 +31,19 @@ const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
 )
 
+// GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
+func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client, ref *metalv1alpha1.ObjectReference) (*metalv1alpha1.ServerMaintenance, error) {
+	if ref == nil {
+		return nil, fmt.Errorf("got nil reference")
+	}
+	maintenance := &metalv1alpha1.ServerMaintenance{}
+	if err := c.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: ref.Namespace}, maintenance); err != nil {
+		return nil, fmt.Errorf("failed to get ServerMaintenance: %w", err)
+	}
+
+	return maintenance, nil
+}
+
 // GetCondition finds a condition in a condition slice.
 func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
 	condition := &metav1.Condition{}
@@ -57,7 +70,7 @@ func GetServerByName(ctx context.Context, c client.Client, serverName string) (*
 	server := &metalv1alpha1.Server{}
 	if err := c.Get(ctx, client.ObjectKey{Name: serverName}, server); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get server: %w", err)
+			return nil, err
 		}
 		return nil, fmt.Errorf("server not found")
 	}

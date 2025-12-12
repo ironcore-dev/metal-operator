@@ -85,6 +85,9 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		}
 
 		By("Ensuring that the server01 is in available state")
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server01, func() {
 			server01.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -121,6 +124,9 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		}
 
 		By("Ensuring that the server02 is in available state")
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server02, func() {
 			server02.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -156,6 +162,9 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		}
 
 		By("Ensuring that the server03 is in available state")
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server03, func() {
 			server03.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -204,8 +213,12 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCVersionSetSpec{
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BMC\"}",
+							upgradeServerBMCVersion, "/redfish/v1/Managers/BMC"),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				BMCSelector: metav1.LabelSelector{
@@ -309,8 +322,12 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCVersionSetSpec{
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BMC\"}",
+							upgradeServerBMCVersion, "/redfish/v1/Managers/BMC"),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				BMCSelector: metav1.LabelSelector{

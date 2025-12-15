@@ -452,7 +452,7 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 		return condComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
-	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeVerficationCondition'")
+	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeVerificationCondition'")
 	verificationComplete := &metav1.Condition{}
 	Eventually(func(g Gomega) int {
 		g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: bmcVersion.Name}, bmcVersion)).To(Succeed())

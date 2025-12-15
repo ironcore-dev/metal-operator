@@ -88,6 +88,7 @@ type BIOSSettingsStatus struct {
 	// +optional
 	State BIOSSettingsState `json:"state,omitempty"`
 
+	// FlowState is a list of individual BIOSSettings operation flows.
 	FlowState []BIOSSettingsFlowStatus `json:"flowState,omitempty"`
 
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.

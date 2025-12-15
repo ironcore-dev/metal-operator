@@ -179,7 +179,7 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCVersion resources %w", err)
 	}
 
-	if err := r.patchBMCVersionfromTemplate(ctx, log, bmcList, bmcVersionSet, ownedBMCVersions); err != nil {
+	if err := r.patchBMCVersionfromTemplate(ctx, log, bmcVersionSet, ownedBMCVersions); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion spec from template %w", err)
 	}
 
@@ -265,7 +265,6 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
-	bmcList *metalv1alpha1.BMCList,
 	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 	bmcVersionList *metalv1alpha1.BMCVersionList,
 ) error {

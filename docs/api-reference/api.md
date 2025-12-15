@@ -218,7 +218,6 @@ _Appears in:_
 | `version` _string_ | Version contains software (eg: BIOS, BMC) version this settings applies to |  |  |
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server. |  |  |
 
 
 #### BIOSVersion
@@ -373,7 +372,6 @@ _Appears in:_
 | `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy An indication of whether the server's upgrade service should bypass vendor update policies |  |  |
 | `image` _[ImageSpec](#imagespec)_ | details regarding the image to use to upgrade to given BIOS version |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server. |  |  |
 
 
 #### BMC
@@ -747,7 +745,6 @@ _Appears in:_
 | `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy is an indication of whether the server's upgrade service should bypass vendor update policies |  |  |
 | `image` _[ImageSpec](#imagespec)_ | details regarding the image to use to upgrade to given BMC version |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
-| `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server. |  |  |
 
 
 #### BootOrder
@@ -981,11 +978,8 @@ ObjectReference is the namespaced name reference to an object.
 
 _Appears in:_
 - [BIOSSettingsSpec](#biossettingsspec)
-- [BIOSSettingsTemplate](#biossettingstemplate)
 - [BIOSVersionSpec](#biosversionspec)
-- [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCVersionSpec](#bmcversionspec)
-- [BMCVersionTemplate](#bmcversiontemplate)
 - [ServerMaintenanceRefItem](#servermaintenancerefitem)
 - [ServerSpec](#serverspec)
 

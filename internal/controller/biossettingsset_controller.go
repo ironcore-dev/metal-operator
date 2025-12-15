@@ -312,14 +312,7 @@ func (r *BIOSSettingsSetReconciler) patchBIOSSettingsfromTemplate(
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosSettings, func() error {
-			// serverMaintenanceRef might not be part of the patching template, so we do not patch if not provided
-			if biosSettingsTemplate.ServerMaintenanceRef != nil {
-				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
-			} else {
-				serverMaintenanceRef := biosSettings.Spec.ServerMaintenanceRef
-				biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
-				biosSettings.Spec.ServerMaintenanceRef = serverMaintenanceRef
-			}
+			biosSettings.Spec.BIOSSettingsTemplate = *biosSettingsTemplate.DeepCopy()
 			return nil
 		}) //nolint:errcheck
 		if err != nil {

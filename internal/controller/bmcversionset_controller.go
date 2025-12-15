@@ -273,10 +273,6 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 		log.V(1).Info("No BMCVersion found, skipping spec template update")
 		return nil
 	}
-	bmcNameMap := make(map[string]metalv1alpha1.BMC)
-	for _, bmc := range bmcList.Items {
-		bmcNameMap[bmc.Name] = bmc
-	}
 
 	var errs []error
 	for _, bmcVersion := range bmcVersionList.Items {

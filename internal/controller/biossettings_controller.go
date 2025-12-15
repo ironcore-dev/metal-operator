@@ -1316,18 +1316,19 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByServerRefs(ctx context.Con
 
 	settingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := r.List(ctx, settingsList, client.MatchingFields{serverRefField: server.Name}); err != nil {
-		log.Error(err, "failed to list BIOSSettings by server ref", "server", server.Name)
+		log.Error(err, "failed to list BIOSSettings by server ref")
 		return nil
 	}
 
 	reqs := make([]ctrl.Request, 0, len(settingsList.Items))
 	for _, settings := range settingsList.Items {
-		// Skip completed or failed settings
-		if settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+		if settings.Spec.ServerMaintenanceRef == nil ||
+			(server.Spec.ServerMaintenanceRef != nil &&
+				server.Spec.ServerMaintenanceRef.UID != settings.Spec.ServerMaintenanceRef.UID) ||
+			settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
 			settings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 			continue
 		}
-
 		reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 	}
 	return reqs
@@ -1344,8 +1345,6 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBMC(ctx context.Context, o
 	}
 
 	var reqs []ctrl.Request
-	seen := make(map[string]struct{}, len(serverList.Items))
-
 	for _, server := range serverList.Items {
 		if server.Spec.BIOSSettingsRef == nil {
 			continue
@@ -1357,19 +1356,11 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBMC(ctx context.Context, o
 			continue
 		}
 
-		if settings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
-			continue
-		}
-
-		resetCond, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCConditionReset)
-		if err != nil || resetCond.Status == metav1.ConditionTrue {
-			continue
-		}
-		if resetCond.Reason == BMCReasonReset {
-			key := settings.Name
-			if _, dup := seen[key]; !dup {
-				seen[key] = struct{}{}
-				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: key}})
+		// Only enqueue if BMC reset was issued but not yet completed
+		if settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+			resetCond, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCConditionReset)
+			if err == nil && resetCond.Status != metav1.ConditionTrue && resetCond.Reason == BMCReasonReset {
+				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 			}
 		}
 	}
@@ -1380,7 +1371,7 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBiosVersionResource(ctx co
 	version := obj.(*metalv1alpha1.BIOSVersion)
 	log := ctrl.LoggerFrom(ctx).WithValues("BIOSVersion", version.Name)
 
-	if version.Status.State != metalv1alpha1.BIOSVersionStateCompleted {
+	if version.Status.State != metalv1alpha1.BIOSVersionStateCompleted || version.Spec.ServerRef == nil {
 		return nil
 	}
 

@@ -1305,64 +1305,71 @@ func (r *BIOSSettingsReconciler) getFlowItemFromSettingsStatus(settings *metalv1
 }
 
 func (r *BIOSSettingsReconciler) enqueueBiosSettingsByServerRefs(ctx context.Context, obj client.Object) []ctrl.Request {
-	host := obj.(*metalv1alpha1.Server)
+	server := obj.(*metalv1alpha1.Server)
+	log := ctrl.LoggerFrom(ctx).WithValues("Server", server.Name)
 
-	if host.Status.State == metalv1alpha1.ServerStateDiscovery ||
-		host.Status.State == metalv1alpha1.ServerStateError ||
-		host.Status.State == metalv1alpha1.ServerStateInitial ||
-		host.Spec.ServerMaintenanceRef == nil {
+	if server.Status.State == metalv1alpha1.ServerStateDiscovery ||
+		server.Status.State == metalv1alpha1.ServerStateError ||
+		server.Status.State == metalv1alpha1.ServerStateInitial {
 		return nil
 	}
 
-	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
-	if err := r.List(ctx, biosSettingsList, client.MatchingFields{serverRefField: host.Name}); err != nil {
-		ctrl.LoggerFrom(ctx).Error(err, "failed to list BIOSSettings by server ref")
+	settingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := r.List(ctx, settingsList, client.MatchingFields{serverRefField: server.Name}); err != nil {
+		log.Error(err, "failed to list BIOSSettings by server ref", "server", server.Name)
 		return nil
 	}
 
-	reqs := make([]ctrl.Request, 0, 1)
-	for _, biosSettings := range biosSettingsList.Items {
-		if biosSettings.Spec.ServerMaintenanceRef == nil ||
-			biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
-			biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+	reqs := make([]ctrl.Request, 0, len(settingsList.Items))
+	for _, settings := range settingsList.Items {
+		// Skip completed or failed settings
+		if settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+			settings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 			continue
 		}
-		if biosSettings.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
-			continue
-		}
-		reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: biosSettings.Name}})
+
+		reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 	}
 	return reqs
 }
 
 func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBMC(ctx context.Context, obj client.Object) []ctrl.Request {
 	bmcObj := obj.(*metalv1alpha1.BMC)
-	log := ctrl.LoggerFrom(ctx)
+	log := ctrl.LoggerFrom(ctx).WithValues("BMC", bmcObj.Name)
 
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList, client.MatchingFields{bmcRefField: bmcObj.Name}); err != nil {
-		log.V(1).Error(err, "failed to list Server by BMC ref", "BMC", bmcObj.Name)
+		log.Error(err, "failed to list Servers by BMC ref")
 		return nil
 	}
 
 	var reqs []ctrl.Request
+	seen := make(map[string]struct{}, len(serverList.Items))
+
 	for _, server := range serverList.Items {
 		if server.Spec.BIOSSettingsRef == nil {
 			continue
 		}
 
-		biosSettings := &metalv1alpha1.BIOSSettings{}
-		if err := r.Get(ctx, types.NamespacedName{Name: server.Spec.BIOSSettingsRef.Name}, biosSettings); err != nil {
+		settings := &metalv1alpha1.BIOSSettings{}
+		if err := r.Get(ctx, types.NamespacedName{Name: server.Spec.BIOSSettingsRef.Name}, settings); err != nil {
+			log.Error(err, "failed to get BIOSSettings, skipping", "name", server.Spec.BIOSSettingsRef.Name)
 			continue
 		}
 
-		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-			resetBMC, err := GetCondition(r.Conditions, biosSettings.Status.Conditions, BMCConditionReset)
-			if err != nil || resetBMC.Status == metav1.ConditionTrue {
-				continue
-			}
-			if resetBMC.Reason == BMCReasonReset {
-				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: biosSettings.Name}})
+		if settings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
+			continue
+		}
+
+		resetCond, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCConditionReset)
+		if err != nil || resetCond.Status == metav1.ConditionTrue {
+			continue
+		}
+		if resetCond.Reason == BMCReasonReset {
+			key := settings.Name
+			if _, dup := seen[key]; !dup {
+				seen[key] = struct{}{}
+				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: key}})
 			}
 		}
 	}
@@ -1370,24 +1377,26 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBMC(ctx context.Context, o
 }
 
 func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBiosVersionResource(ctx context.Context, obj client.Object) []ctrl.Request {
-	biosVersion := obj.(*metalv1alpha1.BIOSVersion)
-	if biosVersion.Status.State != metalv1alpha1.BIOSVersionStateCompleted {
+	version := obj.(*metalv1alpha1.BIOSVersion)
+	log := ctrl.LoggerFrom(ctx).WithValues("BIOSVersion", version.Name)
+
+	if version.Status.State != metalv1alpha1.BIOSVersionStateCompleted {
 		return nil
 	}
 
-	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
-	if err := r.List(ctx, biosSettingsList, client.MatchingFields{serverRefField: biosVersion.Spec.ServerRef.Name}); err != nil {
-		ctrl.LoggerFrom(ctx).Error(err, "failed to list BIOSSettings by server ref")
+	settingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := r.List(ctx, settingsList, client.MatchingFields{serverRefField: version.Spec.ServerRef.Name}); err != nil {
+		log.Error(err, "failed to list BIOSSettings by server ref")
 		return nil
 	}
 
 	reqs := make([]ctrl.Request, 0, 1)
-	for _, biosSettings := range biosSettingsList.Items {
-		if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
-			biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+	for _, settings := range settingsList.Items {
+		if settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+			settings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 			continue
 		}
-		reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: biosSettings.Name}})
+		reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 	}
 	return reqs
 }

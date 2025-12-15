@@ -1322,12 +1322,11 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByServerRefs(ctx context.Con
 
 	reqs := make([]ctrl.Request, 0, len(settingsList.Items))
 	for _, settings := range settingsList.Items {
-		// Skip completed or failed settings
-		if settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
+		if settings.Spec.ServerMaintenanceRef == nil ||
+			settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
 			settings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 			continue
 		}
-
 		reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 	}
 	return reqs

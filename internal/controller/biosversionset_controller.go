@@ -433,7 +433,7 @@ func (r *BIOSVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return true
 					},
 					UpdateFunc: func(e event.UpdateEvent) bool {
-						return enqueFromChildObjUpdatesExceptAnnotation(e)
+						return enqueueFromChildObjUpdatesExceptAnnotation(e)
 					},
 					DeleteFunc: func(e event.DeleteEvent) bool {
 						return true

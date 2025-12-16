@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -69,7 +68,7 @@ type BMCReconciler struct {
 	// BMCClientRetryInterval defines the duration to requeue reconciliation after a BMC client error/reset/unavailablility.
 	BMCClientRetryInterval time.Duration
 	// DNSRecordTemplatePath is the path to the file containing the DNSRecord template.
-	DNSRecordTemplatePath string
+	DNSRecordTemplate string
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -267,7 +266,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
 
 		// Create DNS record for the server if template path is configured
-		if r.ManagerNamespace != "" && r.DNSRecordTemplatePath != "" {
+		if r.ManagerNamespace != "" && r.DNSRecordTemplate != "" {
 			if err := r.createDNSRecordForServer(ctx, log, bmcObj, server); err != nil && !apierrors.IsNotFound(err) {
 				log.Error(err, "failed to create DNS record for server", "Server", server.Name)
 				errs = append(errs, fmt.Errorf("failed to create DNS record for server %s: %w", server.Name, err))
@@ -291,12 +290,6 @@ type DNSRecordTemplateData struct {
 
 // createDNSRecordForServer creates a DNS record resource from a YAML template loaded from ConfigMap
 func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, server *metalv1alpha1.Server) error {
-	// Load DNS record template from ConfigMap
-	templateText, err := r.loadDNSRecordTemplate(log)
-	if err != nil {
-		return err
-	}
-
 	// Prepare template data
 	templateData := DNSRecordTemplateData{
 		Namespace: r.ManagerNamespace,
@@ -307,7 +300,7 @@ func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.L
 	}
 
 	// Render the template
-	tmpl, err := template.New("dnsRecord").Parse(templateText)
+	tmpl, err := template.New("dnsRecord").Parse(r.DNSRecordTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse DNS record template: %w", err)
 	}
@@ -343,22 +336,6 @@ func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.L
 
 	log.Info("Created or patched DNS record", "Record", server.Name, "Operation", opResult)
 	return nil
-}
-
-// loadDNSRecordTemplate loads the DNS record template from a mounted file, falling back to a default template
-func (r *BMCReconciler) loadDNSRecordTemplate(log logr.Logger) (string, error) {
-	// Try to read from the mounted file
-	templateText, err := os.ReadFile(r.DNSRecordTemplatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read DNS record template file: %w", err)
-	}
-
-	if len(templateText) == 0 {
-		return "", fmt.Errorf("DNS record template file is empty: %s", r.DNSRecordTemplatePath)
-	}
-
-	log.Info("Loaded DNS record template from file", "Path", r.DNSRecordTemplatePath)
-	return string(templateText), nil
 }
 
 func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {

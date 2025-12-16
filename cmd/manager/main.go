@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -165,6 +166,17 @@ func main() { // nolint: gocyclo
 	if probeImage == "" {
 		setupLog.Error(nil, "probe image must be set")
 		os.Exit(1)
+	}
+
+	dnsRecordTemplate := ""
+
+	if dnsRecordTemplatePath != "" {
+		var err error
+		dnsRecordTemplate, err = dns.LoadTemplate(dnsRecordTemplatePath)
+		if err != nil {
+			setupLog.Error(err, "unable to load DNS record template")
+			os.Exit(1)
+		}
 	}
 
 	// Load MACAddress DB
@@ -332,7 +344,7 @@ func main() { // nolint: gocyclo
 		BMCResetWaitTime:       bmcResetWaitingInterval,
 		BMCClientRetryInterval: bmcResetResyncInterval,
 		ManagerNamespace:       managerNamespace,
-		DNSRecordTemplatePath:  dnsRecordTemplatePath,
+		DNSRecordTemplate:      dnsRecordTemplate,
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},

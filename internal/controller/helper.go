@@ -153,7 +153,7 @@ func GenerateRandomPassword(length int) ([]byte, error) {
 	return result, nil
 }
 
-func enqueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
+func enqueueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 	isNil := func(arg any) bool {
 		if v := reflect.ValueOf(arg); !v.IsValid() || ((v.Kind() == reflect.Ptr ||
 			v.Kind() == reflect.Interface ||
@@ -242,13 +242,7 @@ func resetBMCOfServer(
 	return fmt.Errorf("no BMC reference or inline BMC details found in server spec to reset BMC")
 }
 
-func handleIgnoreAnnotationPropagation(
-	ctx context.Context,
-	log logr.Logger,
-	kClient client.Client,
-	parentObj client.Object,
-	ownedObjects client.ObjectList,
-) error {
+func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -260,7 +254,7 @@ func handleIgnoreAnnotationPropagation(
 		if !childObj.GetDeletionTimestamp().IsZero() {
 			return nil
 		}
-		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+		opResult, err := controllerutil.CreateOrPatch(ctx, c, childObj, func() error {
 			annotations := childObj.GetAnnotations()
 
 			if !shouldChildIgnoreReconciliation(parentObj) && isChildIgnoredThroughSets(childObj) && annotations != nil {
@@ -290,13 +284,7 @@ func handleIgnoreAnnotationPropagation(
 	return errors.Join(errs...)
 }
 
-func handleRetryAnnotationPropagation(
-	ctx context.Context,
-	log logr.Logger,
-	kClient client.Client,
-	parentObj client.Object,
-	ownedObjects client.ObjectList,
-) error {
+func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -310,7 +298,7 @@ func handleRetryAnnotationPropagation(
 		}
 		log.V(1).Info("Child's annotations check", "ChildResource", childObj.GetName())
 
-		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+		opResult, err := controllerutil.CreateOrPatch(ctx, c, childObj, func() error {
 			annotations := childObj.GetAnnotations()
 
 			if !shouldChildRetryReconciliation(parentObj) && isChildRetryThroughSets(childObj) && annotations != nil {

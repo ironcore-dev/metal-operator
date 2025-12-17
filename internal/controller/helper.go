@@ -244,7 +244,7 @@ func resetBMCOfServer(
 
 func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
 	var errs []error
-	if err := meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
+	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
 		if !ok {
 			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
@@ -280,15 +280,13 @@ func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c c
 			log.V(1).Info("Patched Child's annotations for ignore operation", "ChildResource", childObj.GetName(), "Operation", opResult)
 		}
 		return nil
-	}); errs != nil {
-		errs = append(errs, err)
-	}
+	})
 	return errors.Join(errs...)
 }
 
 func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
 	var errs []error
-	if err := meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
+	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
 		if !ok {
 			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
@@ -326,9 +324,7 @@ func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c cl
 			log.V(1).Info("Patched Child's annotations to retry annotation", "ChildResource", childObj.GetName(), "Operation", opResult)
 		}
 		return nil
-	}); errs != nil {
-		errs = append(errs, err)
-	}
+	})
 	return errors.Join(errs...)
 }
 

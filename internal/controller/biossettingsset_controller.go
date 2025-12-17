@@ -368,7 +368,7 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 		}
 	}
 
-	result := make([]ctrl.Request, 0, 1)
+	result := make([]ctrl.Request, 0, len(reqs))
 	for k := range reqs {
 		result = append(result, ctrl.Request{NamespacedName: k})
 	}

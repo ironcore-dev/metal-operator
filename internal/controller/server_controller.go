@@ -92,7 +92,7 @@ type ServerReconciler struct {
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
-	IgnitionConfigPath      string
+	DiscoveryIgnitionPath   string
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -717,11 +717,11 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, ss
 
 	// Load ignition template from file
 	ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-		r.IgnitionConfigPath,
+		r.DiscoveryIgnitionPath,
 		config,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate ignition data from file %s: %w", r.IgnitionConfigPath, err)
+		return nil, fmt.Errorf("failed to generate ignition data from file %s: %w", r.DiscoveryIgnitionPath, err)
 	}
 
 	return ignitionData, nil

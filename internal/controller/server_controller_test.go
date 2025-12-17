@@ -923,9 +923,7 @@ passwd:
 
 			tmpFile, err := os.CreateTemp("", "ignition-template-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				Expect(os.Remove(tmpFile.Name())).To(Succeed())
-			}()
+			DeferCleanup(os.Remove, tmpFile.Name())
 
 			_, err = tmpFile.WriteString(customTemplate)
 			Expect(err).NotTo(HaveOccurred())
@@ -933,12 +931,12 @@ passwd:
 
 			By("Creating a ServerReconciler with file path")
 			reconciler := &ServerReconciler{
-				Client:             k8sClient,
-				Scheme:             k8sClient.Scheme(),
-				RegistryURL:        registryURL,
-				ManagerNamespace:   ns.Name,
-				ProbeImage:         "foo:latest",
-				IgnitionConfigPath: tmpFile.Name(),
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: tmpFile.Name(),
 			}
 
 			By("Generating ignition data with custom file")
@@ -961,12 +959,12 @@ passwd:
 		It("Should fallback with error when file is missing", func(ctx SpecContext) {
 			By("Creating a ServerReconciler with non-existent file path")
 			reconciler := &ServerReconciler{
-				Client:             k8sClient,
-				Scheme:             k8sClient.Scheme(),
-				RegistryURL:        registryURL,
-				ManagerNamespace:   ns.Name,
-				ProbeImage:         "foo:latest",
-				IgnitionConfigPath: "/nonexistent/path/ignition.yaml",
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: "/nonexistent/path/ignition.yaml",
 			}
 
 			By("Generating ignition data (should fail)")
@@ -989,9 +987,7 @@ systemd:
 
 			tmpFile, err := os.CreateTemp("", "invalid-template-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				Expect(os.Remove(tmpFile.Name())).To(Succeed())
-			}()
+			DeferCleanup(os.Remove, tmpFile.Name())
 
 			_, err = tmpFile.WriteString(invalidTemplate)
 			Expect(err).NotTo(HaveOccurred())
@@ -999,12 +995,12 @@ systemd:
 
 			By("Creating a ServerReconciler with invalid template file")
 			reconciler := &ServerReconciler{
-				Client:             k8sClient,
-				Scheme:             k8sClient.Scheme(),
-				RegistryURL:        registryURL,
-				ManagerNamespace:   ns.Name,
-				ProbeImage:         "foo:latest",
-				IgnitionConfigPath: tmpFile.Name(),
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: tmpFile.Name(),
 			}
 
 			By("Generating ignition data (should fail)")
@@ -1040,9 +1036,7 @@ passwd:
 
 			tmpFile, err := os.CreateTemp("", "default-ignition-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				Expect(os.Remove(tmpFile.Name())).To(Succeed())
-			}()
+			DeferCleanup(os.Remove, tmpFile.Name())
 
 			_, err = tmpFile.WriteString(defaultTemplate)
 			Expect(err).NotTo(HaveOccurred())
@@ -1050,12 +1044,12 @@ passwd:
 
 			By("Creating a ServerReconciler with default file path")
 			reconciler := &ServerReconciler{
-				Client:             k8sClient,
-				Scheme:             k8sClient.Scheme(),
-				RegistryURL:        registryURL,
-				ManagerNamespace:   ns.Name,
-				ProbeImage:         "foo:latest",
-				IgnitionConfigPath: tmpFile.Name(),
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "foo:latest",
+				DiscoveryIgnitionPath: tmpFile.Name(),
 			}
 
 			By("Generating ignition data (should use default template)")
@@ -1098,9 +1092,7 @@ passwd:
 
 			tmpFile, err := os.CreateTemp("", "e2e-ignition-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				Expect(os.Remove(tmpFile.Name())).To(Succeed())
-			}()
+			DeferCleanup(os.Remove, tmpFile.Name())
 
 			_, err = tmpFile.WriteString(customTemplate)
 			Expect(err).NotTo(HaveOccurred())
@@ -1108,13 +1100,13 @@ passwd:
 
 			By("Creating a reconciler with custom ignition template path")
 			customReconciler := &ServerReconciler{
-				Client:             k8sClient,
-				Scheme:             k8sClient.Scheme(),
-				RegistryURL:        registryURL,
-				ManagerNamespace:   ns.Name,
-				ProbeImage:         "custom-probe:v1.0.0",
-				Insecure:           true,
-				IgnitionConfigPath: tmpFile.Name(),
+				Client:                k8sClient,
+				Scheme:                k8sClient.Scheme(),
+				RegistryURL:           registryURL,
+				ManagerNamespace:      ns.Name,
+				ProbeImage:            "custom-probe:v1.0.0",
+				Insecure:              true,
+				DiscoveryIgnitionPath: tmpFile.Name(),
 			}
 
 			By("Generating ignition data with custom template")

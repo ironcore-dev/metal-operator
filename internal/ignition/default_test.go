@@ -53,9 +53,7 @@ passwd:
 
 			tmpFile, err := os.CreateTemp("", "ignition-template-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				Expect(os.Remove(tmpFile.Name())).To(Succeed())
-			}()
+			DeferCleanup(os.Remove, tmpFile.Name())
 
 			_, err = tmpFile.WriteString(customTemplate)
 			Expect(err).NotTo(HaveOccurred())
@@ -87,9 +85,7 @@ systemd:
 
 			tmpFile, err := os.CreateTemp("", "invalid-template-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				Expect(os.Remove(tmpFile.Name())).To(Succeed())
-			}()
+			DeferCleanup(os.Remove, tmpFile.Name())
 
 			_, err = tmpFile.WriteString(invalidTemplate)
 			Expect(err).NotTo(HaveOccurred())

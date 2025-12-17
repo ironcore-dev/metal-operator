@@ -77,7 +77,7 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
-		ignitionConfigPath                 string
+		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
 		powerPollingInterval               time.Duration
@@ -116,7 +116,7 @@ func main() { // nolint: gocyclo
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
-	flag.StringVar(&ignitionConfigPath, "ignition-config-path", "/etc/metal-operator/ignition-template.yaml",
+	flag.StringVar(&discoveryIgnitionPath, "discovery-ignition-path", "/etc/metal-operator/ignition-template.yaml",
 		"Path to the ignition template file.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
@@ -354,7 +354,7 @@ func main() { // nolint: gocyclo
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		IgnitionConfigPath:      ignitionConfigPath,
+		DiscoveryIgnitionPath:   discoveryIgnitionPath,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

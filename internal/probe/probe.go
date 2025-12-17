@@ -45,21 +45,21 @@ func (a *Agent) Init(ctx context.Context) error {
 	}
 	systeminfo, err := collectSystemInfoData()
 	if err != nil {
-		a.log.Info("System info collection skipped (DMI/SMBIOS not accessible)", "error", err.Error())
+		a.log.Error(err, "System info collection skipped (DMI/SMBIOS not accessible)")
 		// Continue without system info - use empty struct
 		systeminfo = registry.DMI{}
 	}
 
 	cpuInfos, err := collectCPUInfoData()
 	if err != nil {
-		a.log.Info("CPU info collection skipped", "error", err.Error())
+		a.log.Error(err, "CPU info collection skipped")
 		// Continue without CPU info
 		cpuInfos = []registry.CPUInfo{}
 	}
 
 	LLDPInfo, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
 	if err != nil {
-		a.log.Info("LLDP info collection skipped (lldpctl not available or failed)", "error", err.Error())
+		a.log.Error(err, "LLDP info collection skipped (lldpctl not available or failed)")
 		// Continue without LLDP info - it's optional
 		LLDPInfo = registry.LLDP{}
 	} else {
@@ -68,28 +68,28 @@ func (a *Agent) Init(ctx context.Context) error {
 
 	blockDevices, err := collectStorageInfoData()
 	if err != nil {
-		a.log.Info("Storage info collection skipped", "error", err.Error())
+		a.log.Error(err, "Storage info collection skipped")
 		// Continue without storage info
 		blockDevices = []registry.BlockDevice{}
 	}
 
 	memoryDevices, err := collectMemoryInfoData()
 	if err != nil {
-		a.log.Info("Memory info collection skipped", "error", err.Error())
+		a.log.Error(err, "Memory info collection skipped")
 		// Continue without memory info
 		memoryDevices = []registry.MemoryDevice{}
 	}
 
 	nics, err := collectNICInfoData()
 	if err != nil {
-		a.log.Info("NIC info collection skipped", "error", err.Error())
+		a.log.Error(err, "NIC info collection skipped")
 		// Continue without NIC info
 		nics = []registry.NIC{}
 	}
 
 	pciDevices, err := collectPCIDevicesInfoData()
 	if err != nil {
-		a.log.Info("PCI devices info collection skipped", "error", err.Error())
+		a.log.Error(err, "PCI devices info collection skipped")
 		// Continue without PCI device info
 		pciDevices = []registry.PCIDevice{}
 	}

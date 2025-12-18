@@ -17,6 +17,7 @@ func ShouldAllowForceUpdateInProgress(obj client.Object) bool {
 	return val == metalv1alpha1.OperationAnnotationForceUpdateInProgress || val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
 }
 
+// ShouldAllowForceDeleteInProgress checks if the object be allowed to be force deleted.
 func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
 	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !found {

@@ -367,7 +367,7 @@ KIND_CLUSTER_NAME ?= metal
 
 .PHONY: kind-create
 kind-create: $(ENVTEST) kubectl ## create metal kind cluster if needed
-	./scripts/kind-with-registry.sh
+	./hack/kind-with-registry.sh
 
 .PHONY: kind-delete
 kind-delete: ## Destroys the "metal" kind cluster.

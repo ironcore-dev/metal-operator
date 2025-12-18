@@ -89,3 +89,59 @@ certmanager:
 # [NETWORK POLICIES]: To enable NetworkPolicies set true
 networkPolicy:
   enable: false
+
+# [IGNITION]: Ignition template configuration
+# By default, the operator uses a template file baked into the container at /etc/metal-operator/ignition-template.yaml
+# Enable this to override the template by mounting a ConfigMap at that location
+ignition:
+  # Set to true to override the default ignition template with a custom one
+  override: false
+  # Template content that can be customized - this will be created as a ConfigMap
+  # and mounted to override the default template
+  template: |
+    variant: fcos
+    version: "1.3.0"
+    systemd:
+      units:
+        - name: docker-install.service
+          enabled: true
+          contents: |-
+            [Unit]
+            Description=Install Docker
+            Before=metalprobe.service
+            After=var-lib-docker.mount
+            [Service]
+            Restart=on-failure
+            RestartSec=20
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/usr/bin/apt-get update
+            ExecStart=/usr/bin/apt-get install docker.io docker-cli -y
+            [Install]
+            WantedBy=multi-user.target
+        - name: docker.service
+          enabled: true
+        - name: metalprobe.service
+          enabled: true
+          contents: |-
+            [Unit]
+            Description=Run My Docker Container
+            [Service]
+            Restart=on-failure
+            RestartSec=20
+            ExecStartPre=-/usr/bin/docker stop metalprobe
+            ExecStartPre=-/usr/bin/docker rm metalprobe
+            ExecStartPre=/usr/bin/docker pull {{.Image}}
+            ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe {{.Image}} {{.Flags}}
+            ExecStop=/usr/bin/docker stop metalprobe
+            TimeoutSec=900
+            [Install]
+            WantedBy=multi-user.target
+    storage:
+      files: []
+    passwd:
+      users:
+        - name: metal
+          password_hash: {{.PasswordHash}}
+          groups: [ "wheel" ]
+          ssh_authorized_keys: [ {{.SSHPublicKey}} ]

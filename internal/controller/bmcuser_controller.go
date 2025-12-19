@@ -39,15 +39,7 @@ type BMCUserReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcusers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcusers/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the BMCUser object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.2/pkg/reconcile
+// Reconcile reconciles a BMCUser object
 func (r *BMCUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	user := &metalv1alpha1.BMCUser{}
@@ -164,15 +156,15 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 			forceRotation = true
 		}
 	}
-	if user.Spec.RotationPolicy == nil && !forceRotation {
+	if user.Spec.RotationPeriod == nil && !forceRotation {
 		log.V(1).Info("No rotation period set for BMC user, skipping password rotation", "User", user.Name)
 		return ctrl.Result{}, nil
 	}
-	if user.Status.LastRotation != nil && user.Status.LastRotation.Add(user.Spec.RotationPolicy.Duration).After(metav1.Now().Time) && !forceRotation {
+	if user.Status.LastRotation != nil && user.Status.LastRotation.Add(user.Spec.RotationPeriod.Duration).After(metav1.Now().Time) && !forceRotation {
 		log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 		return ctrl.Result{
 			Requeue:      true,
-			RequeueAfter: user.Spec.RotationPolicy.Duration,
+			RequeueAfter: user.Spec.RotationPeriod.Duration,
 		}, nil
 	}
 	log.Info("Rotating BMC user password", "User", user.Name)
@@ -322,7 +314,7 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.
 		return fmt.Errorf("failed to get BMCSecret %s: %w", user.Spec.BMCSecretRef.Name, err)
 	}
 
-	invalidCredentials, err := r.bmcConnectionTest(secret, bmcObj)
+	invalidCredentials, err := r.bmcConnectionTest(ctx, secret, bmcObj)
 	if err != nil {
 		return fmt.Errorf("failed to test BMC connection with BMCSecret %s: %w", secret.Name, err)
 	}
@@ -347,7 +339,7 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.
 		}
 	}
 
-	invalidCredentials, err = r.bmcConnectionTest(effSecret, bmcObj)
+	invalidCredentials, err = r.bmcConnectionTest(ctx, effSecret, bmcObj)
 	if err != nil {
 		return fmt.Errorf("failed to test BMC connection with effectiveSecret %s: %w", effSecret.Name, err)
 	}
@@ -361,13 +353,13 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.
 	return nil
 }
 
-func (r *BMCUserReconciler) bmcConnectionTest(secret *metalv1alpha1.BMCSecret, bmcObj *metalv1alpha1.BMC) (bool, error) {
+func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metalv1alpha1.BMCSecret, bmcObj *metalv1alpha1.BMC) (bool, error) {
 	protocolScheme := bmcutils.GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, r.Insecure)
-	address, err := bmcutils.GetBMCAddressForBMC(context.Background(), r.Client, bmcObj)
+	address, err := bmcutils.GetBMCAddressForBMC(ctx, r.Client, bmcObj)
 	if err != nil {
 		return false, fmt.Errorf("failed to get BMC address: %w", err)
 	}
-	_, err = bmcutils.CreateBMCClient(context.Background(), r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions)
+	_, err = bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions)
 	if err != nil {
 		if httpErr, ok := err.(*common.Error); ok {
 			if httpErr.HTTPReturnedStatusCode == 401 || httpErr.HTTPReturnedStatusCode == 403 {

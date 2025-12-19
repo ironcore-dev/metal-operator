@@ -9,7 +9,7 @@ spec:
   userName: admin
   roleID: "Administrator"
   description: "Administrator user"
-  rotationPolicy: 720h0m0s
+  rotationPeriod: 720h0m0s
   bmcSecretRef:
     name: bmc-secret-sample
   bmcRef:

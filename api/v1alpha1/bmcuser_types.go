@@ -13,7 +13,7 @@ type BMCUserSpec struct {
 	UserName       string           `json:"userName"`
 	RoleID         string           `json:"roleID"`
 	Description    string           `json:"description,omitempty"`
-	RotationPolicy *metav1.Duration `json:"rotationPeriod,omitempty"`
+	RotationPeriod *metav1.Duration `json:"rotationPeriod,omitempty"`
 	// if not set, the operator will generate a secure password based on BMC manufacturer requirements.
 	BMCSecretRef *v1.LocalObjectReference `json:"bmcSecretRef,omitempty"`
 	BMCRef       *v1.LocalObjectReference `json:"bmcRef,omitempty"`

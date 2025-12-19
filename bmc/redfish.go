@@ -731,6 +731,7 @@ func (r *RedfishBMC) CreateOrUpdateAccount(
 					return fmt.Errorf("failed to change account password: %w", err)
 				}
 			}
+			return nil
 		}
 	}
 	_, err = service.CreateAccount(userName, password, role)
@@ -752,8 +753,7 @@ func (r *RedfishBMC) DeleteAccount(ctx context.Context, userName, id string) err
 	for _, a := range accounts {
 		// make sure we delete the correct account
 		if a.UserName == userName && a.ID == id {
-			service.PostWithResponse(a.ODataID, nil) // nolint: errcheck
-			_, err := r.client.Delete(service.ODataID + "/" + a.ID)
+			_, err := r.client.Delete(a.ODataID)
 			if err != nil {
 				return err
 			}

@@ -42,17 +42,14 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 		return nil, err
 	}
 	if acc, ok := UnitTestMockUps.Accounts[options.Username]; ok {
-		if acc.Password != options.Password {
-			return nil, &gofishCommon.Error{
-				HTTPReturnedStatusCode: 401,
-			}
-		}
-	} else {
-		return nil, &gofishCommon.Error{
-			HTTPReturnedStatusCode: 401,
+		if acc.Password == options.Password {
+			// authenticated
+			return &RedfishLocalBMC{RedfishBMC: bmc}, nil
 		}
 	}
-	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
+	return nil, &gofishCommon.Error{
+		HTTPReturnedStatusCode: 401,
+	}
 }
 
 // GetAccounts retrieves all user accounts from the BMC.

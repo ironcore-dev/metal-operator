@@ -4,7 +4,7 @@ on: pull_request
 
 jobs:
   test:
-    name: reuse
+    name: Run REUSE check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

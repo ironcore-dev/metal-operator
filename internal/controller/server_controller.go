@@ -91,6 +91,7 @@ type ServerReconciler struct {
 	BMCOptions              bmc.Options
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
+	Conditions              *conditionutils.Accessor
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -478,7 +479,7 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
 	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
 		Namespace:  config.Namespace,
 		Name:       config.Name,
 		UID:        config.UID,
@@ -820,9 +821,14 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 			CarrierStatus: s.CarrierStatus,
 		}
 
-		// Process all IP addresses from the single IPAddresses slice
+		// Process all IP addresses from IPAddresses slice, with fallback to singular IPAddress
 		var allIPs []metalv1alpha1.IP
-		for _, ipAddr := range s.IPAddresses {
+		ipAddrs := s.IPAddresses
+		// Fallback: if IPAddresses is empty, use the deprecated singular IPAddress field
+		if len(ipAddrs) == 0 && s.IPAddress != "" {
+			ipAddrs = []string{s.IPAddress}
+		}
+		for _, ipAddr := range ipAddrs {
 			if ipAddr != "" {
 				// Parse and validate the IP address
 				ip, err := metalv1alpha1.ParseIP(ipAddr)
@@ -975,8 +981,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *metalv1alpha1.Server) error {
 	original := server.DeepCopy()
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	err := acc.UpdateSlice(
+	err := r.Conditions.UpdateSlice(
 		&server.Status.Conditions,
 		PoweringOnCondition,
 		conditionutils.UpdateStatus(metav1.ConditionTrue),

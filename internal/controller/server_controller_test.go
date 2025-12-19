@@ -81,7 +81,6 @@ var _ = Describe("Server Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
@@ -231,7 +230,7 @@ var _ = Describe("Server Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
-			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
 				Name:       server.Name,
@@ -302,7 +301,6 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
@@ -417,13 +415,12 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the Server resource has been created")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
-			HaveField("Spec.UUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
-			HaveField("Spec.BootConfigurationRef", &v1.ObjectReference{
+			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerBootConfiguration",
 				Namespace:  ns.Name,
 				Name:       server.Name,
@@ -527,7 +524,6 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
@@ -611,7 +607,6 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
@@ -675,7 +670,6 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
@@ -760,7 +754,6 @@ var _ = Describe("Server Controller", func() {
 				GenerateName: "server-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{

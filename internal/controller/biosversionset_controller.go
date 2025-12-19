@@ -295,14 +295,7 @@ func (r *BIOSVersionSetReconciler) patchBIOSVersionfromTemplate(
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
-			// serverMaintenanceRef might not be part of the patching template, so we do not patch if not provided
-			if biosVersionTemplate.ServerMaintenanceRef != nil {
-				biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
-			} else {
-				serverMaintenanceRef := biosVersion.Spec.ServerMaintenanceRef
-				biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
-				biosVersion.Spec.ServerMaintenanceRef = serverMaintenanceRef
-			}
+			biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
 			return nil
 		}) //nolint:errcheck
 		if err != nil {
@@ -440,7 +433,7 @@ func (r *BIOSVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return true
 					},
 					UpdateFunc: func(e event.UpdateEvent) bool {
-						return enqueFromChildObjUpdatesExceptAnnotation(e)
+						return enqueueFromChildObjUpdatesExceptAnnotation(e)
 					},
 					DeleteFunc: func(e event.DeleteEvent) bool {
 						return true

@@ -145,9 +145,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 			})).Should(Succeed())
 			By("mock servermaintenance Creation maintenance")
 			Eventually(Update(BMCVersionV1, func() {
-				BMCVersionV1.Spec.ServerMaintenanceRefs = []metalv1alpha1.ServerMaintenanceRefItem{
-					{ServerMaintenanceRef: &v1.ObjectReference{Name: "foobar-Maintenance"}},
-				}
+				BMCVersionV1.Spec.ServerMaintenanceRefs = []metalv1alpha1.ObjectReference{{Name: "foobar-Maintenance"}}
 			})).Should(Succeed())
 			By("Updating an biosSettingsV1 spec, should fail to update when inProgress")
 			BMCVersionV1Updated := BMCVersionV1.DeepCopy()

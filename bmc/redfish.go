@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ironcore-dev/metal-operator/bmc/oem"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
 	"github.com/stmcginnis/gofish/redfish"
@@ -63,6 +64,16 @@ var pxeBootWithSettingUEFIBootMode = redfish.Boot{
 var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
 	BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
 	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
+}
+
+type InvalidBIOSSettingsError struct {
+	SettingName  string
+	SettingValue any
+	Message      string
+}
+
+func (e *InvalidBIOSSettingsError) Error() string {
+	return fmt.Sprintf("Settings Name: %s\nSettings Value: %v\nError: %s", e.SettingName, e.SettingValue, e.Message)
 }
 
 // NewRedfishBMCClient creates a new RedfishBMC with the given connection details.
@@ -184,7 +195,8 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 	}
 	var setBoot redfish.Boot
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	if system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
+	// Fix for older BMCs that don't report BootSourceOverrideMode
+	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
 		setBoot = pxeBootWithSettingUEFIBootMode
 	} else {
 		setBoot = pxeBootWithoutSettingUEFIBootMode
@@ -220,7 +232,7 @@ func (r *RedfishBMC) GetManager(bmcUUID string) (*redfish.Manager, error) {
 	return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
 }
 
-func (r *RedfishBMC) getOEMManager(bmcUUID string) (OEMManagerInterface, error) {
+func (r *RedfishBMC) getOEMManager(bmcUUID string) (oem.ManagerInterface, error) {
 	manager, err := r.GetManager(bmcUUID)
 	if err != nil {
 		return nil, fmt.Errorf("not able to Manager %v", err)
@@ -361,7 +373,7 @@ func (r *RedfishBMC) GetBiosAttributeValues(ctx context.Context, systemURI strin
 	return result, err
 }
 
-func (r *RedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes []string) (redfish.SettingsAttributes, error) {
+func (r *RedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -369,8 +381,7 @@ func (r *RedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, 
 	if err != nil {
 		return nil, err
 	}
-
-	return oemManager.GetOEMBMCSettingAttribute(attributes)
+	return oemManager.GetOEMBMCSettingAttribute(ctx, attributes)
 }
 
 func (r *RedfishBMC) GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (redfish.SettingsAttributes, error) {
@@ -441,7 +452,7 @@ func (r *RedfishBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUUID s
 		return nil, err
 	}
 
-	return oemManager.GetBMCPendingAttributeValues()
+	return oemManager.GetBMCPendingAttributeValues(ctx)
 }
 
 // SetBiosAttributesOnReset sets given bios attributes.
@@ -470,7 +481,7 @@ func (r *RedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID st
 	if err != nil {
 		return err
 	}
-	return oemManager.UpdateBMCAttributesApplyAt(attributes, common.ImmediateApplyTime)
+	return oemManager.UpdateBMCAttributesApplyAt(ctx, attributes, common.ImmediateApplyTime)
 }
 
 // SetBootOrder sets bios boot order
@@ -527,48 +538,51 @@ func (r *RedfishBMC) checkAttribues(attrs redfish.SettingsAttributes, filtered m
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
-			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
+			err := &InvalidBIOSSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message:      "attribute not found or is immutable/hidden",
+			}
+			errs = append(errs, err)
 			continue
 		}
-		if entryAttribute.ResetRequired {
+		// if ResetRequired is nil, assume true
+		if entryAttribute.ResetRequired == nil || *entryAttribute.ResetRequired {
 			reset = true
 		}
 		switch strings.ToLower(entryAttribute.Type) {
 		case "integer":
 			if _, ok := value.(int); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 			}
 		case "string":
 			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 			}
 		case "enumeration":
 			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type (Non String). needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 				break
 			}
 			var validEnum bool
@@ -579,30 +593,45 @@ func (r *RedfishBMC) checkAttribues(attrs redfish.SettingsAttributes, filtered m
 				}
 			}
 			if !validEnum {
-				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message:      fmt.Sprintf("attributes value is unknown. Valid Attributes %v", entryAttribute.Value),
+				}
+				errs = append(errs, err)
+			}
+		case "boolean":
+			if _, ok := value.(bool); !ok {
+				err := &InvalidBIOSSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		default:
-			errs = append(
-				errs,
-				fmt.Errorf(
-					"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-					name,
-					value,
+			err := &InvalidBIOSSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 					entryAttribute.Type,
-					entryAttribute,
-				))
+				),
+			}
+			errs = append(errs, err)
 		}
 	}
 	return reset, errors.Join(errs...)
 }
 
-func (r *RedfishBMC) CheckBMCAttributes(bmcUUID string, attrs redfish.SettingsAttributes) (bool, error) {
+func (r *RedfishBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string, attrs redfish.SettingsAttributes) (bool, error) {
 	oemManager, err := r.getOEMManager(bmcUUID)
 	if err != nil {
 		return false, err
 	}
 
-	return oemManager.CheckBMCAttributes(attrs)
+	return oemManager.CheckBMCAttributes(ctx, attrs)
 }
 
 func (r *RedfishBMC) getSystemManufacturer() (string, error) {
@@ -631,6 +660,8 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemURI string) ([]Stora
 		func(ctx context.Context) (bool, error) {
 			systemStorage, err = system.Storage()
 			if err != nil {
+				log := ctrl.LoggerFrom(ctx)
+				log.V(1).Info("Storage not ready yet", "error", err)
 				return false, nil
 			}
 			return true, nil

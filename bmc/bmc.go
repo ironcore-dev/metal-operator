@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/common"
@@ -75,7 +74,7 @@ type BMC interface {
 	GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (redfish.SettingsAttributes, error)
 
 	// GetBMCAttributeValues retrieves BMC attribute values for the system.
-	GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (redfish.SettingsAttributes, error)
+	GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (redfish.SettingsAttributes, error)
 
 	// GetBMCPendingAttributeValues retrieves pending BMC attribute values for the system.
 	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result redfish.SettingsAttributes, err error)
@@ -84,7 +83,7 @@ type BMC interface {
 	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
 
 	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
-	CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
+	CheckBMCAttributes(ctx context.Context, UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
 
 	// SetBiosAttributesOnReset sets BIOS attributes on the system and applies them on the next reset.
 	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes redfish.SettingsAttributes) (err error)
@@ -123,31 +122,6 @@ type BMC interface {
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
 }
 
-// OEMManagerInterface defines methods for OEM-specific BMC management.
-type OEMManagerInterface interface {
-	// GetOEMBMCSettingAttribute retrieves OEM-specific BMC setting attributes.
-	GetOEMBMCSettingAttribute(attributes []string) (redfish.SettingsAttributes, error)
-
-	// GetBMCPendingAttributeValues retrieves pending BMC attribute values.
-	GetBMCPendingAttributeValues() (redfish.SettingsAttributes, error)
-
-	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
-	CheckBMCAttributes(attributes redfish.SettingsAttributes) (bool, error)
-
-	// GetObjFromUri retrieves an object from a given URI and populates the response object.
-	GetObjFromUri(uri string, respObj any) ([]string, error)
-
-	// UpdateBMCAttributesApplyAt updates BMC attributes and applies them at the specified time.
-	UpdateBMCAttributesApplyAt(attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
-}
-
-// OEMInterface defines methods for OEM-specific BMC operations.
-type OEMInterface interface {
-	GetUpdateRequestBody(parameters *redfish.SimpleUpdateParameters) *oem.SimpleUpdateRequestBody
-	GetUpdateTaskMonitorURI(response *http.Response) (string, error)
-	GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error)
-}
-
 type Entity struct {
 	// ID uniquely identifies the resource.
 	ID string `json:"Id"`
@@ -172,7 +146,7 @@ type RegistryEntryAttributes struct {
 	MenuPath      string
 	MinLength     int
 	ReadOnly      bool
-	ResetRequired bool
+	ResetRequired *bool
 	Type          string
 	WriteOnly     bool
 	Value         []AllowedValues
@@ -325,11 +299,21 @@ type Manager struct {
 	OemLinks        json.RawMessage
 }
 
-func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerInterface, error) {
-	var OEMManager OEMManagerInterface
+func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
+	var OEMManager oem.ManagerInterface
 	switch ooem.Manufacturer {
 	case string(ManufacturerDell):
 		OEMManager = &oem.DellIdracManager{
+			BMC:     ooem,
+			Service: service,
+		}
+	case string(ManufacturerHPE):
+		OEMManager = &oem.HPEILOManager{
+			BMC:     ooem,
+			Service: service,
+		}
+	case string(ManufacturerLenovo):
+		OEMManager = &oem.LenovoXCCManager{
 			BMC:     ooem,
 			Service: service,
 		}
@@ -339,8 +323,8 @@ func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (OEMManagerIn
 	return OEMManager, nil
 }
 
-func NewOEM(manufacturer string, service *gofish.Service) (OEMInterface, error) {
-	var oemintf OEMInterface
+func NewOEM(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
+	var oemintf oem.OEMInterface
 	switch manufacturer {
 	case string(ManufacturerDell):
 		return &oem.Dell{

@@ -11,11 +11,13 @@ import (
 )
 
 const (
-	ServerSystemUUIDIndexField = "spec.systemUUID"
+	serverSystemUUIDIndexField = "spec.systemUUID"
+	serverRefField             = "spec.serverRef.name"
+	bmcRefField                = "spec.bmcRef.name"
 )
 
 func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error {
-	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, ServerSystemUUIDIndexField, func(rawObj client.Object) []string {
+	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, serverSystemUUIDIndexField, func(rawObj client.Object) []string {
 		server, ok := rawObj.(*metalv1alpha1.Server)
 		if !ok {
 			return nil
@@ -27,5 +29,32 @@ func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error
 	}); err != nil {
 		return err
 	}
+
+	if err := indexer.IndexField(ctx, &metalv1alpha1.BIOSSettings{}, serverRefField, func(rawObj client.Object) []string {
+		biosSettings, ok := rawObj.(*metalv1alpha1.BIOSSettings)
+		if !ok {
+			return nil
+		}
+		if biosSettings.Spec.ServerRef == nil {
+			return nil
+		}
+		return []string{biosSettings.Spec.ServerRef.Name}
+	}); err != nil {
+		return err
+	}
+
+	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, bmcRefField, func(rawObj client.Object) []string {
+		server, ok := rawObj.(*metalv1alpha1.Server)
+		if !ok {
+			return nil
+		}
+		if server.Spec.BMCRef == nil {
+			return nil
+		}
+		return []string{server.Spec.BMCRef.Name}
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }

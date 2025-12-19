@@ -179,7 +179,7 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCVersion resources %w", err)
 	}
 
-	if err := r.patchBMCVersionfromTemplate(ctx, log, &bmcVersionSet.Spec.BMCVersionTemplate, ownedBMCVersions); err != nil {
+	if err := r.patchBMCVersionfromTemplate(ctx, log, bmcVersionSet, ownedBMCVersions); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion spec from template %w", err)
 	}
 
@@ -218,7 +218,6 @@ func (r *BMCVersionSetReconciler) createMissingBMCVersions(
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "bmc-version-set-",
 				}}
-
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCVersion, func() error {
 				newBMCVersion.Spec.BMCVersionTemplate = *bmcVersionSet.Spec.BMCVersionTemplate.DeepCopy()
 				newBMCVersion.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}
@@ -266,7 +265,7 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 	ctx context.Context,
 	log logr.Logger,
-	bmcVersionTemplate *metalv1alpha1.BMCVersionTemplate,
+	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 	bmcVersionList *metalv1alpha1.BMCVersionList,
 ) error {
 	if len(bmcVersionList.Items) == 0 {
@@ -276,11 +275,12 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 
 	var errs []error
 	for _, bmcVersion := range bmcVersionList.Items {
-		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress && bmcVersion.Status.UpgradeTask != nil {
+			log.V(1).Info("Skipping BMCVersion spec patching as it is in InProgress state with an active UpgradeTask")
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
-			bmcVersion.Spec.BMCVersionTemplate = *bmcVersionTemplate.DeepCopy()
+			bmcVersion.Spec.BMCVersionTemplate = *bmcVersionSet.Spec.BMCVersionTemplate.DeepCopy()
 			return nil
 		}) //nolint:errcheck
 		if err != nil {
@@ -419,7 +419,7 @@ func (r *BMCVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return true
 					},
 					UpdateFunc: func(e event.UpdateEvent) bool {
-						return enqueFromChildObjUpdatesExceptAnnotation(e)
+						return enqueueFromChildObjUpdatesExceptAnnotation(e)
 					},
 					DeleteFunc: func(e event.DeleteEvent) bool {
 						return true

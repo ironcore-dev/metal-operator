@@ -173,12 +173,13 @@ func (r *RedfishKubeBMC) getFilteredBiosRegistryAttributes(readOnly, immutable b
 
 	filtered := make(map[string]RegistryEntryAttributes)
 	for name, attrData := range UnitTestMockUps.BIOSSettingAttr {
+		resetRequired := attrData["reboot"].(bool)
 		filtered[name] = RegistryEntryAttributes{
 			AttributeName: name,
 			Immutable:     immutable,
 			ReadOnly:      readOnly,
 			Type:          attrData["type"].(string),
-			ResetRequired: attrData["reboot"].(bool),
+			ResetRequired: &resetRequired,
 		}
 	}
 	return filtered, nil
@@ -267,7 +268,7 @@ func (r *RedfishKubeBMC) SetBMCAttributesImmediately(ctx context.Context, UUID s
 }
 
 // GetBMCAttributeValues retrieves specific BMC attribute values.
-func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (redfish.SettingsAttributes, error) {
+func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -278,9 +279,9 @@ func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string,
 	}
 
 	result := make(redfish.SettingsAttributes, len(attributes))
-	for _, name := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[name]; ok && filtered[name].AttributeName != "" {
-			result[name] = attrData["value"]
+	for key := range attributes {
+		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok && filtered[key].AttributeName != "" {
+			result[key] = attrData["value"]
 		}
 	}
 	return result, nil
@@ -320,7 +321,7 @@ func (r *RedfishKubeBMC) getFilteredBMCRegistryAttributes(readOnly, immutable bo
 }
 
 // CheckBMCAttributes validates BMC attributes.
-func (r *RedfishKubeBMC) CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (bool, error) {
+func (r *RedfishKubeBMC) CheckBMCAttributes(ctx context.Context, UUID string, attrs redfish.SettingsAttributes) (bool, error) {
 	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err
@@ -375,7 +376,8 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	}
 	var setBoot redfish.Boot
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	if system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
+	// Fix for older BMCs that don't report BootSourceOverrideMode
+	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
 		setBoot = pxeBootWithSettingUEFIBootMode
 	} else {
 		setBoot = pxeBootWithoutSettingUEFIBootMode
@@ -383,7 +385,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	if err := system.SetBoot(setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
-	netData := `{"networkInterfaces":[{"name":"dummy0","ipAddress":"127.0.0.2","macAddress":"aa:bb:cc:dd:ee:ff"}]`
+	netData := `{"networkInterfaces":[{"name":"dummy0","ipAddresses":["127.0.0.2"],"macAddress":"aa:bb:cc:dd:ee:ff"}]`
 	curlCmd := fmt.Sprintf(
 		`apk add curl && curl -H 'Content-Type: application/json' \
 -d '{"SystemUUID":"%s","data":%s}}' \

@@ -91,6 +91,7 @@ type ServerReconciler struct {
 	BMCOptions              bmc.Options
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
+	Conditions              *conditionutils.Accessor
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -478,7 +479,7 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
 	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &v1.ObjectReference{
+	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
 		Namespace:  config.Namespace,
 		Name:       config.Name,
 		UID:        config.UID,
@@ -814,14 +815,60 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	// update network interfaces
 	nics := make([]metalv1alpha1.NetworkInterface, 0, len(serverDetails.NetworkInterfaces))
 	for _, s := range serverDetails.NetworkInterfaces {
-		nics = append(nics, metalv1alpha1.NetworkInterface{
-			Name:       s.Name,
-			IP:         metalv1alpha1.MustParseIP(s.IPAddress),
-			MACAddress: s.MACAddress,
-		})
-	}
-	server.Status.NetworkInterfaces = nics
+		nic := metalv1alpha1.NetworkInterface{
+			Name:          s.Name,
+			MACAddress:    s.MACAddress,
+			CarrierStatus: s.CarrierStatus,
+		}
 
+		// Process all IP addresses from IPAddresses slice, with fallback to singular IPAddress
+		var allIPs []metalv1alpha1.IP
+		ipAddrs := s.IPAddresses
+		// Fallback: if IPAddresses is empty, use the deprecated singular IPAddress field
+		if len(ipAddrs) == 0 && s.IPAddress != "" {
+			ipAddrs = []string{s.IPAddress}
+		}
+		for _, ipAddr := range ipAddrs {
+			if ipAddr != "" {
+				// Parse and validate the IP address
+				ip, err := metalv1alpha1.ParseIP(ipAddr)
+				if err != nil {
+					log.V(1).Error(err, "Invalid IP address, skipping", "interface", s.Name, "ip", ipAddr)
+					continue
+				}
+
+				// Add all valid IP addresses (both IPv4 and IPv6) to the slice
+				allIPs = append(allIPs, ip)
+			}
+		}
+
+		nic.IPs = allIPs
+		nics = append(nics, nic)
+	}
+
+	// Merge LLDP neighbors into corresponding network interfaces
+	for _, lldpIface := range serverDetails.LLDP {
+		// Find the matching network interface by name
+		for i := range nics {
+			if nics[i].Name == lldpIface.Name {
+				// Convert LLDP neighbors to the CRD format
+				neighbors := make([]metalv1alpha1.LLDPNeighbor, 0, len(lldpIface.Neighbors))
+				for _, neighbor := range lldpIface.Neighbors {
+					neighbors = append(neighbors, metalv1alpha1.LLDPNeighbor{
+						MACAddress:        neighbor.ChassisID,
+						PortID:            neighbor.PortID,
+						PortDescription:   neighbor.PortDescription,
+						SystemName:        neighbor.SystemName,
+						SystemDescription: neighbor.SystemDescription,
+					})
+				}
+				nics[i].Neighbors = neighbors
+				break
+			}
+		}
+	}
+
+	server.Status.NetworkInterfaces = nics
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to patch server status: %w", err)
 	}
@@ -934,8 +981,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 
 func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *metalv1alpha1.Server) error {
 	original := server.DeepCopy()
-	acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-	err := acc.UpdateSlice(
+	err := r.Conditions.UpdateSlice(
 		&server.Status.Conditions,
 		PoweringOnCondition,
 		conditionutils.UpdateStatus(metav1.ConditionTrue),

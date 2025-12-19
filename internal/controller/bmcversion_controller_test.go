@@ -134,6 +134,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
@@ -186,20 +189,22 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
+				[]metalv1alpha1.ObjectReference{
+					{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
 						APIVersion: metalv1alpha1.GroupVersion.String(),
-					}}}),
+					},
+				},
+			),
 		)
 
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -231,6 +236,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should upgrade servers BMC when server in reserved state", func(ctx SpecContext) {
@@ -306,15 +314,16 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by bmcVersion")
 		Eventually(Object(bmcVersion)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
-				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
+				[]metalv1alpha1.ObjectReference{
+					{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
 						UID:        serverMaintenance.UID,
 						APIVersion: metalv1alpha1.GroupVersion.String(),
-					}}}),
-		)
+					},
+				},
+			))
 
 		By("Ensuring that the bmcVersion has Inprogress state and waiting")
 		Eventually(Object(bmcVersion)).Should(
@@ -329,7 +338,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that Server in Maintenance state")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
-			HaveField("Spec.ServerMaintenanceRef", &v1.ObjectReference{
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
 				Kind:       "ServerMaintenance",
 				Name:       serverMaintenance.Name,
 				Namespace:  serverMaintenance.Namespace,
@@ -364,6 +373,10 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))),
+		))
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {
@@ -439,7 +452,7 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 		return condComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
-	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeVerficationCondition'")
+	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeVerificationCondition'")
 	verificationComplete := &metav1.Condition{}
 	Eventually(func(g Gomega) int {
 		g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: bmcVersion.Name}, bmcVersion)).To(Succeed())
@@ -447,7 +460,7 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 	}).Should(BeNumerically(">=", 4))
 	Eventually(func(g Gomega) bool {
 		g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: bmcVersion.Name}, bmcVersion)).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeVerficationCondition, verificationComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeVerificationCondition, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 }

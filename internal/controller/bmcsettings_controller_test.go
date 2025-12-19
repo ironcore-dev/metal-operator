@@ -202,6 +202,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
+		By("Ensuring that the Maintenance resource has been deleted")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
+		))
+
 		By("Deleting the BMCSettings")
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
 
@@ -211,9 +219,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		// cleanup
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should create maintenance and wait for its approval before applying settings", func(ctx SpecContext) {
@@ -287,7 +295,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmcSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
-					ServerMaintenanceRef: &v1.ObjectReference{
+					ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
 						Kind:       "ServerMaintenance",
 						Name:       serverMaintenance.Name,
 						Namespace:  serverMaintenance.Namespace,
@@ -336,6 +344,10 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))),
+		))
 	})
 
 	It("Should wait for upgrade and reconcile BMCSettings version is correct", func(ctx SpecContext) {
@@ -371,7 +383,11 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings resource state is correct State inVersionUpgrade")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStatePending),
+			HaveField("Status.Conditions", Not(ContainElement(SatisfyAll(
+				HaveField("Type", BMCVersionUpdatePendingCondition),
+				HaveField("Status", metav1.ConditionTrue),
+			)))),
 		))
 
 		By("Ensuring that the serverMaintenance not ref. while waiting for upgrade")
@@ -387,6 +403,10 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Ensuring that the BMCSettings resource has completed Upgrade and setting update, and moved the state")
 		Eventually(Object(BMCSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+			HaveField("Status.Conditions", Not(ContainElement(SatisfyAll(
+				HaveField("Type", BMCVersionUpdatePendingCondition),
+				HaveField("Status", metav1.ConditionFalse),
+			)))),
 		))
 
 		By("Ensuring that the Maintenance resource has been created")
@@ -428,6 +448,10 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", BeNil()),
 		))
+
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {
@@ -478,5 +502,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
 	})
 })

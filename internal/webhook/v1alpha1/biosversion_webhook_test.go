@@ -40,7 +40,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 	})
 
 	AfterEach(func() {
-		By("Deleting the BIOSVersion and Server resources")
+		By("Deleting the BIOSVersion resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BIOSVersion{})).To(Succeed())
 
 		By("Ensuring clean state")

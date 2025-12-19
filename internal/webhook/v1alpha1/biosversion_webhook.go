@@ -97,7 +97,7 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj run
 	versionLog.Info("Validation for BIOSVersion upon deletion", "name", version.GetName())
 
 	if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(version) {
-		return nil, apierrors.NewBadRequest("The bios version in progress, unable to delete")
+		return nil, apierrors.NewBadRequest("The BIOS version is in progress and cannot be deleted")
 	}
 	return nil, nil
 }

@@ -24,7 +24,8 @@ import (
 // log is for logging in this package.
 var versionLog = logf.Log.WithName("biosversion-resource")
 
-// SetupBIOSVersionWebhookWithManager registers the webhook for BIOSVersion in the manager.
+// SetupBIOSVersionWebhookWithManager registers a webhook for BIOSVersion resources with the provided controller manager and configures it to use BIOSVersionCustomValidator.
+// It returns any error encountered while constructing or registering the webhook.
 func SetupBIOSVersionWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&metalv1alpha1.BIOSVersion{}).
 		WithValidator(&BIOSVersionCustomValidator{Client: mgr.GetClient()}).
@@ -102,6 +103,11 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj run
 	return nil, nil
 }
 
+// checkForDuplicateBIOSVersionRefToServer checks whether the provided BIOSVersion's
+// ServerRef.Name duplicates any other BIOSVersion's ServerRef.Name in the given list.
+// If version.Spec.ServerRef is nil the function returns no error.
+// It returns nil when no duplicate is found, or an Invalid API error that targets
+// spec.serverRef.name when a duplicate server reference is detected.
 func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersionList, version *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
 	if version.Spec.ServerRef == nil {
 		return nil, nil

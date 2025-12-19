@@ -11,7 +11,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-// EnsureCleanState ensures that all ServerClaims and cluster scoped objects are removed from the API server.
+// EnsureCleanState waits (as a test helper) until all cluster-scoped metalv1alpha1 resources — including endpoints, BMCs, BMCSecrets, ServerClaims, BMCSettings, BMCVersionSets, BMCVersions, BIOSVersions, BIOSSettingsSets, BIOSSettings, ServerMaintenances, and Servers — have been removed from the API server.
 func EnsureCleanState() {
 	GinkgoHelper()
 

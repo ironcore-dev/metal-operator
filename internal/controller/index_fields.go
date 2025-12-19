@@ -5,35 +5,19 @@ package controller
 
 import (
 	"context"
-	"errors"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	ServerSystemUUIDIndexField = "spec.systemUUID"
-	// ServerMaintenanceServerRefIndex is the index for the server reference in the ServerMaintenance resource.
-	ServerMaintenanceServerRefIndex = "spec.serverRef"
+	serverSystemUUIDIndexField = "spec.systemUUID"
+	serverRefField             = "spec.serverRef.name"
+	bmcRefField                = "spec.bmcRef.name"
 )
 
-// RegisterIndexFields registers index fields.
-func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) (errs error) {
-	if err := indexer.IndexField(
-		ctx,
-		&metalv1alpha1.ServerMaintenance{},
-		ServerMaintenanceServerRefIndex,
-		func(rawObj client.Object) []string {
-			maintenance := rawObj.(*metalv1alpha1.ServerMaintenance)
-			if maintenance.Spec.ServerRef != nil {
-				return []string{maintenance.Spec.ServerRef.Name}
-			}
-			return nil
-		},
-	); err != nil {
-		errs = errors.Join(errs, err)
-	}
-	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, ServerSystemUUIDIndexField, func(rawObj client.Object) []string {
+func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error {
+	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, serverSystemUUIDIndexField, func(rawObj client.Object) []string {
 		server, ok := rawObj.(*metalv1alpha1.Server)
 		if !ok {
 			return nil
@@ -43,7 +27,47 @@ func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) (errs
 		}
 		return []string{server.Spec.SystemUUID}
 	}); err != nil {
-		errs = errors.Join(errs, err)
+		return err
 	}
-	return errs
+
+	if err := indexer.IndexField(ctx, &metalv1alpha1.BIOSSettings{}, serverRefField, func(rawObj client.Object) []string {
+		biosSettings, ok := rawObj.(*metalv1alpha1.BIOSSettings)
+		if !ok {
+			return nil
+		}
+		if biosSettings.Spec.ServerRef == nil {
+			return nil
+		}
+		return []string{biosSettings.Spec.ServerRef.Name}
+	}); err != nil {
+		return err
+	}
+
+	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, bmcRefField, func(rawObj client.Object) []string {
+		server, ok := rawObj.(*metalv1alpha1.Server)
+		if !ok {
+			return nil
+		}
+		if server.Spec.BMCRef == nil {
+			return nil
+		}
+		return []string{server.Spec.BMCRef.Name}
+	}); err != nil {
+		return err
+	}
+
+	if err := indexer.IndexField(ctx, &metalv1alpha1.ServerMaintenance{}, serverRefField, func(rawObj client.Object) []string {
+		maintenance, ok := rawObj.(*metalv1alpha1.ServerMaintenance)
+		if !ok {
+			return nil
+		}
+		if maintenance.Spec.ServerRef == nil {
+			return nil
+		}
+		return []string{maintenance.Spec.ServerRef.Name}
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }

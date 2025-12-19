@@ -195,7 +195,8 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 	}
 	var setBoot redfish.Boot
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	if system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
+	// Fix for older BMCs that don't report BootSourceOverrideMode
+	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
 		setBoot = pxeBootWithSettingUEFIBootMode
 	} else {
 		setBoot = pxeBootWithoutSettingUEFIBootMode

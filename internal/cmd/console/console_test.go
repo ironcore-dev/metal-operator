@@ -41,6 +41,7 @@ var _ = Describe("Console Access", func() {
 						Name: bmcSecret.Name,
 					},
 				},
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
@@ -95,6 +96,7 @@ var _ = Describe("Console Access", func() {
 				BMCRef: &corev1.LocalObjectReference{
 					Name: bmc.Name,
 				},
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())

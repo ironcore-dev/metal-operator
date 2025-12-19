@@ -22,6 +22,7 @@ on:
 
 jobs:
   helm-chart:
+    name: Run chart publish
     runs-on: ubuntu-latest
     permissions:
       contents: read

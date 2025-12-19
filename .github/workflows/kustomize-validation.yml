@@ -9,6 +9,7 @@ on:
 
 jobs:
   kustomize-validation:
+    name: Run validate kustomizations
     runs-on: ubuntu-latest
     steps:
       - name: Check out code

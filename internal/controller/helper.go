@@ -13,11 +13,14 @@ import (
 	"slices"
 
 	"github.com/go-logr/logr"
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -27,6 +30,52 @@ import (
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
 )
+
+// GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
+func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client, ref *metalv1alpha1.ObjectReference) (*metalv1alpha1.ServerMaintenance, error) {
+	if ref == nil {
+		return nil, fmt.Errorf("got nil reference")
+	}
+	maintenance := &metalv1alpha1.ServerMaintenance{}
+	if err := c.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: ref.Namespace}, maintenance); err != nil {
+		return nil, fmt.Errorf("failed to get ServerMaintenance: %w", err)
+	}
+
+	return maintenance, nil
+}
+
+// GetCondition finds a condition in a condition slice.
+func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
+	condition := &metav1.Condition{}
+	condFound, err := acc.FindSlice(conditions, conditionType, condition)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
+	}
+	if !condFound {
+		condition.Type = conditionType
+		if err := acc.Update(
+			condition,
+			conditionutils.UpdateStatus(corev1.ConditionFalse),
+		); err != nil {
+			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
+		}
+	}
+
+	return condition, nil
+}
+
+// GetServerByName returns a Server object by its name or an error in case the object can not be found.
+func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
+	server := &metalv1alpha1.Server{}
+	if err := c.Get(ctx, client.ObjectKey{Name: serverName}, server); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("server not found")
+	}
+	return server, nil
+}
 
 // shouldIgnoreReconciliation checks if the object should be ignored during reconciliation.
 func shouldIgnoreReconciliation(obj client.Object) bool {
@@ -112,7 +161,7 @@ func truncateString(s string, maxLength int) string {
 	return s[:maxLength]
 }
 
-func enqueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
+func enqueueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 	isNil := func(arg any) bool {
 		if v := reflect.ValueOf(arg); !v.IsValid() || ((v.Kind() == reflect.Ptr ||
 			v.Kind() == reflect.Interface ||
@@ -201,13 +250,7 @@ func resetBMCOfServer(
 	return fmt.Errorf("no BMC reference or inline BMC details found in server spec to reset BMC")
 }
 
-func handleIgnoreAnnotationPropagation(
-	ctx context.Context,
-	log logr.Logger,
-	kClient client.Client,
-	parentObj client.Object,
-	ownedObjects client.ObjectList,
-) error {
+func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -219,7 +262,7 @@ func handleIgnoreAnnotationPropagation(
 		if !childObj.GetDeletionTimestamp().IsZero() {
 			return nil
 		}
-		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+		opResult, err := controllerutil.CreateOrPatch(ctx, c, childObj, func() error {
 			annotations := childObj.GetAnnotations()
 
 			if !shouldChildIgnoreReconciliation(parentObj) && isChildIgnoredThroughSets(childObj) && annotations != nil {
@@ -249,13 +292,7 @@ func handleIgnoreAnnotationPropagation(
 	return errors.Join(errs...)
 }
 
-func handleRetryAnnotationPropagation(
-	ctx context.Context,
-	log logr.Logger,
-	kClient client.Client,
-	parentObj client.Object,
-	ownedObjects client.ObjectList,
-) error {
+func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -269,7 +306,7 @@ func handleRetryAnnotationPropagation(
 		}
 		log.V(1).Info("Child's annotations check", "ChildResource", childObj.GetName())
 
-		opResult, err := controllerutil.CreateOrPatch(ctx, kClient, childObj, func() error {
+		opResult, err := controllerutil.CreateOrPatch(ctx, c, childObj, func() error {
 			annotations := childObj.GetAnnotations()
 
 			if !shouldChildRetryReconciliation(parentObj) && isChildRetryThroughSets(childObj) && annotations != nil {

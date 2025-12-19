@@ -107,7 +107,11 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 }
 
 func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (result ctrl.Result, err error) {
-	server, err := r.getServerRef(ctx, serverMaintenance)
+	if serverMaintenance.Spec.ServerRef == nil {
+		return ctrl.Result{}, fmt.Errorf("server reference is nil")
+	}
+
+	server, err := GetServerByName(ctx, r.Client, serverMaintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -184,7 +188,11 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 }
 
 func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
-	server, err := r.getServerRef(ctx, serverMaintenance)
+	if serverMaintenance.Spec.ServerRef == nil {
+		return ctrl.Result{}, fmt.Errorf("server reference is nil")
+	}
+
+	server, err := GetServerByName(ctx, r.Client, serverMaintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -323,8 +331,10 @@ func (r *ServerMaintenanceReconciler) handleFailedState(log logr.Logger, serverM
 }
 
 func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logger, serverMaintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
-	log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", serverMaintenance.Name)
-	server, err := r.getServerRef(ctx, serverMaintenance)
+	if serverMaintenance.Spec.ServerRef == nil {
+		return ctrl.Result{}, nil
+	}
+	server, err := GetServerByName(ctx, r.Client, serverMaintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -476,7 +486,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{
-			ServerMaintenanceServerRefIndex: server.Name,
+			serverRefField: server.Name,
 		}); err != nil {
 			log.Error(err, "failed to list host serverMaintenances")
 			return nil
@@ -517,7 +527,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{
-			ServerMaintenanceServerRefIndex: claim.Spec.ServerRef.Name,
+			serverRefField: claim.Spec.ServerRef.Name,
 		}); err != nil {
 			log.Error(err, "failed to list host serverMaintenances")
 			return nil

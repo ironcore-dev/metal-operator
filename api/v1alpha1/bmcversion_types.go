@@ -37,16 +37,16 @@ type BMCVersionTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-
-	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
-	// +optional
-	ServerMaintenanceRefs []ObjectReference `json:"serverMaintenanceRefs,omitempty"`
 }
 
 // BMCVersionSpec defines the desired state of BMCVersion.
 type BMCVersionSpec struct {
 	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
 	BMCVersionTemplate `json:",inline"`
+
+	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
+	// +optional
+	ServerMaintenanceRefs []ObjectReference `json:"serverMaintenanceRefs,omitempty"`
 
 	// BMCRef is a reference to a specific BMC to apply BMC upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bmcRef is immutable"

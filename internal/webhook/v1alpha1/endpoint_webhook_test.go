@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,14 @@ var _ = Describe("Endpoint Webhook", func() {
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
 	})
 
+	AfterEach(func() {
+		By("Deleting the Endpoint")
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Endpoint{})).To(Succeed())
+
+		By("Ensuring clean state")
+		controller.EnsureCleanState()
+	})
+
 	Context("When creating or updating an Endpoint under Validating Webhook", func() {
 		It("Should deny creation if an Endpoint has a duplicate MAC address", func(ctx SpecContext) {
 			By("Creating an Endpoint")
@@ -42,7 +51,6 @@ var _ = Describe("Endpoint Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, endpoint)
 
 			By("Creating an Endpoint with existing MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
@@ -69,7 +77,6 @@ var _ = Describe("Endpoint Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, endpoint)).ToNot(HaveOccurred())
-			DeferCleanup(k8sClient.Delete, endpoint)
 
 			By("Creating an Endpoint with non-existing MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
@@ -96,7 +103,6 @@ var _ = Describe("Endpoint Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, endpoint)
 
 			By("Creating an Endpoint with different MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
@@ -109,7 +115,6 @@ var _ = Describe("Endpoint Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, existingEndpoint)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, existingEndpoint)
 
 			By("Updating an Endpoint to conflicting MAC address")
 			updatedEndpoint := endpoint.DeepCopy()
@@ -129,7 +134,6 @@ var _ = Describe("Endpoint Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, existingEndpoint)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, existingEndpoint)
 
 			By("Updating an Endpoint IP address")
 			updatedEndpoint := existingEndpoint.DeepCopy()

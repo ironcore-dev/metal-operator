@@ -4,6 +4,8 @@
 package v1alpha1
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,10 +38,17 @@ var _ = Describe("Server Webhook", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, server)
 		validator = ServerCustomValidator{Client: k8sClient}
 		SetClient(k8sClient)
 		By("Creating an server")
+	})
+
+	AfterEach(func(ctx context.Context) {
+		By("Deleting the server")
+		Expect(k8sClient.DeleteAllOf(ctx, server)).To(Succeed())
+
+		By("Ensuring clean state")
+		controller.EnsureCleanState()
 	})
 
 	Context("When deleting Server under Validating Webhook", func() {
@@ -47,9 +56,6 @@ var _ = Describe("Server Webhook", func() {
 			By("Patching the server to a maintenance state and adding finalizer")
 			Eventually(UpdateStatus(server, func() {
 				server.Status.State = metalv1alpha1.ServerStateMaintenance
-			})).Should(Succeed())
-			Eventually(Update(server, func() {
-				server.Finalizers = append(server.Finalizers, controller.ServerFinalizer)
 			})).Should(Succeed())
 
 			By("Deleting the Server should not pass")
@@ -61,9 +67,6 @@ var _ = Describe("Server Webhook", func() {
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress,
 				}
 			})).Should(Succeed())
-
-			By("Deleting the server should pass: by DeferCleanup")
 		})
 	})
-
 })

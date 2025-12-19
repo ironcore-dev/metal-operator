@@ -98,7 +98,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
 	})
 
-	It("Should deny update if a Spec.ServerRef field is duplicate", func() {
+	It("Should deny update if spec.serverRef is duplicate", func() {
 		By("Creating a BIOSSettings with different ServerRef")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{

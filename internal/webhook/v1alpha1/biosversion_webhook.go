@@ -97,7 +97,7 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj run
 	versionLog.Info("Validation for BIOSVersion upon deletion", "name", version.GetName())
 
 	if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(version) {
-		return nil, apierrors.NewBadRequest("The bios version in progress, unable to delete")
+		return nil, apierrors.NewBadRequest("The BIOS version is in progress and cannot be deleted")
 	}
 	return nil, nil
 }
@@ -115,7 +115,7 @@ func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersion
 			continue
 		}
 		if version.Spec.ServerRef.Name == bv.Spec.ServerRef.Name {
-			err := fmt.Errorf("server (%s) referred in %s is duplicate of Server (%s) referred in %s",
+			err := fmt.Errorf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
 				version.Spec.ServerRef.Name,
 				version.Name,
 				bv.Spec.ServerRef.Name,

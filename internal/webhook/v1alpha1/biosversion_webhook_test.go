@@ -22,7 +22,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 
 	BeforeEach(func() {
 		validator = BIOSVersionCustomValidator{Client: k8sClient}
-		By("Creating an BIOSVersion")
+		By("Creating a BIOSVersion")
 		biosVersionV1 = &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -40,14 +40,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 	})
 
 	AfterEach(func() {
-		By("Deleting the BIOSVersion and Server resources")
+		By("Deleting the BIOSVersion resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BIOSVersion{})).To(Succeed())
 
 		By("Ensuring clean state")
 		controller.EnsureCleanState()
 	})
 
-	It("Should deny creation if a spec.serverRef field is duplicate", func(ctx SpecContext) {
+	It("Should deny creation if spec.serverRef is duplicate", func(ctx SpecContext) {
 		By("Creating another BIOSVersion with existing ServerRef")
 		biosVersionV2 := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
@@ -80,11 +80,11 @@ var _ = Describe("BIOSVersion Webhook", func() {
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 			},
 		}
-		Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
+		Expect(validator.ValidateCreate(ctx, biosVersionV2)).Error().ToNot(HaveOccurred())
 	})
 
-	It("Should deny update if a spec.serverRef field is a duplicate", func() {
-		By("Creating an BIOSVersion with different ServerRef")
+	It("Should deny update if spec.serverRef is duplicate", func() {
+		By("Creating a BIOSVersion with different ServerRef")
 		biosVersionV2 := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -100,14 +100,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
 
-		By("Updating an BIOSVersion V2 to conflicting spec.serverRef")
+		By("Updating a BIOSVersion V2 to conflicting spec.serverRef")
 		biosVersionV2Updated := biosVersionV2.DeepCopy()
 		biosVersionV2Updated.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
 		Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().To(HaveOccurred())
 	})
 
 	It("Should allow update if a different field is duplicate", func() {
-		By("Creating an BIOSVersion with different ServerRef")
+		By("Creating a BIOSVersion with different ServerRef")
 		biosVersionV2 := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -123,14 +123,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
 
-		By("Updating an BIOSVersion V2 to conflicting spec.biosVersionSpec")
+		By("Updating BIOSVersion V2 to duplicate spec.image")
 		biosVersionV2Updated := biosVersionV2.DeepCopy()
 		biosVersionV2Updated.Spec.Image = biosVersionV1.Spec.Image
 		Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().ToNot(HaveOccurred())
 	})
 
 	It("Should allow update if a ServerRef field is not a duplicate", func() {
-		By("Creating an BIOSVersion with different ServerRef")
+		By("Creating a BIOSVersion with different ServerRef")
 		biosVersionV2 := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -146,19 +146,19 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
 
-		By("Updating an BIOSVersion V2 to a non-conflicting spec.serverRef ")
+		By("Updating a BIOSVersion V2 to a non-conflicting spec.serverRef")
 		biosVersionV2Updated := biosVersionV2.DeepCopy()
 		biosVersionV2Updated.Spec.ServerRef = &v1.LocalObjectReference{Name: "foobar"}
 		Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().ToNot(HaveOccurred())
 	})
 
-	It("Should no allow update a BIOSVersion is in progress, but should allow to force update it", func() {
+	It("Should not allow update when BIOSVersion is in progress, but should allow force update", func() {
 		By("Patching the BIOSVersion V1 to in-progress state")
 		Eventually(UpdateStatus(biosVersionV1, func() {
 			biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
 		})).Should(Succeed())
 
-		By("Add ServerMaintenance reference")
+		By("Adding ServerMaintenance reference")
 		Eventually(Update(biosVersionV1, func() {
 			biosVersionV1.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: "maintenance"}
 		})).Should(Succeed())
@@ -168,7 +168,7 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		biosVersionV1Updated.Spec.Version = "P712"
 		Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().To(HaveOccurred())
 
-		By("Updating an biosVersion V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
+		By("Updating BIOSVersion V1 spec should succeed when InProgress with ForceUpdateInProgress annotation")
 		biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 		Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().ToNot(HaveOccurred())
 
@@ -179,17 +179,16 @@ var _ = Describe("BIOSVersion Webhook", func() {
 	})
 
 	It("Should refuse to delete if InProgress", func() {
-		By("Patching the BIOSVersionV1 to InProgress state")
+		By("Patching the BIOSVersion V1 to InProgress state")
 		Eventually(UpdateStatus(biosVersionV1, func() {
 			biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
 		})).Should(Succeed())
 
-		By("Deleting the BIOSSettings V1 should fail")
-		Expect(k8sClient.Delete(ctx, biosVersionV1)).To(Not(Succeed()))
+		By("Validating deletion of BIOSVersion V1 should fail")
+		Expect(validator.ValidateDelete(ctx, biosVersionV1)).Error().To(HaveOccurred())
 
 		Eventually(UpdateStatus(biosVersionV1, func() {
 			biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateCompleted
 		})).Should(Succeed())
 	})
-
 })

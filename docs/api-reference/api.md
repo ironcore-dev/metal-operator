@@ -18,6 +18,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
 - [BMCSettings](#bmcsettings)
+- [BMCUser](#bmcuser)
 - [BMCVersion](#bmcversion)
 - [BMCVersionSet](#bmcversionset)
 - [Endpoint](#endpoint)
@@ -593,6 +594,67 @@ _Appears in:_
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  |  |
 
 
+#### BMCUser
+
+
+
+BMCUser is the Schema for the bmcusers API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `BMCUser` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[BMCUserSpec](#bmcuserspec)_ |  |  |  |
+| `status` _[BMCUserStatus](#bmcuserstatus)_ |  |  |  |
+
+
+#### BMCUserSpec
+
+
+
+BMCUserSpec defines the desired state of BMCUser.
+
+
+
+_Appears in:_
+- [BMCUser](#bmcuser)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `userName` _string_ |  |  |  |
+| `roleID` _string_ |  |  |  |
+| `description` _string_ |  |  |  |
+| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ |  |  |  |
+| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | if not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |
+| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ |  |  |  |
+| `enabled` _boolean_ |  |  |  |
+| `bmcControllerUser` _boolean_ | set if the user should be used by the BMC controller to access the system. | false |  |
+
+
+#### BMCUserStatus
+
+
+
+BMCUserStatus defines the observed state of BMCUser.
+
+
+
+_Appears in:_
+- [BMCUser](#bmcuser)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `effectiveBMCSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ |  |  |  |
+| `lastRotation` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ |  |  |  |
+| `passwordExpiration` _string_ |  |  |  |
+| `id` _string_ |  |  |  |
+
+
 #### BMCVersion
 
 
@@ -990,6 +1052,8 @@ _Appears in:_
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  |  |
 | `name` _string_ | Name is the name of the referenced object. |  |  |
 | `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#uid-types-pkg)_ | UID is the uid of the referenced object. |  |  |
+
+
 
 
 #### Phase

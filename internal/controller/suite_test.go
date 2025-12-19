@@ -17,6 +17,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -66,7 +67,6 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -164,6 +164,9 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:    true,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		dnsTemplate, err := dns.LoadTemplate("../../test/data/dns_record_template.yaml")
+		Expect(err).NotTo(HaveOccurred())
+
 		Expect((&BMCReconciler{
 			Client:                 k8sManager.GetClient(),
 			Scheme:                 k8sManager.GetScheme(),
@@ -171,6 +174,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ManagerNamespace:       ns.Name,
 			BMCResetWaitTime:       400 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
+			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

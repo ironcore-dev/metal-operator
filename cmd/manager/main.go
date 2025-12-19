@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
+	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -90,6 +91,7 @@ func main() { // nolint: gocyclo
 		bmcResetWaitingInterval            time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
+		dnsRecordTemplatePath              string
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -146,6 +148,9 @@ func main() { // nolint: gocyclo
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.DurationVar(&biosSettingsApplyTimeout, "bios-setting-timeout", 2*time.Hour,
 		"Timeout for BIOS Settings Controller")
+	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
+		"Path to the DNS record template file used for creating DNS records for Servers.")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -162,6 +167,17 @@ func main() { // nolint: gocyclo
 	if probeImage == "" {
 		setupLog.Error(nil, "probe image must be set")
 		os.Exit(1)
+	}
+
+	dnsRecordTemplate := ""
+
+	if dnsRecordTemplatePath != "" {
+		var err error
+		dnsRecordTemplate, err = dns.LoadTemplate(dnsRecordTemplatePath)
+		if err != nil {
+			setupLog.Error(err, "unable to load DNS record template")
+			os.Exit(1)
+		}
 	}
 
 	// Load MACAddress DB
@@ -329,6 +345,7 @@ func main() { // nolint: gocyclo
 		BMCResetWaitTime:       bmcResetWaitingInterval,
 		BMCClientRetryInterval: bmcResetResyncInterval,
 		ManagerNamespace:       managerNamespace,
+		DNSRecordTemplate:      dnsRecordTemplate,
 		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth: true,

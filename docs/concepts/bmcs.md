@@ -26,6 +26,7 @@ spec:
   consoleProtocol:
     name: SSH
     port: 22
+  hostname: my-bmc.region.cloud.com
 ```
 
 Using inline `endpoint`:
@@ -49,6 +50,27 @@ spec:
     port: 22
 ```
 
+Using a DNS record template:
+
+```yaml
+apiVersion: v1
+kind: SomeDNSRecord
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+  {{- range $key, $value := .Labels }}
+    {{ $key }}: {{ $value }}
+  {{- end }}
+data:
+  hostname: "{{ .Hostname }}"
+  ip: "{{ .IP }}"
+  recordType: "A"
+  record: "ingress.region.cloud.com."
+  zoneName: "region.cloud.com."
+  ttl: "300"
+```
+
 ## Usage
 
 The BMC CRD is essential for managing and monitoring BMC devices. It is used to:
@@ -56,6 +78,7 @@ The BMC CRD is essential for managing and monitoring BMC devices. It is used to:
 - **Reconcile BMC State**: Continuously monitor the BMC's status and update its state.
 - **Detect Managed Systems**: Identify all systems (servers) managed by the BMC and create corresponding [`Server`](servers.md) resources.
 - **Automate Hardware Management**: Enable automated power control, firmware updates, and health monitoring of physical servers through the BMC.
+- **Create DNS Record**: Automatically create DNS record using a provided Go YAML template via the the managers `dns-record-template-path` flag.
 
 ## Reconciliation Process
 
@@ -73,3 +96,11 @@ power state.
 
 5. **Create Server Resources**: For each detected system, the `BMCReconciler` creates a corresponding [`Server`](servers.md)
 resource to represent the physical server.
+
+6. **Create BMC DNS Record**: If a DNS record template path is provided via the managers `dns-record-template-path` flag,
+the controller will create an instance using this template. The following BMC data is injected to the Go YAML template:
+- Namespace
+- Name
+- Spec
+- Status
+- Labels

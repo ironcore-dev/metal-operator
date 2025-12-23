@@ -334,7 +334,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, log logr.Logge
 	if serverMaintenance.Spec.ServerRef == nil {
 		return ctrl.Result{}, nil
 	}
-	server, err := GetServerByName(ctx, r.Client, serverMaintenance.Spec.ServerRef.Name)
+	server, err := r.getServerRef(ctx, serverMaintenance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

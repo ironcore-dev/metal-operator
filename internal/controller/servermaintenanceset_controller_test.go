@@ -278,6 +278,14 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 			maintenanceList.Items[2].Status.State = metalv1alpha1.ServerMaintenanceStateCompleted
 		})).Should(Succeed())
 
+		Eventually(Object(servermaintenanceset)).Should(SatisfyAll(
+			HaveField("Status.Maintenances", BeNumerically("==", 3)),
+			HaveField("Status.Pending", BeNumerically("==", 0)),
+			HaveField("Status.InMaintenance", BeNumerically("==", 0)),
+			HaveField("Status.Failed", BeNumerically("==", 0)),
+			HaveField("Status.Completed", BeNumerically("==", 3)),
+		))
+
 		By("Deleting the first server")
 		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
 
@@ -292,6 +300,16 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
+
+		By("Make sure all servers are deleted")
+		Eventually(func() int {
+			serverList := &metalv1alpha1.ServerList{}
+			err := k8sClient.List(ctx, serverList, &client.ListOptions{Namespace: ns.Name})
+			if err != nil {
+				return -1
+			}
+			return len(serverList.Items)
+		}).Should(Equal(0))
 
 		By("Checking if the status has been updated to zero maintenances")
 		Eventually(Object(servermaintenanceset), "10s").Should(SatisfyAll(
@@ -354,9 +372,9 @@ var _ = Describe("ServerMaintenanceSet Controller", func() {
 		))
 
 		// cleanup
-		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, server01)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, server02)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, servermaintenanceset)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 })

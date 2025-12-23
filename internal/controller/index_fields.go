@@ -56,5 +56,18 @@ func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error
 		return err
 	}
 
+	if err := indexer.IndexField(ctx, &metalv1alpha1.ServerMaintenance{}, serverRefField, func(rawObj client.Object) []string {
+		maintenance, ok := rawObj.(*metalv1alpha1.ServerMaintenance)
+		if !ok {
+			return nil
+		}
+		if maintenance.Spec.ServerRef == nil {
+			return nil
+		}
+		return []string{maintenance.Spec.ServerRef.Name}
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -1,0 +1,16 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerMaintenanceSet
+metadata:
+  labels:
+    app.kubernetes.io/name: servermaintenanceset
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: servermaintenanceset-sample
+spec:
+  serverSelector:
+    matchLabels:
+      manufacturer: "dell"
+  serverMaintenanceTemplate:
+    policy: OwnerApproval
+    serverPower: "Off"

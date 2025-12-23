@@ -25,6 +25,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
 - [ServerMaintenance](#servermaintenance)
+- [ServerMaintenanceSet](#servermaintenanceset)
 
 
 
@@ -1020,6 +1021,7 @@ Power defines the possible power states for a device.
 _Appears in:_
 - [ServerClaimSpec](#serverclaimspec)
 - [ServerMaintenanceSpec](#servermaintenancespec)
+- [ServerMaintenanceTemplate](#servermaintenancetemplate)
 - [ServerSpec](#serverspec)
 
 | Field | Description |
@@ -1208,6 +1210,7 @@ ServerBootConfigurationTemplate defines the parameters to be used for rendering 
 
 _Appears in:_
 - [ServerMaintenanceSpec](#servermaintenancespec)
+- [ServerMaintenanceTemplate](#servermaintenancetemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -1306,6 +1309,7 @@ _Appears in:_
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
 - [ServerMaintenanceSpec](#servermaintenancespec)
+- [ServerMaintenanceTemplate](#servermaintenancetemplate)
 
 | Field | Description |
 | --- | --- |
@@ -1329,6 +1333,62 @@ _Appears in:_
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the BMCSettings has requested for the referred server. |  |  |
 
 
+#### ServerMaintenanceSet
+
+
+
+ServerMaintenanceSet is the Schema for the ServerMaintenanceSet API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `ServerMaintenanceSet` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[ServerMaintenanceSetSpec](#servermaintenancesetspec)_ |  |  |  |
+| `status` _[ServerMaintenanceSetStatus](#servermaintenancesetstatus)_ |  |  |  |
+
+
+#### ServerMaintenanceSetSpec
+
+
+
+ServerMaintenanceSetSpec defines the desired state of ServerMaintenanceSet.
+
+
+
+_Appears in:_
+- [ServerMaintenanceSet](#servermaintenanceset)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#labelselector-v1-meta)_ | ServerLabelSelector specifies a label selector to identify the servers that are to be maintained. |  |  |
+| `serverMaintenanceTemplate` _[ServerMaintenanceTemplate](#servermaintenancetemplate)_ | Template specifies the template for the server maintenance. |  |  |
+
+
+#### ServerMaintenanceSetStatus
+
+
+
+ServerMaintenanceSetStatus defines the observed state of ServerMaintenanceSet.
+
+
+
+_Appears in:_
+- [ServerMaintenanceSet](#servermaintenanceset)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `maintenances` _integer_ | Maintenances is the number of server maintenances in the set. |  |  |
+| `pending` _integer_ | Pending is the total number of pending server maintenances in the set. |  |  |
+| `inMaintenance` _integer_ | InMaintenance is the total number of server maintenances in the set that are currently in maintenance. |  |  |
+| `failed` _integer_ | Failed is the total number of failed server maintenances in the set. |  |  |
+| `completed` _integer_ | Completed is the total number of completed server maintenances in the set. |  |  |
+
+
 #### ServerMaintenanceSpec
 
 
@@ -1343,9 +1403,9 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `policy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | Policy specifies the maintenance policy to be enforced on the server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | ServerRef is a reference to the server that is to be maintained. |  |  |
 | `serverPower` _[Power](#power)_ | ServerPower specifies the power state of the server during maintenance. |  |  |
 | `serverBootConfigurationTemplate` _[ServerBootConfigurationTemplate](#serverbootconfigurationtemplate)_ | ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance. |  |  |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | ServerRef is a reference to the server that is to be maintained. |  |  |
 
 
 #### ServerMaintenanceState
@@ -1364,6 +1424,7 @@ _Appears in:_
 | `Pending` | ServerMaintenanceStatePending specifies that the server maintenance is pending.<br /> |
 | `InMaintenance` | ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.<br /> |
 | `Failed` | ServerMaintenanceStateFailed specifies that the server maintenance has failed.<br /> |
+| `Completed` | ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.<br /> |
 
 
 #### ServerMaintenanceStatus
@@ -1380,6 +1441,25 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `state` _[ServerMaintenanceState](#servermaintenancestate)_ | State specifies the current state of the server maintenance. |  |  |
+
+
+#### ServerMaintenanceTemplate
+
+
+
+ServerMaintenanceTemplate defines the template for the ServerMaintenance Resource to be applied to the server.
+
+
+
+_Appears in:_
+- [ServerMaintenanceSetSpec](#servermaintenancesetspec)
+- [ServerMaintenanceSpec](#servermaintenancespec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `policy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | Policy specifies the maintenance policy to be enforced on the server. |  |  |
+| `serverPower` _[Power](#power)_ | ServerPower specifies the power state of the server during maintenance. |  |  |
+| `serverBootConfigurationTemplate` _[ServerBootConfigurationTemplate](#serverbootconfigurationtemplate)_ | ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance. |  |  |
 
 
 #### ServerPowerState

@@ -715,7 +715,9 @@ var _ = Describe("Server Controller", func() {
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
-				Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerMaintenanceTemplate: metalv1alpha1.ServerMaintenanceTemplate{
+					Policy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, maintenance)).To(Succeed())

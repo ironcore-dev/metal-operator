@@ -28,16 +28,11 @@ type ServerBootConfigurationTemplate struct {
 	Spec ServerBootConfigurationSpec `json:"spec"`
 }
 
-// ServerMaintenanceSpec defines the desired state of a ServerMaintenance
-type ServerMaintenanceSpec struct {
+// ServerMaintenanceTemplate defines the template for the ServerMaintenance Resource to be applied to the server.
+type ServerMaintenanceTemplate struct {
 	// Policy specifies the maintenance policy to be enforced on the server.
 	// +optional
 	Policy ServerMaintenancePolicy `json:"policy,omitempty"`
-
-	// ServerRef is a reference to the server that is to be maintained.
-	// +required
-	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
-
 	// ServerPower specifies the power state of the server during maintenance.
 	// +optional
 	ServerPower Power `json:"serverPower,omitempty"`
@@ -45,6 +40,15 @@ type ServerMaintenanceSpec struct {
 	// ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.
 	// +optional
 	ServerBootConfigurationTemplate *ServerBootConfigurationTemplate `json:"serverBootConfigurationTemplate,omitempty"`
+}
+
+// ServerMaintenanceSpec defines the desired state of a ServerMaintenance
+type ServerMaintenanceSpec struct {
+	// ServerMaintenanceTemplate defines the template for the ServerMaintenance Resource to be applied to the server.
+	ServerMaintenanceTemplate `json:",inline"`
+	// ServerRef is a reference to the server that is to be maintained.
+	// +required
+	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
 }
 
 // ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.
@@ -73,6 +77,8 @@ const (
 	ServerMaintenanceStateInMaintenance ServerMaintenanceState = "InMaintenance"
 	// ServerMaintenanceStateFailed specifies that the server maintenance has failed.
 	ServerMaintenanceStateFailed ServerMaintenanceState = "Failed"
+	// ServerMaintenanceStateCompleted specifies that the server maintenance has been completed.
+	ServerMaintenanceStateCompleted ServerMaintenanceState = "Completed"
 )
 
 // +kubebuilder:object:root=true

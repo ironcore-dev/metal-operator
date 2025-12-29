@@ -11,6 +11,7 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
+// SubscribeMetricsReport subscribes to Redfish metric reporting events for the given hostname and callback URL.
 func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
@@ -19,11 +20,12 @@ func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
 	)
 	if err != nil {
-		return link, fmt.Errorf("failed to create event subscription: %w", err)
+		return "", fmt.Errorf("failed to create event subscription: %w", err)
 	}
 	return link, nil
 }
 
+// SubscribeEvents creates a Redfish event subscription for events.
 func SubscribeEvents(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,

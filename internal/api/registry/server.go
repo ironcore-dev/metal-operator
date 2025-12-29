@@ -6,9 +6,11 @@ package registry
 // NetworkInterface represents a network interface on a server,
 // including its IP and MAC addresses.
 type NetworkInterface struct {
-	Name       string `json:"name"`
-	IPAddress  string `json:"ipAddress"`
-	MACAddress string `json:"macAddress"`
+	Name          string   `json:"name"`
+	IPAddress     string   `json:"ipAddress,omitempty"` // Deprecated: kept for backward compatibility, always nil
+	IPAddresses   []string `json:"ipAddresses"`
+	MACAddress    string   `json:"macAddress"`
+	CarrierStatus string   `json:"carrierStatus"`
 }
 
 // Server represents a server with a list of network interfaces.

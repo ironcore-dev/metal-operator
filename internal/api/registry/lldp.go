@@ -56,6 +56,7 @@ func ParseLLDPCTL(data []byte) (LLDP, error) {
 	type rawVlan struct {
 		VlanID string `json:"vlan-id"`
 		PVID   bool   `json:"pvid"`
+		Value  string `json:"value,omitempty"`
 	}
 	type rawIfaceDetails struct {
 		Via     string                `json:"via"`
@@ -63,7 +64,7 @@ func ParseLLDPCTL(data []byte) (LLDP, error) {
 		Age     string                `json:"age"`
 		Chassis map[string]rawChassis `json:"chassis"`
 		Port    rawPort               `json:"port"`
-		Vlan    *rawVlan              `json:"vlan,omitempty"`
+		Vlan    json.RawMessage       `json:"vlan,omitempty"`
 	}
 	type rawLLDPCTL struct {
 		LLDP struct {
@@ -105,8 +106,28 @@ func ParseLLDPCTL(data []byte) (LLDP, error) {
 					PortDescription:   details.Port.Descr,
 					MgmtIP:            ch.MgmtIP,
 				}
-				if details.Vlan != nil {
-					n.VlanID = details.Vlan.VlanID
+				// Parse vlan field which can be either a single object or an array
+				if len(details.Vlan) > 0 {
+					// Try single object first
+					var singleVlan rawVlan
+					if err := json.Unmarshal(details.Vlan, &singleVlan); err == nil {
+						n.VlanID = singleVlan.VlanID
+					} else {
+						// Try array of vlans
+						var vlanArray []rawVlan
+						if err := json.Unmarshal(details.Vlan, &vlanArray); err == nil && len(vlanArray) > 0 {
+							// Take the first vlan with pvid=true, or just the first one
+							for _, v := range vlanArray {
+								if v.PVID {
+									n.VlanID = v.VlanID
+									break
+								}
+							}
+							if n.VlanID == "" && len(vlanArray) > 0 {
+								n.VlanID = vlanArray[0].VlanID
+							}
+						}
+					}
 				}
 				for _, cap := range ch.Capability {
 					if cap.Enabled {

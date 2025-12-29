@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
@@ -66,6 +67,7 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -129,6 +131,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
+		Expect(RegisterIndexFields(mgrCtx, k8sManager.GetFieldIndexer())).To(Succeed())
 
 		prefixDB := &macdb.MacPrefixes{
 			MacPrefixes: []macdb.MacPrefix{
@@ -152,6 +155,8 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}
 
+		accessor := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+
 		// register reconciler here
 		Expect((&EndpointReconciler{
 			Client:      k8sManager.GetClient(),
@@ -161,11 +166,14 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCReconciler{
-			Client:           k8sManager.GetClient(),
-			Scheme:           k8sManager.GetScheme(),
-			EventURL:         "http://localhost:8008",
-			Insecure:         true,
-			ManagerNamespace: ns.Name,
+			Client:                 k8sManager.GetClient(),
+			Scheme:                 k8sManager.GetScheme(),
+			Insecure:               true,
+			ManagerNamespace:       ns.Name,
+			BMCResetWaitTime:       400 * time.Millisecond,
+			BMCClientRetryInterval: 25 * time.Millisecond,
+			EventURL:               "http://localhost:8008",
+			Conditions:             accessor,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
@@ -180,6 +188,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
+			Conditions:              accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -205,12 +214,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&BiosSettingsReconciler{
+		Expect((&BIOSSettingsReconciler{
 			Client:           k8sManager.GetClient(),
 			ManagerNamespace: ns.Name,
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -225,6 +235,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -243,6 +254,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -256,6 +268,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:         true,
 			Scheme:           k8sManager.GetScheme(),
 			ResyncInterval:   10 * time.Millisecond,
+			Conditions:       accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -275,7 +288,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 
 		By("Starting the registry server")
 		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			registryServer := registry.NewServer(GinkgoLogr, ":30000")
+			registryServer := registry.NewServer(GinkgoLogr, ":30000", k8sManager.GetClient())
 			if err := registryServer.Start(ctx); err != nil {
 				return fmt.Errorf("failed to start registry server: %w", err)
 			}

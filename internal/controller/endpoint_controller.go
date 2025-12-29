@@ -149,7 +149,8 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
-
+			default:
+				return ctrl.Result{}, fmt.Errorf("uknown protocol: %s", m.Protocol)
 			}
 			// TODO: other types like Switches can be handled here later
 		}

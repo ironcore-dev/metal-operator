@@ -25,10 +25,11 @@ concurrency:
 jobs:
   # Build job
   build:
+    name: Run docs build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Not needed if lastUpdated is not enabled
       # - uses: pnpm/action-setup@v3 # Uncomment this block if you're using pnpm
@@ -60,7 +61,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
     runs-on: ubuntu-latest
-    name: Deploy
+    name: Run docs publish
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: Run tests on Ubuntu
+    name: Run tests
     runs-on: ubuntu-latest
     steps:
       - name: Install lldpd
@@ -22,7 +22,7 @@ jobs:
           sudo systemctl start lldpd
 
       - name: Clone the code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Go
         uses: actions/setup-go@v6

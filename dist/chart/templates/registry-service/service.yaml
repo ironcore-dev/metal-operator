@@ -1,0 +1,16 @@
+{{ if .Values.registry.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: metal-registry
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: registry
+    port: {{ .Values.registry.port }}
+    protocol: TCP
+    targetPort: {{ .Values.registry.port }}
+  selector:
+    control-plane: controller-manager
+  type: ClusterIP
+{{ end }}

@@ -12,6 +12,7 @@ import (
 	gofishCommon "github.com/stmcginnis/gofish/common"
 
 	"github.com/stmcginnis/gofish/redfish"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
@@ -84,6 +85,8 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, 
 
 // ResetManager resets the BMC with a delay for pending settings.
 func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating BMC reset", "UUID", UUID, "ResetType", resetType)
 	go func() {
 		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
 			time.Sleep(150 * time.Millisecond)
@@ -117,7 +120,7 @@ func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, UUID 
 }
 
 // GetBMCAttributeValues retrieves specific BMC attribute values.
-func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes []string) (redfish.SettingsAttributes, error) {
+func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -128,9 +131,9 @@ func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string
 	}
 
 	result := make(redfish.SettingsAttributes, len(attributes))
-	for _, name := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[name]; ok && filtered[name].AttributeName != "" {
-			result[name] = attrData["value"]
+	for key := range attributes {
+		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok && filtered[key].AttributeName != "" {
+			result[key] = attrData["value"]
 		}
 	}
 	return result, nil
@@ -170,7 +173,7 @@ func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(readOnly, immutable b
 }
 
 // CheckBMCAttributes validates BMC attributes.
-func (r *RedfishLocalBMC) CheckBMCAttributes(UUID string, attrs redfish.SettingsAttributes) (bool, error) {
+func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, attrs redfish.SettingsAttributes) (bool, error) {
 	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err

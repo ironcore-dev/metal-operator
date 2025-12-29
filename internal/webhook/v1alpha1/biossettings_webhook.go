@@ -22,7 +22,7 @@ import (
 
 // nolint:unused
 // log is for logging in this package.
-var biossettingslog = logf.Log.WithName("biossettings-resource")
+var settingsLog = logf.Log.WithName("biossettings-resource")
 
 // SetupBIOSSettingsWebhookWithManager registers the webhook for BIOSSettings in the manager.
 func SetupBIOSSettingsWebhookWithManager(mgr ctrl.Manager) error {
@@ -37,38 +37,35 @@ func SetupBIOSSettingsWebhookWithManager(mgr ctrl.Manager) error {
 
 // BIOSSettingsCustomValidator struct is responsible for validating the BIOSSettings resource
 // when it is created, updated, or deleted.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as this struct is used only for temporary operations and does not need to be deeply copied.
 type BIOSSettingsCustomValidator struct {
-	Client client.Client
+	client.Client
 }
 
 var _ webhook.CustomValidator = &BIOSSettingsCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
 func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	biossettings, ok := obj.(*metalv1alpha1.BIOSSettings)
+	settings, ok := obj.(*metalv1alpha1.BIOSSettings)
 	if !ok {
 		return nil, fmt.Errorf("expected a BIOSSettings object but got %T", obj)
 	}
-	biossettingslog.Info("Validation for BIOSSettings upon creation", "name", biossettings.GetName())
+	settingsLog.Info("Validation for BIOSSettings upon creation", "name", settings.GetName())
 
-	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
-	if err := v.Client.List(ctx, biosSettingsList); err != nil {
-		return nil, fmt.Errorf("failed to list BIOSSettingsList: %w", err)
+	settingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := v.List(ctx, settingsList); err != nil {
+		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
 	}
 
-	return checkForDuplicateBiosSettingsRefToServer(biosSettingsList, biossettings)
+	return checkForDuplicateBIOSSettingsRefToServer(settingsList, settings)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
 func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	biossettings, ok := newObj.(*metalv1alpha1.BIOSSettings)
+	settings, ok := newObj.(*metalv1alpha1.BIOSSettings)
 	if !ok {
 		return nil, fmt.Errorf("expected a BIOSSettings object for the newObj but got %T", newObj)
 	}
-	biossettingslog.Info("Validation for BIOSSettings upon update", "name", biossettings.GetName())
+	settingsLog.Info("Validation for BIOSSettings upon update", "name", settings.GetName())
 
 	oldBIOSSettings, ok := oldObj.(*metalv1alpha1.BIOSSettings)
 	if !ok {
@@ -76,56 +73,52 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 	}
 	// we do not allow Updates to BIOSSettings post server Maintenance creation
 	if oldBIOSSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(biossettings) && oldBIOSSettings.Spec.ServerMaintenanceRef != nil {
+		!ShouldAllowForceUpdateInProgress(settings) && oldBIOSSettings.Spec.ServerMaintenanceRef != nil {
 		err := fmt.Errorf("BIOSSettings (%v) is in progress, unable to update %v",
 			oldBIOSSettings.Name,
-			biossettings.Name)
+			settings.Name)
 		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: biossettings.GroupVersionKind().Group, Kind: biossettings.Kind},
-			biossettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+			schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
+			settings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
 	}
 
-	biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
-	if err := v.Client.List(ctx, biosSettingsList); err != nil {
-		return nil, fmt.Errorf("failed to list BIOSSettingsList: %w", err)
+	settingsList := &metalv1alpha1.BIOSSettingsList{}
+	if err := v.List(ctx, settingsList); err != nil {
+		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
 	}
 
-	return checkForDuplicateBiosSettingsRefToServer(biosSettingsList, biossettings)
+	return checkForDuplicateBIOSSettingsRefToServer(settingsList, settings)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
-func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	biossettings, ok := obj.(*metalv1alpha1.BIOSSettings)
+func (v *BIOSSettingsCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+	settings, ok := obj.(*metalv1alpha1.BIOSSettings)
 	if !ok {
 		return nil, fmt.Errorf("expected a BIOSSettings object but got %T", obj)
 	}
-	biossettingslog.Info("Validation for BIOSSettings upon deletion", "name", biossettings.GetName())
+	settingsLog.Info("Validation for BIOSSettings upon deletion", "name", settings.GetName())
 
-	if biossettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(biossettings) {
+	if settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(settings) {
 		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
 	}
 
 	return nil, nil
 }
 
-func checkForDuplicateBiosSettingsRefToServer(
-	biosSettingsList *metalv1alpha1.BIOSSettingsList,
-	biosSettings *metalv1alpha1.BIOSSettings,
-) (admission.Warnings, error) {
-
-	for _, bs := range biosSettingsList.Items {
-		if biosSettings.Name == bs.Name {
+func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSettingsList, settings *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
+	for _, bs := range settingsList.Items {
+		if settings.Name == bs.Name {
 			continue
 		}
-		if biosSettings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
+		if settings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
 			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
-				biosSettings.Spec.ServerRef.Name,
-				biosSettings.Name,
+				settings.Spec.ServerRef.Name,
+				settings.Name,
 				bs.Spec.ServerRef.Name,
 				bs.Name)
 			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: biosSettings.GroupVersionKind().Group, Kind: biosSettings.Kind},
-				biosSettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", "ServerRef"), err)})
+				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
+				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", "serverRef"), err)})
 		}
 	}
 	return nil, nil

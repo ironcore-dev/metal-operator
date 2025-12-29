@@ -300,7 +300,10 @@ spec:
                 description: SKU is the stock keeping unit identifier for the BMC.
                 type: string
               state:
-                description: State represents the current state of the BMC.
+                default: Pending
+                description: |-
+                  State represents the current state of the BMC.
+                  kubebuilder:validation:Enum=Enabled;Error;Pending
                 type: string
             type: object
         type: object

@@ -20,14 +20,10 @@ type BIOSSettingsTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
-	// +optional
-	ServerMaintenanceRef *corev1.ObjectReference `json:"serverMaintenanceRef,omitempty"`
 }
 
 type SettingsFlowItem struct {
-	// Name identifies what this settings is doing
+	// Name is the name of the flow item
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1000
@@ -49,6 +45,10 @@ type SettingsFlowItem struct {
 type BIOSSettingsSpec struct {
 	// BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.
 	BIOSSettingsTemplate `json:",inline"`
+
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server.
+	// +optional
+	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
 	// ServerRef is a reference to a specific server to apply bios setting on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
@@ -88,6 +88,7 @@ type BIOSSettingsStatus struct {
 	// +optional
 	State BIOSSettingsState `json:"state,omitempty"`
 
+	// FlowState is a list of individual BIOSSettings operation flows.
 	FlowState []BIOSSettingsFlowStatus `json:"flowState,omitempty"`
 
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.

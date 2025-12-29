@@ -8,10 +8,27 @@ import (
 	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
+// ObjectReference is the namespaced name reference to an object.
+type ObjectReference struct {
+	// APIVersion is the API version of the referenced object.
+	APIVersion string `json:"apiVersion"`
+	// Kind is the kind of the referenced object.
+	Kind string `json:"kind"`
+	// Namespace is the namespace of the referenced object.
+	Namespace string `json:"namespace"`
+	// Name is the name of the referenced object.
+	Name string `json:"name"`
+	// UID is the uid of the referenced object.
+	UID types.UID `json:"uid"`
+}
+
 // IP is an IP address.
+// +kubebuilder:validation:Type=string
+// +kubebuilder:validation:Format=ip
 type IP struct {
 	netip.Addr `json:"-"`
 }

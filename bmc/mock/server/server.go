@@ -81,6 +81,8 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 		s.handleRedfishPOST(w, r)
 	case http.MethodPatch:
 		s.handleRedfishPATCH(w, r)
+	case http.MethodDelete:
+		s.handleRedfishDELETE(w, r)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
@@ -151,6 +153,42 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 	defer s.mu.Unlock()
 	// Store the newly modified version
 	s.overrides[urlPath] = base
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *MockServer) handleRedfishDELETE(w http.ResponseWriter, r *http.Request) {
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
+
+	urlPath := resolvePath(r.URL.Path)
+
+	// Load existing resource: from override if exists, else embedded
+	base, err := fetchCurrentDataForPath(s, urlPath)
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "resource not found"):
+			http.NotFound(w, r)
+			return
+		case strings.Contains(err.Error(), "corrupt embedded JSON"):
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// If it's a Collection (has "Members"), reject
+	if _, isCollection := base["Members"]; isCollection {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Remove the override to revert to embedded JSON
+	delete(s.overrides, urlPath)
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -295,7 +295,13 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 	}
 
 	if len(pendingSettings) > 0 {
-		log.V(1).Info("Pending BIOS setting tasks found", "TaskCound", len(pendingSettings))
+		log.V(1).Info("Pending BIOS setting tasks found", "TaskCount", len(pendingSettings))
+
+		// Request maintenance to keep server in maintenance state while pending settings exist
+		if _, err := r.requestMaintenanceForServer(ctx, log, settings, server); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		pendingSettingStateCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSPendingSettingConditionCheck)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BIOSSettings state %w", err)

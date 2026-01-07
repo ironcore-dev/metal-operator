@@ -466,23 +466,3 @@ func (d *DellIdracManager) CheckBMCAttributes(
 	}
 	return helpers.CheckAttribues(attributes, filteredAttr)
 }
-
-// DellIdracBiosManager provides Dell-specific BIOS management functionality
-type DellIdracBiosManager struct {
-	Service *gofish.Service
-}
-
-// GetDellBIOSAttributes retrieves Dell-specific BIOS attributes that may not be
-// available through standard Redfish BIOS endpoints
-func (d *DellIdracBiosManager) GetDellBIOSAttributes(ctx context.Context, systemURI string) (map[string]interface{}, error) {
-	// Dell iDRAC may expose additional BIOS attributes through OEM endpoints
-	// This is a placeholder for future Dell-specific BIOS attribute handling
-	return make(map[string]interface{}), nil
-}
-
-// SetDellBIOSAttributes sets Dell-specific BIOS attributes
-func (d *DellIdracBiosManager) SetDellBIOSAttributes(ctx context.Context, systemURI string, attributes map[string]interface{}) error {
-	// Dell iDRAC may require special handling for certain BIOS attributes
-	// This is a placeholder for future Dell-specific BIOS attribute setting
-	return nil
-}

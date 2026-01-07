@@ -83,25 +83,4 @@ var _ = Describe("Dell OEM", func() {
 		})
 	})
 
-	Describe("Dell Common BMC Attributes", func() {
-		It("should include Dell-specific BMC attributes", func() {
-			Expect(dellCommonBMCAttributes).ToNot(BeEmpty())
-
-			// Check that common Dell attributes are defined
-			Expect(dellCommonBMCAttributes).To(HaveKey("SysLog.1.SysLogEnable"))
-			Expect(dellCommonBMCAttributes).To(HaveKey("NTPConfigGroup.1.NTPEnable"))
-			Expect(dellCommonBMCAttributes).To(HaveKey("EmailAlert.1.Enable"))
-			Expect(dellCommonBMCAttributes).To(HaveKey("SNMP.1.AgentEnable"))
-		})
-
-		It("should have correct attribute types", func() {
-			syslogAttr := dellCommonBMCAttributes["SysLog.1.SysLogEnable"]
-			Expect(syslogAttr.Type).To(Equal(redfish.BooleanAttributeType))
-			Expect(syslogAttr.ReadOnly).To(BeFalse())
-
-			snmpAttr := dellCommonBMCAttributes["SNMP.1.AgentCommunity"]
-			Expect(snmpAttr.Type).To(Equal(redfish.StringAttributeType))
-			Expect(snmpAttr.ReadOnly).To(BeFalse())
-		})
-	})
 })

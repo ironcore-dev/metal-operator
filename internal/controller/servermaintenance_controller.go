@@ -103,10 +103,6 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 }
 
 func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance) (result ctrl.Result, err error) {
-	if maintenance.Spec.ServerRef == nil {
-		return ctrl.Result{}, fmt.Errorf("server reference is nil")
-	}
-
 	server, err := GetServerByName(ctx, r.Client, maintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -178,10 +174,6 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 }
 
 func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
-	if maintenance.Spec.ServerRef == nil {
-		return ctrl.Result{}, fmt.Errorf("server reference is nil")
-	}
-
 	server, err := GetServerByName(ctx, r.Client, maintenance.Spec.ServerRef.Name)
 	if err != nil {
 		return ctrl.Result{}, err

@@ -416,35 +416,19 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 		}
 
 		var req []reconcile.Request
-		processedNames := make(map[string]struct{})
-
 		if server.Status.State == metalv1alpha1.ServerStateInitial {
 			return nil
 		}
 
 		if server.Spec.ServerMaintenanceRef != nil {
-			name := server.Spec.ServerMaintenanceRef.Name
-			if _, found := processedNames[name]; !found {
-				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: server.Namespace, Name: name},
-				})
-				processedNames[name] = struct{}{}
-			}
+			req = append(req, reconcile.Request{
+				NamespacedName: types.NamespacedName{Namespace: server.Namespace, Name: server.Spec.ServerMaintenanceRef.Name},
+			})
 		}
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: server.Name}); err != nil {
 			log.Error(err, "failed to list ServerMaintenances")
-		} else {
-			for _, maintenance := range maintenanceList.Items {
-				name := maintenance.Name
-				if _, found := processedNames[name]; !found {
-					req = append(req, reconcile.Request{
-						NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: name},
-					})
-					processedNames[name] = struct{}{}
-				}
-			}
 		}
 		return req
 	})

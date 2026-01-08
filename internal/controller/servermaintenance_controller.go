@@ -58,6 +58,11 @@ func (r *ServerMaintenanceReconciler) reconcileExists(ctx context.Context, log l
 func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	log.V(1).Info("Reconciling ServerMaintenance")
 
+	if maintenance.Spec.ServerRef == nil {
+		log.V(1).Info("ServerRef is nil, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
 	if shouldIgnoreReconciliation(maintenance) {
 		log.V(1).Info("Skipped ServerMaintenance reconciliation")
 		return ctrl.Result{}, nil
@@ -429,6 +434,12 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: server.Name}); err != nil {
 			log.Error(err, "failed to list ServerMaintenances")
+			return req
+		}
+		for _, maintenance := range maintenanceList.Items {
+			req = append(req, reconcile.Request{
+				NamespacedName: types.NamespacedName{Namespace: maintenance.Namespace, Name: maintenance.Name},
+			})
 		}
 		return req
 	})

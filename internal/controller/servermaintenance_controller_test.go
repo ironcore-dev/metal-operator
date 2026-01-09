@@ -16,8 +16,10 @@ import (
 var _ = Describe("ServerMaintenance Controller", func() {
 	ns := SetupTest(nil)
 
-	var server *metalv1alpha1.Server
-	var bmcSecret *metalv1alpha1.BMCSecret
+	var (
+		server    *metalv1alpha1.Server
+		bmcSecret *metalv1alpha1.BMCSecret
+	)
 
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")

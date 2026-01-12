@@ -25,11 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	mockServerIP   = "127.0.0.1"
-	mockServerPort = 8000
-)
-
 var _ = Describe("BIOSSettings Controller", func() {
 	ns := SetupTest(nil)
 
@@ -64,9 +59,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -915,12 +910,12 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -1100,7 +1095,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	})
 
 	It("Should fail and create maintenance when pending settings exist", func(ctx SpecContext) {
-		// Ensure BMC is in Enabled state
+		By("Ensuring BMC is in Enabled state")
 		Eventually(UpdateStatus(bmcObj, func() {
 			bmcObj.Status.State = metalv1alpha1.BMCStateEnabled
 		})).To(Succeed())
@@ -1139,7 +1134,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		)
 
 		By("Creating pending changes on the mock server via HTTP PATCH")
-		pendingSettingsURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", mockServerIP, mockServerPort)
+		pendingSettingsURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", MockServerIP, MockServerPort)
 		pendingData := map[string]interface{}{
 			"Attributes": map[string]interface{}{
 				"PendingSetting1": "PendingValue1",
@@ -1157,7 +1152,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		}
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
-		defer resp.Body.Close()
+		DeferCleanup(resp.Body.Close)
 		Expect(resp.StatusCode).To(BeElementOf(http.StatusOK, http.StatusNoContent, http.StatusAccepted))
 
 		By("Creating BIOSSettings to apply new changes")
@@ -1206,13 +1201,13 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		)
 
 		By("Clearing pending changes on the mock server via HTTP DELETE")
-		clearPendingURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", mockServerIP, mockServerPort)
+		clearPendingURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", MockServerIP, MockServerPort)
 		clearReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, clearPendingURL, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		clearResp, err := client.Do(clearReq)
 		Expect(err).NotTo(HaveOccurred())
-		defer clearResp.Body.Close()
+		DeferCleanup(clearResp.Body.Close)
 		Expect(clearResp.StatusCode).To(BeElementOf(http.StatusOK, http.StatusNoContent, http.StatusAccepted))
 
 		By("Cleaning up BIOSSettings")
@@ -1267,9 +1262,9 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},

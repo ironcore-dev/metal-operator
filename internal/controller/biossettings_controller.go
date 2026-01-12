@@ -297,11 +297,6 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 	if len(pendingSettings) > 0 {
 		log.V(1).Info("Pending BIOS setting tasks found", "TaskCount", len(pendingSettings))
 
-		// Request maintenance to keep server in maintenance state while pending settings exist
-		if _, err := r.requestMaintenanceForServer(ctx, log, settings, server); err != nil {
-			return ctrl.Result{}, err
-		}
-
 		pendingSettingStateCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSPendingSettingConditionCheck)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BIOSSettings state %w", err)
@@ -970,8 +965,21 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, log logr
 		return ctrl.Result{}, nil
 	}
 
-	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bios settings maintenance
 	log.V(1).Info("Failed to update BIOS settings", "Server", server.Name)
+
+	// Create maintenance object only if failure is due to pending settings and maintenance not already present
+	if settings.Spec.ServerMaintenanceRef == nil {
+		// Check if the failure is due to pending settings
+		for _, condition := range settings.Status.Conditions {
+			if condition.Type == BIOSPendingSettingConditionCheck && condition.Status == metav1.ConditionTrue {
+				if _, err := r.requestMaintenanceForServer(ctx, log, settings, server); err != nil {
+					return ctrl.Result{}, err
+				}
+				break
+			}
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 

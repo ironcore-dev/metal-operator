@@ -46,7 +46,6 @@ var _ = Describe("ServerClaim Controller", func() {
 				GenerateName: "test-claim-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
@@ -590,6 +589,9 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 				},
 				Labels: map[string]string{"foo": "bar"},
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 			},
 		}
 		ExpectWithOffset(1, k8sClient.Create(ctx, &server)).To(Succeed())

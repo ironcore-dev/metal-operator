@@ -25,6 +25,7 @@ concurrency:
 jobs:
   # Build job
   build:
+    name: Run docs build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -60,7 +61,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
     runs-on: ubuntu-latest
-    name: Deploy
+    name: Run docs publish
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

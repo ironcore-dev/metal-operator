@@ -4,7 +4,10 @@
 package console
 
 import (
+	"context"
+
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -13,6 +16,16 @@ import (
 
 var _ = Describe("Console Access", func() {
 	_ = SetupTest()
+
+	AfterEach(func(ctx context.Context) {
+		By("Deleting the Server, BMC and BMCSecret resources")
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{})).To(Succeed())
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMC{})).To(Succeed())
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSecret{})).To(Succeed())
+
+		By("Ensuring clean state")
+		controller.EnsureCleanState()
+	})
 
 	It("Should successfully construct console config for Server with inline configuration", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
@@ -26,7 +39,6 @@ var _ = Describe("Console Access", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		By("Creating a Server object")
 		server := &metalv1alpha1.Server{
@@ -41,10 +53,10 @@ var _ = Describe("Console Access", func() {
 						Name: bmcSecret.Name,
 					},
 				},
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, server)
 
 		config, err := GetConfigForServerName(ctx, k8sClient, server.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -67,7 +79,6 @@ var _ = Describe("Console Access", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmcSecret)
 
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
@@ -84,7 +95,6 @@ var _ = Describe("Console Access", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, bmc)
 
 		By("Creating a Server object")
 		server := &metalv1alpha1.Server{
@@ -95,10 +105,10 @@ var _ = Describe("Console Access", func() {
 				BMCRef: &corev1.LocalObjectReference{
 					Name: bmc.Name,
 				},
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, server)
 
 		config, err := GetConfigForServerName(ctx, k8sClient, server.Name)
 		Expect(err).NotTo(HaveOccurred())

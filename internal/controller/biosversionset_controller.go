@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -44,57 +43,44 @@ type BIOSVersionSetReconciler struct {
 // move the current state of the cluster closer to the desired state.
 func (r *BIOSVersionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	biosVersionSet := &metalv1alpha1.BIOSVersionSet{}
-	if err := r.Get(ctx, req.NamespacedName, biosVersionSet); err != nil {
+	versionSet := &metalv1alpha1.BIOSVersionSet{}
+	if err := r.Get(ctx, req.NamespacedName, versionSet); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.V(1).Info("Reconciling biosVersionSet")
-
-	return r.reconcileExists(ctx, log, biosVersionSet)
+	return r.reconcileExists(ctx, log, versionSet)
 }
 
-func (r *BIOSVersionSetReconciler) reconcileExists(
-	ctx context.Context,
-	log logr.Logger,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) (ctrl.Result, error) {
-	// if object is being deleted - reconcile deletion
-	if !biosVersionSet.DeletionTimestamp.IsZero() {
-		log.V(1).Info("object is being deleted")
-		return r.delete(ctx, log, biosVersionSet)
+func (r *BIOSVersionSetReconciler) reconcileExists(ctx context.Context, log logr.Logger, versionSet *metalv1alpha1.BIOSVersionSet) (ctrl.Result, error) {
+	if !versionSet.DeletionTimestamp.IsZero() {
+		return r.delete(ctx, log, versionSet)
 	}
-
-	return r.reconcile(ctx, log, biosVersionSet)
+	return r.reconcile(ctx, log, versionSet)
 }
 
-func (r *BIOSVersionSetReconciler) delete(
-	ctx context.Context,
-	log logr.Logger,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(biosVersionSet, BIOSVersionSetFinalizer) {
+func (r *BIOSVersionSetReconciler) delete(ctx context.Context, log logr.Logger, versionSet *metalv1alpha1.BIOSVersionSet) (ctrl.Result, error) {
+	log.V(1).Info("Deleting BIOSVersionSet")
+	if !controllerutil.ContainsFinalizer(versionSet, BIOSVersionSetFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.handleIgnoreAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, versionSet); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
+	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
 	}
 
-	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
-
-	if currentStatus.AvailableBIOSVersion != (currentStatus.CompletedBIOSVersion+currentStatus.FailedBIOSVersion) ||
-		biosVersionSet.Status.AvailableBIOSVersion != currentStatus.AvailableBIOSVersion {
-		err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
-		if err != nil {
-			log.Error(err, "failed to update current Status")
-			return ctrl.Result{}, fmt.Errorf("failed to update current BIOSVersionSet Status: %w", err)
+	status := r.getOwnedBIOSVersionSetStatus(versions)
+	if status.AvailableBIOSVersion != (status.CompletedBIOSVersion+status.FailedBIOSVersion) ||
+		versionSet.Status.AvailableBIOSVersion != status.AvailableBIOSVersion {
+		if err = r.patchStatus(ctx, status, versionSet); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSVersionSet status: %w", err)
 		}
-		if err := r.handleRetryAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+		log.V(1).Info("BIOSVersionSet status patched", "Status", status)
+
+		if err := r.handleRetryAnnotationPropagation(ctx, log, versionSet); err != nil {
 			return ctrl.Result{}, err
 		}
 		log.Info("Waiting on the created BIOSVersion to reach terminal status")
@@ -102,127 +88,111 @@ func (r *BIOSVersionSetReconciler) delete(
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, biosVersionSet, BIOSVersionSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, versionSet, BIOSVersionSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("biosVersionSet is deleted")
+	log.V(1).Info("Deleted BIOSVersionSet")
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(
-	ctx context.Context,
-	log logr.Logger,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) error {
-	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
+func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, versionSet *metalv1alpha1.BIOSVersionSet) error {
+	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
 	if err != nil {
 		return err
 	}
-	if len(ownedBiosVersions.Items) == 0 {
-		log.V(1).Info("No BIOSVersion found, skipping ignore annotation propagation")
+
+	if len(versions.Items) == 0 {
+		log.V(1).Info("No BIOSVersions found, skipping ignore annotation propagation")
 		return nil
 	}
-	return handleIgnoreAnnotationPropagation(ctx, log, r.Client, biosVersionSet, ownedBiosVersions)
+	return handleIgnoreAnnotationPropagation(ctx, log, r.Client, versionSet, versions)
 }
 
-func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(
-	ctx context.Context,
-	log logr.Logger,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) error {
-	ownedBiosVersion, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
+func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, versionSet *metalv1alpha1.BIOSVersionSet) error {
+	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
 	if err != nil {
 		return err
 	}
-	if len(ownedBiosVersion.Items) == 0 {
+
+	if len(versions.Items) == 0 {
 		log.V(1).Info("No BIOSVersion found, skipping retry annotation propagation")
 		return nil
 	}
-	return handleRetryAnnotationPropagation(ctx, log, r.Client, biosVersionSet, ownedBiosVersion)
+	return handleRetryAnnotationPropagation(ctx, log, r.Client, versionSet, versions)
 }
 
-func (r *BIOSVersionSetReconciler) reconcile(
-	ctx context.Context,
-	log logr.Logger,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) (ctrl.Result, error) {
-	if err := r.handleIgnoreAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+func (r *BIOSVersionSetReconciler) reconcile(ctx context.Context, log logr.Logger, versionSet *metalv1alpha1.BIOSVersionSet) (ctrl.Result, error) {
+	log.V(1).Info("Reconciling BIOSVersionSet")
+	if err := r.handleIgnoreAnnotationPropagation(ctx, log, versionSet); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if shouldIgnoreReconciliation(biosVersionSet) {
+	if shouldIgnoreReconciliation(versionSet) {
 		log.V(1).Info("Skipped BIOSVersionSet reconciliation")
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersionSet, BIOSVersionSetFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, versionSet, BIOSVersionSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
-	serverList, err := r.getServersBySelector(ctx, biosVersionSet)
+	servers, err := r.getServersBySelector(ctx, versionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get servers by selector: %w", err)
 	}
 
-	ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, biosVersionSet)
+	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
 	}
 
-	log.V(1).Info("Summary of servers and BIOSVersions", "Server count", len(serverList.Items),
-		"BIOSVersion count", len(ownedBiosVersions.Items))
+	log.V(1).Info("Summary of Servers and BIOSVersions", "ServerCount", len(servers.Items), "BIOSVersionCount", len(versions.Items))
 
-	// create BIOSVersion for servers selected, if it does not exist
-	if err := r.createMissingBIOSVersions(ctx, log, serverList, ownedBiosVersions, biosVersionSet); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create missing BIOSVersions: %w", err)
+	// Create BIOSVersion for servers which do not have one yet
+	if err := r.ensureBIOSVersionsForServers(ctx, log, servers, versions, versionSet); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create BIOSVersions: %w", err)
 	}
 
-	// delete BIOSVersion for servers which do not exist anymore
-	if _, err := r.deleteOrphanBIOSVersions(ctx, log, serverList, ownedBiosVersions); err != nil {
+	// Delete BIOSVersions which no longer have a matching server
+	if err := r.deleteOrphanBIOSVersions(ctx, log, servers, versions); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSVersions: %w", err)
 	}
 
-	if err := r.patchBIOSVersionfromTemplate(ctx, log, &biosVersionSet.Spec.BIOSVersionTemplate, ownedBiosVersions); err != nil {
+	if err := r.patchBIOSVersionFromTemplate(ctx, log, &versionSet.Spec.BIOSVersionTemplate, versions); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BIOSVersion spec from template: %w", err)
 	}
 
-	log.V(1).Info("updating the status of BIOSVersionSet")
-	currentStatus := r.getOwnedBIOSVersionSetStatus(ownedBiosVersions)
-	currentStatus.FullyLabeledServers = int32(len(serverList.Items))
+	log.V(1).Info("Updating the status of BIOSVersionSet")
+	status := r.getOwnedBIOSVersionSetStatus(versions)
+	status.FullyLabeledServers = int32(len(servers.Items))
 
-	err = r.updateStatus(ctx, log, currentStatus, biosVersionSet)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update current BIOSVersionSet Status: %w", err)
+	if err := r.patchStatus(ctx, status, versionSet); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update BIOSVersionSet status: %w", err)
 	}
+	log.V(1).Info("Patched BIOSVersionSet status", "Status", status)
 
-	if err := r.handleRetryAnnotationPropagation(ctx, log, biosVersionSet); err != nil {
+	if err := r.handleRetryAnnotationPropagation(ctx, log, versionSet); err != nil {
 		return ctrl.Result{}, err
 	}
-	// wait for any updates from owned resources
+
+	log.V(1).Info("Reconciled BIOSVersionSet")
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSVersionSetReconciler) createMissingBIOSVersions(
-	ctx context.Context,
-	log logr.Logger,
-	serverList *metalv1alpha1.ServerList,
-	biosVersionList *metalv1alpha1.BIOSVersionList,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) error {
-
-	serverWithBiosVersion := make(map[string]bool)
-	for _, biosVersion := range biosVersionList.Items {
-		serverWithBiosVersion[biosVersion.Spec.ServerRef.Name] = true
+func (r *BIOSVersionSetReconciler) ensureBIOSVersionsForServers(ctx context.Context, log logr.Logger, servers *metalv1alpha1.ServerList, versions *metalv1alpha1.BIOSVersionList, versionSet *metalv1alpha1.BIOSVersionSet) error {
+	withBiosVersion := make(map[string]bool)
+	for _, version := range versions.Items {
+		withBiosVersion[version.Spec.ServerRef.Name] = true
 	}
 
 	var errs []error
-	for _, server := range serverList.Items {
-		if !serverWithBiosVersion[server.Name] {
+	for _, server := range servers.Items {
+		if !withBiosVersion[server.Name] {
 			var newBiosVersion *metalv1alpha1.BIOSVersion
-			newBiosVersionName := fmt.Sprintf("%s-%s", biosVersionSet.Name, server.Name)
+			newBiosVersionName := fmt.Sprintf("%s-%s", versionSet.Name, server.Name)
 			if len(newBiosVersionName) > utilvalidation.DNS1123SubdomainMaxLength {
-				log.V(1).Info("BiosVersion name is too long, it will be shortened using randam string", "name", newBiosVersionName)
+				log.V(1).Info("BIOSVersion name is too long, it will be shortened using random string", "BIOSVersionName", newBiosVersionName)
 				newBiosVersion = &metalv1alpha1.BIOSVersion{
 					ObjectMeta: metav1.ObjectMeta{
 						GenerateName: newBiosVersionName[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-",
@@ -235,38 +205,30 @@ func (r *BIOSVersionSetReconciler) createMissingBIOSVersions(
 			}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {
-				newBiosVersion.Spec.BIOSVersionTemplate = *biosVersionSet.Spec.BIOSVersionTemplate.DeepCopy()
+				newBiosVersion.Spec.BIOSVersionTemplate = *versionSet.Spec.BIOSVersionTemplate.DeepCopy()
 				newBiosVersion.Spec.ServerRef = &corev1.LocalObjectReference{Name: server.Name}
-				return controllerutil.SetControllerReference(biosVersionSet, newBiosVersion, r.Client.Scheme())
+				return controllerutil.SetControllerReference(versionSet, newBiosVersion, r.Client.Scheme())
 			})
 			if err != nil {
 				errs = append(errs, err)
 			}
-			log.V(1).Info("Created BIOSVersion", "BIOSVersion", newBiosVersion.Name, "server ref", server.Name, "Operation", opResult)
+			log.V(1).Info("Created BIOSVersion", "BIOSVersion", newBiosVersion.Name, "Server", server.Name, "Operation", opResult)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(
-	ctx context.Context,
-	log logr.Logger,
-	serverList *metalv1alpha1.ServerList,
-	biosVersionList *metalv1alpha1.BIOSVersionList,
-) ([]string, error) {
-
+func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(ctx context.Context, log logr.Logger, servers *metalv1alpha1.ServerList, versions *metalv1alpha1.BIOSVersionList) error {
 	serverMap := make(map[string]bool)
-	for _, server := range serverList.Items {
+	for _, server := range servers.Items {
 		serverMap[server.Name] = true
 	}
 
 	var errs []error
-	var warnings []string
-	for _, biosVersion := range biosVersionList.Items {
+	for _, biosVersion := range versions.Items {
 		if !serverMap[biosVersion.Spec.ServerRef.Name] {
 			if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-				log.V(1).Info("waiting for BIOSVersion to move out of InProgress state", "BIOSVersion", biosVersion.Name, "status", biosVersion.Status)
-				warnings = append(warnings, fmt.Sprintf("BIOSVersion %s is still in progress, skipping deletion", biosVersion.Name))
+				log.V(1).Info("Waiting for BIOSVersion to move out of InProgress state", "BIOSVersion", biosVersion.Name, "Status", biosVersion.Status)
 				continue
 			}
 			if err := r.Delete(ctx, &biosVersion); err != nil {
@@ -274,152 +236,110 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(
 			}
 		}
 	}
-
-	return warnings, errors.Join(errs...)
+	return errors.Join(errs...)
 }
 
-func (r *BIOSVersionSetReconciler) patchBIOSVersionfromTemplate(
-	ctx context.Context,
-	log logr.Logger,
-	biosVersionTemplate *metalv1alpha1.BIOSVersionTemplate,
-	biosVersionList *metalv1alpha1.BIOSVersionList,
-) error {
-	if len(biosVersionList.Items) == 0 {
+func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Context, log logr.Logger, template *metalv1alpha1.BIOSVersionTemplate, versions *metalv1alpha1.BIOSVersionList) error {
+	if len(versions.Items) == 0 {
 		log.V(1).Info("No BIOSVersion found, skipping spec template update")
 		return nil
 	}
 
 	var errs []error
-	for _, biosVersion := range biosVersionList.Items {
-		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+	for _, version := range versions.Items {
+		if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
 			continue
 		}
-		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &biosVersion, func() error {
-			// serverMaintenanceRef might not be part of the patching template, so we do not patch if not provided
-			if biosVersionTemplate.ServerMaintenanceRef != nil {
-				biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
-			} else {
-				serverMaintenanceRef := biosVersion.Spec.ServerMaintenanceRef
-				biosVersion.Spec.BIOSVersionTemplate = *biosVersionTemplate.DeepCopy()
-				biosVersion.Spec.ServerMaintenanceRef = serverMaintenanceRef
-			}
+		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &version, func() error {
+			version.Spec.BIOSVersionTemplate = *template.DeepCopy()
 			return nil
-		}) //nolint:errcheck
+		})
 		if err != nil {
 			errs = append(errs, err)
 		}
 		if opResult != controllerutil.OperationResultNone {
-			log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersions", biosVersion.Name, "Operation", opResult)
+			log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersion", version.Name, "Operation", opResult)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionSetStatus(
-	biosVersionList *metalv1alpha1.BIOSVersionList,
-) *metalv1alpha1.BIOSVersionSetStatus {
-	currentStatus := &metalv1alpha1.BIOSVersionSetStatus{}
-	currentStatus.AvailableBIOSVersion = int32(len(biosVersionList.Items))
-	for _, biosVersion := range biosVersionList.Items {
+func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionSetStatus(versionList *metalv1alpha1.BIOSVersionList) *metalv1alpha1.BIOSVersionSetStatus {
+	status := &metalv1alpha1.BIOSVersionSetStatus{}
+	status.AvailableBIOSVersion = int32(len(versionList.Items))
+	for _, biosVersion := range versionList.Items {
 		switch biosVersion.Status.State {
 		case metalv1alpha1.BIOSVersionStateCompleted:
-			currentStatus.CompletedBIOSVersion += 1
+			status.CompletedBIOSVersion += 1
 		case metalv1alpha1.BIOSVersionStateFailed:
-			currentStatus.FailedBIOSVersion += 1
+			status.FailedBIOSVersion += 1
 		case metalv1alpha1.BIOSVersionStateInProgress:
-			currentStatus.InProgressBIOSVersion += 1
+			status.InProgressBIOSVersion += 1
 		case metalv1alpha1.BIOSVersionStatePending, "":
-			currentStatus.PendingBIOSVersion += 1
+			status.PendingBIOSVersion += 1
 		}
 	}
-	return currentStatus
+	return status
 }
 
-func (r *BIOSVersionSetReconciler) getOwnedBIOSVersions(
-	ctx context.Context,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) (*metalv1alpha1.BIOSVersionList, error) {
+func (r *BIOSVersionSetReconciler) getOwnedBIOSVersions(ctx context.Context, versionSet *metalv1alpha1.BIOSVersionSet) (*metalv1alpha1.BIOSVersionList, error) {
 	biosVersionList := &metalv1alpha1.BIOSVersionList{}
-	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, biosVersionSet, biosVersionList); err != nil {
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, versionSet, biosVersionList); err != nil {
 		return nil, err
 	}
 	return biosVersionList, nil
 }
 
-func (r *BIOSVersionSetReconciler) getServersBySelector(
-	ctx context.Context,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) (*metalv1alpha1.ServerList, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&biosVersionSet.Spec.ServerSelector)
+func (r *BIOSVersionSetReconciler) getServersBySelector(ctx context.Context, set *metalv1alpha1.BIOSVersionSet) (*metalv1alpha1.ServerList, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&set.Spec.ServerSelector)
 	if err != nil {
 		return nil, err
 	}
-	serverList := &metalv1alpha1.ServerList{}
-	if err := r.List(ctx, serverList, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+	servers := &metalv1alpha1.ServerList{}
+	if err := r.List(ctx, servers, client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return nil, err
 	}
-
-	return serverList, nil
+	return servers, nil
 }
 
-func (r *BIOSVersionSetReconciler) updateStatus(
-	ctx context.Context,
-	log logr.Logger,
-	currentStatus *metalv1alpha1.BIOSVersionSetStatus,
-	biosVersionSet *metalv1alpha1.BIOSVersionSet,
-) error {
+func (r *BIOSVersionSetReconciler) patchStatus(ctx context.Context, status *metalv1alpha1.BIOSVersionSetStatus, versionSet *metalv1alpha1.BIOSVersionSet) error {
+	versionSetBase := versionSet.DeepCopy()
+	versionSet.Status = *status
 
-	biosVersionSetBase := biosVersionSet.DeepCopy()
-
-	biosVersionSet.Status = *currentStatus
-
-	if err := r.Status().Patch(ctx, biosVersionSet, client.MergeFrom(biosVersionSetBase)); err != nil {
+	if err := r.Status().Patch(ctx, versionSet, client.MergeFrom(versionSetBase)); err != nil {
 		return err
 	}
-
-	log.V(1).Info("Updated biosVersionSet state ", "new state", currentStatus)
-
 	return nil
 }
 
 func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	host := obj.(*metalv1alpha1.Server)
+	server := obj.(*metalv1alpha1.Server)
 
-	biosVersionSetList := &metalv1alpha1.BIOSVersionSetList{}
-	if err := r.List(ctx, biosVersionSetList); err != nil {
+	setList := &metalv1alpha1.BIOSVersionSetList{}
+	if err := r.List(ctx, setList); err != nil {
 		log.V(1).Error(err, "failed to list BIOSVersionSet")
 		return nil
 	}
 	reqs := make([]ctrl.Request, 0)
-	for _, biosVersionSet := range biosVersionSetList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(&biosVersionSet.Spec.ServerSelector)
+	for _, set := range setList.Items {
+		selector, err := metav1.LabelSelectorAsSelector(&set.Spec.ServerSelector)
 		if err != nil {
 			log.V(1).Error(err, "failed to convert label selector")
 			return nil
 		}
-		// if the host label matches the selector, enqueue the request
-		if selector.Matches(labels.Set(host.GetLabels())) {
-			reqs = append(reqs, ctrl.Request{
-				NamespacedName: client.ObjectKey{
-					Name:      biosVersionSet.Name,
-					Namespace: biosVersionSet.Namespace,
-				},
-			})
+		// If the Server label matches the selector, enqueue the request
+		if selector.Matches(labels.Set(server.GetLabels())) {
+			reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKey{Name: set.Name}})
 		} else { // if the label has been removed
-			ownedBiosVersions, err := r.getOwnedBIOSVersions(ctx, &biosVersionSet)
+			versions, err := r.getOwnedBIOSVersions(ctx, &set)
 			if err != nil {
 				log.V(1).Error(err, "failed to get owned BIOSVersions")
 				return nil
 			}
-			for _, biosVersion := range ownedBiosVersions.Items {
-				if biosVersion.Spec.ServerRef.Name == host.Name {
-					reqs = append(reqs, ctrl.Request{
-						NamespacedName: client.ObjectKey{
-							Name:      biosVersionSet.Name,
-							Namespace: biosVersionSet.Namespace,
-						},
-					})
+			for _, version := range versions.Items {
+				if version.Spec.ServerRef.Name == server.Name {
+					reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKey{Name: set.Name}})
 				}
 			}
 		}
@@ -431,25 +351,7 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 func (r *BIOSVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSVersionSet{}).
-		Watches(
-			&metalv1alpha1.BIOSVersion{},
-			handler.EnqueueRequestForOwner(r.Scheme, r.RESTMapper(), &metalv1alpha1.BIOSVersionSet{}),
-			builder.WithPredicates(
-				predicate.Funcs{
-					CreateFunc: func(e event.CreateEvent) bool {
-						return true
-					},
-					UpdateFunc: func(e event.UpdateEvent) bool {
-						return enqueFromChildObjUpdatesExceptAnnotation(e)
-					},
-					DeleteFunc: func(e event.DeleteEvent) bool {
-						return true
-					}, GenericFunc: func(e event.GenericEvent) bool {
-						return false
-					},
-				},
-			),
-		).
+		Owns(&metalv1alpha1.BIOSVersion{}).
 		Watches(&metalv1alpha1.Server{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
 			builder.WithPredicates(predicate.LabelChangedPredicate{})).

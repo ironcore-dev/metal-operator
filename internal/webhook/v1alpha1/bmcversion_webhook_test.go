@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	"fmt"
 
+	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -39,13 +40,16 @@ var _ = Describe("BMCVersion Webhook", func() {
 		}
 		By("Creating an BMCVersion")
 		Expect(k8sClient.Create(ctx, BMCVersionV1)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, BMCVersionV1)
 		SetClient(k8sClient)
 
 	})
 
 	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
+		By("Deleting BMCVersion")
+		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCVersion{})).To(Succeed())
+
+		By("Ensuring clean state")
+		controller.EnsureCleanState()
 	})
 
 	Context("When creating or updating BMCVersion under Validating Webhook", func() {
@@ -85,7 +89,6 @@ var _ = Describe("BMCVersion Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, BMCVersionV2)
 		})
 
 		It("Should deny Update if a BMC referred is already referred by another", func() {
@@ -105,7 +108,6 @@ var _ = Describe("BMCVersion Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, BMCVersionV2)
 
 			By("Updating an BMCVersionV2 to refer to existing BMC")
 			BMCVersionV2Updated := BMCVersionV2.DeepCopy()
@@ -130,7 +132,6 @@ var _ = Describe("BMCVersion Webhook", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, BMCVersionV2)
 
 			By("Updating an BMCVersionV2 to refer to new BMC")
 			BMCVersionV2Updated := BMCVersionV2.DeepCopy()
@@ -172,9 +173,6 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Eventually(UpdateStatus(BMCVersionV1, func() {
 				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateCompleted
 			})).Should(Succeed())
-
-			By("Deleting the BMCVersionV1 should pass: by DeferCleanup")
 		})
 	})
-
 })

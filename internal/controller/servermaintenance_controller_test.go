@@ -16,8 +16,10 @@ import (
 var _ = Describe("ServerMaintenance Controller", func() {
 	ns := SetupTest(nil)
 
-	var server *metalv1alpha1.Server
-	var bmcSecret *metalv1alpha1.BMCSecret
+	var (
+		server    *metalv1alpha1.Server
+		bmcSecret *metalv1alpha1.BMCSecret
+	)
 
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")
@@ -38,7 +40,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				UUID:       "38947555-7742-3448-3784-823347823834",
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{

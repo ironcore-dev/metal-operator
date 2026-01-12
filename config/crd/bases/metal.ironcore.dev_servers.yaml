@@ -307,7 +307,7 @@ spec:
                   Deprecated in favor of systemUUID.
                 type: string
             required:
-            - uuid
+            - systemUUID
             type: object
           status:
             description: ServerStatus defines the observed state of Server.

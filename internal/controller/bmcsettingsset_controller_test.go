@@ -195,7 +195,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					Name: bmcSettingsSet.Name + "-" + bmc02.Name,
 				},
 			}
-			Consistently(Get(bmcSettings02)).Should(MatchError(ContainSubstring("not found")))
+			Consistently(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
 
 			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
 				HaveField(("Status.FullyLabeledBMCs"), BeNumerically("==", 1)),
@@ -209,10 +209,10 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Deleting the BMCSettingsSet")
 			Expect(k8sClient.Delete(ctx, bmcSettingsSet)).To(Succeed())
 			By("Waiting for BMCSettingsSet and dependent resources to be deleted")
-			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Checking if the BMCSettingsSet was deleted")
-			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Deleting the BMCSetting resource")
 			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
@@ -277,7 +277,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					Name: bmcSettingsSet.Name + "-" + bmc02.Name,
 				},
 			}
-			Consistently(Get(bmcSettings02)).Should(MatchError(ContainSubstring("not found")))
+			Consistently(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
 
 			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
 				HaveField(("Status.FullyLabeledBMCs"), BeNumerically("==", 1)),
@@ -290,10 +290,10 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Deleting BMC01 resource")
 			Expect(k8sClient.Delete(ctx, bmc01)).To(Succeed())
-			Eventually(Get(bmc01)).Should(MatchError(ContainSubstring("not found")))
+			Eventually(Get(bmc01)).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Checking that BMCSettings was deleted after BMC deletion")
-			Eventually(Get(bmcSettings01)).Should(MatchError(ContainSubstring("not found")))
+			Eventually(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
 
 			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
 				HaveField(("Status.FullyLabeledBMCs"), BeNumerically("==", 0)),
@@ -308,7 +308,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, bmcSettingsSet)).To(Succeed())
 
 			By("Checking if the BMCSettingsSet was deleted")
-			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
 
 		})
 
@@ -394,7 +394,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, bmcSettingsSet)).To(Succeed())
 
 			By("Checking if the BMCSettingsSet was deleted")
-			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Deleting the BMCSetting resource")
 			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
@@ -464,7 +464,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					Name: bmcSettingsSet.Name + "-" + bmc02.Name,
 				},
 			}
-			Consistently(Get(bmcSettings02)).Should(MatchError(ContainSubstring("not found")))
+			Consistently(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
 
 			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
 				HaveField(("Status.FullyLabeledBMCs"), BeNumerically("==", 1)),
@@ -489,7 +489,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, bmcSettingsSet)).To(Succeed())
 
 			By("Checking if the BMCSettingsSet was deleted")
-			Eventually(Get(bmcSettingsSet)).Should(MatchError(ContainSubstring("not found")))
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Deleting the BMCSettings01 resource")
 			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())

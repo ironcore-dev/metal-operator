@@ -319,11 +319,6 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		return nil
 	}
 
-	bmcNameMap := make(map[string]metalv1alpha1.BMC)
-	for _, bmc := range bmcList.Items {
-		bmcNameMap[bmc.Name] = bmc
-	}
-
 	var errs []error
 	for _, bmcSettings := range bmcSettingsList.Items {
 		if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress {

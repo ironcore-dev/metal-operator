@@ -20,11 +20,14 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -51,6 +54,8 @@ func init() {
 	utilruntime.Must(metalv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
+
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create
 
 func main() { // nolint: gocyclo
 	var (
@@ -305,6 +310,23 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+	namespace := &corev1.Namespace{}
+	namespace.Name = managerNamespace
+	if err := mgr.GetClient().Get(ctx, client.ObjectKey{Name: managerNamespace}, namespace); err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			setupLog.Info("creating manager namespace", "namespace", managerNamespace)
+			namespace.ObjectMeta = metav1.ObjectMeta{Name: managerNamespace}
+			if err := mgr.GetClient().Create(ctx, namespace); err != nil {
+				setupLog.Error(err, "unable to create manager namespace")
+				os.Exit(1)
+			}
+		} else {
+			setupLog.Error(err, "unable to check if manager namespace exists")
+			os.Exit(1)
+		}
+	}
+
 	if err = (&controller.EndpointReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -534,7 +556,6 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
 	if err := controller.RegisterIndexFields(ctx, mgr.GetFieldIndexer()); err != nil {
 		setupLog.Error(err, "unable to register field indexers")
 		os.Exit(1)

@@ -10,6 +10,15 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - create

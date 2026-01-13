@@ -116,6 +116,7 @@ spec:
                 format: date-time
                 type: string
               passwordExpiration:
+                format: date-time
                 type: string
             type: object
         type: object

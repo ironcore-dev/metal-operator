@@ -43,8 +43,6 @@ func (v *BMCSecretCustomValidator) ValidateCreate(ctx context.Context, obj runti
 	}
 	bmcsecretlog.Info("Validation for BMCSecret upon creation", "name", bmcsecret.GetName())
 
-	// TODO(user): fill in your validation logic upon object creation.
-
 	return nil, nil
 }
 
@@ -79,8 +77,6 @@ func (v *BMCSecretCustomValidator) ValidateDelete(ctx context.Context, obj runti
 		return nil, fmt.Errorf("expected a BMCSecret object but got %T", obj)
 	}
 	bmcsecretlog.Info("Validation for BMCSecret upon deletion", "name", bmcsecret.GetName())
-
-	// TODO(user): fill in your validation logic upon object deletion.
 
 	return nil, nil
 }

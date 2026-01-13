@@ -327,4 +327,71 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Delete(ctx, effectiveSecret)).To(Succeed())
 	})
 
+	It("Should rotate password if OperationAnnotationRotateCredentials is set", func(ctx SpecContext) {
+		By("Creating a User resource")
+		user := &metalv1alpha1.BMCUser{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "annotated-user",
+			},
+			Spec: metalv1alpha1.BMCUserSpec{
+				UserName: "annotated-user",
+				RoleID:   "ReadOnly",
+				BMCRef: &v1.LocalObjectReference{
+					Name: bmc.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, user)).To(Succeed())
+		By("Ensuring that the User resource has been created")
+		Eventually(Get(user)).Should(Succeed())
+
+		By("Ensuring that the User resource has EffectiveBMCSecretRef")
+		Eventually(Object(user)).Should(SatisfyAll(
+			HaveField("Status.EffectiveBMCSecretRef", Not(BeNil())),
+		))
+
+		initialSecretName := ""
+		By("Getting the initial effective secret name")
+		Eventually(Object(user)).Should(WithTransform(func(u *metalv1alpha1.BMCUser) string {
+			initialSecretName = u.Status.EffectiveBMCSecretRef.Name
+			return initialSecretName
+		}, Not(BeEmpty())))
+
+		By("Adding the rotation annotation to the User resource")
+		Eventually(Object(user)).Should(SatisfyAll(
+			HaveField("ObjectMeta.Annotations", BeNil()),
+		))
+		Eventually(Update(user, func() {
+			user.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRotateCredentials,
+			}
+		})).Should(Succeed())
+
+		By("Ensuring that a new secret with new password has been rotated and set to EffectiveBMCSecretRef")
+		Eventually(Object(user), "4s").Should(SatisfyAll(
+			HaveField("Status.EffectiveBMCSecretRef", Not(BeNil())),
+			HaveField("Status.EffectiveBMCSecretRef.Name", Not(Equal(initialSecretName))),
+		))
+
+		newSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: user.Status.EffectiveBMCSecretRef.Name,
+			},
+		}
+		Eventually(Get(newSecret)).Should(Succeed())
+
+		By("Checking that the rotation annotation has been removed")
+		Eventually(Object(user)).Should(SatisfyAll(
+			HaveField("ObjectMeta.Annotations", BeNil()),
+		))
+
+		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, newSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: initialSecretName,
+			},
+		})).To(Succeed())
+	})
+
 })

@@ -128,7 +128,12 @@ func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, log logr.Logger
 			log.V(1).Info("BMC account already exists", "User", user.Name, "ID", account.ID)
 			userBase := user.DeepCopy()
 			user.Status.ID = account.ID
-			user.Status.PasswordExpiration = account.PasswordExpiration
+			exp, err := time.Parse(time.RFC3339, account.PasswordExpiration)
+			if err == nil {
+				user.Status.PasswordExpiration = &metav1.Time{Time: exp}
+			} else {
+				log.Error(err, "Failed to parse password expiration time from BMC account", "User", user.Name, "Expiration", account.PasswordExpiration)
+			}
 			if err := r.Status().Patch(ctx, user, client.MergeFrom(userBase)); err != nil {
 				return fmt.Errorf("failed to patch User status with BMC account ID: %w", err)
 			}
@@ -144,13 +149,14 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 	if user.GetAnnotations() != nil && user.GetAnnotations()[metalv1alpha1.OperationAnnotation] == metalv1alpha1.OperationAnnotationRotateCredentials {
 		log.Info("User has rotation annotation set, triggering password rotation", "User", user.Name)
 		forceRotation = true
-	}
-	if user.Status.PasswordExpiration != "" {
-		exp, err := time.Parse(time.RFC3339, user.Status.PasswordExpiration)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to parse password expiration time: %w", err)
+		userBase := user.DeepCopy()
+		delete(user.Annotations, metalv1alpha1.OperationAnnotation)
+		if err := r.Patch(ctx, user, client.MergeFrom(userBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to remove rotation annotation from User: %w", err)
 		}
-		if exp.Before(metav1.Now().Time) {
+	}
+	if user.Status.PasswordExpiration != nil {
+		if user.Status.PasswordExpiration.Time.Before(metav1.Now().Time) {
 			log.Info("BMC user password has expired, rotating password", "User", user.Name)
 			// If the password has expired, we need to rotate it
 			forceRotation = true
@@ -160,7 +166,7 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 		log.V(1).Info("No rotation period set for BMC user, skipping password rotation", "User", user.Name)
 		return ctrl.Result{}, nil
 	}
-	if user.Status.LastRotation != nil && user.Status.LastRotation.Add(user.Spec.RotationPeriod.Duration).After(metav1.Now().Time) && !forceRotation {
+	if user.Status.LastRotation != nil && user.Status.LastRotation.Time.Add(user.Spec.RotationPeriod.Duration).After(time.Now()) && !forceRotation {
 		log.V(1).Info("BMC user password rotation is not needed yet", "User", user.Name)
 		return ctrl.Result{
 			Requeue:      true,
@@ -331,12 +337,10 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.
 	}
 
 	effSecret := &metalv1alpha1.BMCSecret{}
-	if user.Status.EffectiveBMCSecretRef != nil {
-		if err := r.Get(ctx, client.ObjectKey{
-			Name: user.Status.EffectiveBMCSecretRef.Name,
-		}, effSecret); err != nil {
-			return fmt.Errorf("failed to get effective BMCSecret %s: %w", user.Status.EffectiveBMCSecretRef.Name, err)
-		}
+	if err := r.Get(ctx, client.ObjectKey{
+		Name: user.Status.EffectiveBMCSecretRef.Name,
+	}, effSecret); err != nil {
+		return fmt.Errorf("failed to get effective BMCSecret %s: %w", user.Status.EffectiveBMCSecretRef.Name, err)
 	}
 
 	invalidCredentials, err = r.bmcConnectionTest(ctx, effSecret, bmcObj)

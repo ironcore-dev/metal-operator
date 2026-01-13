@@ -27,7 +27,7 @@ type BMCUserSpec struct {
 type BMCUserStatus struct {
 	EffectiveBMCSecretRef *v1.LocalObjectReference `json:"effectiveBMCSecretRef,omitempty"`
 	LastRotation          *metav1.Time             `json:"lastRotation,omitempty"`
-	PasswordExpiration    string                   `json:"passwordExpiration,omitempty"`
+	PasswordExpiration    *metav1.Time             `json:"passwordExpiration,omitempty"`
 	ID                    string                   `json:"id,omitempty"` // ID of the user in the BMC system
 }
 

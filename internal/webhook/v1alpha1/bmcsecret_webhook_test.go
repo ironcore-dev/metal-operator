@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -41,10 +42,6 @@ var _ = Describe("BMCSecret Webhook", func() {
 
 	})
 
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
-	})
-
 	Context("When creating or updating BMCSecret under Validating Webhook", func() {
 		It("Should deny Update BMCSecret if Immutable is set to True", func(ctx SpecContext) {
 			By("Updating an BMCSecret with Immutable set to True")
@@ -56,7 +53,7 @@ var _ = Describe("BMCSecret Webhook", func() {
 		It("Should allow Update BMCSecret if Immutable is set to False", func(ctx SpecContext) {
 			By("Updating an BMCSecret with Immutable set to False")
 			BMCSecretMutable := BMCSecret.DeepCopy()
-			BMCSecretMutable.Immutable = &[]bool{false}[0]
+			BMCSecretMutable.Immutable = ptr.To(false)
 			Expect(k8sClient.Update(ctx, BMCSecretMutable)).To(Succeed())
 
 			BMCSecretUpdated := BMCSecretMutable.DeepCopy()

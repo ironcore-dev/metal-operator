@@ -651,7 +651,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `effectiveBMCSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ |  |  |  |
 | `lastRotation` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ |  |  |  |
-| `passwordExpiration` _string_ |  |  |  |
+| `passwordExpiration` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ |  |  |  |
 | `id` _string_ |  |  |  |
 
 

@@ -276,31 +276,6 @@ func (r *BMCUserReconciler) setEffectiveSecretRef(ctx context.Context, log logr.
 }
 
 func (r *BMCUserReconciler) getBMCClient(ctx context.Context, bmcObj *metalv1alpha1.BMC) (bmc.BMC, error) {
-	/* will be needed when supporting admin user management
-	if bmcObj.Spec.AdminUserRef != nil && bmcObj.Spec.AdminUserRef.Name == user.Name {
-		if user.Spec.BMCSecretRef == nil {
-			// if this user is the admin user, we cannot create a BMC client without a BMCSecretRef (password)
-			return bmcClient, fmt.Errorf("BMC %s admin user %s does not have a BMCSecretRef set", bmcObj.Name, user.Name)
-		}
-		log.Info("User is the admin user for the BMC", "User", user.Name)
-		protocolScheme := bmcutils.GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, r.Insecure)
-		address, err := bmcutils.GetBMCAddressForBMC(ctx, r.Client, bmcObj)
-		if err != nil {
-			return bmcClient, fmt.Errorf("failed to get BMC address: %w", err)
-		}
-		bmcSecret := &metalv1alpha1.BMCSecret{}
-		if err := r.Get(ctx, client.ObjectKey{
-			Namespace: user.Namespace,
-			Name:      user.Spec.BMCSecretRef.Name,
-		}, bmcSecret); err != nil {
-			return bmcClient, err
-		}
-		bmcClient, err = bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, r.BMCOptions)
-		if err != nil {
-			return bmcClient, fmt.Errorf("failed to create BMC client: %w", err)
-		}
-	} else {
-	*/
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
 	if err != nil {
 		return bmcClient, fmt.Errorf("failed to create BMC client: %w", err)

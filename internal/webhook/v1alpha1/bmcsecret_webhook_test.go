@@ -26,7 +26,7 @@ var _ = Describe("BMCSecret Webhook", func() {
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
 		BMCSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    "ns.Name",
+				Namespace:    "test-namespace",
 				GenerateName: "test-bmc-secret",
 			},
 			Data: map[string][]byte{

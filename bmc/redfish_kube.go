@@ -112,6 +112,32 @@ func (r *RedfishKubeBMC) PowerOff(ctx context.Context, systemURI string) error {
 	return nil
 }
 
+// PowerCycle performs a full power cycle on the system asynchronously.
+func (r *RedfishKubeBMC) PowerCycle(ctx context.Context, systemURI string) error {
+	go func() {
+		if err := r.setSystemPowerState(ctx, systemURI, redfish.OffPowerState); err != nil {
+			log.FromContext(ctx).Error(err, "PowerCycle: PowerOff failed", "systemURI", systemURI)
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+		if err := r.setSystemPowerState(ctx, systemURI, redfish.OnPowerState); err != nil {
+			log.FromContext(ctx).Error(err, "PowerCycle: PowerOn failed", "systemURI", systemURI)
+			return
+		}
+
+		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
+			time.Sleep(50 * time.Millisecond)
+			for key, data := range UnitTestMockUps.PendingBIOSSetting {
+				if _, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
+					UnitTestMockUps.BIOSSettingAttr[key] = data
+				}
+			}
+			UnitTestMockUps.ResetPendingBIOSSetting()
+		}
+	}()
+	return nil
+}
+
 // GetBiosPendingAttributeValues returns pending BIOS attribute values.
 func (r *RedfishKubeBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
 	pending := UnitTestMockUps.PendingBIOSSetting

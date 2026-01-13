@@ -333,10 +333,10 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOn)
 
-	if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+	if err := r.ensureServerPowerCycle(ctx, log, bmcClient, server); err != nil {
+		return false, fmt.Errorf("failed to power cycle server for PXE boot: %w", err)
 	}
-	log.V(1).Info("Server state set to power on")
+	log.V(1).Info("Server power cycled for PXE boot")
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to patch Server status: %w", err)
@@ -445,9 +445,13 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 			return false, fmt.Errorf("failed to boot server: %w", err)
 		}
 		log.V(1).Info("Server is powered off, booting Server in PXE")
-	}
-	if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to ensure server power state: %w", err)
+		if err := r.ensureServerPowerCycle(ctx, log, bmcClient, server); err != nil {
+			return false, fmt.Errorf("failed to power cycle server for PXE boot: %w", err)
+		}
+	} else {
+		if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
+			return false, fmt.Errorf("failed to ensure server power state: %w", err)
+		}
 	}
 
 	if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
@@ -976,6 +980,20 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, log logr.
 	}
 	log.V(1).Info("Ensured server power state", "PowerState", server.Spec.Power)
 
+	return nil
+}
+
+func (r *ServerReconciler) ensureServerPowerCycle(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+	log.V(1).Info("Power cycling server for PXE boot")
+	if err := bmcClient.PowerCycle(ctx, server.Spec.SystemURI); err != nil {
+		return fmt.Errorf("failed to power cycle server: %w", err)
+	}
+	if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, redfish.OnPowerState); err != nil {
+		return fmt.Errorf("failed to wait for server power on after power cycle: %w", err)
+	}
+	if err := r.updatePowerOnCondition(ctx, server); err != nil {
+		return fmt.Errorf("failed to update power on condition: %w", err)
+	}
 	return nil
 }
 

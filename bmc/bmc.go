@@ -43,6 +43,10 @@ type BMC interface {
 	// ForcePowerOff powers off the system.
 	ForcePowerOff(ctx context.Context, systemURI string) error
 
+	// PowerCycle performs a full power cycle (off then on) on the system.
+	// This ensures a cold boot which is required for boot overrides like PXE to take effect.
+	PowerCycle(ctx context.Context, systemURI string) error
+
 	// Reset performs a reset on the system.
 	Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error
 

@@ -154,6 +154,19 @@ func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemURI string) error 
 	return nil
 }
 
+// PowerCycle performs a full power cycle on the system using Redfish.
+// This ensures a cold boot which is required for boot overrides like PXE to take effect.
+func (r *RedfishBMC) PowerCycle(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if err := system.Reset(redfish.PowerCycleResetType); err != nil {
+		return fmt.Errorf("failed to power cycle system: %w", err)
+	}
+	return nil
+}
+
 // Reset performs a reset on the system using Redfish.
 func (r *RedfishBMC) Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)

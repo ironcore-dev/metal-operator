@@ -10,14 +10,24 @@ import (
 
 // BMCUserSpec defines the desired state of BMCUser.
 type BMCUserSpec struct {
-	UserName       string           `json:"userName"`
-	RoleID         string           `json:"roleID"`
-	Description    string           `json:"description,omitempty"`
+	// Username of the BMC user.
+	UserName string `json:"userName"`
+	// RoleID is the ID of the role to assign to the user.
+	// The available roles depend on the BMC implementation.
+	// For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly".
+	RoleID string `json:"roleID"`
+	// Description is an optional description for the BMC user.
+	Description string `json:"description,omitempty"`
+	// RotationPeriod defines how often the password should be rotated.
+	// if not set, the password will not be rotated.
 	RotationPeriod *metav1.Duration `json:"rotationPeriod,omitempty"`
-	// if not set, the operator will generate a secure password based on BMC manufacturer requirements.
+	// BMCSecretRef references the BMCSecret containing the credentials for this user.
+	// If not set, the operator will generate a secure password based on BMC manufacturer requirements.
 	BMCSecretRef *v1.LocalObjectReference `json:"bmcSecretRef,omitempty"`
-	BMCRef       *v1.LocalObjectReference `json:"bmcRef,omitempty"`
-	Enabled      bool                     `json:"enabled"`
+	// BMCRef references the BMC this user should be created on.
+	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
+	// Enabled indicates whether the user account is enabled.
+	Enabled bool `json:"enabled"`
 	// set if the user should be used by the BMC controller to access the system.
 	// +kubebuilder:default=false
 	BMCControllerUser bool `json:"bmcControllerUser"`
@@ -25,10 +35,15 @@ type BMCUserSpec struct {
 
 // BMCUserStatus defines the observed state of BMCUser.
 type BMCUserStatus struct {
+	// EffectiveBMCSecretRef references the BMCSecret currently used for this user.
+	// This may differ from Spec.BMCSecretRef if the operator generated a password.
 	EffectiveBMCSecretRef *v1.LocalObjectReference `json:"effectiveBMCSecretRef,omitempty"`
-	LastRotation          *metav1.Time             `json:"lastRotation,omitempty"`
-	PasswordExpiration    *metav1.Time             `json:"passwordExpiration,omitempty"`
-	ID                    string                   `json:"id,omitempty"` // ID of the user in the BMC system
+	// LastRotation is the timestamp of the last password rotation.
+	LastRotation *metav1.Time `json:"lastRotation,omitempty"`
+	// PasswordExpiration is the timestamp when the password will expire.
+	PasswordExpiration *metav1.Time `json:"passwordExpiration,omitempty"`
+	// ID of the user in the BMC system
+	ID string `json:"id,omitempty"`
 }
 
 // +kubebuilder:object:root=true

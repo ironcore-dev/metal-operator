@@ -45,9 +45,8 @@ spec:
                   to access the system.
                 type: boolean
               bmcRef:
-                description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                description: BMCRef references the BMC this user should be created
+                  on.
                 properties:
                   name:
                     default: ""
@@ -61,8 +60,9 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               bmcSecretRef:
-                description: if not set, the operator will generate a secure password
-                  based on BMC manufacturer requirements.
+                description: |-
+                  BMCSecretRef references the BMCSecret containing the credentials for this user.
+                  If not set, the operator will generate a secure password based on BMC manufacturer requirements.
                 properties:
                   name:
                     default: ""
@@ -76,14 +76,24 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               description:
+                description: Description is an optional description for the BMC user.
                 type: string
               enabled:
+                description: Enabled indicates whether the user account is enabled.
                 type: boolean
               roleID:
+                description: |-
+                  RoleID is the ID of the role to assign to the user.
+                  The available roles depend on the BMC implementation.
+                  For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly".
                 type: string
               rotationPeriod:
+                description: |-
+                  RotationPeriod defines how often the password should be rotated.
+                  if not set, the password will not be rotated.
                 type: string
               userName:
+                description: Username of the BMC user.
                 type: string
             required:
             - bmcControllerUser
@@ -96,8 +106,8 @@ spec:
             properties:
               effectiveBMCSecretRef:
                 description: |-
-                  LocalObjectReference contains enough information to let you locate the
-                  referenced object inside the same namespace.
+                  EffectiveBMCSecretRef references the BMCSecret currently used for this user.
+                  This may differ from Spec.BMCSecretRef if the operator generated a password.
                 properties:
                   name:
                     default: ""
@@ -111,11 +121,15 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               id:
+                description: ID of the user in the BMC system
                 type: string
               lastRotation:
+                description: LastRotation is the timestamp of the last password rotation.
                 format: date-time
                 type: string
               passwordExpiration:
+                description: PasswordExpiration is the timestamp when the password
+                  will expire.
                 format: date-time
                 type: string
             type: object

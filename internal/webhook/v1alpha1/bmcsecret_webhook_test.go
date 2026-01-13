@@ -10,7 +10,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("BMCSecret Webhook", func() {
@@ -38,8 +37,6 @@ var _ = Describe("BMCSecret Webhook", func() {
 		By("Creating an BMCSecret")
 		Expect(k8sClient.Create(ctx, BMCSecret)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, BMCSecret)
-		SetClient(k8sClient)
-
 	})
 
 	Context("When creating or updating BMCSecret under Validating Webhook", func() {

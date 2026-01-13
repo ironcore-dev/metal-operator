@@ -51,7 +51,6 @@ func (r *BMCUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *BMCUserReconciler) reconcileExists(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
 	if !user.DeletionTimestamp.IsZero() {
-		log.Info("User is being deleted, handling deletion", "User", user.Name)
 		return r.delete(ctx, log, user)
 	}
 	return r.reconcile(ctx, log, user)

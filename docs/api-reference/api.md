@@ -626,13 +626,13 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `userName` _string_ |  |  |  |
-| `roleID` _string_ |  |  |  |
-| `description` _string_ |  |  |  |
-| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ |  |  |  |
-| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | if not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |
-| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ |  |  |  |
-| `enabled` _boolean_ |  |  |  |
+| `userName` _string_ | Username of the BMC user. |  |  |
+| `roleID` _string_ | RoleID is the ID of the role to assign to the user.<br />The available roles depend on the BMC implementation.<br />For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly". |  |  |
+| `description` _string_ | Description is an optional description for the BMC user. |  |  |
+| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />if not set, the password will not be rotated. |  |  |
+| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | BMCSecretRef references the BMCSecret containing the credentials for this user.<br />If not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |
+| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | BMCRef references the BMC this user should be created on. |  |  |
+| `enabled` _boolean_ | Enabled indicates whether the user account is enabled. |  |  |
 | `bmcControllerUser` _boolean_ | set if the user should be used by the BMC controller to access the system. | false |  |
 
 
@@ -649,10 +649,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `effectiveBMCSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ |  |  |  |
-| `lastRotation` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ |  |  |  |
-| `passwordExpiration` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ |  |  |  |
-| `id` _string_ |  |  |  |
+| `effectiveBMCSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | EffectiveBMCSecretRef references the BMCSecret currently used for this user.<br />This may differ from Spec.BMCSecretRef if the operator generated a password. |  |  |
+| `lastRotation` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | LastRotation is the timestamp of the last password rotation. |  |  |
+| `passwordExpiration` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | PasswordExpiration is the timestamp when the password will expire. |  |  |
+| `id` _string_ | ID of the user in the BMC system |  |  |
 
 
 #### BMCVersion

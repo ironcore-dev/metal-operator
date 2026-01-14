@@ -24,7 +24,7 @@ export default withMermaid({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Concepts', link: '/concepts' },
-      { text: 'Usage', link: '/usage' },
+      { text: 'Quickstart', link: '/quickstart' },
       { text: 'IronCore Documentation', link: 'https://ironcore-dev.github.io' },
     ],
 
@@ -46,7 +46,14 @@ export default withMermaid({
     sidebar: [
         {
         items: [
-          { text: 'Quick Start', link: '/usage/installation' },
+          { text: "Quickstart", link: '/quickstart' },
+          { text: 'Installation',
+            collapsed: true,
+            items: [
+              { text: 'Kustomize', link: '/installation/kustomize' },
+              { text: 'Helm', link: '/installation/helm' },
+            ]
+          },
           { text: 'Architecture', link: '/architecture' },
           { text: 'API Reference', link: '/api-reference/api' },
         ]
@@ -75,7 +82,6 @@ export default withMermaid({
         text: 'Usage',
         collapsed: false,
         items: [
-          { text: 'Installation', link: '/usage/installation' },
           { text: 'metalctl', link: '/usage/metalctl' },
         ]
       },

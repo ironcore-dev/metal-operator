@@ -29,7 +29,7 @@ var _ = Describe("Endpoints Controller", func() {
 			},
 			Spec: metalv1alpha1.EndpointSpec{
 				MACAddress: "23:11:8A:33:CF:EA",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
@@ -73,7 +73,7 @@ var _ = Describe("Endpoints Controller", func() {
 			HaveField("Spec.BMCSecretRef.Name", Equal(bmc.Name)),
 			HaveField("Spec.Protocol", metalv1alpha1.Protocol{
 				Name: metalv1alpha1.ProtocolRedfishLocal,
-				Port: 8000,
+				Port: MockServerPort,
 			}),
 			HaveField("Spec.ConsoleProtocol", &metalv1alpha1.ConsoleProtocol{
 				Name: metalv1alpha1.ConsoleProtocolNameSSH,

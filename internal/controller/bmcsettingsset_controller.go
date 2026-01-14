@@ -209,7 +209,7 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCSettings resource %w", err)
 	}
 
-	if err := r.patchBMCSettingsFromTemplate(ctx, log, bmcList, bmcSettingsSet, ownedBMCSettings); err != nil {
+	if err := r.patchBMCSettingsFromTemplate(ctx, log, bmcSettingsSet, ownedBMCSettings); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCSettings from template %w", err)
 	}
 
@@ -310,7 +310,6 @@ func (r *BMCSettingsSetReconciler) deleteOrphanedBMCSettings(
 func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 	ctx context.Context,
 	log logr.Logger,
-	bmcList *metalv1alpha1.BMCList,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 	bmcSettingsList *metalv1alpha1.BMCSettingsList,
 ) error {
@@ -385,7 +384,6 @@ func (r *BMCSettingsSetReconciler) enqueueByBMC(
 			}
 		}
 	}
-
 	return reqs
 }
 

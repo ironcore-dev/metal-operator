@@ -4,7 +4,6 @@
 package v1alpha1
 
 import (
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -49,9 +48,6 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		By("Deleting the BIOSSettings and Server resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BIOSSettings{})).To(Succeed())
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{})).To(Succeed())
-
-		By("Ensuring clean state")
-		controller.EnsureCleanState()
 	})
 
 	It("Should deny creation if a Server already has a BIOSSettings", func(ctx SpecContext) {

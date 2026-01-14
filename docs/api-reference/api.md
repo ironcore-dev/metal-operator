@@ -504,8 +504,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the servers. |  |  |
-| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#labelselector-v1-meta)_ |  BMCSelector specifies a label selector to identify the servers that are to be selected. |  |  |
+| `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the BMCs. |  |  |
+| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#labelselector-v1-meta)_ |  BMCSelector specifies a label selector to identify the BMCs that are to be selected. |  |  |
 
 
 #### BMCSettingsSetStatus

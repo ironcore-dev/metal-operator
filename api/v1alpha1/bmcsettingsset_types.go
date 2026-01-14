@@ -9,10 +9,11 @@ import (
 
 // BMCSettingsSetSpec defines the desired state of BMCSettingsSet.
 type BMCSettingsSetSpec struct {
-	// BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the servers.
+	// BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the BMCs.
+	// +required
 	BMCSettingsTemplate BMCSettingsTemplate `json:"bmcSettingsTemplate,omitempty"`
 
-	//  BMCSelector specifies a label selector to identify the servers that are to be selected.
+	//  BMCSelector specifies a label selector to identify the BMCs that are to be selected.
 	// +required
 	BMCSelector metav1.LabelSelector `json:"bmcSelector"`
 }

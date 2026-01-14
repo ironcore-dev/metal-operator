@@ -8,7 +8,7 @@ metadata:
 spec:
   bmcSettingsTemplate:
     version: 2.10.3 # version to apply settings to
-    serverMaintenancePolicy : OwnerApproval
+    serverMaintenancePolicy: OwnerApproval
     settings:
       foo: bar
       foo2: bar2

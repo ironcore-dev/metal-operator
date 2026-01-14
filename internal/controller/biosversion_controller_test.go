@@ -55,9 +55,9 @@ var _ = Describe("BIOSVersion Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -446,12 +446,12 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,

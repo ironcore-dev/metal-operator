@@ -66,7 +66,7 @@ spec:
             properties:
               bmcSelector:
                 description: ' BMCSelector specifies a label selector to identify
-                  the servers that are to be selected.'
+                  the BMCs that are to be selected.'
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -113,7 +113,7 @@ spec:
                 x-kubernetes-map-type: atomic
               bmcSettingsTemplate:
                 description: BMCSettingsTemplate defines the template for the BMCSettings
-                  Resource to be applied to the servers.
+                  Resource to be applied to the BMCs.
                 properties:
                   serverMaintenancePolicy:
                     description: ServerMaintenancePolicy is a maintenance policy to
@@ -133,6 +133,7 @@ spec:
                 type: object
             required:
             - bmcSelector
+            - bmcSettingsTemplate
             type: object
           status:
             description: BMCSettingsSetStatus defines the observed state of BMCSettingsSet.

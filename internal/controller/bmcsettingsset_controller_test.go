@@ -211,9 +211,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Waiting for BMCSettingsSet and dependent resources to be deleted")
 			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
 
-			By("Checking if the BMCSettingsSet was deleted")
-			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
-
 			By("Deleting the BMCSetting resource")
 			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
 
@@ -477,7 +474,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Updating the BMCSettingsSet template")
 			Eventually(Update(bmcSettingsSet, func() {
-				bmcSettingsSet.Spec.BMCSettingsTemplate.Version = "1.45.455b66-rev4"
 				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsMap = bmcSettingNew
 			})).Should(Succeed())
 

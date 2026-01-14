@@ -41,6 +41,8 @@ const (
 	pollingInterval      = 50 * time.Millisecond
 	eventuallyTimeout    = 5 * time.Second
 	consistentlyDuration = 1 * time.Second
+	MockServerIP         = "127.0.0.1"
+	MockServerPort       = 8000
 )
 
 var (
@@ -138,7 +140,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 					MacPrefix:    "23",
 					Manufacturer: "Foo",
 					Protocol:     "RedfishLocal",
-					Port:         8000,
+					Port:         MockServerPort,
 					Type:         "bmc",
 					DefaultCredentials: []macdb.Credential{
 						{
@@ -309,7 +311,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		} else {
 			By("Starting the default mock Redfish server")
 			Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-				mockServer := server.NewMockServer(GinkgoLogr, ":8000")
+				mockServer := server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort))
 				if err := mockServer.Start(ctx); err != nil {
 					return fmt.Errorf("failed to start mock Redfish server: %w", err)
 				}

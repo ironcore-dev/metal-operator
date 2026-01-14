@@ -396,7 +396,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 		"-c",
 		curlCmd,
 	}
-	if err := r.createJob(context.TODO(), r.kclient, cmd, r.namespace, system.UUID); err != nil {
+	if err := r.createJob(ctx, r.kclient, cmd, r.namespace, system.UUID); err != nil {
 		return fmt.Errorf("failed to create job for system %s: %w", system.UUID, err)
 	}
 	return nil

@@ -31,13 +31,13 @@ var _ = Describe("metalctl move", func() {
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-common-"},
 			Spec: metalv1alpha1.EndpointSpec{
 				MACAddress: "23:11:8A:33:CF:EA",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
 			}}
 		sourceEndpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
 			Spec: metalv1alpha1.EndpointSpec{
 				MACAddress: "23:11:8A:33:CF:EB",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.2"),
+				IP:         metalv1alpha1.MustParseIP(MockServerIP2),
 			}}
 		Expect(clients.Source.Create(ctx, sourceCommonEndpoint)).To(Succeed())
 		Expect(clients.Source.Create(ctx, sourceEndpoint)).To(Succeed())

@@ -4,7 +4,6 @@
 package v1alpha1
 
 import (
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -42,9 +41,6 @@ var _ = Describe("BIOSVersion Webhook", func() {
 	AfterEach(func() {
 		By("Deleting the BIOSVersion resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BIOSVersion{})).To(Succeed())
-
-		By("Ensuring clean state")
-		controller.EnsureCleanState()
 	})
 
 	It("Should deny creation if spec.serverRef is duplicate", func(ctx SpecContext) {

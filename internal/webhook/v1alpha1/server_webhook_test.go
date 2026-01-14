@@ -12,7 +12,6 @@ import (
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 )
 
 var _ = Describe("Server Webhook", func() {
@@ -46,9 +45,6 @@ var _ = Describe("Server Webhook", func() {
 	AfterEach(func(ctx context.Context) {
 		By("Deleting the server")
 		Expect(k8sClient.DeleteAllOf(ctx, server)).To(Succeed())
-
-		By("Ensuring clean state")
-		controller.EnsureCleanState()
 	})
 
 	Context("When deleting Server under Validating Webhook", func() {

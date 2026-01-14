@@ -6,7 +6,6 @@ package v1alpha1
 import (
 	"fmt"
 
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -47,9 +46,6 @@ var _ = Describe("BMCVersion Webhook", func() {
 	AfterEach(func() {
 		By("Deleting BMCVersion")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCVersion{})).To(Succeed())
-
-		By("Ensuring clean state")
-		controller.EnsureCleanState()
 	})
 
 	Context("When creating or updating BMCVersion under Validating Webhook", func() {

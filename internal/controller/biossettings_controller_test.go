@@ -1135,8 +1135,8 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 
 		By("Creating pending changes on the mock server via HTTP PATCH")
 		pendingSettingsURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", MockServerIP, MockServerPort)
-		pendingData := map[string]interface{}{
-			"Attributes": map[string]interface{}{
+		pendingData := map[string]any{
+			"Attributes": map[string]any{
 				"PendingSetting1": "PendingValue1",
 			},
 		}
@@ -1175,11 +1175,6 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
-
-		By("Approving the ServerClaim maintenance")
-		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
-		})).Should(Succeed())
 
 		By("Ensuring BIOSSettings transitions to Failed state")
 		Eventually(Object(biosSettings)).Should(

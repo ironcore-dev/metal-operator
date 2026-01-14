@@ -44,9 +44,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: corev1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},

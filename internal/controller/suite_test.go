@@ -276,6 +276,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&BMCSettingsSetReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		Expect((&BMCVersionSetReconciler{
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
@@ -345,6 +350,9 @@ func EnsureCleanState() {
 
 		claims := &metalv1alpha1.ServerClaimList{}
 		g.Eventually(ObjectList(claims)).Should(HaveField("Items", HaveLen(0)))
+
+		bmcSettingsSets := &metalv1alpha1.BMCSettingsSetList{}
+		g.Eventually(ObjectList(bmcSettingsSets)).Should(HaveField("Items", HaveLen(0)))
 
 		bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 		g.Eventually(ObjectList(bmcSettingsList)).Should(HaveField("Items", HaveLen(0)))

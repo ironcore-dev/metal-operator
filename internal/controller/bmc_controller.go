@@ -268,7 +268,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 
 		// Create DNS record for the server if template path is configured
 		if r.ManagerNamespace != "" && r.DNSRecordTemplate != "" {
-			if err := r.createDNSRecordForServer(ctx, log, bmcObj, server); err != nil && !apierrors.IsNotFound(err) {
+			if err := r.createDNSRecordForServer(ctx, log, bmcObj); err != nil && !apierrors.IsNotFound(err) {
 				log.Error(err, "failed to create DNS record for server", "Server", server.Name)
 				errs = append(errs, fmt.Errorf("failed to create DNS record for server %s: %w", server.Name, err))
 			}
@@ -290,7 +290,7 @@ type DNSRecordTemplateData struct {
 }
 
 // createDNSRecordForServer creates a DNS record resource from a YAML template loaded from ConfigMap
-func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, server *metalv1alpha1.Server) error {
+func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
 	// Prepare template data
 	templateData := DNSRecordTemplateData{
 		Namespace: r.ManagerNamespace,

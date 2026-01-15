@@ -51,7 +51,15 @@ func (r *BMCUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *BMCUserReconciler) reconcileExists(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
 	if !user.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, user)
+		err := r.delete(ctx, log, user)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to delete User: %w", err)
+		}
+		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+			log.Info("Removed finalizer for User", "User", user.Name)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 	return r.reconcile(ctx, log, user)
 }
@@ -349,32 +357,28 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 	return false, nil
 }
 
-func (r *BMCUserReconciler) delete(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
+func (r *BMCUserReconciler) delete(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) error {
 	if user.Spec.BMCRef == nil {
 		log.Info("No BMC reference set for User, skipping deletion", "User", user.Name)
-		return ctrl.Result{}, nil
+		return nil
 	}
 	bmcObj := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, client.ObjectKey{
 		Name: user.Spec.BMCRef.Name,
 	}, bmcObj); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return client.IgnoreNotFound(err)
 	}
 	bmcClient, err := r.getBMCClient(ctx, bmcObj)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
+		return fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
 	log.Info("Deleting BMC account for User", "User", user.Name)
 	if err := bmcClient.DeleteAccount(ctx, user.Spec.UserName, user.Status.ID); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to delete BMC account: %w", err)
-	}
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
-		log.Info("Removed finalizer for User", "User", user.Name)
-		return ctrl.Result{}, err
+		return fmt.Errorf("failed to delete BMC account: %w", err)
 	}
 	log.Info("Successfully deleted BMC account and removed finalizer for User", "User", user.Name)
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

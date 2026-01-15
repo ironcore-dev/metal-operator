@@ -78,7 +78,7 @@ The BMC CRD is essential for managing and monitoring BMC devices. It is used to:
 - **Reconcile BMC State**: Continuously monitor the BMC's status and update its state.
 - **Detect Managed Systems**: Identify all systems (servers) managed by the BMC and create corresponding [`Server`](servers.md) resources.
 - **Automate Hardware Management**: Enable automated power control, firmware updates, and health monitoring of physical servers through the BMC.
-- **Create DNS Record**: Automatically create DNS record using a provided Go YAML template via the the managers `dns-record-template-path` flag.
+- **Create DNS Record**: Automatically create DNS record using a provided Go YAML template via the managers `dns-record-template-path` flag.
 
 ## Reconciliation Process
 
@@ -101,6 +101,6 @@ resource to represent the physical server.
 the controller will create an instance using this template. The following BMC data is injected to the Go YAML template:
 - Namespace
 - Name
-- Spec
-- Status
+- Spec (the full `Spec` object is injected into the template context, allowing direct access to its properties)
+- Status (the full `Status` object is injected into the template context, allowing direct access to its properties)
 - Labels

@@ -317,25 +317,15 @@ func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.L
 		return fmt.Errorf("failed to unmarshal DNS record YAML: %w", err)
 	}
 
-	// Set owner reference for garbage collection
-	if err := controllerutil.SetControllerReference(bmcObj, dnsRecord, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference on DNS record: %w", err)
-	}
-
 	// Create or patch the DNS record
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, dnsRecord, func() error {
-		// Preserve any existing fields and only update spec/labels
-		if dnsRecord.GetResourceVersion() != "" {
-			// Preserve the resource version if it already exists
-			return nil
-		}
-		return nil
+		return controllerutil.SetControllerReference(bmcObj, dnsRecord, r.Scheme)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create or patch DNS record: %w", err)
 	}
 
-	log.Info("Created or patched DNS record", "Record", server.Name, "Operation", opResult)
+	log.Info("Created or patched DNS record", "RecordName", dnsRecord.GetName(), "Operation", opResult)
 	return nil
 }
 

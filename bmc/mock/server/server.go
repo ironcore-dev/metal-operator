@@ -158,20 +158,39 @@ func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *MockServer) handleRedfishDELETE(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
 
 	urlPath := resolvePath(r.URL.Path)
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	// Load existing resource: from override if exists, else embedded
-	if _, ok := s.overrides[urlPath]; ok {
-		delete(s.overrides, urlPath)
-		w.WriteHeader(http.StatusNoContent)
+	base, err := fetchCurrentDataForPath(s, urlPath)
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "resource not found"):
+			http.NotFound(w, r)
+			return
+		case strings.Contains(err.Error(), "corrupt embedded JSON"):
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// If it's a Collection (has "Members"), reject
+	if _, isCollection := base["Members"]; isCollection {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	http.NotFound(w, r)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Remove the override to revert to embedded JSON
+	delete(s.overrides, urlPath)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func deepCopy(m map[string]any) map[string]any {

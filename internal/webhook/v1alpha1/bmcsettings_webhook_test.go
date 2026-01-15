@@ -6,7 +6,6 @@ package v1alpha1
 import (
 	"fmt"
 
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -29,11 +28,12 @@ var _ = Describe("BMCSettings Webhook", func() {
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
-				Version:                 "P70 v1.45 (12/06/2017)",
-				SettingsMap:             map[string]string{},
-				BMCRef:                  &v1.LocalObjectReference{Name: "foo"},
-				ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-			},
+				BMCRef: &v1.LocalObjectReference{Name: "foo"},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version:                 "P70 v1.45 (12/06/2017)",
+					SettingsMap:             map[string]string{},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				}},
 		}
 		By("Creating an BMCSettings")
 		Expect(k8sClient.Create(ctx, BMCSettingsV1)).To(Succeed())
@@ -45,9 +45,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 	AfterEach(func() {
 		By("Deleting BMCSettings")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSettings{})).To(Succeed())
-
-		By("Ensuring clean state")
-		controller.EnsureCleanState()
 	})
 
 	Context("When creating or updating BMCSettings under Validating Webhook", func() {
@@ -60,11 +57,12 @@ var _ = Describe("BMCSettings Webhook", func() {
 					GenerateName: "test-bmc-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             map[string]string{},
-					BMCRef:                  &v1.LocalObjectReference{Name: "foo"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				},
+					BMCRef: &v1.LocalObjectReference{Name: "foo"},
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "1.45.455b66-rev4",
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					}},
 			}
 			Expect(validator.ValidateCreate(ctx, BMCSettingsV2)).Error().To(HaveOccurred())
 		})
@@ -77,11 +75,12 @@ var _ = Describe("BMCSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					BMCRef:                  &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "P70 v1.45 (12/06/2017)",
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					}},
 			}
 			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
 		})
@@ -94,11 +93,12 @@ var _ = Describe("BMCSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					BMCRef:                  &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "P70 v1.45 (12/06/2017)",
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					}},
 			}
 			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
 
@@ -116,11 +116,12 @@ var _ = Describe("BMCSettings Webhook", func() {
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
-					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
-					BMCRef:                  &v1.LocalObjectReference{Name: "bar"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "P70 v1.45 (12/06/2017)",
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					}},
 			}
 			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
 

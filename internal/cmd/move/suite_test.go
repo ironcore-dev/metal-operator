@@ -27,6 +27,9 @@ const (
 	pollingInterval      = 50 * time.Millisecond
 	eventuallyTimeout    = 3 * time.Second
 	consistentlyDuration = 1 * time.Second
+	MockServerIP         = "127.0.0.1"
+	MockServerIP2        = "127.0.0.2"
+	MockServerPort       = 8000
 )
 
 var (

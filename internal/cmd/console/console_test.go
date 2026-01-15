@@ -7,7 +7,6 @@ import (
 	"context"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -22,9 +21,6 @@ var _ = Describe("Console Access", func() {
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{})).To(Succeed())
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMC{})).To(Succeed())
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSecret{})).To(Succeed())
-
-		By("Ensuring clean state")
-		controller.EnsureCleanState()
 	})
 
 	It("Should successfully construct console config for Server with inline configuration", func(ctx SpecContext) {

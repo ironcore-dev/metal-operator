@@ -24,9 +24,9 @@ import (
 var _ = Describe("BMCVersionSet Controller", func() {
 	var (
 		MockServerIPAddrs = []netip.AddrPort{
-			netip.MustParseAddrPort("127.0.0.1:8000"),
-			netip.MustParseAddrPort("127.0.0.1:8001"),
-			netip.MustParseAddrPort("127.0.0.1:8002"),
+			netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort)),
+			netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort+1)),
+			netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort+2)),
 		}
 		bmc01                   *metalv1alpha1.BMC
 		bmc02                   *metalv1alpha1.BMC

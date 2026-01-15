@@ -376,8 +376,8 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	}
 	var setBoot redfish.Boot
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	// Fix for older BMCs that don't report BootSourceOverrideMode
-	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
+	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
+	if system.Boot.BootSourceOverrideMode != "" {
 		setBoot = pxeBootWithSettingUEFIBootMode
 	} else {
 		setBoot = pxeBootWithoutSettingUEFIBootMode
@@ -396,7 +396,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 		"-c",
 		curlCmd,
 	}
-	if err := r.createJob(context.TODO(), r.kclient, cmd, r.namespace, system.UUID); err != nil {
+	if err := r.createJob(ctx, r.kclient, cmd, r.namespace, system.UUID); err != nil {
 		return fmt.Errorf("failed to create job for system %s: %w", system.UUID, err)
 	}
 	return nil

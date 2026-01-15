@@ -1,0 +1,18 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCSettingsSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bmcsettingsset-sample
+spec:
+  bmcSettingsTemplate:
+    version: 2.10.3 # version to apply settings to
+    serverMaintenancePolicy: OwnerApproval
+    settings:
+      foo: bar
+      foo2: bar2
+  bmcSelector:
+    matchLabels:
+      manufacturer: "dell"
+      model: "poweredge-r840"

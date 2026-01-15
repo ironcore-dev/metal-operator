@@ -4,7 +4,6 @@
 package v1alpha1
 
 import (
-	"github.com/ironcore-dev/metal-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,9 +32,6 @@ var _ = Describe("Endpoint Webhook", func() {
 	AfterEach(func() {
 		By("Deleting the Endpoint")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Endpoint{})).To(Succeed())
-
-		By("Ensuring clean state")
-		controller.EnsureCleanState()
 	})
 
 	Context("When creating or updating an Endpoint under Validating Webhook", func() {

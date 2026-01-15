@@ -10,8 +10,8 @@ import (
 
 // BMCSettings refer's to Out-Of-Band_management like IDrac for Dell, iLo for HPE etc Settings
 
-// BMCSettingsSpec defines the desired state of BMCSettings.
-type BMCSettingsSpec struct {
+type BMCSettingsTemplate struct {
+
 	// Version defines the BMC firmware for which the settings should be applied.
 	// +required
 	Version string `json:"version"`
@@ -20,19 +20,25 @@ type BMCSettingsSpec struct {
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
-	// BMCRef is a reference to a specific BMC to apply setting to.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	// +optional
-	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
-
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+}
+
+// BMCSettingsSpec defines the desired state of BMCSettings.
+
+type BMCSettingsSpec struct {
+	BMCSettingsTemplate `json:",inline"`
 
 	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
 	// server that needs to be updated with the BMC settings.
 	// +optional
 	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
+
+	// BMCRef is a reference to a specific BMC to apply setting to.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BMCRef is immutable"
+	// +required
+	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
 }
 
 // ServerMaintenanceRefItem is a reference to a ServerMaintenance object.

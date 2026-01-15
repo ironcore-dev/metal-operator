@@ -44,7 +44,7 @@ var _ = Describe("Server Controller", func() {
 			Spec: metalv1alpha1.EndpointSpec{
 				// emulator BMC mac address
 				MACAddress: "23:11:8A:33:CF:EA",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
@@ -305,9 +305,9 @@ var _ = Describe("Server Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -528,9 +528,9 @@ var _ = Describe("Server Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -611,9 +611,9 @@ var _ = Describe("Server Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -674,9 +674,9 @@ var _ = Describe("Server Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -758,9 +758,9 @@ var _ = Describe("Server Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},

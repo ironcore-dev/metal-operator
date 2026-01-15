@@ -4,6 +4,8 @@
 package controller
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,9 +23,9 @@ import (
 var _ = Describe("BIOSSettingsSet Controller", func() {
 	var (
 		MockServerIPAddrs = []netip.AddrPort{
-			netip.MustParseAddrPort("127.0.0.1:8000"),
-			netip.MustParseAddrPort("127.0.0.1:8001"),
-			netip.MustParseAddrPort("127.0.0.1:8002"),
+			netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort)),
+			netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort+1)),
+			netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort+2)),
 		}
 		server01  *metalv1alpha1.Server
 		server02  *metalv1alpha1.Server

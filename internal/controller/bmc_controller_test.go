@@ -263,7 +263,7 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should create a DNSRecord for the server if configured", func(ctx SpecContext) {
+	It("Should create a DNSRecord for the bmc if configured", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -303,7 +303,7 @@ var _ = Describe("BMC Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
 
-		By("Ensuring that the DNSRecord resource has been created for the server")
+		By("Ensuring that the DNSRecord resource has been created for the bmc")
 		dnsRecord := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      bmc.Name,

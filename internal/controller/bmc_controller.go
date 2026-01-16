@@ -173,6 +173,13 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	}
 	log.V(1).Info("Updated BMC status", "State", bmcObj.Status.State)
 
+	// Create DNS record for the bmc if template path is configured
+	if r.ManagerNamespace != "" && r.DNSRecordTemplate != "" {
+		if err := r.createDNSRecord(ctx, log, bmcObj); err != nil && !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to create DNS record for BMC %s: %w", bmcObj.Name, err)
+		}
+	}
+
 	if err := r.discoverServers(ctx, log, bmcClient, bmcObj); err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to discover servers: %w", err)
 	}
@@ -265,14 +272,6 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bm
 			continue
 		}
 		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
-
-		// Create DNS record for the server if template path is configured
-		if r.ManagerNamespace != "" && r.DNSRecordTemplate != "" {
-			if err := r.createDNSRecordForServer(ctx, log, bmcObj); err != nil && !apierrors.IsNotFound(err) {
-				log.Error(err, "failed to create DNS record for server", "Server", server.Name)
-				errs = append(errs, fmt.Errorf("failed to create DNS record for server %s: %w", server.Name, err))
-			}
-		}
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("errors occurred during server discovery: %v", errs)
@@ -289,8 +288,8 @@ type DNSRecordTemplateData struct {
 	Labels map[string]string
 }
 
-// createDNSRecordForServer creates a DNS record resource from a YAML template loaded from ConfigMap
-func (r *BMCReconciler) createDNSRecordForServer(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
+// createDNSRecord creates a DNS record resource from a YAML template loaded from ConfigMap
+func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
 	// Prepare template data
 	templateData := DNSRecordTemplateData{
 		Namespace: r.ManagerNamespace,

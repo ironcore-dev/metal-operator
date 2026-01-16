@@ -422,7 +422,7 @@ func (r *BMCVersionReconciler) getServerMaintenances(ctx context.Context, log lo
 		key := client.ObjectKey{Name: ref.Name, Namespace: r.ManagerNamespace}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{}
 		if err := r.Get(ctx, key, serverMaintenance); err != nil {
-			log.V(1).Error(err, "failed to get referred serverMaintenance obj", ref.Name)
+			log.V(1).Error(err, "failed to get referred serverMaintenance obj", "ServerMaintenance", ref.Name)
 			errs = append(errs, err)
 			continue
 		}

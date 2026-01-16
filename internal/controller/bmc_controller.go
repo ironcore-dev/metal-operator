@@ -290,7 +290,6 @@ type DNSRecordTemplateData struct {
 
 // createDNSRecord creates a DNS record resource from a YAML template loaded from ConfigMap
 func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
-	// Prepare template data
 	templateData := DNSRecordTemplateData{
 		Namespace: r.ManagerNamespace,
 		Name:      bmcObj.Name,
@@ -298,8 +297,6 @@ func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bm
 		BMCStatus: bmcObj.Status,
 		Labels:    bmcObj.Labels,
 	}
-
-	// Render the template
 	tmpl, err := template.New("dnsRecord").Parse(r.DNSRecordTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse DNS record template: %w", err)
@@ -309,22 +306,30 @@ func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bm
 	if err := tmpl.Execute(&renderedYAML, templateData); err != nil {
 		return fmt.Errorf("failed to render DNS record template: %w", err)
 	}
-
-	// Unmarshal the rendered YAML into an unstructured object
 	dnsRecord := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal(renderedYAML.Bytes(), dnsRecord); err != nil {
 		return fmt.Errorf("failed to unmarshal DNS record YAML: %w", err)
 	}
 
-	// Create or patch the DNS record
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, dnsRecord, func() error {
-		return controllerutil.SetControllerReference(bmcObj, dnsRecord, r.Scheme)
-	})
+	gvk := dnsRecord.GroupVersionKind()
+	if gvk.Version == "" || gvk.Kind == "" {
+		return fmt.Errorf("template is missing apiVersion or kind")
+	}
+	if dnsRecord.GetName() == "" {
+		return fmt.Errorf("DNS record template must specify a name")
+	}
+	if dnsRecord.GetNamespace() == "" {
+		dnsRecord.SetNamespace(r.ManagerNamespace)
+	}
+	if err := controllerutil.SetControllerReference(bmcObj, dnsRecord, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference: %w", err)
+	}
+	err = r.Patch(ctx, dnsRecord, client.Apply, fieldOwner, client.ForceOwnership)
 	if err != nil {
 		return fmt.Errorf("failed to create or patch DNS record: %w", err)
 	}
 
-	log.Info("Created or patched DNS record", "RecordName", dnsRecord.GetName(), "Operation", opResult)
+	log.Info("Created or patched DNS record", "RecordName", dnsRecord.GetName())
 	return nil
 }
 

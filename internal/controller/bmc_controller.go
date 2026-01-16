@@ -297,7 +297,9 @@ func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bm
 		BMCStatus: bmcObj.Status,
 		Labels:    bmcObj.Labels,
 	}
-	tmpl, err := template.New("dnsRecord").Parse(r.DNSRecordTemplate)
+	tmpl, err := template.New("dnsRecord").
+		Option("missingkey=error").
+		Parse(r.DNSRecordTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse DNS record template: %w", err)
 	}

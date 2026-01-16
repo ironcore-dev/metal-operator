@@ -16,7 +16,7 @@ const (
 	// BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting
 	BIOSVersionStatePending BIOSVersionState = "Pending"
 	// BIOSVersionStateInProgress specifies that upgrading bios is in progress.
-	BIOSVersionStateInProgress BIOSVersionState = "Processing"
+	BIOSVersionStateInProgress BIOSVersionState = "InProgress"
 	// BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.
 	BIOSVersionStateCompleted BIOSVersionState = "Completed"
 	// BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.

@@ -413,7 +413,7 @@ type Storage struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
-//+kubebuilder:printcolumn:name="UUID",type=string,JSONPath=`.spec.uuid`
+//+kubebuilder:printcolumn:name="SystemUUID",type=string,JSONPath=`.spec.systemUUID`
 //+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
 //+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
 //+kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`

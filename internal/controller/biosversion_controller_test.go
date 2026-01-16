@@ -203,6 +203,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 			}),
 		))
 
+		By("Ensuring that both BMCVersion and BIOSVersion report consistent InProgress state while waiting on maintenance")
+		// This test verifies that both version CRDs use the same state enum value when waiting on maintenance
+		Eventually(Object(biosVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateInProgress),
+		)
+
 		ensureBiosVersionConditionTransition(acc, biosVersion, server)
 
 		By("Ensuring that BIOS upgrade has completed")

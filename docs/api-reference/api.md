@@ -332,7 +332,7 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `Pending` | BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting<br /> |
-| `Processing` | BIOSVersionStateInProgress specifies that upgrading bios is in progress.<br /> |
+| `InProgress` | BIOSVersionStateInProgress specifies that upgrading bios is in progress.<br /> |
 | `Completed` | BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.<br /> |
 | `Failed` | BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.<br /> |
 

@@ -173,9 +173,9 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	}
 	log.V(1).Info("Updated BMC status", "State", bmcObj.Status.State)
 
-	// Create DNS record for the bmc if template path is configured
+	// Create DNS record for the bmc if template is configured
 	if r.ManagerNamespace != "" && r.DNSRecordTemplate != "" {
-		if err := r.createDNSRecord(ctx, log, bmcObj); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.createDNSRecord(ctx, log, bmcObj); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create DNS record for BMC %s: %w", bmcObj.Name, err)
 		}
 	}

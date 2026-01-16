@@ -20,6 +20,15 @@ const (
 	ProtocolRedfishKube = "RedfishKube"
 )
 
+type PasswordPolicy string
+
+const (
+	// PasswordPolicyExternal indicates that the password policy is managed externally, such as by an external identity provider.
+	PasswordPolicyExternal PasswordPolicy = "External"
+	// PasswordPolicyInternal indicates that the password policy is managed internally, such as by the BMC itself.
+	PasswordPolicyInternal PasswordPolicy = "Internal"
+)
+
 // BMCSpec defines the desired state of BMC
 // +kubebuilder:validation:XValidation:rule="has(self.access) != has(self.endpointRef)",message="exactly one of access or endpointRef needs to be set"
 type BMCSpec struct {

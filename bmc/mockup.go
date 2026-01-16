@@ -3,7 +3,10 @@
 
 package bmc
 
-import "github.com/stmcginnis/gofish/redfish"
+import (
+	"github.com/stmcginnis/gofish/common"
+	"github.com/stmcginnis/gofish/redfish"
+)
 
 // RedfishMockUps is an implementation of the BMC interface for Redfish.
 type RedfishMockUps struct {
@@ -22,6 +25,7 @@ type RedfishMockUps struct {
 	BMCUpgradeTaskIndex  int
 	BMCUpgradeTaskStatus []redfish.Task
 
+	Accounts              map[string]*redfish.ManagerAccount
 	SimulateUnvailableBMC bool
 }
 
@@ -107,6 +111,39 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		},
 	}
 
+	r.Accounts = map[string]*redfish.ManagerAccount{
+		"foo": {
+			Entity: common.Entity{
+				ID: "0",
+			},
+			UserName: "foo",
+			Enabled:  true,
+			RoleID:   "ReadOnly",
+			Locked:   false,
+			Password: "bar",
+		},
+		"admin": {
+			Entity: common.Entity{
+				ID: "1",
+			},
+
+			UserName: "admin",
+			Enabled:  true,
+			RoleID:   "Administrator",
+			Locked:   false,
+			Password: "adminpass",
+		},
+		"user": {
+			Entity: common.Entity{
+				ID: "2",
+			},
+			UserName: "user",
+			Enabled:  true,
+			RoleID:   "ReadOnly",
+			Locked:   false,
+			Password: "userpass",
+		},
+	}
 	r.SimulateUnvailableBMC = false
 }
 

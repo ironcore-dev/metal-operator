@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -77,6 +78,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Get(server)).Should(Succeed())
 
 		By("Ensuring that the Server is in an available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -106,8 +110,12 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 defaultMockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					Version: defaultMockUpServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BMC\"}",
+							defaultMockUpServerBMCVersion, "/redfish/v1/Managers/BMC"),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -161,8 +169,12 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BMC\"}",
+							upgradeServerBMCVersion, "/redfish/v1/Managers/BMC"),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -286,8 +298,12 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BMC\"}",
+							upgradeServerBMCVersion, "/redfish/v1/Managers/BMC"),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 				},
 			},
@@ -389,8 +405,12 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BMC\"}",
+							upgradeServerBMCVersion, "/redfish/v1/Managers/BMC"),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -437,7 +457,7 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 
 	By("Ensuring that BMCVersion has updated the task Status with task URI")
 	Eventually(Object(bmcVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
+		HaveField("Status.UpgradeTask.URI", "/redfish/v1/TaskService/Tasks/dummyBMCTask"), // from BMCVersion Update task from mock server
 	)
 
 	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeCompleted'")

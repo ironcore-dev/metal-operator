@@ -1269,6 +1269,9 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 
 		By("Ensure that the Server is in available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())

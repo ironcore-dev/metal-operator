@@ -6,13 +6,11 @@ package bmc
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ironcore-dev/metal-operator/bmc/common"
 	gofishCommon "github.com/stmcginnis/gofish/common"
 
 	"github.com/stmcginnis/gofish/redfish"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
@@ -42,63 +40,6 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 		return nil, fmt.Errorf("failed to create RedfishBMC client: %w", err)
 	}
 	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
-}
-
-// GetBiosVersion retrieves the BIOS version.
-func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
-	if UnitTestMockUps.BIOSVersion == "" {
-		var err error
-		UnitTestMockUps.BIOSVersion, err = r.RedfishBMC.GetBiosVersion(ctx, systemUUID)
-		if err != nil {
-			return "", fmt.Errorf("failed to get BIOS version: %w", err)
-		}
-	}
-	return UnitTestMockUps.BIOSVersion, nil
-}
-
-// UpgradeBiosVersion initiates a BIOS upgrade.
-func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
-	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
-	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BIOSUpgradeTaskIndex++
-		}
-	}()
-	return DummyMockTaskForUpgrade, false, nil
-}
-
-// GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
-func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
-	index := UnitTestMockUps.BIOSUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BIOSUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
-	}
-	task := &UnitTestMockUps.BIOSUpgradeTaskStatus[index]
-	if task.TaskState == redfish.CompletedTaskState {
-		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
-	}
-	return task, nil
-}
-
-// ResetManager resets the BMC with a delay for pending settings.
-func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Simulating BMC reset", "UUID", UUID, "ResetType", resetType)
-	go func() {
-		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
-			time.Sleep(150 * time.Millisecond)
-			for key, data := range UnitTestMockUps.PendingBMCSetting {
-				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
-					UnitTestMockUps.BMCSettingAttr[key] = data
-				}
-			}
-			UnitTestMockUps.ResetPendingBMCSetting()
-		}
-	}()
-	return nil
 }
 
 // SetBMCAttributesImmediately sets BMC attributes, applying them immediately or on reset.
@@ -179,43 +120,4 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, a
 		return false, err
 	}
 	return common.CheckAttribues(attrs, filtered)
-}
-
-// GetBMCVersion retrieves the BMC version.
-func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
-	if UnitTestMockUps.BMCVersion == "" {
-		var err error
-		UnitTestMockUps.BMCVersion, err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
-		if err != nil {
-			return "", fmt.Errorf("failed to get BMC version: %w", err)
-		}
-	}
-	return UnitTestMockUps.BMCVersion, nil
-}
-
-// UpgradeBMCVersion initiates a BMC upgrade.
-func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
-	UnitTestMockUps.BMCUpgradeTaskIndex = 0
-	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BMCUpgradeTaskIndex++
-		}
-	}()
-	return DummyMockTaskForUpgrade, false, nil
-}
-
-// GetBMCUpgradeTask retrieves the status of a BMC upgrade task.
-func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
-	index := UnitTestMockUps.BMCUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BMCUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
-	}
-	task := &UnitTestMockUps.BMCUpgradeTaskStatus[index]
-	if task.TaskState == redfish.CompletedTaskState {
-		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
-	}
-	return task, nil
 }

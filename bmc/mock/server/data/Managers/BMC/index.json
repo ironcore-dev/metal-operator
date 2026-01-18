@@ -1,6 +1,6 @@
 {
     "@odata.type": "#Manager.v1_19_0.Manager",
-    "Id": "BMC",
+    "Id": "58893887-8974-2487-2389-841168418919",
     "Name": "Manager",
     "ManagerType": "BMC",
     "Description": "Contoso BMC",

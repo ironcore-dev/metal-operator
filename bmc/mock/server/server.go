@@ -31,6 +31,9 @@ const (
 	ResourceLockKey       = "resourceLock"
 	PowerOffState         = "Off"
 	PowerOnState          = "On"
+
+	BIOSUpdateTask = "/redfish/v1/TaskService/Tasks/dummyBIOSTask"
+	BMCUpdateTask  = "/redfish/v1/TaskService/Tasks/dummyBMCTask"
 )
 
 type MockServer struct {
@@ -235,6 +238,13 @@ func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.URL.Path == BIOSUpdateTask || r.URL.Path == BMCUpdateTask {
+		// special handling for firmware update tasks
+		s.log.Info("Task details requested not found", "Task", r.URL.Path)
+		http.NotFound(w, r)
+		return
+	}
+
 	content, err := dataFS.ReadFile(urlPath)
 	if err != nil {
 		http.NotFound(w, r)
@@ -339,8 +349,25 @@ func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 			s.log.Error(err, "Failed to write response")
 			return
 		}
-	case strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
+	case strings.Contains(urlPath, "UpdateService/Actions/SimpleUpdate"):
 		// Simulate a firmware update action
+		status, err := handleSimpleUpdate(s, body)
+		if err != nil {
+			http.Error(w, err.Error(), status)
+			return
+		}
+		if status != http.StatusAccepted {
+			w.Header().Set("Location", BIOSUpdateTask)
+		} else {
+			w.Header().Set("Location", BMCUpdateTask)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, err = w.Write([]byte(`{"status": "Accepted"}`))
+		if err != nil {
+			s.log.Error(err, "Failed to write response")
+			return
+		}
 	default:
 		s.log.Info("Unhandled POST request", "path", urlPath)
 		w.Header().Set("Content-Type", "application/json")
@@ -480,6 +507,14 @@ func handleBMCReset(s *MockServer, r *http.Request, urlPath string, body []byte)
 	s.mu.Lock()
 	if val, ok := base[ResourceLockKey]; ok && val == LockedResourceState {
 		s.mu.Unlock()
+		go func() {
+			// unlock after waiting period incase of stuck lock
+			time.Sleep(300 * time.Millisecond)
+			base["PowerState"] = PowerOnState
+			base["Status"].(map[string]any)["State"] = "Enabled"
+			delete(base, ResourceLockKey)
+			s.overrides[urlPath] = base
+		}()
 		return errors.New("BMC resource locked, cannot perform reset")
 	}
 	base[ResourceLockKey] = LockedResourceState
@@ -489,16 +524,18 @@ func handleBMCReset(s *MockServer, r *http.Request, urlPath string, body []byte)
 		return strings.Contains(string(body), s)
 	}) {
 		go func() {
-			time.Sleep(150 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			s.mu.Lock()
+			base["Status"].(map[string]any)["State"] = "Rebooting"
 			base["PowerState"] = PowerOffState
 			// Store the newly modified version
 			s.overrides[urlPath] = base
 			s.log.Info("Powered Off the BMC")
 			s.mu.Unlock()
-			time.Sleep(150 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			s.mu.Lock()
 			base["PowerState"] = PowerOnState
+			base["Status"].(map[string]any)["State"] = "Enabled"
 			delete(base, ResourceLockKey)
 			// Store the newly modified version
 			s.overrides[urlPath] = base
@@ -577,6 +614,83 @@ func fetchCurrentDataForPath(s *MockServer, path string) (map[string]any, error)
 	return base, nil
 }
 
+func handleSimpleUpdate(s *MockServer, body []byte) (int, error) {
+	if len(body) == 0 {
+		return http.StatusBadRequest, errors.New("empty body")
+	}
+	var updatePayload map[string]any
+	if err := json.Unmarshal(body, &updatePayload); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("invalid JSON for the update BIOS payload: %w", err)
+	}
+	// to mock the server to update, we follow following format for the body
+	// https://github.com/ironcore-dev/metal-operator/blob/493d58792737e64c2df32f5e95ff1181ad4359b3/bmc/oem/types.go#SimpleUpdateRequestBody
+	// SimpleUpdateRequestBody{
+	//    ImageURI : <json string>"
+	//	{
+	//	 "updatedVersion": "2.3.4",
+	//	 "ResourceURI": "/redfish/v1/Systems/437XR1138R2" | "redfish/v1/Managers/BMC",
+	//	 "Module": "Bios" | "BMC" | <any other string>
+	//	}
+	//	"
+	var details map[string]string
+	if err := json.Unmarshal([]byte(updatePayload["ImageURI"].(string)), &details); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("invalid JSON string for ImageURI: %w", err)
+	}
+
+	systemPath := resolvePath(details["ResourceURI"])
+	base, err := fetchCurrentDataForPath(s, systemPath)
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "resource not found"):
+			s.log.Error(err, "Cannot update version as resource not found", details["ResourceURI"])
+			return http.StatusNotFound, err
+		case strings.Contains(err.Error(), "corrupt embedded JSON"):
+			s.log.Error(err, "Cannot update version as resource JSON is corrupt")
+			return http.StatusInternalServerError, err
+		default:
+			s.log.Error(err, "Cannot update version with error")
+			return http.StatusInternalServerError, err
+		}
+	}
+	switch details["Module"] {
+	case "BIOS":
+		biosTasksPath := resolvePath(BIOSUpdateTask)
+		if taskDetails, ok := s.overrides[biosTasksPath]; ok && taskDetails.(map[string]any)["TaskState"] != "Completed" {
+			return http.StatusConflict, errors.New("upgrade BIOS tasks already running at /redfish/v1/TaskService/Tasks/dummyBIOSTask")
+		}
+		if base["BiosVersion"] == nil || base["BiosVersion"] == "" {
+			return http.StatusInternalServerError, errors.New("BiosVersion field not found in system resource")
+		}
+		// Simulate a BMC firmware update action
+		go func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			mockedFirmwareUpgradeTasksProgress(base["BiosVersion"].(string), biosTasksPath, s, details)
+			base["BiosVersion"] = details["updatedVersion"]
+		}()
+		return http.StatusAccepted, nil
+	case "BMC":
+		bmcTasksPath := resolvePath(BMCUpdateTask)
+		if taskDetails, ok := s.overrides[bmcTasksPath]; ok && taskDetails.(map[string]any)["TaskState"] != "Completed" {
+			return http.StatusConflict, errors.New("upgrade BMC tasks already running at /redfish/v1/TaskService/Tasks/dummyBMCTask")
+		}
+		if base["FirmwareVersion"] == nil || base["FirmwareVersion"] == "" {
+			return http.StatusInternalServerError, errors.New("FirmwareVersion field not found in system resource")
+		}
+		// Simulate a BMC firmware update action
+		go func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			mockedFirmwareUpgradeTasksProgress(base["FirmwareVersion"].(string), bmcTasksPath, s, details)
+			base["FirmwareVersion"] = details["updatedVersion"]
+		}()
+		return http.StatusCreated, nil
+	default:
+		s.log.Info("Unhandled SimpleUpdate request", "body", string(body))
+		return http.StatusBadRequest, errors.New("module not supported for SimpleUpdate")
+	}
+}
+
 // Start starts the mock server and stops on ctx cancellation.
 func (s *MockServer) Start(ctx context.Context) error {
 	if s.handler == nil {
@@ -608,4 +722,40 @@ func (s *MockServer) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func mockedFirmwareUpgradeTasksProgress(currentVersion, resourcePath string, s *MockServer, details map[string]string) {
+	if currentVersion == details["updatedVersion"] {
+		s.log.Info("version is already at the requested version, no upgrade needed", "version", details["updatedVersion"], "Resource", details["Module"])
+		// note: this is a mocked tasks
+		// will be deleted once its completed and has been read by the client to unblock the next upgrades
+		s.overrides[resourcePath] = map[string]any{
+			"TaskState":       "Completed",
+			"PercentComplete": 100,
+			"Description":     "BMC upgrade not needed, already at requested version",
+		}
+	}
+
+	type mockedtasks struct {
+		TaskState       string
+		PercentComplete int
+	}
+	// mock the bios upgrade progress at incre
+	TaskInProgress := []mockedtasks{
+		{"New", 0},
+		{"Pending", 0},
+		{"Starting", 0},
+		{"Running", 10},
+		{"Running", 20},
+		{"Running", 100},
+		{"Completed", 100}, // final state, will be deleted after read by client to unblock next upgrades
+	}
+	for _, task := range TaskInProgress {
+		// mock delays for each tasks state
+		time.Sleep(200 * time.Millisecond)
+		s.overrides[resourcePath] = map[string]any{
+			"TaskState":       task.TaskState,
+			"PercentComplete": task.PercentComplete,
+		}
+	}
 }

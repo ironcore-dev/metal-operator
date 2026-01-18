@@ -19,9 +19,10 @@ import (
 type Manufacturer string
 
 const (
-	ManufacturerDell   Manufacturer = "Dell Inc."
-	ManufacturerLenovo Manufacturer = "Lenovo"
-	ManufacturerHPE    Manufacturer = "HPE"
+	ManufacturerDell           Manufacturer = "Dell Inc."
+	ManufacturerLenovo         Manufacturer = "Lenovo"
+	ManufacturerHPE            Manufacturer = "HPE"
+	ManufacturerTestingMockups Manufacturer = "Contoso"
 )
 
 type SettingAttributeValueTypes string
@@ -336,6 +337,10 @@ func NewOEM(manufacturer string, service *gofish.Service) (oem.OEMInterface, err
 		}, nil
 	case string(ManufacturerLenovo):
 		return &oem.Lenovo{
+			Service: service,
+		}, nil
+	case string(ManufacturerTestingMockups):
+		return &oem.Mock{
 			Service: service,
 		}, nil
 	default:

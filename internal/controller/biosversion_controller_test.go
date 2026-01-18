@@ -4,6 +4,8 @@
 package controller
 
 import (
+	"fmt"
+
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -48,7 +50,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-maintenance-",
+				GenerateName: "test-bios-version-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
@@ -66,7 +68,15 @@ var _ = Describe("BIOSVersion Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.SystemURI", Not(BeEmpty())),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
 		By("Ensuring that the Server is in available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -94,8 +104,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 defaultMockUpServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
+					Version: defaultMockUpServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BIOS\"}",
+							defaultMockUpServerBiosVersion, server.Spec.SystemURI),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -147,8 +161,13 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						// create a fake json string as expected by the mock server
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BIOS\"}",
+							upgradeServerBiosVersion, server.Spec.SystemURI),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -275,8 +294,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BIOS\"}",
+							upgradeServerBiosVersion, server.Spec.SystemURI),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -382,8 +405,12 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BIOS\"}",
+							upgradeServerBiosVersion, server.Spec.SystemURI),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -467,16 +494,22 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 			},
 		}
 		Eventually(Get(server)).Should(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.SystemURI", Not(BeEmpty())),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
 
 		By("Ensuring that the Server is in available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
+
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
-
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
@@ -502,8 +535,12 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BIOS\"}",
+							upgradeServerBiosVersion, server.Spec.SystemURI),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -605,7 +642,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 
 	By("Ensuring that BIOSVersion has updated the taskStatus with taskURI")
 	Eventually(Object(biosVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
+		HaveField("Status.UpgradeTask.URI", "/redfish/v1/TaskService/Tasks/dummyBIOSTask"), // from BIOSVersion Update task from mock server
 	)
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeCompleted'")

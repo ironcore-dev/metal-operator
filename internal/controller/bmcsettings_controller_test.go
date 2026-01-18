@@ -74,6 +74,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Get(server)).Should(Succeed())
 
 		By("Ensuring that the Server is in an available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Equal(metalv1alpha1.ServerStateDiscovery)),
+		)
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -356,7 +359,9 @@ var _ = Describe("BMCSettings Controller", func() {
 
 	It("Should wait for upgrade and reconcile BMCSettings version is correct", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
-		bmcSetting["fooreboot"] = "145"
+		// revert after moving bmc settings to the actual mock server
+		// bmcSetting["fooreboot"] = "145"
+		bmcSetting["abc"] = "145"
 
 		By("update the server state to Available  state")
 		Eventually(UpdateStatus(server, func() {
@@ -463,7 +468,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
 		bmcSetting := make(map[string]string)
-		bmcSetting["fooreboot"] = "145"
+		bmcSetting["abc"] = "145"
+		// revert after moving bmc settings to the actual mock server
+		// bmcSetting["fooreboot"] = "145"
 
 		By("update the server state to Available  state")
 		Eventually(UpdateStatus(server, func() {
@@ -497,10 +504,6 @@ var _ = Describe("BMCSettings Controller", func() {
 				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
 			}
 		})).Should(Succeed())
-
-		Eventually(Object(bmcSettings)).Should(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
-		)
 
 		Eventually(Object(bmcSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),

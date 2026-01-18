@@ -72,6 +72,11 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, server01)).Should(Succeed())
 
+		Eventually(Object(server01)).Should(SatisfyAll(
+			HaveField("Spec.SystemURI", Not(BeEmpty())),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
 		By("Creating a second Server02")
 		server02 = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
@@ -96,6 +101,11 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
 
+		Eventually(Object(server02)).Should(SatisfyAll(
+			HaveField("Spec.SystemURI", Not(BeEmpty())),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
 		By("Creating a third Server03")
 		server03 = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
@@ -119,6 +129,11 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server03)).Should(Succeed())
+
+		Eventually(Object(server03)).Should(SatisfyAll(
+			HaveField("Spec.SystemURI", Not(BeEmpty())),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
 	})
 
 	AfterEach(func(ctx SpecContext) {
@@ -141,8 +156,12 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BIOS\"}",
+							upgradeServerBiosVersion, server01.Spec.SystemURI),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerSelector: metav1.LabelSelector{
@@ -242,8 +261,12 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI: fmt.Sprintf(
+							"{\"updatedVersion\": \"%s\", \"ResourceURI\": \"%s\", \"Module\": \"BIOS\"}",
+							upgradeServerBiosVersion, server01.Spec.SystemURI),
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerSelector: metav1.LabelSelector{

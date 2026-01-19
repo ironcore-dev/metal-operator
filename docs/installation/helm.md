@@ -1,4 +1,4 @@
-# Helm Installation Guide
+# Helm Installation
 
 This guide will help you install the Metal Operator using Helm.
 

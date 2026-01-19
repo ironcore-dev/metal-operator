@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: Getting started
-      link: /usage/installation
+      link: /quickstart
     - theme: alt
       text: API Reference
       link: /api-reference/api

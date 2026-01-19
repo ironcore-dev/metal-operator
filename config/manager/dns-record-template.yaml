@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-record-template
+  namespace: metal-system
+data:
+  # DNS record template for automatic DNS record creation during server discovery.
+  # This template supports Go text/template syntax with the following variables:
+  #
+  # Variables available for templating:
+  #   - .Name:      Server name (e.g., "server-0")
+  #   - .Namespace: Target namespace from ManagerNamespace
+  #   - .Hostname:  Hostname for DNS resolution (same as .Name by default)
+  #   - .IP:        IP address of the BMC
+  #   - .Labels:    Labels from the BMC resource (can iterate with range)
+  #
+  # Example template:
+  #   apiVersion: dns.ironcore.dev/v1alpha1
+  #   kind: DNSRecord
+  #   metadata:
+  #     name: {{ .Name }}
+  #     namespace: {{ .Namespace }}
+  #     labels:
+  #       {{- range $key, $value := .Labels }}
+  #       {{ $key }}: {{ $value }}
+  #       {{- end }}
+  #   spec:
+  #     hostname: {{ .Hostname }}
+  #     ip: {{ .IP }}
+  #     recordType: A
+  #     ttl: 300
+  #
+  template.yaml: |
+    apiVersion: dns.ironcore.dev/v1alpha1
+    kind: DNSRecord
+    metadata:
+      name: {{ .Name }}
+      namespace: {{ .Namespace }}
+      labels:
+        {{- range $key, $value := .Labels }}
+        {{ $key }}: {{ $value }}
+        {{- end }}
+    spec:
+      hostname: {{ .Hostname }}
+      ip: {{ .IP }}
+      recordType: A
+      ttl: 300

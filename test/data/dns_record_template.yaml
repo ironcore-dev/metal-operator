@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+  {{- range $key, $value := .Labels }}
+    {{ $key }}: {{ $value }}
+  {{- end }}
+data:
+  hostname: "{{ .Hostname }}"
+  ip: "{{ .IP }}"
+  recordType: "A"
+  record: "ingress.region.cloud.com."
+  zoneName: "region.cloud.com."
+  ttl: "300"

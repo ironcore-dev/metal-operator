@@ -624,6 +624,7 @@ _Appears in:_
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC.<br />It could be a standard protocol such as IPMI or Redfish. |  |  |
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC.<br />This field is optional and can be omitted if console access is not required. |  |  |
 | `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
+| `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 
 
 #### BMCState

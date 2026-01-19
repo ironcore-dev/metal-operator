@@ -180,7 +180,7 @@ func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 			URI:          s.ODataID,
 			Model:        s.Model,
 			Manufacturer: s.Manufacturer,
-			PowerState:   PowerState(s.PowerState),
+			PowerState:   s.PowerState,
 			SerialNumber: s.SerialNumber,
 		})
 	}
@@ -267,8 +267,7 @@ func (r *RedfishBMC) ResetManager(ctx context.Context, bmcUUID string, resetType
 		return fmt.Errorf("reset type of %v is not supported for manager %v", resetType, manager.UUID)
 	}
 
-	err = manager.Reset(resetType)
-	if err != nil {
+	if err = manager.Reset(resetType); err != nil {
 		return fmt.Errorf("failed to reset managers %v with error: %w", manager.UUID, err)
 	}
 	return nil
@@ -407,16 +406,14 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUR
 		Attributes redfish.SettingsAttributes `json:"Attributes"`
 		Settings   common.Settings            `json:"@Redfish.Settings"`
 	}
-	err = r.GetEntityFromUri(tSys.Bios.String(), system.GetClient(), &tBios)
-	if err != nil {
+	if err = r.GetEntityFromUri(ctx, tSys.Bios.String(), system.GetClient(), &tBios); err != nil {
 		return nil, err
 	}
 
 	var tBiosPendingSetting struct {
 		Attributes redfish.SettingsAttributes `json:"Attributes"`
 	}
-	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosPendingSetting)
-	if err != nil {
+	if err = r.GetEntityFromUri(ctx, tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosPendingSetting); err != nil {
 		return nil, err
 	}
 
@@ -435,18 +432,24 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUR
 	return tBiosPendingSetting.Attributes, nil
 }
 
-func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
-	Resp, err := client.Get(uri)
-	if err != nil {
-		return err
-	}
-	defer Resp.Body.Close() // nolint: errcheck
+func (r *RedfishBMC) GetEntityFromUri(ctx context.Context, uri string, client common.Client, entity any) error {
+	log := ctrl.LoggerFrom(ctx)
 
-	RespRawBody, err := io.ReadAll(Resp.Body)
+	resp, err := client.Get(uri)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(RespRawBody, &entity)
+	defer func(Body io.ReadCloser) {
+		if err = Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, &entity)
 }
 
 func (r *RedfishBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUUID string) (redfish.SettingsAttributes, error) {
@@ -531,10 +534,10 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool
 	if err != nil {
 		return false, err
 	}
-	return r.checkAttribues(attrs, filtered)
+	return r.checkAttributes(attrs, filtered)
 }
 
-func (r *RedfishBMC) checkAttribues(attrs redfish.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
+func (r *RedfishBMC) checkAttributes(attrs redfish.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
 	//TODO: add more types like maps and Enumerations
@@ -805,19 +808,23 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 		return "", false, err
 	}
 
-	oem, err := NewOEM(manufacturer, service)
+	oemInterface, err := NewOEMInterface(manufacturer, service)
 	if err != nil {
 		return "", false, err
 	}
 
-	RequestBody := oem.GetUpdateRequestBody(parameters)
+	RequestBody := oemInterface.GetUpdateRequestBody(parameters)
 
 	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
 
 	if err != nil {
 		return "", false, err
 	}
-	defer resp.Body.Close() // nolint: errcheck
+	defer func(Body io.ReadCloser) {
+		if err = Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(resp.Body)
 
 	// any error post this point is fatal, as we can not issue multiple upgrade requests.
 	// expectation is to move to failed state, and manually check the status before retrying
@@ -841,7 +848,7 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 			)
 	}
 
-	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
+	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
 		log.V(1).Error(err,
 			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
@@ -854,11 +861,17 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 }
 
 func (r *RedfishBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error) {
+	log := ctrl.LoggerFrom(ctx)
+
 	respTask, err := r.client.GetService().GetClient().Get(taskURI)
 	if err != nil {
 		return nil, err
 	}
-	defer respTask.Body.Close() // nolint: errcheck
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Error(err, "failed to close body")
+		}
+	}(respTask.Body) // nolint: errcheck
 
 	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
 		respTaskRawBody, err := io.ReadAll(respTask.Body)
@@ -874,12 +887,12 @@ func (r *RedfishBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer string
 				respTask.StatusCode)
 	}
 
-	oem, err := NewOEM(manufacturer, r.client.GetService())
+	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get oem object, %v", err)
+		return nil, fmt.Errorf("failed to get OEM interface object, %v", err)
 	}
 
-	return oem.GetTaskMonitorDetails(ctx, respTask)
+	return oemInterface.GetTaskMonitorDetails(ctx, respTask)
 }
 
 // UpgradeBMCVersion upgrade given BMC version.
@@ -887,7 +900,7 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 	log := ctrl.LoggerFrom(ctx)
 	service := r.client.GetService()
 
-	upgradeServices, err := service.UpdateService()
+	updateService, err := service.UpdateService()
 	if err != nil {
 		return "", false, err
 	}
@@ -904,8 +917,7 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 		Actions tActions
 	}
 
-	err = json.Unmarshal(upgradeServices.RawData, &tUS)
-	if err != nil {
+	if err = json.Unmarshal(updateService.RawData, &tUS); err != nil {
 		return "", false, err
 	}
 
@@ -916,24 +928,27 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 		}
 	}
 
-	oem, err := NewOEM(manufacturer, service)
+	oemInterface, err := NewOEMInterface(manufacturer, service)
 	if err != nil {
 		return "", false, err
 	}
 
-	RequestBody := oem.GetUpdateRequestBody(parameters)
+	RequestBody := oemInterface.GetUpdateRequestBody(parameters)
 
-	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
-
+	resp, err := updateService.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
 	if err != nil {
 		return "", false, err
 	}
-	defer resp.Body.Close() // nolint: errcheck
+
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(resp.Body)
 
 	// any error post this point is fatal, as we can not issue multiple upgrade requests.
 	// expectation is to move to failed state, and manually check the status before retrying
-	log.V(1).Info("update has been issued", "Response status code", resp.StatusCode)
-
+	log.V(1).Info("Update has been issued", "ResponseCode", resp.StatusCode)
 	if resp.StatusCode != http.StatusAccepted {
 		bmcRawBody, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -952,7 +967,7 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 			)
 	}
 
-	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
+	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
 		log.V(1).Error(err,
 			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
@@ -960,16 +975,22 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 	}
 
 	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
-
 	return taskMonitorURI, false, nil
 }
 
 func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error) {
+	log := ctrl.LoggerFrom(ctx)
+
 	respTask, err := r.client.GetService().GetClient().Get(taskURI)
 	if err != nil {
 		return nil, err
 	}
-	defer respTask.Body.Close() // nolint: errcheck
+
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(respTask.Body)
 
 	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
 		respTaskRawBody, err := io.ReadAll(respTask.Body)
@@ -992,10 +1013,10 @@ func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string,
 		}
 	}
 
-	oem, err := NewOEM(manufacturer, r.client.GetService())
+	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get oem object, %v", err)
+		return nil, fmt.Errorf("failed to get OEM interface object, %v", err)
 	}
 
-	return oem.GetTaskMonitorDetails(ctx, respTask)
+	return oemInterface.GetTaskMonitorDetails(ctx, respTask)
 }

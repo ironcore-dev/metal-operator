@@ -373,7 +373,8 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 
 	if resetBMC.Reason != BMCReasonReset {
 		// apply the BMC Settings if not done.
-		if BMC.Status.PowerState != "" && BMC.Status.PowerState != metalv1alpha1.OnPowerState {
+		if BMC.Status.PowerState != metalv1alpha1.OnPowerState &&
+			BMC.Status.PowerState != metalv1alpha1.NAPowerState {
 			log.V(1).Info("BMC is not Powered On. Can not proceed", "PowerState", BMC.Status.PowerState)
 			BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
 			if err != nil {

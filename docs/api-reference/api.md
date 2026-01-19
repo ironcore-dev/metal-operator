@@ -430,6 +430,7 @@ _Appears in:_
 | `Paused` | PausedPowerState the system is paused.<br /> |
 | `PoweringOn` | PoweringOnPowerState A temporary state between Off and On. This<br />temporary state can be very short.<br /> |
 | `PoweringOff` | PoweringOffPowerState A temporary state between On and Off. The power<br />off action can take time while the OS is in the shutdown process.<br /> |
+| `Unknown` | UnknownPowerState indicates that power state is unknown for this BMC.<br /> |
 
 
 #### BMCSecret

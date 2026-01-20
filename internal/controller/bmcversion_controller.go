@@ -259,9 +259,13 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 
 	if issuedCondition.Status != metav1.ConditionTrue {
 		log.V(1).Info("Issuing upgrade of BMC version")
-		if BMC.Status.PowerState != metalv1alpha1.OnPowerState &&
-			BMC.Status.PowerState != metalv1alpha1.NAPowerState {
-			log.V(1).Info("BMC is still powered off. waiting", "BMC", BMC.Name, "PowerState", BMC.Status.PowerState)
+		switch BMC.Status.PowerState {
+		case metalv1alpha1.OnPowerState:
+			// proceed silently
+		case metalv1alpha1.UnknownPowerState:
+			log.V(1).Info("BMC PowerState unknown, continuing anyway.", "BMC", BMC.Name, "PowerState", BMC.Status.PowerState)
+		default:
+			log.V(1).Info("BMC is not powered on. Can not proceed", "BMC", BMC.Name, "PowerState", BMC.Status.PowerState)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, r.issueBMCUpgrade(ctx, log, bmcVersion, bmcClient, BMC, issuedCondition)

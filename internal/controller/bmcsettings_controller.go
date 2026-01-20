@@ -373,24 +373,10 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 
 	if resetBMC.Reason != BMCReasonReset {
 		// apply the BMC Settings if not done.
-		if BMC.Status.PowerState != metalv1alpha1.OnPowerState &&
-			BMC.Status.PowerState != metalv1alpha1.NAPowerState {
-			log.V(1).Info("BMC is not Powered On. Can not proceed", "PowerState", BMC.Status.PowerState)
-			BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
-			}
-			if err := r.Conditions.Update(
-				BMCPoweredOffCondition,
-				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BMCPoweredOffReason),
-				conditionutils.UpdateMessage(fmt.Sprintf("BMC in not Powered On, Power State: %v", BMC.Status.PowerState)),
-			); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
-			}
-			err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
-			return ctrl.Result{}, err
-		} else {
+		switch BMC.Status.PowerState {
+		case metalv1alpha1.OnPowerState:
+			fallthrough
+		case metalv1alpha1.UnknownPowerState:
 			BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
@@ -407,6 +393,22 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 				err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCondition)
 				return ctrl.Result{}, err
 			}
+		default:
+			log.V(1).Info("BMC is not Powered On. Can not proceed", "PowerState", BMC.Status.PowerState)
+			BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
+			}
+			if err := r.Conditions.Update(
+				BMCPoweredOffCondition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason(BMCPoweredOffReason),
+				conditionutils.UpdateMessage(fmt.Sprintf("BMC in not Powered On, Power State: %v", BMC.Status.PowerState)),
+			); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+			}
+			err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
+			return ctrl.Result{}, err
 		}
 
 		pendingAttr, err := bmcClient.GetBMCPendingAttributeValues(ctx, BMC.Spec.BMCUUID)

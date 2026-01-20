@@ -239,7 +239,8 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		if manager.PowerState != "" {
 			bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(string(manager.PowerState))
 		} else {
-			bmcObj.Status.PowerState = metalv1alpha1.NAPowerState
+			bmcObj.Status.PowerState = metalv1alpha1.UnknownPowerState
+			log.V(1).Info("Power state not reported by BMC, setting to N/A", "BMC", bmcObj.Name)
 		}
 		bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
 		bmcObj.Status.SerialNumber = manager.SerialNumber

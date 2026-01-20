@@ -235,12 +235,12 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.Manufacturer = manager.Manufacturer
 		bmcObj.Status.State = metalv1alpha1.BMCState(string(manager.Status.State))
-		// Set power state, or N/A if not available from BMC
+		// Set power state, or unknown if not available from BMC
 		if manager.PowerState != "" {
 			bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(string(manager.PowerState))
 		} else {
 			bmcObj.Status.PowerState = metalv1alpha1.UnknownPowerState
-			log.V(1).Info("Power state not reported by BMC, setting to N/A", "BMC", bmcObj.Name)
+			log.V(1).Info("Power state not reported by BMC, setting to unknown", "BMC", bmcObj.Name)
 		}
 		bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
 		bmcObj.Status.SerialNumber = manager.SerialNumber

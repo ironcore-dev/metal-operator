@@ -8,25 +8,22 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-// nolint:unused
 // log is for logging in this package.
 var bmcsettingslog = logf.Log.WithName("bmcsettings-resource")
 
 // SetupBMCSettingsWebhookWithManager registers the webhook for BMCSettings in the manager.
 func SetupBMCSettingsWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&metalv1alpha1.BMCSettings{}).
+	return ctrl.NewWebhookManagedBy(mgr, &metalv1alpha1.BMCSettings{}).
 		WithValidator(&BMCSettingsCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 }
@@ -44,84 +41,63 @@ type BMCSettingsCustomValidator struct {
 	Client client.Client
 }
 
-var _ webhook.CustomValidator = &BMCSettingsCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
-func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	bmcSettings, ok := obj.(*metalv1alpha1.BMCSettings)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSettings object but got %T", obj)
-	}
-	bmcsettingslog.Info("Validation for BMCSettings upon creation", "name", bmcSettings.GetName())
+func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
+	bmcsettingslog.Info("Validation for BMCSettings upon creation", "name", obj.GetName())
 
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
-		return nil, fmt.Errorf("failed to list bmcSettingsList: %w", err)
+		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, bmcSettings)
+	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
-func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	bmcSettings, ok := newObj.(*metalv1alpha1.BMCSettings)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSettings object for the newObj but got %T", newObj)
-	}
-	bmcsettingslog.Info("Validation for BMCSettings upon update", "name", bmcSettings.GetName())
+func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
+	bmcsettingslog.Info("Validation for BMCSettings upon update", "name", newObj.GetName())
 
-	oldBMCSettings, ok := oldObj.(*metalv1alpha1.BMCSettings)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSettings object for the oldObj but got %T", oldObj)
-	}
-	if oldBMCSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(bmcSettings) && oldBMCSettings.Spec.ServerMaintenanceRefs != nil {
-		err := fmt.Errorf("BMCSettings (%v) is in progress, unable to update %v",
-			oldBMCSettings.Name,
-			bmcSettings.Name)
+	if oldObj.Status.State == metalv1alpha1.BMCSettingsStateInProgress &&
+		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRefs != nil {
+		err := fmt.Errorf("BMCSettings (%s) is in progress, unable to update %s",
+			oldObj.Name,
+			newObj.Name)
 		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
-			bmcSettings.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: oldObj.Kind},
+			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
 	}
 
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
-		return nil, fmt.Errorf("failed to list bmcSettingsList: %w", err)
+		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, bmcSettings)
+	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
-func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	bmcsettings, ok := obj.(*metalv1alpha1.BMCSettings)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSettings object but got %T", obj)
-	}
-	bmcsettingslog.Info("Validation for BMCSettings upon deletion", "name", bmcsettings.GetName())
+func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
+	bmcsettingslog.Info("Validation for BMCSettings upon deletion", "name", obj.GetName())
 
-	if bmcsettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(bmcsettings) {
+	if obj.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
 		return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
 	}
 
 	return nil, nil
 }
 
-func checkForDuplicateBMCSettingsRefToBMC(
-	bmcSettingsList *metalv1alpha1.BMCSettingsList,
-	bmcSettings *metalv1alpha1.BMCSettings,
-) (admission.Warnings, error) {
-	for _, bs := range bmcSettingsList.Items {
-		if bmcSettings.Name == bs.Name {
+func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSettingsList, settings *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
+	for _, bs := range settingsList.Items {
+		if settings.Name == bs.Name {
 			continue
 		}
-		if bs.Spec.BMCRef.Name == bmcSettings.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
-				bmcSettings.Spec.BMCRef.Name,
-				bmcSettings.Name,
+		if bs.Spec.BMCRef.Name == settings.Spec.BMCRef.Name {
+			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
+				settings.Spec.BMCRef.Name,
+				settings.Name,
 				bs.Spec.BMCRef.Name,
 				bs.Name)
 			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: bmcSettings.GroupVersionKind().Group, Kind: bmcSettings.Kind},
-				bmcSettings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", "BMCRef"), err)})
+				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
+				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
 		}
 	}
 	return nil, nil

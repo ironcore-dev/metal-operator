@@ -8,14 +8,14 @@ import (
 )
 
 func collectPCIDevicesInfoData() ([]registry.PCIDevice, error) {
-	pciDevs := make([]registry.PCIDevice, 0)
-	pciDevs = append(pciDevs, registry.PCIDevice{
-		Address:    "0000:00:00.0",
-		Vendor:     "FooVendor",
-		VendorID:   "1234",
-		Product:    "BarProduct",
-		ProductID:  "5678",
-		NumaNodeID: 0,
-	})
-	return pciDevs, nil
+	return []registry.PCIDevice{
+		{
+			Address:    "0000:00:00.0",
+			Vendor:     "FooVendor",
+			VendorID:   "1234",
+			Product:    "BarProduct",
+			ProductID:  "5678",
+			NumaNodeID: 0,
+		},
+	}, nil
 }

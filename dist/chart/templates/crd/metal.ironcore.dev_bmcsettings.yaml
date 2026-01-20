@@ -53,7 +53,6 @@ spec:
           metadata:
             type: object
           spec:
-            description: BMCSettingsSpec defines the desired state of BMCSettings.
             properties:
               BMCRef:
                 description: BMCRef is a reference to a specific BMC to apply setting
@@ -71,7 +70,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
                 x-kubernetes-validations:
-                - message: serverRef is immutable
+                - message: BMCRef is immutable
                   rule: self == oldSelf
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
@@ -126,6 +125,7 @@ spec:
                   should be applied.
                 type: string
             required:
+            - BMCRef
             - version
             type: object
           status:

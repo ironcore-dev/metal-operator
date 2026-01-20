@@ -61,6 +61,10 @@ type BMCSpec struct {
 	// the BMC configuration for this BMC.
 	// +optional
 	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
+
+	// Hostname is the hostname of the BMC.
+	// +optional
+	Hostname *string `json:"hostname,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.

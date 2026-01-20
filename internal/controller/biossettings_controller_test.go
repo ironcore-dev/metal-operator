@@ -4,7 +4,10 @@
 package controller
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -56,9 +59,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},
@@ -907,12 +910,12 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -1090,6 +1093,135 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))),
 		))
 	})
+
+	It("Should fail and create maintenance when pending settings exist", func(ctx SpecContext) {
+		By("Ensuring BMC is in Enabled state")
+		Eventually(UpdateStatus(bmcObj, func() {
+			bmcObj.Status.State = metalv1alpha1.BMCStateEnabled
+		})).To(Succeed())
+
+		biosSetting := make(map[string]string)
+		biosSetting["EmbeddedSata"] = "Raid"
+
+		By("Creating an Ignition secret")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: nil,
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+		By("Creating a ServerClaim")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             metalv1alpha1.PowerOff,
+				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server has been claimed")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		)
+
+		By("Creating pending changes on the mock server via HTTP PATCH")
+		pendingSettingsURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", MockServerIP, MockServerPort)
+		pendingData := map[string]any{
+			"Attributes": map[string]any{
+				"PendingSetting1": "PendingValue1",
+			},
+		}
+		pendingBody, err := json.Marshal(pendingData)
+		Expect(err).NotTo(HaveOccurred())
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPatch, pendingSettingsURL, bytes.NewReader(pendingBody))
+		Expect(err).NotTo(HaveOccurred())
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{
+			Timeout: 5 * time.Second,
+		}
+		resp, err := client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(resp.Body.Close)
+		Expect(resp.StatusCode).To(BeElementOf(http.StatusOK, http.StatusNoContent, http.StatusAccepted))
+
+		By("Creating BIOSSettings to apply new changes")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-pending-changes",
+				Namespace:    ns.Name,
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring BIOSSettings transitions to Failed state")
+		Eventually(Object(biosSettings)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+		)
+
+		By("Verifying ServerMaintenance object was created")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      biosSettings.Name,
+			},
+		}
+		Eventually(Get(serverMaintenance)).Should(Succeed())
+
+		By("Verifying BIOSSettings has maintenance reference")
+		Eventually(Object(biosSettings)).Should(
+			HaveField("Spec.ServerMaintenanceRef", Not(BeNil())),
+		)
+
+		By("Clearing pending changes on the mock server via HTTP DELETE")
+		clearPendingURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", MockServerIP, MockServerPort)
+		clearReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, clearPendingURL, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		clearResp, err := client.Do(clearReq)
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(clearResp.Body.Close)
+		Expect(clearResp.StatusCode).To(BeElementOf(http.StatusOK, http.StatusNoContent, http.StatusAccepted))
+
+		By("Cleaning up BIOSSettings")
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+
+		By("Cleaning up ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).Should(Succeed())
+
+		By("Waiting for Server to exit Maintenance state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+
+		By("Cleaning up ServerClaim")
+		Expect(k8sClient.Delete(ctx, serverClaim)).Should(Succeed())
+
+		By("Cleaning up Ignition secret")
+		Expect(k8sClient.Delete(ctx, ignitionSecret)).Should(Succeed())
+	})
 })
 
 var _ = Describe("BIOSSettings Sequence Controller", func() {
@@ -1125,9 +1257,9 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000,
+						Port: MockServerPort,
 					},
-					Address: "127.0.0.1",
+					Address: MockServerIP,
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name,
 					},

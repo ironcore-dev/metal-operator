@@ -18,6 +18,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
 - [BMCSettings](#bmcsettings)
+- [BMCSettingsSet](#bmcsettingsset)
 - [BMCVersion](#bmcversion)
 - [BMCVersionSet](#bmcversionset)
 - [Endpoint](#endpoint)
@@ -471,11 +472,68 @@ BMCSettings is the Schema for the BMCSettings API.
 | `status` _[BMCSettingsStatus](#bmcsettingsstatus)_ |  |  |  |
 
 
+#### BMCSettingsSet
+
+
+
+BMCSettingsSet is the Schema for the bmcsettingssets API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `BMCSettingsSet` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[BMCSettingsSetSpec](#bmcsettingssetspec)_ |  |  |  |
+| `status` _[BMCSettingsSetStatus](#bmcsettingssetstatus)_ |  |  |  |
+
+
+#### BMCSettingsSetSpec
+
+
+
+BMCSettingsSetSpec defines the desired state of BMCSettingsSet.
+
+
+
+_Appears in:_
+- [BMCSettingsSet](#bmcsettingsset)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the BMCs. |  |  |
+| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#labelselector-v1-meta)_ |  BMCSelector specifies a label selector to identify the BMCs that are to be selected. |  |  |
+
+
+#### BMCSettingsSetStatus
+
+
+
+BMCSettingsSetStatus defines the observed state of BMCSettingsSet.
+
+
+
+_Appears in:_
+- [BMCSettingsSet](#bmcsettingsset)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of BMC in the set. |  |  |
+| `availableBMCSettings` _integer_ | AvailableBMCSettings is the number of BMCSettings currently created by the set. |  |  |
+| `pendingBMCSettings` _integer_ | PendingBMCSettings is the total number of pending BMC in the set. |  |  |
+| `inProgressBMCSettings` _integer_ | InProgressBMCSettings is the total number of BMC in the set that are currently in progress. |  |  |
+| `completedBMCSettings` _integer_ | CompletedBMCSettings is the total number of completed BMC in the set. |  |  |
+| `failedBMCSettings` _integer_ | FailedBMCSettings is the total number of failed BMC in the set. |  |  |
+
+
 #### BMCSettingsSpec
 
 
 
-BMCSettingsSpec defines the desired state of BMCSettings.
+
 
 
 
@@ -486,9 +544,9 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version defines the BMC firmware for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains bmc settings as map |  |  |
-| `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply setting to. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
+| `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply setting to. |  |  |
 
 
 #### BMCSettingsState
@@ -527,6 +585,25 @@ _Appears in:_
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC Settings Resource state. |  |  |
 
 
+#### BMCSettingsTemplate
+
+
+
+
+
+
+
+_Appears in:_
+- [BMCSettingsSetSpec](#bmcsettingssetspec)
+- [BMCSettingsSpec](#bmcsettingsspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `version` _string_ | Version defines the BMC firmware for which the settings should be applied. |  |  |
+| `settings` _object (keys:string, values:string)_ | SettingsMap contains bmc settings as map |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
+
+
 #### BMCSpec
 
 
@@ -547,6 +624,7 @@ _Appears in:_
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC.<br />It could be a standard protocol such as IPMI or Redfish. |  |  |
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC.<br />This field is optional and can be omitted if console access is not required. |  |  |
 | `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
+| `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 
 
 #### BMCState
@@ -1305,6 +1383,7 @@ _Appears in:_
 - [BIOSVersionSpec](#biosversionspec)
 - [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
 - [ServerMaintenanceSpec](#servermaintenancespec)

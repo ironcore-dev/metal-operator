@@ -41,14 +41,36 @@ func (r *Dell) GetUpdateRequestBody(
 func (r *Dell) GetUpdateTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)
+		return "", fmt.Errorf("failed to read the response body: %w", err)
 	}
 
-	if taskMonitor, ok := response.Header["Location"]; ok && len(rawBody) == 0 {
+	// Dell iDRAC returns task monitor URI in Location header for async operations
+	if taskMonitor, ok := response.Header["Location"]; ok && len(taskMonitor) > 0 {
 		return taskMonitor[0], nil
 	}
 
-	return "", fmt.Errorf("unexpected response body %v %v", err, rawBody)
+	// Some Dell iDRAC versions return task info in response body
+	var taskResp struct {
+		TaskMonitor string `json:"@odata.id,omitempty"`
+		Task        struct {
+			OdataID string `json:"@odata.id,omitempty"`
+		} `json:"Task,omitempty"`
+	}
+
+	if len(rawBody) > 0 {
+		if err := json.Unmarshal(rawBody, &taskResp); err != nil {
+			return "", fmt.Errorf("failed to unmarshal task monitor response: %w", err)
+		}
+
+		if taskResp.TaskMonitor != "" {
+			return taskResp.TaskMonitor, nil
+		}
+		if taskResp.Task.OdataID != "" {
+			return taskResp.Task.OdataID, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable to extract task monitor URI from Dell iDRAC response")
 }
 
 func (r *Dell) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error) {
@@ -209,38 +231,45 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 		return nil, fmt.Errorf("'ManagerAttributeRegistry' not found")
 	}
 
-	// from the gives attributes to change, find the ones which can be changed and get current value for them
+	// from the given attributes to change, find the ones which can be changed and get current value for them
 	result := make(redfish.SettingsAttributes, len(attributes))
 	var errs []error
 	for name := range attributes {
-		if entry, ok := filteredAttr[name]; ok {
-			// enumerations current setting comtains display name.
-			// need to be checked with the actual value rather than the display value
-			// as the settings provided will have actual values.
-			// replace display values with actual values
-			if strings.ToLower(string(entry.Type)) == string(redfish.EnumerationAttributeType) {
-				for _, attrValue := range entry.Value {
-					if attrValue.ValueDisplayName == mergedBMCAttributes[name] {
-						result[name] = attrValue.ValueName
-						break
-					}
+		var entry redfish.Attribute
+		var ok bool
+
+		// First check registry attributes, then fall back to Dell common attributes
+		if entry, ok = filteredAttr[name]; !ok {
+			if entry, ok = dellCommonBMCAttributes[name]; !ok {
+				// possible error in settings key
+				errs = append(errs, fmt.Errorf("setting key '%v' not found in possible settings", name))
+				continue
+			}
+		}
+
+		// enumerations current setting contains display name.
+		// need to be checked with the actual value rather than the display value
+		// as the settings provided will have actual values.
+		// replace display values with actual values
+		if strings.ToLower(string(entry.Type)) == string(redfish.EnumerationAttributeType) {
+			for _, attrValue := range entry.Value {
+				if attrValue.ValueDisplayName == mergedBMCAttributes[name] {
+					result[name] = attrValue.ValueName
+					break
 				}
-				if _, ok := result[name]; !ok {
-					errs = append(
-						errs,
-						fmt.Errorf(
-							"current setting '%v' for key '%v' not found in possible values for it (%v)",
-							mergedBMCAttributes[name],
-							name,
-							entry.Value,
-						))
-				}
-			} else {
-				result[name] = mergedBMCAttributes[name]
+			}
+			if _, ok := result[name]; !ok {
+				errs = append(
+					errs,
+					fmt.Errorf(
+						"current setting '%v' for key '%v' not found in possible values for it (%v)",
+						mergedBMCAttributes[name],
+						name,
+						entry.Value,
+					))
 			}
 		} else {
-			// possible error in settings key
-			errs = append(errs, fmt.Errorf("setting key '%v' not found in possible settings", name))
+			result[name] = mergedBMCAttributes[name]
 		}
 	}
 	if len(errs) > 0 {
@@ -361,6 +390,61 @@ func (d *DellIdracManager) GetBMCPendingAttributeValues(ctx context.Context) (re
 	return mergedPendingBMCAttributes, nil
 }
 
+// dellCommonBMCAttributes defines commonly configured Dell iDRAC attributes
+// that may not be in the standard registry but are supported by Dell iDRAC
+var dellCommonBMCAttributes = map[string]redfish.Attribute{
+	"SysLog.1.SysLogEnable": {
+		Type:          redfish.BooleanAttributeType,
+		ReadOnly:      false,
+		ResetRequired: true,
+	},
+	"SysLog.1.SysLogServer1": {
+		Type:          redfish.StringAttributeType,
+		ReadOnly:      false,
+		ResetRequired: false,
+	},
+	"SysLog.1.SysLogServer2": {
+		Type:          redfish.StringAttributeType,
+		ReadOnly:      false,
+		ResetRequired: false,
+	},
+	"NTPConfigGroup.1.NTPEnable": {
+		Type:          redfish.BooleanAttributeType,
+		ReadOnly:      false,
+		ResetRequired: true,
+	},
+	"NTPConfigGroup.1.NTP1": {
+		Type:          redfish.StringAttributeType,
+		ReadOnly:      false,
+		ResetRequired: true,
+	},
+	"NTPConfigGroup.1.NTP2": {
+		Type:          redfish.StringAttributeType,
+		ReadOnly:      false,
+		ResetRequired: true,
+	},
+	"EmailAlert.1.Enable": {
+		Type:          redfish.BooleanAttributeType,
+		ReadOnly:      false,
+		ResetRequired: false,
+	},
+	"EmailAlert.1.Address": {
+		Type:          redfish.StringAttributeType,
+		ReadOnly:      false,
+		ResetRequired: false,
+	},
+	"SNMP.1.AgentEnable": {
+		Type:          redfish.BooleanAttributeType,
+		ReadOnly:      false,
+		ResetRequired: true,
+	},
+	"SNMP.1.AgentCommunity": {
+		Type:          redfish.StringAttributeType,
+		ReadOnly:      false,
+		ResetRequired: true,
+	},
+}
+
 func (d *DellIdracManager) CheckBMCAttributes(
 	ctx context.Context,
 	attributes redfish.SettingsAttributes,
@@ -369,6 +453,14 @@ func (d *DellIdracManager) CheckBMCAttributes(
 	if err != nil {
 		return false, err
 	}
+
+	// Merge Dell-specific common attributes with registry attributes
+	for name, attr := range dellCommonBMCAttributes {
+		if _, exists := filteredAttr[name]; !exists {
+			filteredAttr[name] = attr
+		}
+	}
+
 	if len(filteredAttr) == 0 {
 		return false, nil
 	}

@@ -20,7 +20,7 @@ import (
 )
 
 var _ = Describe("BMC Controller", func() {
-	_ = SetupTest(nil)
+	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -35,7 +35,7 @@ var _ = Describe("BMC Controller", func() {
 			Spec: metalv1alpha1.EndpointSpec{
 				// emulator BMC mac address
 				MACAddress: "23:11:8A:33:CF:EA",
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
 			},
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
@@ -55,7 +55,7 @@ var _ = Describe("BMC Controller", func() {
 				Controller:         ptr.To(true),
 				BlockOwnerDeletion: ptr.To(true),
 			})),
-			HaveField("Status.IP", metalv1alpha1.MustParseIP("127.0.0.1")),
+			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
 			HaveField("Status.Model", "Joo Janta 200"),
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
@@ -124,12 +124,12 @@ var _ = Describe("BMC Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -139,7 +139,7 @@ var _ = Describe("BMC Controller", func() {
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
 
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Status.IP", metalv1alpha1.MustParseIP("127.0.0.1")),
+			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
 			HaveField("Status.Model", "Joo Janta 200"),
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
@@ -203,12 +203,12 @@ var _ = Describe("BMC Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "23:11:8A:33:CF:EA",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -218,7 +218,7 @@ var _ = Describe("BMC Controller", func() {
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
 
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Status.IP", metalv1alpha1.MustParseIP("127.0.0.1")),
+			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
 			HaveField("Status.Model", "Joo Janta 200"),
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
@@ -266,6 +266,79 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("Should create a DNSRecord for the bmc if configured", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		bmcLabels := map[string]string{
+			"foo": "bar",
+		}
+
+		By("Creating a BMC resource")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-",
+				Labels:       bmcLabels,
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					MACAddress: "23:11:8A:33:CF:EA",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: 8000,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+				Hostname: ptr.To("node001r-bb001.region.cloud.com"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		By("Ensuring that the DNSRecord resource has been created for the bmc")
+		dnsRecord := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      bmc.Name,
+				Namespace: ns.Name,
+			},
+		}
+		Eventually(Object(dnsRecord)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "BMC",
+				Name:               bmc.Name,
+				UID:                bmc.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Data", HaveKeyWithValue("hostname", "node001r-bb001.region.cloud.com")),
+			HaveField("Data", HaveKeyWithValue("ip", "127.0.0.1")),
+			HaveField("Data", HaveKeyWithValue("recordType", "A")),
+			HaveField("Data", HaveKeyWithValue("ttl", "300")),
+		))
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, dnsRecord)).To(Succeed())
+	})
+
 })
 
 var _ = Describe("BMC Validation", func() {
@@ -281,7 +354,7 @@ var _ = Describe("BMC Validation", func() {
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
@@ -354,7 +427,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Update(bmc, func() {
 			bmc.Spec.EndpointRef = nil
 			bmc.Spec.Endpoint = &metalv1alpha1.InlineEndpoint{
-				IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
 				MACAddress: "aa:bb:cc:dd:ee:ff",
 			}
 		})).Should(Succeed())
@@ -371,7 +444,7 @@ var _ = Describe("BMC Validation", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
@@ -390,7 +463,7 @@ var _ = Describe("BMC Validation", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
@@ -402,7 +475,7 @@ var _ = Describe("BMC Validation", func() {
 		})).Should(Not(Succeed()))
 
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.Endpoint.IP", metalv1alpha1.MustParseIP("127.0.0.1")),
+			HaveField("Spec.Endpoint.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Spec.Endpoint.MACAddress", "aa:bb:cc:dd:ee:ff"),
 		))
 
@@ -418,7 +491,7 @@ var _ = Describe("BMC Validation", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 			},
@@ -463,12 +536,12 @@ var _ = Describe("BMC Reset", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -531,12 +604,12 @@ var _ = Describe("BMC Conditions", func() {
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
-					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
 					MACAddress: "aa:bb:cc:dd:ee:ff",
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,

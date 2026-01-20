@@ -18,6 +18,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,6 +43,8 @@ const (
 	pollingInterval      = 50 * time.Millisecond
 	eventuallyTimeout    = 5 * time.Second
 	consistentlyDuration = 1 * time.Second
+	MockServerIP         = "127.0.0.1"
+	MockServerPort       = 8000
 )
 
 var (
@@ -67,7 +70,6 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -139,7 +141,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 					MacPrefix:    "23",
 					Manufacturer: "Foo",
 					Protocol:     "RedfishLocal",
-					Port:         8000,
+					Port:         MockServerPort,
 					Type:         "bmc",
 					DefaultCredentials: []macdb.Credential{
 						{
@@ -165,6 +167,9 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Insecure:    true,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		dnsTemplate, err := dns.LoadTemplate("../../test/data/dns_record_template.yaml")
+		Expect(err).NotTo(HaveOccurred())
+
 		Expect((&BMCReconciler{
 			Client:                 k8sManager.GetClient(),
 			Scheme:                 k8sManager.GetScheme(),
@@ -173,6 +178,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			BMCResetWaitTime:       400 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
 			EventURL:               "http://localhost:8008",
+			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -276,6 +282,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&BMCSettingsSetReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		Expect((&BMCVersionSetReconciler{
 			Client: k8sManager.GetClient(),
 			Scheme: k8sManager.GetScheme(),
@@ -311,7 +322,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		} else {
 			By("Starting the default mock Redfish server")
 			Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-				mockServer := server.NewMockServer(GinkgoLogr, ":8000")
+				mockServer := server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort))
 				if err := mockServer.Start(ctx); err != nil {
 					return fmt.Errorf("failed to start mock Redfish server: %w", err)
 				}
@@ -327,4 +338,52 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 	})
 
 	return ns
+}
+
+// EnsureCleanState ensures that all ServerClaims and cluster scoped objects are removed from the API server.
+func EnsureCleanState() {
+	GinkgoHelper()
+
+	Eventually(func(g Gomega) error {
+		endpoints := &metalv1alpha1.EndpointList{}
+		g.Eventually(ObjectList(endpoints)).Should(HaveField("Items", HaveLen(0)))
+
+		bmcs := &metalv1alpha1.BMCList{}
+		g.Eventually(ObjectList(bmcs)).Should(HaveField("Items", HaveLen(0)))
+
+		bmcSecrets := &metalv1alpha1.BMCSecretList{}
+		g.Eventually(ObjectList(bmcSecrets)).Should(HaveField("Items", HaveLen(0)))
+
+		claims := &metalv1alpha1.ServerClaimList{}
+		g.Eventually(ObjectList(claims)).Should(HaveField("Items", HaveLen(0)))
+
+		bmcSettingsSets := &metalv1alpha1.BMCSettingsSetList{}
+		g.Eventually(ObjectList(bmcSettingsSets)).Should(HaveField("Items", HaveLen(0)))
+
+		bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
+		g.Eventually(ObjectList(bmcSettingsList)).Should(HaveField("Items", HaveLen(0)))
+
+		bmcVersionSets := &metalv1alpha1.BMCVersionSetList{}
+		g.Eventually(ObjectList(bmcVersionSets)).Should(HaveField("Items", HaveLen(0)))
+
+		bmcVersions := &metalv1alpha1.BMCVersionList{}
+		g.Eventually(ObjectList(bmcVersions)).Should(HaveField("Items", HaveLen(0)))
+
+		biosVersions := &metalv1alpha1.BIOSVersionList{}
+		g.Eventually(ObjectList(biosVersions)).Should(HaveField("Items", HaveLen(0)))
+
+		biosSettingsSets := &metalv1alpha1.BIOSSettingsSetList{}
+		g.Eventually(ObjectList(biosSettingsSets)).Should(HaveField("Items", HaveLen(0)))
+
+		biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
+		g.Eventually(ObjectList(biosSettingsList)).Should(HaveField("Items", HaveLen(0)))
+
+		maintenances := &metalv1alpha1.ServerMaintenanceList{}
+		g.Eventually(ObjectList(maintenances)).Should(HaveField("Items", HaveLen(0)))
+
+		servers := &metalv1alpha1.ServerList{}
+		g.Eventually(ObjectList(servers)).Should(HaveField("Items", HaveLen(0)))
+
+		return nil
+	}).Should(Succeed())
 }

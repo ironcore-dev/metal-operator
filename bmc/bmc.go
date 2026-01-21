@@ -24,14 +24,6 @@ const (
 	ManufacturerHPE    Manufacturer = "HPE"
 )
 
-type SettingAttributeValueTypes string
-
-const (
-	TypeInteger      SettingAttributeValueTypes = "integer"
-	TypeString       SettingAttributeValueTypes = "string"
-	TypeEnumerations SettingAttributeValueTypes = "enumeration"
-)
-
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
@@ -184,7 +176,7 @@ type Server struct {
 	URI          string
 	Model        string
 	Manufacturer string
-	PowerState   PowerState
+	PowerState   redfish.PowerState
 	SerialNumber string
 }
 
@@ -228,25 +220,6 @@ type Storage struct {
 	// Volumes is a collection of volumes associated with this storage.
 	Volumes []Volume `json:"volumes,omitempty"`
 }
-
-// PowerState is the power state of the system.
-type PowerState string
-
-const (
-	// OnPowerState the system is powered on.
-	OnPowerState PowerState = "On"
-	// OffPowerState the system is powered off, although some components may
-	// continue to have AUX power such as management controller.
-	OffPowerState PowerState = "Off"
-	// PausedPowerState the system is paused.
-	PausedPowerState PowerState = "Paused"
-	// PoweringOnPowerState A temporary state between Off and On. This
-	// temporary state can be very short.
-	PoweringOnPowerState PowerState = "PoweringOn"
-	// PoweringOffPowerState A temporary state between On and Off. The power
-	// off action can take time while the OS is in the shutdown process.
-	PoweringOffPowerState PowerState = "PoweringOff"
-)
 
 // Processor represents a processor in the system.
 type Processor struct {
@@ -299,32 +272,32 @@ type Manager struct {
 	OemLinks        json.RawMessage
 }
 
-func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
+func NewOEMManager(manager *redfish.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
 	var OEMManager oem.ManagerInterface
-	switch ooem.Manufacturer {
+	switch manager.Manufacturer {
 	case string(ManufacturerDell):
 		OEMManager = &oem.DellIdracManager{
-			BMC:     ooem,
+			BMC:     manager,
 			Service: service,
 		}
 	case string(ManufacturerHPE):
 		OEMManager = &oem.HPEILOManager{
-			BMC:     ooem,
+			BMC:     manager,
 			Service: service,
 		}
 	case string(ManufacturerLenovo):
 		OEMManager = &oem.LenovoXCCManager{
-			BMC:     ooem,
+			BMC:     manager,
 			Service: service,
 		}
 	default:
-		return nil, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
+		return nil, fmt.Errorf("unsupported manufacturer: %v", manager.Manufacturer)
 	}
 	return OEMManager, nil
 }
 
-func NewOEM(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
-	var oemintf oem.OEMInterface
+func NewOEMInterface(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
+	var oemInterface oem.OEMInterface
 	switch manufacturer {
 	case string(ManufacturerDell):
 		return &oem.Dell{
@@ -339,6 +312,6 @@ func NewOEM(manufacturer string, service *gofish.Service) (oem.OEMInterface, err
 			Service: service,
 		}, nil
 	default:
-		return oemintf, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
+		return oemInterface, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
 	}
 }

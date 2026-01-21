@@ -191,7 +191,7 @@ func (r *RedfishKubeBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return r.checkAttribues(attrs, filtered)
+	return r.checkAttributes(attrs, filtered)
 }
 
 // GetBiosVersion retrieves the BIOS version.

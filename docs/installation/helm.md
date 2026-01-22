@@ -77,7 +77,7 @@ This will remove all the resources associated with the Metal Operator.
 
 ## Ignition Template Customization
 
-The metal-operator uses [Ignition](https://coreos.github.io/ignition/) templates to configure bare metal servers during their first boot. The operator includes a default template file baked into the container at `/etc/metal-operator/ignition-template.yaml`. You can optionally override this template by mounting a ConfigMap at the same location.
+The metal-operator uses [Ignition](https://coreos.github.io/ignition/) templates to configure bare metal servers during their first boot. The operator includes a default template file in the container at `/etc/metal-operator/ignition-template.yaml`. You can optionally override this template by mounting a ConfigMap at the same location.
 
 ### Configuration
 
@@ -90,7 +90,7 @@ ignition:
     # Your custom Ignition template here
 ```
 
-**Default Behavior**: When `ignition.override: false` (default), the operator uses the template file baked into the container image at `/etc/metal-operator/ignition-template.yaml`.
+**Default Behavior**: When `ignition.override: false` (default), the operator uses the template file in the container image at `/etc/metal-operator/ignition-template.yaml`.
 
 **Override Behavior**: When `ignition.override: true`, a ConfigMap is created and mounted to `/etc/metal-operator/ignition-template.yaml`, replacing the default template file.
 
@@ -98,10 +98,10 @@ ignition:
 
 Your custom template must include these template variables for proper operation:
 
-- `{{.Image}}` - Docker image for the metalprobe container
-- `{{.Flags}}` - Command-line flags for metalprobe (includes --registry-url and --server-uuid)
-- `{{.SSHPublicKey}}` - SSH public key for server access
-- `{{.PasswordHash}}` - Bcrypt hash of the user password
+- <span v-pre>`{{.Image}}`</span> - Docker image for the metalprobe container
+- <span v-pre>`{{.Flags}}`</span> - Command-line flags for metalprobe (includes --registry-url and --server-uuid)
+- <span v-pre>`{{.SSHPublicKey}}`</span> - SSH public key for server access
+- <span v-pre>`{{.PasswordHash}}`</span> - Bcrypt hash of the user password
 
 ### Example: Custom Template
 
@@ -138,7 +138,7 @@ ignition:
 helm install metal-operator dist/chart
 ```
 
-This uses the template file baked into the container image. No ConfigMap is created, and the operator works immediately with the default configuration.
+This uses the template file in the container image. No ConfigMap is created, and the operator works immediately with the default configuration.
 
 ### Using Custom Template Override
 

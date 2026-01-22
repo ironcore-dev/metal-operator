@@ -23,7 +23,7 @@ systemd:
       enabled: true
       contents: |-
         [Unit]
-        Description=Run My Docker Container
+        Description=Run Metalprobe Docker Container
         [Service]
         Restart=on-failure
         RestartSec=20

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"sync"
 
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +25,8 @@ type Server struct {
 }
 
 var (
-	alertsGauge = prometheus.NewGaugeVec(
+	metricsReportMu sync.Mutex
+	alertsGauge     = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "redfish_alerts_total",
 			Help: "Number of redfish alerts",
@@ -120,8 +122,10 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 	metricsReport := MetricsReport{}
 	if err := json.NewDecoder(r.Body).Decode(&metricsReport); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	for _, mv := range metricsReport.MetricsValues {
+		metricsReportMu.Lock()
 		if _, ok := metricsReportCollectors[mv.MetricId]; !ok {
 			gauge := prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
@@ -131,7 +135,12 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 				[]string{"hostname", "vendor"},
 			)
 			metricsReportCollectors[mv.MetricId] = gauge
-			metrics.Registry.MustRegister(gauge)
+			if err := metrics.Registry.Register(gauge); err != nil {
+				s.log.Error(err, "failed to register metric", "metricID", mv.MetricId)
+				metricsReportMu.Unlock()
+				continue
+			}
+
 		}
 		floatVal, err := strconv.ParseFloat(mv.MetricValue, 64)
 		if err != nil {
@@ -139,7 +148,9 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 				floatVal = 1
 			}
 		}
-		metricsReportCollectors[mv.MetricId].WithLabelValues(hostname, vendor).Set(floatVal)
+		collector := metricsReportCollectors[mv.MetricId]
+		metricsReportMu.Unlock()
+		collector.WithLabelValues(hostname, vendor).Set(floatVal)
 		s.log.Info("Metric", "id", mv.MetricId, "property", mv.MetricProperty, "value", mv.MetricValue, "timestamp", mv.Timestamp)
 	}
 	w.WriteHeader(http.StatusOK)

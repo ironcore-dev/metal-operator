@@ -20,7 +20,7 @@ func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to create event subscription: %w", err)
+		return link, fmt.Errorf("failed to create event subscription: %w", err)
 	}
 	return link, nil
 }
@@ -34,7 +34,7 @@ func SubscribeEvents(ctx context.Context, url, hostname string, bmcClient bmc.BM
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to create alert subscription: %w", err)
+		return link, fmt.Errorf("failed to create alert subscription: %w", err)
 	}
 	return link, nil
 }

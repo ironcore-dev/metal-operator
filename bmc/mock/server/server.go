@@ -368,7 +368,12 @@ func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 		var base Collection
 		if hasOverride {
 			s.log.Info("Using overridden data for POST", "path", urlPath)
-			base = cached.(Collection)
+			var ok bool
+			base, ok = cached.(Collection)
+			if !ok {
+				http.Error(w, "Corrupt overridden JSON", http.StatusInternalServerError)
+				return
+			}
 		} else {
 			s.log.Info("Using embedded data for POST", "path", urlPath)
 			data, err := dataFS.ReadFile(urlPath)

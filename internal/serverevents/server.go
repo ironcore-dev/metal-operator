@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
@@ -31,7 +32,7 @@ var (
 			Name: "redfish_alerts_total",
 			Help: "Number of redfish alerts",
 		},
-		[]string{"hostname", "vendor", "severity"},
+		[]string{"hostname", "severity"},
 	)
 	metricsReportCollectors map[string]*prometheus.GaugeVec
 )
@@ -87,9 +88,8 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("Received alert data")
-	// expected path: /serverevents/alerts/{vendor}/{hostname}
+	// expected path: /serverevents/alerts/{hostname}
 	hostname := path.Base(r.URL.Path)
-	vendor := path.Base(path.Dir(r.URL.Path))
 	eventData := EventData{}
 	if err := json.NewDecoder(r.Body).Decode(&eventData); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -105,8 +105,8 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 			totalCriticals++
 		}
 	}
-	alertsGauge.WithLabelValues(hostname, vendor, "Warning").Set(float64(totalWarnings))
-	alertsGauge.WithLabelValues(hostname, vendor, "Critical").Set(float64(totalCriticals))
+	alertsGauge.WithLabelValues(hostname, "Warning").Set(float64(totalWarnings))
+	alertsGauge.WithLabelValues(hostname, "Critical").Set(float64(totalCriticals))
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -118,7 +118,7 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 	// expected path: /serverevents/metricsreport/{vendor}/{hostname}
 	hostname := path.Base(r.URL.Path)
 	vendor := path.Base(path.Dir(r.URL.Path))
-	s.log.Info("receieved metrics report", "hostname", hostname)
+	s.log.Info("received metrics report", "hostname", hostname)
 	metricsReport := MetricsReport{}
 	if err := json.NewDecoder(r.Body).Decode(&metricsReport); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -161,6 +161,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.log.Info("Starting registry server", "address", s.addr)
 	server := &http.Server{Addr: s.addr, Handler: s.mux}
 
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	errChan := make(chan error, 1)
 	go func() {
 		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
@@ -170,13 +173,13 @@ func (s *Server) Start(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		s.log.Info("Shutting down registry server...")
-		if err := server.Shutdown(ctx); err != nil {
+		if err := server.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("HTTP server Shutdown: %w", err)
 		}
 		s.log.Info("Registry server graciously stopped")
 		return nil
 	case err := <-errChan:
-		if shutdownErr := server.Shutdown(ctx); shutdownErr != nil {
+		if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
 			s.log.Error(shutdownErr, "Error shutting down registry server")
 		}
 		return err

@@ -196,11 +196,17 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 	var setBoot redfish.Boot
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
 	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
-	if system.Boot.BootSourceOverrideMode != "" {
+	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
 		setBoot = pxeBootWithSettingUEFIBootMode
 	} else {
 		setBoot = pxeBootWithoutSettingUEFIBootMode
 	}
+
+	// TODO: hack for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
+	if isSuperMicroSystem(system) {
+		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+	}
+
 	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
@@ -208,6 +214,11 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
 	return nil
+}
+
+func isSuperMicroSystem(system *redfish.ComputerSystem) bool {
+	m := strings.TrimSpace(system.Manufacturer)
+	return strings.EqualFold(m, string(ManufacturerSupermicro))
 }
 
 func (r *RedfishBMC) GetManager(bmcUUID string) (*redfish.Manager, error) {

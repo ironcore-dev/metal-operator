@@ -19,9 +19,10 @@ import (
 type Manufacturer string
 
 const (
-	ManufacturerDell   Manufacturer = "Dell Inc."
-	ManufacturerLenovo Manufacturer = "Lenovo"
-	ManufacturerHPE    Manufacturer = "HPE"
+	ManufacturerDell       Manufacturer = "Dell Inc."
+	ManufacturerLenovo     Manufacturer = "Lenovo"
+	ManufacturerHPE        Manufacturer = "HPE"
+	ManufacturerSupermicro Manufacturer = "Supermicro"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.

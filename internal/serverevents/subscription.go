@@ -15,7 +15,7 @@ import (
 func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
-		fmt.Sprintf("%s/%s/metrics", url, hostname),
+		fmt.Sprintf("%s/serverevents/metricsreport/%s", url, hostname),
 		redfish.MetricReportEventFormatType,
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
 	)
@@ -29,7 +29,7 @@ func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient
 func SubscribeEvents(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
-		fmt.Sprintf("%s/%s/alerts", url, hostname),
+		fmt.Sprintf("%s/serverevents/alerts/%s", url, hostname),
 		redfish.EventEventFormatType,
 		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
 	)

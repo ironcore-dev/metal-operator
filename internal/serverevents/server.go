@@ -64,6 +64,7 @@ type Event struct {
 func init() {
 	// Register custom metrics with the global prometheus registry
 	metrics.Registry.MustRegister(alertsGauge)
+	metricsReportCollectors = make(map[string]*prometheus.GaugeVec)
 }
 
 func NewServer(log logr.Logger, addr string) *Server {
@@ -115,9 +116,8 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// expected path: /serverevents/metricsreport/{vendor}/{hostname}
+	// expected path: /serverevents/metricsreport/{hostname}
 	hostname := path.Base(r.URL.Path)
-	vendor := path.Base(path.Dir(r.URL.Path))
 	s.log.Info("received metrics report", "hostname", hostname)
 	metricsReport := MetricsReport{}
 	if err := json.NewDecoder(r.Body).Decode(&metricsReport); err != nil {
@@ -150,7 +150,7 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		collector := metricsReportCollectors[mv.MetricId]
 		metricsReportMu.Unlock()
-		collector.WithLabelValues(hostname, vendor).Set(floatVal)
+		collector.WithLabelValues(hostname).Set(floatVal)
 		s.log.Info("Metric", "id", mv.MetricId, "property", mv.MetricProperty, "value", mv.MetricValue, "timestamp", mv.Timestamp)
 	}
 	w.WriteHeader(http.StatusOK)

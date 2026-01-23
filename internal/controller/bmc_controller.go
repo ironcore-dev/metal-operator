@@ -537,19 +537,28 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 		return false, nil
 	}
 	log.V(1).Info("Handling event subscriptions for BMC")
-	metricsReportLink := ""
-	eventLink := ""
+	metricsReportLink := bmc.Status.MetricsReportSubscriptionLink
+	eventLink := bmc.Status.EventsSubscriptionLink
+	modified := false
 
-	if bmc.Status.MetricsReportSubscriptionLink != "" && bmc.Status.EventsSubscriptionLink != "" {
+	if metricsReportLink == "" {
+		var err error
+		metricsReportLink, err = serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmc.Name, bmcClient)
+		if err != nil {
+			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
+		}
+		modified = true
+	}
+	if eventLink == "" {
+		var err error
+		eventLink, err = serverevents.SubscribeEvents(ctx, r.EventURL, bmc.Name, bmcClient)
+		if err != nil {
+			return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
+		}
+		modified = true
+	}
+	if !modified {
 		return false, nil
-	}
-	metricsReportLink, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmc.Name, bmcClient)
-	if err != nil {
-		return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
-	}
-	eventLink, err = serverevents.SubscribeEvents(ctx, r.EventURL, bmc.Name, bmcClient)
-	if err != nil {
-		return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
 	}
 	log.Info("event subscriptions created", "metricsReportLink", metricsReportLink, "eventLink", eventLink)
 	bmcBase := bmc.DeepCopy()

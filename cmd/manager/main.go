@@ -597,14 +597,18 @@ func main() { // nolint: gocyclo
 	}
 
 	if eventAddr != "" {
-		setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
-		eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
-		go func() {
+		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
+			eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
 			if err := eventServer.Start(ctx); err != nil {
-				setupLog.Error(err, "problem running event server")
-				os.Exit(1)
+				return fmt.Errorf("unable to start event server: %w", err)
 			}
-		}()
+			<-ctx.Done()
+			return nil
+		})); err != nil {
+			setupLog.Error(err, "unable to add event runnable to manager")
+			os.Exit(1)
+		}
 	}
 
 	setupLog.Info("starting manager")

@@ -194,7 +194,7 @@ func (s *MockServer) handleRedfishDELETE(w http.ResponseWriter, r *http.Request)
 	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
 	urlPath := resolvePath(r.URL.Path)
-	s.mu.RLock()
+	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, hasOverride := s.overrides[urlPath]
 	if hasOverride {
@@ -206,7 +206,12 @@ func (s *MockServer) handleRedfishDELETE(w http.ResponseWriter, r *http.Request)
 	cached, hasOverride := s.overrides[collectionPath]
 	var collection Collection
 	if hasOverride {
-		collection = cached.(Collection)
+		var ok bool
+		collection, ok = cached.(Collection)
+		if !ok {
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
 	} else {
 		data, err := dataFS.ReadFile(collectionPath)
 		if err != nil {

@@ -132,7 +132,7 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 					Name: mv.MetricProperty,
 					Help: "Metric with ID " + mv.MetricId,
 				},
-				[]string{"hostname", "vendor"},
+				[]string{"hostname"},
 			)
 			metricsReportCollectors[mv.MetricId] = gauge
 			if err := metrics.Registry.Register(gauge); err != nil {

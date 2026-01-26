@@ -113,6 +113,18 @@ type BMC interface {
 
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
+
+	// CreateOrUpdateAccount creates or updates a BMC user account.
+	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
+
+	// DeleteAccount deletes a BMC user account.
+	DeleteAccount(ctx context.Context, userName, id string) error
+
+	// GetAccounts retrieves all BMC user accounts.
+	GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error)
+
+	// GetAccountService retrieves the account service.
+	GetAccountService(ctx context.Context) (*redfish.AccountService, error)
 }
 
 type Entity struct {

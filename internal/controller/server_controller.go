@@ -92,6 +92,7 @@ type ServerReconciler struct {
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
+	FirstBootConditions     []string
 }
 
 //+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -320,7 +321,7 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logg
 }
 
 func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
+	if _, ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
 		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
 		return true, err
 	}
@@ -412,7 +413,8 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 			return true, err
 		}
 	}
-	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
+	bootConfig, ready, err := r.serverBootConfigurationIsReady(ctx, server)
+	if err != nil || !ready {
 		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
 		return true, err
 	}
@@ -420,7 +422,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 
 	// TODO: fix properly, we need to free up the server if the claim does not exist anymore
 	claim := &metalv1alpha1.ServerClaim{}
-	err := r.Get(ctx, client.ObjectKey{
+	err = r.Get(ctx, client.ObjectKey{
 		Name:      server.Spec.ServerClaimRef.Name,
 		Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
 	if err != nil {
@@ -439,12 +441,13 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 		return false, fmt.Errorf("failed to get ServerClaim: %w", err)
 	}
 
+	shouldConfigureNetworkBoot := shouldPXEBootServer(claim, bootConfig, r.FirstBootConditions)
 	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
-	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
+	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState && shouldConfigureNetworkBoot {
 		if err := r.pxeBootServer(ctx, log, bmcClient, server); err != nil {
 			return false, fmt.Errorf("failed to boot server: %w", err)
 		}
-		log.V(1).Info("Server is powered off, booting Server in PXE")
+		log.V(1).Info("Server is powered off and boot policy requires PXE, booting Server in PXE", "BootPolicy", claim.Spec.BootPolicy)
 	}
 	if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
@@ -764,15 +767,15 @@ func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, log 
 	return false, nil
 }
 
-func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, bool, error) {
 	if server.Spec.BootConfigurationRef == nil {
-		return false, nil
+		return nil, false, nil
 	}
 	config := &metalv1alpha1.ServerBootConfiguration{}
 	if err := r.Get(ctx, client.ObjectKey{Namespace: server.Spec.BootConfigurationRef.Namespace, Name: server.Spec.BootConfigurationRef.Name}, config); err != nil {
-		return false, err
+		return nil, false, err
 	}
-	return config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
+	return config, config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
 }
 
 func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
@@ -789,6 +792,49 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, b
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
 	return nil
+}
+
+func shouldPXEBootServer(claim *metalv1alpha1.ServerClaim, bootConfig *metalv1alpha1.ServerBootConfiguration, firstBootConditions []string) bool {
+	if claim == nil {
+		return false
+	}
+
+	switch claim.Spec.BootPolicy {
+	case "", metalv1alpha1.BootPolicyNetworkBootOnce:
+		return !bootConfigHasFirstBootCondition(bootConfig, firstBootConditions)
+	case metalv1alpha1.BootPolicyNetworkBootAlways:
+		return true
+	default:
+		return false
+	}
+}
+
+func bootConfigHasFirstBootCondition(bootConfig *metalv1alpha1.ServerBootConfiguration, firstBootConditions []string) bool {
+	if bootConfig == nil || len(firstBootConditions) == 0 {
+		return false
+	}
+
+	conditionSet := make(map[string]struct{}, len(firstBootConditions))
+	for _, conditionType := range firstBootConditions {
+		conditionType = strings.TrimSpace(conditionType)
+		if conditionType == "" {
+			continue
+		}
+		conditionSet[conditionType] = struct{}{}
+	}
+	if len(conditionSet) == 0 {
+		return false
+	}
+
+	for _, condition := range bootConfig.Status.Conditions {
+		if condition.Status != metav1.ConditionTrue {
+			continue
+		}
+		if _, ok := conditionSet[condition.Type]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {

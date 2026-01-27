@@ -32,7 +32,7 @@ var _ = Describe("BMCSecret Webhook", func() {
 				"username": []byte("admin"),
 				"password": []byte("adminpass"),
 			},
-			Immutable: &[]bool{true}[0],
+			Immutable: ptr.To(true),
 		}
 		By("Creating an BMCSecret")
 		Expect(k8sClient.Create(ctx, BMCSecret)).To(Succeed())

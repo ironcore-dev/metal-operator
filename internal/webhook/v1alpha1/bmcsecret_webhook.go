@@ -58,7 +58,10 @@ func (v *BMCSecretCustomValidator) ValidateUpdate(ctx context.Context, oldObj, n
 	}
 	bmcsecretlog.Info("Validation for BMCSecret upon update", "name", bmcsecret.GetName())
 
-	if bmcsecret.Immutable != nil && *bmcsecret.Immutable {
+	if oldSecret.Immutable != nil && *oldSecret.Immutable {
+		if bmcsecret.Immutable == nil || !*bmcsecret.Immutable {
+			return nil, fmt.Errorf("immutable field cannot be changed from true to false")
+		}
 		if !reflect.DeepEqual(bmcsecret.Data, oldSecret.Data) {
 			return nil, fmt.Errorf("data field is immutable and cannot be updated")
 		}

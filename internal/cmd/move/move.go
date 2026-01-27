@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -144,9 +145,10 @@ func moveCrs(
 			cr.SetOwnerReferences(ownerReferences)
 		}
 		cr.SetResourceVersion("")
-		if err := cl.Create(ctx, cr); err != nil {
-			err = fmt.Errorf("CR %s couldn't be created in the target cluster: %w", crName(cr), err)
-			return movedCrs, err
+		// TODO: log operation result
+		_, err := controllerutil.CreateOrPatch(ctx, cl, cr, nil)
+		if err != nil {
+			return movedCrs, fmt.Errorf("CR %s couldn't be created in the target cluster: %w", crName(cr), err)
 		}
 		movedCrs = append(movedCrs, cr)
 	}

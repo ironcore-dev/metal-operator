@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"reflect"
 	"slices"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -84,13 +84,13 @@ func getCrsToBeMoved(
 			return nil, fmt.Errorf("failed to check CR existence in the target cluster: %w", err)
 		}
 
-		if reflect.DeepEqual(clearFields(sourceCr), clearFields(targetCr)) {
-			slog.Debug("source and target CRs are the same", slog.String("CR", crName(sourceCr)))
-			continue
-		}
-		return nil, fmt.Errorf(
-			"a CR %s/%s already exists in the target cluster and is different then in the source cluster",
-			sourceCr.GetNamespace(), sourceCr.GetName())
+		//if reflect.DeepEqual(clearFields(sourceCr), clearFields(targetCr)) {
+		//	slog.Debug("source and target CRs are the same", slog.String("CR", crName(sourceCr)))
+		//	continue
+		//}
+		//return nil, fmt.Errorf(
+		//	"a CR %s/%s already exists in the target cluster and is different then in the source cluster",
+		//	sourceCr.GetNamespace(), sourceCr.GetName())
 	}
 	return crsToMove, nil
 }
@@ -144,9 +144,10 @@ func moveCrs(
 			cr.SetOwnerReferences(ownerReferences)
 		}
 		cr.SetResourceVersion("")
-		if err := cl.Create(ctx, cr); err != nil {
-			err = fmt.Errorf("CR %s couldn't be created in the target cluster: %w", crName(cr), err)
-			return movedCrs, err
+		// TODO: log operation result
+		_, err := controllerutil.CreateOrPatch(ctx, cl, cr, nil)
+		if err != nil {
+			return movedCrs, fmt.Errorf("CR %s couldn't be created in the target cluster: %w", crName(cr), err)
 		}
 		movedCrs = append(movedCrs, cr)
 	}

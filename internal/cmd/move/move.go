@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"reflect"
 	"slices"
 	"time"
 
@@ -85,13 +84,13 @@ func getCrsToBeMoved(
 			return nil, fmt.Errorf("failed to check CR existence in the target cluster: %w", err)
 		}
 
-		if reflect.DeepEqual(clearFields(sourceCr), clearFields(targetCr)) {
-			slog.Debug("source and target CRs are the same", slog.String("CR", crName(sourceCr)))
-			continue
-		}
-		return nil, fmt.Errorf(
-			"a CR %s/%s already exists in the target cluster and is different then in the source cluster",
-			sourceCr.GetNamespace(), sourceCr.GetName())
+		//if reflect.DeepEqual(clearFields(sourceCr), clearFields(targetCr)) {
+		//	slog.Debug("source and target CRs are the same", slog.String("CR", crName(sourceCr)))
+		//	continue
+		//}
+		//return nil, fmt.Errorf(
+		//	"a CR %s/%s already exists in the target cluster and is different then in the source cluster",
+		//	sourceCr.GetNamespace(), sourceCr.GetName())
 	}
 	return crsToMove, nil
 }

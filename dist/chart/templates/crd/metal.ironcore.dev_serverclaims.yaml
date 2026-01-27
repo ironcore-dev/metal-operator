@@ -61,6 +61,15 @@ spec:
           spec:
             description: ServerClaimSpec defines the desired state of ServerClaim.
             properties:
+              bootPolicy:
+                default: NetworkBootOnce
+                description: BootPolicy specifies how the server should be configured
+                  to boot from the network.
+                enum:
+                - None
+                - NetworkBootOnce
+                - NetworkBootAlways
+                type: string
               ignitionSecretRef:
                 description: |-
                   IgnitionSecretRef is a reference to the Kubernetes Secret object that contains

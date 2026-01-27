@@ -332,7 +332,8 @@ var _ = Describe("BIOSVersion Controller", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, "true")
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
 		})).Should(Succeed())
 
 		By("Ensuring that Server in Maintenance state")

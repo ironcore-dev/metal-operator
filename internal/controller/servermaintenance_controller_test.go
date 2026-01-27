@@ -192,6 +192,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
 			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
 		})).Should(Succeed())
 
 		maintenanceAnnotations := map[string]string{
@@ -201,6 +202,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		}
 		maintenanceLabels := map[string]string{
 			metalv1alpha1.ServerMaintenanceNeededLabelKey: trueValue,
+			metalv1alpha1.ServerMaintenanceApprovalKey:    trueValue,
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance.Name),

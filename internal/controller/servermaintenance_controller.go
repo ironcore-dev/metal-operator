@@ -154,17 +154,21 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 	log.V(1).Info("Patched ServerClaim labels and annotations", "ServerClaim", client.ObjectKeyFromObject(serverClaim))
 	if maintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
 		annotations := serverClaim.GetAnnotations()
-		if _, ok := annotations[metalv1alpha1.ServerMaintenanceApprovalKey]; !ok {
-			log.V(1).Info("Server not approved for maintenance, waiting for approval", "Server", server.Name)
-			return ctrl.Result{}, nil
+		labels := serverClaim.GetLabels()
+		_, hasAnnotation := annotations[metalv1alpha1.ServerMaintenanceApprovalKey]
+		_, hasLabel := labels[metalv1alpha1.ServerMaintenanceApprovalKey]
+
+		if hasAnnotation || hasLabel {
+			log.V(1).Info("Server approved for maintenance", "Server", server.Name)
+			if err = r.updateServerRef(ctx, log, maintenance, server); err != nil {
+				return ctrl.Result{}, err
+			}
+			if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
+				return ctrl.Result{}, err
+			}
 		}
-		log.V(1).Info("Server approved for maintenance", "Server", server.Name)
-		if err = r.updateServerRef(ctx, log, maintenance, server); err != nil {
-			return ctrl.Result{}, err
-		}
-		if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
+		log.V(1).Info("Server not approved for maintenance, waiting for approval", "Server", server.Name)
+		return ctrl.Result{}, nil
 	}
 
 	if maintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced {
@@ -358,6 +362,7 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logg
 		metalv1alpha1.ServerMaintenanceReasonAnnotationKey,
 	})
 	metautils.DeleteLabels(serverClaim, []string{
+		metalv1alpha1.ServerMaintenanceApprovalKey,
 		metalv1alpha1.ServerMaintenanceNeededLabelKey,
 	})
 	if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {

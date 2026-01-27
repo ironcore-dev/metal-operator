@@ -362,6 +362,7 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, log logr.Logg
 		metalv1alpha1.ServerMaintenanceReasonAnnotationKey,
 	})
 	metautils.DeleteLabels(serverClaim, []string{
+		metalv1alpha1.ServerMaintenanceApprovalKey,
 		metalv1alpha1.ServerMaintenanceNeededLabelKey,
 	})
 	if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {

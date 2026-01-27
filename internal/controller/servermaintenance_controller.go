@@ -25,6 +25,9 @@ import (
 const (
 	// ServerMaintenanceFinalizer is the finalizer for the ServerMaintenance resource.
 	ServerMaintenanceFinalizer = "metal.ironcore.dev/servermaintenance"
+
+	// trueValue represents the string value "true" used for labels and annotations
+	trueValue = "true"
 )
 
 // ServerMaintenanceReconciler reconciles a ServerMaintenance object
@@ -137,11 +140,11 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 	if serverClaim.Labels == nil {
 		serverClaim.Labels = make(map[string]string)
 	}
-	serverClaim.Labels[metalv1alpha1.ServerMaintenanceNeededLabelKey] = "true"
+	serverClaim.Labels[metalv1alpha1.ServerMaintenanceNeededLabelKey] = trueValue
 	if serverClaim.Annotations == nil {
 		serverClaim.Annotations = make(map[string]string)
 	}
-	serverClaim.Annotations[metalv1alpha1.ServerMaintenanceNeededLabelKey] = "true"
+	serverClaim.Annotations[metalv1alpha1.ServerMaintenanceNeededLabelKey] = trueValue
 	if maintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] != "" {
 		serverClaim.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] = maintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey]
 	}

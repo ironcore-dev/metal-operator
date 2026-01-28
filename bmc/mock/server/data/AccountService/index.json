@@ -9,6 +9,7 @@
     },
     "ServiceEnabled": true,
     "AuthFailureLoggingThreshold": 3,
+    "MaxPasswordLength": 30,
     "MinPasswordLength": 8,
     "AccountLockoutThreshold": 5,
     "AccountLockoutDuration": 30,

@@ -6,6 +6,7 @@
     "Enabled": true,
     "Password": null,
     "PasswordChangeRequired": false,
+    "PasswordExpiration": "2026-12-31T23:59:59Z",
     "AccountTypes": [
         "Redfish"
     ],

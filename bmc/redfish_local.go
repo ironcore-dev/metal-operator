@@ -53,7 +53,7 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 }
 
 // GetAccounts retrieves all user accounts from the BMC.
-func (r *RedfishLocalBMC) GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error) {
+func (r *RedfishLocalBMC) GetAccounts() ([]*redfish.ManagerAccount, error) {
 	accounts := make([]*redfish.ManagerAccount, 0, len(UnitTestMockUps.Accounts))
 	for _, a := range UnitTestMockUps.Accounts {
 		accounts = append(accounts, a)

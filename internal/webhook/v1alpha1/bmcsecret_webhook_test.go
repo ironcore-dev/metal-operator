@@ -22,7 +22,6 @@ var _ = Describe("BMCSecret Webhook", func() {
 		validator = BMCSecretCustomValidator{
 			Client: k8sClient,
 		}
-		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
 		BMCSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    "test-namespace",

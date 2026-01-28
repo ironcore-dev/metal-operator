@@ -805,18 +805,16 @@ func (r *RedfishBMC) DeleteAccount(ctx context.Context, userName, id string) err
 			if err != nil {
 				return err
 			}
-			defer func(Body io.ReadCloser) {
-				if err = Body.Close(); err != nil {
-					log.Error(err, "failed to close response body")
-				}
-			}(resp.Body)
+			if err = resp.Body.Close(); err != nil {
+				log.Error(err, "failed to close response body")
+			}
 			return nil
 		}
 	}
 	return fmt.Errorf("account %s not found", userName)
 }
 
-func (r *RedfishBMC) GetAccountService(ctx context.Context) (*redfish.AccountService, error) {
+func (r *RedfishBMC) GetAccountService() (*redfish.AccountService, error) {
 	service, err := r.client.GetService().AccountService()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account service: %w", err)
@@ -824,7 +822,7 @@ func (r *RedfishBMC) GetAccountService(ctx context.Context) (*redfish.AccountSer
 	return service, nil
 }
 
-func (r *RedfishBMC) GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error) {
+func (r *RedfishBMC) GetAccounts() ([]*redfish.ManagerAccount, error) {
 	service, err := r.client.GetService().AccountService()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account service: %w", err)

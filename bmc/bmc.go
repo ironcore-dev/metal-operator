@@ -121,10 +121,10 @@ type BMC interface {
 	DeleteAccount(ctx context.Context, userName, id string) error
 
 	// GetAccounts retrieves all BMC user accounts.
-	GetAccounts(ctx context.Context) ([]*redfish.ManagerAccount, error)
+	GetAccounts() ([]*redfish.ManagerAccount, error)
 
 	// GetAccountService retrieves the account service.
-	GetAccountService(ctx context.Context) (*redfish.AccountService, error)
+	GetAccountService() (*redfish.AccountService, error)
 }
 
 type Entity struct {

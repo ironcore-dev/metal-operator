@@ -125,7 +125,7 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, log logr.Logger, user
 }
 
 func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, bmcClient bmc.BMC) error {
-	accounts, err := bmcClient.GetAccounts(ctx)
+	accounts, err := bmcClient.GetAccounts()
 	if err != nil {
 		return fmt.Errorf("failed to get BMC accounts: %w", err)
 	}
@@ -183,7 +183,7 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 		}, nil
 	}
 	log.Info("Rotating BMC user password", "User", user.Name)
-	accountService, err := bmcClient.GetAccountService(ctx)
+	accountService, err := bmcClient.GetAccountService()
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get account service: %w", err)
 	}
@@ -213,7 +213,7 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 
 func (r *BMCUserReconciler) ensureBMCSecretForUser(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, user *metalv1alpha1.BMCUser, bmcObj *metalv1alpha1.BMC) error {
 	log.Info("No BMCSecret reference set for User, creating a new one", "User", user.Name)
-	accountService, err := bmcClient.GetAccountService(ctx)
+	accountService, err := bmcClient.GetAccountService()
 	if err != nil {
 		return fmt.Errorf("failed to get account service: %w", err)
 	}

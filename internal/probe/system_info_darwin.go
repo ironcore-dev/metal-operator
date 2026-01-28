@@ -6,8 +6,6 @@
 package probe
 
 import (
-	"log"
-
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 )
 
@@ -15,8 +13,7 @@ import (
 // It returns hardcoded mock data, allowing the application to run
 // for local development and testing without causing a panic.
 func collectSystemInfoData() (registry.DMI, error) {
-	log.Println("Running on Darwin, providing mock system info for testing.")
-	dmi := registry.DMI{
+	return registry.DMI{
 		BIOSInformation: registry.BIOSInformation{
 			Vendor:  "MockVendor",
 			Version: "D.123",
@@ -38,6 +35,5 @@ func collectSystemInfoData() (registry.DMI, error) {
 			SerialNumber: "MOCK-BOARD-SERIAL",
 			AssetTag:     "MOCK-ASSET-TAG",
 		},
-	}
-	return dmi, nil
+	}, nil
 }

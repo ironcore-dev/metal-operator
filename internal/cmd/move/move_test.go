@@ -4,9 +4,7 @@
 package move
 
 import (
-	"context"
 	"errors"
-	"log/slog"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -24,8 +22,6 @@ var _ = Describe("metalctl move", func() {
 	_ = SetupTest()
 
 	It("Should successfully move metal CRs from a source cluster on a target cluster", func(ctx SpecContext) {
-		slog.SetLogLoggerLevel(slog.LevelDebug)
-
 		// source cluster setup
 		sourceCommonEndpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-common-"},
@@ -79,13 +75,12 @@ var _ = Describe("metalctl move", func() {
 		targetBmcSecret := &metalv1alpha1.BMCSecret{}
 
 		// TEST
-		crsSchema := []schema.GroupVersionKind{}
-		for _, crdKind := range []string{"BMC", "BMCSecret", "Endpoint", "Server", "ServerBootConfiguration", "ServerClaim"} {
-			crsSchema = append(crsSchema,
-				schema.GroupVersionKind{Group: "metal.ironcore.dev", Version: "v1alpha1", Kind: crdKind})
+		crds := []string{"BMC", "BMCSecret", "Endpoint", "Server", "ServerBootConfiguration", "ServerClaim"}
+		crsSchema := make([]schema.GroupVersionKind, len(crds))
+		for i, crdKind := range crds {
+			crsSchema[i] = schema.GroupVersionKind{Group: "metal.ironcore.dev", Version: "v1alpha1", Kind: crdKind}
 		}
-		err := Move(context.TODO(), clients, crsSchema, "", false)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(Move(ctx, clients, crsSchema, "", false)).ToNot(HaveOccurred())
 
 		Eventually(func(g Gomega) error {
 			return clients.Target.Get(ctx, client.ObjectKeyFromObject(targetCommonEndpoint), targetCommonEndpoint)

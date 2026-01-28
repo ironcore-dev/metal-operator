@@ -34,6 +34,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -619,28 +622,29 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 		return fmt.Errorf("failed to generate SSH keypair: %w", err)
 	}
 
-	sshSecret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: r.ManagerNamespace,
-			Name:      fmt.Sprintf("%s-ssh", bootConfig.Name),
-		},
-		Data: map[string][]byte{
+	ownerRef := metav1apply.OwnerReference().
+		WithAPIVersion(bootConfig.APIVersion).
+		WithKind(bootConfig.Kind).
+		WithName(bootConfig.Name).
+		WithUID(bootConfig.UID).
+		WithController(true).
+		WithBlockOwnerDeletion(true)
+
+	sshSecretApply := corev1apply.
+		Secret(fmt.Sprintf("%s-ssh", bootConfig.Name), r.ManagerNamespace).
+		WithType("Opaque").
+		WithData(map[string][]byte{
 			SSHKeyPairSecretPublicKeyName:   sshPublicKey,
 			SSHKeyPairSecretPrivateKeyName:  sshPrivateKey,
 			SSHKeyPairSecretPasswordKeyName: password,
-		},
-	}
-	if err := controllerutil.SetControllerReference(bootConfig, sshSecret, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference: %w", err)
-	}
-	if err := r.Patch(ctx, sshSecret, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
+		}).
+		WithOwnerReferences(ownerRef)
+
+	if err := r.Apply(ctx, sshSecretApply, fieldOwner, client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to apply default SSH keypair: %w", err)
 	}
-	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", client.ObjectKeyFromObject(sshSecret))
+	sshKeyPairNamespacedName := fmt.Sprintf("%s/%s", ptr.Deref(sshSecretApply.Namespace, ""), ptr.Deref(sshSecretApply.Name, ""))
+	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", sshKeyPairNamespacedName)
 
 	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
 	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey, password)
@@ -648,26 +652,24 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
 	}
 
-	ignitionSecret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: r.ManagerNamespace,
-			Name:      bootConfig.Name,
-		},
-		Data: map[string][]byte{
+	ownerRef = metav1apply.OwnerReference().
+		WithAPIVersion(bootConfig.APIVersion).
+		WithKind(bootConfig.Kind).
+		WithName(bootConfig.Name).
+		WithUID(bootConfig.UID).
+		WithController(true).
+		WithBlockOwnerDeletion(true)
+
+	ignitionSecretApply := corev1apply.
+		Secret(bootConfig.Name, r.ManagerNamespace).
+		WithType("Opaque").
+		WithData(map[string][]byte{
 			DefaultIgnitionFormatKey:     []byte(DefaultIgnitionFormatValue),
 			DefaultIgnitionSecretKeyName: ignitionData,
-		},
-	}
+		}).
+		WithOwnerReferences(ownerRef)
 
-	if err := controllerutil.SetControllerReference(bootConfig, ignitionSecret, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference: %w", err)
-	}
-
-	if err := r.Patch(ctx, ignitionSecret, client.Apply, fieldOwner, client.ForceOwnership); err != nil {
+	if err := r.Apply(ctx, ignitionSecretApply, fieldOwner, client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to apply default ignition secret: %w", err)
 	}
 	log.V(1).Info("Applied Ignition Secret")

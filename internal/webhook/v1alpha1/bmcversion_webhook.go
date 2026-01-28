@@ -8,25 +8,22 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-// nolint:unused
 // log is for logging in this package.
 var bmcversionlog = logf.Log.WithName("bmcversion-resource")
 
 // SetupBMCVersionWebhookWithManager registers the webhook for BMCVersion in the manager.
 func SetupBMCVersionWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&metalv1alpha1.BMCVersion{}).
+	return ctrl.NewWebhookManagedBy(mgr, &metalv1alpha1.BMCVersion{}).
 		WithValidator(&BMCVersionCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 }
@@ -42,93 +39,72 @@ type BMCVersionCustomValidator struct {
 	Client client.Client
 }
 
-var _ webhook.CustomValidator = &BMCVersionCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
-func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	bmcversion, ok := obj.(*metalv1alpha1.BMCVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCVersion object but got %T", obj)
-	}
-	bmcversionlog.Info("Validation for BMCVersion upon creation", "name", bmcversion.GetName())
+func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
+	bmcversionlog.Info("Validation for BMCVersion upon creation", "name", obj.GetName())
 	bmcVersionList := &metalv1alpha1.BMCVersionList{}
 	if err := v.Client.List(ctx, bmcVersionList); err != nil {
-		return nil, fmt.Errorf("failed to list BMCVersionList: %w", err)
+		return nil, fmt.Errorf("failed to list BMCVersions: %w", err)
 	}
-	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, bmcversion)
+	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
-func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	bmcversion, ok := newObj.(*metalv1alpha1.BMCVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCVersion object for the newObj but got %T", newObj)
-	}
-	bmcversionlog.Info("Validation for BMCVersion upon update", "name", bmcversion.GetName())
+func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
+	bmcversionlog.Info("Validation for BMCVersion upon update", "name", newObj.GetName())
 
-	oldBMCVersion, ok := oldObj.(*metalv1alpha1.BMCVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCVersion object for the oldObj but got %T", oldObj)
-	}
-	if oldBMCVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(bmcversion) && oldBMCVersion.Spec.ServerMaintenanceRefs != nil {
+	if oldObj.Status.State == metalv1alpha1.BMCVersionStateInProgress &&
+		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRefs != nil {
 		err := fmt.Errorf("BMCVersion (%v) is in progress, unable to update %v",
-			oldBMCVersion.Name,
-			bmcversion.Name)
+			oldObj.Name,
+			newObj.Name)
 		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: bmcversion.GroupVersionKind().Group, Kind: bmcversion.Kind},
-			bmcversion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
+			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
 	}
 
 	bmcVersionList := &metalv1alpha1.BMCVersionList{}
 	if err := v.Client.List(ctx, bmcVersionList); err != nil {
-		return nil, fmt.Errorf("failed to list BMCVersionList: %w", err)
+		return nil, fmt.Errorf("failed to list BMCVersions: %w", err)
 	}
 
-	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, bmcversion)
+	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
-func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	bmcversion, ok := obj.(*metalv1alpha1.BMCVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCVersion object but got %T", obj)
-	}
-	bmcversionlog.Info("Validation for BMCVersion upon deletion", "name", bmcversion.GetName())
+func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
+	bmcversionlog.Info("Validation for BMCVersion upon deletion", "name", obj.GetName())
 
 	bv := &metalv1alpha1.BMCVersion{}
 	err := v.Client.Get(ctx, client.ObjectKey{
-		Name:      bmcversion.GetName(),
-		Namespace: bmcversion.GetNamespace(),
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
 	}, bv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get BMCVersion: %w", err)
 	}
 
-	if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress && !ShouldAllowForceDeleteInProgress(bmcversion) {
-		return nil, apierrors.NewBadRequest("The BMCVersion in progress, unable to delete")
+	if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
+		return nil, apierrors.NewBadRequest("Unable to delete BMCVersion as it is in progress")
 	}
 
 	return nil, nil
 }
 
-func checkForDuplicateBMCVersionsRefToBMC(
-	bmcVersionList *metalv1alpha1.BMCVersionList,
-	bmcVersion *metalv1alpha1.BMCVersion,
-) (admission.Warnings, error) {
-	for _, bv := range bmcVersionList.Items {
-		if bmcVersion.Name == bv.Name {
+func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionList, version *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
+	for _, v := range versionList.Items {
+		if version.Name == v.Name {
 			continue
 		}
-		if bv.Spec.BMCRef.Name == bmcVersion.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%v) referred in %v is duplicate of BMC (%v) referred in %v",
-				bmcVersion.Spec.BMCRef.Name,
-				bmcVersion.Name,
-				bv.Spec.BMCRef.Name,
-				bv.Name)
+		if v.Spec.BMCRef.Name == version.Spec.BMCRef.Name {
+			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
+				version.Spec.BMCRef.Name,
+				version.Name,
+				v.Spec.BMCRef.Name,
+				v.Name)
 			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: bmcVersion.GroupVersionKind().Group, Kind: bmcVersion.Kind},
-				bmcVersion.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec", "BMCRef"), err)})
+				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
+				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
 		}
 	}
 	return nil, nil

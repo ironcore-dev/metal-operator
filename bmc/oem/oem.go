@@ -35,6 +35,9 @@ type OEMInterface interface {
 	GetUpdateRequestBody(parameters *redfish.SimpleUpdateParameters) *SimpleUpdateRequestBody
 	GetUpdateTaskMonitorURI(response *http.Response) (string, error)
 	GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error)
+	MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error
+	EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error
+	GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error)
 }
 
 func IsSubMap(main, sub map[string]any) bool {

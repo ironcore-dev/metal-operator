@@ -262,6 +262,7 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log 
 		config.Spec.ServerRef = *claim.Spec.ServerRef
 		config.Spec.Image = claim.Spec.Image
 		config.Spec.IgnitionSecretRef = claim.Spec.IgnitionSecretRef
+		config.Spec.BootMethod = claim.Spec.BootMethod
 		return ctrl.SetControllerReference(claim, config, r.Scheme)
 	})
 	if err != nil {

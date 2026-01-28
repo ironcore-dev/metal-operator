@@ -1031,3 +1031,68 @@ func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string,
 
 	return oemInterface.GetTaskMonitorDetails(ctx, respTask)
 }
+
+func (r *RedfishBMC) SetVirtualMediaBootOnce(ctx context.Context, systemURI string) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	system, err := redfish.GetComputerSystem(r.client, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system: %w", err)
+	}
+
+	setBoot := redfish.Boot{
+		BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled, // One-time only
+		BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,    // UEFI mode
+		BootSourceOverrideTarget:  redfish.CdBootSourceOverrideTarget,    // CD/DVD (virtual media)
+	}
+
+	if err := system.SetBoot(setBoot); err != nil {
+		return fmt.Errorf("failed to set virtual media boot once: %w", err)
+	}
+
+	log.Info("Successfully set virtual media boot once", "systemURI", systemURI)
+	return nil
+}
+
+func (r *RedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	manufacturer, err := r.getSystemManufacturer()
+	if err != nil {
+		return fmt.Errorf("failed to get manufacturer: %w", err)
+	}
+
+	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
+	if err != nil {
+		return fmt.Errorf("failed to get OEM interface: %w", err)
+	}
+
+	return oemInterface.MountVirtualMedia(ctx, systemURI, mediaURL, slotID)
+}
+
+func (r *RedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	manufacturer, err := r.getSystemManufacturer()
+	if err != nil {
+		return fmt.Errorf("failed to get manufacturer: %w", err)
+	}
+
+	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
+	if err != nil {
+		return fmt.Errorf("failed to get OEM interface: %w", err)
+	}
+
+	return oemInterface.EjectVirtualMedia(ctx, systemURI, slotID)
+}
+
+// GetVirtualMediaStatus retrieves the status of all virtual media devices.
+func (r *RedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error) {
+	manufacturer, err := r.getSystemManufacturer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manufacturer: %w", err)
+	}
+
+	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OEM interface: %w", err)
+	}
+
+	return oemInterface.GetVirtualMediaStatus(ctx, systemURI)
+}

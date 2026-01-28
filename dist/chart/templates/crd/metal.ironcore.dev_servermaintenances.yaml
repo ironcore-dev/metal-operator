@@ -79,6 +79,16 @@ spec:
                     description: Parameters specify the parameters to be used for
                       rendering the boot configuration.
                     properties:
+                      bootMethod:
+                        default: PXE
+                        description: |-
+                          BootMethod specifies the boot method to use for the server.
+                          Valid values are "PXE" (default) and "VirtualMedia".
+                          If not specified, defaults to PXE for backwards compatibility.
+                        enum:
+                        - PXE
+                        - VirtualMedia
+                        type: string
                       ignitionSecretRef:
                         description: |-
                           IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
@@ -98,6 +108,8 @@ spec:
                       image:
                         description: |-
                           Image specifies the boot image to be used for the server.
+                          For PXE boot: OCI image reference containing kernel/initrd.
+                          For VirtualMedia boot: OCI image reference containing bootable ISO layer.
                           This field is optional and can be omitted if not specified.
                         type: string
                       serverRef:

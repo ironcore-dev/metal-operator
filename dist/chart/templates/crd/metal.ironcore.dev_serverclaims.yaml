@@ -30,6 +30,9 @@ spec:
     - jsonPath: .spec.image
       name: Image
       type: string
+    - jsonPath: .spec.bootMethod
+      name: BootMethod
+      type: string
     - jsonPath: .status.phase
       name: Phase
       type: string
@@ -61,6 +64,16 @@ spec:
           spec:
             description: ServerClaimSpec defines the desired state of ServerClaim.
             properties:
+              bootMethod:
+                default: PXE
+                description: |-
+                  BootMethod specifies the boot method to use for the server.
+                  Valid values are "PXE" (default) and "VirtualMedia".
+                  If not specified, defaults to PXE for backwards compatibility.
+                enum:
+                - PXE
+                - VirtualMedia
+                type: string
               ignitionSecretRef:
                 description: |-
                   IgnitionSecretRef is a reference to the Kubernetes Secret object that contains

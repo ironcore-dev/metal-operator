@@ -308,10 +308,23 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logg
 	}
 	log.V(1).Info("Applied Server boot configuration")
 
-	if err := r.pxeBootServer(ctx, log, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to set PXE boot for server: %w", err)
+	// Get the server boot configuration to determine boot type
+	if server.Spec.BootConfigurationRef == nil {
+		return false, fmt.Errorf("server boot configuration reference is nil")
 	}
-	log.V(1).Info("Set PXE Boot for Server")
+
+	config := &metalv1alpha1.ServerBootConfiguration{}
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: server.Spec.BootConfigurationRef.Namespace,
+		Name:      server.Spec.BootConfigurationRef.Name,
+	}, config); err != nil {
+		return false, fmt.Errorf("failed to get server boot configuration: %w", err)
+	}
+
+	if err := r.bootServer(ctx, log, bmcClient, server, config); err != nil {
+		return false, fmt.Errorf("failed to boot server: %w", err)
+	}
+	log.V(1).Info("Configured server boot", "bootType", config.Spec.BootType)
 
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
 		return false, err
@@ -387,6 +400,23 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 		log.V(1).Info("Server state set to power off")
 	}
 
+	if server.Spec.BMCRef != nil && server.Spec.SystemURI != "" {
+		currentMedia, err := bmcClient.GetVirtualMediaStatus(ctx, server.Spec.SystemURI)
+		if err != nil {
+			log.V(1).Info("Failed to get virtual media status", "error", err.Error())
+		} else {
+			for _, media := range currentMedia {
+				if media.Inserted {
+					if err := bmcClient.EjectVirtualMedia(ctx, server.Spec.SystemURI, media.ID); err != nil {
+						log.V(1).Info("Failed to eject virtual media", "id", media.ID, "error", err.Error())
+					} else {
+						log.V(1).Info("Ejected virtual media", "id", media.ID)
+					}
+				}
+			}
+		}
+	}
+
 	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
 	}
@@ -441,10 +471,22 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 
 	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
-		if err := r.pxeBootServer(ctx, log, bmcClient, server); err != nil {
+		if server.Spec.BootConfigurationRef == nil {
+			return false, fmt.Errorf("server boot configuration reference is nil")
+		}
+
+		config := &metalv1alpha1.ServerBootConfiguration{}
+		if err := r.Get(ctx, client.ObjectKey{
+			Namespace: server.Spec.BootConfigurationRef.Namespace,
+			Name:      server.Spec.BootConfigurationRef.Name,
+		}, config); err != nil {
+			return false, fmt.Errorf("failed to get server boot configuration: %w", err)
+		}
+
+		if err := r.bootServer(ctx, log, bmcClient, server, config); err != nil {
 			return false, fmt.Errorf("failed to boot server: %w", err)
 		}
-		log.V(1).Info("Server is powered off, booting Server in PXE")
+		log.V(1).Info("Server is powered off, booting server", "bootType", config.Spec.BootType)
 	}
 	if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
@@ -775,6 +817,21 @@ func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, s
 	return config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
 }
 
+func (r *ServerReconciler) bootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+	if config == nil {
+		return fmt.Errorf("server boot configuration is required")
+	}
+
+	switch config.Spec.BootType {
+	case metalv1alpha1.BootTypeVirtualMedia:
+		log.Info("Booting server via virtual media")
+		return r.virtualMediaBootServer(ctx, log, bmcClient, server, config)
+	default: // BootTypePXE or empty
+		log.Info("Booting server via PXE")
+		return r.pxeBootServer(ctx, log, bmcClient, server)
+	}
+}
+
 func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
 	if server == nil || server.Spec.BootConfigurationRef == nil {
 		log.V(1).Info("Server not ready for netboot")
@@ -788,6 +845,59 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, b
 	if err := bmcClient.SetPXEBootOnce(ctx, server.Spec.SystemURI); err != nil {
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
+	return nil
+}
+
+func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+	if server == nil || server.Spec.BootConfigurationRef == nil {
+		log.V(1).Info("Server not ready for virtual media boot")
+		return nil
+	}
+
+	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
+		return fmt.Errorf("can only boot server via virtual media with valid BMC ref or inline BMC configuration")
+	}
+
+	bootISOURL := config.Status.BootISOURL
+	if bootISOURL == "" {
+		return fmt.Errorf("boot-operator has not provided BootISOURL in ServerBootConfiguration status")
+	}
+
+	systemURI := server.Spec.SystemURI
+
+	currentMedia, err := bmcClient.GetVirtualMediaStatus(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get current virtual media status: %w", err)
+	}
+
+	for _, media := range currentMedia {
+		if media.Inserted {
+			if err := bmcClient.EjectVirtualMedia(ctx, systemURI, media.ID); err != nil {
+				log.V(1).Info("Failed to eject existing virtual media", "id", media.ID, "error", err.Error())
+			} else {
+				log.V(1).Info("Ejected existing virtual media", "id", media.ID)
+			}
+		}
+	}
+
+	if err := bmcClient.MountVirtualMedia(ctx, systemURI, bootISOURL, "1"); err != nil {
+		return fmt.Errorf("failed to mount boot ISO: %w", err)
+	}
+	log.V(1).Info("Mounted boot ISO", "slot", "1")
+
+	configISOURL := config.Status.ConfigISOURL
+	if configISOURL != "" {
+		if err := bmcClient.MountVirtualMedia(ctx, systemURI, configISOURL, "2"); err != nil {
+			return fmt.Errorf("failed to mount config ISO: %w", err)
+		}
+		log.V(1).Info("Mounted config ISO", "slot", "2")
+	}
+
+	if err := bmcClient.SetVirtualMediaBootOnce(ctx, systemURI); err != nil {
+		return fmt.Errorf("failed to set virtual media boot: %w", err)
+	}
+	log.V(1).Info("Set boot override to virtual media")
+
 	return nil
 }
 

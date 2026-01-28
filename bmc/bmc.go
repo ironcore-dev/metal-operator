@@ -113,6 +113,21 @@ type BMC interface {
 
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
+
+	// SetVirtualMediaBootOnce sets one-time boot from virtual media (CD/DVD).
+	// This sets the boot source override to CD/DVD for one boot cycle only.
+	SetVirtualMediaBootOnce(ctx context.Context, systemURI string) error
+
+	// MountVirtualMedia mounts an ISO image via BMC virtual media.
+	// The mediaURL should be an HTTP/HTTPS URL accessible by the BMC.
+	// The slotID indicates which virtual media slot to use (e.g., "1" or "2").
+	MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error
+
+	// EjectVirtualMedia ejects virtual media from the specified slot.
+	EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error
+
+	// GetVirtualMediaStatus retrieves the status of all virtual media devices.
+	GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error)
 }
 
 type Entity struct {

@@ -280,3 +280,87 @@ func (l *LenovoXCCManager) GetBMCPendingAttributeValues(ctx context.Context) (re
 	// We do not have any option to get pending attributes for Dell iDRAC
 	return redfish.SettingsAttributes{}, nil
 }
+
+func (r *Lenovo) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	managers, err := r.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
+
+	payload := map[string]interface{}{
+		"Image":          mediaURL,
+		"Inserted":       true,
+		"WriteProtected": true,
+	}
+
+	resp, err := r.Service.GetClient().Patch(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to mount virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to mount virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (r *Lenovo) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	managers, err := r.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
+
+	payload := map[string]interface{}{
+		"Image":    "",
+		"Inserted": false,
+	}
+
+	resp, err := r.Service.GetClient().Patch(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to eject virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to eject virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (r *Lenovo) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error) {
+	managers, err := r.Service.Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	return manager.VirtualMedia()
+}

@@ -169,7 +169,6 @@ func (r *ServerReconciler) delete(ctx context.Context, log logr.Logger, server *
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer has been removed")
-
 	log.V(1).Info("Deleted server")
 	return ctrl.Result{}, nil
 }

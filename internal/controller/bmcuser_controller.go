@@ -364,26 +364,44 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 
 func (r *BMCUserReconciler) delete(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
 	if user.Spec.BMCRef == nil {
-		log.Info("No BMC reference set for User, skipping deletion")
+		log.Info("No BMC reference set for User, removing finalizer")
+		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, nil
 	}
+
 	bmcObj := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, client.ObjectKey{Name: user.Spec.BMCRef.Name}, bmcObj); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		if client.IgnoreNotFound(err) == nil {
+			log.Info("BMC not found, removing finalizer")
+			if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
 	}
+
 	bmcClient, err := r.getBMCClient(ctx, bmcObj)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
+
 	log.Info("Deleting BMC account for User")
 	if err := bmcClient.DeleteAccount(ctx, user.Spec.UserName, user.Status.ID); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to delete BMC account: %w", err)
+		var httpErr *common.Error
+		if errors.As(err, &httpErr) && httpErr.HTTPReturnedStatusCode == 404 {
+			log.Info("BMC account not found, continuing finalizer removal")
+		} else {
+			return ctrl.Result{}, fmt.Errorf("failed to delete BMC account: %w", err)
+		}
 	}
-	log.Info("Successfully deleted BMC account and removed finalizer for User")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
+	log.Info("Successfully deleted BMC account and removed finalizer for User")
 	return ctrl.Result{}, nil
 }
 

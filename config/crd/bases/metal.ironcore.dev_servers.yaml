@@ -292,15 +292,15 @@ spec:
                   REDFISH API.
                 type: string
               systemUUID:
-                description: SystemUUID is the unique identifier for the server.
+                description: |-
+                  SystemUUID is the unique identifier for the server.
+                  If not provided, it will be derived from the serial
                 type: string
               uuid:
                 description: |-
                   UUID is the unique identifier for the server.
                   Deprecated in favor of systemUUID.
                 type: string
-            required:
-            - systemUUID
             type: object
           status:
             description: ServerStatus defines the observed state of Server.

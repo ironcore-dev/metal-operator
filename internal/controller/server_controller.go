@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -829,6 +830,7 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	}
 
 	serverBase := server.DeepCopy()
+
 	// update network interfaces
 	nics := make([]metalv1alpha1.NetworkInterface, 0, len(serverDetails.NetworkInterfaces))
 	for _, s := range serverDetails.NetworkInterfaces {
@@ -905,6 +907,23 @@ func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1
 	return true, nil
 }
 
+// generatePseudoUUID generates a deterministic UUID from an input string.
+// Format: 99999999-xxxx-3xxx-8xxx-xxxxxxxxxxxx (prefix identifies generated UUIDs)
+func generatePseudoUUID(input string) string {
+	hash := md5.Sum([]byte(input))
+	hashHex := fmt.Sprintf("%x", hash[:])
+
+	// Build UUID with version (3) and variant (8) bits embedded in groups
+	// Format: 99999999 - 4 - 3+3 - 8+3 - 12
+	uuid := fmt.Sprintf("99999999-%s-3%s-8%s-%s",
+		hashHex[0:4],   // 4 hex chars
+		hashHex[4:7],   // 3 hex chars (becomes 3XXX)
+		hashHex[7:10],  // 3 hex chars (becomes 8XXX)
+		hashHex[10:22], // 12 hex chars
+	)
+	return uuid
+}
+
 func (r *ServerReconciler) patchServerURI(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if len(server.Spec.SystemURI) != 0 {
@@ -917,21 +936,55 @@ func (r *ServerReconciler) patchServerURI(ctx context.Context, bmcClient bmc.BMC
 		return false, err
 	}
 
-	for _, system := range systems {
-		if strings.EqualFold(system.UUID, server.Spec.SystemUUID) {
-			serverBase := server.DeepCopy()
-			server.Spec.SystemURI = system.URI
-			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-				return false, fmt.Errorf("failed to patch server URI: %w", err)
+	// Try to find system by UUID if one is provided
+	if len(server.Spec.SystemUUID) > 0 {
+		for _, system := range systems {
+			if strings.EqualFold(system.UUID, server.Spec.SystemUUID) {
+				serverBase := server.DeepCopy()
+				server.Spec.SystemURI = system.URI
+				if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+					return false, fmt.Errorf("failed to patch server URI: %w", err)
+				}
+				return true, nil
 			}
 		}
 	}
-	if len(server.Spec.SystemURI) == 0 {
-		log.V(1).Info("Patching systemURI failed", "no system found for UUID", server.Spec.SystemUUID)
+
+	// If no system found by UUID or UUID is empty, and we only have one system, use it
+	// This handles cases where the Redfish implementation doesn't provide System.UUID
+	if len(systems) == 1 {
+		system := systems[0]
+		serverBase := server.DeepCopy()
+		server.Spec.SystemURI = system.URI
+
+		// If SystemUUID is empty, use system UUID if available, otherwise generate from SerialNumber
+		if len(server.Spec.SystemUUID) == 0 {
+			if len(system.UUID) > 0 {
+				server.Spec.SystemUUID = system.UUID
+			} else if len(system.SerialNumber) > 0 {
+				server.Spec.SystemUUID = generatePseudoUUID(system.SerialNumber)
+				log.V(1).Info("Generated pseudo-UUID from system serial number",
+					"serialNumber", system.SerialNumber, "pseudoUUID", server.Spec.SystemUUID)
+			} else {
+				return false, fmt.Errorf("system does not provide UUID or SerialNumber; cannot generate a unique identifier")
+			}
+		}
+
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server URI: %w", err)
+		}
+		return true, nil
+	}
+
+	// Multiple systems available but couldn't match by UUID
+	if len(server.Spec.SystemUUID) > 0 {
+		log.V(1).Info("No system found for UUID, and multiple systems available", "requestedUUID", server.Spec.SystemUUID)
 		return false, fmt.Errorf("unable to find system URI for UUID: %v", server.Spec.SystemUUID)
 	}
 
-	return true, nil
+	// No SystemUUID provided and multiple systems available - cannot determine which to use
+	log.V(1).Info("No SystemUUID provided and multiple systems available, cannot determine target system")
+	return false, fmt.Errorf("SystemUUID must be provided when multiple systems are available")
 }
 
 func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {

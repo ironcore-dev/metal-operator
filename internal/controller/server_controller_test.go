@@ -937,3 +937,84 @@ func deleteRegistrySystemIfExists(systemUUID string) {
 		defer resp.Body.Close() //nolint:errcheck
 	}
 }
+
+var _ = Describe("generatePseudoUUID", func() {
+	It("Should generate UUIDs matching RFC 4122-like format (8-4-4-4-12)", func() {
+		testCases := []struct {
+			name   string
+			serial string
+		}{
+			{"short_numeric", "123"},
+			{"short_alphanumeric", "ABC"},
+			{"medium_serial", "CZ2D1Y0BB3"},
+			{"long_serial", "LENOVO-SR850P-00012345-ABCDEF"},
+			{"uuid_like_serial", "550e8400-e29b-41d4-a716-446655440000"},
+			{"special_chars", "SN-2024_001+TEST"},
+			{"long_complex", "HPE-DL360-Gen10-Plus-SN123456789ABCDEFGHIJKLMNOP"},
+			{"numeric_heavy", "999999999999999999999999"},
+			{"mixed_case", "LenovoThinkSystem-SR850P-SN001"},
+			{"minimal", "X"},
+		}
+
+		for _, tc := range testCases {
+			uuid := generatePseudoUUID(tc.serial)
+
+			// Verify 8-4-4-4-12 hex format
+			Expect(uuid).To(MatchRegexp(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`),
+				fmt.Sprintf("Invalid UUID format for %s: %s", tc.name, uuid))
+
+			// Verify 99999999 prefix
+			Expect(uuid).To(HavePrefix("99999999-"),
+				fmt.Sprintf("Missing 99999999 prefix for %s: %s", tc.name, uuid))
+
+			// Verify version 3 bit (3rd group)
+			Expect(uuid).To(MatchRegexp(`-3[0-9a-f]{3}-`),
+				fmt.Sprintf("Version 3 bit not set for %s: %s", tc.name, uuid))
+
+			// Verify variant 8 bit (4th group starts with 8, 9, a, or b)
+			Expect(uuid).To(MatchRegexp(`-[89ab][0-9a-f]{3}-`),
+				fmt.Sprintf("Variant bit not set for %s: %s", tc.name, uuid))
+		}
+	})
+
+	It("Should generate deterministic UUIDs", func() {
+		serial := "TEST-SERIAL-12345"
+		uuid1 := generatePseudoUUID(serial)
+		uuid2 := generatePseudoUUID(serial)
+
+		Expect(uuid1).To(Equal(uuid2),
+			"Same serial should always produce same UUID")
+	})
+
+	It("Should generate unique UUIDs for different inputs", func() {
+		serials := []string{"SN001", "SN002", "SN003", "SN004", "SN005"}
+		uuids := make(map[string]bool)
+
+		for _, serial := range serials {
+			uuid := generatePseudoUUID(serial)
+			Expect(uuids[uuid]).To(BeFalse(),
+				fmt.Sprintf("Duplicate UUID generated for serial %s: %s", serial, uuid))
+			uuids[uuid] = true
+		}
+
+		Expect(uuids).To(HaveLen(len(serials)))
+	})
+
+	It("Should handle varying lengths and complexity", func() {
+		testCases := []string{
+			"X",          // minimal
+			"SHORT",      // short
+			"CZ2D1Y0BB3", // medium
+			"LENOVO-SR850P-00012345-ABCDEF-GHIJKL-MNOPQR", // long
+			"!@#$%^&*()-_=+[]{}|;:',.<>?/~`",              // special
+			"混合テスト",                                       // unicode
+			"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // very long
+		}
+
+		for _, serial := range testCases {
+			uuid := generatePseudoUUID(serial)
+			Expect(uuid).To(MatchRegexp(`^99999999-[0-9a-f]{4}-3[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`),
+				fmt.Sprintf("Invalid UUID for complex input: %s", uuid))
+		}
+	})
+})

@@ -83,7 +83,8 @@ type ServerSpec struct {
 	UUID string `json:"uuid,omitempty"`
 
 	// SystemUUID is the unique identifier for the server.
-	// +required
+	// If not provided, it will be derived from the serial
+	// +optional
 	SystemUUID string `json:"systemUUID"`
 
 	// SystemURI is the unique URI for the server resource in REDFISH API.

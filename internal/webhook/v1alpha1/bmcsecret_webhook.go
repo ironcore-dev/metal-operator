@@ -27,6 +27,10 @@ func SetupBMCSecretWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
+// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
+// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
+// +kubebuilder:webhook:path=/validate-metal-ironcore-dev-v1alpha1-bmcsecret,mutating=false,failurePolicy=fail,sideEffects=None,groups=metal.ironcore.dev,resources=bmcsecrets,verbs=create;update;delete,versions=v1alpha1,name=vbmcsecret-v1alpha1.kb.io,admissionReviewVersions=v1
+
 type BMCSecretCustomValidator struct {
 	Client client.Client
 }

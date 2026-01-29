@@ -623,8 +623,8 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 	}
 
 	ownerRef := metav1apply.OwnerReference().
-		WithAPIVersion(bootConfig.APIVersion).
-		WithKind(bootConfig.Kind).
+		WithAPIVersion("metal.ironcore.dev/v1alpha1").
+		WithKind("ServerBootConfiguration").
 		WithName(bootConfig.Name).
 		WithUID(bootConfig.UID).
 		WithController(true).
@@ -653,8 +653,8 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, lo
 	}
 
 	ownerRef = metav1apply.OwnerReference().
-		WithAPIVersion(bootConfig.APIVersion).
-		WithKind(bootConfig.Kind).
+		WithAPIVersion("metal.ironcore.dev/v1alpha1").
+		WithKind("ServerBootConfiguration").
 		WithName(bootConfig.Name).
 		WithUID(bootConfig.UID).
 		WithController(true).

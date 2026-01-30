@@ -33,7 +33,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 		const changedBMCSetting = "changed-bmc-setting"
 
 		BeforeEach(func(ctx SpecContext) {
-
 			By("Creating a BMCSecret")
 			bmcSecret = &metalv1alpha1.BMCSecret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -118,8 +117,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			))
 		})
-		AfterEach(func(ctx SpecContext) {
 
+		AfterEach(func(ctx SpecContext) {
 			By("Ensuring servers are available before deletion (if they exist)")
 			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(server01), server01); err == nil {
 				Eventually(UpdateStatus(server01, func() {
@@ -480,6 +479,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Checking if the bmcSettings was updated")
 			Eventually(Object(bmcSettings01)).Should(HaveField("Spec.Version", Equal("1.45.455b66-rev4")))
 			Eventually(Object(bmcSettings01)).Should(HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "new-bmc-setting")))
+			// Ensure the bmcSettings are in a deletable state
+			Eventually(Object(bmcSettings01)).Should(HaveField("Status.State", Equal(metalv1alpha1.BMCSettingsStateApplied)))
 
 			By("Deleting the BMCSettingsSet")
 			Expect(k8sClient.Delete(ctx, bmcSettingsSet)).To(Succeed())

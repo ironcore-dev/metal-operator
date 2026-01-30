@@ -10,6 +10,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
 var _ = Describe("BMCSecret Webhook", func() {
@@ -31,7 +32,6 @@ var _ = Describe("BMCSecret Webhook", func() {
 				"username": []byte("admin"),
 				"password": []byte("adminpass"),
 			},
-			Immutable: ptr.To(true),
 		}
 		By("Creating an BMCSecret")
 		Expect(k8sClient.Create(ctx, BMCSecret)).To(Succeed())
@@ -40,6 +40,11 @@ var _ = Describe("BMCSecret Webhook", func() {
 
 	Context("When creating or updating BMCSecret under Validating Webhook", func() {
 		It("Should deny Update BMCSecret if Immutable is set to True", func(ctx SpecContext) {
+			By("Setting Immutable to True")
+			Eventually(Update(BMCSecret, func() {
+				BMCSecret.Immutable = ptr.To(true)
+			})).Should(Succeed())
+
 			By("Updating an BMCSecret with Immutable set to True")
 			BMCSecretUpdated := BMCSecret.DeepCopy()
 			BMCSecretUpdated.Data["username"] = []byte("newadmin")

@@ -47,6 +47,8 @@ rules:
   - bmcs
   - bmcsecrets
   - bmcsettings
+  - bmcsettingssets
+  - bmcusers
   - bmcversions
   - bmcversionsets
   - endpoints
@@ -73,6 +75,8 @@ rules:
   - bmcs/finalizers
   - bmcsecrets/finalizers
   - bmcsettings/finalizers
+  - bmcsettingssets/finalizers
+  - bmcusers/finalizers
   - bmcversions/finalizers
   - bmcversionsets/finalizers
   - endpoints/finalizers
@@ -92,6 +96,8 @@ rules:
   - bmcs/status
   - bmcsecrets/status
   - bmcsettings/status
+  - bmcsettingssets/status
+  - bmcusers/status
   - bmcversions/status
   - bmcversionsets/status
   - endpoints/status

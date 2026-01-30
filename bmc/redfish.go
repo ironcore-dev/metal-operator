@@ -5,10 +5,12 @@ package bmc
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"slices"
@@ -181,7 +183,7 @@ func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 			URI:          s.ODataID,
 			Model:        s.Model,
 			Manufacturer: s.Manufacturer,
-			PowerState:   PowerState(s.PowerState),
+			PowerState:   s.PowerState,
 			SerialNumber: s.SerialNumber,
 		})
 	}
@@ -197,11 +199,17 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 	var setBoot redfish.Boot
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
 	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
-	if system.Boot.BootSourceOverrideMode != "" {
+	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
 		setBoot = pxeBootWithSettingUEFIBootMode
 	} else {
 		setBoot = pxeBootWithoutSettingUEFIBootMode
 	}
+
+	// TODO: hack for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
+	if isSuperMicroSystem(system) {
+		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+	}
+
 	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
@@ -209,6 +217,11 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
 	return nil
+}
+
+func isSuperMicroSystem(system *redfish.ComputerSystem) bool {
+	m := strings.TrimSpace(system.Manufacturer)
+	return strings.EqualFold(m, string(ManufacturerSupermicro))
 }
 
 func (r *RedfishBMC) GetManager(bmcUUID string) (*redfish.Manager, error) {
@@ -268,8 +281,7 @@ func (r *RedfishBMC) ResetManager(ctx context.Context, bmcUUID string, resetType
 		return fmt.Errorf("reset type of %v is not supported for manager %v", resetType, manager.UUID)
 	}
 
-	err = manager.Reset(resetType)
-	if err != nil {
+	if err = manager.Reset(resetType); err != nil {
 		return fmt.Errorf("failed to reset managers %v with error: %w", manager.UUID, err)
 	}
 	return nil
@@ -408,16 +420,14 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUR
 		Attributes redfish.SettingsAttributes `json:"Attributes"`
 		Settings   common.Settings            `json:"@Redfish.Settings"`
 	}
-	err = r.GetEntityFromUri(tSys.Bios.String(), system.GetClient(), &tBios)
-	if err != nil {
+	if err = r.GetEntityFromUri(ctx, tSys.Bios.String(), system.GetClient(), &tBios); err != nil {
 		return nil, err
 	}
 
 	var tBiosPendingSetting struct {
 		Attributes redfish.SettingsAttributes `json:"Attributes"`
 	}
-	err = r.GetEntityFromUri(tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosPendingSetting)
-	if err != nil {
+	if err = r.GetEntityFromUri(ctx, tBios.Settings.SettingsObject.String(), system.GetClient(), &tBiosPendingSetting); err != nil {
 		return nil, err
 	}
 
@@ -436,18 +446,24 @@ func (r *RedfishBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUR
 	return tBiosPendingSetting.Attributes, nil
 }
 
-func (r *RedfishBMC) GetEntityFromUri(uri string, client common.Client, entity any) error {
-	Resp, err := client.Get(uri)
-	if err != nil {
-		return err
-	}
-	defer Resp.Body.Close() // nolint: errcheck
+func (r *RedfishBMC) GetEntityFromUri(ctx context.Context, uri string, client common.Client, entity any) error {
+	log := ctrl.LoggerFrom(ctx)
 
-	RespRawBody, err := io.ReadAll(Resp.Body)
+	resp, err := client.Get(uri)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(RespRawBody, &entity)
+	defer func(Body io.ReadCloser) {
+		if err = Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, &entity)
 }
 
 func (r *RedfishBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUUID string) (redfish.SettingsAttributes, error) {
@@ -532,10 +548,10 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool
 	if err != nil {
 		return false, err
 	}
-	return r.checkAttribues(attrs, filtered)
+	return r.checkAttributes(attrs, filtered)
 }
 
-func (r *RedfishBMC) checkAttribues(attrs redfish.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
+func (r *RedfishBMC) checkAttributes(attrs redfish.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
 	//TODO: add more types like maps and Enumerations
@@ -738,6 +754,87 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemURI string) ([]Stora
 	return result, nil
 }
 
+func (r *RedfishBMC) CreateOrUpdateAccount(
+	ctx context.Context, userName,
+	role, password string, enabled bool,
+) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	for _, a := range accounts {
+		if a.UserName == userName {
+			a.RoleID = role
+			a.UserName = userName
+			a.Enabled = enabled
+			if err := a.Update(); err != nil {
+				return fmt.Errorf("failed to update account: %w", err)
+			}
+			if password != "" {
+				if err := a.ChangePassword(password, r.options.Password); err != nil {
+					return fmt.Errorf("failed to change account password: %w", err)
+				}
+			}
+			return nil
+		}
+	}
+	_, err = service.CreateAccount(userName, password, role)
+	if err != nil {
+		return fmt.Errorf("failed to create account: %w", err)
+	}
+	return nil
+}
+
+func (r *RedfishBMC) DeleteAccount(ctx context.Context, userName, id string) error {
+	log := ctrl.LoggerFrom(ctx)
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	for _, a := range accounts {
+		// make sure we delete the correct account
+		if a.UserName == userName && a.ID == id {
+			resp, err := r.client.Delete(a.ODataID)
+			if err != nil {
+				return err
+			}
+			if err = resp.Body.Close(); err != nil {
+				log.Error(err, "failed to close response body")
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("account %s not found", userName)
+}
+
+func (r *RedfishBMC) GetAccountService() (*redfish.AccountService, error) {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account service: %w", err)
+	}
+	return service, nil
+}
+
+func (r *RedfishBMC) GetAccounts() ([]*redfish.ManagerAccount, error) {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounts: %w", err)
+	}
+	return accounts, nil
+}
+
 func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*redfish.ComputerSystem, error) {
 	if len(systemURI) == 0 {
 		return nil, fmt.Errorf("can not process empty URI")
@@ -806,19 +903,23 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 		return "", false, err
 	}
 
-	oem, err := NewOEM(manufacturer, service)
+	oemInterface, err := NewOEMInterface(manufacturer, service)
 	if err != nil {
 		return "", false, err
 	}
 
-	RequestBody := oem.GetUpdateRequestBody(parameters)
+	RequestBody := oemInterface.GetUpdateRequestBody(parameters)
 
 	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
 
 	if err != nil {
 		return "", false, err
 	}
-	defer resp.Body.Close() // nolint: errcheck
+	defer func(Body io.ReadCloser) {
+		if err = Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(resp.Body)
 
 	// any error post this point is fatal, as we can not issue multiple upgrade requests.
 	// expectation is to move to failed state, and manually check the status before retrying
@@ -842,7 +943,7 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 			)
 	}
 
-	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
+	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
 		log.V(1).Error(err,
 			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
@@ -855,11 +956,17 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 }
 
 func (r *RedfishBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error) {
+	log := ctrl.LoggerFrom(ctx)
+
 	respTask, err := r.client.GetService().GetClient().Get(taskURI)
 	if err != nil {
 		return nil, err
 	}
-	defer respTask.Body.Close() // nolint: errcheck
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Error(err, "failed to close body")
+		}
+	}(respTask.Body) // nolint: errcheck
 
 	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
 		respTaskRawBody, err := io.ReadAll(respTask.Body)
@@ -875,12 +982,12 @@ func (r *RedfishBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer string
 				respTask.StatusCode)
 	}
 
-	oem, err := NewOEM(manufacturer, r.client.GetService())
+	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get oem object, %v", err)
+		return nil, fmt.Errorf("failed to get OEM interface object, %v", err)
 	}
 
-	return oem.GetTaskMonitorDetails(ctx, respTask)
+	return oemInterface.GetTaskMonitorDetails(ctx, respTask)
 }
 
 // UpgradeBMCVersion upgrade given BMC version.
@@ -888,7 +995,7 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 	log := ctrl.LoggerFrom(ctx)
 	service := r.client.GetService()
 
-	upgradeServices, err := service.UpdateService()
+	updateService, err := service.UpdateService()
 	if err != nil {
 		return "", false, err
 	}
@@ -905,8 +1012,7 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 		Actions tActions
 	}
 
-	err = json.Unmarshal(upgradeServices.RawData, &tUS)
-	if err != nil {
+	if err = json.Unmarshal(updateService.RawData, &tUS); err != nil {
 		return "", false, err
 	}
 
@@ -917,24 +1023,27 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 		}
 	}
 
-	oem, err := NewOEM(manufacturer, service)
+	oemInterface, err := NewOEMInterface(manufacturer, service)
 	if err != nil {
 		return "", false, err
 	}
 
-	RequestBody := oem.GetUpdateRequestBody(parameters)
+	RequestBody := oemInterface.GetUpdateRequestBody(parameters)
 
-	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
-
+	resp, err := updateService.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
 	if err != nil {
 		return "", false, err
 	}
-	defer resp.Body.Close() // nolint: errcheck
+
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(resp.Body)
 
 	// any error post this point is fatal, as we can not issue multiple upgrade requests.
 	// expectation is to move to failed state, and manually check the status before retrying
-	log.V(1).Info("update has been issued", "Response status code", resp.StatusCode)
-
+	log.V(1).Info("Update has been issued", "ResponseCode", resp.StatusCode)
 	if resp.StatusCode != http.StatusAccepted {
 		bmcRawBody, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -953,7 +1062,7 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 			)
 	}
 
-	taskMonitorURI, err := oem.GetUpdateTaskMonitorURI(resp)
+	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
 		log.V(1).Error(err,
 			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
@@ -961,16 +1070,22 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 	}
 
 	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
-
 	return taskMonitorURI, false, nil
 }
 
 func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error) {
+	log := ctrl.LoggerFrom(ctx)
+
 	respTask, err := r.client.GetService().GetClient().Get(taskURI)
 	if err != nil {
 		return nil, err
 	}
-	defer respTask.Body.Close() // nolint: errcheck
+
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Error(err, "failed to close response body")
+		}
+	}(respTask.Body)
 
 	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
 		respTaskRawBody, err := io.ReadAll(respTask.Body)
@@ -993,12 +1108,115 @@ func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string,
 		}
 	}
 
-	oem, err := NewOEM(manufacturer, r.client.GetService())
+	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get oem object, %v", err)
+		return nil, fmt.Errorf("failed to get OEM interface object, %v", err)
 	}
 
-	return oem.GetTaskMonitorDetails(ctx, respTask)
+	return oemInterface.GetTaskMonitorDetails(ctx, respTask)
+}
+
+const (
+	charLower = "abcdefghijklmnopqrstuvwxyz"
+	charUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	charDigit = "0123456789"
+)
+
+// ManufacturerPasswordConfig holds vendor-specific constraints, including max length and allowed special characters.
+type ManufacturerPasswordConfig struct {
+	SpecialChars string
+}
+
+// Vendor-specific constraints map.
+var manufacturerPasswordConfigs = map[Manufacturer]ManufacturerPasswordConfig{
+	ManufacturerDell: {
+		SpecialChars: "!#$%%&()*.?-@[]^_`{}|~+=",
+	},
+	ManufacturerHPE: {
+		SpecialChars: "~`!@#$%^&*()_-+={[}]|.?/",
+	},
+	ManufacturerLenovo: {
+		SpecialChars: ";@!$%-+=[]{}|/?~_",
+	},
+	"default": {
+		SpecialChars: "!@#$%&*()_-+=[]{}/?~|",
+	},
+}
+
+// GenerateSecurePassword generates a secure password for BMC accounts based on vendor-specific requirements.
+func GenerateSecurePassword(manufacturer Manufacturer, length int) (string, error) {
+	config, ok := manufacturerPasswordConfigs[manufacturer]
+	if !ok {
+		config = manufacturerPasswordConfigs["default"]
+	}
+
+	// Define the total character pool using the vendor-specific special characters.
+	allChars := charLower + charUpper + charDigit + config.SpecialChars
+
+	// Ensure the special character set is not empty (it shouldn't be with the defined constants)
+	if len(config.SpecialChars) == 0 {
+		return "", fmt.Errorf("vendor %s has an empty special character set, complexity cannot be guaranteed", manufacturer)
+	}
+
+	// Ensure minimum complexity (at least one of each type).
+	mustInclude := []string{charLower, charUpper, charDigit, config.SpecialChars}
+	if length < len(mustInclude) {
+		return "", fmt.Errorf("password length must be at least %d to meet complexity requirements", len(mustInclude))
+	}
+
+	passwordRunes := make([]rune, length)
+	currentIdx := 0
+
+	// A. Add mandatory characters (one from each group).
+	for i, charSet := range mustInclude {
+		if len(charSet) == 0 {
+			return "", fmt.Errorf("character set %d is empty, cannot generate secure password", i)
+		}
+		char, err := randomChar(charSet)
+		if err != nil {
+			return "", err
+		}
+		passwordRunes[currentIdx] = char
+		currentIdx++
+	}
+
+	// B. Fill the remainder randomly.
+	remainingLength := length - len(mustInclude)
+	for i := 0; i < remainingLength; i++ {
+		char, err := randomChar(allChars)
+		if err != nil {
+			return "", err
+		}
+		passwordRunes[currentIdx] = char
+		currentIdx++
+	}
+
+	// C. Shuffle to randomize positions.
+	if err := shuffleRunes(passwordRunes); err != nil {
+		return "", err
+	}
+
+	return string(passwordRunes), nil
+}
+
+func randomChar(charSet string) (rune, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charSet))))
+	if err != nil {
+		return 0, err
+	}
+	return rune(charSet[n.Int64()]), nil
+}
+
+func shuffleRunes(a []rune) error {
+	for i := len(a) - 1; i > 0; i-- {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return err
+		}
+		j := n.Int64()
+		a[i], a[j] = a[j], a[i]
+	}
+	return nil
 }
 
 type subscriptionPayload struct {

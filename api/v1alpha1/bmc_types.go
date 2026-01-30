@@ -163,6 +163,8 @@ const (
 	// PoweringOffPowerState A temporary state between On and Off. The power
 	// off action can take time while the OS is in the shutdown process.
 	PoweringOffPowerState BMCPowerState = "PoweringOff"
+	// UnknownPowerState indicates that power state is unknown for this BMC.
+	UnknownPowerState BMCPowerState = "Unknown"
 )
 
 // BMCStatus defines the observed state of BMC.

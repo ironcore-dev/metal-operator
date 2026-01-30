@@ -19,17 +19,10 @@ import (
 type Manufacturer string
 
 const (
-	ManufacturerDell   Manufacturer = "Dell Inc."
-	ManufacturerLenovo Manufacturer = "Lenovo"
-	ManufacturerHPE    Manufacturer = "HPE"
-)
-
-type SettingAttributeValueTypes string
-
-const (
-	TypeInteger      SettingAttributeValueTypes = "integer"
-	TypeString       SettingAttributeValueTypes = "string"
-	TypeEnumerations SettingAttributeValueTypes = "enumeration"
+	ManufacturerDell       Manufacturer = "Dell Inc."
+	ManufacturerLenovo     Manufacturer = "Lenovo"
+	ManufacturerHPE        Manufacturer = "HPE"
+	ManufacturerSupermicro Manufacturer = "Supermicro"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -126,6 +119,18 @@ type BMC interface {
 
 	// DeleteEventSubscription deletes an event subscription for the manager.
 	DeleteEventSubscription(ctx context.Context, uri string) error
+
+	// CreateOrUpdateAccount creates or updates a BMC user account.
+	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
+
+	// DeleteAccount deletes a BMC user account.
+	DeleteAccount(ctx context.Context, userName, id string) error
+
+	// GetAccounts retrieves all BMC user accounts.
+	GetAccounts() ([]*redfish.ManagerAccount, error)
+
+	// GetAccountService retrieves the account service.
+	GetAccountService() (*redfish.AccountService, error)
 }
 
 type Entity struct {
@@ -190,7 +195,7 @@ type Server struct {
 	URI          string
 	Model        string
 	Manufacturer string
-	PowerState   PowerState
+	PowerState   redfish.PowerState
 	SerialNumber string
 }
 
@@ -234,25 +239,6 @@ type Storage struct {
 	// Volumes is a collection of volumes associated with this storage.
 	Volumes []Volume `json:"volumes,omitempty"`
 }
-
-// PowerState is the power state of the system.
-type PowerState string
-
-const (
-	// OnPowerState the system is powered on.
-	OnPowerState PowerState = "On"
-	// OffPowerState the system is powered off, although some components may
-	// continue to have AUX power such as management controller.
-	OffPowerState PowerState = "Off"
-	// PausedPowerState the system is paused.
-	PausedPowerState PowerState = "Paused"
-	// PoweringOnPowerState A temporary state between Off and On. This
-	// temporary state can be very short.
-	PoweringOnPowerState PowerState = "PoweringOn"
-	// PoweringOffPowerState A temporary state between On and Off. The power
-	// off action can take time while the OS is in the shutdown process.
-	PoweringOffPowerState PowerState = "PoweringOff"
-)
 
 // Processor represents a processor in the system.
 type Processor struct {
@@ -305,32 +291,32 @@ type Manager struct {
 	OemLinks        json.RawMessage
 }
 
-func NewOEMManager(ooem *redfish.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
+func NewOEMManager(manager *redfish.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
 	var OEMManager oem.ManagerInterface
-	switch ooem.Manufacturer {
+	switch manager.Manufacturer {
 	case string(ManufacturerDell):
 		OEMManager = &oem.DellIdracManager{
-			BMC:     ooem,
+			BMC:     manager,
 			Service: service,
 		}
 	case string(ManufacturerHPE):
 		OEMManager = &oem.HPEILOManager{
-			BMC:     ooem,
+			BMC:     manager,
 			Service: service,
 		}
 	case string(ManufacturerLenovo):
 		OEMManager = &oem.LenovoXCCManager{
-			BMC:     ooem,
+			BMC:     manager,
 			Service: service,
 		}
 	default:
-		return nil, fmt.Errorf("unsupported manufacturer: %v", ooem.Manufacturer)
+		return nil, fmt.Errorf("unsupported manufacturer: %v", manager.Manufacturer)
 	}
 	return OEMManager, nil
 }
 
-func NewOEM(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
-	var oemintf oem.OEMInterface
+func NewOEMInterface(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
+	var oemInterface oem.OEMInterface
 	switch manufacturer {
 	case string(ManufacturerDell):
 		return &oem.Dell{
@@ -345,6 +331,6 @@ func NewOEM(manufacturer string, service *gofish.Service) (oem.OEMInterface, err
 			Service: service,
 		}, nil
 	default:
-		return oemintf, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
+		return oemInterface, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
 	}
 }

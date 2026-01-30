@@ -80,20 +80,20 @@ var _ = Describe("Endpoints Controller", func() {
 				Port: 22,
 			})))
 
+		// we wait for the server to be created so that it can deleted in the cleanup
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Eventually(Get(server)).Should(Succeed())
+
 		By("Removing the endpoint")
 		Expect(k8sClient.Delete(ctx, endpoint)).To(Succeed())
 
 		By("Ensuring that all subsequent objects have been removed")
 		Eventually(Get(endpoint)).Should(Satisfy(apierrors.IsNotFound))
 
-		// cleanup
-		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
-			},
-		}
-		// we wait for the server to be created first and the then deleted
-		Eventually(Get(server)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())

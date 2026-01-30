@@ -28,9 +28,9 @@ REDFISH_CONTAINER_NAME=redfish_mockup_server
 REDFISH_CONTAINER_VERSION=latest
 
 # Use the most portable option for core detection
-NPROCS := $(shell getconf _NPROCESSORS_ONLN)
+# NPROCS := $(shell getconf _NPROCESSORS_ONLN)
 # Add a fallback just in case the command fails
-NPROCS ?= 4
+NPROCS ?= 1
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.

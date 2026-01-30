@@ -43,6 +43,12 @@ spec:
     name: my-ignition-secret
 ```
 
+## Boot Policies
+
+- `bootPolicy: NetworkBootOnce` (default): The controller configures a one-time PXE boot when the server is restarted.
+- `bootPolicy: NetworkBootAlways`: The controller always refreshes the PXE boot configuration during reconciliation, ensuring every power cycle uses network boot.
+- `bootPolicy: None`: The controller does not configure PXE boot, preserving the existing boot configuration during power operations.
+
 ## Reconciliation Process
 
 - [`ServerBootConfiguration`](serverbootconfigurations.md):

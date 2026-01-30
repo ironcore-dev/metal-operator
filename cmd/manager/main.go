@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
@@ -92,6 +93,8 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
+		firstBootConditionsRaw             string
+		firstBootConditions                []string
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -150,6 +153,8 @@ func main() { // nolint: gocyclo
 		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
+	flag.StringVar(&firstBootConditionsRaw, "first-boot-conditions", "IgnitionDataFetched,IPXEScriptFetched",
+		"Comma-separated list of ServerBootConfiguration condition types that indicate first boot completion.")
 
 	opts := zap.Options{
 		Development: true,
@@ -158,6 +163,8 @@ func main() { // nolint: gocyclo
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	firstBootConditions = splitAndTrimList(firstBootConditionsRaw)
 
 	if probeOSImage == "" {
 		setupLog.Error(nil, "probe OS image must be set")
@@ -368,6 +375,7 @@ func main() { // nolint: gocyclo
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		FirstBootConditions:     firstBootConditions,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -598,4 +606,21 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func splitAndTrimList(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
 }

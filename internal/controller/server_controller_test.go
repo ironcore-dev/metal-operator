@@ -795,6 +795,77 @@ var _ = Describe("Server Controller", func() {
 	})
 })
 
+var _ = Describe("shouldPXEBootServer", func() {
+	var claim *metalv1alpha1.ServerClaim
+	var bootConfig *metalv1alpha1.ServerBootConfiguration
+	var firstBootConditions []string
+
+	BeforeEach(func() {
+		claim = &metalv1alpha1.ServerClaim{
+			Spec: metalv1alpha1.ServerClaimSpec{
+				BootPolicy: metalv1alpha1.BootPolicyNetworkBootOnce,
+			},
+		}
+		bootConfig = &metalv1alpha1.ServerBootConfiguration{}
+		firstBootConditions = []string{"IgnitionDataFetched", "IPXEScriptFetched"}
+	})
+
+	It("returns true for NetworkBootAlways regardless of boot config conditions", func() {
+		claim.Spec.BootPolicy = metalv1alpha1.BootPolicyNetworkBootAlways
+		Expect(shouldPXEBootServer(claim, bootConfig, firstBootConditions)).To(BeTrue())
+	})
+
+	It("returns false for NetworkBootOnce when a first-boot condition is true", func() {
+		bootConfig.Status.Conditions = []metav1.Condition{
+			{
+				Type:   "IPXEScriptFetched",
+				Status: metav1.ConditionTrue,
+			},
+		}
+		Expect(shouldPXEBootServer(claim, bootConfig, firstBootConditions)).To(BeFalse())
+	})
+
+	It("treats an empty BootPolicy as NetworkBootOnce", func() {
+		claim.Spec.BootPolicy = ""
+		bootConfig.Status.Conditions = []metav1.Condition{
+			{
+				Type:   "IgnitionDataFetched",
+				Status: metav1.ConditionTrue,
+			},
+		}
+		Expect(shouldPXEBootServer(claim, bootConfig, firstBootConditions)).To(BeFalse())
+	})
+
+	It("returns true for NetworkBootOnce when no first-boot conditions match", func() {
+		bootConfig.Status.Conditions = []metav1.Condition{
+			{
+				Type:   "FooBarFetched",
+				Status: metav1.ConditionTrue,
+			},
+		}
+		Expect(shouldPXEBootServer(claim, bootConfig, firstBootConditions)).To(BeTrue())
+	})
+
+	It("returns true for NetworkBootOnce when first-boot conditions are not true", func() {
+		bootConfig.Status.Conditions = []metav1.Condition{
+			{
+				Type:   "IPXEScriptFetched",
+				Status: metav1.ConditionFalse,
+			},
+		}
+		Expect(shouldPXEBootServer(claim, bootConfig, firstBootConditions)).To(BeTrue())
+	})
+
+	It("returns true for NetworkBootOnce when no boot config is provided", func() {
+		Expect(shouldPXEBootServer(claim, nil, firstBootConditions)).To(BeTrue())
+	})
+
+	It("returns false for BootPolicyNone", func() {
+		claim.Spec.BootPolicy = metalv1alpha1.BootPolicyNone
+		Expect(shouldPXEBootServer(claim, bootConfig, firstBootConditions)).To(BeFalse())
+	})
+})
+
 func deleteRegistrySystemIfExists(systemUUID string) {
 	response, err := http.Get(registryURL + "/systems/" + systemUUID)
 	if err != nil {

@@ -146,6 +146,8 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			if mv.MetricValue == "Up" || mv.MetricValue == "Operational" {
 				floatVal = 1
+			} else {
+				s.log.Info("failed to parse metric value, setting to 0", "metricID", mv.MetricId, "value", mv.MetricValue)
 			}
 		}
 		collector := metricsReportCollectors[mv.MetricId]
@@ -161,9 +163,6 @@ func (s *Server) Start(ctx context.Context) error {
 	s.log.Info("Starting registry server", "address", s.addr)
 	server := &http.Server{Addr: s.addr, Handler: s.mux}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	errChan := make(chan error, 1)
 	go func() {
 		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
@@ -173,12 +172,16 @@ func (s *Server) Start(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		s.log.Info("Shutting down registry server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("HTTP server Shutdown: %w", err)
 		}
 		s.log.Info("Registry server graciously stopped")
 		return nil
 	case err := <-errChan:
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
 			s.log.Error(shutdownErr, "Error shutting down registry server")
 		}

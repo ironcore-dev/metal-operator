@@ -1265,6 +1265,12 @@ func (r *RedfishBMC) CreateEventSubscription(
 	if err != nil {
 		return "", err
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+	}
 	// return subscription link from returned location
 	subscriptionLink := resp.Header.Get("Location")
 	urlParser, err := url.ParseRequestURI(subscriptionLink)

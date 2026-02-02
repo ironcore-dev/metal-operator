@@ -137,6 +137,9 @@ type ServerSpec struct {
 	// the BIOS configuration for this server.
 	// +optional
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
+
+	// +optional
+	CleanPolicy *CleanPolicy `json:"cleanPolicy,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -160,6 +163,9 @@ const (
 
 	// ServerStateMaintenance indicates that the server is in maintenance.
 	ServerStateMaintenance ServerState = "Maintenance"
+
+	// ServerStateCleaning indicates that the server is undergoing a cleaning process.
+	ServerStateCleaning ServerState = "Cleaning"
 )
 
 // IndicatorLED represents LED indicator states
@@ -237,6 +243,14 @@ type ServerStatus struct {
 	// Storages is a list of storages associated with the server.
 	// +optional
 	Storages []Storage `json:"storages,omitempty"`
+
+	// ActiveTask tracks an ongoing Redfish asynchronous operation
+	// +optional
+	ActiveTask *ActiveTask `json:"activeTask,omitempty"`
+
+	// CleanHistory records the history of cleaning steps performed on the server.
+	// +optional
+	CleanHistory []CleanHistory `json:"cleanHistory,omitempty"`
 
 	// Conditions represents the latest available observations of the server's current state.
 	// +patchStrategy=merge
@@ -408,6 +422,45 @@ type Storage struct {
 	// Drives is a collection of drives associated with this storage.
 	// +optional
 	Drives []StorageDrive `json:"drives,omitempty"`
+}
+
+type CleanPolicy struct {
+	// StopOnError determines if the cleaning sequence should halt if a step fails
+	// +optional
+	StopOnError bool `json:"stopOnError,omitempty"`
+
+	// Steps is the ordered list of cleaning operations to perform
+	Steps []CleanStep `json:"steps"`
+}
+
+type CleanStepName string
+
+const (
+	StepSecureEraseDisks CleanStepName = "SecureEraseDisks"
+	StepResetBios        CleanStepName = "ResetBios"
+	StepClearEventLogs   CleanStepName = "ClearEventLogs"
+)
+
+type CleanStep struct {
+	// +kubebuilder:validation:Enum=SecureEraseDisks;ResetBios;ClearEventLogs;FirmwareUpdate
+	Name CleanStepName `json:"name"`
+
+	// Parameters provides key-value pairs for specific tool configurations
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+type CleanHistory struct {
+	Step        CleanStepName `json:"step"`
+	CompletedAt *metav1.Time  `json:"completedAt"`
+	// +kubebuilder:validation:Enum=Succeeded;Failed
+	Result string `json:"result"`
+}
+
+type ActiveTask struct {
+	TaskURI   string        `json:"taskUri"`
+	StepName  CleanStepName `json:"stepName"`
+	StartTime *metav1.Time  `json:"startTime,omitempty"`
 }
 
 //+kubebuilder:object:root=true

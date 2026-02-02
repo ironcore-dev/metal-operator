@@ -210,6 +210,37 @@ spec:
                   - priority
                   type: object
                 type: array
+              cleanPolicy:
+                properties:
+                  steps:
+                    description: Steps is the ordered list of cleaning operations
+                      to perform
+                    items:
+                      properties:
+                        name:
+                          enum:
+                          - SecureEraseDisks
+                          - ResetBios
+                          - ClearEventLogs
+                          - FirmwareUpdate
+                          type: string
+                        parameters:
+                          additionalProperties:
+                            type: string
+                          description: Parameters provides key-value pairs for specific
+                            tool configurations
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  stopOnError:
+                    description: StopOnError determines if the cleaning sequence should
+                      halt if a step fails
+                    type: boolean
+                required:
+                - steps
+                type: object
               indicatorLED:
                 description: IndicatorLED specifies the desired state of the server's
                   indicator LED.
@@ -318,9 +349,44 @@ spec:
           status:
             description: ServerStatus defines the observed state of Server.
             properties:
+              activeTask:
+                description: ActiveTask tracks an ongoing Redfish asynchronous operation
+                properties:
+                  startTime:
+                    format: date-time
+                    type: string
+                  stepName:
+                    type: string
+                  taskUri:
+                    type: string
+                required:
+                - stepName
+                - taskUri
+                type: object
               biosVersion:
                 description: BIOSVersion is the version of the server's BIOS.
                 type: string
+              cleanHistory:
+                description: CleanHistory records the history of cleaning steps performed
+                  on the server.
+                items:
+                  properties:
+                    completedAt:
+                      format: date-time
+                      type: string
+                    result:
+                      enum:
+                      - Succeeded
+                      - Failed
+                      type: string
+                    step:
+                      type: string
+                  required:
+                  - completedAt
+                  - result
+                  - step
+                  type: object
+                type: array
               conditions:
                 description: Conditions represents the latest available observations
                   of the server's current state.

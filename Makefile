@@ -80,8 +80,9 @@ vet: ## Run go vet against code.
 check-gen: generate manifests docs helm fmt ## Run code generation, manifests generation, documentation generation, helm plugin setup, and formatting checks.
 
 .PHONY: test-only
-test-only: setup-envtest ## Run tests without generating manifests or code.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -p $(NPROCS) $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+test-only: setup-envtest ginkgo ## Run tests without generating manifests or code.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	$(GINKGO) --fail-fast --cover --coverprofile=cover.out --skip-package=e2e ./...
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest test-only ## Run tests.
@@ -268,6 +269,7 @@ KUBEBUILDER ?= $(LOCALBIN)/kubebuilder
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
 METALCTL ?= $(LOCALBIN)/metalctl
+GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.5.0
@@ -281,6 +283,12 @@ GOIMPORTS_VERSION ?= v0.38.0
 CRD_REF_DOCS_VERSION ?= v0.2.0
 KUBEBUILDER_VERSION ?= v4.10.1
 ADDLICENSE_VERSION ?= v1.1.1
+GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
+
+.PHONY: ginkgo
+ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.
+$(GINKGO): $(LOCALBIN)
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
 
 .PHONY: addlicense
 addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.

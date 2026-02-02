@@ -12,6 +12,11 @@ import (
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.serverRef) || has(self.serverRef)", message="serverRef is required once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.serverSelector) || has(self.serverSelector)", message="serverSelector is required once set"
 type ServerClaimSpec struct {
+	// BootPolicy specifies how the server should be configured to boot from the network.
+	// +kubebuilder:validation:Enum=None;NetworkBootOnce;NetworkBootAlways
+	// +kubebuilder:default=NetworkBootOnce
+	BootPolicy BootPolicy `json:"bootPolicy,omitempty"`
+
 	// Power specifies the desired power state of the server.
 	// +required
 	Power Power `json:"power"`
@@ -39,6 +44,18 @@ type ServerClaimSpec struct {
 	// +required
 	Image string `json:"image"`
 }
+
+// BootPolicy defines the boot behavior for a server claimed by a ServerClaim.
+type BootPolicy string
+
+const (
+	// BootPolicyNone indicates that no network boot should be configured when reconciling the server claim.
+	BootPolicyNone BootPolicy = "None"
+	// BootPolicyNetworkBootOnce configures the server to boot from the network once on the next power cycle.
+	BootPolicyNetworkBootOnce BootPolicy = "NetworkBootOnce"
+	// BootPolicyNetworkBootAlways configures the server to set PXE boot on every reconciliation.
+	BootPolicyNetworkBootAlways BootPolicy = "NetworkBootAlways"
+)
 
 // Phase defines the possible phases of a ServerClaim.
 type Phase string

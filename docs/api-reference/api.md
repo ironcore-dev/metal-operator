@@ -30,6 +30,24 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 
 
 
+#### ActiveTask
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerStatus](#serverstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `taskUri` _string_ |  |  |  |
+| `stepName` _[CleanStepName](#cleanstepname)_ |  |  |  |
+| `startTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ |  |  |  |
+
+
 #### BIOSSettings
 
 
@@ -904,6 +922,78 @@ _Appears in:_
 | `device` _string_ | Device is the device to boot from. |  |  |
 
 
+#### CleanHistory
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerStatus](#serverstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `step` _[CleanStepName](#cleanstepname)_ |  |  |  |
+| `completedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ |  |  |  |
+| `result` _string_ |  |  | Enum: [Succeeded Failed] <br /> |
+
+
+#### CleanPolicy
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerSpec](#serverspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `stopOnError` _boolean_ | StopOnError determines if the cleaning sequence should halt if a step fails |  |  |
+| `steps` _[CleanStep](#cleanstep) array_ | Steps is the ordered list of cleaning operations to perform |  |  |
+
+
+#### CleanStep
+
+
+
+
+
+
+
+_Appears in:_
+- [CleanPolicy](#cleanpolicy)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _[CleanStepName](#cleanstepname)_ |  |  | Enum: [SecureEraseDisks ResetBios ClearEventLogs FirmwareUpdate] <br /> |
+| `parameters` _object (keys:string, values:string)_ | Parameters provides key-value pairs for specific tool configurations |  |  |
+
+
+#### CleanStepName
+
+_Underlying type:_ _string_
+
+
+
+
+
+_Appears in:_
+- [ActiveTask](#activetask)
+- [CleanHistory](#cleanhistory)
+- [CleanStep](#cleanstep)
+
+| Field | Description |
+| --- | --- |
+| `SecureEraseDisks` |  |
+| `ResetBios` |  |
+| `ClearEventLogs` |  |
+
+
 #### ConsoleProtocol
 
 
@@ -1568,6 +1658,7 @@ _Appears in:_
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. This field is optional and can be omitted |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
+| `cleanPolicy` _[CleanPolicy](#cleanpolicy)_ |  |  |  |
 
 
 #### ServerState
@@ -1589,6 +1680,7 @@ _Appears in:_
 | `Reserved` | ServerStateReserved indicates that the server is reserved for a specific use or user.<br /> |
 | `Error` | ServerStateError indicates that there is an error with the server.<br /> |
 | `Maintenance` | ServerStateMaintenance indicates that the server is in maintenance.<br /> |
+| `Cleaning` | ServerStateCleaning indicates that the server is undergoing a cleaning process.<br /> |
 
 
 #### ServerStatus
@@ -1616,6 +1708,8 @@ _Appears in:_
 | `totalSystemMemory` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#quantity-resource-api)_ | TotalSystemMemory is the total amount of memory in bytes available on the server. |  |  |
 | `processors` _[Processor](#processor) array_ | Processors is a list of Processors associated with the server. |  |  |
 | `storages` _[Storage](#storage) array_ | Storages is a list of storages associated with the server. |  |  |
+| `activeTask` _[ActiveTask](#activetask)_ | ActiveTask tracks an ongoing Redfish asynchronous operation |  |  |
+| `cleanHistory` _[CleanHistory](#cleanhistory) array_ | CleanHistory records the history of cleaning steps performed on the server. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the server's current state. |  |  |
 
 

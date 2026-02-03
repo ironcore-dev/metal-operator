@@ -15,8 +15,8 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -576,7 +576,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	completedCondition *metav1.Condition,
 ) (bool, error) {
 	taskURI := biosVersion.Status.UpgradeTask.URI
-	taskCurrentStatus, err := func() (*redfish.Task, error) {
+	taskCurrentStatus, err := func() (*schemas.Task, error) {
 		if taskURI == "" {
 			return nil, fmt.Errorf("invalid task URI. uri provided: '%v'", taskURI)
 		}
@@ -591,7 +591,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		URI:             biosVersion.Status.UpgradeTask.URI,
 		State:           taskCurrentStatus.TaskState,
 		Status:          taskCurrentStatus.TaskStatus,
-		PercentComplete: int32(taskCurrentStatus.PercentComplete),
+		PercentComplete: int32(gofish.Deref(taskCurrentStatus.PercentComplete)),
 	}
 
 	// use checkpoint in case the job has stalled and we need to requeue
@@ -605,10 +605,10 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		return false, fmt.Errorf("failed to create checkpoint for Condition. %w", err)
 	}
 
-	if taskCurrentStatus.TaskState == redfish.KilledTaskState ||
-		taskCurrentStatus.TaskState == redfish.ExceptionTaskState ||
-		taskCurrentStatus.TaskState == redfish.CancelledTaskState ||
-		(taskCurrentStatus.TaskStatus != common.OKHealth && taskCurrentStatus.TaskStatus != "") {
+	if taskCurrentStatus.TaskState == schemas.KilledTaskState ||
+		taskCurrentStatus.TaskState == schemas.ExceptionTaskState ||
+		taskCurrentStatus.TaskState == schemas.CancelledTaskState ||
+		(taskCurrentStatus.TaskStatus != schemas.OKHealth && taskCurrentStatus.TaskStatus != "") {
 		message := fmt.Sprintf(
 			"Upgrade Bios task has failed. with message %v check '%v' for details",
 			taskCurrentStatus.Messages,
@@ -626,7 +626,7 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		return false, r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateFailed, upgradeCurrentTaskStatus, completedCondition)
 	}
 
-	if taskCurrentStatus.TaskState == redfish.CompletedTaskState {
+	if taskCurrentStatus.TaskState == schemas.CompletedTaskState {
 		if err := r.Conditions.Update(
 			completedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
@@ -686,12 +686,12 @@ func (r *BIOSVersionReconciler) upgradeBIOSVersion(
 		forceUpdate = true
 	}
 
-	parameters := &redfish.SimpleUpdateParameters{
+	parameters := &schemas.UpdateServiceSimpleUpdateParameters{
 		ForceUpdate:      forceUpdate,
 		ImageURI:         biosVersion.Spec.Image.URI,
-		Passord:          password,
+		Password:         password,
 		Username:         username,
-		TransferProtocol: redfish.TransferProtocolType(biosVersion.Spec.Image.TransferProtocol),
+		TransferProtocol: schemas.TransferProtocolType(biosVersion.Spec.Image.TransferProtocol),
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {

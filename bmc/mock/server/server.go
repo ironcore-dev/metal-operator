@@ -365,7 +365,7 @@ func handleSystemReset(s *MockServer, r *http.Request, urlPath string, body []by
 		s.mu.Unlock()
 		s.log.Info("System resource is locked, cannot perform reset", base)
 		go func() {
-			// unlock after waiting period incase of stuck lock
+			// unlock after waiting period in case of stuck lock
 			time.Sleep(300 * time.Millisecond)
 			delete(base, ResourceLockKey)
 		}()

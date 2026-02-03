@@ -216,8 +216,8 @@ func CreateBMCClient(
 	return bmcClient, nil
 }
 
-func GetServerNameFromBMCandIndex(index int, bmc *metalv1alpha1.BMC) string {
-	return fmt.Sprintf("%s-%s-%d", bmc.Name, "system", index)
+func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
+	return fmt.Sprintf("%s-%s-%d", bmcObj.Name, "system", index)
 }
 
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
@@ -241,15 +241,15 @@ func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password strin
 	default:
 		return fmt.Errorf("unsupported BMC manufacturer %s for bmc reset", manufacturer)
 	}
-	client, err := ssh.Dial("tcp", net.JoinHostPort(ip, "22"), config)
+	sshClient, err := ssh.Dial("tcp", net.JoinHostPort(ip, "22"), config)
 	if err != nil {
 		return fmt.Errorf("failed to dial ssh: %w", err)
 	}
 	defer func() {
-		_ = client.Close()
+		_ = sshClient.Close()
 	}()
 
-	session, err := client.NewSession()
+	session, err := sshClient.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create ssh session: %w", err)
 	}

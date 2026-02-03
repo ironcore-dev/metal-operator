@@ -39,7 +39,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -50,7 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(metalv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() { // nolint: gocyclo
@@ -337,6 +337,13 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "unable to create controller", "controller", "BMCSecret")
 		os.Exit(1)
 	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhookmetalv1alpha1.SetupBMCSecretWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "BMCSecret")
+			os.Exit(1)
+		}
+	}
 	if err = (&controller.BMCReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
@@ -562,7 +569,7 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "unable to create controller", "controller", "User")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

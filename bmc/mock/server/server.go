@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"path"
 	"slices"
@@ -395,9 +396,7 @@ func (s *MockServer) applyBiosSettings(urlPath string, update map[string]any) er
 	}
 
 	if biosAttrs, ok := biosBase[attributesKey].(map[string]any); ok {
-		for key, val := range immediate {
-			biosAttrs[key] = val
-		}
+		maps.Copy(biosAttrs, immediate)
 	}
 	s.overrides[biosPath] = biosBase
 
@@ -432,9 +431,7 @@ func (s *MockServer) applyPendingBiosSettings(basePath string) error {
 	}
 
 	// Apply pending settings to current.
-	for key, val := range pendingAttrs {
-		currentAttrs[key] = val
-	}
+	maps.Copy(currentAttrs, pendingAttrs)
 
 	// Clear pending settings.
 	pending[attributesKey] = map[string]any{}

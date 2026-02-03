@@ -410,19 +410,19 @@ type Storage struct {
 	Drives []StorageDrive `json:"drives,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
-//+kubebuilder:printcolumn:name="SystemUUID",type=string,JSONPath=`.spec.systemUUID`
-//+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
-//+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
-//+kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
-//+kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
-//+kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
-//+kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`
-//+kubebuilder:printcolumn:name="IndicatorLED",type=string,JSONPath=`.status.indicatorLED`,priority=100
-//+kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
-//+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="SystemUUID",type=string,JSONPath=`.spec.systemUUID`
+// +kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
+// +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+// +kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
+// +kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
+// +kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
+// +kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`
+// +kubebuilder:printcolumn:name="IndicatorLED",type=string,JSONPath=`.status.indicatorLED`,priority=100
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // Server is the Schema for the servers API
 type Server struct {
@@ -433,7 +433,7 @@ type Server struct {
 	Status ServerStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServerList contains a list of Server
 type ServerList struct {

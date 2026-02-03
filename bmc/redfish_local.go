@@ -159,7 +159,7 @@ func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, UUID 
 			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
 				attrData["value"] = value
 			} else {
-				UnitTestMockUps.PendingBMCSetting[key] = map[string]interface{}{
+				UnitTestMockUps.PendingBMCSetting[key] = map[string]any{
 					"type":   attrData["type"],
 					"reboot": attrData["reboot"],
 					"value":  value,

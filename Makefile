@@ -125,7 +125,7 @@ stopbmc: ## Stop BMC emulator
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) run --max-same-issues=0
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
@@ -163,11 +163,11 @@ docs: crd-ref-docs ## Run go generate to generate API reference documentation.
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/manager/main.go
+	go build -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/manager/main.go
+	go run ./cmd/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -272,8 +272,9 @@ METALCTL ?= $(LOCALBIN)/metalctl
 GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.5.0
+KUSTOMIZE_VERSION ?= v5.7.1
 CONTROLLER_TOOLS_VERSION ?= v0.20.0
+
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
@@ -281,7 +282,7 @@ ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -
 GOLANGCI_LINT_VERSION ?= v2.8
 GOIMPORTS_VERSION ?= v0.38.0
 CRD_REF_DOCS_VERSION ?= v0.2.0
-KUBEBUILDER_VERSION ?= v4.10.1
+KUBEBUILDER_VERSION ?= v4.11.1
 ADDLICENSE_VERSION ?= v1.1.1
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 

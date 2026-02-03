@@ -97,15 +97,15 @@ type ServerReconciler struct {
 	Conditions              *conditionutils.Accessor
 }
 
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/finalizers,verbs=update
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverconfigurations,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverconfigurations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -442,7 +442,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 		return false, fmt.Errorf("failed to get ServerClaim: %w", err)
 	}
 
-	//TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
+	// TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
 		if err := r.pxeBootServer(ctx, log, bmcClient, server); err != nil {
 			return false, fmt.Errorf("failed to boot server: %w", err)

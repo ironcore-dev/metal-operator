@@ -74,7 +74,7 @@ func (i IP) MarshalJSON() ([]byte, error) {
 	return json.Marshal(i.String())
 }
 
-func (i IP) ToUnstructured() interface{} {
+func (i IP) ToUnstructured() any {
 	if i.IsZero() {
 		return nil
 	}
@@ -185,7 +185,7 @@ func (i IPPrefix) MarshalJSON() ([]byte, error) {
 	return json.Marshal(i.String())
 }
 
-func (i IPPrefix) ToUnstructured() interface{} {
+func (i IPPrefix) ToUnstructured() any {
 	if i.IsZero() {
 		return nil
 	}

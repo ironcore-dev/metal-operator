@@ -50,13 +50,13 @@ type ServerBootConfigurationStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
-//+kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.spec.image`
-//+kubebuilder:printcolumn:name="IgnitionRef",type=string,JSONPath=`.spec.ignitionSecretRef.name`
-//+kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
-//+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
+// +kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.spec.image`
+// +kubebuilder:printcolumn:name="IgnitionRef",type=string,JSONPath=`.spec.ignitionSecretRef.name`
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // ServerBootConfiguration is the Schema for the serverbootconfigurations API
 type ServerBootConfiguration struct {
@@ -67,7 +67,7 @@ type ServerBootConfiguration struct {
 	Status ServerBootConfigurationStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServerBootConfigurationList contains a list of ServerBootConfiguration
 type ServerBootConfigurationList struct {

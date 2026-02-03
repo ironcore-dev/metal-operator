@@ -735,7 +735,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
 	bmcClient bmc.BMC,
-	bmc *metalv1alpha1.BMC,
+	bmcObj *metalv1alpha1.BMC,
 	bmcUpgradeTaskUri string,
 	completedCondition *metav1.Condition,
 ) (ctrl.Result, error) {
@@ -743,7 +743,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		if bmcUpgradeTaskUri == "" {
 			return nil, fmt.Errorf("invalid task URI. uri provided: '%v'", bmcUpgradeTaskUri)
 		}
-		return bmcClient.GetBMCUpgradeTask(ctx, bmc.Status.Manufacturer, bmcUpgradeTaskUri)
+		return bmcClient.GetBMCUpgradeTask(ctx, bmcObj.Status.Manufacturer, bmcUpgradeTaskUri)
 	}()
 	if err != nil {
 		log.V(1).Error(err, "failed to get the task details of BMC upgrade task", "TaskURI", bmcUpgradeTaskUri)
@@ -856,7 +856,7 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 	log logr.Logger,
 	bmcVersion *metalv1alpha1.BMCVersion,
 	bmcClient bmc.BMC,
-	bmc *metalv1alpha1.BMC,
+	bmcObj *metalv1alpha1.BMC,
 	issuedCondition *metav1.Condition,
 ) error {
 	var username, password string
@@ -882,13 +882,13 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {
-		return bmcClient.UpgradeBMCVersion(ctx, bmc.Status.Manufacturer, parameters)
+		return bmcClient.UpgradeBMCVersion(ctx, bmcObj.Status.Manufacturer, parameters)
 	}()
 
 	upgradeCurrentTaskStatus := &metalv1alpha1.Task{URI: taskMonitor}
 
 	if isFatal {
-		log.V(1).Error(err, "failed to issue bmc upgrade", "requested bmc version", bmcVersion.Spec.Version, "BMC", bmc.Name)
+		log.V(1).Error(err, "failed to issue bmc upgrade", "requested bmc version", bmcVersion.Spec.Version, "BMC", bmcObj.Name)
 		var errCond error
 		if errCond = r.Conditions.Update(
 			issuedCondition,
@@ -909,7 +909,7 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 		return errors.Join(errCond, err)
 	}
 	if err != nil {
-		log.V(1).Error(err, "failed to issue bmc upgrade", "bmc version", bmcVersion.Spec.Version, "BMC", bmc.Name)
+		log.V(1).Error(err, "failed to issue bmc upgrade", "bmc version", bmcVersion.Spec.Version, "BMC", bmcObj.Name)
 		return err
 	}
 	var errCond error

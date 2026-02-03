@@ -7,13 +7,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 // todo: merge with checkBiosAttribues after #298
 func CheckAttribues(
-	attrs redfish.SettingsAttributes,
-	filtered map[string]redfish.Attribute,
+	attrs schemas.SettingsAttributes,
+	filtered map[string]schemas.Attributes,
 ) (reset bool, err error) {
 	reset = false
 	var errs []error
@@ -28,7 +28,7 @@ func CheckAttribues(
 			reset = true
 		}
 		switch entryAttribute.Type {
-		case redfish.IntegerAttributeType:
+		case schemas.IntegerAttributeType:
 			if _, ok := value.(int); !ok {
 				errs = append(
 					errs,
@@ -40,7 +40,7 @@ func CheckAttribues(
 						entryAttribute,
 					))
 			}
-		case redfish.StringAttributeType:
+		case schemas.StringAttributeType:
 			if _, ok := value.(string); !ok {
 				errs = append(
 					errs,
@@ -52,7 +52,7 @@ func CheckAttribues(
 						entryAttribute,
 					))
 			}
-		case redfish.EnumerationAttributeType:
+		case schemas.EnumerationAttributeType:
 			if _, ok := value.(string); !ok {
 				errs = append(
 					errs,

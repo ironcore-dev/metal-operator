@@ -26,7 +26,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 // BMCSettingsReconciler reconciles a BMCSettings object
@@ -363,7 +363,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
-	settingsDiff redfish.SettingsAttributes,
+	settingsDiff schemas.SettingsAttributes,
 	bmcClient bmc.BMC,
 ) (ctrl.Result, error) {
 	resetBMC, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCResetPostSettingApplyCondition)
@@ -595,7 +595,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 	bmcClient bmc.BMC,
-) (diff redfish.SettingsAttributes, err error) {
+) (diff schemas.SettingsAttributes, err error) {
 	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.BMCUUID, bmcSetting.Spec.SettingsMap)
 	if err != nil {
 		return diff, fmt.Errorf("failed to get BMC settings: %w", err)
@@ -603,7 +603,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 
 	log.V(1).Info("Current BMC settings fetched", "Settings", currentSettings)
 
-	diff = redfish.SettingsAttributes{}
+	diff = schemas.SettingsAttributes{}
 	var errs []error
 	for key, value := range bmcSetting.Spec.SettingsMap {
 		res, ok := currentSettings[key]

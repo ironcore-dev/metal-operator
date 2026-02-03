@@ -14,8 +14,7 @@ import (
 	"strings"
 
 	"github.com/stmcginnis/gofish"
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -24,12 +23,12 @@ type Lenovo struct {
 }
 
 func (r *Lenovo) GetUpdateRequestBody(
-	parameters *redfish.SimpleUpdateParameters,
+	parameters *schemas.UpdateServiceSimpleUpdateParameters,
 ) *SimpleUpdateRequestBody {
 	RequestBody := &SimpleUpdateRequestBody{}
 	RequestBody.ForceUpdate = parameters.ForceUpdate
 	RequestBody.ImageURI = parameters.ImageURI
-	RequestBody.Passord = parameters.Passord
+	RequestBody.Password = parameters.Password
 	RequestBody.Username = parameters.Username
 	RequestBody.Targets = parameters.Targets
 	RequestBody.TransferProtocol = parameters.TransferProtocol
@@ -54,8 +53,8 @@ func (r *Lenovo) GetUpdateTaskMonitorURI(response *http.Response) (string, error
 	return tResp.TaskMonitor, nil
 }
 
-func (r *Lenovo) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error) {
-	task := &redfish.Task{}
+func (r *Lenovo) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error) {
+	task := &schemas.Task{}
 	respTaskRawBody, err := io.ReadAll(taskMonitorResponse.Body)
 	if err != nil {
 		return nil, err
@@ -66,7 +65,7 @@ func (r *Lenovo) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse 
 		return nil, err
 	}
 
-	if len(task.Messages) > 0 && task.TaskState == redfish.CompletedTaskState && task.TaskStatus == common.OKHealth {
+	if len(task.Messages) > 0 && task.TaskState == schemas.CompletedTaskState && task.TaskStatus == schemas.OKHealth {
 		for _, msg := range task.Messages {
 			if strings.Contains(msg.MessageID, "OperationTransitionedToJob") &&
 				len(msg.MessageArgs) > 0 {
@@ -103,19 +102,19 @@ func (r *Lenovo) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse 
 						)
 				}
 
-				job := &redfish.Job{}
+				job := &schemas.Job{}
 				err = json.Unmarshal(respJobRawBody, &job)
 				if err != nil {
 					return nil, err
 				}
-				task = &redfish.Task{}
+				task = &schemas.Task{}
 				task.ID = job.ID
 				task.ODataID = job.ODataID
 				task.Description = job.Description
 				task.StartTime = job.StartTime
 				task.EndTime = job.EndTime
 				task.PercentComplete = job.PercentComplete
-				task.TaskState = redfish.TaskState(job.JobState)
+				task.TaskState = schemas.TaskState(job.JobState)
 				task.TaskStatus = job.JobStatus
 				task.Messages = job.Messages
 				break
@@ -127,7 +126,7 @@ func (r *Lenovo) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse 
 }
 
 type LenovoXCCManager struct {
-	BMC     *redfish.Manager
+	BMC     *schemas.Manager
 	Service *gofish.Service
 }
 
@@ -157,13 +156,13 @@ func (l *LenovoXCCManager) GetObjFromUri(
 func (l *LenovoXCCManager) GetOEMBMCSettingAttribute(
 	ctx context.Context,
 	attributes map[string]string,
-) (redfish.SettingsAttributes, error) {
+) (schemas.SettingsAttributes, error) {
 	log := ctrl.LoggerFrom(ctx)
 	c := l.Service.GetClient()
 	if c == nil {
 		return nil, fmt.Errorf("failed to get client from gofish service")
 	}
-	result := redfish.SettingsAttributes{}
+	result := schemas.SettingsAttributes{}
 	errs := []error{}
 	for key, data := range attributes {
 		parts := strings.Fields(key)
@@ -214,7 +213,7 @@ func (l *LenovoXCCManager) GetOEMBMCSettingAttribute(
 
 func (l *LenovoXCCManager) CheckBMCAttributes(
 	ctx context.Context,
-	attributes redfish.SettingsAttributes,
+	attributes schemas.SettingsAttributes,
 ) (bool, error) {
 	// We do not have any option to check attributes for HPE iLO
 	return false, nil
@@ -222,12 +221,12 @@ func (l *LenovoXCCManager) CheckBMCAttributes(
 
 func (l *LenovoXCCManager) UpdateBMCAttributesApplyAt(
 	ctx context.Context,
-	attrs redfish.SettingsAttributes,
-	applyTime common.ApplyTime,
+	attrs schemas.SettingsAttributes,
+	applyTime schemas.SettingsApplyTime,
 ) error {
 	// apply the attributes through PATCH or POST call
 	// we can not paralaize the calls to HPE here due to limitation from server
-	if applyTime != common.ImmediateApplyTime {
+	if applyTime != schemas.ImmediateSettingsApplyTime {
 		return fmt.Errorf("does not support scheduled apply time for BMC attributes")
 	}
 	c := l.Service.GetClient()
@@ -276,7 +275,7 @@ func (l *LenovoXCCManager) UpdateBMCAttributesApplyAt(
 	return errors.Join(errs...)
 }
 
-func (l *LenovoXCCManager) GetBMCPendingAttributeValues(ctx context.Context) (redfish.SettingsAttributes, error) {
+func (l *LenovoXCCManager) GetBMCPendingAttributeValues(ctx context.Context) (schemas.SettingsAttributes, error) {
 	// We do not have any option to get pending attributes for Dell iDRAC
-	return redfish.SettingsAttributes{}, nil
+	return schemas.SettingsAttributes{}, nil
 }

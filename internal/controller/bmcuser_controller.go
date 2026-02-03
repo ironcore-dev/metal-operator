@@ -22,7 +22,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"github.com/stmcginnis/gofish/common"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 const (
@@ -176,7 +176,7 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get account service: %w", err)
 	}
-	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), accountService.MaxPasswordLength)
+	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), int(accountService.MaxPasswordLength))
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to generate new password for BMC user %s: %w", user.Name, err)
 	}
@@ -206,7 +206,7 @@ func (r *BMCUserReconciler) ensureBMCSecretForUser(ctx context.Context, log logr
 	if err != nil {
 		return fmt.Errorf("failed to get account service: %w", err)
 	}
-	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), accountService.MaxPasswordLength)
+	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), int(accountService.MaxPasswordLength))
 	if err != nil {
 		return fmt.Errorf("failed to generate new password for BMC account %s: %w", user.Name, err)
 	}
@@ -351,7 +351,7 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 	}
 	_, err = bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions)
 	if err != nil {
-		var httpErr *common.Error
+		var httpErr *schemas.Error
 		if errors.As(err, &httpErr) {
 			if httpErr.HTTPReturnedStatusCode == 401 || httpErr.HTTPReturnedStatusCode == 403 {
 				return true, nil
@@ -391,7 +391,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, log logr.Logger, user *m
 
 	log.Info("Deleting BMC account for User")
 	if err := bmcClient.DeleteAccount(ctx, user.Spec.UserName, user.Status.ID); err != nil {
-		var httpErr *common.Error
+		var httpErr *schemas.Error
 		if errors.As(err, &httpErr) && httpErr.HTTPReturnedStatusCode == 404 {
 			log.Info("BMC account not found, continuing finalizer removal")
 		} else {

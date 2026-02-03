@@ -11,7 +11,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 func TestDellOEM(t *testing.T) {
@@ -28,10 +28,10 @@ var _ = Describe("Dell OEM", func() {
 
 	Describe("GetUpdateRequestBody", func() {
 		It("should create request body with correct parameters", func() {
-			params := &redfish.SimpleUpdateParameters{
+			params := &schemas.UpdateServiceSimpleUpdateParameters{
 				ImageURI:    "http://example.com/firmware.bin",
 				Username:    "admin",
-				Passord:     "password",
+				Password:    "password",
 				ForceUpdate: true,
 				Targets:     []string{"/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate"},
 			}
@@ -40,10 +40,10 @@ var _ = Describe("Dell OEM", func() {
 
 			Expect(body.ImageURI).To(Equal(params.ImageURI))
 			Expect(body.Username).To(Equal(params.Username))
-			Expect(body.Passord).To(Equal(params.Passord))
+			Expect(body.Password).To(Equal(params.Password))
 			Expect(body.ForceUpdate).To(Equal(params.ForceUpdate))
 			Expect(body.Targets).To(Equal(params.Targets))
-			Expect(body.RedfishOperationApplyTime).To(Equal(redfish.ImmediateOperationApplyTime))
+			Expect(body.RedfishOperationApplyTime).To(Equal(schemas.ImmediateOperationApplyTime))
 		})
 	})
 

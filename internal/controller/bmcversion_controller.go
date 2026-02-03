@@ -14,8 +14,8 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -747,7 +747,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 	completedCondition *metav1.Condition,
 ) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	taskCurrentStatus, err := func() (*redfish.Task, error) {
+	taskCurrentStatus, err := func() (*schemas.Task, error) {
 		if bmcUpgradeTaskUri == "" {
 			return nil, fmt.Errorf("invalid task URI. uri provided: '%v'", bmcUpgradeTaskUri)
 		}
@@ -763,7 +763,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		URI:             bmcVersion.Status.UpgradeTask.URI,
 		State:           taskCurrentStatus.TaskState,
 		Status:          taskCurrentStatus.TaskStatus,
-		PercentComplete: int32(taskCurrentStatus.PercentComplete),
+		PercentComplete: int32(gofish.Deref(taskCurrentStatus.PercentComplete)),
 	}
 
 	// use checkpoint in case the job has stalled and we need to requeue
@@ -777,10 +777,10 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		return ctrl.Result{}, fmt.Errorf("failed to create checkpoint for Condition. %v", err)
 	}
 
-	if taskCurrentStatus.TaskState == redfish.KilledTaskState ||
-		taskCurrentStatus.TaskState == redfish.ExceptionTaskState ||
-		taskCurrentStatus.TaskState == redfish.CancelledTaskState ||
-		(taskCurrentStatus.TaskStatus != common.OKHealth && taskCurrentStatus.TaskStatus != "") {
+	if taskCurrentStatus.TaskState == schemas.KilledTaskState ||
+		taskCurrentStatus.TaskState == schemas.ExceptionTaskState ||
+		taskCurrentStatus.TaskState == schemas.CancelledTaskState ||
+		(taskCurrentStatus.TaskStatus != schemas.OKHealth && taskCurrentStatus.TaskStatus != "") {
 		message := fmt.Sprintf(
 			"Upgrade BMC task has failed. with message %v check '%v' for details",
 			taskCurrentStatus.Messages,
@@ -805,7 +805,7 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		return ctrl.Result{}, err
 	}
 
-	if taskCurrentStatus.TaskState == redfish.CompletedTaskState {
+	if taskCurrentStatus.TaskState == schemas.CompletedTaskState {
 		if err := r.Conditions.Update(
 			completedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
@@ -878,12 +878,12 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 		forceUpdate = true
 	}
 
-	parameters := &redfish.SimpleUpdateParameters{
+	parameters := &schemas.UpdateServiceSimpleUpdateParameters{
 		ForceUpdate:      forceUpdate,
 		ImageURI:         bmcVersion.Spec.Image.URI,
-		Passord:          password,
+		Password:         password,
 		Username:         username,
-		TransferProtocol: redfish.TransferProtocolType(bmcVersion.Spec.Image.TransferProtocol),
+		TransferProtocol: schemas.TransferProtocolType(bmcVersion.Spec.Image.TransferProtocol),
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {

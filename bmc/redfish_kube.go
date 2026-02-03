@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/ironcore-dev/metal-operator/bmc/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,7 +63,7 @@ func NewRedfishKubeBMCClient(
 }
 
 // setSystemPowerState updates the power state of a system.
-func (r *RedfishKubeBMC) setSystemPowerState(ctx context.Context, systemURI string, state redfish.PowerState) error {
+func (r *RedfishKubeBMC) setSystemPowerState(ctx context.Context, systemURI string, state schemas.PowerState) error {
 	// Apply a 150ms delay before performing the power state change.
 	time.Sleep(150 * time.Millisecond)
 
@@ -83,7 +83,7 @@ func (r *RedfishKubeBMC) setSystemPowerState(ctx context.Context, systemURI stri
 // PowerOn powers on the system asynchronously.
 func (r *RedfishKubeBMC) PowerOn(ctx context.Context, systemURI string) error {
 	go func() {
-		if err := r.setSystemPowerState(ctx, systemURI, redfish.OnPowerState); err != nil {
+		if err := r.setSystemPowerState(ctx, systemURI, schemas.OnPowerState); err != nil {
 			log.FromContext(ctx).Error(err, "PowerOn failed", "systemURI", systemURI)
 			return
 		}
@@ -105,7 +105,7 @@ func (r *RedfishKubeBMC) PowerOn(ctx context.Context, systemURI string) error {
 // PowerOff powers off the system asynchronously.
 func (r *RedfishKubeBMC) PowerOff(ctx context.Context, systemURI string) error {
 	go func() {
-		if err := r.setSystemPowerState(ctx, systemURI, redfish.OffPowerState); err != nil {
+		if err := r.setSystemPowerState(ctx, systemURI, schemas.OffPowerState); err != nil {
 			log.FromContext(ctx).Error(err, "PowerOff failed", "systemURI", systemURI)
 		}
 	}()
@@ -113,13 +113,13 @@ func (r *RedfishKubeBMC) PowerOff(ctx context.Context, systemURI string) error {
 }
 
 // GetBiosPendingAttributeValues returns pending BIOS attribute values.
-func (r *RedfishKubeBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
+func (r *RedfishKubeBMC) GetBiosPendingAttributeValues(ctx context.Context, systemUUID string) (schemas.SettingsAttributes, error) {
 	pending := UnitTestMockUps.PendingBIOSSetting
 	if len(pending) == 0 {
-		return redfish.SettingsAttributes{}, nil
+		return schemas.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pending))
+	result := make(schemas.SettingsAttributes, len(pending))
 	for key, data := range pending {
 		result[key] = data["value"]
 	}
@@ -127,7 +127,7 @@ func (r *RedfishKubeBMC) GetBiosPendingAttributeValues(ctx context.Context, syst
 }
 
 // SetBiosAttributesOnReset sets BIOS attributes, applying them immediately or on next reset.
-func (r *RedfishKubeBMC) SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes redfish.SettingsAttributes) error {
+func (r *RedfishKubeBMC) SetBiosAttributesOnReset(ctx context.Context, systemUUID string, attributes schemas.SettingsAttributes) error {
 	UnitTestMockUps.ResetPendingBIOSSetting()
 	for key, value := range attributes {
 		if attrData, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
@@ -146,7 +146,7 @@ func (r *RedfishKubeBMC) SetBiosAttributesOnReset(ctx context.Context, systemUUI
 }
 
 // GetBiosAttributeValues retrieves specific BIOS attribute values.
-func (r *RedfishKubeBMC) GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (redfish.SettingsAttributes, error) {
+func (r *RedfishKubeBMC) GetBiosAttributeValues(ctx context.Context, systemUUID string, attributes []string) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -156,7 +156,7 @@ func (r *RedfishKubeBMC) GetBiosAttributeValues(ctx context.Context, systemUUID 
 		return nil, fmt.Errorf("failed to get filtered BIOS attributes: %w", err)
 	}
 
-	result := make(redfish.SettingsAttributes, len(attributes))
+	result := make(schemas.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if attrData, ok := UnitTestMockUps.BIOSSettingAttr[name]; ok && filtered[name].AttributeName != "" {
 			result[name] = attrData["value"]
@@ -186,7 +186,7 @@ func (r *RedfishKubeBMC) getFilteredBiosRegistryAttributes(readOnly, immutable b
 }
 
 // CheckBiosAttributes validates BIOS attributes.
-func (r *RedfishKubeBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool, error) {
+func (r *RedfishKubeBMC) CheckBiosAttributes(attrs schemas.SettingsAttributes) (bool, error) {
 	filtered, err := r.getFilteredBiosRegistryAttributes(false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err
@@ -207,7 +207,7 @@ func (r *RedfishKubeBMC) GetBiosVersion(ctx context.Context, systemUUID string) 
 }
 
 // UpgradeBiosVersion initiates a BIOS upgrade.
-func (r *RedfishKubeBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *RedfishKubeBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
 	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
 	go func() {
@@ -221,20 +221,20 @@ func (r *RedfishKubeBMC) UpgradeBiosVersion(ctx context.Context, manufacturer st
 }
 
 // GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
-func (r *RedfishKubeBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
+func (r *RedfishKubeBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
 	index := UnitTestMockUps.BIOSUpgradeTaskIndex
 	if index >= len(UnitTestMockUps.BIOSUpgradeTaskStatus) {
 		index = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
 	}
 	task := &UnitTestMockUps.BIOSUpgradeTaskStatus[index]
-	if task.TaskState == redfish.CompletedTaskState {
+	if task.TaskState == schemas.CompletedTaskState {
 		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
 	}
 	return task, nil
 }
 
 // ResetManager resets the BMC with a delay for pending settings.
-func (r *RedfishKubeBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
+func (r *RedfishKubeBMC) ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error {
 	go func() {
 		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
 			time.Sleep(150 * time.Millisecond)
@@ -250,7 +250,7 @@ func (r *RedfishKubeBMC) ResetManager(ctx context.Context, UUID string, resetTyp
 }
 
 // SetBMCAttributesImmediately sets BMC attributes, applying them immediately or on reset.
-func (r *RedfishKubeBMC) SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) error {
+func (r *RedfishKubeBMC) SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) error {
 	for key, value := range attributes {
 		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
 			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
@@ -268,7 +268,7 @@ func (r *RedfishKubeBMC) SetBMCAttributesImmediately(ctx context.Context, UUID s
 }
 
 // GetBMCAttributeValues retrieves specific BMC attribute values.
-func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
+func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -278,7 +278,7 @@ func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string,
 		return nil, fmt.Errorf("failed to get filtered BMC attributes: %w", err)
 	}
 
-	result := make(redfish.SettingsAttributes, len(attributes))
+	result := make(schemas.SettingsAttributes, len(attributes))
 	for key := range attributes {
 		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok && filtered[key].AttributeName != "" {
 			result[key] = attrData["value"]
@@ -288,13 +288,13 @@ func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string,
 }
 
 // GetBMCPendingAttributeValues returns pending BMC attribute values.
-func (r *RedfishKubeBMC) GetBMCPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
+func (r *RedfishKubeBMC) GetBMCPendingAttributeValues(ctx context.Context, systemUUID string) (schemas.SettingsAttributes, error) {
 	pending := UnitTestMockUps.PendingBMCSetting
 	if len(pending) == 0 {
-		return redfish.SettingsAttributes{}, nil
+		return schemas.SettingsAttributes{}, nil
 	}
 
-	result := make(redfish.SettingsAttributes, len(pending))
+	result := make(schemas.SettingsAttributes, len(pending))
 	for key, data := range pending {
 		result[key] = data["value"]
 	}
@@ -302,18 +302,18 @@ func (r *RedfishKubeBMC) GetBMCPendingAttributeValues(ctx context.Context, syste
 }
 
 // getFilteredBMCRegistryAttributes returns filtered BMC registry attributes.
-func (r *RedfishKubeBMC) getFilteredBMCRegistryAttributes(readOnly, immutable bool) (map[string]redfish.Attribute, error) {
+func (r *RedfishKubeBMC) getFilteredBMCRegistryAttributes(readOnly, immutable bool) (map[string]schemas.Attributes, error) {
 	if len(UnitTestMockUps.BMCSettingAttr) == 0 {
 		return nil, fmt.Errorf("no BMC setting attributes found")
 	}
 
-	filtered := make(map[string]redfish.Attribute)
+	filtered := make(map[string]schemas.Attributes)
 	for name, attrData := range UnitTestMockUps.BMCSettingAttr {
-		filtered[name] = redfish.Attribute{
+		filtered[name] = schemas.Attributes{
 			AttributeName: name,
 			Immutable:     immutable,
 			ReadOnly:      readOnly,
-			Type:          attrData["type"].(redfish.AttributeType),
+			Type:          attrData["type"].(schemas.AttributeType),
 			ResetRequired: attrData["reboot"].(bool),
 		}
 	}
@@ -321,7 +321,7 @@ func (r *RedfishKubeBMC) getFilteredBMCRegistryAttributes(readOnly, immutable bo
 }
 
 // CheckBMCAttributes validates BMC attributes.
-func (r *RedfishKubeBMC) CheckBMCAttributes(ctx context.Context, UUID string, attrs redfish.SettingsAttributes) (bool, error) {
+func (r *RedfishKubeBMC) CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (bool, error) {
 	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err
@@ -342,7 +342,7 @@ func (r *RedfishKubeBMC) GetBMCVersion(ctx context.Context, systemUUID string) (
 }
 
 // UpgradeBMCVersion initiates a BMC upgrade.
-func (r *RedfishKubeBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *RedfishKubeBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	UnitTestMockUps.BMCUpgradeTaskIndex = 0
 	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
 	go func() {
@@ -356,13 +356,13 @@ func (r *RedfishKubeBMC) UpgradeBMCVersion(ctx context.Context, manufacturer str
 }
 
 // GetBMCUpgradeTask retrieves the status of a BMC upgrade task.
-func (r *RedfishKubeBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
+func (r *RedfishKubeBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
 	index := UnitTestMockUps.BMCUpgradeTaskIndex
 	if index >= len(UnitTestMockUps.BMCUpgradeTaskStatus) {
 		index = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
 	}
 	task := &UnitTestMockUps.BMCUpgradeTaskStatus[index]
-	if task.TaskState == redfish.CompletedTaskState {
+	if task.TaskState == schemas.CompletedTaskState {
 		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
 	}
 	return task, nil
@@ -374,7 +374,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	var setBoot redfish.Boot
+	var setBoot schemas.Boot
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
 	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
 	if system.Boot.BootSourceOverrideMode != "" {
@@ -382,7 +382,7 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	} else {
 		setBoot = pxeBootWithoutSettingUEFIBootMode
 	}
-	if err := system.SetBoot(setBoot); err != nil {
+	if err := system.SetBoot(&setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
 	netData := `{"networkInterfaces":[{"name":"dummy0","ipAddresses":["127.0.0.2"],"macAddress":"aa:bb:cc:dd:ee:ff"}]`

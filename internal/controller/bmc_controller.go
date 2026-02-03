@@ -25,8 +25,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -352,13 +351,13 @@ func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, bmcObj *
 	if !ok {
 		return false, nil
 	}
-	var value redfish.ResetType
+	var value schemas.ResetType
 	if value, ok = metalv1alpha1.AnnotationToRedfishMapping[operation]; !ok {
-		log.V(1).Info("Unknown operation annotation, ignoring", "Operation", operation, "Supported Operations", redfish.GracefulRestartResetType)
+		log.V(1).Info("Unknown operation annotation, ignoring", "Operation", operation, "Supported Operations", schemas.GracefulRestartResetType)
 		return false, nil
 	}
 	switch value {
-	case redfish.GracefulRestartResetType:
+	case schemas.GracefulRestartResetType:
 		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
 		if err := r.resetBMC(ctx, bmcObj, bmcClient, bmcUserResetReason, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
@@ -378,7 +377,7 @@ func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, bmcObj *
 }
 
 func (r *BMCReconciler) updateReadyConditionOnBMCFailure(ctx context.Context, bmcObj *metalv1alpha1.BMC, err error) error {
-	httpErr := &common.Error{}
+	httpErr := &schemas.Error{}
 	if errors.As(err, &httpErr) {
 		// only handle 5xx errors
 		switch httpErr.HTTPReturnedStatusCode {
@@ -488,14 +487,14 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 	}
 	var err error
 	if bmcClient != nil {
-		if err = bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, redfish.GracefulRestartResetType); err == nil {
+		if err = bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.GracefulRestartResetType); err == nil {
 			log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)
 			return r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
 		}
 	}
 	// BMC Unavailable, currently can not perform reset. try to reset with ssh when available
 	log.Error(err, "failed to reset BMC via Redfish, falling back to rest via ssh", "BMC", bmcObj.Name)
-	if httpErr, ok := err.(*common.Error); ok {
+	if httpErr, ok := err.(*schemas.Error); ok {
 		// only handle 5xx errors
 		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
 			return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("cannot reset bmc: %w", err))

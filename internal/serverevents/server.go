@@ -42,11 +42,11 @@ type MetricsReport struct {
 }
 
 type MetricsValue struct {
-	MetricId       string      `json:"MetricId"`
-	MetricProperty string      `json:"MetricProperty"`
-	MetricValue    string      `json:"MetricValue"`
-	Timestamp      string      `json:"Timestamp"`
-	Oem            interface{} `json:"Oem"`
+	MetricId       string `json:"MetricId"`
+	MetricProperty string `json:"MetricProperty"`
+	MetricValue    string `json:"MetricValue"`
+	Timestamp      string `json:"Timestamp"`
+	Oem            any    `json:"Oem"`
 }
 
 type EventData struct {

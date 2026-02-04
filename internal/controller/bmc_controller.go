@@ -540,18 +540,18 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 	return nil
 }
 
-func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmc *metalv1alpha1.BMC) (bool, error) {
+func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) (bool, error) {
 	if r.EventURL == "" {
 		return false, nil
 	}
 	log.V(1).Info("Handling event subscriptions for BMC")
-	metricsReportLink := bmc.Status.MetricsReportSubscriptionLink
-	eventLink := bmc.Status.EventsSubscriptionLink
+	metricsReportLink := bmcObj.Status.MetricsReportSubscriptionLink
+	eventLink := bmcObj.Status.EventsSubscriptionLink
 	modified := false
 
 	if metricsReportLink == "" {
 		var err error
-		metricsReportLink, err = serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmc.Name, bmcClient)
+		metricsReportLink, err = serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
 			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
 		}
@@ -559,7 +559,7 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 	}
 	if eventLink == "" {
 		var err error
-		eventLink, err = serverevents.SubscribeEvents(ctx, r.EventURL, bmc.Name, bmcClient)
+		eventLink, err = serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
 			return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
 		}
@@ -569,28 +569,28 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 		return false, nil
 	}
 	log.Info("event subscriptions created", "metricsReportLink", metricsReportLink, "eventLink", eventLink)
-	bmcBase := bmc.DeepCopy()
-	bmc.Status.MetricsReportSubscriptionLink = metricsReportLink
-	bmc.Status.EventsSubscriptionLink = eventLink
-	if err := r.Status().Patch(ctx, bmc, client.MergeFrom(bmcBase)); err != nil {
+	bmcBase := bmcObj.DeepCopy()
+	bmcObj.Status.MetricsReportSubscriptionLink = metricsReportLink
+	bmcObj.Status.EventsSubscriptionLink = eventLink
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
 	}
 	log.Info("Subscribed to server events and metrics")
 	return true, nil
 }
 
-func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmc *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
 	if r.EventURL == "" {
 		return nil
 	}
-	if bmc.Status.MetricsReportSubscriptionLink != "" {
-		if err := bmcClient.DeleteEventSubscription(ctx, bmc.Status.MetricsReportSubscriptionLink); err != nil {
+	if bmcObj.Status.MetricsReportSubscriptionLink != "" {
+		if err := bmcClient.DeleteEventSubscription(ctx, bmcObj.Status.MetricsReportSubscriptionLink); err != nil {
 			return fmt.Errorf("failed to unsubscribe from server metrics report: %w", err)
 		}
 		log.V(1).Info("Unsubscribed from server metrics report")
 	}
-	if bmc.Status.EventsSubscriptionLink != "" {
-		if err := bmcClient.DeleteEventSubscription(ctx, bmc.Status.EventsSubscriptionLink); err != nil {
+	if bmcObj.Status.EventsSubscriptionLink != "" {
+		if err := bmcClient.DeleteEventSubscription(ctx, bmcObj.Status.EventsSubscriptionLink); err != nil {
 			return fmt.Errorf("failed to unsubscribe from server events: %w", err)
 		}
 		log.V(1).Info("Unsubscribed from server events")

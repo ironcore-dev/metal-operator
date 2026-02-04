@@ -144,7 +144,7 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 	case strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
 		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
 	default:
-		//s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
+		//
 		urlPath := resolvePath(r.URL.Path)
 		var update map[string]any
 		if err := json.Unmarshal(body, &update); err != nil {
@@ -205,6 +205,7 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
 }
 
 func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {

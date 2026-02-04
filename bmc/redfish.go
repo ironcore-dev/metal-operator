@@ -1226,7 +1226,7 @@ type subscriptionPayload struct {
 	ResourceTypes       []string                         `json:"ResourceTypes,omitempty"`
 	DeliveryRetryPolicy redfish.DeliveryRetryPolicy      `json:"DeliveryRetryPolicy,omitempty"`
 	HTTPHeaders         map[string]string                `json:"HttpHeaders,omitempty"`
-	Oem                 interface{}                      `json:"Oem,omitempty"`
+	Oem                 any                              `json:"Oem,omitempty"`
 	Protocol            redfish.EventDestinationProtocol `json:"Protocol,omitempty"`
 	Context             string                           `json:"Context,omitempty"`
 }

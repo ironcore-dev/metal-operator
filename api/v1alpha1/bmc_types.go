@@ -259,7 +259,7 @@ type BMC struct {
 	Status BMCStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BMCList contains a list of BMC
 type BMCList struct {

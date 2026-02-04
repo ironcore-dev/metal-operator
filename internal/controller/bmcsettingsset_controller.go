@@ -245,9 +245,9 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 				continue
 			}
 
-			//generate k8s conform name for bmcsettings
+			// generate k8s conform name for bmcsettings
 			newBMCSettingsName := fmt.Sprintf("%s-%s", bmcSettingsSet.Name, bmc.Name)
-			//e.g. performance-test-bmcsettingsset-01-node001-region
+			// e.g. performance-test-bmcsettingsset-01-node001-region
 			var newBMCSettings *metalv1alpha1.BMCSettings
 
 			if len(newBMCSettingsName) > utilvalidation.DNS1123SubdomainMaxLength {
@@ -264,7 +264,7 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 					}}
 			}
 
-			//create/patch new Settings
+			// create/patch new Settings
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCSettings, func() error {
 				newBMCSettings.Spec.BMCSettingsTemplate = *bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
 				newBMCSettings.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}

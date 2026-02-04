@@ -19,7 +19,7 @@ func collectLLDPInfo(ctx context.Context, interval, duration time.Duration) (reg
 	var out bytes.Buffer
 	tool, err := exec.LookPath("lldpctl")
 	if err != nil {
-		//TODO: exit or just skip?
+		// TODO: exit or just skip?
 		return lldp, fmt.Errorf("lldpctl is not present: %w", err)
 	}
 

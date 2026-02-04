@@ -1039,9 +1039,7 @@ func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient 
 func (r *BIOSSettingsReconciler) getBIOSVersionAndSettingsDiff(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (string, redfish.SettingsAttributes, error) {
 	completeSettings := make(map[string]string)
 	for _, flowItem := range settings.Spec.SettingsFlow {
-		for key, value := range flowItem.Settings {
-			completeSettings[key] = value
-		}
+		maps.Copy(completeSettings, flowItem.Settings)
 	}
 
 	diff, err := r.getSettingsDiff(ctx, bmcClient, completeSettings, server)

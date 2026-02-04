@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/big"
 	"net/http"
 	"slices"
@@ -486,9 +487,7 @@ func (r *RedfishBMC) SetBiosAttributesOnReset(ctx context.Context, systemURI str
 	}
 
 	attrs := make(redfish.SettingsAttributes, len(attributes))
-	for name, value := range attributes {
-		attrs[name] = value
-	}
+	maps.Copy(attrs, attributes)
 	return bios.UpdateBiosAttributesApplyAt(attrs, common.OnResetApplyTime)
 }
 
@@ -553,7 +552,7 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool
 func (r *RedfishBMC) checkAttributes(attrs redfish.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
-	//TODO: add more types like maps and Enumerations
+	// TODO: add more types like maps and Enumerations
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
@@ -1181,7 +1180,7 @@ func GenerateSecurePassword(manufacturer Manufacturer, length int) (string, erro
 
 	// B. Fill the remainder randomly.
 	remainingLength := length - len(mustInclude)
-	for i := 0; i < remainingLength; i++ {
+	for range remainingLength {
 		char, err := randomChar(allChars)
 		if err != nil {
 			return "", err

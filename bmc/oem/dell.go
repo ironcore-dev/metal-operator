@@ -331,7 +331,7 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 				continue
 			}
 
-			data := map[string]interface{}{"Attributes": payload}
+			data := map[string]any{"Attributes": payload}
 			if applyTime != "" {
 				data["@Redfish.SettingsApplyTime"] = map[string]string{"ApplyTime": string(applyTime)}
 			}

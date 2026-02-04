@@ -143,7 +143,7 @@ func isChildRetryThroughSets(childObj client.Object) bool {
 func GenerateRandomPassword(length int) ([]byte, error) {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)
-	for i := 0; i < length; i++ {
+	for i := range length {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate random password: %w", err)
@@ -228,12 +228,12 @@ func resetBMCOfServer(
 		// no BMC ref, but BMC details are inline in server spec
 		// we can directly reset BMC in this case, so just proceed
 		// as we have the BMCclient, get the 1st manager and reset it
-		bmc, err := bmcClient.GetManager("")
+		bmcManager, err := bmcClient.GetManager("")
 		if err != nil {
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
 		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
-		err = bmcClient.ResetManager(ctx, bmc.ID, redfish.GracefulRestartResetType)
+		err = bmcClient.ResetManager(ctx, bmcManager.ID, redfish.GracefulRestartResetType)
 		if err != nil {
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}

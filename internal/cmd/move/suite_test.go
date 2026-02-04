@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 const (
@@ -70,7 +70,7 @@ var _ = BeforeSuite(func() {
 
 	Expect(metalv1alpha1.AddToScheme(k8sSchema.Scheme)).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	clients.Source, err = client.New(sourceCfg, client.Options{Scheme: k8sSchema.Scheme})
 	Expect(err).NotTo(HaveOccurred())

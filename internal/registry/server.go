@@ -30,13 +30,13 @@ type Server struct {
 }
 
 // NewServer initializes and returns a new Server instance.
-func NewServer(log logr.Logger, addr string, k8sClient client.Client) *Server {
+func NewServer(logger logr.Logger, addr string, k8sClient client.Client) *Server {
 	mux := http.NewServeMux()
 	server := &Server{
 		addr:         addr,
 		mux:          mux,
 		systemsStore: &sync.Map{},
-		log:          log,
+		log:          logger,
 		k8sClient:    k8sClient,
 	}
 	server.routes()

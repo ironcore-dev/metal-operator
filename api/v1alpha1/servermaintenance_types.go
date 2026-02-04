@@ -93,7 +93,7 @@ type ServerMaintenance struct {
 	Status ServerMaintenanceStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServerMaintenanceList contains a list of ServerMaintenances
 type ServerMaintenanceList struct {

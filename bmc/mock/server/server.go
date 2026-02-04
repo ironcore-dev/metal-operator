@@ -204,8 +204,8 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Location", location)
 			}
 		}
+		s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
 	}
-	s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
 }
 
 func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
@@ -246,16 +246,22 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
-	urlPath := resolvePath(r.URL.Path)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_, hasOverride := s.overrides[urlPath]
-	if hasOverride {
-		// remove the resource
-		delete(s.overrides, urlPath)
+	filePath := resolvePath(r.URL.Path)
+	base, err := s.loadResource(filePath)
+	if err != nil {
+		s.handleError(w, r, err)
+		return
 	}
+	if _, isCollection := base["Members"]; isCollection {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.mu.Lock()
+	delete(s.overrides, filePath)
+	s.mu.Unlock()
+
 	// get collection of the resource
-	collectionPath := path.Dir(urlPath)
+	collectionPath := path.Dir(filePath)
 	cached, hasOverride := s.overrides[collectionPath]
 	var collection Collection
 	if hasOverride {
@@ -266,7 +272,7 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		data, err := dataFS.ReadFile(collectionPath)
+		data, err := dataFS.ReadFile(collectionPath + "/index.json")
 		if err != nil {
 			http.NotFound(w, r)
 			return
@@ -285,7 +291,9 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("Removing member from collection", "members", newMembers, "collection", collectionPath)
 	collection.Members = newMembers
+	s.mu.Lock()
 	s.overrides[collectionPath] = collection
+	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
 

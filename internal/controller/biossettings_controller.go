@@ -47,7 +47,7 @@ const (
 // BIOS Version conditions
 const (
 	BIOSVersionUpdateConditionPending = "BIOSVersionUpdatePending"
-	BIOSVersionUpgradeReasonPending   = "BIOSVersionNeedsTObeUpgraded"
+	BIOSVersionUpgradeReasonPending   = "BIOSVersionNeedsToBeUpgraded"
 )
 
 // Pending settings and validation conditions

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"path"
 	"slices"
@@ -34,11 +35,32 @@ type Member struct {
 }
 
 const (
-	LockedResourceState   = "Locked"
-	UnlockedResourceState = "Unlocked"
-	ResourceLockKey       = "resourceLock"
-	PowerOffState         = "Off"
-	PowerOnState          = "On"
+	PowerOffState = "Off"
+	PowerOnState  = "On"
+
+	biosSettingsPathSuffix = "Bios/Settings"
+	attributesKey          = "Attributes"
+)
+
+// BIOS settings that can be applied without reboot.
+var noRebootSettings = []string{"AdminPhone"}
+
+// Power state categories for system reset actions.
+var (
+	powerOffStates   = []string{"ForceOff", "GracefulShutdown", "PushPowerButton"}
+	powerOnStates    = []string{"On", "ForceOn"}
+	powerResetStates = []string{"GracefulRestart", "ForceRestart", "Nmi", "PowerCycle"}
+)
+
+// Power state categories for BMC reset actions.
+var powerResetBMCStates = []string{"GracefulRestart", "ForceRestart"}
+
+// Sentinel errors for HTTP response mapping.
+var (
+	errNotFound    = errors.New("resource not found")
+	errCorruptJSON = errors.New("corrupt embedded JSON")
+	errLocked      = errors.New("resource locked")
+	errBadReset    = errors.New("unknown reset type")
 )
 
 type MockServer struct {
@@ -50,322 +72,85 @@ type MockServer struct {
 }
 
 func NewMockServer(log logr.Logger, addr string) *MockServer {
-	mux := http.NewServeMux()
-	server := &MockServer{
+	s := &MockServer{
 		addr:      addr,
 		log:       log,
 		overrides: make(map[string]any),
 	}
 
-	mux.HandleFunc("/redfish/v1/", server.redfishHandler)
-	server.handler = mux
+	mux := http.NewServeMux()
+	mux.HandleFunc("/redfish/v1/", s.redfishHandler)
+	s.handler = mux
 
-	return server
+	return s
 }
 
-// currently hardcoded until specific logic is required
-var currentSettingsNeedsNoReboot = []string{"AdminPhone"}
-
-// power states from data/Systems/437XR1138R2/index.json
-var powerOffStates = []string{"ForceOff", "GracefulShutdown", "PushPowerButton"}
-var powerOnStates = []string{"On", "ForceOn"}
-var powerResetStates = []string{"GracefulRestart", "ForceRestart", "Nmi", "PowerCycle"}
-
-// power states from data/Managers/BMC/index.json
-var powerResetBMCStates = []string{"GracefulRestart", "ForceRestart"}
-
-const (
-	BiosSettingsPathSufficx = "Bios/Settings"
-	AttributesKey           = "Attributes"
-)
-
 func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
+	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
 
 	switch r.Method {
 	case http.MethodGet:
-		s.handleRedfishGET(w, r)
+		s.handleGet(w, r)
 	case http.MethodPost:
-		s.handleRedfishPOST(w, r)
+		s.handlePost(w, r)
 	case http.MethodPatch:
-		s.handleRedfishPATCH(w, r)
+		s.handlePatch(w, r)
 	case http.MethodDelete:
-		s.handleRedfishDELETE(w, r)
+		s.handleDelete(w, r)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func (s *MockServer) handleRedfishPATCH(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
-
-	urlPath := resolvePath(r.URL.Path)
-	body, err := io.ReadAll(r.Body)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			s.log.Error(err, "Failed to close request body")
-		}
-	}(r.Body)
-
-	if err != nil || len(body) == 0 {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-
-	var update map[string]any
-	if err := json.Unmarshal(body, &update); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Load existing resource: from override if exists, else embedded
-	base, err := fetchCurrentDataForPath(s, urlPath)
-	if err != nil {
-		switch {
-		case strings.Contains(err.Error(), "resource not found"):
-			http.NotFound(w, r)
-			return
-		case strings.Contains(err.Error(), "corrupt embedded JSON"):
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		default:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	// If it's a Collection (has "Members"), reject
-	if _, isCollection := base["Members"]; isCollection {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	err = handlebiosSettingsApply(s, r.URL.Path, update)
-	if err != nil {
-		switch {
-		case strings.Contains(err.Error(), "resource not found"):
-			http.NotFound(w, r)
-			return
-		case strings.Contains(err.Error(), "corrupt embedded JSON"):
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		default:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// Merge update into the copy
-	mergeJSON(base, update)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	// Store the newly modified version
-	s.overrides[urlPath] = base
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func deepCopy(m map[string]any) map[string]any {
-	c := make(map[string]any)
-	for k, v := range m {
-		if vMap, ok := v.(map[string]any); ok {
-			c[k] = deepCopy(vMap)
-		} else {
-			c[k] = v
-		}
-	}
-	return c
-}
-
-func resolvePath(urlPath string) string {
-	trimmed := strings.TrimPrefix(urlPath, "/redfish/v1")
-	trimmed = strings.Trim(trimmed, "/")
-
-	if trimmed == "" {
-		return "data/index.json"
-	}
-	if strings.HasSuffix(trimmed, ".json") {
-		return path.Join("data", trimmed)
-	}
-	return path.Join("data", trimmed, "index.json")
-}
-
-func (s *MockServer) handleRedfishDELETE(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
-
-	urlPath := resolvePath(r.URL.Path)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_, hasOverride := s.overrides[urlPath]
-	if hasOverride {
-		// remove the resource
-		delete(s.overrides, urlPath)
-	}
-	// get collection of the resource
-	collectionPath := path.Dir(urlPath)
-	cached, hasOverride := s.overrides[collectionPath]
-	var collection Collection
-	if hasOverride {
-		var ok bool
-		collection, ok = cached.(Collection)
-		if !ok {
-			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
-			return
-		}
-	} else {
-		data, err := dataFS.ReadFile(collectionPath)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		if err := json.Unmarshal(data, &collection); err != nil {
-			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
-			return
-		}
-	}
-	// remove member from collection
-	newMembers := make([]Member, 0)
-	for _, member := range collection.Members {
-		if member.OdataID != r.URL.Path {
-			newMembers = append(newMembers, member)
-		}
-	}
-	s.log.Info("Removing member from collection", "members", newMembers, "collection", collectionPath)
-	collection.Members = newMembers
-	s.overrides[collectionPath] = collection
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *MockServer) handleRedfishGET(w http.ResponseWriter, r *http.Request) {
-	urlPath := resolvePath(r.URL.Path)
+func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
+	filePath := resolvePath(r.URL.Path)
 
 	s.mu.RLock()
-	cached, hasOverride := s.overrides[urlPath]
+	cached, hasOverride := s.overrides[filePath]
 	s.mu.RUnlock()
 
 	if hasOverride {
-		resp, _ := json.MarshalIndent(cached, "", "  ")
-		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write(resp)
-		if err != nil {
-			s.log.Error(err, "Failed to write response")
-		}
+		s.writeJSON(w, http.StatusOK, cached)
 		return
 	}
 
-	content, err := dataFS.ReadFile(urlPath)
+	content, err := dataFS.ReadFile(filePath)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(content)
-	if err != nil {
+	if _, err := w.Write(content); err != nil {
 		s.log.Error(err, "Failed to write response")
 	}
+
 }
 
-func mergeJSON(base, update map[string]interface{}) {
-	for k, v := range update {
-		if bv, ok := base[k]; ok {
-			if bvMap, ok1 := bv.(map[string]interface{}); ok1 {
-				if vMap, ok2 := v.(map[string]interface{}); ok2 {
-					mergeJSON(bvMap, vMap)
-					continue
-				}
-			}
-		}
-		base[k] = v
-	}
-}
-
-func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
-	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path, "address", s.addr)
-
+func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
+	_ = r.Body.Close()
 	if err != nil {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			s.log.Error(err, "Failed to close request body")
-		}
-	}(r.Body)
 
-	var update map[string]any
-	if err := json.Unmarshal(body, &update); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	s.log.Info("POST body received", "body", string(body))
-	urlPath := resolvePath(r.URL.Path)
-
+	urlPath := r.URL.Path
 	switch {
-	case strings.Contains(urlPath, "Actions/ComputerSystem.Reset"):
-		// Simulate a system reset action
-		err := handleSystemReset(s, r, urlPath, body)
-		if err != nil {
-			switch {
-			case strings.Contains(err.Error(), "resource not found"):
-				http.NotFound(w, r)
-				return
-			case strings.Contains(err.Error(), "corrupt embedded JSON"):
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			case strings.Contains(err.Error(), "resource locked"):
-				http.Error(w, err.Error(), http.StatusConflict)
-				return
-			case strings.Contains(err.Error(), "unknown reset type"):
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		_, err = w.Write([]byte(`{"status": "Accepted"}`))
-		if err != nil {
-			s.log.Error(err, "Failed to write response")
-			return
-		}
-	case strings.Contains(urlPath, "Managers/BMC/Actions/Manager.Reset"):
-		// Simulate a BMC reset action
-		err := handleBMCReset(s, r, urlPath, body)
-		if err != nil {
-			switch {
-			case strings.Contains(err.Error(), "resource not found"):
-				http.NotFound(w, r)
-				return
-			case strings.Contains(err.Error(), "corrupt embedded JSON"):
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			case strings.Contains(err.Error(), "resource locked"):
-				http.Error(w, err.Error(), http.StatusConflict)
-				return
-			case strings.Contains(err.Error(), "unknown reset type"):
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		_, err = w.Write([]byte(`{"status": "Accepted"}`))
-		if err != nil {
-			s.log.Error(err, "Failed to write response")
-			return
-		}
+	case strings.HasSuffix(urlPath, "/Actions/ComputerSystem.Reset"):
+		s.handleSystemReset(w, r, body)
+	case strings.HasSuffix(urlPath, "/Actions/Manager.Reset"):
+		s.handleBMCReset(w, r, body)
 	case strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
-		// Simulate a firmware update action
+		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
 	default:
+		//s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
+		urlPath := resolvePath(r.URL.Path)
+		var update map[string]any
+		if err := json.Unmarshal(body, &update); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
 		// Handle resource creation in collections
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -419,245 +204,410 @@ func (s *MockServer) handleRedfishPOST(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Location", location)
 			}
 		}
-		s.log.Info("Storing updated data for POST", "path", urlPath, "data", update)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_, err = w.Write([]byte(`{"status": "created"}`))
+	}
+}
+
+func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	_ = r.Body.Close()
+	if err != nil || len(body) == 0 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	var update map[string]any
+	if err := json.Unmarshal(body, &update); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	filePath := resolvePath(r.URL.Path)
+	base, err := s.loadResource(filePath)
+	if err != nil {
+		s.handleError(w, r, err)
+		return
+	}
+
+	if _, isCollection := base["Members"]; isCollection {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := s.applyBiosSettings(r.URL.Path, update); err != nil {
+		s.handleError(w, r, err)
+		return
+	}
+
+	mergeJSON(base, update)
+	s.saveResource(filePath, base)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
+	urlPath := resolvePath(r.URL.Path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, hasOverride := s.overrides[urlPath]
+	if hasOverride {
+		// remove the resource
+		delete(s.overrides, urlPath)
+	}
+	// get collection of the resource
+	collectionPath := path.Dir(urlPath)
+	cached, hasOverride := s.overrides[collectionPath]
+	var collection Collection
+	if hasOverride {
+		var ok bool
+		collection, ok = cached.(Collection)
+		if !ok {
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		data, err := dataFS.ReadFile(collectionPath)
 		if err != nil {
-			s.log.Error(err, "Failed to write response")
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.Unmarshal(data, &collection); err != nil {
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
 			return
 		}
 	}
+	// remove member from collection
+	newMembers := make([]Member, 0)
+	for _, member := range collection.Members {
+		if member.OdataID != r.URL.Path {
+			newMembers = append(newMembers, member)
+		}
+	}
+	s.log.Info("Removing member from collection", "members", newMembers, "collection", collectionPath)
+	collection.Members = newMembers
+	s.overrides[collectionPath] = collection
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func handleSystemReset(s *MockServer, r *http.Request, urlPath string, body []byte) error {
+func (s *MockServer) handleSystemReset(w http.ResponseWriter, r *http.Request, body []byte) {
 	basePath := strings.TrimSuffix(r.URL.Path, "/Actions/ComputerSystem.Reset")
 	systemPath := resolvePath(basePath)
-	base, err := fetchCurrentDataForPath(s, systemPath)
+
+	resetType, err := s.parseResetType(body, powerOffStates, powerOnStates, powerResetStates)
 	if err != nil {
-		return err
+		s.handleError(w, r, err)
+		return
 	}
+
 	s.mu.Lock()
-	if val, ok := base[ResourceLockKey]; ok && val == LockedResourceState {
-		s.mu.Unlock()
-		s.log.Info("System resource is locked, cannot perform reset", base)
-		go func() {
-			// unlock after waiting period incase of stuck lock
-			time.Sleep(300 * time.Millisecond)
-			delete(base, ResourceLockKey)
-		}()
-		return errors.New("system resource locked, cannot perform reset")
-	}
-	base[ResourceLockKey] = LockedResourceState
-	s.overrides[urlPath] = base
-	s.mu.Unlock()
-	s.log.Info("System resource locked for reset operation")
-	if slices.ContainsFunc(powerOffStates, func(s string) bool {
-		return strings.Contains(string(body), s)
-	}) {
-		go func() {
-			time.Sleep(150 * time.Millisecond)
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			base["PowerState"] = PowerOffState
-			delete(base, ResourceLockKey)
-			s.overrides[urlPath] = base
-			s.log.Info("Powered Off the system")
-		}()
-	} else if slices.ContainsFunc(powerOnStates, func(s string) bool {
-		return strings.Contains(string(body), s)
-	}) {
-		go func() {
-			time.Sleep(150 * time.Millisecond)
-			s.mu.Lock()
-			base["PowerState"] = PowerOnState
-			delete(base, ResourceLockKey)
-			s.overrides[urlPath] = base
-			s.mu.Unlock()
-			s.log.Info("Powered On the system")
-			err := handlePostPowerOnActions(s, basePath)
-			if err != nil {
-				s.log.Error(err, "Failed to handle post power-on actions")
-			}
-			s.log.Info("Handled system power-on actions")
-		}()
-	} else if slices.ContainsFunc(powerResetStates, func(s string) bool {
-		return strings.Contains(string(body), s)
-	}) {
-		go func() {
-			time.Sleep(150 * time.Millisecond)
-			s.mu.Lock()
-			base["PowerState"] = PowerOffState
-			// Store the newly modified version
-			s.overrides[urlPath] = base
-			s.mu.Unlock()
-			s.log.Info("Powered Off the system")
-			time.Sleep(50 * time.Millisecond)
-			s.mu.Lock()
-			base["PowerState"] = PowerOnState
-			delete(base, ResourceLockKey)
-			// Store the newly modified version
-			s.overrides[urlPath] = base
-			s.mu.Unlock()
-			s.log.Info("Powered On the system")
-			err := handlePostPowerOnActions(s, basePath)
-			if err != nil {
-				s.log.Error(err, "Failed to handle post power-on actions")
-			}
-			s.log.Info("Handled system power-on actions")
-		}()
-	} else {
-		return fmt.Errorf("unknown reset type in request body: %s", string(body))
-	}
-	return nil
-}
-func handlePostPowerOnActions(s *MockServer, basePath string) error {
-	// Handle Bios settings applicationn
-	biosPendingSettingsURL := path.Join(basePath, strings.Trim(BiosSettingsPathSufficx, "/"))
-	pendingSettingsFilePath := resolvePath(biosPendingSettingsURL)
-	// get the Pending Bios settings
-	pendingBiosSettingsBase, err := fetchCurrentDataForPath(s, pendingSettingsFilePath)
+	base, err := s.loadResourceLocked(systemPath)
 	if err != nil {
-		return err
+		s.mu.Unlock()
+		s.handleError(w, r, err)
+		return
 	}
-	if data, ok := pendingBiosSettingsBase[AttributesKey]; ok {
-		// if pending settings exist, apply them to current settings
-		if pendingAttributes, ok := data.(map[string]any); ok && len(pendingAttributes) > 0 {
-			// save the pending Attributes
-			pendingAttributesCopy := deepCopy(pendingAttributes)
-			// get the current Bios settings
-			biosCurrentSettingsURL := path.Join(basePath, "Bios")
-			currentSettingsFilePath := resolvePath(biosCurrentSettingsURL)
-			currentBiosSettingsBase, err := fetchCurrentDataForPath(s, currentSettingsFilePath)
-			if err != nil {
-				return err
-			}
-			s.mu.Lock()
-			currentAttributesCopy := deepCopy(currentBiosSettingsBase[AttributesKey].(map[string]any))
-			mergeJSON(currentAttributesCopy, pendingAttributesCopy)
-			currentBiosSettingsBase[AttributesKey] = currentAttributesCopy
-			pendingBiosSettingsBase[AttributesKey] = map[string]any{}
-			s.overrides[currentSettingsFilePath] = currentBiosSettingsBase
-			s.overrides[pendingSettingsFilePath] = pendingBiosSettingsBase
-			s.mu.Unlock()
-			s.log.Info("Post power-on actions completed for system")
-		}
+
+	if s.isLocked(base) {
+		s.mu.Unlock()
+		s.handleError(w, r, errLocked)
+		return
 	}
-	return nil
+
+	s.setLocked(base, true)
+	s.overrides[systemPath] = base
+	s.mu.Unlock()
+
+	switch resetType {
+	case "off":
+		go s.doPowerOff(systemPath)
+	case "on":
+		go s.doPowerOn(systemPath, basePath)
+	case "reset":
+		go s.doPowerReset(systemPath, basePath)
+	}
+
+	s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
 }
 
-func handleBMCReset(s *MockServer, r *http.Request, urlPath string, body []byte) error {
-	// Placeholder for handling system reset logic
-	basePath := strings.TrimSuffix(r.URL.Path, "Actions/Manager.Reset")
-	systemPath := resolvePath(basePath)
-	base, err := fetchCurrentDataForPath(s, systemPath)
-	if err != nil {
-		return err
+func (s *MockServer) handleBMCReset(w http.ResponseWriter, r *http.Request, body []byte) {
+	basePath := strings.TrimSuffix(r.URL.Path, "/Actions/Manager.Reset")
+	bmcPath := resolvePath(basePath)
+
+	if !containsAny(string(body), powerResetBMCStates) {
+		s.handleError(w, r, fmt.Errorf("%w: %s", errBadReset, string(body)))
+		return
 	}
+
 	s.mu.Lock()
-	if val, ok := base[ResourceLockKey]; ok && val == LockedResourceState {
+	base, err := s.loadResourceLocked(bmcPath)
+	if err != nil {
 		s.mu.Unlock()
-		return errors.New("BMC resource locked, cannot perform reset")
+		s.handleError(w, r, err)
+		return
 	}
-	base[ResourceLockKey] = LockedResourceState
-	s.overrides[urlPath] = base
+
+	if s.isLocked(base) {
+		s.mu.Unlock()
+		s.handleError(w, r, errLocked)
+		return
+	}
+
+	s.setLocked(base, true)
+	s.overrides[bmcPath] = base
 	s.mu.Unlock()
-	if slices.ContainsFunc(powerResetBMCStates, func(s string) bool {
-		return strings.Contains(string(body), s)
-	}) {
-		go func() {
-			time.Sleep(150 * time.Millisecond)
-			s.mu.Lock()
-			base["PowerState"] = PowerOffState
-			// Store the newly modified version
-			s.overrides[urlPath] = base
-			s.log.Info("Powered Off the BMC")
-			s.mu.Unlock()
-			time.Sleep(150 * time.Millisecond)
-			s.mu.Lock()
-			base["PowerState"] = PowerOnState
-			delete(base, ResourceLockKey)
-			// Store the newly modified version
-			s.overrides[urlPath] = base
-			s.mu.Unlock()
-			s.log.Info("Powered On the BMC")
-		}()
-	} else {
-		return fmt.Errorf("unknown reset type in request body: %s", string(body))
-	}
-	return nil
+
+	go s.doBMCReset(bmcPath)
+
+	s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
 }
 
-func handlebiosSettingsApply(s *MockServer, settingsPath string, bodyUpdate map[string]any) error {
-	replace := map[string]any{}
+func (s *MockServer) parseResetType(body []byte, offStates, onStates, resetStates []string) (string, error) {
+	bodyStr := string(body)
 	switch {
-	case strings.Contains(settingsPath, BiosSettingsPathSufficx):
-		// Handle Bios Settings PATCH if needed
-		s.log.Info("Check if BIOS settings that do not require reboot are present", "settings", bodyUpdate)
-		if len(bodyUpdate[AttributesKey].(map[string]any)) > 0 {
-			// currently, hardcoded until specific logic is required
-			if updatedAttributes, ok := bodyUpdate[AttributesKey]; ok {
-				if updatedAttributesMap, ok := updatedAttributes.(map[string]any); ok {
-					for key, newData := range updatedAttributesMap {
-						if slices.Contains(currentSettingsNeedsNoReboot, key) {
-							// apply immediately
-							replace[key] = newData
-						}
-					}
-				}
-			}
-		}
+	case containsAny(bodyStr, offStates):
+		return "off", nil
+	case containsAny(bodyStr, onStates):
+		return "on", nil
+	case containsAny(bodyStr, resetStates):
+		return "reset", nil
 	default:
+		return "", fmt.Errorf("%w: %s", errBadReset, bodyStr)
+	}
+}
+
+func (s *MockServer) doPowerOff(systemPath string) {
+	time.Sleep(150 * time.Millisecond)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if base, ok := s.overrides[systemPath].(map[string]any); ok {
+		base["PowerState"] = PowerOffState
+		s.setLocked(base, false)
+		s.log.Info("Powered off the system")
+	}
+}
+
+func (s *MockServer) doPowerOn(systemPath, basePath string) {
+	time.Sleep(150 * time.Millisecond)
+	s.mu.Lock()
+	if base, ok := s.overrides[systemPath].(map[string]any); ok {
+		base["PowerState"] = PowerOnState
+		s.setLocked(base, false)
+		s.log.Info("Powered on the system")
+	}
+	s.mu.Unlock()
+
+	if err := s.applyPendingBiosSettings(basePath); err != nil {
+		s.log.Error(err, "Failed to apply pending BIOS settings")
+	}
+}
+
+func (s *MockServer) doPowerReset(systemPath, basePath string) {
+	time.Sleep(150 * time.Millisecond)
+	s.mu.Lock()
+	if base, ok := s.overrides[systemPath].(map[string]any); ok {
+		base["PowerState"] = PowerOffState
+		s.log.Info("Powered off the system")
+	}
+	s.mu.Unlock()
+
+	time.Sleep(50 * time.Millisecond)
+
+	s.mu.Lock()
+	if base, ok := s.overrides[systemPath].(map[string]any); ok {
+		base["PowerState"] = PowerOnState
+		s.setLocked(base, false)
+		s.log.Info("Powered on the system")
+	}
+	s.mu.Unlock()
+
+	if err := s.applyPendingBiosSettings(basePath); err != nil {
+		s.log.Error(err, "Failed to apply pending BIOS settings")
+	}
+}
+
+func (s *MockServer) doBMCReset(bmcPath string) {
+	time.Sleep(150 * time.Millisecond)
+	s.mu.Lock()
+	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
+		base["PowerState"] = PowerOffState
+		s.log.Info("Powered off the BMC")
+	}
+	s.mu.Unlock()
+
+	time.Sleep(150 * time.Millisecond)
+
+	s.mu.Lock()
+	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
+		base["PowerState"] = PowerOnState
+		s.setLocked(base, false)
+		s.log.Info("Powered on the BMC")
+	}
+	s.mu.Unlock()
+}
+
+func (s *MockServer) applyBiosSettings(urlPath string, update map[string]any) error {
+	if !strings.Contains(urlPath, biosSettingsPathSuffix) {
 		return nil
 	}
 
-	if len(replace) > 0 {
-		s.log.Info("Applying BIOS settings that do not require reboot", "settings", replace)
-		for key := range replace {
-			delete(bodyUpdate[AttributesKey].(map[string]any), key)
-		}
-		BiosURL := strings.TrimSuffix(settingsPath, "Settings")
-		biosPath := resolvePath(BiosURL)
-		// Load existing resource: from override if exists, else embedded
-		biosBase, err := fetchCurrentDataForPath(s, biosPath)
-		if err != nil {
-			return err
-		}
-		if biosAttributes, ok := biosBase[AttributesKey].(map[string]any); ok {
-			for key, value := range replace {
-				biosAttributes[key] = value
-			}
-		}
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.overrides[biosPath] = biosBase
+	attrs, ok := update[attributesKey].(map[string]any)
+	if !ok || len(attrs) == 0 {
+		return nil
 	}
+
+	// Find settings that can be applied immediately without reboot.
+	immediate := make(map[string]any)
+	for key, val := range attrs {
+		if slices.Contains(noRebootSettings, key) {
+			immediate[key] = val
+		}
+	}
+
+	if len(immediate) == 0 {
+		return nil
+	}
+
+	s.log.Info("Applying BIOS settings without reboot", "settings", immediate)
+
+	// Remove immediate settings from pending update.
+	for key := range immediate {
+		delete(attrs, key)
+	}
+
+	// Apply to current BIOS settings.
+	biosURL := strings.TrimSuffix(urlPath, "/Settings")
+	biosPath := resolvePath(biosURL)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	biosBase, err := s.loadResourceLocked(biosPath)
+	if err != nil {
+		return err
+	}
+
+	if biosAttrs, ok := biosBase[attributesKey].(map[string]any); ok {
+		maps.Copy(biosAttrs, immediate)
+	}
+	s.overrides[biosPath] = biosBase
+
 	return nil
 }
 
-func fetchCurrentDataForPath(s *MockServer, path string) (map[string]any, error) {
+func (s *MockServer) applyPendingBiosSettings(basePath string) error {
+	pendingPath := resolvePath(path.Join(basePath, biosSettingsPathSuffix))
+	currentPath := resolvePath(path.Join(basePath, "Bios"))
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	base := make(map[string]any)
-	if cached, ok := s.overrides[path]; ok {
-		base = deepCopy(cached.(map[string]any))
-	} else {
-		data, err := dataFS.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("resource not found: %v", err)
-		}
-		if err := json.Unmarshal(data, &base); err != nil {
-			return nil, fmt.Errorf("corrupt embedded JSON: %v", err)
-		}
+
+	pending, err := s.loadResourceLocked(pendingPath)
+	if err != nil {
+		return err
 	}
-	s.overrides[path] = base
-	return base, nil
+
+	pendingAttrs, ok := pending[attributesKey].(map[string]any)
+	if !ok || len(pendingAttrs) == 0 {
+		return nil
+	}
+
+	current, err := s.loadResourceLocked(currentPath)
+	if err != nil {
+		return err
+	}
+
+	currentAttrs, ok := current[attributesKey].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	// Apply pending settings to current.
+	maps.Copy(currentAttrs, pendingAttrs)
+
+	// Clear pending settings.
+	pending[attributesKey] = map[string]any{}
+
+	s.overrides[currentPath] = current
+	s.overrides[pendingPath] = pending
+	s.log.Info("Applied pending BIOS settings")
+
+	return nil
+}
+
+// loadResource loads a resource from override or embedded data.
+// Returns a copy that can be safely modified.
+func (s *MockServer) loadResource(filePath string) (map[string]any, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.loadResourceLocked(filePath)
+}
+
+// loadResourceLocked loads a resource while the caller already holds a lock.
+func (s *MockServer) loadResourceLocked(filePath string) (map[string]any, error) {
+	if cached, ok := s.overrides[filePath].(map[string]any); ok {
+		return deepCopy(cached), nil
+	}
+
+	data, err := dataFS.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", errNotFound, err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("%w: %v", errCorruptJSON, err)
+	}
+
+	return result, nil
+}
+
+func (s *MockServer) saveResource(filePath string, data map[string]any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.overrides[filePath] = data
+}
+
+func (s *MockServer) isLocked(resource map[string]any) bool {
+	locked, _ := resource["resourceLock"].(string)
+	return locked == "Locked"
+}
+
+func (s *MockServer) setLocked(resource map[string]any, locked bool) {
+	if locked {
+		resource["resourceLock"] = "Locked"
+	} else {
+		delete(resource, "resourceLock")
+	}
+}
+
+func (s *MockServer) handleError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, errNotFound):
+		http.NotFound(w, r)
+	case errors.Is(err, errCorruptJSON):
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	case errors.Is(err, errLocked):
+		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, errBadReset):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *MockServer) writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	resp, _ := json.MarshalIndent(data, "", "  ")
+	if _, err := w.Write(resp); err != nil {
+		s.log.Error(err, "Failed to write response")
+	}
 }
 
 // Start starts the mock server and stops on ctx cancellation.
 func (s *MockServer) Start(ctx context.Context) error {
 	if s.handler == nil {
-		return fmt.Errorf("mock redfish handler is nil")
+		return errors.New("mock redfish handler is nil")
 	}
 
 	srv := &http.Server{
@@ -665,18 +615,16 @@ func (s *MockServer) Start(ctx context.Context) error {
 		Handler: s.handler,
 	}
 
-	done := make(chan struct{})
-
 	go func() {
 		s.log.Info("Started mock server", "address", s.addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			s.log.Error(err, "Server failed")
 		}
-		close(done)
 	}()
 
 	<-ctx.Done()
 	s.log.Info("Shutting down mock server")
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
 
@@ -685,4 +633,49 @@ func (s *MockServer) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func resolvePath(urlPath string) string {
+	trimmed := strings.TrimPrefix(urlPath, "/redfish/v1")
+	trimmed = strings.Trim(trimmed, "/")
+
+	if trimmed == "" {
+		return "data/index.json"
+	}
+	if strings.HasSuffix(trimmed, ".json") {
+		return path.Join("data", trimmed)
+	}
+	return path.Join("data", trimmed, "index.json")
+}
+
+func deepCopy(m map[string]any) map[string]any {
+	c := make(map[string]any)
+	for k, v := range m {
+		if vMap, ok := v.(map[string]any); ok {
+			c[k] = deepCopy(vMap)
+		} else {
+			c[k] = v
+		}
+	}
+	return c
+}
+
+func mergeJSON(base, update map[string]any) {
+	for k, v := range update {
+		if bv, ok := base[k]; ok {
+			if bvMap, ok := bv.(map[string]any); ok {
+				if vMap, ok := v.(map[string]any); ok {
+					mergeJSON(bvMap, vMap)
+					continue
+				}
+			}
+		}
+		base[k] = v
+	}
+}
+
+func containsAny(s string, substrs []string) bool {
+	return slices.ContainsFunc(substrs, func(sub string) bool {
+		return strings.Contains(s, sub)
+	})
 }

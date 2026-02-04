@@ -331,6 +331,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		server02.ResourceVersion = ""
 		server02.Spec.BIOSSettingsRef = nil
 		Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
+
 		By("Checking if the BIOSSettings have been created")
 		Eventually(Get(biosSettings02)).Should(Succeed())
 		Eventually(Get(biosSettings03)).Should(Succeed())

@@ -74,11 +74,11 @@ type BMCReconciler struct {
 	Conditions        *conditionutils.Accessor
 }
 
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -167,7 +167,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		return ctrl.Result{}, err
 	}
 
-	if modified, err := r.handleAnnotionOperations(ctx, log, bmcObj, bmcClient); err != nil || modified {
+	if modified, err := r.handleAnnotationOperations(ctx, log, bmcObj, bmcClient); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -343,19 +343,21 @@ func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bm
 	if dnsRecord.GetNamespace() == "" {
 		dnsRecord.SetNamespace(r.ManagerNamespace)
 	}
+
 	if err := controllerutil.SetControllerReference(bmcObj, dnsRecord, r.Scheme); err != nil {
 		return fmt.Errorf("failed to set controller reference: %w", err)
 	}
-	err = r.Patch(ctx, dnsRecord, client.Apply, fieldOwner, client.ForceOwnership)
-	if err != nil {
-		return fmt.Errorf("failed to create or patch DNS record: %w", err)
+
+	dnsRecordApply := client.ApplyConfigurationFromUnstructured(dnsRecord)
+	if err := r.Apply(ctx, dnsRecordApply, fieldOwner, client.ForceOwnership); err != nil {
+		return fmt.Errorf("failed to apply DNS record: %w", err)
 	}
 
 	log.Info("Created or patched DNS record", "RecordName", dnsRecord.GetName())
 	return nil
 }
 
-func (r *BMCReconciler) handleAnnotionOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {
+func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {
 	operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !ok {
 		return false, nil

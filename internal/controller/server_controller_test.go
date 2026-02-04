@@ -173,16 +173,16 @@ var _ = Describe("Server Controller", func() {
 
 		// Since the bycrypted password hash is not deterministic, we will extract if from the actual secret and
 		// add it to our ignition data which we want to compare the rest with.
-		var parsedData map[string]interface{}
+		var parsedData map[string]any
 		Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).ToNot(HaveOccurred())
 
-		passwd, ok := parsedData["passwd"].(map[string]interface{})
+		passwd, ok := parsedData["passwd"].(map[string]any)
 		Expect(ok).To(BeTrue())
 
-		users, _ := passwd["users"].([]interface{})
+		users, _ := passwd["users"].([]any)
 		Expect(users).To(HaveLen(1))
 
-		user, ok := users[0].(map[string]interface{})
+		user, ok := users[0].(map[string]any)
 		Expect(ok).To(BeTrue())
 		Expect(user).To(HaveKeyWithValue("name", "metal"))
 
@@ -368,16 +368,16 @@ var _ = Describe("Server Controller", func() {
 
 		// Since the bycrypted password hash is not deterministic we will extract if from the actual secret and
 		// add it to our ignition data which we want to compare the rest with.
-		var parsedData map[string]interface{}
+		var parsedData map[string]any
 		Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).ToNot(HaveOccurred())
 
-		passwd, ok := parsedData["passwd"].(map[string]interface{})
+		passwd, ok := parsedData["passwd"].(map[string]any)
 		Expect(ok).To(BeTrue())
 
-		users, _ := passwd["users"].([]interface{})
+		users, _ := passwd["users"].([]any)
 		Expect(users).To(HaveLen(1))
 
-		user, ok := users[0].(map[string]interface{})
+		user, ok := users[0].(map[string]any)
 		Expect(ok).To(BeTrue())
 		Expect(user).To(HaveKeyWithValue("name", "metal"))
 

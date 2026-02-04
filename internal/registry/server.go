@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 
@@ -31,13 +30,13 @@ type Server struct {
 }
 
 // NewServer initializes and returns a new Server instance.
-func NewServer(log logr.Logger, addr string, k8sClient client.Client) *Server {
+func NewServer(logger logr.Logger, addr string, k8sClient client.Client) *Server {
 	mux := http.NewServeMux()
 	server := &Server{
 		addr:         addr,
 		mux:          mux,
 		systemsStore: &sync.Map{},
-		log:          log,
+		log:          logger,
 		k8sClient:    k8sClient,
 	}
 	server.routes()
@@ -130,39 +129,39 @@ func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("Received unsupported HTTP method", "method", r.Method)
 		return
 	}
-	var bootstate registry.BootstatePayload
-	if err := json.NewDecoder(r.Body).Decode(&bootstate); err != nil {
+	var payload registry.BootstatePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		s.log.Error(err, "Failed to decode bootstate payload")
 		return
 	}
-	log.Printf("Received boot state for system UUID: %s, Booted: %t\n", bootstate.SystemUUID, bootstate.Booted)
-	if !bootstate.Booted {
+	s.log.Info("Received boot state for system", "SystemUUID", payload.SystemUUID, "BootState", payload.Booted)
+	if !payload.Booted {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 	var servers metalv1alpha1.ServerList
-	if err := s.k8sClient.List(r.Context(), &servers, client.MatchingFields{"spec.systemUUID": bootstate.SystemUUID}); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to list servers for system UUID %s: %v", bootstate.SystemUUID, err), http.StatusInternalServerError)
-		s.log.Error(err, "Failed to list servers for system", "systemUUID", bootstate.SystemUUID)
+	if err := s.k8sClient.List(r.Context(), &servers, client.MatchingFields{"spec.systemUUID": payload.SystemUUID}); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to list servers for system UUID %s: %v", payload.SystemUUID, err), http.StatusInternalServerError)
+		s.log.Error(err, "Failed to list servers for system", "systemUUID", payload.SystemUUID)
 		return
 	}
 	if len(servers.Items) != 1 {
-		http.Error(w, fmt.Sprintf("No servers found for system UUID %s", bootstate.SystemUUID), http.StatusNotFound)
-		s.log.Info("Found unexpected number of server of system", "systemUUID", bootstate.SystemUUID, "count", len(servers.Items))
+		http.Error(w, fmt.Sprintf("No servers found for system UUID %s", payload.SystemUUID), http.StatusNotFound)
+		s.log.Info("Found unexpected number of server of system", "systemUUID", payload.SystemUUID, "count", len(servers.Items))
 		return
 	}
 	server := servers.Items[0]
 	bootConfigRef := server.Spec.BootConfigurationRef
 	if bootConfigRef == nil {
-		http.Error(w, fmt.Sprintf("Servers for system UUID %s does not reference a ServerBootConfiguration", bootstate.SystemUUID), http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("Servers for system UUID %s does not reference a ServerBootConfiguration", payload.SystemUUID), http.StatusNotFound)
 		s.log.Info("Server does not reference a ServerBootConfiguration", "server", server.Name)
 		return
 	}
 	bootConfigKey := client.ObjectKey{Namespace: bootConfigRef.Namespace, Name: bootConfigRef.Name}
 	var bootConfig metalv1alpha1.ServerBootConfiguration
 	if err := s.k8sClient.Get(r.Context(), bootConfigKey, &bootConfig); err != nil {
-		http.Error(w, fmt.Sprintf("No ServerBootConfig found for system UUID %s", bootstate.SystemUUID), http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("No ServerBootConfig found for system UUID %s", payload.SystemUUID), http.StatusNotFound)
 		s.log.Error(err, "Failed to retrieve ServerBootConfiguration", "name", bootConfigKey.Name, "namespace", bootConfig.Namespace)
 		return
 	}

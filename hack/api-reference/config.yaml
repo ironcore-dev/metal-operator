@@ -6,7 +6,7 @@ processor:
     - "List$"
 
 render:
-  kubernetesVersion: "1.34"
+  kubernetesVersion: "1.35"
   externalPackages:
     - typeMatchPrefix: "^net/netip"
       docsURLTemplate: "https://pkg.go.dev/net/netip#{{.TypeIdentifier}}"
@@ -15,7 +15,7 @@ render:
     - typeMatchPrefix: "^k8s\\.io/apimachinery/pkg/types"
       docsURLTemplate: "https://pkg.go.dev/k8s.io/apimachinery/pkg/types#{{.TypeIdentifier}}"
     - typeMatchPrefix: "^k8s\\.io/(api|apimachinery/pkg/apis)/"
-      docsURLTemplate: "https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#{{lower .TypeIdentifier}}-{{arrIndex .PackageSegments -1}}-{{arrIndex .PackageSegments -2}}"
+      docsURLTemplate: "https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#{{lower .TypeIdentifier}}-{{arrIndex .PackageSegments -1}}-{{arrIndex .PackageSegments -2}}"
   typeDisplayNamePrefixOverrides:
     k8s.io/api/: "Kubernetes "
     k8s.io/apimachinery/pkg/apis/: "Kubernetes "

@@ -12,7 +12,7 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY cmd/manager/main.go cmd/manager/main.go
+COPY cmd/main.go cmd/main.go
 COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
 COPY api/ api/
 COPY internal/ internal/
@@ -26,7 +26,7 @@ COPY bmc/ bmc/
 FROM builder AS manager-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/manager/main.go
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 FROM builder AS probe-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
@@ -50,6 +50,6 @@ COPY --from=probe-builder /workspace/metalprobe .
 COPY hack/metalprobe_launch.sh /launch.sh
 RUN chmod +x /launch.sh
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates bash curl iproute2 iputils-ping net-tools ethtool lldpd && \
+    ca-certificates bash curl iproute2 iputils-ping net-tools ethtool lldpd && \
     rm -rf /var/lib/apt/lists/*
 ENTRYPOINT ["/launch.sh"]

@@ -8,11 +8,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -24,48 +22,38 @@ var bmcsecretlog = logf.Log.WithName("bmcsecret-resource")
 
 // SetupBMCSecretWebhookWithManager registers the webhook for BMCSecret in the manager.
 func SetupBMCSecretWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&metalv1alpha1.BMCSecret{}).
-		WithValidator(&BMCSecretCustomValidator{}).
+	return ctrl.NewWebhookManagedBy(mgr, &metalv1alpha1.BMCSecret{}).
+		WithValidator(&BMCSecretCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 }
+
+// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
+// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
+// +kubebuilder:webhook:path=/validate-metal-ironcore-dev-v1alpha1-bmcsecret,mutating=false,failurePolicy=fail,sideEffects=None,groups=metal.ironcore.dev,resources=bmcsecrets,verbs=create;update;delete,versions=v1alpha1,name=vbmcsecret-v1alpha1.kb.io,admissionReviewVersions=v1
 
 type BMCSecretCustomValidator struct {
 	Client client.Client
 }
 
-var _ webhook.CustomValidator = &BMCSecretCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCSecret.
-func (v *BMCSecretCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	bmcsecret, ok := obj.(*metalv1alpha1.BMCSecret)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSecret object but got %T", obj)
-	}
-	bmcsecretlog.Info("Validation for BMCSecret upon creation", "name", bmcsecret.GetName())
+func (v *BMCSecretCustomValidator) ValidateCreate(_ context.Context, obj *metalv1alpha1.BMCSecret) (admission.Warnings, error) {
+	bmcsecretlog.Info("Validation for BMCSecret upon creation", "name", obj.GetName())
 
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCSecret.
-func (v *BMCSecretCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	bmcsecret, ok := newObj.(*metalv1alpha1.BMCSecret)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSecret object for the newObj but got %T", newObj)
-	}
-	oldSecret, ok := oldObj.(*metalv1alpha1.BMCSecret)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSecret object for the oldObj but got %T", oldObj)
-	}
-	bmcsecretlog.Info("Validation for BMCSecret upon update", "name", bmcsecret.GetName())
+func (v *BMCSecretCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj *metalv1alpha1.BMCSecret) (admission.Warnings, error) {
+	bmcsecretlog.Info("Validation for BMCSecret upon update", "name", newObj.GetName())
 
-	if oldSecret.Immutable != nil && *oldSecret.Immutable {
-		if bmcsecret.Immutable == nil || !*bmcsecret.Immutable {
+	if oldObj.Immutable != nil && *oldObj.Immutable {
+		if newObj.Immutable == nil || !*newObj.Immutable {
 			return nil, fmt.Errorf("immutable field cannot be changed from true to false")
 		}
-		if !reflect.DeepEqual(bmcsecret.Data, oldSecret.Data) {
+		if !reflect.DeepEqual(newObj.Data, oldObj.Data) {
 			return nil, fmt.Errorf("data field is immutable and cannot be updated")
 		}
-		if !reflect.DeepEqual(bmcsecret.StringData, oldSecret.StringData) {
+		if !reflect.DeepEqual(newObj.StringData, oldObj.StringData) {
 			return nil, fmt.Errorf("stringData field is immutable and cannot be updated")
 		}
 	}
@@ -74,12 +62,8 @@ func (v *BMCSecretCustomValidator) ValidateUpdate(ctx context.Context, oldObj, n
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCSecret.
-func (v *BMCSecretCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	bmcsecret, ok := obj.(*metalv1alpha1.BMCSecret)
-	if !ok {
-		return nil, fmt.Errorf("expected a BMCSecret object but got %T", obj)
-	}
-	bmcsecretlog.Info("Validation for BMCSecret upon deletion", "name", bmcsecret.GetName())
+func (v *BMCSecretCustomValidator) ValidateDelete(_ context.Context, obj *metalv1alpha1.BMCSecret) (admission.Warnings, error) {
+	bmcsecretlog.Info("Validation for BMCSecret upon deletion", "name", obj.GetName())
 
 	return nil, nil
 }

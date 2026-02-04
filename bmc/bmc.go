@@ -147,7 +147,7 @@ type AllowedValues struct {
 
 type RegistryEntryAttributes struct {
 	AttributeName string
-	CurrentValue  interface{}
+	CurrentValue  any
 	DisplayName   string
 	DisplayOrder  int
 	HelpText      string

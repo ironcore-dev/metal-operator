@@ -40,7 +40,7 @@ type Endpoint struct {
 	Status EndpointStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // EndpointList contains a list of Endpoint
 type EndpointList struct {

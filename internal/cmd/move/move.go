@@ -58,7 +58,7 @@ func clearFields(obj client.Object) map[string]any {
 	}
 
 	if so["status"] != nil && so["status"].(map[string]any)["conditions"] != nil {
-		for _, field := range so["status"].(map[string]any)["conditions"].([]interface{}) {
+		for _, field := range so["status"].(map[string]any)["conditions"].([]any) {
 			delete(field.(map[string]any), "lastTransitionTime")
 		}
 	}

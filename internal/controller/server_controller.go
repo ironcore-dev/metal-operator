@@ -311,10 +311,10 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logg
 	}
 	log.V(1).Info("Applied Server boot configuration")
 
-	if err := r.pxeBootServer(ctx, log, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to set PXE boot for server: %w", err)
+	if err := r.bootServer(ctx, log, bmcClient, server); err != nil {
+		return false, fmt.Errorf("failed to boot the server: %w", err)
 	}
-	log.V(1).Info("Set PXE Boot for Server")
+	log.V(1).Info("Powered on Server")
 
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
 		return false, err
@@ -444,10 +444,10 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 
 	// TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
-		if err := r.pxeBootServer(ctx, log, bmcClient, server); err != nil {
+		if err := r.bootServer(ctx, log, bmcClient, server); err != nil {
 			return false, fmt.Errorf("failed to boot server: %w", err)
 		}
-		log.V(1).Info("Server is powered off, booting Server in PXE")
+		log.V(1).Info("Server is powered off, booting Server")
 	}
 	if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
@@ -777,18 +777,18 @@ func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, s
 	return config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
 }
 
-func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) bootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
 	if server == nil || server.Spec.BootConfigurationRef == nil {
 		log.V(1).Info("Server not ready for netboot")
 		return nil
 	}
 
 	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
-		return fmt.Errorf("can only PXE boot server with valid BMC ref or inline BMC configuration")
+		return fmt.Errorf("can only boot server with valid BMC ref or inline BMC configuration")
 	}
 
-	if err := bmcClient.SetPXEBootOnce(ctx, server.Spec.SystemURI); err != nil {
-		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
+	if err := bmcClient.SetNextBoot(ctx, server.Spec.SystemURI); err != nil {
+		return fmt.Errorf("failed to set next boot for server: %w", err)
 	}
 	return nil
 }

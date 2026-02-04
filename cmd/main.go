@@ -15,6 +15,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
 	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
+	"github.com/stmcginnis/gofish/redfish"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -92,6 +93,7 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
+		defaultBootTargetString            string
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -150,6 +152,8 @@ func main() { // nolint: gocyclo
 		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
+	flag.StringVar(&defaultBootTargetString, "default-boot-target", "",
+		"Default boot target to set for the Server. Valid values are: 'Pxe', 'UefiHttp'.")
 
 	opts := zap.Options{
 		Development: true,
@@ -178,6 +182,19 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "unable to load DNS record template")
 			os.Exit(1)
 		}
+	}
+
+	var defaultBootTarget redfish.BootSourceOverrideTarget
+	switch defaultBootTargetString {
+	case "":
+		fallthrough
+	case string(redfish.PxeBootSourceOverrideTarget):
+		defaultBootTarget = redfish.PxeBootSourceOverrideTarget
+	case string(redfish.UefiHTTPBootSourceOverrideTarget):
+		defaultBootTarget = redfish.UefiHTTPBootSourceOverrideTarget
+	default:
+		setupLog.Error(nil, "invalid default boot target", "defaultBootTarget", defaultBootTargetString)
+		os.Exit(1)
 	}
 
 	// Load MACAddress DB
@@ -377,6 +394,7 @@ func main() { // nolint: gocyclo
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
+			DefaultBootTarget:       defaultBootTarget,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,

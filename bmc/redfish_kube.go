@@ -368,8 +368,8 @@ func (r *RedfishKubeBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, ta
 	return task, nil
 }
 
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+// SetNextBoot sets the boot device for the next system boot using Redfish.
+func (r *RedfishKubeBMC) SetNextBoot(ctx context.Context, systemURI string) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
@@ -378,10 +378,19 @@ func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) e
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
 	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
 	if system.Boot.BootSourceOverrideMode != "" {
-		setBoot = pxeBootWithSettingUEFIBootMode
+		setBoot = redfish.Boot{
+			BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
+			BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,
+			// TODO: override later with the correct boot target based on the system configuration and available boot targets
+			BootSourceOverrideTarget: r.options.DefaultBootTarget,
+		}
 	} else {
-		setBoot = pxeBootWithoutSettingUEFIBootMode
+		setBoot = redfish.Boot{
+			BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
+			BootSourceOverrideTarget:  r.options.DefaultBootTarget,
+		}
 	}
+
 	if err := system.SetBoot(setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}

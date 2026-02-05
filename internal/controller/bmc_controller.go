@@ -545,38 +545,36 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 		return false, nil
 	}
 	log.V(1).Info("Handling event subscriptions for BMC")
-	metricsReportLink := bmcObj.Status.MetricsReportSubscriptionLink
-	eventLink := bmcObj.Status.EventsSubscriptionLink
+	bmcBase := bmcObj.DeepCopy()
 	modified := false
 
-	if metricsReportLink == "" {
+	defer func() {
+		if modified {
+			log.Info("Patching event subscriptions", "metrics", bmcObj.Status.MetricsReportSubscriptionLink, "events", bmcObj.Status.EventsSubscriptionLink)
+			if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+				log.Error(err, "failed to patch server status with subscription links")
+			}
+		}
+	}()
+	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
 		var err error
-		metricsReportLink, err = serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
+		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
 			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
 		}
+		bmcObj.Status.MetricsReportSubscriptionLink = link
 		modified = true
 	}
-	if eventLink == "" {
+	if bmcObj.Status.EventsSubscriptionLink == "" {
 		var err error
-		eventLink, err = serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
+		link, err := serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
 			return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
 		}
+		bmcObj.Status.EventsSubscriptionLink = link
 		modified = true
 	}
-	if !modified {
-		return false, nil
-	}
-	log.Info("event subscriptions created", "metricsReportLink", metricsReportLink, "eventLink", eventLink)
-	bmcBase := bmcObj.DeepCopy()
-	bmcObj.Status.MetricsReportSubscriptionLink = metricsReportLink
-	bmcObj.Status.EventsSubscriptionLink = eventLink
-	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-		return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
-	}
-	log.Info("Subscribed to server events and metrics")
-	return true, nil
+	return modified, nil
 }
 
 func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {

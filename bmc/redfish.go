@@ -1272,6 +1272,9 @@ func (r *RedfishBMC) CreateEventSubscription(
 	}
 	// return subscription link from returned location
 	subscriptionLink := resp.Header.Get("Location")
+	if subscriptionLink == "" {
+		return "", fmt.Errorf("failed to get subscription link from response header")
+	}
 	urlParser, err := url.ParseRequestURI(subscriptionLink)
 	if err == nil {
 		subscriptionLink = urlParser.RequestURI()

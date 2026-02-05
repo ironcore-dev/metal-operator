@@ -65,6 +65,24 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 	return condition, nil
 }
 
+// SetCondition is a helper to get (or create) a condition and update it with status, reason, and message in one call.
+func SetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition,
+	conditionType string, status metav1.ConditionStatus, reason, message string) (*metav1.Condition, error) {
+	condition, err := GetCondition(acc, conditions, conditionType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get condition %s: %w", conditionType, err)
+	}
+	if err := acc.Update(
+		condition,
+		conditionutils.UpdateStatus(status),
+		conditionutils.UpdateReason(reason),
+		conditionutils.UpdateMessage(message),
+	); err != nil {
+		return nil, fmt.Errorf("failed to update condition %s: %w", conditionType, err)
+	}
+	return condition, nil
+}
+
 // GetServerByName returns a Server object by its name or an error in case the object can not be found.
 func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}

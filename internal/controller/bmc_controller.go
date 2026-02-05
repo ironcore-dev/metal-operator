@@ -548,14 +548,6 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 	bmcBase := bmcObj.DeepCopy()
 	modified := false
 
-	defer func() {
-		if modified {
-			log.Info("Patching event subscriptions", "metrics", bmcObj.Status.MetricsReportSubscriptionLink, "events", bmcObj.Status.EventsSubscriptionLink)
-			if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-				log.Error(err, "failed to patch server status with subscription links")
-			}
-		}
-	}()
 	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
 		var err error
 		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
@@ -564,6 +556,9 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 		}
 		bmcObj.Status.MetricsReportSubscriptionLink = link
 		modified = true
+		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+		}
 	}
 	if bmcObj.Status.EventsSubscriptionLink == "" {
 		var err error
@@ -573,6 +568,9 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 		}
 		bmcObj.Status.EventsSubscriptionLink = link
 		modified = true
+		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+		}
 	}
 	return modified, nil
 }

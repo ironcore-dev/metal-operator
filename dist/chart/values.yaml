@@ -89,3 +89,14 @@ certmanager:
 # [NETWORK POLICIES]: To enable NetworkPolicies set true
 networkPolicy:
   enable: false
+
+# [IGNITION]: Ignition template configuration
+# By default, the operator uses a template file baked into the container at /etc/metal-operator/ignition-template.yaml
+# Enable this to override the template by mounting a ConfigMap at that location
+ignition:
+  # Set to true to override the default ignition template with a custom one.
+  override: false
+  # Template content that can be customized - this will be created as a ConfigMap
+  # and mounted to override the default template
+  # template: |
+    

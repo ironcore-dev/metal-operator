@@ -512,8 +512,7 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		TimeoutExpiry:               biosSettingsApplyTimeout,
-		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
+		TimeoutExpiry: biosSettingsApplyTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "biossettings")
 		os.Exit(1)
@@ -533,7 +532,6 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "biosversion")
 		os.Exit(1)
@@ -553,7 +551,6 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "bmcsettings")
 		os.Exit(1)
@@ -573,7 +570,6 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "bmcversion")
 		os.Exit(1)
@@ -675,6 +671,50 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "Failed to create webhook", "webhook", "bmcversion")
 			os.Exit(1)
 		}
+	}
+	if err = (&controller.BMCVersionSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BMCVersionSet")
+		os.Exit(1)
+	}
+	if err = (&controller.BIOSSettingsSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettingsSet")
+		os.Exit(1)
+	}
+	if err := (&controller.BMCSettingsSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BMCSettingsSet")
+		os.Exit(1)
+	}
+	if err := (&controller.BMCUserSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BMCUserSet")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCUserReconciler{
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "User")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

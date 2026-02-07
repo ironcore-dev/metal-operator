@@ -17,6 +17,7 @@ resources:
 - bases/metal.ironcore.dev_bmcversionsets.yaml
 - bases/metal.ironcore.dev_biossettingssets.yaml
 - bases/metal.ironcore.dev_bmcusers.yaml
+- bases/metal.ironcore.dev_bmcusersets.yaml
 - bases/metal.ironcore.dev_bmcsettingssets.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 

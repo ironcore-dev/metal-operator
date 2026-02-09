@@ -29,7 +29,25 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
+
+	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
+	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
+	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
+	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
+	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
+	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
+	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
+
+type BMCTaskFetchFailedError struct {
+	TaskURI  string
+	Resource string
+	Err      error
+}
+
+func (e BMCTaskFetchFailedError) Error() string {
+	return e.Err.Error()
+}
 
 // GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
 func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client, ref *metalv1alpha1.ObjectReference) (*metalv1alpha1.ServerMaintenance, error) {

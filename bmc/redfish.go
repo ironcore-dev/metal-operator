@@ -192,15 +192,27 @@ func (r *RedfishBMC) SetNetworkBoot(ctx context.Context, systemURI string, bootS
 		BootSourceOverrideTarget:  bootSourceTarget,
 	}
 
-	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
-	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
+	// HTTPBoot (UefiHttp) always requires UEFI mode. For PXE, only upgrade to
+	// UEFI when the BMC reports a non-UEFI mode (e.g. Legacy) so we don't
+	// force UEFI on systems that may legitimately PXE-boot in Legacy mode.
+	switch {
+	case bootSourceTarget == redfish.UefiHTTPBootSourceOverrideTarget:
 		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
-	}
-
-	// TODO: hack for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
-	if isSuperMicroSystem(system) {
-		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+	case isSuperMicroSystem(system):
+		// SuperMicro BMCs require an explicit BootSourceOverrideMode in every
+		// request. Use UEFI as the safe default since all modern servers
+		// support it.
+		if system.Boot.BootSourceOverrideMode != "" {
+			setBoot.BootSourceOverrideMode = system.Boot.BootSourceOverrideMode
+		} else {
+			setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+		}
+	default:
+		// For other vendors, only set the mode when the BMC reports a
+		// non-UEFI mode so we upgrade Legacy → UEFI for PXE.
+		if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
+			setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+		}
 	}
 
 	log := ctrl.LoggerFrom(ctx)

@@ -380,9 +380,11 @@ func (r *RedfishKubeBMC) SetNetworkBoot(ctx context.Context, systemURI string, b
 		BootSourceOverrideTarget:  bootSourceTarget,
 	}
 
-	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
-	if system.Boot.BootSourceOverrideMode != "" {
+	// HTTPBoot (UefiHttp) always requires UEFI mode. For PXE, only upgrade to
+	// UEFI when the BMC reports a non-UEFI mode.
+	if bootSourceTarget == redfish.UefiHTTPBootSourceOverrideTarget {
+		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+	} else if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
 		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
 	}
 	if err := system.SetBoot(setBoot); err != nil {

@@ -886,6 +886,42 @@ _Appears in:_
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
 
 
+#### BootMethod
+
+_Underlying type:_ _string_
+
+BootMethod specifies the method used to network boot a server.
+
+
+
+_Appears in:_
+- [ServerBootConfigurationSpec](#serverbootconfigurationspec)
+- [ServerClaimSpec](#serverclaimspec)
+
+| Field | Description |
+| --- | --- |
+| `PXE` | BootMethodPXE boots the server using PXE (Pre-Boot Execution Environment).<br /> |
+| `HTTPBoot` | BootMethodHTTPBoot boots the server using UEFI HTTP Boot.<br /> |
+
+
+#### BootMode
+
+_Underlying type:_ _string_
+
+BootMode specifies whether the network boot override is applied once or persistently.
+
+
+
+_Appears in:_
+- [ServerBootConfigurationSpec](#serverbootconfigurationspec)
+- [ServerClaimSpec](#serverclaimspec)
+
+| Field | Description |
+| --- | --- |
+| `Once` | BootModeOnce applies the network boot method for the next boot only.<br />After the server boots once via the specified method, the BIOS boot order takes over.<br />This is the typical mode for OS installation workflows.<br /> |
+| `Continuous` | BootModeContinuous applies the network boot method on every boot cycle.<br />The server will always network-boot using the specified method until changed.<br />This is used for diskless/stateless servers or persistent netboot environments.<br /> |
+
+
 #### BootOrder
 
 
@@ -1300,6 +1336,8 @@ _Appears in:_
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to the server for which this boot configuration is intended. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server.<br />This field is optional and can be omitted if not specified. |  |  |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Kubernetes Secret object that contains<br />the ignition configuration for the server. This field is optional and can be omitted if not specified. |  |  |
+| `bootMethod` _[BootMethod](#bootmethod)_ | BootMethod specifies the network boot method to use for the server.<br />This value can be overridden independently of the originating ServerClaim's preference.<br />Supported values are "PXE" and "HTTPBoot".<br />Defaults to "PXE" if not specified. | PXE | Enum: [PXE HTTPBoot] <br /> |
+| `bootMode` _[BootMode](#bootmode)_ | BootMode controls whether the boot method override is applied once or on every boot.<br />"Once" boots from the network one time (e.g. for OS installation), then the BIOS boot<br />order takes over. "Continuous" boots from the network on every boot cycle.<br />Defaults to "Once" if not specified. | Once | Enum: [Once Continuous] <br /> |
 
 
 #### ServerBootConfigurationState
@@ -1391,6 +1429,8 @@ _Appears in:_
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed.<br />This field is optional and can be omitted if a specific server is referenced using ServerRef. |  | Optional: \{\} <br /> |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Kubernetes Secret object that contains<br />the ignition configuration for the server. This field is optional and can be omitted if not specified. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
+| `bootMethod` _[BootMethod](#bootmethod)_ | BootMethod specifies the preferred network boot method for the server.<br />This value is used as the default when creating a ServerBootConfiguration for this claim.<br />Supported values are "PXE" and "HTTPBoot".<br />Defaults to "PXE" if not specified. | PXE | Enum: [PXE HTTPBoot] <br /> |
+| `bootMode` _[BootMode](#bootmode)_ | BootMode controls whether the boot method override is applied once or on every boot.<br />"Once" boots from the network one time (e.g. for OS installation), then the BIOS boot<br />order takes over. "Continuous" boots from the network on every boot cycle.<br />This value is used as the default when creating a ServerBootConfiguration for this claim.<br />Defaults to "Once" if not specified. | Once | Enum: [Once Continuous] <br /> |
 
 
 #### ServerClaimStatus

@@ -36,6 +36,8 @@ type ServerClaimReconciler struct {
 	Cache                   cache.Cache
 	Scheme                  *runtime.Scheme
 	MaxConcurrentReconciles int
+	DefaultBootMethod       metalv1alpha1.BootMethod
+	DefaultBootMode         metalv1alpha1.BootMode
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverclaims,verbs=get;list;watch;create;update;patch;delete
@@ -262,6 +264,8 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log 
 		config.Spec.ServerRef = *claim.Spec.ServerRef
 		config.Spec.Image = claim.Spec.Image
 		config.Spec.IgnitionSecretRef = claim.Spec.IgnitionSecretRef
+		config.Spec.BootMethod = r.effectiveBootMethod(claim)
+		config.Spec.BootMode = r.effectiveBootMode(claim)
 		return ctrl.SetControllerReference(claim, config, r.Scheme)
 	})
 	if err != nil {
@@ -278,6 +282,30 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log 
 		Kind:       "ServerBootConfiguration",
 	}
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
+}
+
+// effectiveBootMethod returns the claim's boot method if set, otherwise falls back
+// to the reconciler's configured default.
+func (r *ServerClaimReconciler) effectiveBootMethod(claim *metalv1alpha1.ServerClaim) metalv1alpha1.BootMethod {
+	if claim.Spec.BootMethod != "" {
+		return claim.Spec.BootMethod
+	}
+	if r.DefaultBootMethod != "" {
+		return r.DefaultBootMethod
+	}
+	return metalv1alpha1.BootMethodPXE
+}
+
+// effectiveBootMode returns the claim's boot mode if set, otherwise falls back
+// to the reconciler's configured default.
+func (r *ServerClaimReconciler) effectiveBootMode(claim *metalv1alpha1.ServerClaim) metalv1alpha1.BootMode {
+	if claim.Spec.BootMode != "" {
+		return claim.Spec.BootMode
+	}
+	if r.DefaultBootMode != "" {
+		return r.DefaultBootMode
+	}
+	return metalv1alpha1.BootModeOnce
 }
 
 func (r *ServerClaimReconciler) removeClaimRefFromServer(ctx context.Context, server *metalv1alpha1.Server) error {

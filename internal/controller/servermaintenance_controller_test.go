@@ -84,8 +84,10 @@ var _ = Describe("ServerMaintenance Controller", func() {
 				ServerBootConfigurationTemplate: &metalv1alpha1.ServerBootConfigurationTemplate{
 					Name: "test-boot",
 					Spec: metalv1alpha1.ServerBootConfigurationSpec{
-						ServerRef: corev1.LocalObjectReference{Name: server.Name},
-						Image:     "some_image",
+						ServerRef:  corev1.LocalObjectReference{Name: server.Name},
+						Image:      "some_image",
+						BootMethod: metalv1alpha1.BootMethodHTTPBoot,
+						BootMode:   metalv1alpha1.BootModeContinuous,
 					},
 				},
 			},
@@ -100,6 +102,19 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Checking the Server is in maintenance")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
+		))
+
+		By("Ensuring the ServerBootConfiguration has the correct boot settings from the template")
+		maintenanceBootConfig := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serverMaintenance.Name,
+				Namespace: ns.Name,
+			},
+		}
+		Eventually(Object(maintenanceBootConfig)).Should(SatisfyAll(
+			HaveField("Spec.Image", "some_image"),
+			HaveField("Spec.BootMethod", metalv1alpha1.BootMethodHTTPBoot),
+			HaveField("Spec.BootMode", metalv1alpha1.BootModeContinuous),
 		))
 
 		By("Deleting the ServerMaintenance to finish the maintenance on the server")
@@ -209,14 +224,18 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Spec.MaintenanceBootConfigurationRef", Not(BeNil())),
 		))
 
-		By("Ensuring that the ServerBootConfiguration is created")
+		By("Ensuring that the ServerBootConfiguration is created with default boot settings")
 		bootConfig := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
 				Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
 			},
 		}
-		Eventually(Get(bootConfig)).Should(Succeed())
+		Eventually(Object(bootConfig)).Should(SatisfyAll(
+			HaveField("Spec.Image", "foo:latest"),
+			HaveField("Spec.BootMethod", metalv1alpha1.BootMethodPXE),
+			HaveField("Spec.BootMode", metalv1alpha1.BootModeOnce),
+		))
 
 		By("Patching the boot configuration to a Ready state")
 		Eventually(UpdateStatus(bootConfig, func() {

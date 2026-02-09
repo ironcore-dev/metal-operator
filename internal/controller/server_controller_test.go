@@ -20,6 +20,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stmcginnis/gofish/redfish"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -813,3 +814,33 @@ func deleteRegistrySystemIfExists(systemUUID string) {
 		defer resp.Body.Close() //nolint:errcheck
 	}
 }
+
+var _ = Describe("Redfish Boot Mapping", func() {
+	Context("redfishBootSourceTarget", func() {
+		It("should map PXE to Pxe boot source override target", func() {
+			Expect(redfishBootSourceTarget(metalv1alpha1.BootMethodPXE)).To(Equal(redfish.PxeBootSourceOverrideTarget))
+		})
+
+		It("should map HTTPBoot to UefiHttp boot source override target", func() {
+			Expect(redfishBootSourceTarget(metalv1alpha1.BootMethodHTTPBoot)).To(Equal(redfish.UefiHTTPBootSourceOverrideTarget))
+		})
+
+		It("should default to Pxe for an empty boot method", func() {
+			Expect(redfishBootSourceTarget(metalv1alpha1.BootMethod(""))).To(Equal(redfish.PxeBootSourceOverrideTarget))
+		})
+	})
+
+	Context("redfishBootSourceEnabled", func() {
+		It("should map Once to Once boot source override enabled", func() {
+			Expect(redfishBootSourceEnabled(metalv1alpha1.BootModeOnce)).To(Equal(redfish.OnceBootSourceOverrideEnabled))
+		})
+
+		It("should map Continuous to Continuous boot source override enabled", func() {
+			Expect(redfishBootSourceEnabled(metalv1alpha1.BootModeContinuous)).To(Equal(redfish.ContinuousBootSourceOverrideEnabled))
+		})
+
+		It("should default to Once for an empty boot mode", func() {
+			Expect(redfishBootSourceEnabled(metalv1alpha1.BootMode(""))).To(Equal(redfish.OnceBootSourceOverrideEnabled))
+		})
+	})
+})

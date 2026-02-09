@@ -92,6 +92,8 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
+		defaultBootMethod                  string
+		defaultBootMode                    string
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -150,6 +152,10 @@ func main() { // nolint: gocyclo
 		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
+	flag.StringVar(&defaultBootMethod, "default-boot-method", "PXE",
+		"Default network boot method when not specified by a ServerClaim. Supported values: PXE, HTTPBoot.")
+	flag.StringVar(&defaultBootMode, "default-boot-mode", "Once",
+		"Default boot mode when not specified by a ServerClaim. Supported values: Once, Continuous.")
 
 	opts := zap.Options{
 		Development: true,
@@ -178,6 +184,20 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "unable to load DNS record template")
 			os.Exit(1)
 		}
+	}
+
+	// Validate boot method and mode flags
+	switch metalv1alpha1.BootMethod(defaultBootMethod) {
+	case metalv1alpha1.BootMethodPXE, metalv1alpha1.BootMethodHTTPBoot:
+	default:
+		setupLog.Error(nil, "invalid default-boot-method, must be PXE or HTTPBoot", "value", defaultBootMethod)
+		os.Exit(1)
+	}
+	switch metalv1alpha1.BootMode(defaultBootMode) {
+	case metalv1alpha1.BootModeOnce, metalv1alpha1.BootModeContinuous:
+	default:
+		setupLog.Error(nil, "invalid default-boot-mode, must be Once or Continuous", "value", defaultBootMode)
+		os.Exit(1)
 	}
 
 	// Load MACAddress DB
@@ -399,13 +419,17 @@ func main() { // nolint: gocyclo
 		Cache:                   mgr.GetCache(),
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,
+		DefaultBootMethod:       metalv1alpha1.BootMethod(defaultBootMethod),
+		DefaultBootMode:         metalv1alpha1.BootMode(defaultBootMode),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerClaim")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerMaintenanceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		DefaultBootMethod: metalv1alpha1.BootMethod(defaultBootMethod),
+		DefaultBootMode:   metalv1alpha1.BootMode(defaultBootMode),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServerMaintenance")
 		os.Exit(1)

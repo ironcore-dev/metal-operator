@@ -59,16 +59,6 @@ type RedfishBMC struct {
 	options Options
 }
 
-var pxeBootWithSettingUEFIBootMode = redfish.Boot{
-	BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,
-	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
-}
-var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
-	BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
-}
-
 type InvalidBIOSSettingsError struct {
 	SettingName  string
 	SettingValue any
@@ -190,19 +180,22 @@ func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	return servers, nil
 }
 
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+// SetNetworkBoot configures the network boot source override on the BMC using Redfish.
+func (r *RedfishBMC) SetNetworkBoot(ctx context.Context, systemURI string, bootSourceTarget redfish.BootSourceOverrideTarget, bootSourceEnabled redfish.BootSourceOverrideEnabled) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	var setBoot redfish.Boot
+
+	setBoot := redfish.Boot{
+		BootSourceOverrideEnabled: bootSourceEnabled,
+		BootSourceOverrideTarget:  bootSourceTarget,
+	}
+
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
 	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
 	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
-		setBoot = pxeBootWithSettingUEFIBootMode
-	} else {
-		setBoot = pxeBootWithoutSettingUEFIBootMode
+		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
 	}
 
 	// TODO: hack for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
@@ -210,9 +203,8 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
 	}
 
-	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
+	log.V(2).Info("Setting network boot", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}

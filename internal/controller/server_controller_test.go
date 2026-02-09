@@ -244,6 +244,12 @@ var _ = Describe("Server Controller", func() {
 			)),
 		))
 
+		By("Ensuring that the LastNetworkBoot is set after initial network boot")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.LastNetworkBoot", Not(BeNil())),
+			HaveField("Status.LastNetworkBoot.BootConfigName", server.Name),
+		))
+
 		By("Starting the probe agent")
 		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
@@ -257,6 +263,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
+			HaveField("Status.LastNetworkBoot", BeNil()),
 		))
 
 		By("Ensuring that the boot configuration has been removed")
@@ -434,6 +441,8 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			HaveField("Status.LastNetworkBoot", Not(BeNil())),
+			HaveField("Status.LastNetworkBoot.BootConfigName", server.Name),
 			HaveField("Status.Conditions", ContainElement(
 				HaveField("Type", PoweringOnCondition),
 			)),
@@ -460,6 +469,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
+			HaveField("Status.LastNetworkBoot", BeNil()),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
 			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
 				Name: "Simple Storage Controller",

@@ -120,7 +120,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Deleting the ServerMaintenance to finish the maintenance on the server")
 		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
 
-		By("Checking the Server is not in maintenance")
+		By("Checking the Server is not in maintenance and LastNetworkBoot is cleared")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
@@ -266,6 +266,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 			HaveField("Spec.ServerMaintenanceRef", BeNil()),
 			HaveField("Spec.MaintenanceBootConfigurationRef", BeNil()),
+			HaveField("Status.LastNetworkBoot", BeNil()),
 		))
 
 		By("Checking the ServerClaim is cleaned up")

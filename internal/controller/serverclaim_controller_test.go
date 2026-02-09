@@ -152,9 +152,11 @@ var _ = Describe("ServerClaim Controller", func() {
 			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", config))
 
-		By("Ensuring that the Server has the correct PowerStatus")
+		By("Ensuring that the Server has the correct PowerStatus and LastNetworkBoot")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(claim.Spec.Power)),
+			HaveField("Status.LastNetworkBoot", Not(BeNil())),
+			HaveField("Status.LastNetworkBoot.BootConfigName", config.Name),
 		))
 
 		By("Deleting the ServerClaim")

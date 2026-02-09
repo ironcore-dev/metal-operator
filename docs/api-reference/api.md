@@ -1122,6 +1122,24 @@ _Appears in:_
 | `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
 
 
+#### LastNetworkBoot
+
+
+
+LastNetworkBoot records which boot configuration was last applied to the BMC
+via SetNetworkBoot. The server controller uses this to avoid redundant BMC calls.
+
+
+
+_Appears in:_
+- [ServerStatus](#serverstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `bootConfigName` _string_ | BootConfigName is the name of the ServerBootConfiguration that was applied. |  |  |
+| `generation` _integer_ | Generation is the metadata.generation of the ServerBootConfiguration spec<br />at the time the boot override was applied to the BMC. |  |  |
+
+
 #### NetworkInterface
 
 
@@ -1657,6 +1675,7 @@ _Appears in:_
 | `processors` _[Processor](#processor) array_ | Processors is a list of Processors associated with the server. |  |  |
 | `storages` _[Storage](#storage) array_ | Storages is a list of storages associated with the server. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the server's current state. |  |  |
+| `lastNetworkBoot` _[LastNetworkBoot](#lastnetworkboot)_ | LastNetworkBoot tracks the last network boot override applied to the BMC. |  |  |
 
 
 #### SettingsFlowItem

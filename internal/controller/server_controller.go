@@ -311,10 +311,12 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, log logr.Logg
 	}
 	log.V(1).Info("Applied Server boot configuration")
 
-	if err := r.networkBootServer(ctx, log, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to set network boot for server: %w", err)
+	if !r.networkBootAlreadyTriggered(ctx, server) {
+		if err := r.networkBootServer(ctx, log, bmcClient, server); err != nil {
+			return false, fmt.Errorf("failed to set network boot for server: %w", err)
+		}
+		log.V(1).Info("Set network boot for Server")
 	}
-	log.V(1).Info("Set network boot for Server")
 
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
 		return false, err
@@ -395,6 +397,10 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 	}
 	log.V(1).Info("Ensured initial boot configuration is deleted")
 
+	if err := r.clearLastNetworkBoot(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to clear last network boot: %w", err)
+	}
+
 	if err := r.ensureIndicatorLED(ctx, log, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
@@ -444,10 +450,12 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 
 	// TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
-		if err := r.networkBootServer(ctx, log, bmcClient, server); err != nil {
-			return false, fmt.Errorf("failed to boot server: %w", err)
+		if !r.networkBootAlreadyTriggered(ctx, server) {
+			if err := r.networkBootServer(ctx, log, bmcClient, server); err != nil {
+				return false, fmt.Errorf("failed to boot server: %w", err)
+			}
+			log.V(1).Info("Server is powered off, network booting Server")
 		}
-		log.V(1).Info("Server is powered off, network booting Server")
 	}
 	if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
@@ -466,6 +474,9 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, log logr.
 		// update system info in case the server was changed during Maintenance state (hardwere changes, biosVersion etc.)
 		if err := r.updateServerStatusFromSystemInfo(ctx, log, bmcClient, server); err != nil {
 			return false, fmt.Errorf("failed to update server status system info: %w", err)
+		}
+		if err := r.clearLastNetworkBoot(ctx, server); err != nil {
+			return false, fmt.Errorf("failed to clear last network boot: %w", err)
 		}
 		if server.Spec.ServerClaimRef == nil {
 			return r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial)
@@ -787,7 +798,7 @@ func (r *ServerReconciler) networkBootServer(ctx context.Context, log logr.Logge
 		return fmt.Errorf("can only network boot server with valid BMC ref or inline BMC configuration")
 	}
 
-	bootSourceTarget, bootSourceEnabled, err := r.resolveBootOverride(ctx, server)
+	config, bootSourceTarget, bootSourceEnabled, err := r.resolveBootOverride(ctx, server)
 	if err != nil {
 		return fmt.Errorf("failed to resolve boot override: %w", err)
 	}
@@ -795,24 +806,25 @@ func (r *ServerReconciler) networkBootServer(ctx context.Context, log logr.Logge
 	if err := bmcClient.SetNetworkBoot(ctx, server.Spec.SystemURI, bootSourceTarget, bootSourceEnabled); err != nil {
 		return fmt.Errorf("failed to set network boot for server: %w", err)
 	}
-	return nil
+
+	return r.patchLastNetworkBoot(ctx, server, config)
 }
 
 // resolveBootOverride reads the ServerBootConfiguration referenced by the server
 // and maps BootMethod/BootMode to Redfish boot source override parameters.
-// Falls back to PXE/Once if the boot configuration cannot be found.
-func (r *ServerReconciler) resolveBootOverride(ctx context.Context, server *metalv1alpha1.Server) (redfish.BootSourceOverrideTarget, redfish.BootSourceOverrideEnabled, error) {
+// Returns the boot configuration object alongside the redfish parameters.
+func (r *ServerReconciler) resolveBootOverride(ctx context.Context, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, redfish.BootSourceOverrideTarget, redfish.BootSourceOverrideEnabled, error) {
 	config := &metalv1alpha1.ServerBootConfiguration{}
 	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: server.Spec.BootConfigurationRef.Namespace,
 		Name:      server.Spec.BootConfigurationRef.Name,
 	}, config); err != nil {
-		return "", "", fmt.Errorf("failed to get ServerBootConfiguration: %w", err)
+		return nil, "", "", fmt.Errorf("failed to get ServerBootConfiguration: %w", err)
 	}
 
 	bootSourceTarget := redfishBootSourceTarget(config.Spec.BootMethod)
 	bootSourceEnabled := redfishBootSourceEnabled(config.Spec.BootMode)
-	return bootSourceTarget, bootSourceEnabled, nil
+	return config, bootSourceTarget, bootSourceEnabled, nil
 }
 
 func redfishBootSourceTarget(method metalv1alpha1.BootMethod) redfish.BootSourceOverrideTarget {
@@ -1159,6 +1171,39 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 		}
 	}
 	return false
+}
+
+func (r *ServerReconciler) networkBootAlreadyTriggered(ctx context.Context, server *metalv1alpha1.Server) bool {
+	if server.Status.LastNetworkBoot == nil || server.Spec.BootConfigurationRef == nil {
+		return false
+	}
+	config := &metalv1alpha1.ServerBootConfiguration{}
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: server.Spec.BootConfigurationRef.Namespace,
+		Name:      server.Spec.BootConfigurationRef.Name,
+	}, config); err != nil {
+		return false
+	}
+	return server.Status.LastNetworkBoot.BootConfigName == config.Name &&
+		server.Status.LastNetworkBoot.Generation == config.Generation
+}
+
+func (r *ServerReconciler) patchLastNetworkBoot(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+	serverBase := server.DeepCopy()
+	server.Status.LastNetworkBoot = &metalv1alpha1.LastNetworkBoot{
+		BootConfigName: config.Name,
+		Generation:     config.Generation,
+	}
+	return r.Status().Patch(ctx, server, client.MergeFrom(serverBase))
+}
+
+func (r *ServerReconciler) clearLastNetworkBoot(ctx context.Context, server *metalv1alpha1.Server) error {
+	if server.Status.LastNetworkBoot == nil {
+		return nil
+	}
+	serverBase := server.DeepCopy()
+	server.Status.LastNetworkBoot = nil
+	return r.Status().Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
 // SetupWithManager sets up the controller with the Manager.

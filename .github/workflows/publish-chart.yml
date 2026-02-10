@@ -76,6 +76,16 @@ jobs:
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
           mv kustomize /usr/local/bin
 
+      - name: Install yq
+        run: |
+          curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && chmod a+x /usr/local/bin/yq
+
+      - name: Set container image repository and tag
+        run: |
+          IMAGE_TAG=sha-$(echo ${{ github.sha }} | cut -c1-7)
+          yq -i '.controllerManager.manager.image.repository = "ghcr.io/ironcore-dev/metal-operator-controller-manager"' dist/chart/values.yaml
+          yq -i '.controllerManager.manager.image.tag = "'$IMAGE_TAG'"' dist/chart/values.yaml
+
       - name: Package Helm chart with crds folder in template
         run: |
           helm package dist/chart --version ${{ steps.chart_version.outputs.version }}-crds

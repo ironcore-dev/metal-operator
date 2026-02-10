@@ -20,6 +20,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BMCSettings](#bmcsettings)
 - [BMCSettingsSet](#bmcsettingsset)
 - [BMCUser](#bmcuser)
+- [BMCUserSet](#bmcuserset)
 - [BMCVersion](#bmcversion)
 - [BMCVersionSet](#bmcversionset)
 - [Endpoint](#endpoint)
@@ -692,6 +693,59 @@ BMCUser is the Schema for the bmcusers API.
 | `status` _[BMCUserStatus](#bmcuserstatus)_ |  |  |  |
 
 
+#### BMCUserSet
+
+
+
+BMCUserSet is the Schema for the bmcusersets API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `BMCUserSet` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[BMCUserSetSpec](#bmcusersetspec)_ |  |  |  |
+| `status` _[BMCUserSetStatus](#bmcusersetstatus)_ |  |  |  |
+
+
+#### BMCUserSetSpec
+
+
+
+BMCUserSetSpec defines the desired state of BMCUserSet.
+
+
+
+_Appears in:_
+- [BMCUserSet](#bmcuserset)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs that are to be selected. |  |  |
+| `bmcUserTemplate` _[BMCUserTemplate](#bmcusertemplate)_ | BMCUserTemplate defines the template for the BMCUser Resource to be applied to the BMCs. |  |  |
+
+
+#### BMCUserSetStatus
+
+
+
+BMCUserSetStatus defines the observed state of BMCUserSet.
+
+
+
+_Appears in:_
+- [BMCUserSet](#bmcuserset)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of BMC in the set. |  |  |
+| `availableBMCUsers` _integer_ | AvailableBMCUsers is the number of BMCUsers currently created by the set. |  |  |
+
+
 #### BMCUserSpec
 
 
@@ -730,6 +784,27 @@ _Appears in:_
 | `lastRotation` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastRotation is the timestamp of the last password rotation. |  |  |
 | `passwordExpiration` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | PasswordExpiration is the timestamp when the password will expire. |  |  |
 | `id` _string_ | ID of the user in the BMC system |  |  |
+
+
+#### BMCUserTemplate
+
+
+
+BMCUserTemplate defines the template for the BMCUser Resource to be applied to the BMCs.
+
+
+
+_Appears in:_
+- [BMCUserSetSpec](#bmcusersetspec)
+- [BMCUserSpec](#bmcuserspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `userName` _string_ | Username of the BMC user. |  |  |
+| `roleID` _string_ | RoleID is the ID of the role to assign to the user.<br />The available roles depend on the BMC implementation.<br />For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly". |  |  |
+| `description` _string_ | Description is an optional description for the BMC user. |  |  |
+| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />if not set, the password will not be rotated. |  |  |
+| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef references the BMCSecret containing the credentials for this user.<br />If not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |
 
 
 #### BMCVersion

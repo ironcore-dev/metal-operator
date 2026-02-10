@@ -6,6 +6,7 @@ package ignition
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"text/template"
 )
 
@@ -17,56 +18,28 @@ type Config struct {
 	PasswordHash string
 }
 
-// defaultIgnitionTemplate is a Go template for the default Ignition configuration.
-var defaultIgnitionTemplate = `variant: fcos
-version: "1.3.0"
-systemd:
-  units:
-    - name: docker-install.service
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Install Docker
-        Before=metalprobe.service
-        [Service]
-        Restart=on-failure
-        RestartSec=20
-        Type=oneshot
-        RemainAfterExit=yes
-        ExecStart=/usr/bin/apt-get update
-        ExecStart=/usr/bin/apt-get install docker.io docker-cli -y
-        [Install]
-        WantedBy=multi-user.target
-    - name: docker.service
-      enabled: true
-    - name: metalprobe.service
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Run My Docker Container
-        [Service]
-        Restart=on-failure
-        RestartSec=20
-        ExecStartPre=-/usr/bin/docker stop metalprobe
-        ExecStartPre=-/usr/bin/docker rm metalprobe
-        ExecStartPre=/usr/bin/docker pull {{.Image}}
-        ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe {{.Image}} {{.Flags}}
-        ExecStop=/usr/bin/docker stop metalprobe
-        [Install]
-        WantedBy=multi-user.target
-storage:
-  files: []
-passwd:
-  users:
-    - name: metal
-      password_hash: {{.PasswordHash}}
-      groups: [ "wheel" ]
-      ssh_authorized_keys: [ {{.SSHPublicKey}} ]
-`
+// GenerateIgnitionDataFromFile renders an ignition template from a file with the given Config.
+func GenerateIgnitionDataFromFile(filePath string, config Config) ([]byte, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("file path must be specified")
+	}
 
-// GenerateDefaultIgnitionData renders the defaultIgnitionTemplate with the given Config.
-func GenerateDefaultIgnitionData(config Config) ([]byte, error) {
-	tmpl, err := template.New("defaultIgnition").Parse(defaultIgnitionTemplate)
+	templateContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	trimmedContent := bytes.TrimSpace(templateContent)
+	if len(trimmedContent) == 0 {
+		return nil, fmt.Errorf("ignition template must not be empty")
+	}
+
+	return generateIgnitionDataFromTemplate(string(trimmedContent), config)
+}
+
+// generateIgnitionDataFromTemplate is a helper function that renders any template with the given Config.
+func generateIgnitionDataFromTemplate(templateContent string, config Config) ([]byte, error) {
+	tmpl, err := template.New("ignition").Parse(templateContent)
 	if err != nil {
 		return nil, fmt.Errorf("parsing template failed: %w", err)
 	}
@@ -78,4 +51,30 @@ func GenerateDefaultIgnitionData(config Config) ([]byte, error) {
 	}
 
 	return out.Bytes(), nil
+}
+
+// ValidateIgnitionTemplatePath validates that the ignition template file exists and can be parsed.
+func ValidateIgnitionTemplatePath(filePath string) error {
+	if filePath == "" {
+		return fmt.Errorf("ignition template path is empty")
+	}
+
+	// Check file exists and is readable
+	templateContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("cannot read ignition template file: %w", err)
+	}
+
+	trimmedContent := bytes.TrimSpace(templateContent)
+	if len(trimmedContent) == 0 {
+		return fmt.Errorf("ignition template must not be empty")
+	}
+
+	// Validate template syntax by attempting to parse it
+	_, err = template.New("ignition-validation").Parse(string(trimmedContent))
+	if err != nil {
+		return fmt.Errorf("invalid template syntax: %w", err)
+	}
+
+	return nil
 }

@@ -347,15 +347,9 @@ var _ = Describe("ServerClaim Controller", func() {
 	})
 
 	It("Should not claim a server with set claim ref", func(ctx SpecContext) {
-		By("Patching the Server to available state")
-		Eventually(Update(server, func() {
-			server.Spec.ServerClaimRef = &metalv1alpha1.ObjectReference{
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-				Kind:       "ServerClaim",
-				Namespace:  ns.Name,
-				Name:       "foo",
-				UID:        "12345",
-			}
+		By("Updating the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
 
 		By("Creating a ServerClaim")
@@ -372,14 +366,14 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("Ensuring that the Server has no claim ref")
+		By("Ensuring that the Server has claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ObjectReference{
 				APIVersion: "metal.ironcore.dev/v1alpha1",
 				Kind:       "ServerClaim",
 				Namespace:  ns.Name,
-				Name:       "foo",
-				UID:        "12345",
+				Name:       claim.Name,
+				UID:        claim.UID,
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
@@ -387,23 +381,59 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+		))
+
+		By("Creating another ServerClaim")
+		claim2 := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-duplicate-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				Image:     "foo:bar2",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim2)).To(Succeed())
+
+		By("Ensuring that the ServerClaim is Unbound")
+		Eventually(Object(claim2)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseUnbound),
+		))
+
+		By("Ensuring that the Server has claim ref")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ObjectReference{
+				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Kind:       "ServerClaim",
+				Namespace:  ns.Name,
+				Name:       claim.Name,
+				UID:        claim.UID,
+			}),
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
 
 		By("Ensuring that the ServerBootConfiguration has not been created")
 		config := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
-				Name:      claim.Name,
+				Name:      claim2.Name,
 			},
 		}
 		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Removing the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+		By("Removing the ServerClaim2")
+		Expect(k8sClient.Delete(ctx, claim2)).To(Succeed())
 
 		By("Ensuring that the ServerClaim is deleted")
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(claim2)).Should(Satisfy(apierrors.IsNotFound))
+
 	})
 
 	It("Should not claim a server when labels do not match selector", func(ctx SpecContext) {

@@ -240,11 +240,11 @@ func (r *BMCUserSetReconciler) createMissingBMCUsers(
 			newBMCUser.Spec.Description = bmcUserSet.Spec.BMCUserTemplate.Description
 			newBMCUser.Spec.RotationPeriod = nil
 			if bmcUserSet.Spec.BMCUserTemplate.RotationPeriod != nil {
-				newBMCUser.Spec.RotationPeriod = &metav1.Duration{Duration: bmcUserSet.Spec.BMCUserTemplate.RotationPeriod.Duration}
+				newBMCUser.Spec.RotationPeriod = bmcUserSet.Spec.BMCUserTemplate.RotationPeriod
 			}
 			newBMCUser.Spec.BMCSecretRef = nil
 			if bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef != nil {
-				newBMCUser.Spec.BMCSecretRef = &corev1.LocalObjectReference{Name: bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef.Name}
+				newBMCUser.Spec.BMCSecretRef = bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef
 			}
 			newBMCUser.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}
 			return controllerutil.SetControllerReference(bmcUserSet, newBMCUser, r.Scheme)

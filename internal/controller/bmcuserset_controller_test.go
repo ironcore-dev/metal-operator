@@ -8,13 +8,21 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 )
 
 var _ = Describe("BMCUserSet Controller", func() {
 	_ = SetupTest(nil)
+
+	var (
+		bmc1     *metalv1alpha1.BMC
+		bmc2     *metalv1alpha1.BMC
+		bmcOther *metalv1alpha1.BMC
+	)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
@@ -38,7 +46,7 @@ var _ = Describe("BMCUserSet Controller", func() {
 		}
 
 		By("Creating BMCs that match the selector")
-		bmc1 := &metalv1alpha1.BMC{
+		bmc1 = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "test-bmc-1",
 				Labels: selectorLabels,
@@ -59,7 +67,7 @@ var _ = Describe("BMCUserSet Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, bmc1)).To(Succeed())
 
-		bmc2 := &metalv1alpha1.BMC{
+		bmc2 = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "test-bmc-2",
 				Labels: selectorLabels,
@@ -81,7 +89,7 @@ var _ = Describe("BMCUserSet Controller", func() {
 		Expect(k8sClient.Create(ctx, bmc2)).To(Succeed())
 
 		By("Creating a non-matching BMC")
-		bmcOther := &metalv1alpha1.BMC{
+		bmcOther = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-bmc-other",
 				Labels: map[string]string{
@@ -126,18 +134,25 @@ var _ = Describe("BMCUserSet Controller", func() {
 		Expect(k8sClient.Create(ctx, bmcUserSet)).To(Succeed())
 
 		By("Ensuring BMCUsers are created for matching BMCs")
-		Eventually(ObjectList(&metalv1alpha1.BMCUserList{})).Should(SatisfyAll(
-			HaveField("Items", HaveLen(2)),
-			HaveField("Items", ContainElements(
+		Eventually(func() []metalv1alpha1.BMCUser {
+			list := &metalv1alpha1.BMCUserList{}
+			Expect(k8sClient.List(ctx, list)).To(Succeed())
+			return list.Items
+		}).Should(ConsistOf(
+			SatisfyAll(
 				HaveField("Spec.BMCRef.Name", bmc1.Name),
-				HaveField("Spec.BMCRef.Name", bmc2.Name),
-			)),
-			HaveField("Items", ContainElements(
 				HaveField("Spec.UserName", "metal-operator"),
 				HaveField("Spec.RoleID", "Administrator"),
 				HaveField("Spec.Description", "managed by bmcuserset"),
 				HaveField("Spec.BMCSecretRef.Name", bmcSecret.Name),
-			)),
+			),
+			SatisfyAll(
+				HaveField("Spec.BMCRef.Name", bmc2.Name),
+				HaveField("Spec.UserName", "metal-operator"),
+				HaveField("Spec.RoleID", "Administrator"),
+				HaveField("Spec.Description", "managed by bmcuserset"),
+				HaveField("Spec.BMCSecretRef.Name", bmcSecret.Name),
+			),
 		))
 
 		By("Ensuring BMCUserSet status is updated")
@@ -150,14 +165,47 @@ var _ = Describe("BMCUserSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmc1)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmc2)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcOther)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+
+		server1 := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc1),
+			},
+		}
+		server2 := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc2),
+			},
+		}
+		server3 := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmcOther),
+			},
+		}
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server1))).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server2))).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server3))).To(Succeed())
+		Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(HaveField("Items", HaveLen(0)))
+
+		bmcUserList := &metalv1alpha1.BMCUserList{}
+		Expect(k8sClient.List(ctx, bmcUserList)).To(Succeed())
+		for i := range bmcUserList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &bmcUserList.Items[i]))).To(Succeed())
+		}
+		Eventually(ObjectList(&metalv1alpha1.BMCUserList{})).Should(HaveField("Items", HaveLen(0)))
+
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for i := range secretList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
+		}
+
 	})
 
 	It("Should update existing BMCUsers when template changes", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-secret-",
+				GenerateName: "bmc-secret-",
 			},
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
@@ -167,7 +215,7 @@ var _ = Describe("BMCUserSet Controller", func() {
 		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
 
 		By("Creating a BMC")
-		bmc := &metalv1alpha1.BMC{
+		bmc1 = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-bmc-update",
 				Labels: map[string]string{
@@ -188,7 +236,7 @@ var _ = Describe("BMCUserSet Controller", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Create(ctx, bmc1)).To(Succeed())
 
 		By("Creating a BMCUserSet")
 		bmcUserSet := &metalv1alpha1.BMCUserSet{
@@ -224,9 +272,21 @@ var _ = Describe("BMCUserSet Controller", func() {
 				HaveField("Spec.Description", "updated description"),
 			)),
 		))
-
 		Expect(k8sClient.Delete(ctx, bmcUserSet)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc1)).To(Succeed())
+
+		server1 := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc1),
+			},
+		}
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server1))).To(Succeed())
+		Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(HaveField("Items", HaveLen(0)))
+
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for i := range secretList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
+		}
 	})
 })

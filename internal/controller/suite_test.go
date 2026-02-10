@@ -363,6 +363,7 @@ func EnsureCleanState() {
 		&metalv1alpha1.BMCList{},
 		&metalv1alpha1.BMCSecretList{},
 		&metalv1alpha1.BMCUserSetList{},
+		&metalv1alpha1.BMCUserList{},
 		&metalv1alpha1.ServerClaimList{},
 		&metalv1alpha1.BMCSettingsSetList{},
 		&metalv1alpha1.BMCSettingsList{},

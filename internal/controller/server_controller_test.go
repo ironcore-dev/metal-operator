@@ -794,7 +794,7 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should reset a Server into initial state on missing serverClaim and BootConfig", func(ctx SpecContext) {
+	It("Should move Server out of  reserved state on missing serverClaim and BootConfig", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -849,7 +849,7 @@ var _ = Describe("Server Controller", func() {
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
-				GenerateName: "test-",
+				GenerateName: "test-deleted-serverclaim-",
 			},
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:             metalv1alpha1.PowerOn,

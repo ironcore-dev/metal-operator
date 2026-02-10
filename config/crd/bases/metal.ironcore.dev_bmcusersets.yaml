@@ -56,17 +56,20 @@ spec:
             description: BMCUserSetSpec defines the desired state of BMCUserSet.
             properties:
               bmcSelector:
-                description: BMCSelector specifies a label selector to identify the BMCs that are to be selected.
+                description: BMCSelector specifies a label selector to identify the
+                  BMCs that are to be selected.
                 properties:
                   matchExpressions:
-                    description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
                     items:
                       description: |-
                         A label selector requirement is a selector that contains values, a key, and an operator that
                         relates the key and values.
                       properties:
                         key:
-                          description: key is the label key that the selector applies to.
+                          description: key is the label key that the selector applies
+                            to.
                           type: string
                         operator:
                           description: |-
@@ -100,7 +103,8 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               bmcUserTemplate:
-                description: BMCUserTemplate defines the template for the BMCUser Resource to be applied to the BMCs.
+                description: BMCUserTemplate defines the template for the BMCUser
+                  Resource to be applied to the BMCs.
                 properties:
                   bmcSecretRef:
                     description: |-
@@ -119,7 +123,8 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   description:
-                    description: Description is an optional description for the BMC user.
+                    description: Description is an optional description for the BMC
+                      user.
                     type: string
                   roleID:
                     description: |-
@@ -147,7 +152,8 @@ spec:
             description: BMCUserSetStatus defines the observed state of BMCUserSet.
             properties:
               availableBMCUsers:
-                description: AvailableBMCUsers is the number of BMCUsers currently created by the set.
+                description: AvailableBMCUsers is the number of BMCUsers currently
+                  created by the set.
                 format: int32
                 type: integer
               fullyLabeledBMCs:

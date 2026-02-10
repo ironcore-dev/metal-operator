@@ -415,11 +415,6 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 			return true, err
 		}
 	}
-	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
-		return true, err
-	}
-	log.V(1).Info("Server boot configuration is ready")
 
 	// TODO: fix properly, we need to free up the server if the claim does not exist anymore
 	claim := &metalv1alpha1.ServerClaim{}
@@ -441,6 +436,12 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 		}
 		return false, fmt.Errorf("failed to get ServerClaim: %w", err)
 	}
+
+	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
+		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+		return true, err
+	}
+	log.V(1).Info("Server boot configuration is ready")
 
 	// TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {

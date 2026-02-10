@@ -793,6 +793,130 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(bmcSecret)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("Should reset a Server into initial state on missing serverClaim and BootConfig", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Updating the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating an Ignition secret")
+		ignitionSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				"foo": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+
+		By("Creating a ServerClaim")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             metalv1alpha1.PowerOn,
+				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &v1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the ServerBootConfiguration has been created")
+		config := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      claim.Name,
+			},
+		}
+		Eventually(Object(config)).Should(SatisfyAll(
+			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
+				APIVersion:         "metal.ironcore.dev/v1alpha1",
+				Kind:               "ServerClaim",
+				Name:               claim.Name,
+				UID:                claim.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			})),
+			HaveField("Spec.ServerRef.Name", server.Name),
+			HaveField("Spec.Image", "foo:bar"),
+			HaveField("Spec.IgnitionSecretRef.Name", ignitionSecret.Name),
+		))
+
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(config, func() {
+			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
+		By("Ensuring that the Server is set to reserved")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
+
+		// this is needed to catch the case where the server is reconciled after deletion of the claim and config.
+		By("Patching the server with ignore annotation")
+		Eventually(Update(server, func() {
+			metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationIgnore)
+		})).Should(Succeed())
+
+		By("Ensuring that the boot configuration has been removed")
+		Expect(k8sClient.Delete(ctx, config)).To(Succeed())
+
+		By("Ensuring that the serverClaim has been removed")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Remove ignore annotation on server")
+		Eventually(Update(server, func() {
+			server.Annotations = map[string]string{}
+		})).Should(Succeed())
+
+		By("Ensuring that the Server is set not at reserved")
+		Eventually(Object(server)).Should(HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, ignitionSecret)).Should(Succeed())
+	})
 })
 
 func deleteRegistrySystemIfExists(systemUUID string) {

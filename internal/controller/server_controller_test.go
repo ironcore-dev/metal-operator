@@ -906,7 +906,7 @@ var _ = Describe("Server Controller", func() {
 
 		By("Remove ignore annotation on server")
 		Eventually(Update(server, func() {
-			server.Annotations = map[string]string{}
+			delete(server.Annotations, metalv1alpha1.OperationAnnotation)
 		})).Should(Succeed())
 
 		By("Ensuring that the Server is set not at reserved")

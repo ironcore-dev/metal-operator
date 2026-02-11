@@ -94,7 +94,7 @@ type BIOSSettingsReconciler struct {
 func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	biosSettings := &metalv1alpha1.BIOSSettings{}
-	if err := r.Get(ctx, req.NamespacedName, biosSettings); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, biosSettings); err ! {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	return r.reconcileExists(ctx, log, biosSettings)
@@ -123,13 +123,13 @@ func (r *BIOSSettingsReconciler) shouldDelete(log logr.Logger, settings *metalv1
 
 func (r *BIOSSettingsReconciler) delete(ctx context.Context, log logr.Logger, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {
 	log.V(1).Info("Deleting BIOSSettings")
-	if err := r.cleanupReferences(ctx, log, settings); err != nil {
+	if err := r.cleanupReferences(ctx, log, settings); err ! {
 		return ctrl.Result{}, fmt.Errorf("failed to cleanup references: %w", err)
 	}
 	log.V(1).Info("Ensured references were removed")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, settings, BIOSSettingsFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, settings, BIOSSettingsFinalizer); err ! || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer is removed")
@@ -139,7 +139,7 @@ func (r *BIOSSettingsReconciler) delete(ctx context.Context, log logr.Logger, se
 }
 
 func (r *BIOSSettingsReconciler) removeServerMaintenance(ctx context.Context, log logr.Logger, settings *metalv1alpha1.BIOSSettings) error {
-	if settings.Spec.ServerMaintenanceRef == nil {
+	if settings.Spec.ServerMaintenanceRef = {
 		return nil
 	}
 	maintenance, err := GetServerMaintenanceForObjectReference(ctx, r.Client, settings.Spec.ServerMaintenanceRef)
@@ -1007,8 +1007,8 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, log logr
 		log.V(1).Info("Retrying reconciliation")
 		biosSettingsBase := settings.DeepCopy()
 		settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
-		settings.Status.FlowState = nil
-		settings.Status.Conditions = nil
+		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
+		settings.Status.Conditions = []metav1.Condition{}
 		annotations := settings.GetAnnotations()
 		delete(annotations, metalv1alpha1.OperationAnnotation)
 		settings.SetAnnotations(annotations)

@@ -126,11 +126,13 @@ func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, log logr.Logger
 			log.V(1).Info("BMC account already exists", "ID", account.ID)
 			userBase := user.DeepCopy()
 			user.Status.ID = account.ID
-			exp, err := time.Parse(time.RFC3339, account.PasswordExpiration)
-			if err == nil {
-				user.Status.PasswordExpiration = &metav1.Time{Time: exp}
-			} else {
-				log.Error(err, "Failed to parse password expiration time from BMC account", "Expiration", account.PasswordExpiration)
+			if account.PasswordExpiration != "" {
+				exp, err := time.Parse(time.RFC3339, account.PasswordExpiration)
+				if err == nil {
+					user.Status.PasswordExpiration = &metav1.Time{Time: exp}
+				} else {
+					log.Error(err, "Failed to parse password expiration time from BMC account", "Expiration", account.PasswordExpiration)
+				}
 			}
 			if err := r.Status().Patch(ctx, user, client.MergeFrom(userBase)); err != nil {
 				return fmt.Errorf("failed to patch User status with BMC account ID: %w", err)

@@ -1,0 +1,168 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.0
+  name: bmcusersets.metal.ironcore.dev
+spec:
+  group: metal.ironcore.dev
+  names:
+    kind: BMCUserSet
+    listKind: BMCUserSetList
+    plural: bmcusersets
+    singular: bmcuserset
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.bmcUserTemplate.userName
+      name: UserName
+      type: string
+    - jsonPath: .spec.bmcUserTemplate.roleID
+      name: RoleID
+      type: string
+    - jsonPath: .status.fullyLabeledBMCs
+      name: TotalBMCs
+      type: integer
+    - jsonPath: .status.availableBMCUsers
+      name: AvailableBMCUsers
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: BMCUserSet is the Schema for the bmcusersets API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BMCUserSetSpec defines the desired state of BMCUserSet.
+            properties:
+              bmcSelector:
+                description: BMCSelector specifies a label selector to identify the
+                  BMCs that are to be selected.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              bmcUserTemplate:
+                description: BMCUserTemplate defines the template for the BMCUser
+                  Resource to be applied to the BMCs.
+                properties:
+                  bmcSecretRef:
+                    description: |-
+                      BMCSecretRef references the BMCSecret containing the credentials for this user.
+                      If not set, the operator will generate a secure password based on BMC manufacturer requirements.
+                    properties:
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  description:
+                    description: Description is an optional description for the BMC
+                      user.
+                    type: string
+                  roleID:
+                    description: |-
+                      RoleID is the ID of the role to assign to the user.
+                      The available roles depend on the BMC implementation.
+                      For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly".
+                    type: string
+                  rotationPeriod:
+                    description: |-
+                      RotationPeriod defines how often the password should be rotated.
+                      if not set, the password will not be rotated.
+                    type: string
+                  userName:
+                    description: Username of the BMC user.
+                    type: string
+                required:
+                - roleID
+                - userName
+                type: object
+            required:
+            - bmcSelector
+            - bmcUserTemplate
+            type: object
+          status:
+            description: BMCUserSetStatus defines the observed state of BMCUserSet.
+            properties:
+              availableBMCUsers:
+                description: AvailableBMCUsers is the number of BMCUsers currently
+                  created by the set.
+                format: int32
+                type: integer
+              fullyLabeledBMCs:
+                description: FullyLabeledBMCs is the number of BMC in the set.
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

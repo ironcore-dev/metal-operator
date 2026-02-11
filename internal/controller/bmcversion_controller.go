@@ -316,7 +316,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 		var TaskFetchFailed *BMCTaskFetchFailedError
 		if errors.As(err, &TaskFetchFailed) {
 			log.V(1).Info("Failed to fetch BMC upgrade task status from BMC.", "error", err)
-			// some vendor detele the task deatils once upgrade is completed.
+			// some vendor detele the task details once upgrade is completed.
 			// check the current version and then proceed if version is as per spec
 			currentBMCVersion, errVersionFetch := r.getBMCVersionFromBMC(ctx, bmcClient, BMC)
 			if errVersionFetch != nil {

@@ -488,7 +488,9 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 				return ctrl.Result{}, fmt.Errorf("failed to update BMCSettings Applied condition: %w", err)
 			}
 			err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, bmcSetting.Status.State, BMCSettingsAppliedCondition)
-
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Condition for Successful issue of BMC Settings %v", err)
+			}
 			if resetBMCReq {
 				// reset BMC if the setting change requires it
 				if ok, err := r.handleBMCReset(ctx, log, bmcSetting, BMC, BMCResetPostSettingApplyCondition); !ok || err != nil {

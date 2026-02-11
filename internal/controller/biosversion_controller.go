@@ -310,7 +310,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 		var TaskFetchFailed *BMCTaskFetchFailedError
 		if errors.As(err, &TaskFetchFailed) {
 			log.V(1).Info("Failed to fetch BIOS upgrade task status from BMC.", "error", err)
-			// some vendor detele the task deatils once upgrade is completed.
+			// some vendor detele the task details once upgrade is completed.
 			// check the current version and then proceed if version is as per spec
 			currentBiosVersion, errVersionFetch := r.getBIOSVersionFromBMC(ctx, bmcClient, server)
 			if errVersionFetch != nil {

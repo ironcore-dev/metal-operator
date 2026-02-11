@@ -235,11 +235,11 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 		}
 
 		// once in maintenance, clear the waiting condition if present
-		if condition.Status != metav1.ConditionFalse && condition.Reason != ServerMaintenanceReasonWaiting {
+		if condition.Reason != ServerMaintenanceReasonApproved {
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
 				conditionutils.UpdateMessage("Servers are now in Maintenance mode"),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update ServerMaintenance condition: %w", err)
@@ -830,7 +830,11 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 	}()
 	if err != nil {
 		log.V(1).Error(err, "failed to get the task details of BMC upgrade task", "TaskURI", bmcUpgradeTaskUri)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, &BMCTaskFetchFailedError{
+			TaskURI:  bmcUpgradeTaskUri,
+			Resource: "BMCUpgrade",
+			Err:      err,
+		}
 	}
 	log.V(1).Info("BMC upgrade task current status", "TaskStatus", taskCurrentStatus)
 

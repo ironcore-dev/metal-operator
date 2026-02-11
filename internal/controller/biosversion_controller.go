@@ -239,11 +239,11 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 			return false, nil
 		}
 
-		if condition.Status != metav1.ConditionFalse && condition.Reason != ServerMaintenanceReasonWaiting {
+		if condition.Reason != ServerMaintenanceReasonApproved {
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
 				conditionutils.UpdateMessage("Server is now in Maintenance mode"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)

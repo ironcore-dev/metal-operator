@@ -552,9 +552,15 @@ var _ = Describe("BMCSettings Controller", func() {
 		// delete the old settings
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
 		By("force deletion of the object by removing finalizers")
-		Eventually(Update(bmcSettings, func() {
-			bmcSettings.Finalizers = []string{}
-		})).Should(Succeed())
+		Eventually(func() error {
+			err := Update(bmcSettings, func() {
+				bmcSettings.Finalizers = []string{}
+			})()
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}).Should(Succeed())
 		By("check if maintenance has been created on the server and delete if its present")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Eventually(func() error {

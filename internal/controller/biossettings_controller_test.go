@@ -918,9 +918,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// delete the old settings
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 		By("force deletion")
-		Eventually(Update(biosSettings, func() {
-			biosSettings.Finalizers = []string{}
-		})).Should(Succeed())
+		Eventually(func() error {
+			err := Update(biosSettings, func() {
+				biosSettings.Finalizers = []string{}
+			})()
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}).Should(Succeed())
 		By("check if maintenance has been created on the server and delete if its present")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Eventually(func() error {

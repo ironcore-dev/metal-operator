@@ -254,9 +254,10 @@ func (r *BMCSettingsReconciler) reconcile(
 				if err := r.patchBMCSettingsRefOnBMC(ctx, log, BMC, &corev1.LocalObjectReference{Name: bmcSetting.Name}); err != nil {
 					return ctrl.Result{}, err
 				}
-			} else {
-				log.V(1).Info("Referred server contains reference to different BMCSettings object, unable to fetch the referenced BMCSettings")
+				// need to requeue to make sure that reconcile re-happens here. updating BMC object does not trigger reconcile here.
+				return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 			}
+			log.V(1).Info("Referred server contains reference to different BMCSettings object, unable to fetch the referenced BMCSettings")
 			return ctrl.Result{}, err
 		}
 		// check if the current BMCSettings version is newer and update reference if it is newer
@@ -530,7 +531,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 		return ctrl.Result{}, err
 	}
 
-	if BMCSettingsVerifiedCondition.Status != metav1.ConditionFalse && BMCSettingsVerifiedCondition.Reason != BMCSettingsChangesNotYetVerifiedReason {
+	if BMCSettingsVerifiedCondition.Status == metav1.ConditionFalse && BMCSettingsVerifiedCondition.Reason != BMCSettingsChangesNotYetVerifiedReason {
 		if err := r.Conditions.Update(
 			BMCSettingsVerifiedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),

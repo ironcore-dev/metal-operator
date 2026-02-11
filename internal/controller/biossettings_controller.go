@@ -172,7 +172,7 @@ func (r *BIOSSettingsReconciler) removeServerMaintenance(ctx context.Context, lo
 	}
 
 	if apierrors.IsNotFound(err) || err == nil {
-		log.V(1).Info("Cleaning up ServerMaintenance ref in BIOSVersion as the object is gone")
+		log.V(1).Info("Cleaning up ServerMaintenance ref in BIOSSettings as the object is gone")
 		if err := r.patchMaintenanceRef(ctx, settings, nil); err != nil {
 			return fmt.Errorf("failed to remove the ServerMaintenance reference in BIOSSettings status: %w", err)
 		}
@@ -242,13 +242,14 @@ func (r *BIOSSettingsReconciler) reconcile(ctx context.Context, log logr.Logger,
 		referredBIOSSetting, err := r.getBIOSSettingsByName(ctx, server.Spec.BIOSSettingsRef.Name)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				log.V(1).Info("Referred server contains reference to non-existing BIOSSettings object, updating reference to the current BMCSettings")
+				log.V(1).Info("Referred server contains reference to non-existing BIOSSettings object, updating reference to the current BIOSSettings")
 				if err := r.patchBIOSSettingsRefForServer(ctx, server, settings); err != nil {
 					return ctrl.Result{}, err
 				}
-			} else {
-				log.V(1).Info("Server contains a reference to a different BIOSSettings object", "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+				// need to requeue to make sure that reconcile re-happens here. updating server object does not trigger reconcile here.
+				return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 			}
+			log.V(1).Info("Server contains a reference to a different BIOSSettings object", "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
 			return ctrl.Result{}, err
 		}
 		// Check if the current BIOSSettings version is newer and update reference if it is newer
@@ -653,7 +654,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, log log
 					return false, fmt.Errorf("failed to update Invalid Settings condition: %w", errCond)
 				}
 				err = r.updateFlowStatus(ctx, settings, metalv1alpha1.BIOSSettingsFlowStateFailed, flowStatus, inValidSettings)
-				return true, errors.Join(err, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil))
+				return false, errors.Join(err, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil))
 			}
 			return false, err
 		}
@@ -782,7 +783,7 @@ func (r *BIOSSettingsReconciler) verifySettingsUpdateComplete(ctx context.Contex
 		}
 
 		log.V(1).Info("Waiting on the BIOS setting to take place")
-		if verifySettingUpdate.Status != metav1.ConditionFalse && verifySettingUpdate.Reason != BIOSSettingsReasonVerificationNotCompleted {
+		if verifySettingUpdate.Reason != BIOSSettingsReasonVerificationNotCompleted {
 			if err := r.Conditions.Update(
 				verifySettingUpdate,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
@@ -791,7 +792,7 @@ func (r *BIOSSettingsReconciler) verifySettingsUpdateComplete(ctx context.Contex
 			); err != nil {
 				return false, fmt.Errorf("failed to update verify BIOSSetting condition: %w", err)
 			}
-			return false, r.updateFlowStatus(ctx, biosSettings, metalv1alpha1.BIOSSettingsFlowStateApplied, flowStatus, verifySettingUpdate)
+			return false, r.updateFlowStatus(ctx, biosSettings, flowStatus.State, flowStatus, verifySettingUpdate)
 		}
 		return true, nil
 	}

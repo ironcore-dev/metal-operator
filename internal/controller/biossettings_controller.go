@@ -94,7 +94,7 @@ type BIOSSettingsReconciler struct {
 func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	biosSettings := &metalv1alpha1.BIOSSettings{}
-	if err := r.Get(ctx, req.NamespacedName, biosSettings); err ! {
+	if err := r.Get(ctx, req.NamespacedName, biosSettings); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	return r.reconcileExists(ctx, log, biosSettings)
@@ -123,13 +123,13 @@ func (r *BIOSSettingsReconciler) shouldDelete(log logr.Logger, settings *metalv1
 
 func (r *BIOSSettingsReconciler) delete(ctx context.Context, log logr.Logger, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {
 	log.V(1).Info("Deleting BIOSSettings")
-	if err := r.cleanupReferences(ctx, log, settings); err ! {
+	if err := r.cleanupReferences(ctx, log, settings); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to cleanup references: %w", err)
 	}
 	log.V(1).Info("Ensured references were removed")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, settings, BIOSSettingsFinalizer); err ! || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, settings, BIOSSettingsFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer is removed")
@@ -139,7 +139,7 @@ func (r *BIOSSettingsReconciler) delete(ctx context.Context, log logr.Logger, se
 }
 
 func (r *BIOSSettingsReconciler) removeServerMaintenance(ctx context.Context, log logr.Logger, settings *metalv1alpha1.BIOSSettings) error {
-	if settings.Spec.ServerMaintenanceRef = {
+	if settings.Spec.ServerMaintenanceRef == nil {
 		return nil
 	}
 	maintenance, err := GetServerMaintenanceForObjectReference(ctx, r.Client, settings.Spec.ServerMaintenanceRef)

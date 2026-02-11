@@ -266,7 +266,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 			log.V(1).Info("Retrying ...")
 			biosVersionBase := biosVersion.DeepCopy()
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
-			biosVersion.Status.Conditions = nil
+			biosVersion.Status.Conditions = []metav1.Condition{}
 			annotations := biosVersion.GetAnnotations()
 			delete(annotations, metalv1alpha1.OperationAnnotation)
 			biosVersion.SetAnnotations(annotations)
@@ -556,7 +556,7 @@ func (r *BIOSVersionReconciler) updateStatus(
 			return fmt.Errorf("failed to patch BIOSVersion condition: %w", err)
 		}
 	} else {
-		biosVersion.Status.Conditions = nil
+		biosVersion.Status.Conditions = []metav1.Condition{}
 	}
 
 	biosVersion.Status.UpgradeTask = upgradeTask
@@ -610,6 +610,15 @@ func (r *BIOSVersionReconciler) ensurePowerState(ctx context.Context, biosVersio
 
 func (r *BIOSVersionReconciler) requestServerMaintenance(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
 	if biosVersion.Spec.ServerMaintenanceRef != nil {
+		if _, err := GetServerMaintenanceForObjectReference(ctx, r.Client, biosVersion.Spec.ServerMaintenanceRef); apierrors.IsNotFound(err) {
+			log.V(1).Info("Referenced ServerMaintenance no longer exists, clearing ref to allow re-creation")
+			if err = r.patchServerMaintenanceRef(ctx, biosVersion, nil); err != nil {
+				return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+			}
+			return true, nil // requeue to re-create
+		} else if err != nil {
+			return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", err)
+		}
 		condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ServerMaintenanceConditionCreated)
 		if err != nil {
 			return false, err

@@ -263,7 +263,7 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 			log.V(1).Info("Retrying BMCVersion reconciliation")
 			bmcVersionBase := bmcVersion.DeepCopy()
 			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
-			bmcVersion.Status.Conditions = nil
+			bmcVersion.Status.Conditions = []metav1.Condition{}
 			annotations := bmcVersion.GetAnnotations()
 			delete(annotations, metalv1alpha1.OperationAnnotation)
 			bmcVersion.SetAnnotations(annotations)
@@ -670,7 +670,7 @@ func (r *BMCVersionReconciler) patchBMCVersionStatusAndCondition(
 			return fmt.Errorf("failed to patch BMCVersion condition: %w", err)
 		}
 	} else {
-		bmcVersion.Status.Conditions = nil
+		bmcVersion.Status.Conditions = []metav1.Condition{}
 	}
 
 	bmcVersion.Status.UpgradeTask = upgradeTask
@@ -712,6 +712,17 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 
 	// If ServerMaintenance ref is already set, ignoring.
 	if bmcVersion.Spec.ServerMaintenanceRefs != nil && len(bmcVersion.Spec.ServerMaintenanceRefs) == len(servers) {
+		if _, errs := r.getServerMaintenances(ctx, log, bmcVersion); len(errs) > 0 {
+			if apierrors.IsNotFound(errors.Join(errs...)) {
+				log.V(1).Info("Referenced ServerMaintenance no longer exists, clearing ref to allow re-creation")
+				if err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, bmcVersion, nil); err != nil {
+					return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+				}
+				return true, nil // requeue to re-create
+			} else {
+				return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", errors.Join(errs...))
+			}
+		}
 		condition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, ServerMaintenanceConditionCreated)
 		if err != nil {
 			return false, err
@@ -737,7 +748,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 	}
 
 	// Ensure all affected Servers have a ServerMaintenance requested.
-	serverWithMaintenances := make(map[string]bool, len(servers))
+	serverWithMaintenances := make(map[string]*metalv1alpha1.ServerMaintenance, len(servers))
 	if bmcVersion.Spec.ServerMaintenanceRefs != nil {
 		// We fetch all the references already in the Spec (self created/provided by user)
 		serverMaintenances, err := r.getServerMaintenances(ctx, log, bmcVersion)
@@ -745,7 +756,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 			return false, errors.Join(err...)
 		}
 		for _, serverMaintenance := range serverMaintenances {
-			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
+			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = serverMaintenance
 		}
 	}
 
@@ -757,13 +768,22 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 		return false, err
 	}
 	for _, serverMaintenance := range serverMaintenancesList.Items {
-		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
+		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = &serverMaintenance
 	}
 
 	var errs []error
 	serverMaintenanceRefs := make([]metalv1alpha1.ObjectReference, 0, len(servers))
 	for _, server := range servers {
-		if _, ok := serverWithMaintenances[server.Name]; ok {
+		if maintenance, ok := serverWithMaintenances[server.Name]; ok {
+			serverMaintenanceRefs = append(
+				serverMaintenanceRefs,
+				metalv1alpha1.ObjectReference{
+					APIVersion: metalv1alpha1.GroupVersion.String(),
+					Kind:       "ServerMaintenance",
+					Namespace:  maintenance.Namespace,
+					Name:       maintenance.Name,
+					UID:        maintenance.UID,
+				})
 			continue
 		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{

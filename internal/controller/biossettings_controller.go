@@ -1136,6 +1136,16 @@ func (r *BIOSSettingsReconciler) isServerInMaintenance(log logr.Logger, settings
 
 func (r *BIOSSettingsReconciler) requestMaintenanceForServer(ctx context.Context, log logr.Logger, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (bool, error) {
 	if settings.Spec.ServerMaintenanceRef != nil {
+		// Verify the referenced ServerMaintenance still exists
+		if _, err := GetServerMaintenanceForObjectReference(ctx, r.Client, settings.Spec.ServerMaintenanceRef); apierrors.IsNotFound(err) {
+			log.V(1).Info("Referenced ServerMaintenance no longer exists, clearing ref to allow re-creation")
+			if err := r.patchMaintenanceRef(ctx, settings, nil); err != nil {
+				return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+			}
+			return true, nil // requeue to re-create
+		} else if err != nil {
+			return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", err)
+		}
 		condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionCreated)
 		if err != nil {
 			return false, err
@@ -1286,7 +1296,7 @@ func (r *BIOSSettingsReconciler) updateFlowStatus(ctx context.Context, settings 
 					return fmt.Errorf("failed to patch BIOSettings condition: %w", err)
 				}
 			} else {
-				settings.Status.FlowState[idx].Conditions = nil
+				settings.Status.FlowState[idx].Conditions = []metav1.Condition{}
 			}
 			currentIdx = idx
 			continue
@@ -1338,7 +1348,7 @@ func (r *BIOSSettingsReconciler) updateStatus(ctx context.Context, settings *met
 		}
 	} else if state == metalv1alpha1.BIOSSettingsStatePending {
 		// reset, when we restart the setting update
-		settings.Status.Conditions = nil
+		settings.Status.Conditions = []metav1.Condition{}
 		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 	}
 

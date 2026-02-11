@@ -804,6 +804,17 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 
 	// if Server maintenance ref is already given. no further action required.
 	if bmcSetting.Spec.ServerMaintenanceRefs != nil && len(bmcSetting.Spec.ServerMaintenanceRefs) == len(servers) {
+		if _, errs := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs); len(errs) > 0 {
+			if apierrors.IsNotFound(errors.Join(errs...)) {
+				log.V(1).Info("Referenced ServerMaintenance no longer exists, clearing ref to allow re-creation")
+				if err := r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSetting, nil); err != nil {
+					return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+				}
+				return true, nil // requeue to re-create
+			} else {
+				return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", errors.Join(errs...))
+			}
+		}
 		condition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, ServerMaintenanceConditionCreated)
 		if err != nil {
 			return false, err
@@ -829,7 +840,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	// we will only create server maintenance for the servers which do not have maintenance in the bmcSetting.Spec.ServerMaintenanceRefs.
 	// this is to avoid creating duplicate server maintenance refs for the servers which are already in maintenance
 	// if the server maintenance refs are not provided, we will create server maintenance refs for all the servers which are in the BMC.
-	serverWithMaintenances := make(map[string]bool, len(servers))
+	serverWithMaintenances := make(map[string]*metalv1alpha1.ServerMaintenance, len(servers))
 	if bmcSetting.Spec.ServerMaintenanceRefs != nil {
 		// we fetch all the references already in the Spec (self created/provided by user)
 		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs)
@@ -837,7 +848,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			return false, errors.Join(err...)
 		}
 		for _, serverMaintenance := range serverMaintenances {
-			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
+			serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = serverMaintenance
 		}
 	}
 
@@ -849,13 +860,24 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		return false, err
 	}
 	for _, serverMaintenance := range serverMaintenancesList.Items {
-		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = true
+		serverWithMaintenances[serverMaintenance.Spec.ServerRef.Name] = &serverMaintenance
 	}
 
 	var errs []error
 	ServerMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(servers))
 	for _, server := range servers {
-		if serverWithMaintenances[server.Name] {
+		if maintenance, ok := serverWithMaintenances[server.Name]; ok {
+			log.V(1).Info("ServerMaintenance already exists for server, skipping creating new one", "Server", server.Name, "ServerMaintenance", maintenance.Name)
+			ServerMaintenanceRefs = append(
+				ServerMaintenanceRefs,
+				metalv1alpha1.ServerMaintenanceRefItem{
+					ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
+						APIVersion: metalv1alpha1.GroupVersion.String(),
+						Kind:       "ServerMaintenance",
+						Namespace:  maintenance.Namespace,
+						Name:       maintenance.Name,
+						UID:        maintenance.UID,
+					}})
 			continue
 		}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
@@ -1102,7 +1124,7 @@ func (r *BMCSettingsReconciler) updateBMCSettingsStatus(
 			return fmt.Errorf("failed to patch BMCSettings condition: %w", err)
 		}
 	} else if state == "" {
-		bmcSetting.Status.Conditions = nil
+		bmcSetting.Status.Conditions = []metav1.Condition{}
 	}
 
 	if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(BMCSettingsBase)); err != nil {

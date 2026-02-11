@@ -210,6 +210,7 @@ func (r *RedfishBMC) SetNextBoot(ctx context.Context, systemURI string) error {
 	// TODO: hack for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
 	if isSuperMicroSystem(system) {
 		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+		setBoot.HTTPBootURI = "http://localhost"
 	}
 
 	// TODO: pass logging context from caller

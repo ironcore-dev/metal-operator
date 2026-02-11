@@ -207,10 +207,16 @@ func (r *RedfishBMC) SetNextBoot(ctx context.Context, systemURI string) error {
 		}
 	}
 
-	// TODO: hack for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
+	// TODO: hack^2 for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
 	if isSuperMicroSystem(system) {
-		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
-		setBoot.HTTPBootURI = "http://localhost"
+		// setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+		// setBoot.HTTPBootURI = "http://localhost"
+
+		if err := r.SetBiosAttributesOnReset(ctx, systemURI, redfish.SettingsAttributes{
+			"IPv6HTTPSupport": "Enabled",
+		}); err != nil {
+			return fmt.Errorf("failed to set bios attributes on reset for SuperMicro system: %w", err)
+		}
 	}
 
 	// TODO: pass logging context from caller

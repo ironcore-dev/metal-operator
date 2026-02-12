@@ -713,12 +713,44 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 	// If ServerMaintenance ref is already set, ignoring.
 	if bmcVersion.Spec.ServerMaintenanceRefs != nil && len(bmcVersion.Spec.ServerMaintenanceRefs) == len(servers) {
 		if _, errs := r.getServerMaintenances(ctx, log, bmcVersion); len(errs) > 0 {
-			if apierrors.IsNotFound(errors.Join(errs...)) {
-				log.V(1).Info("Referenced ServerMaintenance no longer exists, clearing ref to allow re-creation")
-				if err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, bmcVersion, nil); err != nil {
-					return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+			missingMaintenancesNames := map[string]struct{}{}
+			for _, e := range errs {
+				if apierrors.IsNotFound(e) {
+					missingMaintenancesNames[e.(*MultiErrorTracker).Identifier] = struct{}{}
 				}
-				return true, nil // requeue to re-create
+			}
+
+			if len(missingMaintenancesNames) > 0 {
+				ServerMaintenanceRefs := make([]metalv1alpha1.ObjectReference, 0, len(bmcVersion.Spec.ServerMaintenanceRefs))
+				for _, maintenance := range ServerMaintenanceRefs {
+					if _, ok := missingMaintenancesNames[maintenance.Name]; ok {
+						log.V(1).Info("Referenced ServerMaintenance is missing", "ServerMaintenance", maintenance.Name)
+						continue
+					}
+					ServerMaintenanceRefs = append(
+						ServerMaintenanceRefs,
+						metalv1alpha1.ObjectReference{
+							APIVersion: metalv1alpha1.GroupVersion.String(),
+							Kind:       "ServerMaintenance",
+							Namespace:  maintenance.Namespace,
+							Name:       maintenance.Name,
+							UID:        maintenance.UID,
+						})
+				}
+
+				if len(ServerMaintenanceRefs) == len(bmcVersion.Spec.ServerMaintenanceRefs) {
+					log.V(1).Info("Referenced ServerMaintenances no longer exists, clearing ref to allow re-creation")
+					if err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, bmcVersion, nil); err != nil {
+						return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+					}
+					return true, nil // requeue to re-create
+				} else {
+					log.V(1).Info("Some referenced ServerMaintenances are still present", "Missing ServerMaintenances", missingMaintenancesNames)
+					if err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, bmcVersion, ServerMaintenanceRefs); err != nil {
+						return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+					}
+					return true, nil // requeue to update with remaining refs
+				}
 			} else {
 				return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", errors.Join(errs...))
 			}

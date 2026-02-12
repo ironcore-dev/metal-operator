@@ -49,6 +49,15 @@ func (e BMCTaskFetchFailedError) Error() string {
 	return e.Err.Error()
 }
 
+type MultiErrorTracker struct {
+	Identifier string
+	Err        error
+}
+
+func (e MultiErrorTracker) Error() string {
+	return e.Err.Error()
+}
+
 // GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
 func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client, ref *metalv1alpha1.ObjectReference) (*metalv1alpha1.ServerMaintenance, error) {
 	if ref == nil {

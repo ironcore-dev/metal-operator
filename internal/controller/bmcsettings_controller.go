@@ -805,12 +805,45 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	// if Server maintenance ref is already given. no further action required.
 	if bmcSetting.Spec.ServerMaintenanceRefs != nil && len(bmcSetting.Spec.ServerMaintenanceRefs) == len(servers) {
 		if _, errs := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs); len(errs) > 0 {
-			if apierrors.IsNotFound(errors.Join(errs...)) {
-				log.V(1).Info("Referenced ServerMaintenance no longer exists, clearing ref to allow re-creation")
-				if err := r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSetting, nil); err != nil {
-					return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+			missingMaintenancesNames := map[string]struct{}{}
+			for _, e := range errs {
+				if apierrors.IsNotFound(e) {
+					missingMaintenancesNames[e.(*MultiErrorTracker).Identifier] = struct{}{}
 				}
-				return true, nil // requeue to re-create
+			}
+
+			if len(missingMaintenancesNames) > 0 {
+				ServerMaintenanceRefs := make([]metalv1alpha1.ServerMaintenanceRefItem, 0, len(bmcSetting.Spec.ServerMaintenanceRefs))
+				for _, maintenance := range ServerMaintenanceRefs {
+					if _, ok := missingMaintenancesNames[maintenance.ServerMaintenanceRef.Name]; ok {
+						log.V(1).Info("Referenced ServerMaintenance is missing", "ServerMaintenance", maintenance.ServerMaintenanceRef.Name)
+						continue
+					}
+					ServerMaintenanceRefs = append(
+						ServerMaintenanceRefs,
+						metalv1alpha1.ServerMaintenanceRefItem{
+							ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
+								APIVersion: metalv1alpha1.GroupVersion.String(),
+								Kind:       "ServerMaintenance",
+								Namespace:  maintenance.ServerMaintenanceRef.Namespace,
+								Name:       maintenance.ServerMaintenanceRef.Name,
+								UID:        maintenance.ServerMaintenanceRef.UID,
+							}})
+				}
+
+				if len(ServerMaintenanceRefs) == len(bmcSetting.Spec.ServerMaintenanceRefs) {
+					log.V(1).Info("Referenced ServerMaintenances no longer exists, clearing ref to allow re-creation")
+					if err := r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSetting, nil); err != nil {
+						return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+					}
+					return true, nil // requeue to re-create
+				} else {
+					log.V(1).Info("Some referenced ServerMaintenances are still present", "Missing ServerMaintenances", missingMaintenancesNames)
+					if err := r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSetting, ServerMaintenanceRefs); err != nil {
+						return false, fmt.Errorf("failed to clear stale ServerMaintenances ref: %w", err)
+					}
+					return true, nil // requeue to update with remaining refs
+				}
 			} else {
 				return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", errors.Join(errs...))
 			}
@@ -1010,17 +1043,18 @@ func (r *BMCSettingsReconciler) getReferredServerMaintenances(
 
 	serverMaintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(ServerMaintenanceRefs))
 	var errs []error
-	cnt := 0
 	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
 		key := client.ObjectKey{Name: serverMaintenanceRef.ServerMaintenanceRef.Name, Namespace: r.ManagerNamespace}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{}
 		if err := r.Get(ctx, key, serverMaintenance); err != nil {
 			log.V(1).Error(err, "failed to get referred serverMaintenance obj", serverMaintenanceRef.ServerMaintenanceRef.Name)
-			errs = append(errs, err)
+			errs = append(errs, &MultiErrorTracker{
+				Err:        err,
+				Identifier: serverMaintenanceRef.ServerMaintenanceRef.Name,
+			})
 			continue
 		}
 		serverMaintenances = append(serverMaintenances, serverMaintenance)
-		cnt = cnt + 1
 	}
 
 	if len(errs) > 0 {

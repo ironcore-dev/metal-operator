@@ -70,7 +70,7 @@ func (c *RedfishEventCollector) UpdateFromMetricsReport(hostname string, report 
 		if unit == "" {
 			unit = "seconds"
 		}
-		mType := string(entry.MetricValueKind)
+		mType := entry.MetricValueKind
 		if mType == "" {
 			// Fallback: Try to guess from the ID
 			if strings.Contains(strings.ToLower(entry.MetricID), "temp") {
@@ -111,7 +111,7 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 		event.OriginOfCondition = component
 		key := EventKey{
 			Source:    hostname,
-			Severity:  string(event.Severity),
+			Severity:  event.Severity,
 			EventID:   event.EventID,
 			Component: component,
 		}

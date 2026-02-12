@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/prometheus/client_golang/prometheus"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 type Server struct {
@@ -23,17 +21,6 @@ type Server struct {
 	log       logr.Logger
 	collector *RedfishEventCollector
 }
-
-var (
-	alertsGauge = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "redfish_alerts_total",
-			Help: "Number of redfish alerts",
-		},
-		[]string{"hostname", "severity"},
-	)
-	metricsReportCollectors map[string]*prometheus.GaugeVec
-)
 
 type MetricsReport struct {
 	MetricsValues []MetricsValue `json:"MetricsValues"`
@@ -60,12 +47,6 @@ type Event struct {
 	Severity          string `json:"Severity"`
 	EventTimestamp    string `json:"EventTimestamp"`
 	OriginOfCondition string `json:"OriginOfCondition"`
-}
-
-func init() {
-	// Register custom metrics with the global prometheus registry
-	metrics.Registry.MustRegister(alertsGauge)
-	metricsReportCollectors = make(map[string]*prometheus.GaugeVec)
 }
 
 func NewServer(log logr.Logger, addr string) *Server {

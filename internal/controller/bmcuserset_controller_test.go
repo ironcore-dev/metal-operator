@@ -116,6 +116,9 @@ var _ = Describe("BMCUserSet Controller", func() {
 		bmcUserSet := &metalv1alpha1.BMCUserSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmcuserset-",
+				Annotations: map[string]string{
+					"example.com/propagated-annotation": "from-bmcuserset",
+				},
 			},
 			Spec: metalv1alpha1.BMCUserSetSpec{
 				BMCSelector: metav1.LabelSelector{
@@ -145,6 +148,7 @@ var _ = Describe("BMCUserSet Controller", func() {
 				HaveField("Spec.RoleID", "Administrator"),
 				HaveField("Spec.Description", "managed by bmcuserset"),
 				HaveField("Spec.BMCSecretRef.Name", bmcSecret.Name),
+				HaveField("Annotations", HaveKeyWithValue("example.com/propagated-annotation", "from-bmcuserset")),
 			),
 			SatisfyAll(
 				HaveField("Spec.BMCRef.Name", bmc2.Name),
@@ -152,6 +156,7 @@ var _ = Describe("BMCUserSet Controller", func() {
 				HaveField("Spec.RoleID", "Administrator"),
 				HaveField("Spec.Description", "managed by bmcuserset"),
 				HaveField("Spec.BMCSecretRef.Name", bmcSecret.Name),
+				HaveField("Annotations", HaveKeyWithValue("example.com/propagated-annotation", "from-bmcuserset")),
 			),
 		))
 

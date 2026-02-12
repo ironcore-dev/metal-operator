@@ -247,6 +247,7 @@ func (r *BMCUserSetReconciler) createMissingBMCUsers(
 				newBMCUser.Spec.BMCSecretRef = bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef
 			}
 			newBMCUser.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}
+			syncBMCUserAnnotationsFromSet(newBMCUser, bmcUserSet)
 			return controllerutil.SetControllerReference(bmcUserSet, newBMCUser, r.Scheme)
 		})
 		if err != nil {
@@ -313,6 +314,7 @@ func (r *BMCUserSetReconciler) patchBMCUsersFromTemplate(
 			if bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef != nil {
 				bmcUser.Spec.BMCSecretRef = &corev1.LocalObjectReference{Name: bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef.Name}
 			}
+			syncBMCUserAnnotationsFromSet(bmcUser, bmcUserSet)
 			return nil
 		})
 		if err != nil {
@@ -323,6 +325,17 @@ func (r *BMCUserSetReconciler) patchBMCUsersFromTemplate(
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func syncBMCUserAnnotationsFromSet(bmcUser *metalv1alpha1.BMCUser, bmcUserSet *metalv1alpha1.BMCUserSet) {
+	annotations := bmcUser.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	for key, value := range bmcUserSet.GetAnnotations() {
+		annotations[key] = value
+	}
+	bmcUser.SetAnnotations(annotations)
 }
 
 func (r *BMCUserSetReconciler) enqueueByBMC(

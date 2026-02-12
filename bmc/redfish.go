@@ -140,7 +140,7 @@ func (r *RedfishBMC) PowerOff(ctx context.Context, systemURI string) error {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(redfish.GracefulShutdownResetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+		return fmt.Errorf("failed to reset system to power off state: %w", err)
 	}
 	return nil
 }
@@ -152,7 +152,7 @@ func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemURI string) error 
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(redfish.ForceOffResetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+		return fmt.Errorf("failed to reset system to force power off state: %w", err)
 	}
 	return nil
 }

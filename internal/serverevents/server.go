@@ -134,13 +134,12 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 				},
 				[]string{"hostname"},
 			)
-			metricsReportCollectors[mv.MetricId] = gauge
 			if err := metrics.Registry.Register(gauge); err != nil {
 				s.log.Error(err, "failed to register metric", "metricID", mv.MetricId)
 				metricsReportMu.Unlock()
 				continue
 			}
-
+			metricsReportCollectors[mv.MetricId] = gauge
 		}
 		floatVal, err := strconv.ParseFloat(mv.MetricValue, 64)
 		if err != nil {

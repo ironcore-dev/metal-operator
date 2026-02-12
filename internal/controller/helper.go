@@ -18,7 +18,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/stmcginnis/gofish/redfish"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,10 +68,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}
 	if err := c.Get(ctx, client.ObjectKey{Name: serverName}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("server not found")
+		return nil, err
 	}
 	return server, nil
 }

@@ -400,6 +400,10 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, log logr.
 		log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
 		return false
 	}
+	if len(server.Spec.Taints) > 0 {
+		log.V(1).Info("Server is tainted", "Server", server.Name)
+		return false
+	}
 	isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, log, server)
 	// is undergoing maintenance and not in Reserved State, we should not claim this server
 	if err != nil || isUnderMaintenance {

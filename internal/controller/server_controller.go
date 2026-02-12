@@ -67,6 +67,10 @@ const (
 	InternalAnnotationTypeValue = "Internal"
 	// PoweringOnCondition is the condition type for powering on a server
 	PoweringOnCondition = "PoweringOn"
+	// ServerTaintKeyTainted is the taint key applied when a server enters the Tainted state
+	ServerTaintKeyTainted = "metal.ironcore.dev/tainted"
+	// ServerTaintEffectNoClaim is a custom taint effect indicating the server cannot be claimed
+	ServerTaintEffectNoClaim v1.TaintEffect = "NoClaim"
 )
 
 const (
@@ -215,7 +219,9 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	if server.Status.State != metalv1alpha1.ServerStateInitial && server.Spec.ServerMaintenanceRef != nil {
+	if server.Status.State != metalv1alpha1.ServerStateInitial &&
+		server.Status.State != metalv1alpha1.ServerStateTainted &&
+		server.Spec.ServerMaintenanceRef != nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
@@ -267,9 +273,9 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 // A Server in a reserved state can not be claimed by another claim.
 //
 // Tainted:
-// A tainted Server needs to be sanitized (clean up disks etc.). This is done in a similar way as in the
-// initial state where the server reconciler will create a BootConfiguration and an Ignition secret to
-// boot the server with a cleanup agent. This agent has also an endpoint to report its health state.
+// When a Server loses its claim, a NoClaim taint is set on Spec.Taints and the state transitions to Tainted.
+// The tainted Server needs to be sanitized before becoming available again.
+// Once cleanup is complete, the taint is removed and the Server transitions to Available.
 //
 // Maintenance:
 // A Maintenance state represents a special case where certain operations like BIOS updates should be performed.
@@ -283,6 +289,8 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, log 
 		return r.handleAvailableState(ctx, log, bmcClient, server)
 	case metalv1alpha1.ServerStateReserved:
 		return r.handleReservedState(ctx, log, bmcClient, server)
+	case metalv1alpha1.ServerStateTainted:
+		return r.handleTaintedState(ctx, log, bmcClient, server)
 	case metalv1alpha1.ServerStateMaintenance:
 		return r.handleMaintenanceState(ctx, log, bmcClient, server)
 	default:
@@ -408,10 +416,18 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, log logr.Lo
 }
 
 func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
-	// 		 back to available state.
 	if server.Spec.ServerClaimRef == nil {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+		if !hasTaint(server.Spec.Taints, ServerTaintKeyTainted, ServerTaintEffectNoClaim) {
+			serverBase := server.DeepCopy()
+			server.Spec.Taints = append(server.Spec.Taints, v1.Taint{
+				Key:    ServerTaintKeyTainted,
+				Effect: ServerTaintEffectNoClaim,
+			})
+			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return false, fmt.Errorf("failed to set taint on server: %w", err)
+			}
+		}
+		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateTainted); err != nil || modified {
 			return true, err
 		}
 	}
@@ -458,6 +474,45 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, log logr.Log
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
 	log.V(1).Info("Reconciled reserved state")
+	return true, nil
+}
+
+func (r *ServerReconciler) handleTaintedState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+	// TODO: In the future, cleanup should be performed here before making the server available again.
+	// Options to investigate: booting a cleanup agent (similar to Initial state) to wipe disks and reset BIOS,
+	// or using Redfish/BMC API calls for remote secure erase and BIOS reset.
+	// For now, we power off the server, clean up any remaining boot configuration, and transition to Available.
+
+	serverBase := server.DeepCopy()
+	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+		server.Spec.Power = metalv1alpha1.PowerOff
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to update server power state: %w", err)
+		}
+		log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
+
+		if err := r.ensureServerPowerState(ctx, log, bmcClient, server); err != nil {
+			return false, fmt.Errorf("failed to ensure server power state: %w", err)
+		}
+		log.V(1).Info("Server state set to power off")
+	}
+
+	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
+	}
+	log.V(1).Info("Ensured initial boot configuration is deleted")
+
+	// Remove the tainted taint before transitioning to Available
+	serverBase = server.DeepCopy()
+	server.Spec.Taints = removeTaint(server.Spec.Taints, ServerTaintKeyTainted, ServerTaintEffectNoClaim)
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to remove taint from server: %w", err)
+	}
+
+	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+		return true, err
+	}
+	log.V(1).Info("Reconciled tainted state")
 	return true, nil
 }
 

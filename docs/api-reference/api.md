@@ -1568,6 +1568,7 @@ _Appears in:_
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. This field is optional and can be omitted |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
+| `taints` _[Taint](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#taint-v1-core) array_ | Taints are taints on the server, similar to Kubernetes Node taints. |  |  |
 
 
 #### ServerState
@@ -1587,6 +1588,7 @@ _Appears in:_
 | `Discovery` | ServerStateDiscovery indicates that the server is in its discovery state.<br /> |
 | `Available` | ServerStateAvailable indicates that the server is available for use.<br /> |
 | `Reserved` | ServerStateReserved indicates that the server is reserved for a specific use or user.<br /> |
+| `Tainted` | ServerStateTainted indicates that the server needs to be sanitized before becoming available again.<br /> |
 | `Error` | ServerStateError indicates that there is an error with the server.<br /> |
 | `Maintenance` | ServerStateMaintenance indicates that the server is in maintenance.<br /> |
 

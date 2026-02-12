@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"path"
-	"strconv"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -20,14 +18,14 @@ import (
 )
 
 type Server struct {
-	addr string
-	mux  *http.ServeMux
-	log  logr.Logger
+	addr      string
+	mux       *http.ServeMux
+	log       logr.Logger
+	collector *RedfishEventCollector
 }
 
 var (
-	metricsReportMu sync.Mutex
-	alertsGauge     = prometheus.NewGaugeVec(
+	alertsGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "redfish_alerts_total",
 			Help: "Number of redfish alerts",
@@ -42,11 +40,13 @@ type MetricsReport struct {
 }
 
 type MetricsValue struct {
-	MetricId       string `json:"MetricId"`
-	MetricProperty string `json:"MetricProperty"`
-	MetricValue    string `json:"MetricValue"`
-	Timestamp      string `json:"Timestamp"`
-	Oem            any    `json:"Oem"`
+	MetricID        string `json:"MetricId"`
+	MetricProperty  string `json:"MetricProperty"`
+	MetricValue     string `json:"MetricValue"`
+	Units           string `json:"Units"`
+	MetricValueKind string `json:"MetricValueKind"`
+	Timestamp       string `json:"Timestamp"`
+	Oem             any    `json:"Oem"`
 }
 
 type EventData struct {
@@ -55,10 +55,11 @@ type EventData struct {
 }
 
 type Event struct {
-	EventID        string `json:"EventId"`
-	Message        string `json:"Message"`
-	Severity       string `json:"Severity"`
-	EventTimestamp string `json:"EventTimestamp"`
+	EventID           string `json:"EventId"`
+	Message           string `json:"Message"`
+	Severity          string `json:"Severity"`
+	EventTimestamp    string `json:"EventTimestamp"`
+	OriginOfCondition string `json:"OriginOfCondition"`
 }
 
 func init() {
@@ -70,9 +71,10 @@ func init() {
 func NewServer(log logr.Logger, addr string) *Server {
 	mux := http.NewServeMux()
 	server := &Server{
-		addr: addr,
-		mux:  mux,
-		log:  log,
+		addr:      addr,
+		mux:       mux,
+		log:       log,
+		collector: NewRedfishEventCollector(),
 	}
 	server.routes()
 	return server
@@ -96,18 +98,7 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	totalWarnings := 0
-	totalCriticals := 0
-	for _, event := range eventData.Events {
-		if event.Severity == "Warning" {
-			totalWarnings++
-		}
-		if event.Severity == "Critical" {
-			totalCriticals++
-		}
-	}
-	alertsGauge.WithLabelValues(hostname, "Warning").Set(float64(totalWarnings))
-	alertsGauge.WithLabelValues(hostname, "Critical").Set(float64(totalCriticals))
+	s.collector.UpdateFromEvent(hostname, eventData)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -124,36 +115,7 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	for _, mv := range metricsReport.MetricsValues {
-		metricsReportMu.Lock()
-		if _, ok := metricsReportCollectors[mv.MetricId]; !ok {
-			gauge := prometheus.NewGaugeVec(
-				prometheus.GaugeOpts{
-					Name: mv.MetricProperty,
-					Help: "Metric with ID " + mv.MetricId,
-				},
-				[]string{"hostname"},
-			)
-			if err := metrics.Registry.Register(gauge); err != nil {
-				s.log.Error(err, "failed to register metric", "metricID", mv.MetricId)
-				metricsReportMu.Unlock()
-				continue
-			}
-			metricsReportCollectors[mv.MetricId] = gauge
-		}
-		floatVal, err := strconv.ParseFloat(mv.MetricValue, 64)
-		if err != nil {
-			if mv.MetricValue == "Up" || mv.MetricValue == "Operational" {
-				floatVal = 1
-			} else {
-				s.log.Info("failed to parse metric value, setting to 0", "metricID", mv.MetricId, "value", mv.MetricValue)
-			}
-		}
-		collector := metricsReportCollectors[mv.MetricId]
-		metricsReportMu.Unlock()
-		collector.WithLabelValues(hostname).Set(floatVal)
-		s.log.Info("Metric", "id", mv.MetricId, "property", mv.MetricProperty, "value", mv.MetricValue, "timestamp", mv.Timestamp)
-	}
+	s.collector.UpdateFromMetricsReport(hostname, metricsReport)
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -42,10 +42,11 @@ const (
 
 // Options contain the options for the BMC redfish client.
 type Options struct {
-	Endpoint  string
-	Username  string
-	Password  string
-	BasicAuth bool
+	Endpoint          string
+	Username          string
+	Password          string
+	BasicAuth         bool
+	DefaultBootTarget redfish.BootSourceOverrideTarget
 
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
@@ -57,16 +58,6 @@ type Options struct {
 type RedfishBMC struct {
 	client  *gofish.APIClient
 	options Options
-}
-
-var pxeBootWithSettingUEFIBootMode = redfish.Boot{
-	BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,
-	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
-}
-var pxeBootWithoutSettingUEFIBootMode = redfish.Boot{
-	BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideTarget:  redfish.PxeBootSourceOverrideTarget,
 }
 
 type InvalidBIOSSettingsError struct {
@@ -104,6 +95,9 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (*RedfishBMC, err
 	}
 	if options.PowerPollingTimeout == 0 {
 		options.PowerPollingTimeout = DefaultPowerPollingTimeout
+	}
+	if options.DefaultBootTarget == "" {
+		options.DefaultBootTarget = redfish.PxeBootSourceOverrideTarget
 	}
 	bmc.options = options
 
@@ -190,8 +184,8 @@ func (r *RedfishBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	return servers, nil
 }
 
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+// SetNextBoot sets the boot device for the next system boot using Redfish.
+func (r *RedfishBMC) SetNextBoot(ctx context.Context, systemURI string) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
@@ -200,19 +194,34 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
 	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
 	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != redfish.UEFIBootSourceOverrideMode {
-		setBoot = pxeBootWithSettingUEFIBootMode
+		setBoot = redfish.Boot{
+			BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
+			BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,
+			// TODO: override later with the correct boot target based on the system configuration and available boot targets
+			BootSourceOverrideTarget: r.options.DefaultBootTarget,
+		}
 	} else {
-		setBoot = pxeBootWithoutSettingUEFIBootMode
+		setBoot = redfish.Boot{
+			BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
+			BootSourceOverrideTarget:  r.options.DefaultBootTarget,
+		}
 	}
 
-	// TODO: hack for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
+	// TODO: hack^2 for SuperMicro: set explicitly the BootSourceOverrideMode to UEFI
 	if isSuperMicroSystem(system) {
-		setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+		// setBoot.BootSourceOverrideMode = redfish.UEFIBootSourceOverrideMode
+		// setBoot.HTTPBootURI = "http://localhost"
+
+		if err := r.SetBiosAttributesOnReset(ctx, systemURI, redfish.SettingsAttributes{
+			"IPv6HTTPSupport": "Enabled",
+		}); err != nil {
+			return fmt.Errorf("failed to set bios attributes on reset for SuperMicro system: %w", err)
+		}
 	}
 
 	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
+	log.V(2).Info("Setting next boot target", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(setBoot); err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
 	}

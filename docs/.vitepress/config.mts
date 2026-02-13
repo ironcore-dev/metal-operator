@@ -60,7 +60,7 @@ export default withMermaid({
       },
       {
         text: 'Concepts',
-        collapsed: false,
+        collapsed: true,
         items: [
           { text: 'Endpoints', link: '/concepts/endpoints' },
           { text: 'BMCs', link: '/concepts/bmcs' },

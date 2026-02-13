@@ -520,8 +520,9 @@ func main() { // nolint: gocyclo
 		}
 	}
 	if err = (&controller.BIOSVersionSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BIOSVersionSet")
 		os.Exit(1)
@@ -534,22 +535,25 @@ func main() { // nolint: gocyclo
 		}
 	}
 	if err = (&controller.BMCVersionSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BMCVersionSet")
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSSettingsSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettingsSet")
 		os.Exit(1)
 	}
 	if err := (&controller.BMCSettingsSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BMCSettingsSet")
 		os.Exit(1)

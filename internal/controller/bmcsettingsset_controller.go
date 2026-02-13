@@ -7,11 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,7 +28,8 @@ import (
 
 type BMCSettingsSetReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	ResyncInterval time.Duration
 }
 
 const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
@@ -210,7 +213,8 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCSettings resource %w", err)
 	}
 
-	if err := r.patchBMCSettingsFromTemplate(ctx, log, bmcSettingsSet, ownedBMCSettings); err != nil {
+	var pendingPatchingSettings bool
+	if pendingPatchingSettings, err = r.patchBMCSettingsFromTemplate(ctx, log, bmcSettingsSet, ownedBMCSettings); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCSettings from template %w", err)
 	}
 
@@ -219,6 +223,11 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 	currentStatus.FullyLabeledBMCs = int32(len(bmcList.Items))
 	if err := r.updateStatus(ctx, log, currentStatus, bmcSettingsSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
+	}
+
+	if currentStatus.FullyLabeledBMCs != currentStatus.AvailableBMCSettings || pendingPatchingSettings {
+		log.V(1).Info("Waiting for all BMCSettings to be created/Patched for the labeled BMCs", "Status", currentStatus)
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -240,9 +249,14 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 	for _, bmc := range bmcList.Items {
 		if _, ok := bmcWithSettings[bmc.Name]; !ok {
 			if bmc.Spec.BMCSettingRef != nil {
-				log.V(1).Info("BMC already has different BMCSettingRef, skipping creation",
-					"bmc", bmc.Name, "BMCSettingRef", bmc.Spec.BMCSettingRef)
-				continue
+				if err := r.Get(ctx, client.ObjectKey{Name: bmc.Spec.BMCSettingRef.Name}, &metalv1alpha1.BMCSettings{}); apierrors.IsNotFound(err) {
+					log.Error(err, "failed to get BMCSettings referenced by Server", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+					// we will go ahead and create a new BMCSettings for this server. the ref will be updated when the new BIOSSettings is created
+				} else {
+					// the referenced BMCSettings exists or unable to determining, so we skip creating a new one
+					log.V(1).Info("BMC already has a BMCSettings ref", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+					continue
+				}
 			}
 
 			// generate k8s conform name for bmcsettings
@@ -313,16 +327,18 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 	log logr.Logger,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 	bmcSettingsList *metalv1alpha1.BMCSettingsList,
-) error {
+) (bool, error) {
 	if len(bmcSettingsList.Items) == 0 {
 		log.V(1).Info("No BMCSettings found, skipping spec template update")
-		return nil
+		return false, nil
 	}
 
+	var pendingPatchingSettings bool
 	var errs []error
 	for _, bmcSettings := range bmcSettingsList.Items {
 		if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
 			log.V(1).Info("Skipping BMCSettings spec patching as it is in InProgress state")
+			pendingPatchingSettings = true
 			continue
 		}
 
@@ -337,7 +353,7 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 			log.V(1).Info("Patched BMCSettings with updated spec", "BMCSettings", bmcSettings.Name, "Operation", opResult)
 		}
 	}
-	return errors.Join(errs...)
+	return pendingPatchingSettings, errors.Join(errs...)
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(

@@ -23,7 +23,7 @@ export default withMermaid({
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Concepts', link: '/concepts' },
+      { text: 'Documentation', link: '/architecture' },
       { text: 'Quickstart', link: '/quickstart' },
       { text: 'IronCore Documentation', link: 'https://ironcore-dev.github.io' },
     ],
@@ -86,11 +86,19 @@ export default withMermaid({
         ]
       },
       {
-        text: 'Developer Guide',
+        text: 'Development',
         collapsed: false,
         items: [
           { text: 'Local Dev Setup', link: '/development/dev_setup' },
           { text: 'Documentation', link: '/development/dev_docs' },
+        ]
+      },
+      {
+        text: 'Contributing',
+        collapsed: false,
+        items: [
+          { text: 'Contributing Guide', link: 'https://ironcore.dev/community/contributing.html' },
+          { text: 'Cherry-Picking', link: '/contributing/cherry_pick' },
         ]
       }
     ],

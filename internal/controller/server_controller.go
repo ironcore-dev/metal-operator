@@ -190,7 +190,11 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 
 	// do late state initialization
 	if server.Status.State == "" {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
+		initialState := metalv1alpha1.ServerStateInitial
+		if hasTaint(server.Spec.Taints, ServerTaintKeyTainted, ServerTaintEffectNoClaim) {
+			initialState = metalv1alpha1.ServerStateTainted
+		}
+		if modified, err := r.patchServerState(ctx, server, initialState); err != nil || modified {
 			return ctrl.Result{}, err
 		}
 	}
@@ -224,6 +228,18 @@ func (r *ServerReconciler) reconcile(ctx context.Context, log logr.Logger, serve
 		server.Spec.ServerMaintenanceRef != nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
+		}
+	}
+
+	// If the server has a NoClaim taint while in Initial, Discovery, or Available state,
+	// transition to Tainted. Reserved and Maintenance servers keep their state until the
+	// claim or maintenance is removed.
+	if hasTaint(server.Spec.Taints, ServerTaintKeyTainted, ServerTaintEffectNoClaim) {
+		switch server.Status.State {
+		case metalv1alpha1.ServerStateInitial, metalv1alpha1.ServerStateDiscovery, metalv1alpha1.ServerStateAvailable:
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateTainted); err != nil || modified {
+				return ctrl.Result{}, err
+			}
 		}
 	}
 

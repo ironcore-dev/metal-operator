@@ -66,6 +66,50 @@ flowchart LR
     class BootOperator external;
 ```
 
+## Server State Machine
+
+The `Server` resource follows a well-defined state machine that governs its lifecycle from initial discovery
+through reservation and cleanup.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initial : BMC discovers server
+    [*] --> Tainted : NoClaim taint set on creation
+
+    Initial --> Discovery : Boot config ready, netboot on next boot
+    Initial --> Tainted : NoClaim taint added
+    Initial --> Maintenance : MaintenanceRef set
+
+    Discovery --> Available : Probe agent reports hardware info
+    Discovery --> Initial : Discovery timeout
+    Discovery --> Tainted : NoClaim taint added
+    Discovery --> Maintenance : MaintenanceRef set
+
+    Available --> Reserved : ServerClaimRef set
+    Available --> Tainted : NoClaim taint added
+    Available --> Maintenance : MaintenanceRef set
+
+    Reserved --> Tainted : ServerClaimRef removed (NoClaim taint set)
+    Reserved --> Maintenance : MaintenanceRef set
+
+    Tainted --> Available : Cleanup complete, taint removed
+
+    Maintenance --> Initial : MaintenanceRef removed (no claim)
+    Maintenance --> Reserved : MaintenanceRef removed (claim exists)
+```
+
+### State Descriptions
+
+| State | Description |
+|-------|-------------|
+| **Initial** | A `ServerBootConfiguration` and ignition are created to start the probe agent. The server is configured to netboot on next boot. |
+| **Discovery** | The server boots with the probe agent running. The agent registers hardware details (NICs, storage, etc.) via the registry endpoint. |
+| **Available** | Discovery is complete. The server is powered off and ready to be claimed via a `ServerClaim`. |
+| **Reserved** | The server is claimed. A `ServerBootConfiguration` is created by the claim reconciler and the server is booted with the specified image. |
+| **Tainted** | The server has lost its claim or was explicitly tainted. It is powered off and cleaned up before transitioning back to Available. |
+| **Maintenance** | A special overlay state entered when a `ServerMaintenanceRef` is set. Used for BIOS/BMC updates or hardware repairs. Returns to the previous logical state when maintenance completes. |
+| **Error** | Indicates an unrecoverable error with the server. |
+
 ## Key Components
 
 ### 1. Custom Resource Definitions (CRDs)

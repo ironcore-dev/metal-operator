@@ -3,13 +3,27 @@ name: Tests
 on:
   pull_request:
     types: [ assigned, opened, synchronize, reopened ]
-    paths-ignore:
-    - 'docs/**'
-    - '**/*.md'
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '!docs/**'
+              - '!**/*.md'
+
   test:
     name: Run tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Install lldpd

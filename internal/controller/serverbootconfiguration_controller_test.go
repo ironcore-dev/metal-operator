@@ -54,6 +54,31 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 
 		Eventually(Object(config)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
+			HaveField("Spec.BootMethod", metalv1alpha1.BootMethodPXE),
+			HaveField("Spec.BootMode", metalv1alpha1.BootModeOnce),
+		))
+	})
+
+	It("Should store HTTPBoot and Continuous boot settings", func(ctx SpecContext) {
+		By("Creating a server boot configuration with HTTPBoot and Continuous mode")
+		config := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-httpboot-",
+			},
+			Spec: metalv1alpha1.ServerBootConfigurationSpec{
+				ServerRef:  v1.LocalObjectReference{Name: server.Name},
+				Image:      "foo:latest",
+				BootMethod: metalv1alpha1.BootMethodHTTPBoot,
+				BootMode:   metalv1alpha1.BootModeContinuous,
+			},
+		}
+		Expect(k8sClient.Create(ctx, config)).To(Succeed())
+
+		Eventually(Object(config)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
+			HaveField("Spec.BootMethod", metalv1alpha1.BootMethodHTTPBoot),
+			HaveField("Spec.BootMode", metalv1alpha1.BootModeContinuous),
 		))
 	})
 })

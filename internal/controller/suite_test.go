@@ -206,6 +206,8 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Cache:                   k8sManager.GetCache(),
 			Scheme:                  k8sManager.GetScheme(),
 			MaxConcurrentReconciles: 5,
+			DefaultBootMethod:       metalv1alpha1.BootMethodPXE,
+			DefaultBootMode:         metalv1alpha1.BootModeOnce,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerBootConfigurationReconciler{
@@ -214,8 +216,10 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerMaintenanceReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:            k8sManager.GetClient(),
+			Scheme:            k8sManager.GetScheme(),
+			DefaultBootMethod: metalv1alpha1.BootMethodPXE,
+			DefaultBootMode:   metalv1alpha1.BootModeOnce,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSSettingsReconciler{

@@ -55,6 +55,29 @@ spec:
           spec:
             description: ServerClaimSpec defines the desired state of ServerClaim.
             properties:
+              bootMethod:
+                default: PXE
+                description: |-
+                  BootMethod specifies the preferred network boot method for the server.
+                  This value is used as the default when creating a ServerBootConfiguration for this claim.
+                  Supported values are "PXE" and "HTTPBoot".
+                  Defaults to "PXE" if not specified.
+                enum:
+                - PXE
+                - HTTPBoot
+                type: string
+              bootMode:
+                default: Once
+                description: |-
+                  BootMode controls whether the boot method override is applied once or on every boot.
+                  "Once" boots from the network one time (e.g. for OS installation), then the BIOS boot
+                  order takes over. "Continuous" boots from the network on every boot cycle.
+                  This value is used as the default when creating a ServerBootConfiguration for this claim.
+                  Defaults to "Once" if not specified.
+                enum:
+                - Once
+                - Continuous
+                type: string
               ignitionSecretRef:
                 description: |-
                   IgnitionSecretRef is a reference to the Kubernetes Secret object that contains

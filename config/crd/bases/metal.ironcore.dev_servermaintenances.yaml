@@ -73,6 +73,28 @@ spec:
                     description: Parameters specify the parameters to be used for
                       rendering the boot configuration.
                     properties:
+                      bootMethod:
+                        default: PXE
+                        description: |-
+                          BootMethod specifies the network boot method to use for the server.
+                          This value can be overridden independently of the originating ServerClaim's preference.
+                          Supported values are "PXE" and "HTTPBoot".
+                          Defaults to "PXE" if not specified.
+                        enum:
+                        - PXE
+                        - HTTPBoot
+                        type: string
+                      bootMode:
+                        default: Once
+                        description: |-
+                          BootMode controls whether the boot method override is applied once or on every boot.
+                          "Once" boots from the network one time (e.g. for OS installation), then the BIOS boot
+                          order takes over. "Continuous" boots from the network on every boot cycle.
+                          Defaults to "Once" if not specified.
+                        enum:
+                        - Once
+                        - Continuous
+                        type: string
                       ignitionSecretRef:
                         description: |-
                           IgnitionSecretRef is a reference to the Kubernetes Secret object that contains

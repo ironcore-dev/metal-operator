@@ -33,7 +33,9 @@ const (
 // ServerMaintenanceReconciler reconciles a ServerMaintenance object
 type ServerMaintenanceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme            *runtime.Scheme
+	DefaultBootMethod metalv1alpha1.BootMethod
+	DefaultBootMode   metalv1alpha1.BootMode
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
@@ -243,6 +245,12 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 	}
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, func() error {
 		config.Spec = maintenance.Spec.ServerBootConfigurationTemplate.Spec
+		if config.Spec.BootMethod == "" {
+			config.Spec.BootMethod = r.DefaultBootMethod
+		}
+		if config.Spec.BootMode == "" {
+			config.Spec.BootMode = r.DefaultBootMode
+		}
 		return controllerutil.SetControllerReference(maintenance, config, r.Scheme)
 	})
 	if err != nil {

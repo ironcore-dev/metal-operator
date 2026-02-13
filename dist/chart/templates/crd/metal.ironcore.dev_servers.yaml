@@ -383,6 +383,24 @@ spec:
                 description: IndicatorLED specifies the current state of the server's
                   indicator LED.
                 type: string
+              lastNetworkBoot:
+                description: LastNetworkBoot tracks the last network boot override
+                  applied to the BMC.
+                properties:
+                  bootConfigName:
+                    description: BootConfigName is the name of the ServerBootConfiguration
+                      that was applied.
+                    type: string
+                  generation:
+                    description: |-
+                      Generation is the metadata.generation of the ServerBootConfiguration spec
+                      at the time the boot override was applied to the BMC.
+                    format: int64
+                    type: integer
+                required:
+                - bootConfigName
+                - generation
+                type: object
               manufacturer:
                 description: Manufacturer is the name of the server manufacturer.
                 type: string

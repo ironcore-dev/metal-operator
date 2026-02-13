@@ -39,8 +39,10 @@ type BMC interface {
 	// Reset performs a reset on the system.
 	Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error
 
-	// SetPXEBootOnce sets the boot device for the next system boot.
-	SetPXEBootOnce(ctx context.Context, systemURI string) error
+	// SetNetworkBoot configures the network boot source override on the BMC.
+	// bootSourceTarget specifies what to boot from (e.g. Pxe, UefiHttp).
+	// bootSourceEnabled specifies how long the override lasts (e.g. Once, Continuous).
+	SetNetworkBoot(ctx context.Context, systemURI string, bootSourceTarget redfish.BootSourceOverrideTarget, bootSourceEnabled redfish.BootSourceOverrideEnabled) error
 
 	// GetSystemInfo retrieves information about the system.
 	GetSystemInfo(ctx context.Context, systemURI string) (SystemInfo, error)

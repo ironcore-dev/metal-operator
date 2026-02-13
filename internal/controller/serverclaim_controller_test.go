@@ -114,7 +114,7 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.ServerRef.Name", server.Name),
 		))
 
-		By("Ensuring that the ServerBootConfiguration has been created")
+		By("Ensuring that the ServerBootConfiguration has been created with default boot settings")
 		config := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
@@ -133,6 +133,8 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.ServerRef.Name", server.Name),
 			HaveField("Spec.Image", "foo:bar"),
 			HaveField("Spec.IgnitionSecretRef.Name", ignitionSecret.Name),
+			HaveField("Spec.BootMethod", metalv1alpha1.BootMethodPXE),
+			HaveField("Spec.BootMode", metalv1alpha1.BootModeOnce),
 		))
 
 		By("Ensuring that the server has a correct boot configuration ref")
@@ -150,15 +152,67 @@ var _ = Describe("ServerClaim Controller", func() {
 			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed(), fmt.Sprintf("Unable to set the bootconfig %v to Ready State", config))
 
-		By("Ensuring that the Server has the correct PowerStatus")
+		By("Ensuring that the Server has the correct PowerStatus and LastNetworkBoot")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.PowerState", metalv1alpha1.ServerPowerState(claim.Spec.Power)),
+			HaveField("Status.LastNetworkBoot", Not(BeNil())),
+			HaveField("Status.LastNetworkBoot.BootConfigName", config.Name),
 		))
 
 		By("Deleting the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 
 		By("Ensuring that the ServerClaim is deleted")
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Ensuring that the Server is available")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", BeNil()),
+			HaveField("Spec.BootConfigurationRef", BeNil()),
+			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		))
+	})
+
+	It("Should propagate BootMethod and BootMode from claim to boot configuration", func(ctx SpecContext) {
+		By("Creating a ServerClaim with HTTPBoot and Continuous mode")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:      metalv1alpha1.PowerOn,
+				ServerRef:  &v1.LocalObjectReference{Name: server.Name},
+				Image:      "foo:bar",
+				BootMethod: metalv1alpha1.BootMethodHTTPBoot,
+				BootMode:   metalv1alpha1.BootModeContinuous,
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the ServerClaim is bound")
+		Eventually(Object(claim)).Should(SatisfyAll(
+			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
+		))
+
+		By("Ensuring that the ServerBootConfiguration has the correct boot settings")
+		config := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      claim.Name,
+			},
+		}
+		Eventually(Object(config)).Should(SatisfyAll(
+			HaveField("Spec.ServerRef.Name", server.Name),
+			HaveField("Spec.Image", "foo:bar"),
+			HaveField("Spec.BootMethod", metalv1alpha1.BootMethodHTTPBoot),
+			HaveField("Spec.BootMode", metalv1alpha1.BootModeContinuous),
+		))
+
+		By("Deleting the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the Server is available")

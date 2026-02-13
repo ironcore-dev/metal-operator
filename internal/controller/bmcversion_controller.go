@@ -722,7 +722,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 
 			if len(missingMaintenancesNames) > 0 {
 				ServerMaintenanceRefs := make([]metalv1alpha1.ObjectReference, 0, len(bmcVersion.Spec.ServerMaintenanceRefs))
-				for _, maintenance := range ServerMaintenanceRefs {
+				for _, maintenance := range bmcVersion.Spec.ServerMaintenanceRefs {
 					if _, ok := missingMaintenancesNames[maintenance.Name]; ok {
 						log.V(1).Info("Referenced ServerMaintenance is missing", "ServerMaintenance", maintenance.Name)
 						continue
@@ -738,7 +738,7 @@ func (r *BMCVersionReconciler) requestMaintenanceOnServers(ctx context.Context, 
 						})
 				}
 
-				if len(ServerMaintenanceRefs) == len(bmcVersion.Spec.ServerMaintenanceRefs) {
+				if len(ServerMaintenanceRefs) == 0 {
 					log.V(1).Info("Referenced ServerMaintenances no longer exists, clearing ref to allow re-creation")
 					if err := r.patchMaintenanceRequestRefOnBMCVersion(ctx, bmcVersion, nil); err != nil {
 						return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)

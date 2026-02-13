@@ -249,9 +249,15 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 	for _, bmc := range bmcList.Items {
 		if _, ok := bmcWithSettings[bmc.Name]; !ok {
 			if bmc.Spec.BMCSettingRef != nil {
-				if err := r.Get(ctx, client.ObjectKey{Name: bmc.Spec.BMCSettingRef.Name}, &metalv1alpha1.BMCSettings{}); apierrors.IsNotFound(err) {
-					log.Error(err, "failed to get BMCSettings referenced by Server", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-					// we will go ahead and create a new BMCSettings for this server. the ref will be updated when the new BIOSSettings is created
+				if err := r.Get(ctx, client.ObjectKey{Name: bmc.Spec.BMCSettingRef.Name}, &metalv1alpha1.BMCSettings{}); err != nil {
+					if apierrors.IsNotFound(err) {
+						log.Error(err, "failed to get BMCSettings referenced by Server", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+						// we will go ahead and create a new BMCSettings for this server. the ref will be updated when the new BMCSettings is created
+					} else {
+						log.Error(err, "error when trying to get BMCSettings referenced by Server", "Server", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+						// we will try this again in next reconciliation loop
+						continue
+					}
 				} else {
 					// the referenced BMCSettings exists or unable to determining, so we skip creating a new one
 					log.V(1).Info("BMC already has a BMCSettings ref", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)

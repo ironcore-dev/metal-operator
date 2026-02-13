@@ -220,9 +220,15 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(ctx context.Contex
 	for _, server := range servers.Items {
 		if _, ok := serverWithSettings[server.Name]; !ok {
 			if server.Spec.BIOSSettingsRef != nil {
-				if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, &metalv1alpha1.BIOSSettings{}); apierrors.IsNotFound(err) {
-					log.Error(err, "failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
-					// we will go ahead and create a new BIOSSettings for this server. the ref will be updated when the new BIOSSettings is created
+				if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, &metalv1alpha1.BIOSSettings{}); err != nil {
+					if apierrors.IsNotFound(err) {
+						log.Error(err, "failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+						// we will go ahead and create a new BIOSSettings for this server. the ref will be updated when the new BIOSSettings is created
+					} else {
+						log.Error(err, "error when trying to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+						// we will try this again in next reconciliation loop
+						continue
+					}
 				} else {
 					// the referenced BIOSSettings exists or unable to determining, so we skip creating a new one
 					log.V(1).Info("Server already has a BIOSSettings ref", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)

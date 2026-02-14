@@ -909,13 +909,89 @@ var _ = Describe("Server Controller", func() {
 			delete(server.Annotations, metalv1alpha1.OperationAnnotation)
 		})).Should(Succeed())
 
-		By("Ensuring that the Server is set not at reserved")
-		Eventually(Object(server)).Should(HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReserved))))
+		By("Ensuring that the Server passes through Tainted (may already be Available)")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Or(Equal(metalv1alpha1.ServerStateTainted), Equal(metalv1alpha1.ServerStateAvailable))),
+			HaveField("Spec.Taints", Or(
+				ContainElement(v1.Taint{
+					Key:    ServerTaintKeyTainted,
+					Effect: ServerTaintEffectNoClaim,
+				}),
+				BeEmpty(),
+			)),
+		))
+
+		By("Ensuring that the Server transitions to available with taint removed")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Spec.Taints", BeEmpty()),
+		))
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, ignitionSecret)).Should(Succeed())
+	})
+
+	It("Should transition Server from tainted to available", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Setting the taint on the Server")
+		Eventually(Update(server, func() {
+			server.Spec.Taints = append(server.Spec.Taints, v1.Taint{
+				Key:    ServerTaintKeyTainted,
+				Effect: ServerTaintEffectNoClaim,
+			})
+		})).Should(Succeed())
+
+		By("Setting the Server to tainted state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateTainted
+		})).Should(Succeed())
+
+		By("Ensuring that the Server transitions to available")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Spec.Taints", BeEmpty()),
+		))
+
+		By("Ensuring that the Server has no boot configuration ref")
+		Expect(server.Spec.BootConfigurationRef).To(BeNil())
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 })
 

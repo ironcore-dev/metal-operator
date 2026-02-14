@@ -324,6 +324,25 @@ func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c cl
 	return errors.Join(errs...)
 }
 
+func hasTaint(taints []corev1.Taint, key string, effect corev1.TaintEffect) bool {
+	for _, t := range taints {
+		if t.Key == key && t.Effect == effect {
+			return true
+		}
+	}
+	return false
+}
+
+func removeTaint(taints []corev1.Taint, key string, effect corev1.TaintEffect) []corev1.Taint {
+	var result []corev1.Taint
+	for _, t := range taints {
+		if t.Key != key || t.Effect != effect {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
 func GetImageCredentialsForSecretRef(ctx context.Context, c client.Client, secretRef *corev1.SecretReference) (string, string, error) {
 	if secretRef == nil {
 		return "", "", fmt.Errorf("got nil secretRef")

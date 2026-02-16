@@ -1282,7 +1282,7 @@ func (r *RedfishBMC) CreateEventSubscription(
 	return subscriptionLink, nil
 }
 
-func (r RedfishBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
+func (r *RedfishBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {

@@ -937,7 +937,9 @@ func (r *ServerReconciler) patchServerURI(ctx context.Context, bmcClient bmc.BMC
 	}
 
 	// Try to find system by UUID if one is provided
-	if len(server.Spec.SystemUUID) > 0 {
+	uuidProvided := len(server.Spec.SystemUUID) > 0
+	uuidMatched := false
+	if uuidProvided {
 		for _, system := range systems {
 			if strings.EqualFold(system.UUID, server.Spec.SystemUUID) {
 				serverBase := server.DeepCopy()
@@ -948,11 +950,22 @@ func (r *ServerReconciler) patchServerURI(ctx context.Context, bmcClient bmc.BMC
 				return true, nil
 			}
 		}
+		// UUID was provided but didn't match any system
+		uuidMatched = false
 	}
 
 	// If no system found by UUID or UUID is empty, and we only have one system, use it
 	// This handles cases where the Redfish implementation doesn't provide System.UUID
 	if len(systems) == 1 {
+		// If a UUID was provided but didn't match the only available system, report an error
+		if uuidProvided && !uuidMatched {
+			system := systems[0]
+			log.V(1).Info("Provided SystemUUID does not match the only available system",
+				"requestedUUID", server.Spec.SystemUUID, "systemUUID", system.UUID, "systemSerialNumber", system.SerialNumber)
+			return false, fmt.Errorf("provided SystemUUID %q does not match the only available system (UUID: %q, SerialNumber: %q); check your configuration",
+				server.Spec.SystemUUID, system.UUID, system.SerialNumber)
+		}
+
 		system := systems[0]
 		serverBase := server.DeepCopy()
 		server.Spec.SystemURI = system.URI

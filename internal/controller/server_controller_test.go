@@ -977,7 +977,7 @@ var _ = Describe("generatePseudoUUID", func() {
 		}
 	})
 
-	It("Should generate deterministic UUIDs", func() {
+	It("Should generate UUIDs that are deterministic", func() {
 		serial := "TEST-SERIAL-12345"
 		uuid1 := generatePseudoUUID(serial)
 		uuid2 := generatePseudoUUID(serial)
@@ -986,7 +986,7 @@ var _ = Describe("generatePseudoUUID", func() {
 			"Same serial should always produce same UUID")
 	})
 
-	It("Should generate unique UUIDs for different inputs", func() {
+	It("Should generate UUIDs that are unique for different inputs", func() {
 		serials := []string{"SN001", "SN002", "SN003", "SN004", "SN005"}
 		uuids := make(map[string]bool)
 
@@ -1000,7 +1000,7 @@ var _ = Describe("generatePseudoUUID", func() {
 		Expect(uuids).To(HaveLen(len(serials)))
 	})
 
-	It("Should handle varying lengths and complexity", func() {
+	It("Should generate UUIDs that handle serials of varying length and complexity", func() {
 		testCases := []string{
 			"X",          // minimal
 			"SHORT",      // short

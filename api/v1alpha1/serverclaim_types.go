@@ -38,6 +38,25 @@ type ServerClaimSpec struct {
 	// Image specifies the boot image to be used for the server.
 	// +required
 	Image string `json:"image"`
+
+	// BootMethod specifies the preferred network boot method for the server.
+	// This value is used as the default when creating a ServerBootConfiguration for this claim.
+	// Supported values are "PXE" and "HTTPBoot".
+	// Defaults to "PXE" if not specified.
+	// +kubebuilder:validation:Enum=PXE;HTTPBoot
+	// +kubebuilder:default=PXE
+	// +optional
+	BootMethod BootMethod `json:"bootMethod,omitempty"`
+
+	// BootMode controls whether the boot method override is applied once or on every boot.
+	// "Once" boots from the network one time (e.g. for OS installation), then the BIOS boot
+	// order takes over. "Continuous" boots from the network on every boot cycle.
+	// This value is used as the default when creating a ServerBootConfiguration for this claim.
+	// Defaults to "Once" if not specified.
+	// +kubebuilder:validation:Enum=Once;Continuous
+	// +kubebuilder:default=Once
+	// +optional
+	BootMode BootMode `json:"bootMode,omitempty"`
 }
 
 // Phase defines the possible phases of a ServerClaim.

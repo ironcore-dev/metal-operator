@@ -75,6 +75,16 @@ type BootOrder struct {
 	Device string `json:"device"`
 }
 
+// LastNetworkBoot records which boot configuration was last applied to the BMC
+// via SetNetworkBoot. The server controller uses this to avoid redundant BMC calls.
+type LastNetworkBoot struct {
+	// BootConfigName is the name of the ServerBootConfiguration that was applied.
+	BootConfigName string `json:"bootConfigName"`
+	// Generation is the metadata.generation of the ServerBootConfiguration spec
+	// at the time the boot override was applied to the BMC.
+	Generation int64 `json:"generation"`
+}
+
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// UUID is the unique identifier for the server.
@@ -243,6 +253,10 @@ type ServerStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// LastNetworkBoot tracks the last network boot override applied to the BMC.
+	// +optional
+	LastNetworkBoot *LastNetworkBoot `json:"lastNetworkBoot,omitempty"`
 }
 
 // Processor defines the details of a Processor.

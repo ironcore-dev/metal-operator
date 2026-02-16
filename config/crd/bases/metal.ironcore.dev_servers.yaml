@@ -11,6 +11,8 @@ spec:
     kind: Server
     listKind: ServerList
     plural: servers
+    shortNames:
+    - srv
     singular: server
   scope: Cluster
   versions:
@@ -90,17 +92,15 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               bmc:
-                description: |-
-                  BMC contains the access details for the BMC.
-                  This field is optional and can be omitted if no BMC access is specified.
+                description: BMC contains the access details for the BMC.
                 properties:
                   address:
                     description: Address is the address of the BMC.
                     type: string
                   bmcSecretRef:
                     description: |-
-                      BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
-                      required to access the BMC. This secret includes sensitive information such as usernames and passwords.
+                      BMCSecretRef is a reference to the BMCSecret object that contains the credentials
+                      required to access the BMC.
                     properties:
                       name:
                         default: ""
@@ -118,14 +118,10 @@ spec:
                       with the BMC.
                     properties:
                       name:
-                        description: |-
-                          Name specifies the name of the protocol.
-                          This could be a protocol such as "IPMI", "Redfish", etc.
+                        description: Name specifies the name of the protocol.
                         type: string
                       port:
-                        description: |-
-                          Port specifies the port number used for communication.
-                          This port is used by the specified protocol to establish connections.
+                        description: Port specifies the port number used for communication.
                         format: int32
                         type: integer
                       scheme:
@@ -141,9 +137,8 @@ spec:
                 - protocol
                 type: object
               bmcRef:
-                description: |-
-                  BMCRef is a reference to the BMC object associated with this server.
-                  This field is optional and can be omitted if no BMC is associated with this server.
+                description: BMCRef is a reference to the BMC object associated with
+                  this server.
                 properties:
                   name:
                     default: ""
@@ -159,8 +154,7 @@ spec:
               bootConfigurationRef:
                 description: |-
                   BootConfigurationRef is a reference to a BootConfiguration object that specifies
-                  the boot configuration for this server. This field is optional and can be omitted
-                  if no boot configuration is specified.
+                  the boot configuration for this server.
                 properties:
                   apiVersion:
                     description: APIVersion is the API version of the referenced object.
@@ -211,7 +205,7 @@ spec:
               maintenanceBootConfigurationRef:
                 description: |-
                   MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
-                  the boot configuration for this server during maintenance. This field is optional and can be omitted
+                  the boot configuration for this server during maintenance.
                 properties:
                   apiVersion:
                     description: APIVersion is the API version of the referenced object.
@@ -239,9 +233,8 @@ spec:
                 description: Power specifies the desired power state of the server.
                 type: string
               serverClaimRef:
-                description: |-
-                  ServerClaimRef is a reference to a ServerClaim object that claims this server.
-                  This field is optional and can be omitted if no claim is associated with this server.
+                description: ServerClaimRef is a reference to a ServerClaim object
+                  that claims this server.
                 properties:
                   apiVersion:
                     description: APIVersion is the API version of the referenced object.
@@ -503,14 +496,14 @@ spec:
               storages:
                 description: Storages is a list of storages associated with the server.
                 items:
-                  description: Storage defines the details of one storage device
+                  description: Storage defines the details of one storage device.
                   properties:
                     drives:
                       description: Drives is a collection of drives associated with
                         this storage.
                       items:
                         description: StorageDrive defines the details of one storage
-                          drive
+                          drive.
                         properties:
                           capacity:
                             anyOf:
@@ -529,7 +522,7 @@ spec:
                               device.
                             type: string
                           name:
-                            description: Name is the name of the storage interface.
+                            description: Name is the name of the storage drive.
                             type: string
                           state:
                             description: State specifies the state of the storage
@@ -545,7 +538,7 @@ spec:
                         type: object
                       type: array
                     name:
-                      description: Name is the name of the storage interface.
+                      description: Name is the name of the storage device.
                       type: string
                     state:
                       description: State specifies the state of the storage device.
@@ -555,7 +548,7 @@ spec:
                         this storage.
                       items:
                         description: StorageVolume defines the details of one storage
-                          volume
+                          volume.
                         properties:
                           capacity:
                             anyOf:
@@ -566,7 +559,7 @@ spec:
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           name:
-                            description: Name is the name of the storage interface.
+                            description: Name is the name of the storage volume.
                             type: string
                           raidType:
                             description: RAIDType specifies the RAID type of the associated

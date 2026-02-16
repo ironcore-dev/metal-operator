@@ -17,6 +17,8 @@ spec:
     kind: ServerClaim
     listKind: ServerClaimList
     plural: serverclaims
+    shortNames:
+    - scl
     singular: serverclaim
   scope: Namespaced
   versions:
@@ -63,8 +65,8 @@ spec:
             properties:
               ignitionSecretRef:
                 description: |-
-                  IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
-                  the ignition configuration for the server. This field is optional and can be omitted if not specified.
+                  IgnitionSecretRef is a reference to the Secret object that contains
+                  the ignition configuration for the server.
                 properties:
                   name:
                     default: ""
@@ -84,9 +86,7 @@ spec:
                 description: Power specifies the desired power state of the server.
                 type: string
               serverRef:
-                description: |-
-                  ServerRef is a reference to a specific server to be claimed.
-                  This field is optional and can be omitted if the server is to be selected using ServerSelector.
+                description: ServerRef is a reference to a specific server to be claimed.
                 properties:
                   name:
                     default: ""
@@ -103,9 +103,8 @@ spec:
                 - message: serverRef is immutable
                   rule: self == oldSelf
               serverSelector:
-                description: |-
-                  ServerSelector specifies a label selector to identify the server to be claimed.
-                  This field is optional and can be omitted if a specific server is referenced using ServerRef.
+                description: ServerSelector specifies a label selector to identify
+                  the server to be claimed.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.

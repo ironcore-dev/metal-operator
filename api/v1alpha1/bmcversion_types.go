@@ -11,7 +11,7 @@ import (
 type BMCVersionState string
 
 const (
-	// BMCVersionStatePending specifies that the BMC upgrade maintenance is waiting
+	// BMCVersionStatePending specifies that the BMC upgrade is waiting.
 	BMCVersionStatePending BMCVersionState = "Pending"
 	// BMCVersionStateInProgress specifies that upgrading BMC is in progress.
 	BMCVersionStateInProgress BMCVersionState = "InProgress"
@@ -22,15 +22,15 @@ const (
 )
 
 type BMCVersionTemplate struct {
-	// Version contains a BMC version to upgrade to
+	// Version specifies the BMC version to upgrade to.
 	// +required
 	Version string `json:"version"`
 
-	// UpdatePolicy is an indication of whether the server's upgrade service should bypass vendor update policies
+	// UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies.
 	// +optional
 	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
 
-	// details regarding the image to use to upgrade to given BMC version
+	// Image specifies the image to use to upgrade to the given BMC version.
 	// +required
 	Image ImageSpec `json:"image"`
 
@@ -44,7 +44,7 @@ type BMCVersionSpec struct {
 	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
 	BMCVersionTemplate `json:",inline"`
 
-	// ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server.
+	// ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers.
 	// +optional
 	ServerMaintenanceRefs []ObjectReference `json:"serverMaintenanceRefs,omitempty"`
 
@@ -58,7 +58,7 @@ type BMCVersionStatus struct {
 	// State represents the current state of the BMC configuration task.
 	State BMCVersionState `json:"state,omitempty"`
 
-	// UpgradeTask contains the state of the Upgrade Task created by the BMC
+	// UpgradeTask contains the state of the upgrade task created by the BMC.
 	UpgradeTask *Task `json:"upgradeTask,omitempty"`
 	// Conditions represents the latest available observations of the BMC version upgrade state.
 	// +patchStrategy=merge
@@ -69,9 +69,9 @@ type BMCVersionStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=bmcv
 // +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.version`
-// +kubebuilder:printcolumn:name="updateType",type=string,JSONPath=`.spec.updateType`
+// +kubebuilder:printcolumn:name="UpdatePolicy",type=string,JSONPath=`.spec.updatePolicy`
 // +kubebuilder:printcolumn:name="BMCRef",type=string,JSONPath=`.spec.bmcRef.name`
 // +kubebuilder:printcolumn:name="TaskProgress",type=integer,JSONPath=`.status.upgradeTask.percentageComplete`
 // +kubebuilder:printcolumn:name="TaskState",type=string,JSONPath=`.status.upgradeTask.state`

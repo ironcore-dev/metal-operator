@@ -11,6 +11,8 @@ spec:
     kind: ServerMaintenance
     listKind: ServerMaintenanceList
     plural: servermaintenances
+    shortNames:
+    - sm
     singular: servermaintenance
   scope: Namespaced
   versions:
@@ -70,13 +72,12 @@ spec:
                     description: Name specifies the name of the boot configuration.
                     type: string
                   spec:
-                    description: Parameters specify the parameters to be used for
-                      rendering the boot configuration.
+                    description: Spec specifies the boot configuration to be rendered.
                     properties:
                       ignitionSecretRef:
                         description: |-
-                          IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
-                          the ignition configuration for the server. This field is optional and can be omitted if not specified.
+                          IgnitionSecretRef is a reference to the Secret object that contains
+                          the ignition configuration for the server.
                         properties:
                           name:
                             default: ""
@@ -90,9 +91,8 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       image:
-                        description: |-
-                          Image specifies the boot image to be used for the server.
-                          This field is optional and can be omitted if not specified.
+                        description: Image specifies the boot image to be used for
+                          the server.
                         type: string
                       serverRef:
                         description: ServerRef is a reference to the server for which

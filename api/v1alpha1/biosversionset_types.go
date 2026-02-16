@@ -13,7 +13,7 @@ type BIOSVersionSetSpec struct {
 	// +required
 	ServerSelector metav1.LabelSelector `json:"serverSelector"`
 
-	// BIOSVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers.
+	// BIOSVersionTemplate defines the template for the BIOSVersion resource to be applied to the servers.
 	BIOSVersionTemplate BIOSVersionTemplate `json:"biosVersionTemplate,omitempty"`
 }
 
@@ -25,7 +25,7 @@ type BIOSVersionSetStatus struct {
 	AvailableBIOSVersion int32 `json:"availableBIOSVersion,omitempty"`
 	// PendingBIOSVersion is the total number of pending BIOSVersion in the set.
 	PendingBIOSVersion int32 `json:"pendingBIOSVersion,omitempty"`
-	// InProgressBIOSVersion is the total number of BIOSVersion in the set that are currently in InProgress.
+	// InProgressBIOSVersion is the total number of BIOSVersion resources in the set that are currently in progress.
 	InProgressBIOSVersion int32 `json:"inProgressBIOSVersion,omitempty"`
 	// CompletedBIOSVersion is the total number of completed BIOSVersion in the set.
 	CompletedBIOSVersion int32 `json:"completedBIOSVersion,omitempty"`
@@ -35,7 +35,7 @@ type BIOSVersionSetStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=bvs
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosVersionTemplate.version`
 // +kubebuilder:printcolumn:name="selectedServers",type="integer",JSONPath=`.status.fullyLabeledServers`
 // +kubebuilder:printcolumn:name="AvailableBIOSVersion",type="integer",JSONPath=`.status.availableBIOSVersion`

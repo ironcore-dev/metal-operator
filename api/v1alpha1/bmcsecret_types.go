@@ -11,7 +11,7 @@ import (
 const (
 	// BMCSecretUsernameKeyName is the secret key name for the username.
 	BMCSecretUsernameKeyName = "username"
-	// BMCSecretPasswordKeyName is the secret key name for the password.F
+	// BMCSecretPasswordKeyName is the secret key name for the password.
 	BMCSecretPasswordKeyName = "password"
 )
 

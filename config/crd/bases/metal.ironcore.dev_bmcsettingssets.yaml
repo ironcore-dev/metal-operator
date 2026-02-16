@@ -65,8 +65,8 @@ spec:
             description: BMCSettingsSetSpec defines the desired state of BMCSettingsSet.
             properties:
               bmcSelector:
-                description: ' BMCSelector specifies a label selector to identify
-                  the BMCs that are to be selected.'
+                description: BMCSelector specifies a label selector to identify the
+                  BMCs to be selected.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -113,7 +113,7 @@ spec:
                 x-kubernetes-map-type: atomic
               bmcSettingsTemplate:
                 description: BMCSettingsTemplate defines the template for the BMCSettings
-                  Resource to be applied to the BMCs.
+                  resource to be applied to the BMCs.
                 properties:
                   serverMaintenancePolicy:
                     description: ServerMaintenancePolicy is a maintenance policy to
@@ -122,11 +122,11 @@ spec:
                   settings:
                     additionalProperties:
                       type: string
-                    description: SettingsMap contains bmc settings as map
+                    description: SettingsMap contains BMC settings as a map.
                     type: object
                   version:
-                    description: Version defines the BMC firmware for which the settings
-                      should be applied.
+                    description: Version specifies the BMC firmware version for which
+                      the settings should be applied.
                     type: string
                 required:
                 - version
@@ -145,25 +145,25 @@ spec:
                 type: integer
               completedBMCSettings:
                 description: CompletedBMCSettings is the total number of completed
-                  BMC in the set.
+                  BMCSettings in the set.
                 format: int32
                 type: integer
               failedBMCSettings:
-                description: FailedBMCSettings is the total number of failed BMC in
-                  the set.
+                description: FailedBMCSettings is the total number of failed BMCSettings
+                  in the set.
                 format: int32
                 type: integer
               fullyLabeledBMCs:
-                description: FullyLabeledBMCs is the number of BMC in the set.
+                description: FullyLabeledBMCs is the number of BMCs in the set.
                 format: int32
                 type: integer
               inProgressBMCSettings:
-                description: InProgressBMCSettings is the total number of BMC in the
-                  set that are currently in progress.
+                description: InProgressBMCSettings is the total number of BMCSettings
+                  in the set that are currently in progress.
                 format: int32
                 type: integer
               pendingBMCSettings:
-                description: PendingBMCSettings is the total number of pending BMC
+                description: PendingBMCSettings is the total number of pending BMCSettings
                   in the set.
                 format: int32
                 type: integer

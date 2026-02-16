@@ -17,6 +17,8 @@ spec:
     kind: Endpoint
     listKind: EndpointList
     plural: endpoints
+    shortNames:
+    - mep
     singular: endpoint
   scope: Cluster
   versions:

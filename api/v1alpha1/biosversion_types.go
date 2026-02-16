@@ -13,13 +13,13 @@ import (
 type BIOSVersionState string
 
 const (
-	// BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting
+	// BIOSVersionStatePending specifies that the BIOS upgrade is waiting.
 	BIOSVersionStatePending BIOSVersionState = "Pending"
-	// BIOSVersionStateInProgress specifies that upgrading bios is in progress.
+	// BIOSVersionStateInProgress specifies that upgrading BIOS is in progress.
 	BIOSVersionStateInProgress BIOSVersionState = "InProgress"
-	// BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.
+	// BIOSVersionStateCompleted specifies that the BIOS upgrade has been completed.
 	BIOSVersionStateCompleted BIOSVersionState = "Completed"
-	// BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.
+	// BIOSVersionStateFailed specifies that the BIOS upgrade has failed.
 	BIOSVersionStateFailed BIOSVersionState = "Failed"
 )
 
@@ -30,15 +30,15 @@ const (
 )
 
 type BIOSVersionTemplate struct {
-	// Version contains a BIOS version to upgrade to
+	// Version specifies the BIOS version to upgrade to.
 	// +required
 	Version string `json:"version"`
 
-	// UpdatePolicy An indication of whether the server's upgrade service should bypass vendor update policies
+	// UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies.
 	// +optional
 	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
 
-	// details regarding the image to use to upgrade to given BIOS version
+	// Image specifies the image to use to upgrade to the given BIOS version.
 	// +required
 	Image ImageSpec `json:"image"`
 
@@ -52,34 +52,33 @@ type BIOSVersionSpec struct {
 	// BIOSVersionTemplate defines the template for Version to be applied on the servers.
 	BIOSVersionTemplate `json:",inline"`
 
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server.
+	// ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server.
 	// +optional
 	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
-	// ServerRef is a reference to a specific server to apply bios upgrade on.
+	// ServerRef is a reference to a specific server to apply the BIOS upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
 	// +optional
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 }
 
 type ImageSpec struct {
-	// ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-	// to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+	// SecretRef is a reference to the Secret containing the credentials to access the image URI.
 	// +optional
 	SecretRef *corev1.SecretReference `json:"secretRef,omitempty"`
 
-	// The network protocol that the server's update service uses to retrieve 'ImageURI'
+	// TransferProtocol is the network protocol used to retrieve the image URI.
 	// +optional
 	TransferProtocol string `json:"transferProtocol,omitempty"`
 
-	// The URI of the software image to update/install."
+	// URI is the URI of the software image to install.
 	// +required
 	URI string `json:"URI"`
 }
 
 // BIOSVersionStatus defines the observed state of BIOSVersion.
 type BIOSVersionStatus struct {
-	// State represents the current state of the bios configuration task.
+	// State represents the current state of the BIOS upgrade task.
 	// +optional
 	State BIOSVersionState `json:"state,omitempty"`
 
@@ -87,7 +86,7 @@ type BIOSVersionStatus struct {
 	// +optional
 	UpgradeTask *Task `json:"upgradeTask,omitempty"`
 
-	// Conditions represents the latest available observations of the Bios version upgrade state.
+	// Conditions represents the latest available observations of the BIOS version upgrade state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
 	// +optional
@@ -115,9 +114,9 @@ type Task struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=bv
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
-// +kubebuilder:printcolumn:name="ForceUpdate",type=string,JSONPath=`.spec.updateType`
+// +kubebuilder:printcolumn:name="UpdatePolicy",type=string,JSONPath=`.spec.updatePolicy`
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`
 // +kubebuilder:printcolumn:name="TaskState",type=string,JSONPath=`.status.upgradeTask.state`

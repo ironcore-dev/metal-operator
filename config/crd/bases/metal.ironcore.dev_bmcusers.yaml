@@ -11,6 +11,8 @@ spec:
     kind: BMCUser
     listKind: BMCUserList
     plural: bmcusers
+    shortNames:
+    - bmcu
     singular: bmcuser
   scope: Cluster
   versions:
@@ -71,21 +73,18 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               description:
-                description: Description is an optional description for the BMC user.
+                description: Description is a description for the BMC user.
                 type: string
               roleID:
-                description: |-
-                  RoleID is the ID of the role to assign to the user.
-                  The available roles depend on the BMC implementation.
-                  For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly".
+                description: RoleID is the ID of the role to assign to the user.
                 type: string
               rotationPeriod:
                 description: |-
                   RotationPeriod defines how often the password should be rotated.
-                  if not set, the password will not be rotated.
+                  If not set, the password will not be rotated.
                 type: string
               userName:
-                description: Username of the BMC user.
+                description: UserName is the username of the BMC user.
                 type: string
             required:
             - roleID
@@ -111,7 +110,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               id:
-                description: ID of the user in the BMC system
+                description: ID is the identifier of the user in the BMC system.
                 type: string
               lastRotation:
                 description: LastRotation is the timestamp of the last password rotation.

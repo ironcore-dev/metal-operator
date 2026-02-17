@@ -15,17 +15,11 @@ import (
 )
 
 const (
-<<<<<<< HEAD
-	certmanagerVersion = "v1.19.3"
-	certmanagerURLTmpl = "https://github.com/cert-manager/cert-manager/releases/download/%s/cert-manager.yaml"
-=======
+	certmanagerVersion        = "v1.19.3"
+	certmanagerURLTmpl        = "https://github.com/cert-manager/cert-manager/releases/download/%s/cert-manager.yaml"
 	prometheusOperatorVersion = "v0.77.1"
 	prometheusOperatorURL     = "https://github.com/prometheus-operator/prometheus-operator/" +
 		"releases/download/%s/bundle.yaml"
->>>>>>> tmp-original-17-02-26-00-42
-
-	certmanagerVersion = "v1.16.3"
-	certmanagerURLTmpl = "https://github.com/cert-manager/cert-manager/releases/download/%s/cert-manager.yaml"
 )
 
 func warnError(err error) {
@@ -210,11 +204,7 @@ func UncommentCode(filename, target, prefix string) error {
 
 	idx := strings.Index(strContent, target)
 	if idx < 0 {
-<<<<<<< HEAD
 		return fmt.Errorf("unable to find the code %q to be uncommented", target)
-=======
-		return fmt.Errorf("unable to find the code %s to be uncomment", target)
->>>>>>> tmp-original-17-02-26-00-42
 	}
 
 	out := new(bytes.Buffer)

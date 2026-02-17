@@ -318,14 +318,14 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 
 	setList := &metalv1alpha1.BIOSVersionSetList{}
 	if err := r.List(ctx, setList); err != nil {
-		log.V(1).Error(err, "failed to list BIOSVersionSet")
+		log.Error(err, "failed to list BIOSVersionSet")
 		return nil
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, set := range setList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&set.Spec.ServerSelector)
 		if err != nil {
-			log.V(1).Error(err, "failed to convert label selector")
+			log.Error(err, "failed to convert label selector")
 			return nil
 		}
 		// If the Server label matches the selector, enqueue the request
@@ -334,7 +334,7 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 		} else { // if the label has been removed
 			versions, err := r.getOwnedBIOSVersions(ctx, &set)
 			if err != nil {
-				log.V(1).Error(err, "failed to get owned BIOSVersions")
+				log.Error(err, "failed to get owned BIOSVersions")
 				return nil
 			}
 			for _, version := range versions.Items {

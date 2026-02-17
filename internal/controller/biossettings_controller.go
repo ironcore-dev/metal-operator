@@ -595,7 +595,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, log log
 
 		resetReq, err := bmcClient.CheckBiosAttributes(settingsDiff)
 		if err != nil {
-			log.V(1).Error(err, "could not validate settings and determine if reboot needed")
+			log.Error(err, "could not validate settings and determine if reboot needed")
 			var invalidSettingsErr *bmc.InvalidBIOSSettingsError
 			if errors.As(err, &invalidSettingsErr) {
 				inValidSettings, errCond := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionWrongSettings)

@@ -279,7 +279,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.20.1
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d.%d",$$3, $$2}')
-GOLANGCI_LINT_VERSION ?= v2.8
+GOLANGCI_LINT_VERSION ?= v2.8.0
 GOIMPORTS_VERSION ?= v0.38.0
 CRD_REF_DOCS_VERSION ?= v0.2.0
 KUBEBUILDER_VERSION ?= v4.11.1
@@ -296,10 +296,6 @@ addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
 $(ADDLICENSE): $(LOCALBIN)
 	$(call go-install-tool,$(ADDLICENSE),github.com/google/addlicense,$(ADDLICENSE_VERSION))
 
-<<<<<<< HEAD
-GOLANGCI_LINT_VERSION ?= v2.8.0
-=======
->>>>>>> tmp-original-17-02-26-00-42
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -311,7 +307,6 @@ $(KUBECTL): $(LOCALBIN)
 	curl --retry $(CURL_RETRIES) -fsL https://dl.k8s.io/release/v$(ENVTEST_K8S_VERSION)/bin/$(GOOS)/$(GOARCH)/kubectl -o "$(KUBECTL)"
 	ln -sf "$(KUBECTL)" "$(KUBECTL_BIN)"
 	chmod +x "$(KUBECTL_BIN)" "$(KUBECTL)"
-
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
@@ -334,15 +329,12 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-<<<<<<< HEAD
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 	@test -f .custom-gcl.yml && { \
 		echo "Building custom golangci-lint with plugins..." && \
 		$(GOLANGCI_LINT) custom --destination $(LOCALBIN) --name golangci-lint-custom && \
 		mv -f $(LOCALBIN)/golangci-lint-custom $(GOLANGCI_LINT); \
 	} || true
-=======
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
 
 .PHONY: goimports
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
@@ -362,7 +354,6 @@ $(KUBEBUILDER): $(LOCALBIN)
 .PHONY: metalctl
 metalctl: $(METALCTL) ## Build metalctl locally if necessary.
 	go build -o $(METALCTL) ./cmd/metalctl
->>>>>>> tmp-original-17-02-26-00-42
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # Note: All paths are quoted to work in directories containing spaces or parentheses.

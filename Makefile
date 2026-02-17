@@ -272,8 +272,8 @@ METALCTL ?= $(LOCALBIN)/metalctl
 GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.7.1
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
+KUSTOMIZE_VERSION ?= v5.8.1
+CONTROLLER_TOOLS_VERSION ?= v0.20.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
@@ -296,6 +296,10 @@ addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
 $(ADDLICENSE): $(LOCALBIN)
 	$(call go-install-tool,$(ADDLICENSE),github.com/google/addlicense,$(ADDLICENSE_VERSION))
 
+<<<<<<< HEAD
+GOLANGCI_LINT_VERSION ?= v2.8.0
+=======
+>>>>>>> tmp-original-17-02-26-00-42
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -330,6 +334,14 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
+<<<<<<< HEAD
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	@test -f .custom-gcl.yml && { \
+		echo "Building custom golangci-lint with plugins..." && \
+		$(GOLANGCI_LINT) custom --destination $(LOCALBIN) --name golangci-lint-custom && \
+		mv -f $(LOCALBIN)/golangci-lint-custom $(GOLANGCI_LINT); \
+	} || true
+=======
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
 
 .PHONY: goimports
@@ -350,6 +362,7 @@ $(KUBEBUILDER): $(LOCALBIN)
 .PHONY: metalctl
 metalctl: $(METALCTL) ## Build metalctl locally if necessary.
 	go build -o $(METALCTL) ./cmd/metalctl
+>>>>>>> tmp-original-17-02-26-00-42
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # Note: All paths are quoted to work in directories containing spaces or parentheses.

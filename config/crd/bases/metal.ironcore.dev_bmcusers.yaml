@@ -16,7 +16,26 @@ spec:
     singular: bmcuser
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.id
+      name: ID
+      type: string
+    - jsonPath: .spec.userName
+      name: UserName
+      type: string
+    - jsonPath: .spec.roleID
+      name: RoleID
+      type: string
+    - jsonPath: .status.lastRotation
+      name: LastRotation
+      type: date
+    - jsonPath: .status.passwordExpiration
+      name: PasswordExpiration
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: BMCUser is the Schema for the bmcusers API.

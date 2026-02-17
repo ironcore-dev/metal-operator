@@ -12,7 +12,7 @@ spec:
     listKind: BIOSVersionList
     plural: biosversions
     shortNames:
-    - bv
+    - biosv
     singular: biosversion
   scope: Cluster
   versions:

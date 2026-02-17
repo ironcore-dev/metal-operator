@@ -12,7 +12,7 @@ spec:
     listKind: BIOSSettingsSetList
     plural: biossettingssets
     shortNames:
-    - bss
+    - biosss
     singular: biossettingsset
   scope: Cluster
   versions:

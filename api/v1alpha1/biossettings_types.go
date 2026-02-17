@@ -127,7 +127,7 @@ type BIOSSettingsFlowStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=bs
+// +kubebuilder:resource:scope=Cluster,shortName=bioss
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="ServerMaintenanceRef",type=string,JSONPath=`.spec.serverMaintenanceRef.name`

@@ -114,7 +114,7 @@ type Task struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=bv
+// +kubebuilder:resource:scope=Cluster,shortName=biosv
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="UpdatePolicy",type=string,JSONPath=`.spec.updatePolicy`
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`

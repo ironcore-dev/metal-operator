@@ -35,7 +35,7 @@ type BIOSSettingsSetStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=bss
+// +kubebuilder:resource:scope=Cluster,shortName=biosss
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosSettingsTemplate.version`
 // +kubebuilder:printcolumn:name="TotalServers",type="string",JSONPath=`.status.fullyLabeledServers`
 // +kubebuilder:printcolumn:name="AvailableBIOSSettings",type="string",JSONPath=`.status.availableBIOSSettings`

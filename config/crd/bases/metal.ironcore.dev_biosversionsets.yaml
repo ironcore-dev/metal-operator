@@ -12,7 +12,7 @@ spec:
     listKind: BIOSVersionSetList
     plural: biosversionsets
     shortNames:
-    - bvs
+    - biosvs
     singular: biosversionset
   scope: Cluster
   versions:

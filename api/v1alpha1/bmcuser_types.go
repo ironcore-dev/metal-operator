@@ -50,6 +50,12 @@ type BMCUserStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=bmcu
+// +kubebuilder:printcolumn:name="ID",type=string,JSONPath=`.status.id`
+// +kubebuilder:printcolumn:name="UserName",type=string,JSONPath=`.spec.userName`
+// +kubebuilder:printcolumn:name="RoleID",type=string,JSONPath=`.spec.roleID`
+// +kubebuilder:printcolumn:name="LastRotation",type=date,JSONPath=`.status.lastRotation`
+// +kubebuilder:printcolumn:name="PasswordExpiration",type=date,JSONPath=`.status.passwordExpiration`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BMCUser is the Schema for the bmcusers API.
 type BMCUser struct {

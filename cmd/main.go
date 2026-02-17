@@ -217,7 +217,9 @@ func main() { // nolint: gocyclo
 	var eventAddr string
 	if eventURL == "" {
 		eventAddr = os.Getenv("EVENT_ADDRESS")
-		if eventAddr != "" {
+		if eventAddr == "" {
+			setupLog.Error(nil, "failed to set the event URL as no address is provided")
+		} else {
 			eventURL = fmt.Sprintf("%s://%s:%d", eventProtocol, eventAddr, eventPort)
 		}
 	}
@@ -618,7 +620,7 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 
-	if eventAddr != "" {
+	if eventURL != "" {
 		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 			setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
 			eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))

@@ -44,6 +44,12 @@ type ServerMaintenanceSpec struct {
 	// +optional
 	ServerPower Power `json:"serverPower,omitempty"`
 
+	// Priority determines ordering when multiple ServerMaintenance resources target the same server.
+	// Higher values are processed first. If priorities are equal, older resources are processed first.
+	// If omitted, priority is treated as 0.
+	// +optional
+	Priority int32 `json:"priority,omitempty"`
+
 	// ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance.
 	// +optional
 	ServerBootConfigurationTemplate *ServerBootConfigurationTemplate `json:"serverBootConfigurationTemplate,omitempty"`

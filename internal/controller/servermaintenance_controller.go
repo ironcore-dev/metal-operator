@@ -116,6 +116,15 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
 			return ctrl.Result{}, nil
 		}
+	} else {
+		deferMaintenance, err := r.shouldDeferToHigherPriorityMaintenance(ctx, maintenance)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if deferMaintenance {
+			log.V(1).Info("Deferring maintenance because higher-priority maintenance is pending", "Server", server.Name, "Priority", maintenance.Spec.Priority)
+			return ctrl.Result{}, nil
+		}
 	}
 
 	if server.Spec.ServerClaimRef == nil {
@@ -183,6 +192,48 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, lo
 
 	log.V(1).Info("Reconciled ServerMaintenance in Pending state")
 	return ctrl.Result{}, nil
+}
+
+func (r *ServerMaintenanceReconciler) shouldDeferToHigherPriorityMaintenance(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance) (bool, error) {
+	if maintenance.Spec.ServerRef == nil {
+		return false, nil
+	}
+
+	maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: maintenance.Spec.ServerRef.Name}); err != nil {
+		return false, fmt.Errorf("failed to list ServerMaintenances: %w", err)
+	}
+
+	for i := range maintenanceList.Items {
+		other := &maintenanceList.Items[i]
+		if other.UID == maintenance.UID {
+			continue
+		}
+		if !other.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if other.Status.State != "" && other.Status.State != metalv1alpha1.ServerMaintenanceStatePending {
+			continue
+		}
+		if shouldRunBefore(other, maintenance) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func shouldRunBefore(a, b *metalv1alpha1.ServerMaintenance) bool {
+	if a.Spec.Priority != b.Spec.Priority {
+		return a.Spec.Priority > b.Spec.Priority
+	}
+	if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
+		return a.CreationTimestamp.Before(&b.CreationTimestamp)
+	}
+	if a.Namespace != b.Namespace {
+		return a.Namespace < b.Namespace
+	}
+	return a.Name < b.Name
 }
 
 func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, log logr.Logger, maintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {

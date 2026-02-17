@@ -5,6 +5,7 @@ SPDX-PackageDownloadLocation = "https://github.com/ironcore-dev/metal-operator"
 
 [[annotations]]
 path = [
+    ".devcontainer/**",
     ".github/**",
     ".gitignore",
     ".dockerignore",

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -75,17 +74,18 @@ func (r *BIOSVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	log.V(1).Info("Reconciling BIOSVersion")
 
-	return r.reconcileExists(ctx, log, biosVersion)
+	return r.reconcileExists(ctx, biosVersion)
 }
 
-func (r *BIOSVersionReconciler) reconcileExists(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
-	if r.shouldDelete(log, biosVersion) {
-		return r.delete(ctx, log, biosVersion)
+func (r *BIOSVersionReconciler) reconcileExists(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
+	if r.shouldDelete(ctx, biosVersion) {
+		return r.delete(ctx, biosVersion)
 	}
-	return r.reconcile(ctx, log, biosVersion)
+	return r.reconcile(ctx, biosVersion)
 }
 
-func (r *BIOSVersionReconciler) shouldDelete(log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion) bool {
+func (r *BIOSVersionReconciler) shouldDelete(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) bool {
+	log := ctrl.LoggerFrom(ctx)
 	if biosVersion.DeletionTimestamp.IsZero() {
 		return false
 	}
@@ -99,7 +99,8 @@ func (r *BIOSVersionReconciler) shouldDelete(log logr.Logger, biosVersion *metal
 	return true
 }
 
-func (r *BIOSVersionReconciler) delete(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
+func (r *BIOSVersionReconciler) delete(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting BIOSVersion")
 	defer log.V(1).Info("Deleted BIOSVersion")
 
@@ -115,7 +116,8 @@ func (r *BIOSVersionReconciler) delete(ctx context.Context, log logr.Logger, bio
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSVersionReconciler) cleanupServerMaintenanceReferences(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion) error {
+func (r *BIOSVersionReconciler) cleanupServerMaintenanceReferences(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) error {
+	log := ctrl.LoggerFrom(ctx)
 	if biosVersion.Spec.ServerMaintenanceRef == nil {
 		return nil
 	}
@@ -145,7 +147,8 @@ func (r *BIOSVersionReconciler) cleanupServerMaintenanceReferences(ctx context.C
 	return nil
 }
 
-func (r *BIOSVersionReconciler) reconcile(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
+func (r *BIOSVersionReconciler) reconcile(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if shouldIgnoreReconciliation(biosVersion) {
 		log.V(1).Info("Skipped BIOSVersion reconciliation")
 		return ctrl.Result{}, nil
@@ -155,7 +158,7 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, err
 	}
 
-	requeue, err := r.transitionState(ctx, log, biosVersion)
+	requeue, err := r.transitionState(ctx, biosVersion)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -167,7 +170,8 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion) (bool, error) {
+func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if biosVersion.Spec.ServerRef == nil {
 		return false, fmt.Errorf("BIOSVersion does not have a ServerRef")
 	}
@@ -189,10 +193,10 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 
 	switch biosVersion.Status.State {
 	case "", metalv1alpha1.BIOSVersionStatePending:
-		return false, r.cleanup(ctx, log, bmcClient, biosVersion, server)
+		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateInProgress:
 		if biosVersion.Spec.ServerMaintenanceRef == nil {
-			if requeue, err := r.requestServerMaintenance(ctx, log, biosVersion, server); err != nil || requeue {
+			if requeue, err := r.requestServerMaintenance(ctx, biosVersion, server); err != nil || requeue {
 				return false, err
 			}
 		}
@@ -207,13 +211,13 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 			return false, nil
 		}
 
-		if ok, err := r.handleBMCReset(ctx, log, bmcClient, biosVersion, server); !ok || err != nil {
+		if ok, err := r.handleBMCReset(ctx, bmcClient, biosVersion, server); !ok || err != nil {
 			return false, err
 		}
 
-		return r.processInProgressState(ctx, log, bmcClient, biosVersion, server)
+		return r.processInProgressState(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateCompleted:
-		return false, r.cleanup(ctx, log, bmcClient, biosVersion, server)
+		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateFailed:
 		if shouldRetryReconciliation(biosVersion) {
 			log.V(1).Info("Retrying ...")
@@ -237,7 +241,8 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 	return false, nil
 }
 
-func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
+func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	issuedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeIssued)
 	if err != nil {
 		return false, err
@@ -249,7 +254,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 			log.V(1).Info("Server in powered off state. Retrying ...", "Server", server.Name)
 			return false, nil
 		}
-		return false, r.upgradeBIOSVersion(ctx, log, bmcClient, biosVersion, server, issuedCondition)
+		return false, r.upgradeBIOSVersion(ctx, bmcClient, biosVersion, server, issuedCondition)
 	}
 
 	completedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted)
@@ -259,7 +264,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 
 	if completedCondition.Status != metav1.ConditionTrue {
 		log.V(1).Info("Check BIOS version upgrade task status")
-		return r.checkUpdateBiosUpgradeStatus(ctx, log, bmcClient, biosVersion, server, completedCondition)
+		return r.checkUpdateBiosUpgradeStatus(ctx, bmcClient, biosVersion, server, completedCondition)
 	}
 
 	rebootPowerOffCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradePowerOff)
@@ -357,11 +362,11 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, log 
 
 func (r *BIOSVersionReconciler) handleBMCReset(
 	ctx context.Context,
-	log logr.Logger,
 	bmcClient bmc.BMC,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
 ) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	// reset BMC if not already done
 	resetBMC, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, BMCConditionReset)
 	if err != nil {
@@ -372,7 +377,7 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 		// once the server is powered on, reset the BMC to make sure its in stable state
 		// this avoids problems with some BMCs that hang up in subsequent operations
 		if resetBMC.Reason != BMCReasonReset {
-			if err := resetBMCOfServer(ctx, log, r.Client, server, bmcClient); err == nil {
+			if err := resetBMCOfServer(ctx, r.Client, server, bmcClient); err == nil {
 				// mark reset to be issued, wait for next reconcile
 				if err := r.Conditions.Update(
 					resetBMC,
@@ -426,14 +431,15 @@ func (r *BIOSVersionReconciler) getBIOSVersionFromBMC(ctx context.Context, bmcCl
 	return currentBiosVersion, nil
 }
 
-func (r *BIOSVersionReconciler) cleanup(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) error {
+func (r *BIOSVersionReconciler) cleanup(ctx context.Context, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) error {
+	log := ctrl.LoggerFrom(ctx)
 	currentBiosVersion, err := r.getBIOSVersionFromBMC(ctx, bmcClient, server)
 	if err != nil {
 		return err
 	}
 
 	if currentBiosVersion == biosVersion.Spec.Version {
-		if err := r.cleanupServerMaintenanceReferences(ctx, log, biosVersion); err != nil {
+		if err := r.cleanupServerMaintenanceReferences(ctx, biosVersion); err != nil {
 			return err
 		}
 
@@ -533,7 +539,8 @@ func (r *BIOSVersionReconciler) ensurePowerState(ctx context.Context, biosVersio
 	return nil
 }
 
-func (r *BIOSVersionReconciler) requestServerMaintenance(ctx context.Context, log logr.Logger, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
+func (r *BIOSVersionReconciler) requestServerMaintenance(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if biosVersion.Spec.ServerMaintenanceRef != nil {
 		return false, nil
 	}
@@ -569,12 +576,12 @@ func (r *BIOSVersionReconciler) requestServerMaintenance(ctx context.Context, lo
 
 func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 	ctx context.Context,
-	log logr.Logger,
 	bmcClient bmc.BMC,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
 	completedCondition *metav1.Condition,
 ) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	taskURI := biosVersion.Status.UpgradeTask.URI
 	taskCurrentStatus, err := func() (*redfish.Task, error) {
 		if taskURI == "" {
@@ -666,12 +673,12 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 
 func (r *BIOSVersionReconciler) upgradeBIOSVersion(
 	ctx context.Context,
-	log logr.Logger,
 	bmcClient bmc.BMC,
 	biosVersion *metalv1alpha1.BIOSVersion,
 	server *metalv1alpha1.Server,
 	issuedCondition *metav1.Condition,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	var username, password string
 	if biosVersion.Spec.Image.SecretRef != nil {
 		var err error

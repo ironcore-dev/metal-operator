@@ -10,6 +10,7 @@ path = [
     ".gitignore",
     ".dockerignore",
     ".golangci.yml",
+    ".custom-gcl.yml",
     "CODEOWNERS",
     "Dockerfile",
     "Makefile",

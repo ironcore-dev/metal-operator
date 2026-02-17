@@ -11,13 +11,19 @@
       "upgradePackages": true
     }
   },
-
-  "runArgs": ["--privileged", "--init"],
-
+  "runArgs": [
+    "--privileged",
+    "--init"
+  ],
   "customizations": {
     "vscode": {
       "settings": {
-        "terminal.integrated.shell.linux": "/bin/bash"
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash"
+          }
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
       },
       "extensions": [
         "ms-kubernetes-tools.vscode-kubernetes-tools",
@@ -25,11 +31,8 @@
       ]
     }
   },
-
   "remoteEnv": {
     "GO111MODULE": "on"
   },
-
   "onCreateCommand": "bash .devcontainer/post-install.sh"
 }
-

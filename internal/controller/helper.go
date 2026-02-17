@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
@@ -21,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -183,18 +183,13 @@ func enqueueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 	return true
 }
 
-func resetBMCOfServer(
-	ctx context.Context,
-	log logr.Logger,
-	kClient client.Client,
-	server *metalv1alpha1.Server,
-	bmcClient bmc.BMC,
-) error {
+func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.BMCRef != nil {
 		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
 		BMC := &metalv1alpha1.BMC{}
 		if err := kClient.Get(ctx, key, BMC); err != nil {
-			log.V(1).Error(err, "failed to get referred server's Manager")
+			log.Error(err, "failed to get referred server's Manager")
 			return err
 		}
 		annotations := BMC.GetAnnotations()
@@ -238,7 +233,8 @@ func resetBMCOfServer(
 	return fmt.Errorf("no BMC reference or inline BMC details found in server spec to reset BMC")
 }
 
-func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+func handleIgnoreAnnotationPropagation(ctx context.Context, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -280,7 +276,8 @@ func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c c
 	return errors.Join(errs...)
 }
 
-func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)

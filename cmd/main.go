@@ -497,18 +497,26 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersionSet")
 		os.Exit(1)
 	}
-	if err = (&controller.BIOSSettingsSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettingsSet")
-		os.Exit(1)
-	}
 	if err := (&controller.BMCSettingsSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettingsSet")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCUserReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Insecure: insecure,
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCUser")
 		os.Exit(1)
 	}
 
@@ -593,7 +601,7 @@ func main() { // nolint: gocyclo
 	}
 
 	setupLog.Info("Starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "Failed to run manager")
 		os.Exit(1)
 	}

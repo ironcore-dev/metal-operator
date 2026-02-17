@@ -183,12 +183,7 @@ func enqueueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 	return true
 }
 
-func resetBMCOfServer(
-	ctx context.Context,
-	kClient client.Client,
-	server *metalv1alpha1.Server,
-	bmcClient bmc.BMC,
-) error {
+func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
 	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.BMCRef != nil {
 		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}

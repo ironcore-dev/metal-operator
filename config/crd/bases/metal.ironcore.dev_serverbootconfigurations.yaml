@@ -11,6 +11,8 @@ spec:
     kind: ServerBootConfiguration
     listKind: ServerBootConfigurationList
     plural: serverbootconfigurations
+    shortNames:
+    - sbc
     singular: serverbootconfiguration
   scope: Namespaced
   versions:
@@ -59,8 +61,8 @@ spec:
             properties:
               ignitionSecretRef:
                 description: |-
-                  IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
-                  the ignition configuration for the server. This field is optional and can be omitted if not specified.
+                  IgnitionSecretRef is a reference to the Secret object that contains
+                  the ignition configuration for the server.
                 properties:
                   name:
                     default: ""
@@ -74,9 +76,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               image:
-                description: |-
-                  Image specifies the boot image to be used for the server.
-                  This field is optional and can be omitted if not specified.
+                description: Image specifies the boot image to be used for the server.
                 type: string
               serverRef:
                 description: ServerRef is a reference to the server for which this

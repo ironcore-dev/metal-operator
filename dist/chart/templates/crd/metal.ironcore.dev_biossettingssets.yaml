@@ -17,6 +17,8 @@ spec:
     kind: BIOSSettingsSet
     listKind: BIOSSettingsSetList
     plural: biossettingssets
+    shortNames:
+    - biosss
     singular: biossettingsset
   scope: Cluster
   versions:
@@ -71,27 +73,27 @@ spec:
             description: BIOSSettingsSetSpec defines the desired state of BIOSSettingsSet.
             properties:
               biosSettingsTemplate:
-                description: BiosSettingsTemplate defines the template for the BIOSSettings
-                  Resource to be applied to the servers.
+                description: BIOSSettingsTemplate defines the template for the BIOSSettings
+                  resource to be applied to the servers.
                 properties:
                   serverMaintenancePolicy:
                     description: ServerMaintenancePolicy is a maintenance policy to
                       be enforced on the server.
                     type: string
                   settingsFlow:
-                    description: SettingsFlow contains BIOS settings sequence to apply
-                      on the BIOS in given order
+                    description: SettingsFlow contains the BIOS settings sequence
+                      to apply in the given order.
                     items:
                       properties:
                         name:
-                          description: Name is the name of the flow item
+                          description: Name is the name of the flow item.
                           maxLength: 1000
                           minLength: 1
                           type: string
                         priority:
-                          description: |-
-                            Priority defines the order of applying the settings
-                            any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
+                          description: Priority defines the order of applying the
+                            settings. Lower numbers have higher priority (i.e. lower
+                            numbers are applied first).
                           format: int32
                           maximum: 2147483645
                           minimum: 1
@@ -99,8 +101,8 @@ spec:
                         settings:
                           additionalProperties:
                             type: string
-                          description: 'Settings contains software (eg: BIOS, BMC)
-                            settings as map'
+                          description: Settings contains software (e.g. BIOS, BMC)
+                            settings as a map.
                           type: object
                       required:
                       - name
@@ -108,8 +110,8 @@ spec:
                       type: object
                     type: array
                   version:
-                    description: 'Version contains software (eg: BIOS, BMC) version
-                      this settings applies to'
+                    description: Version specifies the software version (e.g. BIOS,
+                      BMC) these settings apply to.
                     type: string
                 required:
                 - version
@@ -168,31 +170,31 @@ spec:
             description: BIOSSettingsSetStatus defines the observed state of BIOSSettingsSet.
             properties:
               availableBIOSSettings:
-                description: AvailableBIOSVersion is the number of Settings current
+                description: AvailableBIOSSettings is the number of BIOSSettings currently
                   created by the set.
                 format: int32
                 type: integer
               completedBIOSSettings:
                 description: CompletedBIOSSettings is the total number of completed
-                  server in the set.
+                  BIOSSettings in the set.
                 format: int32
                 type: integer
               failedBIOSSettings:
-                description: FailedBIOSSettings is the total number of failed server
+                description: FailedBIOSSettings is the total number of failed BIOSSettings
                   in the set.
                 format: int32
                 type: integer
               fullyLabeledServers:
-                description: FullyLabeledServers is the number of server in the set.
+                description: FullyLabeledServers is the number of servers in the set.
                 format: int32
                 type: integer
               inProgressBIOSSettings:
-                description: InProgressBIOSSettings is the total number of server
-                  in the set that are currently in InProgress.
+                description: InProgressBIOSSettings is the total number of BIOSSettings
+                  in the set that are currently in progress.
                 format: int32
                 type: integer
               pendingBIOSSettings:
-                description: PendingBIOSSettings is the total number of pending server
+                description: PendingBIOSSettings is the total number of pending BIOSSettings
                   in the set.
                 format: int32
                 type: integer

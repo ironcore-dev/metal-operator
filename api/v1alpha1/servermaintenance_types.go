@@ -25,7 +25,7 @@ type ServerBootConfigurationTemplate struct {
 	// +required
 	Name string `json:"name"`
 
-	// Parameters specify the parameters to be used for rendering the boot configuration.
+	// Spec specifies the boot configuration to be rendered.
 	// +required
 	Spec ServerBootConfigurationSpec `json:"spec"`
 }
@@ -79,6 +79,7 @@ const (
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=sm
 // +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
 // +kubebuilder:printcolumn:name="Policy",type="string",JSONPath=`.spec.policy`
 // +kubebuilder:printcolumn:name="BootConfiguration",type="string",JSONPath=`.spec.serverBootConfigurationTemplate.name`

@@ -9,7 +9,7 @@ import (
 
 // BIOSSettingsSetSpec defines the desired state of BIOSSettingsSet.
 type BIOSSettingsSetSpec struct {
-	// BiosSettingsTemplate defines the template for the BIOSSettings Resource to be applied to the servers.
+	// BIOSSettingsTemplate defines the template for the BIOSSettings resource to be applied to the servers.
 	BIOSSettingsTemplate BIOSSettingsTemplate `json:"biosSettingsTemplate,omitempty"`
 
 	// ServerSelector specifies a label selector to identify the servers that are to be selected.
@@ -19,23 +19,23 @@ type BIOSSettingsSetSpec struct {
 
 // BIOSSettingsSetStatus defines the observed state of BIOSSettingsSet.
 type BIOSSettingsSetStatus struct {
-	// FullyLabeledServers is the number of server in the set.
+	// FullyLabeledServers is the number of servers in the set.
 	FullyLabeledServers int32 `json:"fullyLabeledServers,omitempty"`
-	// AvailableBIOSVersion is the number of Settings current created by the set.
+	// AvailableBIOSSettings is the number of BIOSSettings currently created by the set.
 	AvailableBIOSSettings int32 `json:"availableBIOSSettings,omitempty"`
-	// PendingBIOSSettings is the total number of pending server in the set.
+	// PendingBIOSSettings is the total number of pending BIOSSettings in the set.
 	PendingBIOSSettings int32 `json:"pendingBIOSSettings,omitempty"`
-	// InProgressBIOSSettings is the total number of server in the set that are currently in InProgress.
+	// InProgressBIOSSettings is the total number of BIOSSettings in the set that are currently in progress.
 	InProgressBIOSSettings int32 `json:"inProgressBIOSSettings,omitempty"`
-	// CompletedBIOSSettings is the total number of completed server in the set.
+	// CompletedBIOSSettings is the total number of completed BIOSSettings in the set.
 	CompletedBIOSSettings int32 `json:"completedBIOSSettings,omitempty"`
-	// FailedBIOSSettings is the total number of failed server in the set.
+	// FailedBIOSSettings is the total number of failed BIOSSettings in the set.
 	FailedBIOSSettings int32 `json:"failedBIOSSettings,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=biosss
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosSettingsTemplate.version`
 // +kubebuilder:printcolumn:name="TotalServers",type="string",JSONPath=`.status.fullyLabeledServers`
 // +kubebuilder:printcolumn:name="AvailableBIOSSettings",type="string",JSONPath=`.status.availableBIOSSettings`

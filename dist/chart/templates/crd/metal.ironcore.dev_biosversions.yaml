@@ -17,6 +17,8 @@ spec:
     kind: BIOSVersion
     listKind: BIOSVersionList
     plural: biosversions
+    shortNames:
+    - biosv
     singular: biosversion
   scope: Cluster
   versions:
@@ -24,8 +26,8 @@ spec:
     - jsonPath: .spec.version
       name: BIOSVersion
       type: string
-    - jsonPath: .spec.updateType
-      name: ForceUpdate
+    - jsonPath: .spec.updatePolicy
+      name: UpdatePolicy
       type: string
     - jsonPath: .spec.serverRef.name
       name: ServerRef
@@ -74,16 +76,15 @@ spec:
             description: BIOSVersionSpec defines the desired state of BIOSVersion.
             properties:
               image:
-                description: details regarding the image to use to upgrade to given
-                  BIOS version
+                description: Image specifies the image to use to upgrade to the given
+                  BIOS version.
                 properties:
                   URI:
-                    description: The URI of the software image to update/install."
+                    description: URI is the URI of the software image to install.
                     type: string
                   secretRef:
-                    description: |-
-                      ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-                      to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+                    description: SecretRef is a reference to the Secret containing
+                      the credentials to access the image URI.
                     properties:
                       name:
                         description: name is unique within a namespace to reference
@@ -96,8 +97,8 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   transferProtocol:
-                    description: The network protocol that the server's update service
-                      uses to retrieve 'ImageURI'
+                    description: TransferProtocol is the network protocol used to
+                      retrieve the image URI.
                     type: string
                 required:
                 - URI
@@ -108,7 +109,7 @@ spec:
                 type: string
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
-                  object that that Controller has requested for the referred server.
+                  object that the controller has requested for the referred server.
                 properties:
                   apiVersion:
                     description: APIVersion is the API version of the referenced object.
@@ -134,7 +135,7 @@ spec:
                 type: object
               serverRef:
                 description: ServerRef is a reference to a specific server to apply
-                  bios upgrade on.
+                  the BIOS upgrade on.
                 properties:
                   name:
                     default: ""
@@ -151,11 +152,11 @@ spec:
                 - message: serverRef is immutable
                   rule: self == oldSelf
               updatePolicy:
-                description: UpdatePolicy An indication of whether the server's upgrade
-                  service should bypass vendor update policies
+                description: UpdatePolicy indicates whether the server's upgrade service
+                  should bypass vendor update policies.
                 type: string
               version:
-                description: Version contains a BIOS version to upgrade to
+                description: Version specifies the BIOS version to upgrade to.
                 type: string
             required:
             - image
@@ -166,7 +167,7 @@ spec:
             properties:
               conditions:
                 description: Conditions represents the latest available observations
-                  of the Bios version upgrade state.
+                  of the BIOS version upgrade state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -223,7 +224,7 @@ spec:
                   type: object
                 type: array
               state:
-                description: State represents the current state of the bios configuration
+                description: State represents the current state of the BIOS upgrade
                   task.
                 type: string
               upgradeTask:

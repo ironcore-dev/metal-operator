@@ -943,8 +943,6 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 
 	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
-		log.V(1).Error(err,
-			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
 		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
 	}
 
@@ -1052,18 +1050,11 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 					resp.StatusCode,
 				)
 		}
-		return "",
-			true,
-			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
-				string(bmcRawBody),
-				resp.StatusCode,
-			)
+		return "", true, fmt.Errorf("failed to accept the upgrade request %v, statusCode %v", string(bmcRawBody), resp.StatusCode)
 	}
 
 	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
-		log.V(1).Error(err,
-			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
 		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
 	}
 

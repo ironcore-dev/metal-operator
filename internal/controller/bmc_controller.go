@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -81,23 +80,23 @@ type BMCReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *BMCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	bmcObj := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, req.NamespacedName, bmcObj); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, log, bmcObj)
+	return r.reconcileExists(ctx, bmcObj)
 }
 
-func (r *BMCReconciler) reconcileExists(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
+func (r *BMCReconciler) reconcileExists(ctx context.Context, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
 	if !bmcObj.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, bmcObj)
+		return r.delete(ctx, bmcObj)
 	}
-	return r.reconcile(ctx, log, bmcObj)
+	return r.reconcile(ctx, bmcObj)
 }
 
-func (r *BMCReconciler) delete(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
+func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting BMC")
 	if bmcObj.Spec.BMCSettingRef != nil {
 		bmcSettings := &metalv1alpha1.BMCSettings{}
@@ -117,7 +116,8 @@ func (r *BMCReconciler) delete(ctx context.Context, log logr.Logger, bmcObj *met
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
+func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling BMC")
 	if shouldIgnoreReconciliation(bmcObj) {
 		log.V(1).Info("Skipped BMC reconciliation")
@@ -137,7 +137,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	if err != nil {
 		if r.shouldResetBMC(bmcObj) {
 			log.V(1).Info("BMC needs reset, resetting", "BMC", bmcObj.Name)
-			if err := r.resetBMC(ctx, log, bmcObj, bmcClient, bmcAutoResetReason, bmcAutoResetMessage); err != nil {
+			if err := r.resetBMC(ctx, bmcObj, bmcClient, bmcAutoResetReason, bmcAutoResetMessage); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to reset BMC: %w", err)
 			}
 			log.V(1).Info("BMC reset initiated", "BMC", bmcObj.Name)
@@ -153,11 +153,11 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	defer bmcClient.Logout()
 
 	// if BMC reset was issued and is successful, ensure to remove previous reset annotation
-	if modified, err := r.handlePreviousBMCResetAnnotations(ctx, log, bmcObj); err != nil || modified {
+	if modified, err := r.handlePreviousBMCResetAnnotations(ctx, bmcObj); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
-	if modified, err := r.handleAnnotationOperations(ctx, log, bmcObj, bmcClient); err != nil || modified {
+	if modified, err := r.handleAnnotationOperations(ctx, bmcObj, bmcClient); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -168,19 +168,19 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 		return ctrl.Result{}, fmt.Errorf("failed to set BMC reset complete condition: %w", err)
 	}
 
-	if err := r.updateBMCStatusDetails(ctx, log, bmcClient, bmcObj); err != nil {
+	if err := r.updateBMCStatusDetails(ctx, bmcClient, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update BMC status: %w", err)
 	}
 	log.V(1).Info("Updated BMC status", "State", bmcObj.Status.State)
 
 	// Create DNS record for the bmc if template is configured
 	if r.ManagerNamespace != "" && r.DNSRecordTemplate != "" {
-		if err := r.createDNSRecord(ctx, log, bmcObj); err != nil {
+		if err := r.createDNSRecord(ctx, bmcObj); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create DNS record for BMC %s: %w", bmcObj.Name, err)
 		}
 	}
 
-	if err := r.discoverServers(ctx, log, bmcClient, bmcObj); err != nil && !apierrors.IsNotFound(err) {
+	if err := r.discoverServers(ctx, bmcClient, bmcObj); err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to discover servers: %w", err)
 	}
 	log.V(1).Info("Discovered servers")
@@ -189,7 +189,8 @@ func (r *BMCReconciler) reconcile(ctx context.Context, log logr.Logger, bmcObj *
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	var (
 		ip         metalv1alpha1.IP
 		macAddress string
@@ -256,7 +257,8 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, log logr.Log
 	return nil
 }
 
-func (r *BMCReconciler) discoverServers(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	servers, err := bmcClient.GetSystems(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get servers from BMC %s: %w", bmcObj.Name, err)
@@ -295,7 +297,8 @@ type DNSRecordTemplateData struct {
 }
 
 // createDNSRecord creates a DNS record resource from a YAML template loaded from ConfigMap
-func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) createDNSRecord(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	templateData := DNSRecordTemplateData{
 		Namespace: r.ManagerNamespace,
 		Name:      bmcObj.Name,
@@ -343,7 +346,8 @@ func (r *BMCReconciler) createDNSRecord(ctx context.Context, log logr.Logger, bm
 	return nil
 }
 
-func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {
+func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	operation, ok := bmcObj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !ok {
 		return false, nil
@@ -356,10 +360,10 @@ func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, log logr
 	switch value {
 	case redfish.GracefulRestartResetType:
 		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
-		if err := r.resetBMC(ctx, log, bmcObj, bmcClient, bmcUserResetReason, bmcUserResetMessage); err != nil {
+		if err := r.resetBMC(ctx, bmcObj, bmcClient, bmcUserResetReason, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
-		log.V(0).Info("Handled operation", "Operation", operation)
+		log.Info("Handled operation", "Operation", operation)
 	default:
 		log.V(1).Info("Unsupported operation annotation", "Operation", operation, "RedfishResetType", value)
 		return false, nil
@@ -422,7 +426,8 @@ func (r *BMCReconciler) waitForBMCReset(bmcObj *metalv1alpha1.BMC, delay time.Du
 	return false
 }
 
-func (r *BMCReconciler) handlePreviousBMCResetAnnotations(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC) (bool, error) {
+func (r *BMCReconciler) handlePreviousBMCResetAnnotations(ctx context.Context, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	condition := &metav1.Condition{}
 	found, err := r.Conditions.FindSlice(bmcObj.Status.Conditions, bmcResetConditionType, condition)
 	if err != nil || !found {
@@ -476,7 +481,8 @@ func (r *BMCReconciler) updateBMCState(ctx context.Context, bmcObj *metalv1alpha
 	return nil
 }
 
-func (r *BMCReconciler) resetBMC(ctx context.Context, log logr.Logger, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC, reason, message string) error {
+func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC, reason, message string) error {
+	log := ctrl.LoggerFrom(ctx)
 	if err := r.updateConditions(ctx, bmcObj, true, bmcResetConditionType, corev1.ConditionTrue, reason, message); err != nil {
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
 	}

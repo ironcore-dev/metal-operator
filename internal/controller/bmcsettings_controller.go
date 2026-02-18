@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -62,14 +61,14 @@ func (r *BMCSettingsReconciler) Reconcile(
 	ctx context.Context,
 	req ctrl.Request,
 ) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	bmcSetting := &metalv1alpha1.BMCSettings{}
 	if err := r.Get(ctx, req.NamespacedName, bmcSetting); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling BMCSettings")
 
-	return r.reconcileExists(ctx, log, bmcSetting)
+	return r.reconcileExists(ctx, bmcSetting)
 }
 
 // Determine whether reconciliation is required. It's not required if:
@@ -78,20 +77,20 @@ func (r *BMCSettingsReconciler) Reconcile(
 // - object contains reference to server, but server references to another object with lower version;
 func (r *BMCSettingsReconciler) reconcileExists(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	// if object is being deleted - reconcile deletion
-	if r.shouldDelete(log, bmcSetting) {
+	if r.shouldDelete(ctx, bmcSetting) {
 		log.V(1).Info("Object is being deleted")
-		return r.delete(ctx, log, bmcSetting)
+		return r.delete(ctx, bmcSetting)
 	}
 
-	return r.reconcile(ctx, log, bmcSetting)
+	return r.reconcile(ctx, bmcSetting)
 }
 
 func (r *BMCSettingsReconciler) shouldDelete(
-	log logr.Logger,
+	ctx context.Context,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) bool {
 	if bmcSetting.DeletionTimestamp.IsZero() {
@@ -100,6 +99,7 @@ func (r *BMCSettingsReconciler) shouldDelete(
 
 	if controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) &&
 		bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
+		log := ctrl.LoggerFrom(ctx)
 		log.V(1).Info("postponing delete as Settings update is in progress")
 		return false
 	}
@@ -108,10 +108,10 @@ func (r *BMCSettingsReconciler) shouldDelete(
 
 func (r *BMCSettingsReconciler) delete(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (ctrl.Result, error) {
-	if err := r.cleanupReferences(ctx, log, bmcSetting); err != nil {
+	log := ctrl.LoggerFrom(ctx)
+	if err := r.cleanupReferences(ctx, bmcSetting); err != nil {
 		log.Error(err, "failed to cleanup references")
 		return ctrl.Result{}, err
 	}
@@ -128,14 +128,14 @@ func (r *BMCSettingsReconciler) delete(
 
 func (r *BMCSettingsReconciler) cleanupServerMaintenanceReferences(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSettings *metalv1alpha1.BMCSettings,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	if bmcSettings.Spec.ServerMaintenanceRefs == nil {
 		return nil
 	}
 	// try to get the serverMaintenances created
-	serverMaintenances, errs := r.getReferredServerMaintenances(ctx, log, bmcSettings.Spec.ServerMaintenanceRefs)
+	serverMaintenances, errs := r.getReferredServerMaintenances(ctx, bmcSettings.Spec.ServerMaintenanceRefs)
 
 	var finalErr []error
 	var missingServerMaintenanceRef []error
@@ -172,7 +172,7 @@ func (r *BMCSettingsReconciler) cleanupServerMaintenanceReferences(
 
 	if len(finalErr) == 0 {
 		// all serverMaintenance are deleted
-		err := r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSettings, nil)
+		err := r.patchMaintenanceRequestRefOnBMCSettings(ctx, bmcSettings, nil)
 		if err != nil {
 			return fmt.Errorf("failed to clean up serverMaintenance ref in bmcSetting status: %w", err)
 		}
@@ -183,11 +183,10 @@ func (r *BMCSettingsReconciler) cleanupServerMaintenanceReferences(
 
 func (r *BMCSettingsReconciler) cleanupReferences(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (err error) {
 	if bmcSetting.Spec.BMCRef != nil {
-		BMC, err := r.getBMC(ctx, log, bmcSetting)
+		BMC, err := r.getBMC(ctx, bmcSetting)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -201,7 +200,7 @@ func (r *BMCSettingsReconciler) cleanupReferences(
 				if BMC.Spec.BMCSettingRef.Name != bmcSetting.Name {
 					return nil
 				}
-				return r.patchBMCSettingsRefOnBMC(ctx, log, BMC, nil)
+				return r.patchBMCSettingsRefOnBMC(ctx, BMC, nil)
 			} else {
 				// nothing else to clean up
 				return nil
@@ -214,9 +213,9 @@ func (r *BMCSettingsReconciler) cleanupReferences(
 
 func (r *BMCSettingsReconciler) reconcile(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if shouldIgnoreReconciliation(bmcSetting) {
 		log.V(1).Info("Skipped BMCSettings reconciliation")
 		return ctrl.Result{}, nil
@@ -230,18 +229,18 @@ func (r *BMCSettingsReconciler) reconcile(
 	}
 
 	// if referred BMC contains reference to different BMCSettings object - stop reconciliation
-	BMC, err := r.getBMC(ctx, log, bmcSetting)
+	BMC, err := r.getBMC(ctx, bmcSetting)
 	if err != nil {
 		log.V(1).Info("Referred server object could not be fetched")
 		return ctrl.Result{}, err
 	}
 	// patch BMC with BMCSettings reference
 	if BMC.Spec.BMCSettingRef == nil {
-		if err := r.patchBMCSettingsRefOnBMC(ctx, log, BMC, &corev1.LocalObjectReference{Name: bmcSetting.Name}); err != nil {
+		if err := r.patchBMCSettingsRefOnBMC(ctx, BMC, &corev1.LocalObjectReference{Name: bmcSetting.Name}); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else if BMC.Spec.BMCSettingRef.Name != bmcSetting.Name {
-		referredBMCSettings, err := r.getReferredBMCSettings(ctx, log, BMC.Spec.BMCSettingRef)
+		referredBMCSettings, err := r.getReferredBMCSettings(ctx, BMC.Spec.BMCSettingRef)
 		if err != nil {
 			log.V(1).Info("Referred server contains reference to different BMCSettings object, unable to fetch the referenced BMCSettings")
 			return ctrl.Result{}, err
@@ -250,7 +249,7 @@ func (r *BMCSettingsReconciler) reconcile(
 		// todo : handle version checks correctly
 		if referredBMCSettings.Spec.Version < bmcSetting.Spec.Version {
 			log.V(1).Info("Updating BMCSettings reference to the latest BMC version")
-			if err := r.patchBMCSettingsRefOnBMC(ctx, log, BMC, &corev1.LocalObjectReference{Name: bmcSetting.Name}); err != nil {
+			if err := r.patchBMCSettingsRefOnBMC(ctx, BMC, &corev1.LocalObjectReference{Name: bmcSetting.Name}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -260,15 +259,15 @@ func (r *BMCSettingsReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	return r.ensureBMCSettingsMaintenanceStateTransition(ctx, log, bmcSetting, BMC)
+	return r.ensureBMCSettingsMaintenanceStateTransition(ctx, bmcSetting, BMC)
 }
 
 func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, BMC, r.Insecure, r.BMCOptions)
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
@@ -308,14 +307,14 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 		} else {
 			versionCheckCondition = nil
 		}
-		err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, state, versionCheckCondition)
+		err = r.updateBMCSettingsStatus(ctx, bmcSetting, state, versionCheckCondition)
 		return ctrl.Result{}, err
 	case metalv1alpha1.BMCSettingsStateInProgress:
-		return r.handleSettingInProgressState(ctx, log, bmcSetting, BMC, bmcClient)
+		return r.handleSettingInProgressState(ctx, bmcSetting, BMC, bmcClient)
 	case metalv1alpha1.BMCSettingsStateApplied:
-		return ctrl.Result{}, r.handleSettingAppliedState(ctx, log, bmcSetting, BMC, bmcClient)
+		return ctrl.Result{}, r.handleSettingAppliedState(ctx, bmcSetting, BMC, bmcClient)
 	case metalv1alpha1.BMCSettingsStateFailed:
-		return ctrl.Result{}, r.handleFailedState(ctx, log, bmcSetting, BMC)
+		return ctrl.Result{}, r.handleFailedState(ctx, bmcSetting, BMC)
 	}
 	log.V(1).Info("Unknown State found", "BMCSettings state", bmcSetting.Status.State)
 	return ctrl.Result{}, nil
@@ -323,12 +322,12 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 
 func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 	bmcClient bmc.BMC,
 ) (ctrl.Result, error) {
-	settingsDiff, err := r.getBMCSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
+	log := ctrl.LoggerFrom(ctx)
+	settingsDiff, err := r.getBMCSettingsDifference(ctx, bmcSetting, BMC, bmcClient)
 
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC settings: %w", err)
@@ -336,36 +335,36 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(
 	// if setting is not different, complete the BMCSettings tasks
 	if len(settingsDiff) == 0 {
 		// move status to completed
-		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateApplied, nil)
+		err := r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateApplied, nil)
 		return ctrl.Result{}, err
 	}
 
-	if req, err := r.requestMaintenanceOnServers(ctx, log, bmcSetting, bmcClient); err != nil || req {
+	if req, err := r.requestMaintenanceOnServers(ctx, bmcSetting, bmcClient); err != nil || req {
 		return ctrl.Result{}, err
 	}
 
 	// check if the maintenance is granted
-	if ok := r.checkIfMaintenanceGranted(ctx, log, bmcSetting, bmcClient); !ok {
+	if ok := r.checkIfMaintenanceGranted(ctx, bmcSetting, bmcClient); !ok {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
 		return ctrl.Result{}, err
 	}
 
 	// once the server is powered on, reset the BMC to make sure its in stable state
 	// this avoids problems with some BMCs that hang up in subsequent operations
-	if ok, err := r.handleBMCReset(ctx, log, bmcSetting, BMC, BMCConditionReset); !ok || err != nil {
+	if ok, err := r.handleBMCReset(ctx, bmcSetting, BMC, BMCConditionReset); !ok || err != nil {
 		return ctrl.Result{}, err
 	}
-	return r.updateSettingsAndVerify(ctx, log, bmcSetting, BMC, settingsDiff, bmcClient)
+	return r.updateSettingsAndVerify(ctx, bmcSetting, BMC, settingsDiff, bmcClient)
 }
 
 func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 	settingsDiff redfish.SettingsAttributes,
 	bmcClient bmc.BMC,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	resetBMC, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCResetPostSettingApplyCondition)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
@@ -390,7 +389,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 				); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
 				}
-				err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCondition)
+				err = r.updateBMCSettingsStatus(ctx, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCondition)
 				return ctrl.Result{}, err
 			}
 		default:
@@ -407,7 +406,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
 			}
-			err = r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
+			err = r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
 			return ctrl.Result{}, err
 		}
 
@@ -430,20 +429,20 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 
 			if resetBMCReq {
 				// reset BMC if the setting change requires it
-				if ok, err := r.handleBMCReset(ctx, log, bmcSetting, BMC, BMCResetPostSettingApplyCondition); !ok || err != nil {
+				if ok, err := r.handleBMCReset(ctx, bmcSetting, BMC, BMCResetPostSettingApplyCondition); !ok || err != nil {
 					return ctrl.Result{}, err
 				}
 			}
 		}
 	} else {
 		log.V(1).Info("Waiting for BMC reset post applying BMC settings")
-		if ok, err := r.handleBMCReset(ctx, log, bmcSetting, BMC, BMCResetPostSettingApplyCondition); !ok || err != nil {
+		if ok, err := r.handleBMCReset(ctx, bmcSetting, BMC, BMCResetPostSettingApplyCondition); !ok || err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
 	// verify setting already applied
-	settingsDiff, err = r.getBMCSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
+	settingsDiff, err = r.getBMCSettingsDifference(ctx, bmcSetting, BMC, bmcClient)
 
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC settings: %w", err)
@@ -451,7 +450,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 	// if setting is not different, complete the BMC settings tasks
 	if len(settingsDiff) == 0 {
 		// move  bmcSetting state to completed, and revert the settingUpdate state to initial
-		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, metalv1alpha1.BMCSettingsStateApplied, nil)
+		err := r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateApplied, nil)
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
@@ -459,24 +458,24 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 
 func (r *BMCSettingsReconciler) handleSettingAppliedState(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 	bmcClient bmc.BMC,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	// clean up maintenance crd and references.
-	if err := r.cleanupServerMaintenanceReferences(ctx, log, bmcSetting); err != nil {
+	if err := r.cleanupServerMaintenanceReferences(ctx, bmcSetting); err != nil {
 		return err
 	}
 
-	settingsDiff, err := r.getBMCSettingsDifference(ctx, log, bmcSetting, BMC, bmcClient)
+	settingsDiff, err := r.getBMCSettingsDifference(ctx, bmcSetting, BMC, bmcClient)
 
 	if err != nil {
-		log.V(1).Error(err, "unable to fetch and check BMCSettings")
+		log.Error(err, "unable to fetch and check BMCSettings")
 		return err
 	}
 	if len(settingsDiff) > 0 {
-		err := r.updateBMCSettingsStatus(ctx, log, bmcSetting, "", nil)
+		err := r.updateBMCSettingsStatus(ctx, bmcSetting, "", nil)
 		return err
 	}
 
@@ -486,11 +485,11 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(
 
 func (r *BMCSettingsReconciler) handleBMCReset(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSettings *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 	conditionType string,
 ) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	// reset BMC if not already done
 	resetBMC, err := GetCondition(r.Conditions, bmcSettings.Status.Conditions, conditionType)
 	if err != nil {
@@ -513,7 +512,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 							return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
 						}
 						// patch condition to reset issued
-						return false, r.updateBMCSettingsStatus(ctx, log, bmcSettings, bmcSettings.Status.State, resetBMC)
+						return false, r.updateBMCSettingsStatus(ctx, bmcSettings, bmcSettings.Status.State, resetBMC)
 					} else {
 						return false, fmt.Errorf("unknown annotation on BMC object for operation annotation %v", op)
 					}
@@ -540,7 +539,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 				return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
 			}
 			// patch condition to reset issued
-			return false, r.updateBMCSettingsStatus(ctx, log, bmcSettings, bmcSettings.Status.State, resetBMC)
+			return false, r.updateBMCSettingsStatus(ctx, bmcSettings, bmcSettings.Status.State, resetBMC)
 		}
 
 		// we need to wait until the BMC resource annotation is removed
@@ -561,17 +560,17 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 		); err != nil {
 			return false, fmt.Errorf("failed to update power on server condition: %w", err)
 		}
-		return false, r.updateBMCSettingsStatus(ctx, log, bmcSettings, bmcSettings.Status.State, resetBMC)
+		return false, r.updateBMCSettingsStatus(ctx, bmcSettings, bmcSettings.Status.State, resetBMC)
 	}
 	return true, nil
 }
 
 func (r *BMCSettingsReconciler) handleFailedState(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	if shouldRetryReconciliation(bmcSetting) {
 		log.V(1).Info("Retrying BMCSettings reconciliation")
 		bmcSettingsBase := bmcSetting.DeepCopy()
@@ -591,11 +590,11 @@ func (r *BMCSettingsReconciler) handleFailedState(
 
 func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	BMC *metalv1alpha1.BMC,
 	bmcClient bmc.BMC,
 ) (diff redfish.SettingsAttributes, err error) {
+	log := ctrl.LoggerFrom(ctx)
 	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.BMCUUID, bmcSetting.Spec.SettingsMap)
 	if err != nil {
 		return diff, fmt.Errorf("failed to get BMC settings: %w", err)
@@ -612,7 +611,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 			case int:
 				intvalue, err := strconv.Atoi(value)
 				if err != nil {
-					log.V(1).Error(err, "failed to check type for", "Setting name", key, "setting value", value)
+					log.Error(err, "failed to check type for", "Setting name", key, "setting value", value)
 					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
 					continue
 				}
@@ -626,7 +625,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 			case float64:
 				floatvalue, err := strconv.ParseFloat(value, 64)
 				if err != nil {
-					log.V(1).Error(err, "failed to check type for", "Setting name", key, "Setting value", value)
+					log.Error(err, "failed to check type for", "Setting name", key, "Setting value", value)
 					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
 				}
 				if data != floatvalue {
@@ -647,17 +646,17 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 
 func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	bmcClient bmc.BMC,
 ) bool {
+	log := ctrl.LoggerFrom(ctx)
 	if bmcSetting.Spec.ServerMaintenanceRefs == nil {
 		return false
 	}
 
-	servers, err := r.getServers(ctx, log, bmcSetting, bmcClient)
+	servers, err := r.getServers(ctx, bmcSetting, bmcClient)
 	if err != nil {
-		log.V(1).Error(err, "Failed to get ref. servers to determine maintenance state ")
+		log.Error(err, "Failed to get ref. servers to determine maintenance state ")
 		return false
 	}
 
@@ -701,14 +700,14 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 
 func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	bmcClient bmc.BMC,
 ) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 
-	servers, err := r.getServers(ctx, log, bmcSetting, bmcClient)
+	servers, err := r.getServers(ctx, bmcSetting, bmcClient)
 	if err != nil {
-		log.V(1).Error(err, "Failed to get ref. servers to request maintenance on servers")
+		log.Error(err, "Failed to get ref. servers to request maintenance on servers")
 		return false, err
 	}
 
@@ -724,7 +723,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 	serverWithMaintenances := make(map[string]bool, len(servers))
 	if bmcSetting.Spec.ServerMaintenanceRefs != nil {
 		// we fetch all the references already in the Spec (self created/provided by user)
-		serverMaintenances, err := r.getReferredServerMaintenances(ctx, log, bmcSetting.Spec.ServerMaintenanceRefs)
+		serverMaintenances, err := r.getReferredServerMaintenances(ctx, bmcSetting.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return false, errors.Join(err...)
 		}
@@ -766,7 +765,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			return controllerutil.SetControllerReference(bmcSetting, serverMaintenance, r.Client.Scheme())
 		})
 		if err != nil {
-			log.V(1).Error(err, "failed to create or patch serverMaintenance", "Server", server.Name)
+			log.Error(err, "failed to create or patch serverMaintenance", "Server", server.Name)
 			errs = append(errs, err)
 			continue
 		}
@@ -788,7 +787,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 		return false, errors.Join(errs...)
 	}
 
-	err = r.patchMaintenanceRequestRefOnBMCSettings(ctx, log, bmcSetting, ServerMaintenanceRefs)
+	err = r.patchMaintenanceRequestRefOnBMCSettings(ctx, bmcSetting, ServerMaintenanceRefs)
 	if err != nil {
 		return false, fmt.Errorf("failed to patch serverMaintenance ref in bmcSetting status: %w", err)
 	}
@@ -800,9 +799,9 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 
 func (r *BMCSettingsReconciler) getBMC(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) (*metalv1alpha1.BMC, error) {
+	log := ctrl.LoggerFrom(ctx)
 
 	var refName string
 	if bmcSetting.Spec.BMCRef == nil {
@@ -814,7 +813,7 @@ func (r *BMCSettingsReconciler) getBMC(
 	key := client.ObjectKey{Name: refName}
 	BMC := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, key, BMC); err != nil {
-		log.V(1).Error(err, "failed to get referred server's Manager")
+		log.Error(err, "failed to get referred server's Manager")
 		return BMC, err
 	}
 
@@ -823,17 +822,17 @@ func (r *BMCSettingsReconciler) getBMC(
 
 func (r *BMCSettingsReconciler) getServers(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	bmcClient bmc.BMC,
 ) ([]*metalv1alpha1.Server, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if bmcSetting.Spec.BMCRef == nil {
 		return nil, fmt.Errorf("BMC reference not found")
 	}
-	BMC, err := r.getBMC(ctx, log, bmcSetting)
+	BMC, err := r.getBMC(ctx, bmcSetting)
 
 	if err != nil {
-		log.V(1).Error(err, "failed to get referred BMC")
+		log.Error(err, "failed to get referred BMC")
 		return nil, err
 	}
 	bmcServers, err := bmcClient.GetSystems(ctx)
@@ -844,7 +843,7 @@ func (r *BMCSettingsReconciler) getServers(
 	for i := range bmcServers {
 		serversRefList[i] = &corev1.LocalObjectReference{Name: bmcutils.GetServerNameFromBMCandIndex(i, BMC)}
 	}
-	servers, err := r.getReferredServers(ctx, log, serversRefList)
+	servers, err := r.getReferredServers(ctx, serversRefList)
 	if err != nil {
 		return servers, fmt.Errorf("errors occurred during fetching servers from BMC: %v", err)
 	}
@@ -853,16 +852,16 @@ func (r *BMCSettingsReconciler) getServers(
 
 func (r *BMCSettingsReconciler) getReferredServers(
 	ctx context.Context,
-	log logr.Logger,
 	serverRefList []*corev1.LocalObjectReference,
 ) ([]*metalv1alpha1.Server, error) {
+	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	servers := make([]*metalv1alpha1.Server, len(serverRefList))
 	for idx, serverRef := range serverRefList {
 		key := client.ObjectKey{Name: serverRef.Name}
 		server := &metalv1alpha1.Server{}
 		if err := r.Get(ctx, key, server); err != nil {
-			log.V(1).Error(err, "failed to get referred server", "reference", serverRef.Name)
+			log.Error(err, "failed to get referred server", "reference", serverRef.Name)
 			errs = append(errs, err)
 			continue
 		}
@@ -874,10 +873,9 @@ func (r *BMCSettingsReconciler) getReferredServers(
 
 func (r *BMCSettingsReconciler) getReferredServerMaintenances(
 	ctx context.Context,
-	log logr.Logger,
 	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
 ) ([]*metalv1alpha1.ServerMaintenance, []error) {
-
+	log := ctrl.LoggerFrom(ctx)
 	serverMaintenances := make([]*metalv1alpha1.ServerMaintenance, 0, len(ServerMaintenanceRefs))
 	var errs []error
 	cnt := 0
@@ -885,7 +883,7 @@ func (r *BMCSettingsReconciler) getReferredServerMaintenances(
 		key := client.ObjectKey{Name: serverMaintenanceRef.ServerMaintenanceRef.Name, Namespace: r.ManagerNamespace}
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{}
 		if err := r.Get(ctx, key, serverMaintenance); err != nil {
-			log.V(1).Error(err, "failed to get referred serverMaintenance obj", serverMaintenanceRef.ServerMaintenanceRef.Name)
+			log.Error(err, "failed to get referred serverMaintenance obj", "ServerMaintenance", serverMaintenanceRef.ServerMaintenanceRef.Name)
 			errs = append(errs, err)
 			continue
 		}
@@ -902,13 +900,13 @@ func (r *BMCSettingsReconciler) getReferredServerMaintenances(
 
 func (r *BMCSettingsReconciler) getReferredBMCSettings(
 	ctx context.Context,
-	log logr.Logger,
 	referredBMCSettingsRef *corev1.LocalObjectReference,
 ) (*metalv1alpha1.BMCSettings, error) {
+	log := ctrl.LoggerFrom(ctx)
 	key := client.ObjectKey{Name: referredBMCSettingsRef.Name, Namespace: metav1.NamespaceNone}
 	bmcSetting := &metalv1alpha1.BMCSettings{}
 	if err := r.Get(ctx, key, bmcSetting); err != nil {
-		log.V(1).Error(err, "failed to get referred bmcSetting")
+		log.Error(err, "failed to get referred bmcSetting")
 		return bmcSetting, err
 	}
 	return bmcSetting, nil
@@ -928,10 +926,10 @@ func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(
 
 func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(
 	ctx context.Context,
-	log logr.Logger,
 	BMC *metalv1alpha1.BMC,
 	BMCSettingsReference *corev1.LocalObjectReference,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	if BMC.Spec.BMCSettingRef == BMCSettingsReference {
 		return nil
 	}
@@ -940,7 +938,7 @@ func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(
 	BMCBase := BMC.DeepCopy()
 	BMC.Spec.BMCSettingRef = BMCSettingsReference
 	if err = r.Patch(ctx, BMC, client.MergeFrom(BMCBase)); err != nil {
-		log.V(1).Error(err, "failed to patch BMC settings ref")
+		log.Error(err, "failed to patch BMC settings ref")
 		return err
 	}
 	return err
@@ -948,10 +946,10 @@ func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(
 
 func (r *BMCSettingsReconciler) patchMaintenanceRequestRefOnBMCSettings(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	BMCSettingsBase := bmcSetting.DeepCopy()
 
 	if ServerMaintenanceRefs == nil {
@@ -961,7 +959,7 @@ func (r *BMCSettingsReconciler) patchMaintenanceRequestRefOnBMCSettings(
 	}
 
 	if err := r.Patch(ctx, bmcSetting, client.MergeFrom(BMCSettingsBase)); err != nil {
-		log.V(1).Error(err, "failed to patch BMCSettings ref")
+		log.Error(err, "failed to patch BMCSettings ref")
 		return err
 	}
 
@@ -970,11 +968,11 @@ func (r *BMCSettingsReconciler) patchMaintenanceRequestRefOnBMCSettings(
 
 func (r *BMCSettingsReconciler) updateBMCSettingsStatus(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSetting *metalv1alpha1.BMCSettings,
 	state metalv1alpha1.BMCSettingsState,
 	condition *metav1.Condition,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 
 	if bmcSetting.Status.State == state && condition == nil {
 		return nil

@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ironcore-dev/metal-operator/bmc/common"
-
 	"github.com/stmcginnis/gofish/schemas"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -228,7 +226,7 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, a
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return common.CheckAttribues(attrs, filtered)
+	return checkAttributes(attrs, filtered)
 }
 
 // GetBMCVersion retrieves the BMC version.

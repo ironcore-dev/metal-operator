@@ -12,12 +12,10 @@ import (
 	"io"
 	"maps"
 	"math/big"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
 
-	"github.com/ironcore-dev/metal-operator/bmc/oem"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -274,29 +272,6 @@ func (r *RedfishBaseBMC) GetManager(bmcUUID string) (*schemas.Manager, error) {
 	return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
 }
 
-func (r *RedfishBaseBMC) getOEMManager(bmcUUID string) (oem.ManagerInterface, error) {
-	manager, err := r.GetManager(bmcUUID)
-	if err != nil {
-		return nil, fmt.Errorf("not able to Manager %v", err)
-	}
-
-	// some vendors (like Dell) does not publich this. get through the system
-	if manager.Manufacturer == "" {
-		manufacturer, err := r.getSystemManufacturer()
-		if err != nil {
-			return nil, fmt.Errorf("not able to determine manufacturer: %v", err)
-		}
-		manager.Manufacturer = manufacturer
-	}
-
-	oemManager, err := NewOEMManager(manager, r.client.Service)
-	if err != nil {
-		return nil, fmt.Errorf("not able create oem Manager: %v", err)
-	}
-
-	return oemManager, nil
-}
-
 func (r *RedfishBaseBMC) ResetManager(ctx context.Context, bmcUUID string, resetType schemas.ResetType) error {
 	manager, err := r.GetManager(bmcUUID)
 	if err != nil {
@@ -414,15 +389,11 @@ func (r *RedfishBaseBMC) GetBiosAttributeValues(ctx context.Context, systemURI s
 	return result, err
 }
 
-func (r *RedfishBaseBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
+func (r *RedfishBaseBMC) GetBMCAttributeValues(_ context.Context, _ string, attributes map[string]string) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
-	oemManager, err := r.getOEMManager(bmcUUID)
-	if err != nil {
-		return nil, err
-	}
-	return oemManager.GetOEMBMCSettingAttribute(ctx, attributes)
+	return nil, fmt.Errorf("BMC attribute operations not supported for manufacturer %q", r.manufacturer)
 }
 
 func (r *RedfishBaseBMC) GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (schemas.SettingsAttributes, error) {
@@ -491,13 +462,8 @@ func (r *RedfishBaseBMC) GetEntityFromUri(ctx context.Context, uri string, clien
 	return json.Unmarshal(body, &entity)
 }
 
-func (r *RedfishBaseBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUUID string) (schemas.SettingsAttributes, error) {
-	oemManager, err := r.getOEMManager(bmcUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	return oemManager.GetBMCPendingAttributeValues(ctx)
+func (r *RedfishBaseBMC) GetBMCPendingAttributeValues(_ context.Context, _ string) (schemas.SettingsAttributes, error) {
+	return nil, fmt.Errorf("BMC pending attribute operations not supported for manufacturer %q", r.manufacturer)
 }
 
 // SetBiosAttributesOnReset sets given bios attributes.
@@ -516,15 +482,11 @@ func (r *RedfishBaseBMC) SetBiosAttributesOnReset(ctx context.Context, systemURI
 	return bios.UpdateBiosAttributesApplyAt(attrs, schemas.OnResetSettingsApplyTime)
 }
 
-func (r *RedfishBaseBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) error {
+func (r *RedfishBaseBMC) SetBMCAttributesImmediately(_ context.Context, _ string, attributes schemas.SettingsAttributes) error {
 	if len(attributes) == 0 {
 		return nil
 	}
-	oemManager, err := r.getOEMManager(bmcUUID)
-	if err != nil {
-		return err
-	}
-	return oemManager.UpdateBMCAttributesApplyAt(ctx, attributes, schemas.ImmediateSettingsApplyTime)
+	return fmt.Errorf("BMC attribute operations not supported for manufacturer %q", r.manufacturer)
 }
 
 // SetBootOrder sets bios boot order
@@ -667,13 +629,8 @@ func (r *RedfishBaseBMC) checkAttributes(attrs schemas.SettingsAttributes, filte
 	return reset, errors.Join(errs...)
 }
 
-func (r *RedfishBaseBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string, attrs schemas.SettingsAttributes) (bool, error) {
-	oemManager, err := r.getOEMManager(bmcUUID)
-	if err != nil {
-		return false, err
-	}
-
-	return oemManager.CheckBMCAttributes(ctx, attrs)
+func (r *RedfishBaseBMC) CheckBMCAttributes(_ context.Context, _ string, _ redfish.SettingsAttributes) (bool, error) {
+	return false, fmt.Errorf("BMC attribute checking not supported for manufacturer %q", r.manufacturer)
 }
 
 func (r *RedfishBaseBMC) getSystemManufacturer() (string, error) {
@@ -898,235 +855,22 @@ func (r *RedfishBaseBMC) WaitForServerPowerState(ctx context.Context, systemURI 
 	return nil
 }
 
-// UpgradeBiosVersion upgrade given bios versions.
-func (r *RedfishBaseBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	service := r.client.GetService()
-
-	upgradeServices, err := service.UpdateService()
-	if err != nil {
-		return "", false, err
-	}
-
-	type tActions struct {
-		SimpleUpdate struct {
-			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
-			Target          string
-		} `json:"#UpdateService.SimpleUpdate"`
-		StartUpdate schemas.ActionTarget `json:"#UpdateService.StartUpdate"`
-	}
-
-	var tUS struct {
-		Actions tActions
-	}
-
-	err = json.Unmarshal(upgradeServices.RawData, &tUS)
-	if err != nil {
-		return "", false, err
-	}
-
-	oemInterface, err := NewOEMInterface(manufacturer, service)
-	if err != nil {
-		return "", false, err
-	}
-
-	RequestBody := oemInterface.GetUpdateRequestBody(parameters)
-
-	resp, err := upgradeServices.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
-
-	if err != nil {
-		return "", false, err
-	}
-	defer func(Body io.ReadCloser) {
-		if err = Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
-		}
-	}(resp.Body)
-
-	// any error post this point is fatal, as we can not issue multiple upgrade requests.
-	// expectation is to move to failed state, and manually check the status before retrying
-	log.V(1).Info("update has been issued", "Response status code", resp.StatusCode)
-
-	if resp.StatusCode != http.StatusAccepted {
-		biosRawBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "",
-				true,
-				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
-					err,
-					resp.StatusCode,
-				)
-		}
-		return "",
-			true,
-			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
-				string(biosRawBody),
-				resp.StatusCode,
-			)
-	}
-
-	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
-	if err != nil {
-		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
-	}
-
-	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
-
-	return taskMonitorURI, false, nil
+// UpgradeBiosVersion is a fallback for unknown vendors. Vendor-specific structs override this.
+func (r *RedfishBaseBMC) UpgradeBiosVersion(_ context.Context, _ string, _ *redfish.SimpleUpdateParameters) (string, bool, error) {
+	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)
 }
 
-func (r *RedfishBaseBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	respTask, err := r.client.GetService().GetClient().Get(taskURI)
-	if err != nil {
-		return nil, err
-	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close body")
-		}
-	}(respTask.Body) // nolint: errcheck
-
-	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
-		respTaskRawBody, err := io.ReadAll(respTask.Body)
-		if err != nil {
-			return nil,
-				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
-					err,
-					respTask.StatusCode)
-		}
-		return nil,
-			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
-				string(respTaskRawBody),
-				respTask.StatusCode)
-	}
-
-	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OEM interface object, %v", err)
-	}
-
-	return oemInterface.GetTaskMonitorDetails(ctx, respTask)
+func (r *RedfishBaseBMC) GetBiosUpgradeTask(_ context.Context, _ string, _ string) (*redfish.Task, error) {
+	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
 }
 
-// UpgradeBMCVersion upgrade given BMC version.
-func (r *RedfishBaseBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	service := r.client.GetService()
-
-	updateService, err := service.UpdateService()
-	if err != nil {
-		return "", false, err
-	}
-
-	type tActions struct {
-		SimpleUpdate struct {
-			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
-			Target          string
-		} `json:"#UpdateService.SimpleUpdate"`
-		StartUpdate schemas.ActionTarget `json:"#UpdateService.StartUpdate"`
-	}
-
-	var tUS struct {
-		Actions tActions
-	}
-
-	if err = json.Unmarshal(updateService.RawData, &tUS); err != nil {
-		return "", false, err
-	}
-
-	if len(manufacturer) == 0 {
-		manufacturer, err = r.getSystemManufacturer()
-		if err != nil {
-			return "", false, fmt.Errorf("failed to determine manufacturer")
-		}
-	}
-
-	oemInterface, err := NewOEMInterface(manufacturer, service)
-	if err != nil {
-		return "", false, err
-	}
-
-	RequestBody := oemInterface.GetUpdateRequestBody(parameters)
-
-	resp, err := updateService.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &RequestBody)
-	if err != nil {
-		return "", false, err
-	}
-
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
-		}
-	}(resp.Body)
-
-	// any error post this point is fatal, as we can not issue multiple upgrade requests.
-	// expectation is to move to failed state, and manually check the status before retrying
-	log.V(1).Info("Update has been issued", "ResponseCode", resp.StatusCode)
-	if resp.StatusCode != http.StatusAccepted {
-		bmcRawBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "",
-				true,
-				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
-					err,
-					resp.StatusCode,
-				)
-		}
-		return "", true, fmt.Errorf("failed to accept the upgrade request %v, statusCode %v", string(bmcRawBody), resp.StatusCode)
-	}
-
-	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
-	if err != nil {
-		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
-	}
-
-	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
-	return taskMonitorURI, false, nil
+// UpgradeBMCVersion is a fallback for unknown vendors. Vendor-specific structs override this.
+func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *redfish.SimpleUpdateParameters) (string, bool, error) {
+	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)
 }
 
-func (r *RedfishBaseBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	respTask, err := r.client.GetService().GetClient().Get(taskURI)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
-		}
-	}(respTask.Body)
-
-	if respTask.StatusCode != http.StatusAccepted && respTask.StatusCode != http.StatusOK {
-		respTaskRawBody, err := io.ReadAll(respTask.Body)
-		if err != nil {
-			return nil,
-				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
-					err,
-					respTask.StatusCode)
-		}
-		return nil,
-			fmt.Errorf("failed to get the upgrade Task details. %v, statusCode %v",
-				string(respTaskRawBody),
-				respTask.StatusCode)
-	}
-
-	if len(manufacturer) == 0 {
-		manufacturer, err = r.getSystemManufacturer()
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine manufacturer")
-		}
-	}
-
-	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OEM interface object, %v", err)
-	}
-
-	return oemInterface.GetTaskMonitorDetails(ctx, respTask)
+func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*redfish.Task, error) {
+	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
 }
 
 const (

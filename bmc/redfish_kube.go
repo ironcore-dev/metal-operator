@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ironcore-dev/metal-operator/bmc/common"
 	"github.com/stmcginnis/gofish/schemas"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -326,7 +325,7 @@ func (r *RedfishKubeBMC) CheckBMCAttributes(ctx context.Context, UUID string, at
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return common.CheckAttribues(attrs, filtered)
+	return checkAttributes(attrs, filtered)
 }
 
 // GetBMCVersion retrieves the BMC version.

@@ -32,6 +32,9 @@ spec:
     - jsonPath: .status.state
       name: State
       type: string
+    - jsonPath: .spec.priority
+      name: Priority
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -64,6 +67,14 @@ spec:
                 description: Policy specifies the maintenance policy to be enforced
                   on the server.
                 type: string
+              priority:
+                default: 0
+                description: |-
+                  Priority determines ordering when multiple ServerMaintenance resources target the same server.
+                  Higher values are processed first. If priorities are equal, older resources are processed first.
+                  If omitted, priority is treated as 0.
+                format: int32
+                type: integer
               serverBootConfigurationTemplate:
                 description: ServerBootConfigurationTemplate specifies the boot configuration
                   to be applied to the server during maintenance.

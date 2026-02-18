@@ -358,4 +358,200 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery)))
 	})
+
+	It("Should prioritize higher-priority maintenance for the same server", func(ctx SpecContext) {
+		By("Patching server to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating an Ignition secret")
+		ignitionSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				"foo": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ignitionSecret)
+
+		By("Creating a ServerClaim object")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             powerOpOff,
+				ServerRef:         &corev1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &corev1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:latest",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server is reserved by the ServerClaim")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
+		))
+
+		By("Creating low and high priority ServerMaintenance objects")
+		lowPriorityMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-low-priority-maintenance",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				Priority:    10,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		highPriorityMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-high-priority-maintenance",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				Priority:    100,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, lowPriorityMaintenance)).To(Succeed())
+		Expect(k8sClient.Create(ctx, highPriorityMaintenance)).To(Succeed())
+
+		By("Ensuring both ServerMaintenances are pending")
+		Eventually(Object(lowPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+		Eventually(Object(highPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+
+		By("Approving maintenance on the ServerClaim")
+		Eventually(Update(serverClaim, func() {
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+		})).Should(Succeed())
+
+		By("Ensuring high-priority maintenance starts first")
+		Eventually(Object(server)).Should(HaveField("Spec.ServerMaintenanceRef.Name", highPriorityMaintenance.Name))
+		Eventually(Object(highPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+		Consistently(Object(lowPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+
+		By("Deleting high-priority maintenance")
+		Expect(k8sClient.Delete(ctx, highPriorityMaintenance)).To(Succeed())
+		// check that the high-priority maintenance is deleted before checking the low-priority maintenance
+		Eventually(Get(highPriorityMaintenance)).ShouldNot(Succeed())
+		By("Approving lowPriorityMaintenance on the ServerClaim")
+		Eventually(Update(serverClaim, func() {
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+		})).Should(Succeed())
+		By("Ensuring low-priority maintenance can proceed afterwards")
+		Eventually(Object(lowPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+
+		By("Deleting low-priority maintenance")
+		Expect(k8sClient.Delete(ctx, lowPriorityMaintenance)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+	})
+
+	It("Should treat unset priority as zero", func(ctx SpecContext) {
+		By("Patching server to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating an Ignition secret")
+		ignitionSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				"foo": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ignitionSecret)
+
+		By("Creating a ServerClaim object")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             powerOpOff,
+				ServerRef:         &corev1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &corev1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:latest",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server is reserved by the ServerClaim")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
+		))
+
+		By("Creating maintenances with unset and set priority")
+		unsetPriorityMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-unset-priority-maintenance",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		setPriorityMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-set-priority-maintenance",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				Priority:    1,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, unsetPriorityMaintenance)).To(Succeed())
+		Expect(k8sClient.Create(ctx, setPriorityMaintenance)).To(Succeed())
+
+		By("Approving maintenance on the ServerClaim")
+		Eventually(Update(serverClaim, func() {
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+		})).Should(Succeed())
+
+		By("Ensuring maintenance with explicit priority runs before unset priority")
+		Eventually(Object(server)).Should(HaveField("Spec.ServerMaintenanceRef.Name", setPriorityMaintenance.Name))
+		Eventually(Object(setPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+		Consistently(Object(unsetPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+
+		By("Deleting set-priority maintenance")
+		Expect(k8sClient.Delete(ctx, setPriorityMaintenance)).To(Succeed())
+		Eventually(Get(setPriorityMaintenance)).ShouldNot(Succeed())
+
+		By("Approving lowPriorityMaintenance on the ServerClaim")
+		Eventually(Update(serverClaim, func() {
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+		})).Should(Succeed())
+
+		By("Ensuring unset-priority maintenance can proceed afterwards")
+		Eventually(Object(unsetPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+
+		By("Deleting unset-priority maintenance")
+		Expect(k8sClient.Delete(ctx, unsetPriorityMaintenance)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+	})
 })

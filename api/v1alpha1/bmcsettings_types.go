@@ -20,6 +20,10 @@ type BMCSettingsTemplate struct {
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
+	// FailedAutoRetryCount is the number of times the controller should automatically retry the bios upgrade in case of failure before giving up.
+	// +optional
+	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
+
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
@@ -67,6 +71,10 @@ type BMCSettingsStatus struct {
 	// State represents the current state of the BMC configuration task.
 	// +optional
 	State BMCSettingsState `json:"state,omitempty"`
+
+	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the bios upgrade in case of failure before giving up.
+	// +optional
+	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
 
 	// Conditions represents the latest available observations of the BMC Settings Resource state.
 	// +patchStrategy=merge

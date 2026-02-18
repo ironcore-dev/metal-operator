@@ -34,6 +34,10 @@ type BMCVersionTemplate struct {
 	// +required
 	Image ImageSpec `json:"image"`
 
+	// FailedAutoRetryCount is the number of times the controller should automatically retry the bios upgrade in case of failure before giving up.
+	// +optional
+	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
+
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
@@ -60,6 +64,11 @@ type BMCVersionStatus struct {
 
 	// UpgradeTask contains the state of the Upgrade Task created by the BMC
 	UpgradeTask *Task `json:"upgradeTask,omitempty"`
+
+	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the bios upgrade in case of failure before giving up.
+	// +optional
+	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
+
 	// Conditions represents the latest available observations of the BMC version upgrade state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type

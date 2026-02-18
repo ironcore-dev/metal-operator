@@ -218,9 +218,19 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 		if shouldRetryReconciliation(biosVersion) {
 			log.V(1).Info("Retrying ...")
 			biosVersionBase := biosVersion.DeepCopy()
+			biosVersion.Status.AutoRetryCountRemaining = nil
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
-			biosVersion.Status.Conditions = nil
 			annotations := biosVersion.GetAnnotations()
+			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			if err != nil {
+				return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
+			}
+			r.Conditions.Update(retryCondition,
+				conditionutils.UpdateStatus(metav1.ConditionTrue),
+				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
+			)
+			biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
 			delete(annotations, metalv1alpha1.OperationAnnotation)
 			biosVersion.SetAnnotations(annotations)
 
@@ -228,6 +238,36 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, log logr.Lo
 				return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)
 			}
 			return true, nil
+		}
+		if biosVersion.Spec.FailedAutoRetryCount != nil {
+			remaining := biosVersion.Status.AutoRetryCountRemaining
+			if remaining == nil || *remaining > 0 {
+				log.V(1).Info("Retrying automatically...", "RetryCount", remaining)
+				biosVersionBase := biosVersion.DeepCopy()
+				biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+				retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+				if err != nil {
+					return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
+				}
+				if retryCondition.Status == metav1.ConditionTrue {
+					// keep the condition if it's already true,
+					// otherwise SET resource will patch the retry annotation again.
+					biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
+				} else {
+					biosVersion.Status.Conditions = nil
+				}
+
+				if remaining == nil {
+					*biosVersion.Status.AutoRetryCountRemaining = *biosVersion.Status.AutoRetryCountRemaining - 1
+				} else {
+					*biosVersion.Status.AutoRetryCountRemaining--
+				}
+
+				if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+					return true, fmt.Errorf("failed to patch BIOSVersion status for auto-retrying: %w", err)
+				}
+				return true, nil
+			}
 		}
 		log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion, "Server", server.Name)
 		return false, nil

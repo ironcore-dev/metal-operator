@@ -28,6 +28,9 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
+
+	RetryOfFailedResourceConditionIssued = "RetryOfFailedResourceConditionIssued"
+	RetryOfFailedResourceReasonIssued    = "RetryOfFailedResourceReasonIssued"
 )
 
 // GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
@@ -300,6 +303,28 @@ func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c cl
 			if !shouldChildRetryReconciliation(parentObj) && isChildRetryThroughSets(childObj) && annotations != nil {
 				delete(annotations, metalv1alpha1.OperationAnnotation)
 				childObj.SetAnnotations(annotations)
+			}
+
+			// Use reflection to access the Status.Conditions field, assuming given child objects have it.
+			v := reflect.ValueOf(childObj).Elem()
+			statusField := v.FieldByName("Status")
+			if statusField.IsValid() {
+				// If there's no Status field, we can't check conditions we continue.
+				conditionsField := statusField.FieldByName("Conditions")
+				if conditionsField.IsValid() {
+					// Same as above, if there's no Conditions field, we can't check this.
+					conditions, ok := conditionsField.Interface().([]metav1.Condition)
+					if ok {
+						retriedCondition, err := GetCondition(nil, conditions, RetryOfFailedResourceConditionIssued)
+
+						if err == nil && retriedCondition != nil &&
+							retriedCondition.Status == metav1.ConditionTrue &&
+							retriedCondition.Message == metalv1alpha1.OperationAnnotationRetryFailedPropagated {
+							// retry was already propagated to child, we can skip re-propagation to avoid infinite loop
+							return nil
+						}
+					}
+				}
 			}
 			// should not overwrite the already present retry annotation on child
 			// should not overwrite if the annotation already present on the child

@@ -141,7 +141,7 @@ func (r *RedfishBMC) PowerOff(ctx context.Context, systemURI string) error {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(redfish.GracefulShutdownResetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+		return fmt.Errorf("failed to reset system to power off state: %w", err)
 	}
 	return nil
 }
@@ -153,7 +153,7 @@ func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemURI string) error 
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(redfish.ForceOffResetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+		return fmt.Errorf("failed to reset system to force power off state: %w", err)
 	}
 	return nil
 }
@@ -944,8 +944,6 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 
 	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
-		log.V(1).Error(err,
-			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
 		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
 	}
 
@@ -1053,18 +1051,11 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 					resp.StatusCode,
 				)
 		}
-		return "",
-			true,
-			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
-				string(bmcRawBody),
-				resp.StatusCode,
-			)
+		return "", true, fmt.Errorf("failed to accept the upgrade request %v, statusCode %v", string(bmcRawBody), resp.StatusCode)
 	}
 
 	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
-		log.V(1).Error(err,
-			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
 		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
 	}
 

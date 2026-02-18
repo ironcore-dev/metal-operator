@@ -11,13 +11,13 @@ import (
 const (
 	// BMCSecretUsernameKeyName is the secret key name for the username.
 	BMCSecretUsernameKeyName = "username"
-	// BMCSecretPasswordKeyName is the secret key name for the password.F
+	// BMCSecretPasswordKeyName is the secret key name for the password.
 	BMCSecretPasswordKeyName = "password"
 )
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=bmcsec
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BMCSecret is the Schema for the bmcsecrets API

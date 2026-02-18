@@ -882,6 +882,120 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
 	})
+
+	It("Should replace missing BIOSSettings ref in server", func(ctx SpecContext) {
+		// settings mocked at
+		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
+		biosSetting := make(map[string]string)
+		biosSetting["ProcCores"] = "2"
+
+		By("Creating a BIOSSetting")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-from-server-avail-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Wait for the BIOSSettings to be ref on the Server")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
+			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
+		))
+		// delete the old settings
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+		By("force deletion")
+		Eventually(func() error {
+			err := Update(biosSettings, func() {
+				biosSettings.Finalizers = []string{}
+			})()
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}).Should(Succeed())
+		By("check if maintenance has been created on the server and delete if its present")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(func() error {
+			_, err := ObjectList(&serverMaintenanceList)()
+			if err != nil {
+				return err
+			}
+			if len(serverMaintenanceList.Items) > 0 {
+				for _, item := range serverMaintenanceList.Items {
+					if len(item.OwnerReferences) > 0 && item.OwnerReferences[0].UID == biosSettings.UID {
+						By(fmt.Sprintf("Deleting the ServerMaintenance created by biosSettings %v", item.Name))
+						Expect(k8sClient.Delete(ctx, &item)).To(Succeed())
+						Eventually(func() error {
+							err := Update(&item, func() {
+								item.Finalizers = []string{}
+							})()
+							if apierrors.IsNotFound(err) {
+								return nil
+							}
+							return err
+						}).Should(Succeed())
+					}
+				}
+			}
+			return nil
+		}).Should(Succeed())
+
+		biosSettings2 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-from-server-recreated-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: defaultMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings2)).To(Succeed())
+
+		By("Wait for the BIOSSettings2 to be ref on the Server")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
+			HaveField("Spec.BIOSSettingsRef.Name", biosSettings2.Name),
+		))
+
+		Eventually(Object(biosSettings2)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+		))
+
+		Eventually(Object(biosSettings2)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
+		))
+
+		Expect(k8sClient.Delete(ctx, biosSettings2)).To(Succeed())
+		Eventually(Get(biosSettings2)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
 })
 
 var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
@@ -1671,7 +1785,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	By("Ensuring right number of conditions are present")
 	Eventually(Object(biosSettings)).Should(
-		HaveField("Status.Conditions", HaveLen(3)),
+		HaveField("Status.Conditions", HaveLen(4)),
 	)
 
 	By("Ensuring the wait for version upgrade condition has NOT been added")
@@ -1685,7 +1799,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", BIOSServerMaintenanceConditionCreated),
+				HaveField("Type", ServerMaintenanceConditionCreated),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1734,7 +1848,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", BIOSServerMaintenanceConditionDeleted),
+				HaveField("Type", ServerMaintenanceConditionDeleted),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1742,7 +1856,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 }
 
 func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, RebootNeeded bool, waitForVersionUpgrade bool) {
-	commonConditions := 3
+	commonConditions := 4
 	flowCondition := 5
 
 	if RebootNeeded {
@@ -1793,7 +1907,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", BIOSServerMaintenanceConditionCreated),
+				HaveField("Type", ServerMaintenanceConditionCreated),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1894,7 +2008,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 	By("Ensuring the server maintenance has been deleted")
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElements(
-			HaveField("Type", BIOSServerMaintenanceConditionDeleted),
+			HaveField("Type", ServerMaintenanceConditionDeleted),
 			HaveField("Status", metav1.ConditionTrue),
 		)),
 	)

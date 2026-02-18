@@ -939,9 +939,15 @@ var _ = Describe("BIOSSettings Controller", func() {
 					if len(item.OwnerReferences) > 0 && item.OwnerReferences[0].UID == biosSettings.UID {
 						By(fmt.Sprintf("Deleting the ServerMaintenance created by biosSettings %v", item.Name))
 						Expect(k8sClient.Delete(ctx, &item)).To(Succeed())
-						Eventually(Update(&item, func() {
-							item.Finalizers = []string{}
-						})).Should(Succeed())
+						Eventually(func() error {
+							err := Update(&item, func() {
+								item.Finalizers = []string{}
+							})()
+							if apierrors.IsNotFound(err) {
+								return nil
+							}
+							return err
+						}).Should(Succeed())
 					}
 				}
 			}

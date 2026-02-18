@@ -113,7 +113,7 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
 	if err == nil {
 		defer bmcClient.Logout()
-		if err := r.deleteEventSubscription(ctx, log, bmcClient, bmcObj); err != nil {
+		if err := r.deleteEventSubscription(ctx, bmcClient, bmcObj); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to delete event subscriptions: %w", err)
 		}
 	}
@@ -195,7 +195,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 	}
 	log.V(1).Info("Discovered servers")
 
-	if modified, err := r.handleEventSubscriptions(ctx, log, bmcClient, bmcObj); err != nil || modified {
+	if modified, err := r.handleEventSubscriptions(ctx, bmcClient, bmcObj); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -546,7 +546,8 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 	return nil
 }
 
-func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) (bool, error) {
+func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if r.EventURL == "" {
 		return false, nil
 	}
@@ -580,7 +581,8 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, log logr.L
 	return modified, nil
 }
 
-func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	if r.EventURL == "" {
 		return nil
 	}

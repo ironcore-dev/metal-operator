@@ -73,12 +73,8 @@ var dellCommonBMCAttributes = map[string]redfish.Attribute{
 
 // --- Dell helper methods ---
 
-func (r *DellRedfishBMC) getObjFromUri(uri string, respObj any) (string, error) {
-	manager, err := r.getManagerForOEM()
-	if err != nil {
-		return "", err
-	}
-	resp, err := manager.GetClient().Get(uri)
+func (r *DellRedfishBMC) getObjFromURI(c common.Client, uri string, respObj any) (string, error) {
+	resp, err := c.Get(uri)
 	if err != nil {
 		return "", err
 	}
@@ -107,29 +103,26 @@ func (r *DellRedfishBMC) getManagerForOEM() (*redfish.Manager, error) {
 	return manager, nil
 }
 
-func (r *DellRedfishBMC) getCurrentBMCSettingAttribute() ([]dellAttributes, error) {
-	manager, err := r.getManagerForOEM()
-	if err != nil {
-		return nil, err
-	}
-
+func (r *DellRedfishBMC) getCurrentBMCSettingAttribute(manager *redfish.Manager) ([]dellAttributes, error) {
 	type temp struct {
 		DellOEMData dellManagerLinksOEM `json:"Dell"`
 	}
 
 	tempData := &temp{}
-	err = json.Unmarshal(manager.OemLinks, tempData)
+	err := json.Unmarshal(manager.OemLinks, tempData)
 	if err != nil {
 		return nil, err
 	}
 
+	c := manager.GetClient()
 	bmcDellAttributes := []dellAttributes{}
 	var errs []error
 	for _, data := range tempData.DellOEMData.DellLinkAttributes {
 		bmcDellAttribute := &dellAttributes{}
-		eTag, err := r.getObjFromUri(data.String(), bmcDellAttribute)
+		eTag, err := r.getObjFromURI(c, data.String(), bmcDellAttribute)
 		if err != nil {
 			errs = append(errs, err)
+			continue
 		}
 		bmcDellAttribute.Etag = eTag
 		bmcDellAttributes = append(bmcDellAttributes, *bmcDellAttribute)
@@ -141,18 +134,19 @@ func (r *DellRedfishBMC) getCurrentBMCSettingAttribute() ([]dellAttributes, erro
 	return bmcDellAttributes, nil
 }
 
-func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(readOnly bool, immutable bool) (map[string]redfish.Attribute, error) {
+func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(manager *redfish.Manager, readOnly bool, immutable bool) (map[string]redfish.Attribute, error) {
 	registries, err := r.client.Service.Registries()
 	if err != nil {
 		return nil, err
 	}
+	c := manager.GetClient()
 	bmcRegistryAttribute := &redfish.AttributeRegistry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "ManagerAttributeRegistry") {
 			if len(registry.Location) == 0 {
 				return nil, fmt.Errorf("ManagerAttributeRegistry %q has no Location entries", registry.ID)
 			}
-			_, err = r.getObjFromUri(registry.Location[0].URI, bmcRegistryAttribute)
+			_, err = r.getObjFromURI(c, registry.Location[0].URI, bmcRegistryAttribute)
 			if err != nil {
 				return nil, err
 			}
@@ -175,7 +169,12 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 		return nil, nil
 	}
 
-	bmcDellAttributes, err := r.getCurrentBMCSettingAttribute()
+	manager, err := r.getManagerForOEM()
+	if err != nil {
+		return nil, err
+	}
+
+	bmcDellAttributes, err := r.getCurrentBMCSettingAttribute(manager)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +192,7 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 		}
 	}
 
-	filteredAttr, err := r.getFilteredBMCRegistryAttributes(false, false)
+	filteredAttr, err := r.getFilteredBMCRegistryAttributes(manager, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -237,18 +236,24 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 }
 
 func (r *DellRedfishBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUUID string) (redfish.SettingsAttributes, error) {
-	bmcAttrValues, err := r.getCurrentBMCSettingAttribute()
+	manager, err := r.getManagerForOEM()
 	if err != nil {
 		return nil, err
 	}
 
+	bmcAttrValues, err := r.getCurrentBMCSettingAttribute(manager)
+	if err != nil {
+		return nil, err
+	}
+
+	c := manager.GetClient()
 	var mergedPendingBMCAttributes = make(redfish.SettingsAttributes)
 
 	for _, bmcAttrValue := range bmcAttrValues {
 		var tBMCSetting struct {
 			Attributes redfish.SettingsAttributes `json:"Attributes"`
 		}
-		_, err := r.getObjFromUri(bmcAttrValue.Settings.SettingsObject.String(), &tBMCSetting)
+		_, err := r.getObjFromURI(c, bmcAttrValue.Settings.SettingsObject.String(), &tBMCSetting)
 		if err != nil {
 			return nil, err
 		}
@@ -269,7 +274,12 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 		return nil
 	}
 
-	bmcAttrValues, err := r.getCurrentBMCSettingAttribute()
+	manager, err := r.getManagerForOEM()
+	if err != nil {
+		return err
+	}
+
+	bmcAttrValues, err := r.getCurrentBMCSettingAttribute(manager)
 	if err != nil {
 		return err
 	}
@@ -290,10 +300,6 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 	}
 
 	if len(payloads) > 0 {
-		manager, err := r.getManagerForOEM()
-		if err != nil {
-			return err
-		}
 		var errs []error
 		for settingPath, payload := range payloads {
 			etag, err := func() (string, error) {
@@ -337,7 +343,12 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 }
 
 func (r *DellRedfishBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string, attrs redfish.SettingsAttributes) (bool, error) {
-	filteredAttr, err := r.getFilteredBMCRegistryAttributes(false, false)
+	manager, err := r.getManagerForOEM()
+	if err != nil {
+		return false, err
+	}
+
+	filteredAttr, err := r.getFilteredBMCRegistryAttributes(manager, false, false)
 	if err != nil {
 		return false, err
 	}

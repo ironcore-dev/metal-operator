@@ -9,33 +9,33 @@ import (
 
 // BMCVersionSetSpec defines the desired state of BMCVersionSet.
 type BMCVersionSetSpec struct {
-	// BMCSelector specifies a label selector to identify the BMC that are to be selected.
+	// BMCSelector specifies a label selector to identify the BMCs to be selected.
 	// +required
 	BMCSelector metav1.LabelSelector `json:"bmcSelector"`
 
-	// BMCVersionTemplate defines the template for the BMCversion Resource to be applied to the servers.
+	// BMCVersionTemplate defines the template for the BMCVersion resource to be applied to the BMCs.
 	BMCVersionTemplate BMCVersionTemplate `json:"bmcVersionTemplate,omitempty"`
 }
 
 // BMCVersionSetStatus defines the observed state of BMCVersionSet.
 type BMCVersionSetStatus struct {
-	// FullyLabeledBMCs is the number of server in the set.
+	// FullyLabeledBMCs is the number of BMCs in the set.
 	FullyLabeledBMCs int32 `json:"fullyLabeledBMCs,omitempty"`
-	// AvailableBMCVersion is the number of BMCVersion current created by the set.
+	// AvailableBMCVersion is the number of BMCVersion resources currently created by the set.
 	AvailableBMCVersion int32 `json:"availableBMCVersion,omitempty"`
-	// PendingBMCVersion is the total number of pending BMCVersion in the set.
+	// PendingBMCVersion is the total number of pending BMCVersion resources in the set.
 	PendingBMCVersion int32 `json:"pendingBMCVersion,omitempty"`
-	// InProgressBMCVersion is the total number of BMCVersion in the set that are currently in InProgress.
+	// InProgressBMCVersion is the total number of BMCVersion resources in the set that are currently in progress.
 	InProgressBMCVersion int32 `json:"inProgressBMCVersion,omitempty"`
-	// CompletedBMCVersion is the total number of completed BMCVersion in the set.
+	// CompletedBMCVersion is the total number of completed BMCVersion resources in the set.
 	CompletedBMCVersion int32 `json:"completedBMCVersion,omitempty"`
-	// FailedBMCVersion is the total number of failed BMCVersion in the set.
+	// FailedBMCVersion is the total number of failed BMCVersion resources in the set.
 	FailedBMCVersion int32 `json:"failedBMCVersion,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=bmcvs
 // +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.bmcVersionTemplate.version`
 // +kubebuilder:printcolumn:name="selectedBMCs",type="integer",JSONPath=`.status.fullyLabeledBMCs`
 // +kubebuilder:printcolumn:name="AvailableBMCVersion",type="integer",JSONPath=`.status.availableBMCVersion`

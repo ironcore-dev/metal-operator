@@ -105,23 +105,23 @@ func (h *HPEILOManager) GetObjFromUri(
 	ctx context.Context,
 	uri string,
 	respObj any,
-) ([]string, error) {
+) (string, error) {
 	resp, err := h.BMC.GetClient().Get(uri)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close() // nolint: errcheck
 
 	rawBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = json.Unmarshal(rawBody, &respObj)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return resp.Header["Etag"], nil
+	return resp.Header.Get("ETag"), nil
 }
 
 func (h *HPEILOManager) GetOEMBMCSettingAttribute(

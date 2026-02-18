@@ -24,7 +24,7 @@ type ManagerInterface interface {
 	CheckBMCAttributes(ctx context.Context, attributes redfish.SettingsAttributes) (bool, error)
 
 	// GetObjFromUri retrieves an object from a given URI and populates the response object.
-	GetObjFromUri(ctx context.Context, uri string, respObj any) ([]string, error)
+	GetObjFromUri(ctx context.Context, uri string, respObj any) (string, error)
 
 	// UpdateBMCAttributesApplyAt updates BMC attributes and applies them at the specified time.
 	UpdateBMCAttributesApplyAt(ctx context.Context, attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error

@@ -98,11 +98,13 @@ func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorRespon
 				fmt.Errorf("unable to extract the completed task details %v. \nResponse body %v",
 					err, string(rawBody))
 		}
-		if strings.Contains(tTask.Error.ExtendedInfo[0]["MessageId"], "Success") {
-			task.TaskState = redfish.CompletedTaskState
-			task.PercentComplete = 100
-			task.TaskStatus = common.OKHealth
-			return task, nil
+		if len(tTask.Error.ExtendedInfo) > 0 {
+			if msgID, ok := tTask.Error.ExtendedInfo[0]["MessageId"]; ok && strings.Contains(msgID, "Success") {
+				task.TaskState = redfish.CompletedTaskState
+				task.PercentComplete = 100
+				task.TaskStatus = common.OKHealth
+				return task, nil
+			}
 		}
 		return task, fmt.Errorf("unable to find the state of the Task %v", string(rawBody))
 	}

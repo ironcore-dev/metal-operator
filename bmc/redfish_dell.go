@@ -149,6 +149,9 @@ func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(readOnly bool, immutab
 	bmcRegistryAttribute := &redfish.AttributeRegistry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "ManagerAttributeRegistry") {
+			if len(registry.Location) == 0 {
+				return nil, fmt.Errorf("ManagerAttributeRegistry %q has no Location entries", registry.ID)
+			}
 			_, err = r.getObjFromUri(registry.Location[0].URI, bmcRegistryAttribute)
 			if err != nil {
 				return nil, err
@@ -209,7 +212,7 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 				continue
 			}
 		}
-		if strings.ToLower(string(entry.Type)) == string(redfish.EnumerationAttributeType) {
+		if strings.EqualFold(string(entry.Type), string(redfish.EnumerationAttributeType)) {
 			for _, attrValue := range entry.Value {
 				if attrValue.ValueDisplayName == mergedBMCAttributes[name] {
 					result[name] = attrValue.ValueName
@@ -240,11 +243,11 @@ func (r *DellRedfishBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUU
 	}
 
 	var mergedPendingBMCAttributes = make(redfish.SettingsAttributes)
-	var tBMCSetting struct {
-		Attributes redfish.SettingsAttributes `json:"Attributes"`
-	}
 
 	for _, bmcAttrValue := range bmcAttrValues {
+		var tBMCSetting struct {
+			Attributes redfish.SettingsAttributes `json:"Attributes"`
+		}
 		_, err := r.getObjFromUri(bmcAttrValue.Settings.SettingsObject.String(), &tBMCSetting)
 		if err != nil {
 			return nil, err

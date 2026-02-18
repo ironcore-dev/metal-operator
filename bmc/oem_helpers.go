@@ -138,10 +138,17 @@ func httpBasedGetBMCSettingAttribute(c common.Client, attributes map[string]stri
 		parts := strings.Fields(key)
 		if len(parts) != 2 {
 			errs = append(errs, fmt.Errorf("invalid attribute format: %s\n expected '<HTTP METHOD> <URI>'", key))
+			continue
 		}
 		resp, err := c.Get(parts[1])
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to GET attribute %s to URL %s: %v", key, parts[1], err))
+			continue
+		}
+		respRawBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close() // nolint: errcheck
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to read response body for url %s: %v", parts[1], err))
 			continue
 		}
 		okCodes := []int{http.StatusOK, http.StatusNoContent}
@@ -149,12 +156,6 @@ func httpBasedGetBMCSettingAttribute(c common.Client, attributes map[string]stri
 			errs = append(errs, fmt.Errorf("failed to GET attribute %s: received status code %d", parts[1], resp.StatusCode))
 			continue
 		}
-		respRawBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to read response body for url %s: %v\n %v", parts[1], err, resp))
-			continue
-		}
-		defer resp.Body.Close() // nolint: errcheck
 		var respData map[string]any
 		err = json.Unmarshal(respRawBody, &respData)
 		if err != nil {
@@ -191,10 +192,22 @@ func httpBasedUpdateBMCAttributes(c common.Client, attrs redfish.SettingsAttribu
 		parts := strings.Fields(attr)
 		if len(parts) != 2 {
 			errs = append(errs, fmt.Errorf("invalid attribute format: %s\n expected '<HTTP METHOD> <URI>'", attr))
+			continue
 		}
 		url := parts[1]
+		var jsonBytes []byte
+		if vStr, ok := value.(string); ok {
+			jsonBytes = []byte(vStr)
+		} else {
+			var err error
+			jsonBytes, err = json.Marshal(value)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to marshal spec data for url %s: %v\nbody: %v", parts[1], err, value))
+				continue
+			}
+		}
 		valueMap := map[string]any{}
-		err := json.Unmarshal([]byte(value.(string)), &valueMap)
+		err := json.Unmarshal(jsonBytes, &valueMap)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %v\nbody: %v", parts[1], err, value))
 			continue

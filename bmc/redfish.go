@@ -5,10 +5,13 @@ package bmc
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"math/big"
 	"net/http"
 	"slices"
 	"strings"
@@ -137,7 +140,7 @@ func (r *RedfishBMC) PowerOff(ctx context.Context, systemURI string) error {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(redfish.GracefulShutdownResetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+		return fmt.Errorf("failed to reset system to power off state: %w", err)
 	}
 	return nil
 }
@@ -149,7 +152,7 @@ func (r *RedfishBMC) ForcePowerOff(ctx context.Context, systemURI string) error 
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
 	if err := system.Reset(redfish.ForceOffResetType); err != nil {
-		return fmt.Errorf("failed to reset system to power on state: %w", err)
+		return fmt.Errorf("failed to reset system to force power off state: %w", err)
 	}
 	return nil
 }
@@ -484,9 +487,7 @@ func (r *RedfishBMC) SetBiosAttributesOnReset(ctx context.Context, systemURI str
 	}
 
 	attrs := make(redfish.SettingsAttributes, len(attributes))
-	for name, value := range attributes {
-		attrs[name] = value
-	}
+	maps.Copy(attrs, attributes)
 	return bios.UpdateBiosAttributesApplyAt(attrs, common.OnResetApplyTime)
 }
 
@@ -551,7 +552,7 @@ func (r *RedfishBMC) CheckBiosAttributes(attrs redfish.SettingsAttributes) (bool
 func (r *RedfishBMC) checkAttributes(attrs redfish.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
-	//TODO: add more types like maps and Enumerations
+	// TODO: add more types like maps and Enumerations
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
@@ -751,6 +752,87 @@ func (r *RedfishBMC) GetStorages(ctx context.Context, systemURI string) ([]Stora
 	return result, nil
 }
 
+func (r *RedfishBMC) CreateOrUpdateAccount(
+	ctx context.Context, userName,
+	role, password string, enabled bool,
+) error {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	for _, a := range accounts {
+		if a.UserName == userName {
+			a.RoleID = role
+			a.UserName = userName
+			a.Enabled = enabled
+			if err := a.Update(); err != nil {
+				return fmt.Errorf("failed to update account: %w", err)
+			}
+			if password != "" {
+				if err := a.ChangePassword(password, r.options.Password); err != nil {
+					return fmt.Errorf("failed to change account password: %w", err)
+				}
+			}
+			return nil
+		}
+	}
+	_, err = service.CreateAccount(userName, password, role)
+	if err != nil {
+		return fmt.Errorf("failed to create account: %w", err)
+	}
+	return nil
+}
+
+func (r *RedfishBMC) DeleteAccount(ctx context.Context, userName, id string) error {
+	log := ctrl.LoggerFrom(ctx)
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+	for _, a := range accounts {
+		// make sure we delete the correct account
+		if a.UserName == userName && a.ID == id {
+			resp, err := r.client.Delete(a.ODataID)
+			if err != nil {
+				return err
+			}
+			if err = resp.Body.Close(); err != nil {
+				log.Error(err, "failed to close response body")
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("account %s not found", userName)
+}
+
+func (r *RedfishBMC) GetAccountService() (*redfish.AccountService, error) {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account service: %w", err)
+	}
+	return service, nil
+}
+
+func (r *RedfishBMC) GetAccounts() ([]*redfish.ManagerAccount, error) {
+	service, err := r.client.GetService().AccountService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account service: %w", err)
+	}
+	accounts, err := service.Accounts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounts: %w", err)
+	}
+	return accounts, nil
+}
+
 func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*redfish.ComputerSystem, error) {
 	if len(systemURI) == 0 {
 		return nil, fmt.Errorf("can not process empty URI")
@@ -861,8 +943,6 @@ func (r *RedfishBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string
 
 	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
-		log.V(1).Error(err,
-			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
 		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
 	}
 
@@ -970,18 +1050,11 @@ func (r *RedfishBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string,
 					resp.StatusCode,
 				)
 		}
-		return "",
-			true,
-			fmt.Errorf("failed to accept the upgrade request %v, statusCode %v",
-				string(bmcRawBody),
-				resp.StatusCode,
-			)
+		return "", true, fmt.Errorf("failed to accept the upgrade request %v, statusCode %v", string(bmcRawBody), resp.StatusCode)
 	}
 
 	taskMonitorURI, err := oemInterface.GetUpdateTaskMonitorURI(resp)
 	if err != nil {
-		log.V(1).Error(err,
-			"failed to extract Task created for upgrade. However, upgrade might be running on server.")
 		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
 	}
 
@@ -1095,4 +1168,107 @@ func (r *RedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string
 	}
 
 	return oemInterface.GetVirtualMediaStatus(ctx, systemURI)
+}
+
+const (
+	charLower = "abcdefghijklmnopqrstuvwxyz"
+	charUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	charDigit = "0123456789"
+)
+
+// ManufacturerPasswordConfig holds vendor-specific constraints, including max length and allowed special characters.
+type ManufacturerPasswordConfig struct {
+	SpecialChars string
+}
+
+// Vendor-specific constraints map.
+var manufacturerPasswordConfigs = map[Manufacturer]ManufacturerPasswordConfig{
+	ManufacturerDell: {
+		SpecialChars: "!#$%%&()*.?-@[]^_`{}|~+=",
+	},
+	ManufacturerHPE: {
+		SpecialChars: "~`!@#$%^&*()_-+={[}]|.?/",
+	},
+	ManufacturerLenovo: {
+		SpecialChars: ";@!$%-+=[]{}|/?~_",
+	},
+	"default": {
+		SpecialChars: "!@#$%&*()_-+=[]{}/?~|",
+	},
+}
+
+// GenerateSecurePassword generates a secure password for BMC accounts based on vendor-specific requirements.
+func GenerateSecurePassword(manufacturer Manufacturer, length int) (string, error) {
+	config, ok := manufacturerPasswordConfigs[manufacturer]
+	if !ok {
+		config = manufacturerPasswordConfigs["default"]
+	}
+
+	// Define the total character pool using the vendor-specific special characters.
+	allChars := charLower + charUpper + charDigit + config.SpecialChars
+
+	// Ensure the special character set is not empty (it shouldn't be with the defined constants)
+	if len(config.SpecialChars) == 0 {
+		return "", fmt.Errorf("vendor %s has an empty special character set, complexity cannot be guaranteed", manufacturer)
+	}
+
+	// Ensure minimum complexity (at least one of each type).
+	mustInclude := []string{charLower, charUpper, charDigit, config.SpecialChars}
+	if length < len(mustInclude) {
+		return "", fmt.Errorf("password length must be at least %d to meet complexity requirements", len(mustInclude))
+	}
+
+	passwordRunes := make([]rune, length)
+	currentIdx := 0
+
+	// A. Add mandatory characters (one from each group).
+	for i, charSet := range mustInclude {
+		if len(charSet) == 0 {
+			return "", fmt.Errorf("character set %d is empty, cannot generate secure password", i)
+		}
+		char, err := randomChar(charSet)
+		if err != nil {
+			return "", err
+		}
+		passwordRunes[currentIdx] = char
+		currentIdx++
+	}
+
+	// B. Fill the remainder randomly.
+	remainingLength := length - len(mustInclude)
+	for range remainingLength {
+		char, err := randomChar(allChars)
+		if err != nil {
+			return "", err
+		}
+		passwordRunes[currentIdx] = char
+		currentIdx++
+	}
+
+	// C. Shuffle to randomize positions.
+	if err := shuffleRunes(passwordRunes); err != nil {
+		return "", err
+	}
+
+	return string(passwordRunes), nil
+}
+
+func randomChar(charSet string) (rune, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charSet))))
+	if err != nil {
+		return 0, err
+	}
+	return rune(charSet[n.Int64()]), nil
+}
+
+func shuffleRunes(a []rune) error {
+	for i := len(a) - 1; i > 0; i-- {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return err
+		}
+		j := n.Int64()
+		a[i], a[j] = a[j], a[i]
+	}
+	return nil
 }

@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: servermaintenances.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -11,6 +11,8 @@ spec:
     kind: ServerMaintenance
     listKind: ServerMaintenanceList
     plural: servermaintenances
+    shortNames:
+    - sm
     singular: servermaintenance
   scope: Namespaced
   versions:
@@ -30,6 +32,9 @@ spec:
     - jsonPath: .status.state
       name: State
       type: string
+    - jsonPath: .spec.priority
+      name: Priority
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -62,6 +67,14 @@ spec:
                 description: Policy specifies the maintenance policy to be enforced
                   on the server.
                 type: string
+              priority:
+                default: 0
+                description: |-
+                  Priority determines ordering when multiple ServerMaintenance resources target the same server.
+                  Higher values are processed first. If priorities are equal, older resources are processed first.
+                  If omitted, priority is treated as 0.
+                format: int32
+                type: integer
               serverBootConfigurationTemplate:
                 description: ServerBootConfigurationTemplate specifies the boot configuration
                   to be applied to the server during maintenance.
@@ -70,8 +83,7 @@ spec:
                     description: Name specifies the name of the boot configuration.
                     type: string
                   spec:
-                    description: Parameters specify the parameters to be used for
-                      rendering the boot configuration.
+                    description: Spec specifies the boot configuration to be rendered.
                     properties:
                       bootMethod:
                         default: PXE
@@ -85,8 +97,8 @@ spec:
                         type: string
                       ignitionSecretRef:
                         description: |-
-                          IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
-                          the ignition configuration for the server. This field is optional and can be omitted if not specified.
+                          IgnitionSecretRef is a reference to the Secret object that contains
+                          the ignition configuration for the server.
                         properties:
                           name:
                             default: ""

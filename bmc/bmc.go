@@ -128,6 +128,18 @@ type BMC interface {
 
 	// GetVirtualMediaStatus retrieves the status of all virtual media devices.
 	GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error)
+
+	// CreateOrUpdateAccount creates or updates a BMC user account.
+	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
+
+	// DeleteAccount deletes a BMC user account.
+	DeleteAccount(ctx context.Context, userName, id string) error
+
+	// GetAccounts retrieves all BMC user accounts.
+	GetAccounts() ([]*redfish.ManagerAccount, error)
+
+	// GetAccountService retrieves the account service.
+	GetAccountService() (*redfish.AccountService, error)
 }
 
 type Entity struct {
@@ -144,7 +156,7 @@ type AllowedValues struct {
 
 type RegistryEntryAttributes struct {
 	AttributeName string
-	CurrentValue  interface{}
+	CurrentValue  any
 	DisplayName   string
 	DisplayOrder  int
 	HelpText      string

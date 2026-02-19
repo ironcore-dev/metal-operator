@@ -8,13 +8,11 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -26,7 +24,7 @@ var versionLog = logf.Log.WithName("biosversion-resource")
 
 // SetupBIOSVersionWebhookWithManager registers the webhook for BIOSVersion in the manager.
 func SetupBIOSVersionWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&metalv1alpha1.BIOSVersion{}).
+	return ctrl.NewWebhookManagedBy(mgr, &metalv1alpha1.BIOSVersion{}).
 		WithValidator(&BIOSVersionCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 }
@@ -41,43 +39,29 @@ type BIOSVersionCustomValidator struct {
 	client.Client
 }
 
-var _ webhook.CustomValidator = &BIOSVersionCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
-func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	version, ok := obj.(*metalv1alpha1.BIOSVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BIOSVersion object but got %T", obj)
-	}
-	versionLog.Info("Validation for BIOSVersion upon creation", "name", version.GetName())
+func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
+	versionLog.Info("Validation for BIOSVersion upon creation", "name", obj.GetName())
 
 	versions := &metalv1alpha1.BIOSVersionList{}
 	if err := v.List(ctx, versions); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSVersion: %w", err)
 	}
-	return checkForDuplicateBIOSVersionRefToServer(versions, version)
+	return checkForDuplicateBIOSVersionRefToServer(versions, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
-func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	newVersion, ok := newObj.(*metalv1alpha1.BIOSVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BIOSVersion object for the newObj but got %T", newObj)
-	}
-	versionLog.Info("Validation for BIOSVersion upon update", "name", newVersion.GetName())
+func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
+	versionLog.Info("Validation for BIOSVersion upon update", "name", newObj.GetName())
 
-	oldVersion, ok := oldObj.(*metalv1alpha1.BIOSVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BIOSVersion object for the oldObj but got %T", oldObj)
-	}
-	if oldVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(newVersion) && oldVersion.Spec.ServerMaintenanceRef != nil {
+	if oldObj.Status.State == metalv1alpha1.BIOSVersionStateInProgress &&
+		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRef != nil {
 		err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
-			oldVersion.Name,
-			newVersion.Name)
+			oldObj.Name,
+			newObj.Name)
 		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: newVersion.GroupVersionKind().Group, Kind: newVersion.Kind},
-			newVersion.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
+			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
 	}
 
 	versions := &metalv1alpha1.BIOSVersionList{}
@@ -85,18 +69,14 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		return nil, fmt.Errorf("failed to list BIOSVersion: %w", err)
 	}
 
-	return checkForDuplicateBIOSVersionRefToServer(versions, newVersion)
+	return checkForDuplicateBIOSVersionRefToServer(versions, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
-func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	version, ok := obj.(*metalv1alpha1.BIOSVersion)
-	if !ok {
-		return nil, fmt.Errorf("expected a BIOSVersion object but got %T", obj)
-	}
-	versionLog.Info("Validation for BIOSVersion upon deletion", "name", version.GetName())
+func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
+	versionLog.Info("Validation for BIOSVersion upon deletion", "name", obj.GetName())
 
-	if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(version) {
+	if obj.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
 		return nil, apierrors.NewBadRequest("The BIOS version is in progress and cannot be deleted")
 	}
 	return nil, nil

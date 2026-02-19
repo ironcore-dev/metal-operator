@@ -28,32 +28,28 @@ type BMCSpec struct {
 	// +optional
 	BMCUUID string `json:"bmcUUID,omitempty"`
 
-	// EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
-	// This reference is typically used to locate the BMC endpoint within the cluster.
+	// EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC.
 	// +optional
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="endpointRef is immutable"
 	EndpointRef *v1.LocalObjectReference `json:"endpointRef"`
 
-	// Endpoint allows inline configuration of network access details for the BMC.
-	// Use this field if access settings like address are to be configured directly within the BMC resource.
+	// Endpoint specifies inline network access details for the BMC.
 	// +optional
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="access is immutable"
 	Endpoint *InlineEndpoint `json:"access,omitempty"`
 
-	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
-	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.
+	// BMCSecretRef is a reference to the BMCSecret object that contains the credentials
+	// required to access the BMC.
 	// +required
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
 
 	// Protocol specifies the protocol to be used for communicating with the BMC.
-	// It could be a standard protocol such as IPMI or Redfish.
 	// +required
 	Protocol Protocol `json:"protocol"`
 
 	// ConsoleProtocol specifies the protocol to be used for console access to the BMC.
-	// This field is optional and can be omitted if console access is not required.
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
 
@@ -83,13 +79,11 @@ type InlineEndpoint struct {
 // ConsoleProtocol defines the protocol and port used for console access to the BMC.
 type ConsoleProtocol struct {
 	// Name specifies the name of the console protocol.
-	// This could be a protocol such as "SSH", "Telnet", etc.
 	// +kubebuilder:validation:Enum=IPMI;SSH;SSHLenovo
 	// +required
 	Name ConsoleProtocolName `json:"name"`
 
 	// Port specifies the port number used for console access.
-	// This port is used by the specified console protocol to establish connections.
 	// +required
 	Port int32 `json:"port"`
 }
@@ -121,11 +115,9 @@ const (
 // Protocol defines the protocol and port used for communicating with the BMC.
 type Protocol struct {
 	// Name specifies the name of the protocol.
-	// This could be a protocol such as "IPMI", "Redfish", etc.
 	Name ProtocolName `json:"name"`
 
 	// Port specifies the port number used for communication.
-	// This port is used by the specified protocol to establish connections.
 	Port int32 `json:"port"`
 
 	// Scheme specifies the scheme used for communication.
@@ -170,13 +162,11 @@ const (
 // BMCStatus defines the observed state of BMC.
 type BMCStatus struct {
 	// MACAddress is the MAC address of the BMC.
-	// The format is validated using a regular expression pattern.
 	// +kubebuilder:validation:Pattern=`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`
 	// +optional
 	MACAddress string `json:"macAddress,omitempty"`
 
 	// IP is the IP address of the BMC.
-	// The type is specified as string and is schemaless.
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Schemaless
 	// +optional
@@ -259,7 +249,7 @@ type BMC struct {
 	Status BMCStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BMCList contains a list of BMC
 type BMCList struct {

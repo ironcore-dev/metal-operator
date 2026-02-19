@@ -26,7 +26,7 @@ type EndpointStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=mep
 // +kubebuilder:printcolumn:name="MACAddress",type=string,JSONPath=`.spec.macAddress`
 // +kubebuilder:printcolumn:name="IP",type=string,JSONPath=`.spec.ip`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
@@ -40,7 +40,7 @@ type Endpoint struct {
 	Status EndpointStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // EndpointList contains a list of Endpoint
 type EndpointList struct {

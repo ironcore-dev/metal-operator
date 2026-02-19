@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	v1 "k8s.io/api/core/v1"
@@ -315,7 +316,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 
 		By("Deleting the server02")
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
-		Eventually(Get(server02)).ShouldNot(Succeed())
+		Eventually(Get(server02)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Checking if the BIOSVersion have been deleted")
 		Eventually(Get(biosVersion02)).ShouldNot(Succeed())
@@ -333,6 +334,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		By("creating the server02")
 		server02.ResourceVersion = ""
 		Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
+
 		By("Checking if the BIOSVersion have been created")
 		Eventually(Get(biosVersion02)).Should(Succeed())
 		Eventually(Get(biosVersion03)).Should(Succeed())

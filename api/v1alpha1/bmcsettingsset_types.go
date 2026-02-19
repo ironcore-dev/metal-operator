@@ -9,28 +9,28 @@ import (
 
 // BMCSettingsSetSpec defines the desired state of BMCSettingsSet.
 type BMCSettingsSetSpec struct {
-	// BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the BMCs.
+	// BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs.
 	// +required
 	BMCSettingsTemplate BMCSettingsTemplate `json:"bmcSettingsTemplate,omitempty"`
 
-	//  BMCSelector specifies a label selector to identify the BMCs that are to be selected.
+	// BMCSelector specifies a label selector to identify the BMCs to be selected.
 	// +required
 	BMCSelector metav1.LabelSelector `json:"bmcSelector"`
 }
 
 // BMCSettingsSetStatus defines the observed state of BMCSettingsSet.
 type BMCSettingsSetStatus struct {
-	// FullyLabeledBMCs is the number of BMC in the set.
+	// FullyLabeledBMCs is the number of BMCs in the set.
 	FullyLabeledBMCs int32 `json:"fullyLabeledBMCs,omitempty"`
 	// AvailableBMCSettings is the number of BMCSettings currently created by the set.
 	AvailableBMCSettings int32 `json:"availableBMCSettings,omitempty"`
-	// PendingBMCSettings is the total number of pending BMC in the set.
+	// PendingBMCSettings is the total number of pending BMCSettings in the set.
 	PendingBMCSettings int32 `json:"pendingBMCSettings,omitempty"`
-	// InProgressBMCSettings is the total number of BMC in the set that are currently in progress.
+	// InProgressBMCSettings is the total number of BMCSettings in the set that are currently in progress.
 	InProgressBMCSettings int32 `json:"inProgressBMCSettings,omitempty"`
-	// CompletedBMCSettings is the total number of completed BMC in the set.
+	// CompletedBMCSettings is the total number of completed BMCSettings in the set.
 	CompletedBMCSettings int32 `json:"completedBMCSettings,omitempty"`
-	// FailedBMCSettings is the total number of failed BMC in the set.
+	// FailedBMCSettings is the total number of failed BMCSettings in the set.
 	FailedBMCSettings int32 `json:"failedBMCSettings,omitempty"`
 }
 

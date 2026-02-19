@@ -22,12 +22,12 @@ func collectStorageInfoData() ([]registry.BlockDevice, error) {
 	for _, b := range blockStorage.Disks {
 		rota, err := ToBool(fmt.Sprintf("/sys/class/block/%s/queue/rotational", b.Name))
 		if err != nil {
-			//TODO: just log this or exit?
+			// TODO: just log this or exit?
 			return blockDevices, fmt.Errorf("failed to read rotational state for: %s; %w", b.Name, err)
 		}
 		ro, err := ToBool(fmt.Sprintf("/sys/class/block/%s/ro", b.Name))
 		if err != nil {
-			//TODO: just log this or exit?
+			// TODO: just log this or exit?
 			return blockDevices, fmt.Errorf("failed to read readonly state for: %s: %w", b.Name, err)
 		}
 		lbsz, err := ToInt(fmt.Sprintf("/sys/class/block/%s/queue/logical_block_size", b.Name))

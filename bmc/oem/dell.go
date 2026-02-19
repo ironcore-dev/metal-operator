@@ -109,23 +109,23 @@ func (d *DellIdracManager) GetObjFromUri(
 	ctx context.Context,
 	uri string,
 	respObj any,
-) ([]string, error) {
+) (string, error) {
 	resp, err := d.BMC.GetClient().Get(uri)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close() // nolint: errcheck
 
 	rawBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = json.Unmarshal(rawBody, &respObj)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return resp.Header["Etag"], nil
+	return resp.Header.Get("ETag"), nil
 }
 
 func (d *DellIdracManager) getCurrentBMCSettingAttribute(ctx context.Context) ([]DellAttributes, error) {
@@ -149,9 +149,7 @@ func (d *DellIdracManager) getCurrentBMCSettingAttribute(ctx context.Context) ([
 		if err != nil {
 			errs = append(errs, err)
 		}
-		if eTag != nil {
-			BMCDellAttribute.Etag = eTag[0]
-		}
+		BMCDellAttribute.Etag = eTag
 		BMCDellAttributes = append(BMCDellAttributes, *BMCDellAttribute)
 	}
 	if len(errs) > 0 {
@@ -317,13 +315,13 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 		// for each sub type, apply the settings
 		for settingPath, payload := range payloads {
 			// fetch the etag required for settingPath
-			etag, err := func() ([]string, error) {
+			etag, err := func() (string, error) {
 				resp, err := d.BMC.GetClient().Get(settingPath)
 				if err != nil {
-					return nil, err
+					return "", err
 				}
 				defer resp.Body.Close() // nolint: errcheck
-				return resp.Header["Etag"], nil
+				return resp.Header.Get("ETag"), nil
 			}()
 
 			if err != nil {
@@ -331,13 +329,13 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 				continue
 			}
 
-			data := map[string]interface{}{"Attributes": payload}
+			data := map[string]any{"Attributes": payload}
 			if applyTime != "" {
 				data["@Redfish.SettingsApplyTime"] = map[string]string{"ApplyTime": string(applyTime)}
 			}
 			var header = make(map[string]string)
-			if etag != nil {
-				header["If-Match"] = etag[0]
+			if etag != "" {
+				header["If-Match"] = etag
 			}
 
 			err = func() error {

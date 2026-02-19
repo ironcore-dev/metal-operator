@@ -12,22 +12,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-// nolint:unused
 // log is for logging in this package.
 var endpointlog = logf.Log.WithName("endpoint-resource")
 
 // SetupEndpointWebhookWithManager registers the webhook for Endpoint in the manager.
 func SetupEndpointWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&metalv1alpha1.Endpoint{}).
+	return ctrl.NewWebhookManagedBy(mgr, &metalv1alpha1.Endpoint{}).
 		WithValidator(&EndpointCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 }
@@ -45,57 +42,41 @@ type EndpointCustomValidator struct {
 	Client client.Client
 }
 
-var _ webhook.CustomValidator = &EndpointCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
-func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+	endpointlog.Info("Validation for Endpoint upon creation", "name", obj.GetName())
+
 	allErrs := field.ErrorList{}
-
-	endpoint, ok := obj.(*metalv1alpha1.Endpoint)
-	if !ok {
-		return nil, fmt.Errorf("expected an Endpoint object but got %T", obj)
-	}
-	endpointlog.Info("Validation for Endpoint upon creation", "name", endpoint.GetName())
-
-	allErrs = append(allErrs, ValidateMACAddressCreate(ctx, v.Client, endpoint.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateMACAddressCreate(ctx, v.Client, obj.Spec, field.NewPath("spec"))...)
 
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(
 			schema.GroupKind{Group: "metal.ironcore.dev", Kind: "Endpoint"},
-			endpoint.GetName(), allErrs)
+			obj.GetName(), allErrs)
 	}
 
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
-func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+	endpointlog.Info("Validation for Endpoint upon update", "name", newObj.GetName())
+
 	allErrs := field.ErrorList{}
-
-	endpoint, ok := newObj.(*metalv1alpha1.Endpoint)
-	if !ok {
-		return nil, fmt.Errorf("expected an Endpoint object for the newObj but got %T", newObj)
-	}
-	endpointlog.Info("Validation for Endpoint upon update", "name", endpoint.GetName())
-
-	allErrs = append(allErrs, ValidateMACAddressUpdate(ctx, v.Client, endpoint, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateMACAddressUpdate(ctx, v.Client, newObj, field.NewPath("spec"))...)
 
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(
 			schema.GroupKind{Group: "metal.ironcore.dev", Kind: "Endpoint"},
-			endpoint.GetName(), allErrs)
+			newObj.GetName(), allErrs)
 	}
 
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
-func (v *EndpointCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	endpoint, ok := obj.(*metalv1alpha1.Endpoint)
-	if !ok {
-		return nil, fmt.Errorf("expected an Endpoint object but got %T", obj)
-	}
-	endpointlog.Info("Validation for Endpoint upon deletion", "name", endpoint.GetName())
+func (v *EndpointCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+	endpointlog.Info("Validation for Endpoint upon deletion", "name", obj.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.
 
@@ -119,7 +100,7 @@ func ValidateMACAddressCreate(ctx context.Context, c client.Client, spec metalv1
 	return allErrs
 }
 
-func ValidateMACAddressUpdate(ctx context.Context, c client.Client, updatedEndpoint *metalv1alpha1.Endpoint, path *field.Path) field.ErrorList {
+func ValidateMACAddressUpdate(ctx context.Context, c client.Client, endpoint *metalv1alpha1.Endpoint, path *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	endpoints := &metalv1alpha1.EndpointList{}
@@ -128,8 +109,8 @@ func ValidateMACAddressUpdate(ctx context.Context, c client.Client, updatedEndpo
 	}
 
 	for _, e := range endpoints.Items {
-		if e.Spec.MACAddress == updatedEndpoint.Spec.MACAddress && e.Name != updatedEndpoint.Name {
-			allErrs = append(allErrs, field.Duplicate(field.NewPath("spec").Child("MACAddress"), e.Spec.MACAddress))
+		if e.Spec.MACAddress == endpoint.Spec.MACAddress && e.Name != endpoint.Name {
+			allErrs = append(allErrs, field.Duplicate(field.NewPath("spec").Child("macAddress"), e.Spec.MACAddress))
 		}
 	}
 

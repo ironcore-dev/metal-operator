@@ -9,7 +9,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
@@ -35,30 +34,30 @@ type EndpointReconciler struct {
 	BMCOptions  bmc.Options
 }
 
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints/finalizers,verbs=update
 
 func (r *EndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	endpoint := &metalv1alpha1.Endpoint{}
 	if err := r.Get(ctx, req.NamespacedName, endpoint); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, log, endpoint)
+	return r.reconcileExists(ctx, endpoint)
 }
 
-func (r *EndpointReconciler) reconcileExists(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+func (r *EndpointReconciler) reconcileExists(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
 	if !endpoint.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, endpoint)
+		return r.delete(ctx, endpoint)
 	}
-	return r.reconcile(ctx, log, endpoint)
+	return r.reconcile(ctx, endpoint)
 }
 
-func (r *EndpointReconciler) delete(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting Endpoint")
 	// TODO: cleanup endpoint
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, EndpointFinalizer); err != nil || modified {
@@ -68,7 +67,8 @@ func (r *EndpointReconciler) delete(ctx context.Context, log logr.Logger, endpoi
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling endpoint")
 	if shouldIgnoreReconciliation(endpoint) {
 		log.V(1).Info("Skipped Endpoint reconciliation")
@@ -104,12 +104,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				// TODO: ensure that BMC has the correct MACAddress
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
 				log.V(1).Info("Applied BMC secret for endpoint")
 
-				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for endpoint")
@@ -122,12 +122,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				defer bmcClient.Logout()
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
 				log.V(1).Info("Applied local test BMC secret for endpoint")
 
-				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -140,12 +140,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				defer bmcClient.Logout()
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
 				log.V(1).Info("Applied kube test BMC secret for endpoint")
 
-				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -160,7 +160,8 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcObj := &metalv1alpha1.BMC{}
 	bmcObj.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, func() error {
@@ -186,7 +187,8 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 	return nil
 }
 
-func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {
+func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {
+	log := ctrl.LoggerFrom(ctx)
 	bmcSecret := &metalv1alpha1.BMCSecret{}
 	bmcSecret.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcSecret, func() error {

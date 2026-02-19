@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 const (
@@ -79,7 +79,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.34.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.35.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error
@@ -92,7 +92,7 @@ var _ = BeforeSuite(func() {
 
 	Expect(metalv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
@@ -295,6 +295,17 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&BMCUserReconciler{
+			Client:   k8sManager.GetClient(),
+			Scheme:   k8sManager.GetScheme(),
+			Insecure: true,
+			BMCOptions: bmc.Options{
+				PowerPollingInterval: 50 * time.Millisecond,
+				PowerPollingTimeout:  200 * time.Millisecond,
+				BasicAuth:            true,
+			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		By("Starting the registry server")
 		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
 			registryServer := registry.NewServer(GinkgoLogr, ":30000", k8sManager.GetClient())
@@ -342,46 +353,23 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 func EnsureCleanState() {
 	GinkgoHelper()
 
-	Eventually(func(g Gomega) error {
-		endpoints := &metalv1alpha1.EndpointList{}
-		g.Eventually(ObjectList(endpoints)).Should(HaveField("Items", HaveLen(0)))
+	objectLists := []client.ObjectList{
+		&metalv1alpha1.EndpointList{},
+		&metalv1alpha1.BMCList{},
+		&metalv1alpha1.BMCSecretList{},
+		&metalv1alpha1.ServerClaimList{},
+		&metalv1alpha1.BMCSettingsSetList{},
+		&metalv1alpha1.BMCSettingsList{},
+		&metalv1alpha1.BMCVersionSetList{},
+		&metalv1alpha1.BMCVersionList{},
+		&metalv1alpha1.BIOSVersionList{},
+		&metalv1alpha1.BIOSSettingsSetList{},
+		&metalv1alpha1.BIOSSettingsList{},
+		&metalv1alpha1.ServerMaintenanceList{},
+		&metalv1alpha1.ServerList{},
+	}
 
-		bmcs := &metalv1alpha1.BMCList{}
-		g.Eventually(ObjectList(bmcs)).Should(HaveField("Items", HaveLen(0)))
-
-		bmcSecrets := &metalv1alpha1.BMCSecretList{}
-		g.Eventually(ObjectList(bmcSecrets)).Should(HaveField("Items", HaveLen(0)))
-
-		claims := &metalv1alpha1.ServerClaimList{}
-		g.Eventually(ObjectList(claims)).Should(HaveField("Items", HaveLen(0)))
-
-		bmcSettingsSets := &metalv1alpha1.BMCSettingsSetList{}
-		g.Eventually(ObjectList(bmcSettingsSets)).Should(HaveField("Items", HaveLen(0)))
-
-		bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
-		g.Eventually(ObjectList(bmcSettingsList)).Should(HaveField("Items", HaveLen(0)))
-
-		bmcVersionSets := &metalv1alpha1.BMCVersionSetList{}
-		g.Eventually(ObjectList(bmcVersionSets)).Should(HaveField("Items", HaveLen(0)))
-
-		bmcVersions := &metalv1alpha1.BMCVersionList{}
-		g.Eventually(ObjectList(bmcVersions)).Should(HaveField("Items", HaveLen(0)))
-
-		biosVersions := &metalv1alpha1.BIOSVersionList{}
-		g.Eventually(ObjectList(biosVersions)).Should(HaveField("Items", HaveLen(0)))
-
-		biosSettingsSets := &metalv1alpha1.BIOSSettingsSetList{}
-		g.Eventually(ObjectList(biosSettingsSets)).Should(HaveField("Items", HaveLen(0)))
-
-		biosSettingsList := &metalv1alpha1.BIOSSettingsList{}
-		g.Eventually(ObjectList(biosSettingsList)).Should(HaveField("Items", HaveLen(0)))
-
-		maintenances := &metalv1alpha1.ServerMaintenanceList{}
-		g.Eventually(ObjectList(maintenances)).Should(HaveField("Items", HaveLen(0)))
-
-		servers := &metalv1alpha1.ServerList{}
-		g.Eventually(ObjectList(servers)).Should(HaveField("Items", HaveLen(0)))
-
-		return nil
-	}).Should(Succeed())
+	for _, list := range objectLists {
+		Eventually(ObjectList(list)).Should(HaveField("Items", HaveLen(0)))
+	}
 }

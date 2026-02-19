@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: serverbootconfigurations.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -11,6 +11,8 @@ spec:
     kind: ServerBootConfiguration
     listKind: ServerBootConfigurationList
     plural: serverbootconfigurations
+    shortNames:
+    - sbc
     singular: serverbootconfiguration
   scope: Namespaced
   versions:
@@ -72,8 +74,8 @@ spec:
                 type: string
               ignitionSecretRef:
                 description: |-
-                  IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
-                  the ignition configuration for the server. This field is optional and can be omitted if not specified.
+                  IgnitionSecretRef is a reference to the Secret object that contains
+                  the ignition configuration for the server.
                 properties:
                   name:
                     default: ""
@@ -87,7 +89,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               image:
-                description: |-
+description: |-
                   Image specifies the boot image to be used for the server.
                   For PXE boot: OCI image reference containing kernel/initrd.
                   For VirtualMedia boot: OCI image reference containing bootable ISO layer.

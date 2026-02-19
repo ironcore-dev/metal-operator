@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: bmcsettings.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -47,9 +47,10 @@ spec:
           metadata:
             type: object
           spec:
+            description: BMCSettingsSpec defines the desired state of BMCSettings.
             properties:
               BMCRef:
-                description: BMCRef is a reference to a specific BMC to apply setting
+                description: BMCRef is a reference to a specific BMC to apply settings
                   to.
                 properties:
                   name:
@@ -112,11 +113,11 @@ spec:
               settings:
                 additionalProperties:
                   type: string
-                description: SettingsMap contains bmc settings as map
+                description: SettingsMap contains BMC settings as a map.
                 type: object
               version:
-                description: Version defines the BMC firmware for which the settings
-                  should be applied.
+                description: Version specifies the BMC firmware version for which
+                  the settings should be applied.
                 type: string
             required:
             - BMCRef

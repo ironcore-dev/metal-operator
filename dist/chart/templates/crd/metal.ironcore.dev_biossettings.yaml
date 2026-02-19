@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: biossettings.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -17,6 +17,8 @@ spec:
     kind: BIOSSettings
     listKind: BIOSSettingsList
     plural: biossettings
+    shortNames:
+    - bioss
     singular: biossettings
   scope: Cluster
   versions:
@@ -70,7 +72,7 @@ spec:
                 type: string
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
-                  object that BiosSetting has requested for the referred server.
+                  object that BIOSSettings has requested for the referred server.
                 properties:
                   apiVersion:
                     description: APIVersion is the API version of the referenced object.
@@ -96,7 +98,7 @@ spec:
                 type: object
               serverRef:
                 description: ServerRef is a reference to a specific server to apply
-                  bios setting on.
+                  the BIOS settings on.
                 properties:
                   name:
                     default: ""
@@ -113,19 +115,19 @@ spec:
                 - message: serverRef is immutable
                   rule: self == oldSelf
               settingsFlow:
-                description: SettingsFlow contains BIOS settings sequence to apply
-                  on the BIOS in given order
+                description: SettingsFlow contains the BIOS settings sequence to apply
+                  in the given order.
                 items:
                   properties:
                     name:
-                      description: Name is the name of the flow item
+                      description: Name is the name of the flow item.
                       maxLength: 1000
                       minLength: 1
                       type: string
                     priority:
-                      description: |-
-                        Priority defines the order of applying the settings
-                        any int greater than 0. lower number have higher Priority (ie; lower number is applied first)
+                      description: Priority defines the order of applying the settings.
+                        Lower numbers have higher priority (i.e. lower numbers are
+                        applied first).
                       format: int32
                       maximum: 2147483645
                       minimum: 1
@@ -133,8 +135,8 @@ spec:
                     settings:
                       additionalProperties:
                         type: string
-                      description: 'Settings contains software (eg: BIOS, BMC) settings
-                        as map'
+                      description: Settings contains software (e.g. BIOS, BMC) settings
+                        as a map.
                       type: object
                   required:
                   - name
@@ -142,8 +144,8 @@ spec:
                   type: object
                 type: array
               version:
-                description: 'Version contains software (eg: BIOS, BMC) version this
-                  settings applies to'
+                description: Version specifies the software version (e.g. BIOS, BMC)
+                  these settings apply to.
                 type: string
             required:
             - version
@@ -274,8 +276,8 @@ spec:
                         type: object
                       type: array
                     flowState:
-                      description: State represents the current state of the bios
-                        configuration task for current priority.
+                      description: State represents the current state of the BIOS
+                        settings update for the current priority.
                       type: string
                     lastAppliedTime:
                       description: LastAppliedTime represents the timestamp when the
@@ -283,12 +285,12 @@ spec:
                       format: date-time
                       type: string
                     name:
-                      description: Name identifies current priority settings from
-                        the Spec
+                      description: Name identifies the current priority settings from
+                        the spec.
                       type: string
                     priority:
                       description: Priority identifies the settings priority from
-                        the Spec
+                        the spec.
                       format: int32
                       type: integer
                   type: object
@@ -299,8 +301,8 @@ spec:
                 format: date-time
                 type: string
               state:
-                description: State represents the current state of the bios configuration
-                  task.
+                description: State represents the current state of the BIOS settings
+                  update.
                 type: string
             type: object
         type: object

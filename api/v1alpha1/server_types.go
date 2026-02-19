@@ -59,8 +59,8 @@ type BMCAccess struct {
 	// +required
 	Address string `json:"address"`
 
-	// BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
-	// required to access the BMC. This secret includes sensitive information such as usernames and passwords.
+	// BMCSecretRef is a reference to the BMCSecret object that contains the credentials
+	// required to access the BMC.
 	// +required
 	BMCSecretRef v1.LocalObjectReference `json:"bmcSecretRef"`
 }
@@ -98,7 +98,6 @@ type ServerSpec struct {
 	IndicatorLED IndicatorLED `json:"indicatorLED,omitempty"`
 
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
-	// This field is optional and can be omitted if no claim is associated with this server.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
 	// +optional
@@ -109,23 +108,20 @@ type ServerSpec struct {
 	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
 
 	// BMCRef is a reference to the BMC object associated with this server.
-	// This field is optional and can be omitted if no BMC is associated with this server.
 	// +optional
 	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
 
 	// BMC contains the access details for the BMC.
-	// This field is optional and can be omitted if no BMC access is specified.
 	// +optional
 	BMC *BMCAccess `json:"bmc,omitempty"`
 
 	// BootConfigurationRef is a reference to a BootConfiguration object that specifies
-	// the boot configuration for this server. This field is optional and can be omitted
-	// if no boot configuration is specified.
+	// the boot configuration for this server.
 	// +optional
 	BootConfigurationRef *ObjectReference `json:"bootConfigurationRef,omitempty"`
 
 	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
-	// the boot configuration for this server during maintenance. This field is optional and can be omitted
+	// the boot configuration for this server during maintenance.
 	// +optional
 	MaintenanceBootConfigurationRef *ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
@@ -337,9 +333,9 @@ type LLDPNeighbor struct {
 	SystemDescription string `json:"systemDescription,omitempty"`
 }
 
-// StorageDrive defines the details of one storage drive
+// StorageDrive defines the details of one storage drive.
 type StorageDrive struct {
-	// Name is the name of the storage interface.
+	// Name is the name of the storage drive.
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -368,9 +364,9 @@ type StorageDrive struct {
 	State StorageState `json:"state,omitempty"`
 }
 
-// StorageVolume defines the details of one storage volume
+// StorageVolume defines the details of one storage volume.
 type StorageVolume struct {
-	// Name is the name of the storage interface.
+	// Name is the name of the storage volume.
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -391,9 +387,9 @@ type StorageVolume struct {
 	VolumeUsage string `json:"volumeUsage,omitempty"`
 }
 
-// Storage defines the details of one storage device
+// Storage defines the details of one storage device.
 type Storage struct {
-	// Name is the name of the storage interface.
+	// Name is the name of the storage device.
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -410,19 +406,19 @@ type Storage struct {
 	Drives []StorageDrive `json:"drives,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
-//+kubebuilder:printcolumn:name="SystemUUID",type=string,JSONPath=`.spec.systemUUID`
-//+kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
-//+kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
-//+kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
-//+kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
-//+kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
-//+kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`
-//+kubebuilder:printcolumn:name="IndicatorLED",type=string,JSONPath=`.status.indicatorLED`,priority=100
-//+kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
-//+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster,shortName=srv
+// +kubebuilder:printcolumn:name="SystemUUID",type=string,JSONPath=`.spec.systemUUID`
+// +kubebuilder:printcolumn:name="Manufacturer",type=string,JSONPath=`.status.manufacturer`
+// +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.status.model`
+// +kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.status.totalSystemMemory`
+// +kubebuilder:printcolumn:name="SKU",type=string,JSONPath=`.status.sku`,priority=100
+// +kubebuilder:printcolumn:name="SerialNumber",type=string,JSONPath=`.status.serialNumber`,priority=100
+// +kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`
+// +kubebuilder:printcolumn:name="IndicatorLED",type=string,JSONPath=`.status.indicatorLED`,priority=100
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // Server is the Schema for the servers API
 type Server struct {
@@ -433,7 +429,7 @@ type Server struct {
 	Status ServerStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServerList contains a list of Server
 type ServerList struct {

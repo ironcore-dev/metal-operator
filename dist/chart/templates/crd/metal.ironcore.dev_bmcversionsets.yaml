@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: bmcversionsets.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -17,6 +17,8 @@ spec:
     kind: BMCVersionSet
     listKind: BMCVersionSetList
     plural: bmcversionsets
+    shortNames:
+    - bmcvs
     singular: bmcversionset
   scope: Cluster
   versions:
@@ -72,7 +74,7 @@ spec:
             properties:
               bmcSelector:
                 description: BMCSelector specifies a label selector to identify the
-                  BMC that are to be selected.
+                  BMCs to be selected.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -118,20 +120,19 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               bmcVersionTemplate:
-                description: BMCVersionTemplate defines the template for the BMCversion
-                  Resource to be applied to the servers.
+                description: BMCVersionTemplate defines the template for the BMCVersion
+                  resource to be applied to the BMCs.
                 properties:
                   image:
-                    description: details regarding the image to use to upgrade to
-                      given BMC version
+                    description: Image specifies the image to use to upgrade to the
+                      given BMC version.
                     properties:
                       URI:
-                        description: The URI of the software image to update/install."
+                        description: URI is the URI of the software image to install.
                         type: string
                       secretRef:
-                        description: |-
-                          ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-                          to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+                        description: SecretRef is a reference to the Secret containing
+                          the credentials to access the image URI.
                         properties:
                           name:
                             description: name is unique within a namespace to reference
@@ -144,8 +145,8 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       transferProtocol:
-                        description: The network protocol that the server's update
-                          service uses to retrieve 'ImageURI'
+                        description: TransferProtocol is the network protocol used
+                          to retrieve the image URI.
                         type: string
                     required:
                     - URI
@@ -155,11 +156,11 @@ spec:
                       be enforced on the server managed by referred BMC.
                     type: string
                   updatePolicy:
-                    description: UpdatePolicy is an indication of whether the server's
-                      upgrade service should bypass vendor update policies
+                    description: UpdatePolicy indicates whether the server's upgrade
+                      service should bypass vendor update policies.
                     type: string
                   version:
-                    description: Version contains a BMC version to upgrade to
+                    description: Version specifies the BMC version to upgrade to.
                     type: string
                 required:
                 - image
@@ -172,32 +173,32 @@ spec:
             description: BMCVersionSetStatus defines the observed state of BMCVersionSet.
             properties:
               availableBMCVersion:
-                description: AvailableBMCVersion is the number of BMCVersion current
-                  created by the set.
+                description: AvailableBMCVersion is the number of BMCVersion resources
+                  currently created by the set.
                 format: int32
                 type: integer
               completedBMCVersion:
                 description: CompletedBMCVersion is the total number of completed
-                  BMCVersion in the set.
+                  BMCVersion resources in the set.
                 format: int32
                 type: integer
               failedBMCVersion:
                 description: FailedBMCVersion is the total number of failed BMCVersion
-                  in the set.
+                  resources in the set.
                 format: int32
                 type: integer
               fullyLabeledBMCs:
-                description: FullyLabeledBMCs is the number of server in the set.
+                description: FullyLabeledBMCs is the number of BMCs in the set.
                 format: int32
                 type: integer
               inProgressBMCVersion:
                 description: InProgressBMCVersion is the total number of BMCVersion
-                  in the set that are currently in InProgress.
+                  resources in the set that are currently in progress.
                 format: int32
                 type: integer
               pendingBMCVersion:
                 description: PendingBMCVersion is the total number of pending BMCVersion
-                  in the set.
+                  resources in the set.
                 format: int32
                 type: integer
             type: object

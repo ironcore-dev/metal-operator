@@ -14,7 +14,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
-	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
+	webhookv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -39,7 +39,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -50,7 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(metalv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() { // nolint: gocyclo
@@ -212,7 +212,7 @@ func main() { // nolint: gocyclo
 	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling http/2")
+		setupLog.Info("Disabling HTTP/2")
 		c.NextProtos = []string{"http/1.1"}
 	}
 
@@ -317,7 +317,7 @@ func main() { // nolint: gocyclo
 		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "Failed to start manager")
 		os.Exit(1)
 	}
 
@@ -327,14 +327,14 @@ func main() { // nolint: gocyclo
 		MACPrefixes: macPRefixes,
 		Insecure:    insecure,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Endpoints")
+		setupLog.Error(err, "Failed to create controller", "controller", "Endpoint")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCSecretReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCSecret")
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCSecret")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
@@ -351,7 +351,7 @@ func main() { // nolint: gocyclo
 			BasicAuth: true,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMC")
+		setupLog.Error(err, "Failed to create controller", "controller", "BMC")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerReconciler{
@@ -377,14 +377,14 @@ func main() { // nolint: gocyclo
 		},
 		DiscoveryTimeout: discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Server")
+		setupLog.Error(err, "Failed to create controller", "controller", "Server")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerBootConfigurationReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServerBootConfiguration")
+		setupLog.Error(err, "Failed to create controller", "controller", "ServerBootConfiguration")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerClaimReconciler{
@@ -393,23 +393,15 @@ func main() { // nolint: gocyclo
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServerClaim")
+		setupLog.Error(err, "Failed to create controller", "controller", "ServerClaim")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerMaintenanceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServerMaintenance")
+		setupLog.Error(err, "Failed to create controller", "controller", "ServerMaintenance")
 		os.Exit(1)
-	}
-
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupEndpointWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Endpoint")
-			os.Exit(1)
-		}
 	}
 	if err = (&controller.BIOSSettingsReconciler{
 		Client:           mgr.GetClient(),
@@ -427,15 +419,8 @@ func main() { // nolint: gocyclo
 		},
 		TimeoutExpiry: biosSettingsApplyTimeout,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettings")
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettings")
 		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBIOSSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BIOSSettings")
-			os.Exit(1)
-		}
 	}
 	if err = (&controller.BIOSVersionReconciler{
 		Client:           mgr.GetClient(),
@@ -452,15 +437,8 @@ func main() { // nolint: gocyclo
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSVersion")
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersion")
 		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BIOSVersion")
-			os.Exit(1)
-		}
 	}
 	if err = (&controller.BMCSettingsReconciler{
 		Client:           mgr.GetClient(),
@@ -477,15 +455,8 @@ func main() { // nolint: gocyclo
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCSettings")
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettings")
 		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBMCSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BMCSettings")
-			os.Exit(1)
-		}
 	}
 	if err = (&controller.BMCVersionReconciler{
 		Client:           mgr.GetClient(),
@@ -502,59 +473,110 @@ func main() { // nolint: gocyclo
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCVersion")
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersion")
 		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BMCVersion")
-			os.Exit(1)
-		}
 	}
 	if err = (&controller.BIOSVersionSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSVersionSet")
-		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupServerWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Server")
-			os.Exit(1)
-		}
-	}
-	if err = (&controller.BMCVersionSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCVersionSet")
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersionSet")
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSSettingsSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettingsSet")
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettingsSet")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCVersionSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersionSet")
 		os.Exit(1)
 	}
 	if err := (&controller.BMCSettingsSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCSettingsSet")
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettingsSet")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+	if err = (&controller.BMCUserReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Insecure: insecure,
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCUser")
+		os.Exit(1)
+	}
+
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupEndpointWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "Endpoint")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupBMCSecretWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCSecret")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupServerWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "Server")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupBIOSSettingsWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BIOSSettings")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BIOSVersion")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupBMCSettingsWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCSettings")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCVersion")
+			os.Exit(1)
+		}
+	}
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		setupLog.Error(err, "Failed to set up health check")
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		setupLog.Error(err, "Failed to set up ready check")
 		os.Exit(1)
 	}
 
@@ -578,9 +600,9 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("Starting manager")
 	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "Failed to run manager")
 		os.Exit(1)
 	}
 }

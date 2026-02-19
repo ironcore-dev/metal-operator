@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: bmcversions.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -11,6 +11,8 @@ spec:
     kind: BMCVersion
     listKind: BMCVersionList
     plural: bmcversions
+    shortNames:
+    - bmcv
     singular: bmcversion
   scope: Cluster
   versions:
@@ -18,8 +20,8 @@ spec:
     - jsonPath: .spec.version
       name: BMCVersion
       type: string
-    - jsonPath: .spec.updateType
-      name: updateType
+    - jsonPath: .spec.updatePolicy
+      name: UpdatePolicy
       type: string
     - jsonPath: .spec.bmcRef.name
       name: BMCRef
@@ -83,16 +85,15 @@ spec:
                 - message: bmcRef is immutable
                   rule: self == oldSelf
               image:
-                description: details regarding the image to use to upgrade to given
-                  BMC version
+                description: Image specifies the image to use to upgrade to the given
+                  BMC version.
                 properties:
                   URI:
-                    description: The URI of the software image to update/install."
+                    description: URI is the URI of the software image to install.
                     type: string
                   secretRef:
-                    description: |-
-                      ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials
-                      to access the ImageURI. This secret includes sensitive information such as usernames and passwords.
+                    description: SecretRef is a reference to the Secret containing
+                      the credentials to access the image URI.
                     properties:
                       name:
                         description: name is unique within a namespace to reference
@@ -105,8 +106,8 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   transferProtocol:
-                    description: The network protocol that the server's update service
-                      uses to retrieve 'ImageURI'
+                    description: TransferProtocol is the network protocol used to
+                      retrieve the image URI.
                     type: string
                 required:
                 - URI
@@ -116,9 +117,8 @@ spec:
                   enforced on the server managed by referred BMC.
                 type: string
               serverMaintenanceRefs:
-                description: ServerMaintenanceRefs are references to a ServerMaintenance
-                  objects that Controller has requested for the each of the related
-                  server.
+                description: ServerMaintenanceRefs are references to ServerMaintenance
+                  objects that the controller has requested for the related servers.
                 items:
                   description: ObjectReference is the namespaced name reference to
                     an object.
@@ -148,11 +148,11 @@ spec:
                   type: object
                 type: array
               updatePolicy:
-                description: UpdatePolicy is an indication of whether the server's
-                  upgrade service should bypass vendor update policies
+                description: UpdatePolicy indicates whether the server's upgrade service
+                  should bypass vendor update policies.
                 type: string
               version:
-                description: Version contains a BMC version to upgrade to
+                description: Version specifies the BMC version to upgrade to.
                 type: string
             required:
             - image
@@ -224,8 +224,8 @@ spec:
                   task.
                 type: string
               upgradeTask:
-                description: UpgradeTask contains the state of the Upgrade Task created
-                  by the BMC
+                description: UpgradeTask contains the state of the upgrade task created
+                  by the BMC.
                 properties:
                   URI:
                     description: URI is the URI of the task created by the BMC for

@@ -17,7 +17,7 @@ func CheckAttribues(
 ) (reset bool, err error) {
 	reset = false
 	var errs []error
-	//TODO: add more types like maps and Enumerations
+	// TODO: add more types like maps and Enumerations
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {

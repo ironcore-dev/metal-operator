@@ -1,61 +1,72 @@
 resources:
-# All RBAC will be applied under this service account in
-# the deployment namespace. You may comment out this resource
-# if your manager will use a service account that exists at
-# runtime. Be sure to update RoleBinding and ClusterRoleBinding
-# subjects if changing service account names.
-- service_account.yaml
-- role.yaml
-- role_binding.yaml
-- leader_election_role.yaml
-- leader_election_role_binding.yaml
-# The following RBAC configurations are used to protect
-# the metrics endpoint with authn/authz. These configurations
-# ensure that only authorized users and service accounts
-# can access the metrics endpoint. Comment the following
-# permissions if you want to disable this protection.
-# More info: https://book.kubebuilder.io/reference/metrics.html
-- metrics_auth_role.yaml
-- metrics_auth_role_binding.yaml
-- metrics_reader_role.yaml
-# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
-# default, aiding admins in cluster management. Those roles are
-# not used by the {{ .ProjectName }} itself. You can comment the following lines
-# if you do not want those helpers be installed with your Project.
-- bmcversionset_admin_role.yaml
-- bmcversionset_editor_role.yaml
-- bmcversionset_viewer_role.yaml
-- biosversionset_admin_role.yaml
-- biosversionset_editor_role.yaml
-- biosversionset_viewer_role.yaml
-- biossettingsset_admin_role.yaml
-- biossettingsset_editor_role.yaml
-- biossettingsset_viewer_role.yaml
-- biosversion_admin_role.yaml
-- biosversion_editor_role.yaml
-- biosversion_viewer_role.yaml
-- bmcsettings_admin_role.yaml
-- bmcsettings_editor_role.yaml
-- bmcsettings_viewer_role.yaml
-- bmcversion_admin_role.yaml
-- bmcversion_editor_role.yaml
-- bmcversion_viewer_role.yaml
-- servermaintenance_admin_role.yaml
-- servermaintenance_editor_role.yaml
-- servermaintenance_viewer_role.yaml
-
-# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
-# default, aiding admins in cluster management. Those roles are
-# not used by the {{ .ProjectName }} itself. You can comment the following lines
-# if you do not want those helpers be installed with your Project.
-- biossettings_admin_role.yaml
-- biossettings_editor_role.yaml
-- biossettings_viewer_role.yaml
-
-# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
-# default, aiding admins in cluster management. Those roles are
-# not used by the metal-operator itself. You can comment the following lines
-# if you do not want those helpers be installed with your Project.
-- bmcsettingsset_admin_role.yaml
-- bmcsettingsset_editor_role.yaml
-- bmcsettingsset_viewer_role.yaml
+  # All RBAC will be applied under this service account in
+  # the deployment namespace. You may comment out this resource
+  # if your manager will use a service account that exists at
+  # runtime. Be sure to update RoleBinding and ClusterRoleBinding
+  # subjects if changing service account names.
+  - service_account.yaml
+  - role.yaml
+  - role_binding.yaml
+  - leader_election_role.yaml
+  - leader_election_role_binding.yaml
+  # The following RBAC configurations are used to protect
+  # the metrics endpoint with authn/authz. These configurations
+  # ensure that only authorized users and service accounts
+  # can access the metrics endpoint. Comment the following
+  # permissions if you want to disable this protection.
+  # More info: https://book.kubebuilder.io/reference/metrics.html
+  - metrics_auth_role.yaml
+  - metrics_auth_role_binding.yaml
+  - metrics_reader_role.yaml
+  # For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
+  # default, aiding admins in cluster management. Those roles are
+  # not used by the {{ .ProjectName }} itself. You can comment the following lines
+  # if you do not want those helpers be installed with your Project.
+  - biossettings_admin_role.yaml
+  - biossettings_editor_role.yaml
+  - biossettings_viewer_role.yaml
+  - biossettingsset_admin_role.yaml
+  - biossettingsset_editor_role.yaml
+  - biossettingsset_viewer_role.yaml
+  - biosversion_admin_role.yaml
+  - biosversion_editor_role.yaml
+  - biosversion_viewer_role.yaml
+  - biosversionset_admin_role.yaml
+  - biosversionset_editor_role.yaml
+  - biosversionset_viewer_role.yaml
+  - bmc_admin_role.yaml
+  - bmc_editor_role.yaml
+  - bmc_viewer_role.yaml
+  - bmcsecret_admin_role.yaml
+  - bmcsecret_editor_role.yaml
+  - bmcsecret_viewer_role.yaml
+  - bmcsettings_admin_role.yaml
+  - bmcsettings_editor_role.yaml
+  - bmcsettings_viewer_role.yaml
+  - bmcsettingsset_admin_role.yaml
+  - bmcsettingsset_editor_role.yaml
+  - bmcsettingsset_viewer_role.yaml
+  - bmcuser_admin_role.yaml
+  - bmcuser_editor_role.yaml
+  - bmcuser_viewer_role.yaml
+  - bmcversion_admin_role.yaml
+  - bmcversion_editor_role.yaml
+  - bmcversion_viewer_role.yaml
+  - bmcversionset_admin_role.yaml
+  - bmcversionset_editor_role.yaml
+  - bmcversionset_viewer_role.yaml
+  - endpoint_admin_role.yaml
+  - endpoint_editor_role.yaml
+  - endpoint_viewer_role.yaml
+  - server_admin_role.yaml
+  - server_editor_role.yaml
+  - server_viewer_role.yaml
+  - serverbootconfiguration_admin_role.yaml
+  - serverbootconfiguration_editor_role.yaml
+  - serverbootconfiguration_viewer_role.yaml
+  - serverclaim_admin_role.yaml
+  - serverclaim_editor_role.yaml
+  - serverclaim_viewer_role.yaml
+  - servermaintenance_admin_role.yaml
+  - servermaintenance_editor_role.yaml
+  - servermaintenance_viewer_role.yaml

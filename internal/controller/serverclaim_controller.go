@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -48,30 +47,30 @@ type ServerClaimReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *ServerClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	claim := &metalv1alpha1.ServerClaim{}
 	if err := r.Get(ctx, req.NamespacedName, claim); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, log, claim)
+	return r.reconcileExists(ctx, claim)
 }
 
-func (r *ServerClaimReconciler) reconcileExists(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
+func (r *ServerClaimReconciler) reconcileExists(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	if !claim.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, claim)
+		return r.delete(ctx, claim)
 	}
-	return r.reconcile(ctx, log, claim)
+	return r.reconcile(ctx, claim)
 }
 
-func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
+func (r *ServerClaimReconciler) delete(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting server claim")
 	if !controllerutil.ContainsFinalizer(claim, ServerClaimFinalizer) {
 		log.V(1).Info("Deleted server claim")
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.cleanupAndShutdownServer(ctx, log, claim); err != nil {
+	if err := r.cleanupAndShutdownServer(ctx, claim); err != nil {
 		return ctrl.Result{}, err
 	}
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); !apierrors.IsNotFound(err) || modified {
@@ -83,7 +82,8 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, log logr.Logger, cla
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) error {
+func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, claim *metalv1alpha1.ServerClaim) error {
+	log := ctrl.LoggerFrom(ctx)
 	if claim.Spec.ServerRef == nil {
 		return nil
 	}
@@ -129,7 +129,8 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, lo
 // - Ensure server spec matches claim & set claim ref on server
 // - Patch the claim status to bound
 // - Apply Boot configuration
-func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
+func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling server claim")
 	if shouldIgnoreReconciliation(claim) {
 		log.V(1).Info("Skipped Server claim reconciliation")
@@ -148,7 +149,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	server, err := r.claimServer(ctx, log, claim)
+	server, err := r.claimServer(ctx, claim)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -167,7 +168,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 		return ctrl.Result{}, nil
 	}
 
-	if err = r.applyBootConfiguration(ctx, log, server, claim); err != nil {
+	if err = r.applyBootConfiguration(ctx, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
 	log.V(1).Info("Applied BootConfiguration for ServerClaim")
@@ -177,7 +178,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	}
 	log.V(1).Info("Patched ServerClaim phase", "Phase", claim.Status.Phase)
 
-	if modified, err := r.ensurePowerStateForServer(ctx, log, claim, server); err != nil || modified {
+	if modified, err := r.ensurePowerStateForServer(ctx, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured PowerState for Server", "Server", server.Name)
@@ -186,7 +187,8 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, log logr.Logger, 
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) error {
+func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) error {
+	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.ServerClaimRef != nil {
 		log.V(1).Info("Server is already claimed", "Server", server.Name, "Claim", server.Spec.ServerClaimRef.Name)
 		return nil
@@ -209,7 +211,8 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, lo
 	return nil
 }
 
-func (r *ServerClaimReconciler) ensurePowerStateForServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerClaimReconciler) ensurePowerStateForServer(ctx context.Context, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.Power == claim.Spec.Power {
 		return false, nil
 	}
@@ -253,7 +256,8 @@ func (r *ServerClaimReconciler) patchServerRef(ctx context.Context, claim *metal
 	return false, fmt.Errorf("failed to patch server ref for claim: server reference is immutable")
 }
 
-func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
+func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
+	log := ctrl.LoggerFrom(ctx)
 	config := &metalv1alpha1.ServerBootConfiguration{}
 	config.Name = claim.Name
 	config.Namespace = claim.Namespace
@@ -301,7 +305,8 @@ func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx con
 	return nil
 }
 
-func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
+func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {
+	log := ctrl.LoggerFrom(ctx)
 	serverList := &metalv1alpha1.ServerList{}
 	if err := r.List(ctx, serverList); err != nil {
 		return nil, err
@@ -347,7 +352,7 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 		// server has to passed all the checks for free server
 		// always select the first matching server
 		// we continue through the loop to find if previously claimed server is also present
-		if selectedServer == nil && r.isServerClaimable(ctx, log, &server, claim) {
+		if selectedServer == nil && r.isServerClaimable(ctx, &server, claim) {
 			selectedServer = &server
 			break
 		}
@@ -359,7 +364,7 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	// ensureObjectRefForServer() uses a patch with optimistic locking,
 	// so it will not overwrite the claim with a different server,
 	// in case controller-runtimes cached client is not up to date.
-	err := r.ensureObjectRefForServer(ctx, log, claim, selectedServer)
+	err := r.ensureObjectRefForServer(ctx, claim, selectedServer)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +372,8 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, log logr.Logger
 	return selectedServer, nil
 }
 
-func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
 		log.V(1).Info("Server in or entering Maintenance, Hence can not be claimed")
 		return true, nil
@@ -388,7 +394,8 @@ func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, log
 	return true, nil
 }
 
-func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) bool {
+func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) bool {
+	log := ctrl.LoggerFrom(ctx)
 	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && claimRef.UID != claim.UID {
 		log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
 		return false
@@ -401,7 +408,7 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, log logr.
 		log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
 		return false
 	}
-	isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, log, server)
+	isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, server)
 	// is undergoing maintenance and not in Reserved State, we should not claim this server
 	if err != nil || isUnderMaintenance {
 		log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
@@ -442,13 +449,11 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
 				})
-				return req
 			}
 			if claim.Spec.ServerRef == nil {
 				req = append(req, reconcile.Request{
 					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
 				})
-				return req
 			}
 		}
 		return req

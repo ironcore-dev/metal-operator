@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: bmcs.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -71,9 +71,8 @@ spec:
             description: BMCSpec defines the desired state of BMC
             properties:
               access:
-                description: |-
-                  Endpoint allows inline configuration of network access details for the BMC.
-                  Use this field if access settings like address are to be configured directly within the BMC resource.
+                description: Endpoint specifies inline network access details for
+                  the BMC.
                 properties:
                   ip:
                     description: IP is the IP address of the BMC.
@@ -87,8 +86,8 @@ spec:
                   rule: self == oldSelf
               bmcSecretRef:
                 description: |-
-                  BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials
-                  required to access the BMC. This secret includes sensitive information such as usernames and passwords.
+                  BMCSecretRef is a reference to the BMCSecret object that contains the credentials
+                  required to access the BMC.
                 properties:
                   name:
                     default: ""
@@ -122,23 +121,18 @@ spec:
                   in Redfish API.
                 type: string
               consoleProtocol:
-                description: |-
-                  ConsoleProtocol specifies the protocol to be used for console access to the BMC.
-                  This field is optional and can be omitted if console access is not required.
+                description: ConsoleProtocol specifies the protocol to be used for
+                  console access to the BMC.
                 properties:
                   name:
-                    description: |-
-                      Name specifies the name of the console protocol.
-                      This could be a protocol such as "SSH", "Telnet", etc.
+                    description: Name specifies the name of the console protocol.
                     enum:
                     - IPMI
                     - SSH
                     - SSHLenovo
                     type: string
                   port:
-                    description: |-
-                      Port specifies the port number used for console access.
-                      This port is used by the specified console protocol to establish connections.
+                    description: Port specifies the port number used for console access.
                     format: int32
                     type: integer
                 required:
@@ -146,9 +140,8 @@ spec:
                 - port
                 type: object
               endpointRef:
-                description: |-
-                  EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.
-                  This reference is typically used to locate the BMC endpoint within the cluster.
+                description: EndpointRef is a reference to the Endpoint object that
+                  contains the network access information for the BMC.
                 properties:
                   name:
                     default: ""
@@ -168,19 +161,14 @@ spec:
                 description: Hostname is the hostname of the BMC.
                 type: string
               protocol:
-                description: |-
-                  Protocol specifies the protocol to be used for communicating with the BMC.
-                  It could be a standard protocol such as IPMI or Redfish.
+                description: Protocol specifies the protocol to be used for communicating
+                  with the BMC.
                 properties:
                   name:
-                    description: |-
-                      Name specifies the name of the protocol.
-                      This could be a protocol such as "IPMI", "Redfish", etc.
+                    description: Name specifies the name of the protocol.
                     type: string
                   port:
-                    description: |-
-                      Port specifies the port number used for communication.
-                      This port is used by the specified protocol to establish connections.
+                    description: Port specifies the port number used for communication.
                     format: int32
                     type: integer
                   scheme:
@@ -263,9 +251,7 @@ spec:
                   running on the BMC.
                 type: string
               ip:
-                description: |-
-                  IP is the IP address of the BMC.
-                  The type is specified as string and is schemaless.
+                description: IP is the IP address of the BMC.
                 type: string
               lastResetTime:
                 description: LastResetTime is the timestamp of the last reset operation
@@ -273,9 +259,7 @@ spec:
                 format: date-time
                 type: string
               macAddress:
-                description: |-
-                  MACAddress is the MAC address of the BMC.
-                  The format is validated using a regular expression pattern.
+                description: MACAddress is the MAC address of the BMC.
                 pattern: ^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$
                 type: string
               manufacturer:

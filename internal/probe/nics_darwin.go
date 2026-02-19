@@ -8,16 +8,15 @@ import (
 )
 
 func collectNICInfoData() ([]registry.NIC, error) {
-	var nics []registry.NIC
-
-	nics = append(nics, registry.NIC{
-		Name:            "foo",
-		MAC:             "00:11:22:33:44:55",
-		PCIAddress:      "0000:00:00.0",
-		Speed:           "1000",
-		LinkModes:       []string{"1000baseT/Full"},
-		SupportedPorts:  []string{"TP"},
-		FirmwareVersion: "1.0.0",
-	})
-	return nics, nil
+	return []registry.NIC{
+		{
+			Name:            "foo",
+			MAC:             "00:11:22:33:44:55",
+			PCIAddress:      "0000:00:00.0",
+			Speed:           "1000",
+			LinkModes:       []string{"1000baseT/Full"},
+			SupportedPorts:  []string{"TP"},
+			FirmwareVersion: "1.0.0",
+		},
+	}, nil
 }

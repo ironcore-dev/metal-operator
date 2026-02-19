@@ -2,10 +2,12 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
+cliVersion: 4.12.0
 domain: ironcore.dev
 layout:
 - go.kubebuilder.io/v4
 plugins:
+  autoupdate.kubebuilder.io/v1-alpha: {}
   helm.kubebuilder.io/v1-alpha: {}
 projectName: metal-operator
 repo: github.com/ironcore-dev/metal-operator
@@ -29,6 +31,9 @@ resources:
   kind: BMCSecret
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -140,6 +145,14 @@ resources:
   domain: ironcore.dev
   group: metal
   kind: BMCVersionSet
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: BMCUser
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
 - api:

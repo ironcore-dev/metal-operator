@@ -134,7 +134,7 @@ func (r *RedfishKubeBMC) SetBiosAttributesOnReset(ctx context.Context, systemUUI
 			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
 				attrData["value"] = value
 			} else {
-				UnitTestMockUps.PendingBIOSSetting[key] = map[string]interface{}{
+				UnitTestMockUps.PendingBIOSSetting[key] = map[string]any{
 					"type":   attrData["type"],
 					"reboot": attrData["reboot"],
 					"value":  value,
@@ -256,7 +256,7 @@ func (r *RedfishKubeBMC) SetBMCAttributesImmediately(ctx context.Context, UUID s
 			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
 				attrData["value"] = value
 			} else {
-				UnitTestMockUps.PendingBMCSetting[key] = map[string]interface{}{
+				UnitTestMockUps.PendingBMCSetting[key] = map[string]any{
 					"type":   attrData["type"],
 					"reboot": attrData["reboot"],
 					"value":  value,

@@ -39,9 +39,60 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 	}
 	bmc, err := NewRedfishBMCClient(ctx, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create RedfishBMC client: %w", err)
+		return nil, err
 	}
-	return &RedfishLocalBMC{RedfishBMC: bmc}, nil
+	if acc, ok := UnitTestMockUps.Accounts[options.Username]; ok {
+		if acc.Password == options.Password {
+			// authenticated
+			return &RedfishLocalBMC{RedfishBMC: bmc}, nil
+		}
+	}
+	return nil, &gofishCommon.Error{
+		HTTPReturnedStatusCode: 401,
+	}
+}
+
+// GetAccounts retrieves all user accounts from the BMC.
+func (r *RedfishLocalBMC) GetAccounts() ([]*redfish.ManagerAccount, error) {
+	accounts := make([]*redfish.ManagerAccount, 0, len(UnitTestMockUps.Accounts))
+	for _, a := range UnitTestMockUps.Accounts {
+		accounts = append(accounts, a)
+	}
+	return accounts, nil
+}
+
+// CreateOrUpdateAccount creates or updates a user account on the BMC.
+func (r *RedfishLocalBMC) CreateOrUpdateAccount(
+	ctx context.Context, userName, role, password string, enabled bool,
+) error {
+	for _, a := range UnitTestMockUps.Accounts {
+		if a.UserName == userName {
+			a.RoleID = role
+			a.UserName = userName
+			a.Enabled = enabled
+			a.Password = password
+			return nil
+		}
+	}
+	newAccount := redfish.ManagerAccount{
+		Entity: gofishCommon.Entity{
+			ID: fmt.Sprintf("%d", len(UnitTestMockUps.Accounts)+1),
+		},
+		UserName: userName,
+		RoleID:   role,
+		Enabled:  enabled,
+		Password: password,
+	}
+	UnitTestMockUps.Accounts[userName] = &newAccount
+	return nil
+}
+
+func (r *RedfishLocalBMC) DeleteAccount(ctx context.Context, userName, id string) error {
+	if _, ok := UnitTestMockUps.Accounts[userName]; ok {
+		delete(UnitTestMockUps.Accounts, userName)
+		return nil
+	}
+	return fmt.Errorf("account %s not found", userName)
 }
 
 // GetBiosVersion retrieves the BIOS version.
@@ -108,7 +159,7 @@ func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, UUID 
 			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
 				attrData["value"] = value
 			} else {
-				UnitTestMockUps.PendingBMCSetting[key] = map[string]interface{}{
+				UnitTestMockUps.PendingBMCSetting[key] = map[string]any{
 					"type":   attrData["type"],
 					"reboot": attrData["reboot"],
 					"value":  value,

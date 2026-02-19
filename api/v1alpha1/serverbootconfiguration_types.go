@@ -31,8 +31,8 @@ type ServerBootConfigurationSpec struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
-	// IgnitionSecretRef is a reference to the Kubernetes Secret object that contains
-	// the ignition configuration for the server. This field is optional and can be omitted if not specified.
+	// IgnitionSecretRef is a reference to the Secret object that contains
+	// the ignition configuration for the server.
 	// +optional
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
 
@@ -82,6 +82,7 @@ type ServerBootConfigurationStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=sbc
 //+kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 //+kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.spec.image`
 //+kubebuilder:printcolumn:name="IgnitionRef",type=string,JSONPath=`.spec.ignitionSecretRef.name`
@@ -98,7 +99,7 @@ type ServerBootConfiguration struct {
 	Status ServerBootConfigurationStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ServerBootConfigurationList contains a list of ServerBootConfiguration
 type ServerBootConfigurationList struct {

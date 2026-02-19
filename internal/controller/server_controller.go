@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -327,7 +326,7 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 		return false, fmt.Errorf("failed to get server boot configuration: %w", err)
 	}
 
-	if err := r.bootServer(ctx, log, bmcClient, server, config); err != nil {
+	if err := r.bootServer(ctx, bmcClient, server, config); err != nil {
 		return false, fmt.Errorf("failed to boot server: %w", err)
 	}
 	log.V(1).Info("Configured server boot", "bootMethod", config.Spec.BootMethod)
@@ -414,7 +413,7 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 			log.V(1).Info("Failed to get virtual media status", "error", err.Error())
 		} else {
 			for _, media := range currentMedia {
-				if media.Inserted {
+				if media.Inserted != nil && *media.Inserted {
 					if err := bmcClient.EjectVirtualMedia(ctx, server.Spec.SystemURI, media.ID); err != nil {
 						log.V(1).Info("Failed to eject virtual media", "id", media.ID, "error", err.Error())
 					} else {
@@ -493,7 +492,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 			return false, fmt.Errorf("failed to get server boot configuration: %w", err)
 		}
 
-		if err := r.bootServer(ctx, log, bmcClient, server, config); err != nil {
+		if err := r.bootServer(ctx, bmcClient, server, config); err != nil {
 			return false, fmt.Errorf("failed to boot server: %w", err)
 		}
 		log.V(1).Info("Server is powered off, booting server", "bootMethod", config.Spec.BootMethod)
@@ -833,7 +832,8 @@ func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, s
 	return config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
 }
 
-func (r *ServerReconciler) bootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+func (r *ServerReconciler) bootServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+	log := ctrl.LoggerFrom(ctx)
 	if config == nil {
 		return fmt.Errorf("server boot configuration is required")
 	}
@@ -841,7 +841,7 @@ func (r *ServerReconciler) bootServer(ctx context.Context, log logr.Logger, bmcC
 	switch config.Spec.BootMethod {
 	case metalv1alpha1.BootMethodVirtualMedia:
 		log.Info("Booting server via virtual media")
-		return r.virtualMediaBootServer(ctx, log, bmcClient, server, config)
+		return r.virtualMediaBootServer(ctx, bmcClient, server, config)
 	default: // BootMethodPXE or empty
 		log.Info("Booting server via PXE")
 		return r.pxeBootServer(ctx, bmcClient, server)
@@ -865,7 +865,8 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 	return nil
 }
 
-func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
+	log := ctrl.LoggerFrom(ctx)
 	if server == nil || server.Spec.BootConfigurationRef == nil {
 		log.V(1).Info("Server not ready for virtual media boot")
 		return nil
@@ -888,7 +889,7 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, log logr.
 	}
 
 	for _, media := range currentMedia {
-		if media.Inserted {
+		if media.Inserted != nil && *media.Inserted {
 			if err := bmcClient.EjectVirtualMedia(ctx, systemURI, media.ID); err != nil {
 				log.V(1).Info("Failed to eject existing virtual media", "id", media.ID, "error", err.Error())
 			} else {

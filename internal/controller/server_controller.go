@@ -24,7 +24,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
@@ -965,7 +965,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, bmcClient
 		if err := bmcClient.PowerOn(ctx, server.Spec.SystemURI); err != nil {
 			return fmt.Errorf("failed to power on server: %w", err)
 		}
-		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, redfish.OnPowerState); err != nil {
+		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, schemas.OnPowerState); err != nil {
 			return fmt.Errorf("failed to wait for server power on server: %w", err)
 		}
 		if err := r.updatePowerOnCondition(ctx, server); err != nil {
@@ -978,14 +978,14 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, bmcClient
 		if err := powerOffType(ctx, server.Spec.SystemURI); err != nil {
 			return fmt.Errorf("failed to power off server: %w", err)
 		}
-		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, redfish.OffPowerState); err != nil {
+		if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, schemas.OffPowerState); err != nil {
 			if r.EnforcePowerOff {
 				log.V(1).Info("Failed to wait for server graceful shutdown, retrying with force power off")
 				powerOffType = bmcClient.ForcePowerOff
 				if err := powerOffType(ctx, server.Spec.SystemURI); err != nil {
 					return fmt.Errorf("failed to power off server: %w", err)
 				}
-				if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, redfish.OffPowerState); err != nil {
+				if err := bmcClient.WaitForServerPowerState(ctx, server.Spec.SystemURI, schemas.OffPowerState); err != nil {
 					return fmt.Errorf("failed to wait for server force power off: %w", err)
 				}
 			} else {

@@ -191,7 +191,7 @@ func (r *RedfishBaseBMC) ForcePowerOff(ctx context.Context, systemURI string) er
 }
 
 // Reset performs a reset on the system using Redfish.
-func (r *RedfishBaseBMC) Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error {
+func (r *RedfishBaseBMC) Reset(ctx context.Context, systemURI string, resetType schemas.ResetType) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
@@ -629,7 +629,7 @@ func (r *RedfishBaseBMC) checkAttributes(attrs schemas.SettingsAttributes, filte
 	return reset, errors.Join(errs...)
 }
 
-func (r *RedfishBaseBMC) CheckBMCAttributes(_ context.Context, _ string, _ redfish.SettingsAttributes) (bool, error) {
+func (r *RedfishBaseBMC) CheckBMCAttributes(_ context.Context, _ string, _ schemas.SettingsAttributes) (bool, error) {
 	return false, fmt.Errorf("BMC attribute checking not supported for manufacturer %q", r.manufacturer)
 }
 
@@ -856,20 +856,20 @@ func (r *RedfishBaseBMC) WaitForServerPowerState(ctx context.Context, systemURI 
 }
 
 // UpgradeBiosVersion is a fallback for unknown vendors. Vendor-specific structs override this.
-func (r *RedfishBaseBMC) UpgradeBiosVersion(_ context.Context, _ string, _ *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *RedfishBaseBMC) UpgradeBiosVersion(_ context.Context, _ string, _ *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)
 }
 
-func (r *RedfishBaseBMC) GetBiosUpgradeTask(_ context.Context, _ string, _ string) (*redfish.Task, error) {
+func (r *RedfishBaseBMC) GetBiosUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
 	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
 }
 
 // UpgradeBMCVersion is a fallback for unknown vendors. Vendor-specific structs override this.
-func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)
 }
 
-func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*redfish.Task, error) {
+func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
 	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
 }
 

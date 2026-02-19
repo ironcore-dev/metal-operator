@@ -14,29 +14,28 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // SimpleUpdateRequestBody extends SimpleUpdateParameters with an OEM apply-time field.
 type SimpleUpdateRequestBody struct {
-	redfish.SimpleUpdateParameters
-	RedfishOperationApplyTime redfish.OperationApplyTime `json:"@Redfish.OperationApplyTime,omitempty"`
+	schemas.UpdateServiceSimpleUpdateParameters
+	RedfishOperationApplyTime schemas.OperationApplyTime `json:"@Redfish.OperationApplyTime,omitempty"`
 }
 
 // upgradeRequestBodyFn builds a vendor-specific request body from update parameters.
-type upgradeRequestBodyFn func(parameters *redfish.SimpleUpdateParameters) *SimpleUpdateRequestBody
+type upgradeRequestBodyFn func(parameters *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody
 
 // upgradeTaskMonitorURIFn extracts the task monitor URI from the update response.
 type upgradeTaskMonitorURIFn func(response *http.Response) (string, error)
 
 // taskMonitorDetailsFn parses vendor-specific task monitor details.
-type taskMonitorDetailsFn func(ctx context.Context, response *http.Response) (*redfish.Task, error)
+type taskMonitorDetailsFn func(ctx context.Context, response *http.Response) (*schemas.Task, error)
 
 // upgradeVersion is the common firmware upgrade flow shared by all vendors.
 // Vendor-specific parts are injected via callbacks.
-func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *redfish.SimpleUpdateParameters, requestBodyFn upgradeRequestBodyFn, taskMonitorURIFn upgradeTaskMonitorURIFn) (string, bool, error) {
+func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.UpdateServiceSimpleUpdateParameters, requestBodyFn upgradeRequestBodyFn, taskMonitorURIFn upgradeTaskMonitorURIFn) (string, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	service := base.client.GetService()
 
@@ -50,7 +49,7 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *redfish.S
 			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
 			Target          string
 		} `json:"#UpdateService.SimpleUpdate"`
-		StartUpdate common.ActionTarget `json:"#UpdateService.StartUpdate"`
+		StartUpdate schemas.ActionTarget `json:"#UpdateService.StartUpdate"`
 	}
 
 	var tUS struct {
@@ -98,7 +97,7 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *redfish.S
 }
 
 // getUpgradeTask is the common task polling flow shared by all vendors.
-func getUpgradeTask(ctx context.Context, base *RedfishBaseBMC, taskURI string, parseTaskDetails taskMonitorDetailsFn) (*redfish.Task, error) {
+func getUpgradeTask(ctx context.Context, base *RedfishBaseBMC, taskURI string, parseTaskDetails taskMonitorDetailsFn) (*schemas.Task, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	respTask, err := base.client.GetService().GetClient().Get(taskURI)
@@ -128,11 +127,11 @@ func getUpgradeTask(ctx context.Context, base *RedfishBaseBMC, taskURI string, p
 
 // httpBasedGetBMCSettingAttribute retrieves BMC settings via HTTP GET.
 // Shared by HPE and Lenovo which use "GET <URI>" format attributes.
-func httpBasedGetBMCSettingAttribute(c common.Client, attributes map[string]string) (redfish.SettingsAttributes, error) {
+func httpBasedGetBMCSettingAttribute(c schemas.Client, attributes map[string]string) (schemas.SettingsAttributes, error) {
 	if c == nil {
 		return nil, fmt.Errorf("failed to get client from gofish service")
 	}
-	result := redfish.SettingsAttributes{}
+	result := schemas.SettingsAttributes{}
 	var errs []error
 	for key, data := range attributes {
 		parts := strings.Fields(key)
@@ -179,8 +178,8 @@ func httpBasedGetBMCSettingAttribute(c common.Client, attributes map[string]stri
 
 // httpBasedUpdateBMCAttributes applies BMC attributes via HTTP POST/PATCH.
 // Shared by HPE and Lenovo which use "POST <URI>" or "PATCH <URI>" format attributes.
-func httpBasedUpdateBMCAttributes(c common.Client, attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error {
-	if applyTime != common.ImmediateApplyTime {
+func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttributes, applyTime schemas.SettingsApplyTime) error {
+	if applyTime != schemas.ImmediateSettingsApplyTime {
 		return fmt.Errorf("does not support scheduled apply time for BMC attributes")
 	}
 	if c == nil {
@@ -264,7 +263,7 @@ func isSubMap(main, sub map[string]any) bool {
 
 // checkAttributes validates attributes against a filtered registry, returning
 // whether a reset is required and any validation errors.
-func checkAttributes(attrs redfish.SettingsAttributes, filtered map[string]redfish.Attribute) (reset bool, err error) {
+func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schemas.Attributes) (reset bool, err error) {
 	reset = false
 	var errs []error
 	for name, value := range attrs {
@@ -277,19 +276,19 @@ func checkAttributes(attrs redfish.SettingsAttributes, filtered map[string]redfi
 			reset = true
 		}
 		switch entryAttribute.Type {
-		case redfish.IntegerAttributeType:
+		case schemas.IntegerAttributeType:
 			if _, ok := value.(int); !ok {
 				errs = append(errs,
 					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
 						name, value, entryAttribute.Type, entryAttribute))
 			}
-		case redfish.StringAttributeType:
+		case schemas.StringAttributeType:
 			if _, ok := value.(string); !ok {
 				errs = append(errs,
 					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
 						name, value, entryAttribute.Type, entryAttribute))
 			}
-		case redfish.EnumerationAttributeType:
+		case schemas.EnumerationAttributeType:
 			if _, ok := value.(string); !ok {
 				errs = append(errs,
 					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",

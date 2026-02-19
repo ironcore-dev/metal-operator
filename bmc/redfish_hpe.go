@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
+	"k8s.io/utils/ptr"
 )
 
 // HPERedfishBMC is the HPE-specific implementation of the BMC interface.
@@ -22,35 +22,35 @@ type HPERedfishBMC struct {
 
 // --- BMC interface method overrides ---
 
-func (r *HPERedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
+func (r *HPERedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
 	return httpBasedGetBMCSettingAttribute(r.client.GetService().GetClient(), attributes)
 }
 
-func (r *HPERedfishBMC) GetBMCPendingAttributeValues(_ context.Context, _ string) (redfish.SettingsAttributes, error) {
-	return redfish.SettingsAttributes{}, nil
+func (r *HPERedfishBMC) GetBMCPendingAttributeValues(_ context.Context, _ string) (schemas.SettingsAttributes, error) {
+	return schemas.SettingsAttributes{}, nil
 }
 
-func (r *HPERedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ string, attributes redfish.SettingsAttributes) error {
+func (r *HPERedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ string, attributes schemas.SettingsAttributes) error {
 	if len(attributes) == 0 {
 		return nil
 	}
-	return httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, common.ImmediateApplyTime)
+	return httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, schemas.ImmediateSettingsApplyTime)
 }
 
-func (r *HPERedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ redfish.SettingsAttributes) (bool, error) {
+func (r *HPERedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ schemas.SettingsAttributes) (bool, error) {
 	return false, nil
 }
 
 // --- Firmware upgrade overrides ---
 
-func (r *HPERedfishBMC) hpeBuildRequestBody(parameters *redfish.SimpleUpdateParameters) *SimpleUpdateRequestBody {
+func (r *HPERedfishBMC) hpeBuildRequestBody(parameters *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody {
 	body := &SimpleUpdateRequestBody{}
 	body.ForceUpdate = parameters.ForceUpdate
 	body.ImageURI = parameters.ImageURI
-	body.Passord = parameters.Passord
+	body.Password = parameters.Password
 	body.Username = parameters.Username
 	body.Targets = parameters.Targets
 	body.TransferProtocol = parameters.TransferProtocol
@@ -73,8 +73,8 @@ func (r *HPERedfishBMC) hpeExtractTaskMonitorURI(response *http.Response) (strin
 	return tResp.TaskMonitor, nil
 }
 
-func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error) {
-	task := &redfish.Task{}
+func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error) {
+	task := &schemas.Task{}
 	rawBody, err := io.ReadAll(taskMonitorResponse.Body)
 	if err != nil {
 		return nil, err
@@ -100,9 +100,9 @@ func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorRespon
 		}
 		if len(tTask.Error.ExtendedInfo) > 0 {
 			if msgID, ok := tTask.Error.ExtendedInfo[0]["MessageId"]; ok && strings.Contains(msgID, "Success") {
-				task.TaskState = redfish.CompletedTaskState
-				task.PercentComplete = 100
-				task.TaskStatus = common.OKHealth
+				task.TaskState = schemas.CompletedTaskState
+				task.PercentComplete = ptr.To(uint(100))
+				task.TaskStatus = schemas.OKHealth
 				return task, nil
 			}
 		}
@@ -112,18 +112,18 @@ func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorRespon
 	return task, nil
 }
 
-func (r *HPERedfishBMC) UpgradeBiosVersion(ctx context.Context, _ string, parameters *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *HPERedfishBMC) UpgradeBiosVersion(ctx context.Context, _ string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return upgradeVersion(ctx, r.RedfishBaseBMC, parameters, r.hpeBuildRequestBody, r.hpeExtractTaskMonitorURI)
 }
 
-func (r *HPERedfishBMC) GetBiosUpgradeTask(ctx context.Context, _ string, taskURI string) (*redfish.Task, error) {
+func (r *HPERedfishBMC) GetBiosUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.hpeParseTaskDetails)
 }
 
-func (r *HPERedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, parameters *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *HPERedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return upgradeVersion(ctx, r.RedfishBaseBMC, parameters, r.hpeBuildRequestBody, r.hpeExtractTaskMonitorURI)
 }
 
-func (r *HPERedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*redfish.Task, error) {
+func (r *HPERedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.hpeParseTaskDetails)
 }

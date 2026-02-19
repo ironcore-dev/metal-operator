@@ -11,8 +11,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -23,7 +22,7 @@ type LenovoRedfishBMC struct {
 
 // --- BMC interface method overrides ---
 
-func (r *LenovoRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
+func (r *LenovoRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -36,28 +35,28 @@ func (r *LenovoRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID st
 	return result, nil
 }
 
-func (r *LenovoRedfishBMC) GetBMCPendingAttributeValues(_ context.Context, _ string) (redfish.SettingsAttributes, error) {
-	return redfish.SettingsAttributes{}, nil
+func (r *LenovoRedfishBMC) GetBMCPendingAttributeValues(_ context.Context, _ string) (schemas.SettingsAttributes, error) {
+	return schemas.SettingsAttributes{}, nil
 }
 
-func (r *LenovoRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ string, attributes redfish.SettingsAttributes) error {
+func (r *LenovoRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ string, attributes schemas.SettingsAttributes) error {
 	if len(attributes) == 0 {
 		return nil
 	}
-	return httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, common.ImmediateApplyTime)
+	return httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, schemas.ImmediateSettingsApplyTime)
 }
 
-func (r *LenovoRedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ redfish.SettingsAttributes) (bool, error) {
+func (r *LenovoRedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ schemas.SettingsAttributes) (bool, error) {
 	return false, nil
 }
 
 // --- Firmware upgrade overrides ---
 
-func (r *LenovoRedfishBMC) lenovoBuildRequestBody(parameters *redfish.SimpleUpdateParameters) *SimpleUpdateRequestBody {
+func (r *LenovoRedfishBMC) lenovoBuildRequestBody(parameters *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody {
 	body := &SimpleUpdateRequestBody{}
 	body.ForceUpdate = parameters.ForceUpdate
 	body.ImageURI = parameters.ImageURI
-	body.Passord = parameters.Passord
+	body.Password = parameters.Password
 	body.Username = parameters.Username
 	body.Targets = parameters.Targets
 	body.TransferProtocol = parameters.TransferProtocol
@@ -80,8 +79,8 @@ func (r *LenovoRedfishBMC) lenovoExtractTaskMonitorURI(response *http.Response) 
 	return tResp.TaskMonitor, nil
 }
 
-func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error) {
-	task := &redfish.Task{}
+func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error) {
+	task := &schemas.Task{}
 	rawBody, err := io.ReadAll(taskMonitorResponse.Body)
 	if err != nil {
 		return nil, err
@@ -91,7 +90,7 @@ func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonit
 		return nil, err
 	}
 
-	if len(task.Messages) > 0 && task.TaskState == redfish.CompletedTaskState && task.TaskStatus == common.OKHealth {
+	if len(task.Messages) > 0 && task.TaskState == schemas.CompletedTaskState && task.TaskStatus == schemas.OKHealth {
 		for _, msg := range task.Messages {
 			if strings.Contains(msg.MessageID, "OperationTransitionedToJob") && len(msg.MessageArgs) > 0 {
 				respJob, err := r.client.GetService().GetClient().Get(msg.MessageArgs[0])
@@ -119,18 +118,18 @@ func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonit
 							err, respJob.StatusCode)
 				}
 
-				job := &redfish.Job{}
+				job := &schemas.Job{}
 				if err = json.Unmarshal(respJobRawBody, &job); err != nil {
 					return nil, err
 				}
-				task = &redfish.Task{}
+				task = &schemas.Task{}
 				task.ID = job.ID
 				task.ODataID = job.ODataID
 				task.Description = job.Description
 				task.StartTime = job.StartTime
 				task.EndTime = job.EndTime
 				task.PercentComplete = job.PercentComplete
-				task.TaskState = redfish.TaskState(job.JobState)
+				task.TaskState = schemas.TaskState(job.JobState)
 				task.TaskStatus = job.JobStatus
 				task.Messages = job.Messages
 				break
@@ -141,18 +140,18 @@ func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonit
 	return task, nil
 }
 
-func (r *LenovoRedfishBMC) UpgradeBiosVersion(ctx context.Context, _ string, parameters *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *LenovoRedfishBMC) UpgradeBiosVersion(ctx context.Context, _ string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return upgradeVersion(ctx, r.RedfishBaseBMC, parameters, r.lenovoBuildRequestBody, r.lenovoExtractTaskMonitorURI)
 }
 
-func (r *LenovoRedfishBMC) GetBiosUpgradeTask(ctx context.Context, _ string, taskURI string) (*redfish.Task, error) {
+func (r *LenovoRedfishBMC) GetBiosUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.lenovoParseTaskDetails)
 }
 
-func (r *LenovoRedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, parameters *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *LenovoRedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return upgradeVersion(ctx, r.RedfishBaseBMC, parameters, r.lenovoBuildRequestBody, r.lenovoExtractTaskMonitorURI)
 }
 
-func (r *LenovoRedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*redfish.Task, error) {
+func (r *LenovoRedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.lenovoParseTaskDetails)
 }

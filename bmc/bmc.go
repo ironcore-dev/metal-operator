@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	"k8s.io/apimachinery/pkg/api/resource"
 )

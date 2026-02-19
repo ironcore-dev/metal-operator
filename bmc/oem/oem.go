@@ -33,10 +33,10 @@ type ManagerInterface interface {
 type OEMInterface interface {
 	GetUpdateRequestBody(parameters *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody
 	GetUpdateTaskMonitorURI(response *http.Response) (string, error)
-	GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error)
+	GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error)
 	MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error
 	EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error
-	GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error)
+	GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error)
 }
 
 func IsSubMap(main, sub map[string]any) bool {

@@ -1106,18 +1106,18 @@ func (r *RedfishBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer string,
 func (r *RedfishBMC) SetVirtualMediaBootOnce(ctx context.Context, systemURI string) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	system, err := redfish.GetComputerSystem(r.client, systemURI)
+	system, err := schemas.GetComputerSystem(r.client, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get system: %w", err)
 	}
 
-	setBoot := redfish.Boot{
-		BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled, // One-time only
-		BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,    // UEFI mode
-		BootSourceOverrideTarget:  redfish.CdBootSourceOverrideTarget,    // CD/DVD (virtual media)
+	setBoot := schemas.Boot{
+		BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled, // One-time only
+		BootSourceOverrideMode:    schemas.UEFIBootSourceOverrideMode,    // UEFI mode
+		BootSourceOverrideTarget:  schemas.CdBootSource,                  // CD/DVD (virtual media)
 	}
 
-	if err := system.SetBoot(setBoot); err != nil {
+	if err := system.SetBoot(&setBoot); err != nil {
 		return fmt.Errorf("failed to set virtual media boot once: %w", err)
 	}
 
@@ -1154,7 +1154,7 @@ func (r *RedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, sl
 }
 
 // GetVirtualMediaStatus retrieves the status of all virtual media devices.
-func (r *RedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error) {
+func (r *RedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
 	manufacturer, err := r.getSystemManufacturer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get manufacturer: %w", err)

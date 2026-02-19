@@ -260,7 +260,7 @@ func (r *HPE) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL 
 	manager := managers[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.InsertMedia", manager.ODataID, slotID)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"Image":          mediaURL,
 		"Inserted":       true,
 		"WriteProtected": true,
@@ -296,7 +296,7 @@ func (r *HPE) EjectVirtualMedia(ctx context.Context, systemURI string, slotID st
 	manager := managers[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.EjectMedia", manager.ODataID, slotID)
 
-	resp, err := r.Service.GetClient().Post(vmURI, map[string]interface{}{})
+	resp, err := r.Service.GetClient().Post(vmURI, map[string]any{})
 	if err != nil {
 		return fmt.Errorf("failed to eject virtual media: %w", err)
 	}
@@ -314,7 +314,7 @@ func (r *HPE) EjectVirtualMedia(ctx context.Context, systemURI string, slotID st
 	return nil
 }
 
-func (r *HPE) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error) {
+func (r *HPE) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
 	managers, err := r.Service.Managers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get managers: %w", err)

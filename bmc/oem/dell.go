@@ -479,7 +479,7 @@ func (r *Dell) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL
 	system := systems[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.InsertMedia", system.ODataID, slotID)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"Image":          mediaURL,
 		"Inserted":       true,
 		"WriteProtected": true,
@@ -515,7 +515,7 @@ func (r *Dell) EjectVirtualMedia(ctx context.Context, systemURI string, slotID s
 	system := systems[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.EjectMedia", system.ODataID, slotID)
 
-	resp, err := r.Service.GetClient().Post(vmURI, map[string]interface{}{})
+	resp, err := r.Service.GetClient().Post(vmURI, map[string]any{})
 	if err != nil {
 		return fmt.Errorf("failed to eject virtual media: %w", err)
 	}
@@ -533,7 +533,7 @@ func (r *Dell) EjectVirtualMedia(ctx context.Context, systemURI string, slotID s
 	return nil
 }
 
-func (r *Dell) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error) {
+func (r *Dell) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
 	systems, err := r.Service.Systems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get systems: %w", err)

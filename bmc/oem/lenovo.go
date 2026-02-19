@@ -292,7 +292,7 @@ func (r *Lenovo) MountVirtualMedia(ctx context.Context, systemURI string, mediaU
 	manager := managers[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"Image":          mediaURL,
 		"Inserted":       true,
 		"WriteProtected": true,
@@ -328,7 +328,7 @@ func (r *Lenovo) EjectVirtualMedia(ctx context.Context, systemURI string, slotID
 	manager := managers[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"Image":    "",
 		"Inserted": false,
 	}
@@ -351,7 +351,7 @@ func (r *Lenovo) EjectVirtualMedia(ctx context.Context, systemURI string, slotID
 	return nil
 }
 
-func (r *Lenovo) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error) {
+func (r *Lenovo) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
 	managers, err := r.Service.Managers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get managers: %w", err)

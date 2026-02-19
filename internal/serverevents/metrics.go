@@ -4,12 +4,15 @@
 package serverevents
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -23,12 +26,18 @@ type MetricEntry struct {
 	Timestamp     time.Time
 }
 
+// CriticalEventHandler is a callback function that handles critical events
+type CriticalEventHandler func(ctx context.Context, bmcName string, event Event)
+
 type RedfishEventCollector struct {
-	lastReadings map[string]MetricEntry
-	alertCounts  map[EventKey]uint64
-	mux          sync.RWMutex
-	sensorDesc   *prometheus.Desc
-	alertDesc    *prometheus.Desc
+	lastReadings         map[string]MetricEntry
+	alertCounts          map[EventKey]uint64
+	mux                  sync.RWMutex
+	sensorDesc           *prometheus.Desc
+	alertDesc            *prometheus.Desc
+	client               client.Client
+	log                  logr.Logger
+	criticalEventHandler CriticalEventHandler
 }
 
 type EventKey struct {
@@ -55,9 +64,31 @@ func NewRedfishEventCollector() *RedfishEventCollector {
 			[]string{"hostname", "severity", "message_id", "component"},
 			nil,
 		),
+		log: logr.Discard(),
 	}
 	metrics.Registry.MustRegister(c)
 	return c
+}
+
+// SetClient sets the Kubernetes client for the collector
+func (c *RedfishEventCollector) SetClient(client client.Client) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	c.client = client
+}
+
+// SetLogger sets the logger for the collector
+func (c *RedfishEventCollector) SetLogger(log logr.Logger) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	c.log = log
+}
+
+// SetCriticalEventHandler sets the handler for critical events
+func (c *RedfishEventCollector) SetCriticalEventHandler(handler CriticalEventHandler) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	c.criticalEventHandler = handler
 }
 
 // UpdateFromMetricsReport processes incoming MetricReport events and updates the internal state.
@@ -116,6 +147,15 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 			Component: component,
 		}
 		c.alertCounts[key]++
+
+		// Handle critical events
+		if strings.EqualFold(event.Severity, "Critical") {
+			c.log.Info("Critical event received", "bmcName", hostname, "eventID", event.EventID, "component", component, "message", event.Message)
+			if c.criticalEventHandler != nil {
+				// Call the handler asynchronously to avoid blocking the HTTP handler
+				go c.criticalEventHandler(context.Background(), hostname, event)
+			}
+		}
 	}
 
 }

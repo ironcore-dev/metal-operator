@@ -624,6 +624,11 @@ func main() { // nolint: gocyclo
 		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 			setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
 			eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
+			eventServer.SetClient(mgr.GetClient())
+
+			criticalEventHandler := serverevents.CreateCriticalEventHandler(mgr.GetClient(), setupLog)
+			eventServer.SetCriticalEventHandler(criticalEventHandler)
+
 			if err := eventServer.Start(ctx); err != nil {
 				return fmt.Errorf("unable to start event server: %w", err)
 			}

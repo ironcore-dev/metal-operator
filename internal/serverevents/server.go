@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Server struct {
@@ -51,14 +52,26 @@ type Event struct {
 
 func NewServer(log logr.Logger, addr string) *Server {
 	mux := http.NewServeMux()
+	collector := NewRedfishEventCollector()
+	collector.SetLogger(log)
 	server := &Server{
 		addr:      addr,
 		mux:       mux,
 		log:       log,
-		collector: NewRedfishEventCollector(),
+		collector: collector,
 	}
 	server.routes()
 	return server
+}
+
+// SetClient sets the Kubernetes client on the collector for server tainting
+func (s *Server) SetClient(client client.Client) {
+	s.collector.SetClient(client)
+}
+
+// SetCriticalEventHandler sets the handler for critical events
+func (s *Server) SetCriticalEventHandler(handler CriticalEventHandler) {
+	s.collector.SetCriticalEventHandler(handler)
 }
 
 func (s *Server) routes() {

@@ -69,7 +69,7 @@ type ServerClaimStatus struct {
 // +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
 // +kubebuilder:printcolumn:name="Ignition",type="string",JSONPath=".spec.ignitionSecretRef.name"
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image"
-//+kubebuilder:printcolumn:name="BootMethod",type="string",JSONPath=".spec.bootMethod"
+// +kubebuilder:printcolumn:name="BootMethod",type="string",JSONPath=".spec.bootMethod"
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 

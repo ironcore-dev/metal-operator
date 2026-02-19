@@ -8,16 +8,16 @@ import (
 	"fmt"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
-// SubscribeMetricsReport subscribes to Redfish metric reporting events for the given hostname and callback URL.
+// SubscribeMetricsReport subscribes to sRedfish metric reporting events for the given hostname and callback URL.
 func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
 		fmt.Sprintf("%s/serverevents/metricsreport/%s", url, hostname),
-		redfish.MetricReportEventFormatType,
-		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
+		schemas.MetricReportEventFormatType,
+		schemas.TerminateAfterRetriesDeliveryRetryPolicy,
 	)
 	if err != nil {
 		return link, fmt.Errorf("failed to create event subscription: %w", err)
@@ -30,8 +30,8 @@ func SubscribeEvents(ctx context.Context, url, hostname string, bmcClient bmc.BM
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
 		fmt.Sprintf("%s/serverevents/alerts/%s", url, hostname),
-		redfish.EventEventFormatType,
-		redfish.TerminateAfterRetriesDeliveryRetryPolicy,
+		schemas.EventEventFormatType,
+		schemas.TerminateAfterRetriesDeliveryRetryPolicy,
 	)
 	if err != nil {
 		return link, fmt.Errorf("failed to create alert subscription: %w", err)

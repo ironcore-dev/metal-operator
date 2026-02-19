@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -100,34 +99,36 @@ func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1al
 		"eventMessage", event.Message)
 
 	// Uncomment the following code after PR #672 is merged:
-	serverBase = server.DeepCopy()
-	taintKey := fmt.Sprintf("metal.ironcore.dev/critical-event-%s", event.EventID)
-	taint := corev1.Taint{
-		Key:    taintKey,
-		Value:  event.OriginOfCondition,
-		Effect: corev1.TaintEffectNoSchedule,
-	}
-
-	taintExists := false
-	for _, existingTaint := range server.Spec.Taints {
-		if existingTaint.Key == taint.Key && existingTaint.Effect == taint.Effect {
-			taintExists = true
-			log.V(1).Info("Taint already exists on server", "server", server.Name, "taintKey", taint.Key)
-			break
-		}
-	}
-
-	if !taintExists {
-		server.Spec.Taints = append(server.Spec.Taints, taint)
-
-		if err := k8sClient.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return fmt.Errorf("failed to patch server spec with taint: %w", err)
+	/*
+		serverBase = server.DeepCopy()
+		taintKey := fmt.Sprintf("metal.ironcore.dev/critical-event-%s", event.EventID)
+		taint := corev1.Taint{
+			Key:    taintKey,
+			Value:  event.OriginOfCondition,
+			Effect: corev1.TaintEffectNoSchedule,
 		}
 
-		log.Info("Added taint to server spec",
-			"server", server.Name,
-			"taintKey", taint.Key,
-			"taintValue", taint.Value)
-	}
+			taintExists := false
+			for _, existingTaint := range server.Spec.Taints {
+				if existingTaint.Key == taint.Key && existingTaint.Effect == taint.Effect {
+					taintExists = true
+					log.V(1).Info("Taint already exists on server", "server", server.Name, "taintKey", taint.Key)
+					break
+				}
+			}
+
+			if !taintExists {
+				server.Spec.Taints = append(server.Spec.Taints, taint)
+
+				if err := k8sClient.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+					return fmt.Errorf("failed to patch server spec with taint: %w", err)
+				}
+
+				log.Info("Added taint to server spec",
+					"server", server.Name,
+					"taintKey", taint.Key,
+					"taintValue", taint.Value)
+			}
+	*/
 	return nil
 }

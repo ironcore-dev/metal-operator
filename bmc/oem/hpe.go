@@ -14,8 +14,7 @@ import (
 	"strings"
 
 	"github.com/stmcginnis/gofish"
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 type HPE struct {
@@ -23,12 +22,12 @@ type HPE struct {
 }
 
 func (r *HPE) GetUpdateRequestBody(
-	parameters *redfish.SimpleUpdateParameters,
+	parameters *schemas.UpdateServiceSimpleUpdateParameters,
 ) *SimpleUpdateRequestBody {
 	RequestBody := &SimpleUpdateRequestBody{}
 	RequestBody.ForceUpdate = parameters.ForceUpdate
 	RequestBody.ImageURI = parameters.ImageURI
-	RequestBody.Passord = parameters.Passord
+	RequestBody.Password = parameters.Password
 	RequestBody.Username = parameters.Username
 	RequestBody.Targets = parameters.Targets
 	RequestBody.TransferProtocol = parameters.TransferProtocol
@@ -54,8 +53,8 @@ func (r *HPE) GetUpdateTaskMonitorURI(response *http.Response) (string, error) {
 	return tResp.TaskMonitor, nil
 }
 
-func (r *HPE) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error) {
-	task := &redfish.Task{}
+func (r *HPE) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error) {
+	task := &schemas.Task{}
 	respTaskRawBody, err := io.ReadAll(taskMonitorResponse.Body)
 	if err != nil {
 		return nil, err
@@ -85,9 +84,9 @@ func (r *HPE) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *ht
 					string(respTaskRawBody))
 		}
 		if strings.Contains(tTask.Error.ExtendedInfo[0]["MessageId"], "Success") {
-			task.TaskState = redfish.CompletedTaskState
-			task.PercentComplete = 100
-			task.TaskStatus = common.OKHealth
+			task.TaskState = schemas.CompletedTaskState
+			task.PercentComplete = gofish.ToRef(uint(100))
+			task.TaskStatus = schemas.OKHealth
 			return task, nil
 		}
 		return task, fmt.Errorf("unable to find the state of the Task %v", string(respTaskRawBody))
@@ -97,7 +96,7 @@ func (r *HPE) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *ht
 }
 
 type HPEILOManager struct {
-	BMC     *redfish.Manager
+	BMC     *schemas.Manager
 	Service *gofish.Service
 }
 
@@ -127,12 +126,12 @@ func (h *HPEILOManager) GetObjFromUri(
 func (h *HPEILOManager) GetOEMBMCSettingAttribute(
 	ctx context.Context,
 	attributes map[string]string,
-) (redfish.SettingsAttributes, error) {
+) (schemas.SettingsAttributes, error) {
 	c := h.Service.GetClient()
 	if c == nil {
 		return nil, fmt.Errorf("failed to get client from gofish service")
 	}
-	result := redfish.SettingsAttributes{}
+	result := schemas.SettingsAttributes{}
 	errs := []error{}
 	for key, data := range attributes {
 		parts := strings.Fields(key)
@@ -182,7 +181,7 @@ func (h *HPEILOManager) GetOEMBMCSettingAttribute(
 
 func (h *HPEILOManager) CheckBMCAttributes(
 	ctx context.Context,
-	attributes redfish.SettingsAttributes,
+	attributes schemas.SettingsAttributes,
 ) (bool, error) {
 	// We do not have any option to check attributes for HPE iLO
 	return false, nil
@@ -190,12 +189,12 @@ func (h *HPEILOManager) CheckBMCAttributes(
 
 func (h *HPEILOManager) UpdateBMCAttributesApplyAt(
 	ctx context.Context,
-	attrs redfish.SettingsAttributes,
-	applyTime common.ApplyTime,
+	attrs schemas.SettingsAttributes,
+	applyTime schemas.SettingsApplyTime,
 ) error {
 	// apply the attributes through PATCH or POST call
 	// we can not paralaize the calls to HPE here due to limitation from server
-	if applyTime != common.ImmediateApplyTime {
+	if applyTime != schemas.ImmediateSettingsApplyTime {
 		return fmt.Errorf("does not support scheduled apply time for BMC attributes")
 	}
 	c := h.Service.GetClient()
@@ -244,9 +243,9 @@ func (h *HPEILOManager) UpdateBMCAttributesApplyAt(
 	return errors.Join(errs...)
 }
 
-func (h *HPEILOManager) GetBMCPendingAttributeValues(ctx context.Context) (redfish.SettingsAttributes, error) {
+func (h *HPEILOManager) GetBMCPendingAttributeValues(ctx context.Context) (schemas.SettingsAttributes, error) {
 	// We do not have any option to get pending attributes for Dell iDRAC
-	return redfish.SettingsAttributes{}, nil
+	return schemas.SettingsAttributes{}, nil
 }
 
 func (r *HPE) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {

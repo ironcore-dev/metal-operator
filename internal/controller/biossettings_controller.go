@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -895,7 +895,7 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 	if err != nil {
 		return fmt.Errorf("failed to get pending BIOS settings: %w", err)
 	}
-	var pendingSettingsDiff redfish.SettingsAttributes
+	var pendingSettingsDiff schemas.SettingsAttributes
 	if len(pendingSettings) == 0 {
 		log.V(1).Info("Issuing settings Update on BMC", "settingsDiff", settingsDiff, "SettingsName", flowItem.Name)
 		err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemURI, settingsDiff)
@@ -928,7 +928,7 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 		return errors.Join(err, fmt.Errorf("bios setting issued to bmc not accepted"))
 	}
 
-	pendingSettingsDiff = make(redfish.SettingsAttributes, len(settingsDiff))
+	pendingSettingsDiff = make(schemas.SettingsAttributes, len(settingsDiff))
 	for name, value := range settingsDiff {
 		if pendingValue, ok := pendingSettings[name]; ok && value != pendingValue {
 			pendingSettingsDiff[name] = pendingValue
@@ -1050,24 +1050,24 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsReconciler) getPendingBIOSSettings(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (redfish.SettingsAttributes, error) {
+func (r *BIOSSettingsReconciler) getPendingBIOSSettings(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (schemas.SettingsAttributes, error) {
 	if server == nil {
-		return redfish.SettingsAttributes{}, fmt.Errorf("server is nil")
+		return schemas.SettingsAttributes{}, fmt.Errorf("server is nil")
 	}
 	return bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemURI)
 }
 
-func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings map[string]string, server *metalv1alpha1.Server) (redfish.SettingsAttributes, error) {
+func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings map[string]string, server *metalv1alpha1.Server) (schemas.SettingsAttributes, error) {
 	keys := slices.Collect(maps.Keys(settings))
 
 	// get the accepted type/values from the server BIOS for given keys
 	actualSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemURI, keys)
 	if err != nil {
-		return redfish.SettingsAttributes{}, fmt.Errorf("failed to get BIOSSettings: %w", err)
+		return schemas.SettingsAttributes{}, fmt.Errorf("failed to get BIOSSettings: %w", err)
 	}
 
 	// check if the given settings match the accepted setting's type/values from server BIOS
-	diff := redfish.SettingsAttributes{}
+	diff := schemas.SettingsAttributes{}
 	var errs []error
 	for key, value := range settings {
 		res, ok := actualSettings[key]
@@ -1103,7 +1103,7 @@ func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient 
 	return diff, errors.Join(errs...)
 }
 
-func (r *BIOSSettingsReconciler) getBIOSVersionAndSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (string, redfish.SettingsAttributes, error) {
+func (r *BIOSSettingsReconciler) getBIOSVersionAndSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (string, schemas.SettingsAttributes, error) {
 	log := ctrl.LoggerFrom(ctx)
 	completeSettings := make(map[string]string)
 	for _, flowItem := range settings.Spec.SettingsFlow {

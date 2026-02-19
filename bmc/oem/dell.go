@@ -15,8 +15,7 @@ import (
 
 	helpers "github.com/ironcore-dev/metal-operator/bmc/common"
 	"github.com/stmcginnis/gofish"
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 type Dell struct {
@@ -24,13 +23,13 @@ type Dell struct {
 }
 
 func (r *Dell) GetUpdateRequestBody(
-	parameters *redfish.SimpleUpdateParameters,
+	parameters *schemas.UpdateServiceSimpleUpdateParameters,
 ) *SimpleUpdateRequestBody {
 	RequestBody := &SimpleUpdateRequestBody{}
-	RequestBody.RedfishOperationApplyTime = redfish.ImmediateOperationApplyTime
+	RequestBody.RedfishOperationApplyTime = schemas.ImmediateOperationApplyTime
 	RequestBody.ForceUpdate = parameters.ForceUpdate
 	RequestBody.ImageURI = parameters.ImageURI
-	RequestBody.Passord = parameters.Passord
+	RequestBody.Password = parameters.Password
 	RequestBody.Username = parameters.Username
 	RequestBody.Targets = parameters.Targets
 	RequestBody.TransferProtocol = parameters.TransferProtocol
@@ -73,8 +72,8 @@ func (r *Dell) GetUpdateTaskMonitorURI(response *http.Response) (string, error) 
 	return "", fmt.Errorf("unable to extract task monitor URI from Dell iDRAC response")
 }
 
-func (r *Dell) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error) {
-	task := &redfish.Task{}
+func (r *Dell) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error) {
+	task := &schemas.Task{}
 	respTaskRawBody, err := io.ReadAll(taskMonitorResponse.Body)
 	if err != nil {
 		return nil, err
@@ -89,20 +88,20 @@ func (r *Dell) GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *h
 }
 
 type DellIdracManager struct {
-	BMC     *redfish.Manager
+	BMC     *schemas.Manager
 	Service *gofish.Service
 }
 
 type DellAttributes struct {
 	Id         string
-	Attributes redfish.SettingsAttributes
-	Settings   common.Settings `json:"@Redfish.Settings"`
+	Attributes schemas.SettingsAttributes
+	Settings   schemas.Settings `json:"@Redfish.Settings"`
 	Etag       string
 }
 
 type DellManagerLinksOEM struct {
-	DellLinkAttributes  common.Links `json:"DellAttributes"`
-	DellAttributesCount int          `json:"DellAttributes@odata.count"`
+	DellLinkAttributes  schemas.Links `json:"DellAttributes"`
+	DellAttributesCount int           `json:"DellAttributes@odata.count"`
 }
 
 func (d *DellIdracManager) GetObjFromUri(
@@ -129,13 +128,16 @@ func (d *DellIdracManager) GetObjFromUri(
 }
 
 func (d *DellIdracManager) getCurrentBMCSettingAttribute(ctx context.Context) ([]DellAttributes, error) {
-
 	type temp struct {
-		DellOEMData DellManagerLinksOEM `json:"Dell"`
+		Links struct {
+			Oem struct {
+				Dell DellManagerLinksOEM
+			}
+		}
 	}
 
 	tempData := &temp{}
-	err := json.Unmarshal(d.BMC.OemLinks, tempData)
+	err := json.Unmarshal(d.BMC.RawData, tempData)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +145,7 @@ func (d *DellIdracManager) getCurrentBMCSettingAttribute(ctx context.Context) ([
 	// get all current attributes values for dell manager
 	BMCDellAttributes := []DellAttributes{}
 	var errs []error
-	for _, data := range tempData.DellOEMData.DellLinkAttributes {
+	for _, data := range tempData.Links.Oem.Dell.DellLinkAttributes {
 		BMCDellAttribute := &DellAttributes{}
 		eTag, err := d.GetObjFromUri(ctx, data.String(), BMCDellAttribute)
 		if err != nil {
@@ -165,7 +167,7 @@ func (d *DellIdracManager) getFilteredBMCRegistryAttributes(
 	readOnly bool,
 	immutable bool,
 ) (
-	filtered map[string]redfish.Attribute,
+	filtered map[string]schemas.Attributes,
 	err error,
 ) {
 	// from the registriesAttribure, get the attributes which can be changed.
@@ -173,7 +175,7 @@ func (d *DellIdracManager) getFilteredBMCRegistryAttributes(
 	if err != nil {
 		return nil, err
 	}
-	bmcRegistryAttribute := &redfish.AttributeRegistry{}
+	bmcRegistryAttribute := &schemas.AttributeRegistry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "ManagerAttributeRegistry") {
 			_, err = d.GetObjFromUri(ctx, registry.Location[0].URI, bmcRegistryAttribute)
@@ -184,7 +186,7 @@ func (d *DellIdracManager) getFilteredBMCRegistryAttributes(
 		}
 	}
 	// filter out immutable, readonly and hidden attributes
-	filteredAttr := make(map[string]redfish.Attribute)
+	filteredAttr := make(map[string]schemas.Attributes)
 	for _, entry := range bmcRegistryAttribute.RegistryEntries.Attributes {
 		if entry.Immutable == immutable && entry.ReadOnly == readOnly && !entry.Hidden {
 			filteredAttr[entry.AttributeName] = entry
@@ -197,7 +199,7 @@ func (d *DellIdracManager) getFilteredBMCRegistryAttributes(
 func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 	ctx context.Context,
 	attributes map[string]string,
-) (redfish.SettingsAttributes, error) {
+) (schemas.SettingsAttributes, error) {
 
 	BMCDellAttributes, err := d.getCurrentBMCSettingAttribute(ctx)
 	if err != nil {
@@ -205,7 +207,7 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 	}
 
 	// merge al the current attributes to single map, to help fetch it later
-	var mergedBMCAttributes = make(redfish.SettingsAttributes)
+	var mergedBMCAttributes = make(schemas.SettingsAttributes)
 	for _, BMCattributeValue := range BMCDellAttributes {
 		for k, v := range BMCattributeValue.Attributes {
 			if _, ok := mergedBMCAttributes[k]; !ok {
@@ -230,10 +232,10 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 	}
 
 	// from the given attributes to change, find the ones which can be changed and get current value for them
-	result := make(redfish.SettingsAttributes, len(attributes))
+	result := make(schemas.SettingsAttributes, len(attributes))
 	var errs []error
 	for name := range attributes {
-		var entry redfish.Attribute
+		var entry schemas.Attributes
 		var ok bool
 
 		// First check registry attributes, then fall back to Dell common attributes
@@ -249,7 +251,7 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 		// need to be checked with the actual value rather than the display value
 		// as the settings provided will have actual values.
 		// replace display values with actual values
-		if strings.ToLower(string(entry.Type)) == string(redfish.EnumerationAttributeType) {
+		if strings.ToLower(string(entry.Type)) == string(schemas.EnumerationAttributeType) {
 			for _, attrValue := range entry.Value {
 				if attrValue.ValueDisplayName == mergedBMCAttributes[name] {
 					result[name] = attrValue.ValueName
@@ -283,8 +285,8 @@ func (d *DellIdracManager) GetOEMBMCSettingAttribute(
 
 func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 	ctx context.Context,
-	attrs redfish.SettingsAttributes,
-	applyTime common.ApplyTime,
+	attrs schemas.SettingsAttributes,
+	applyTime schemas.SettingsApplyTime,
 ) error {
 
 	BMCattributeValues, err := d.getCurrentBMCSettingAttribute(ctx)
@@ -292,15 +294,15 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 		return err
 	}
 
-	payloads := make(map[string]redfish.SettingsAttributes, len(BMCattributeValues))
+	payloads := make(map[string]schemas.SettingsAttributes, len(BMCattributeValues))
 	for key, value := range attrs {
 		for _, eachAttr := range BMCattributeValues {
 			if _, ok := eachAttr.Attributes[key]; ok {
-				if data, ok := payloads[eachAttr.Settings.SettingsObject.String()]; ok {
+				if data, ok := payloads[eachAttr.Settings.SettingsObject]; ok {
 					data[key] = value
 				} else {
-					payloads[eachAttr.Settings.SettingsObject.String()] = make(redfish.SettingsAttributes)
-					payloads[eachAttr.Settings.SettingsObject.String()][key] = value
+					payloads[eachAttr.Settings.SettingsObject] = make(schemas.SettingsAttributes)
+					payloads[eachAttr.Settings.SettingsObject][key] = value
 				}
 				// keys cant be duplicate. Hence, break once its already found in one of idrac settings sub types
 				break
@@ -359,20 +361,20 @@ func (d *DellIdracManager) UpdateBMCAttributesApplyAt(
 	return nil
 }
 
-func (d *DellIdracManager) GetBMCPendingAttributeValues(ctx context.Context) (redfish.SettingsAttributes, error) {
+func (d *DellIdracManager) GetBMCPendingAttributeValues(ctx context.Context) (schemas.SettingsAttributes, error) {
 
 	BMCattributeValues, err := d.getCurrentBMCSettingAttribute(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var mergedPendingBMCAttributes = make(redfish.SettingsAttributes)
+	var mergedPendingBMCAttributes = make(schemas.SettingsAttributes)
 	var tBMCSetting struct {
-		Attributes redfish.SettingsAttributes `json:"Attributes"`
+		Attributes schemas.SettingsAttributes `json:"Attributes"`
 	}
 
 	for _, BMCattributeValue := range BMCattributeValues {
-		_, err := d.GetObjFromUri(ctx, BMCattributeValue.Settings.SettingsObject.String(), &tBMCSetting)
+		_, err := d.GetObjFromUri(ctx, BMCattributeValue.Settings.SettingsObject, &tBMCSetting)
 		if err != nil {
 			return nil, err
 		}
@@ -390,54 +392,54 @@ func (d *DellIdracManager) GetBMCPendingAttributeValues(ctx context.Context) (re
 
 // dellCommonBMCAttributes defines commonly configured Dell iDRAC attributes
 // that may not be in the standard registry but are supported by Dell iDRAC
-var dellCommonBMCAttributes = map[string]redfish.Attribute{
+var dellCommonBMCAttributes = map[string]schemas.Attributes{
 	"SysLog.1.SysLogEnable": {
-		Type:          redfish.BooleanAttributeType,
+		Type:          schemas.BooleanAttributeType,
 		ReadOnly:      false,
 		ResetRequired: true,
 	},
 	"SysLog.1.SysLogServer1": {
-		Type:          redfish.StringAttributeType,
+		Type:          schemas.StringAttributeType,
 		ReadOnly:      false,
 		ResetRequired: false,
 	},
 	"SysLog.1.SysLogServer2": {
-		Type:          redfish.StringAttributeType,
+		Type:          schemas.StringAttributeType,
 		ReadOnly:      false,
 		ResetRequired: false,
 	},
 	"NTPConfigGroup.1.NTPEnable": {
-		Type:          redfish.BooleanAttributeType,
+		Type:          schemas.BooleanAttributeType,
 		ReadOnly:      false,
 		ResetRequired: true,
 	},
 	"NTPConfigGroup.1.NTP1": {
-		Type:          redfish.StringAttributeType,
+		Type:          schemas.StringAttributeType,
 		ReadOnly:      false,
 		ResetRequired: true,
 	},
 	"NTPConfigGroup.1.NTP2": {
-		Type:          redfish.StringAttributeType,
+		Type:          schemas.StringAttributeType,
 		ReadOnly:      false,
 		ResetRequired: true,
 	},
 	"EmailAlert.1.Enable": {
-		Type:          redfish.BooleanAttributeType,
+		Type:          schemas.BooleanAttributeType,
 		ReadOnly:      false,
 		ResetRequired: false,
 	},
 	"EmailAlert.1.Address": {
-		Type:          redfish.StringAttributeType,
+		Type:          schemas.StringAttributeType,
 		ReadOnly:      false,
 		ResetRequired: false,
 	},
 	"SNMP.1.AgentEnable": {
-		Type:          redfish.BooleanAttributeType,
+		Type:          schemas.BooleanAttributeType,
 		ReadOnly:      false,
 		ResetRequired: true,
 	},
 	"SNMP.1.AgentCommunity": {
-		Type:          redfish.StringAttributeType,
+		Type:          schemas.StringAttributeType,
 		ReadOnly:      false,
 		ResetRequired: true,
 	},
@@ -445,7 +447,7 @@ var dellCommonBMCAttributes = map[string]redfish.Attribute{
 
 func (d *DellIdracManager) CheckBMCAttributes(
 	ctx context.Context,
-	attributes redfish.SettingsAttributes,
+	attributes schemas.SettingsAttributes,
 ) (bool, error) {
 	filteredAttr, err := d.getFilteredBMCRegistryAttributes(ctx, false, false)
 	if err != nil {

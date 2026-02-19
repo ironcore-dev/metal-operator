@@ -15,7 +15,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -251,7 +251,7 @@ func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
 		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
-		err = bmcClient.ResetManager(ctx, bmcManager.ID, redfish.GracefulRestartResetType)
+		err = bmcClient.ResetManager(ctx, bmcManager.ID, schemas.GracefulRestartResetType)
 		if err != nil {
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}

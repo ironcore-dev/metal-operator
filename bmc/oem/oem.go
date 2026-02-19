@@ -8,33 +8,32 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 // ManagerInterface defines methods for OEM-specific Server Manager's operations in BMC.
 type ManagerInterface interface {
 	// GetOEMBMCSettingAttribute retrieves OEM-specific BMC setting attributes.
-	GetOEMBMCSettingAttribute(ctx context.Context, attributes map[string]string) (redfish.SettingsAttributes, error)
+	GetOEMBMCSettingAttribute(ctx context.Context, attributes map[string]string) (schemas.SettingsAttributes, error)
 
 	// GetBMCPendingAttributeValues retrieves pending BMC attribute values.
-	GetBMCPendingAttributeValues(ctx context.Context) (redfish.SettingsAttributes, error)
+	GetBMCPendingAttributeValues(ctx context.Context) (schemas.SettingsAttributes, error)
 
 	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
-	CheckBMCAttributes(ctx context.Context, attributes redfish.SettingsAttributes) (bool, error)
+	CheckBMCAttributes(ctx context.Context, attributes schemas.SettingsAttributes) (bool, error)
 
 	// GetObjFromUri retrieves an object from a given URI and populates the response object.
 	GetObjFromUri(ctx context.Context, uri string, respObj any) (string, error)
 
 	// UpdateBMCAttributesApplyAt updates BMC attributes and applies them at the specified time.
-	UpdateBMCAttributesApplyAt(ctx context.Context, attrs redfish.SettingsAttributes, applyTime common.ApplyTime) error
+	UpdateBMCAttributesApplyAt(ctx context.Context, attrs schemas.SettingsAttributes, applyTime schemas.SettingsApplyTime) error
 }
 
 // OEMInterface defines methods for OEM-specific Server operations in BMC.
 type OEMInterface interface {
-	GetUpdateRequestBody(parameters *redfish.SimpleUpdateParameters) *SimpleUpdateRequestBody
+	GetUpdateRequestBody(parameters *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody
 	GetUpdateTaskMonitorURI(response *http.Response) (string, error)
-	GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*redfish.Task, error)
+	GetTaskMonitorDetails(ctx context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error)
 }
 
 func IsSubMap(main, sub map[string]any) bool {

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -872,11 +873,12 @@ func (r *ServerReconciler) bootServer(ctx context.Context, log logr.Logger, bmcC
 		return r.virtualMediaBootServer(ctx, log, bmcClient, server, config)
 	default: // BootMethodPXE or empty
 		log.Info("Booting server via PXE")
-		return r.pxeBootServer(ctx, log, bmcClient, server)
+		return r.pxeBootServer(ctx, bmcClient, server)
 	}
 }
 
-func (r *ServerReconciler) pxeBootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+	log := ctrl.LoggerFrom(ctx)
 	if server == nil || server.Spec.BootConfigurationRef == nil {
 		log.V(1).Info("Server not ready for netboot")
 		return nil
@@ -929,7 +931,7 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, log logr.
 	// Dell/Lenovo: Slot 1 = CD, Slot 2 = CD
 	bootISOSlot := "1"
 	configISOSlot := "2"
-	
+
 	systemInfo, err := bmcClient.GetSystemInfo(ctx, systemURI)
 	if err != nil {
 		log.V(1).Info("Failed to get system info for manufacturer detection, using default slot mapping", "error", err.Error())
@@ -961,7 +963,8 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, log logr.
 	return nil
 }
 
-func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, log logr.Logger, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID))
 	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		log.V(1).Info("Did not find server information in registry")

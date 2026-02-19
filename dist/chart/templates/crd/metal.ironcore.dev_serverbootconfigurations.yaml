@@ -95,7 +95,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               image:
-description: |-
+                description: |-
                   Image specifies the boot image to be used for the server.
                   For PXE boot: OCI image reference containing kernel/initrd.
                   For VirtualMedia boot: OCI image reference containing bootable ISO layer.

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -843,22 +844,7 @@ func (r *ServerReconciler) bootServer(ctx context.Context, log logr.Logger, bmcC
 		return r.virtualMediaBootServer(ctx, log, bmcClient, server, config)
 	default: // BootMethodPXE or empty
 		log.Info("Booting server via PXE")
-		return r.pxeBootServer(ctx, log, bmcClient, server)
-	}
-}
-
-func (r *ServerReconciler) bootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
-	if config == nil {
-		return fmt.Errorf("server boot configuration is required")
-	}
-
-	switch config.Spec.BootMethod {
-	case metalv1alpha1.BootMethodVirtualMedia:
-		log.Info("Booting server via virtual media")
-		return r.virtualMediaBootServer(ctx, log, bmcClient, server, config)
-	default: // BootMethodPXE or empty
-		log.Info("Booting server via PXE")
-		return r.pxeBootServer(ctx, log, bmcClient, server)
+		return r.pxeBootServer(ctx, bmcClient, server)
 	}
 }
 
@@ -916,76 +902,7 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, log logr.
 	// Dell/Lenovo: Slot 1 = CD, Slot 2 = CD
 	bootISOSlot := "1"
 	configISOSlot := "2"
-	
-	systemInfo, err := bmcClient.GetSystemInfo(ctx, systemURI)
-	if err != nil {
-		log.V(1).Info("Failed to get system info for manufacturer detection, using default slot mapping", "error", err.Error())
-	} else if systemInfo.Manufacturer == "HPE" || systemInfo.Manufacturer == "HP" {
-		// HPE requires bootable OS ISO on slot 2 (CD), config drive on slot 1 (USB)
-		bootISOSlot = "2"
-		configISOSlot = "1"
-		log.V(1).Info("Detected HPE system, using HPE-specific slot mapping", "bootSlot", bootISOSlot, "configSlot", configISOSlot)
-	}
 
-	if err := bmcClient.MountVirtualMedia(ctx, systemURI, bootISOURL, bootISOSlot); err != nil {
-		return fmt.Errorf("failed to mount boot ISO: %w", err)
-	}
-	log.V(1).Info("Mounted boot ISO", "slot", bootISOSlot)
-
-	configISOURL := config.Status.ConfigISOURL
-	if configISOURL != "" {
-		if err := bmcClient.MountVirtualMedia(ctx, systemURI, configISOURL, configISOSlot); err != nil {
-			return fmt.Errorf("failed to mount config ISO: %w", err)
-		}
-		log.V(1).Info("Mounted config ISO", "slot", configISOSlot)
-	}
-
-	if err := bmcClient.SetVirtualMediaBootOnce(ctx, systemURI); err != nil {
-		return fmt.Errorf("failed to set virtual media boot: %w", err)
-	}
-	log.V(1).Info("Set boot override to virtual media")
-
-	return nil
-}
-
-func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
-	if server == nil || server.Spec.BootConfigurationRef == nil {
-		log.V(1).Info("Server not ready for virtual media boot")
-		return nil
-	}
-
-	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
-		return fmt.Errorf("can only boot server via virtual media with valid BMC ref or inline BMC configuration")
-	}
-
-	bootISOURL := config.Status.BootISOURL
-	if bootISOURL == "" {
-		return fmt.Errorf("boot-operator has not provided BootISOURL in ServerBootConfiguration status")
-	}
-
-	systemURI := server.Spec.SystemURI
-
-	currentMedia, err := bmcClient.GetVirtualMediaStatus(ctx, systemURI)
-	if err != nil {
-		return fmt.Errorf("failed to get current virtual media status: %w", err)
-	}
-
-	for _, media := range currentMedia {
-		if media.Inserted {
-			if err := bmcClient.EjectVirtualMedia(ctx, systemURI, media.ID); err != nil {
-				log.V(1).Info("Failed to eject existing virtual media", "id", media.ID, "error", err.Error())
-			} else {
-				log.V(1).Info("Ejected existing virtual media", "id", media.ID)
-			}
-		}
-	}
-
-	// Determine slot IDs based on manufacturer
-	// HPE: Slot 1 = USB, Slot 2 = CD (bootable OS must be on CD)
-	// Dell/Lenovo: Slot 1 = CD, Slot 2 = CD
-	bootISOSlot := "1"
-	configISOSlot := "2"
-	
 	systemInfo, err := bmcClient.GetSystemInfo(ctx, systemURI)
 	if err != nil {
 		log.V(1).Info("Failed to get system info for manufacturer detection, using default slot mapping", "error", err.Error())

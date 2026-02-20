@@ -3,9 +3,9 @@
 
 package oem
 
-import "github.com/stmcginnis/gofish/redfish"
+import "github.com/stmcginnis/gofish/schemas"
 
 type SimpleUpdateRequestBody struct {
-	redfish.SimpleUpdateParameters
-	RedfishOperationApplyTime redfish.OperationApplyTime `json:"@Redfish.OperationApplyTime,omitempty"`
+	schemas.UpdateServiceSimpleUpdateParameters
+	RedfishOperationApplyTime schemas.OperationApplyTime `json:"@Redfish.OperationApplyTime,omitempty"`
 }

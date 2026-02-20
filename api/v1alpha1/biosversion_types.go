@@ -4,8 +4,7 @@
 package v1alpha1
 
 import (
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -109,11 +108,11 @@ type Task struct {
 
 	// State is the current state of the task.
 	// +optional
-	State redfish.TaskState `json:"state,omitempty"`
+	State schemas.TaskState `json:"state,omitempty"`
 
 	// Status is the current status of the task.
 	// +optional
-	Status common.Health `json:"status,omitempty"`
+	Status schemas.Health `json:"status,omitempty"`
 
 	// PercentComplete is the percentage of completion of the task.
 	// +optional

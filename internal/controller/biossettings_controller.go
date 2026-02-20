@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,10 +34,6 @@ import (
 const (
 	BIOSSettingsFinalizer = "metal.ironcore.dev/biossettings"
 
-	BIOSServerMaintenanceConditionCreated       = "ServerMaintenanceCreated"
-	BIOSServerMaintenanceReasonCreated          = "ServerMaintenanceHasBeenCreated"
-	BIOSServerMaintenanceConditionDeleted       = "ServerMaintenanceDeleted"
-	BIOSServerMaintenanceReasonDeleted          = "ServerMaintenanceHasBeenDeleted"
 	BIOSVersionUpdateConditionPending           = "BIOSVersionUpdatePending"
 	BIOSVersionUpgradeReasonPending             = "BIOSVersionNeedsTObeUpgraded"
 	BIOSPendingSettingConditionCheck            = "BIOSSettingsCheckPendingSettings"
@@ -65,6 +61,7 @@ const (
 	BIOSSettingsReasonRebootServerPowerOn       = "PowerOnCompletedDuringReboot"
 	BIOSSettingsConditionVerifySettings         = "VerifySettingsPostUpdate"
 	BIOSSettingsReasonVerificationCompleted     = "VerificationCompleted"
+	BIOSSettingsReasonVerificationNotCompleted  = "VerificationNotCompleted"
 	BIOSSettingsConditionWrongSettings          = "SettingsProvidedNotValid"
 	BIOSSettingsReasonWrongSettings             = "SettingsProvidedAreNotValid"
 )
@@ -113,6 +110,7 @@ func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *met
 	if settings.DeletionTimestamp.IsZero() {
 		return false
 	}
+	log.V(1).Info("Reconciling BIOSSettings")
 
 	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) &&
 		settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
@@ -154,14 +152,14 @@ func (r *BIOSSettingsReconciler) removeServerMaintenance(ctx context.Context, se
 	if err == nil && maintenance.DeletionTimestamp.IsZero() {
 		if metav1.IsControlledBy(maintenance, settings) {
 			log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(maintenance), "State", maintenance.Status.State)
-			condition, err = GetCondition(r.Conditions, settings.Status.Conditions, BIOSServerMaintenanceConditionDeleted)
+			condition, err = GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionDeleted)
 			if err != nil {
 				return fmt.Errorf("failed to get the delete condition for ServerMaintenance: %w", err)
 			}
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BIOSServerMaintenanceReasonDeleted),
+				conditionutils.UpdateReason(ServerMaintenanceReasonDeleted),
 				conditionutils.UpdateMessage(fmt.Sprintf("Deleting %s", maintenance.Name)),
 			); err != nil {
 				return fmt.Errorf("failed to update deleting ServerMaintenance condition: %w", err)
@@ -175,8 +173,13 @@ func (r *BIOSSettingsReconciler) removeServerMaintenance(ctx context.Context, se
 	}
 
 	if apierrors.IsNotFound(err) || err == nil {
-		if err := r.patchMaintenanceRef(ctx, settings, nil, condition); err != nil {
+		log.V(1).Info("Cleaning up ServerMaintenance ref in BIOSSettings as the object is gone")
+		if err := r.patchMaintenanceRef(ctx, settings, nil); err != nil {
 			return fmt.Errorf("failed to remove the ServerMaintenance reference in BIOSSettings status: %w", err)
+		}
+		// Update condition to reflect deletion
+		if err := r.updateStatus(ctx, settings, settings.Status.State, condition); err != nil {
+			return fmt.Errorf("failed to patch BIOSSettings conditions: %w", err)
 		}
 	}
 	return nil
@@ -241,6 +244,14 @@ func (r *BIOSSettingsReconciler) reconcile(ctx context.Context, settings *metalv
 	} else if server.Spec.BIOSSettingsRef.Name != settings.Name {
 		referredBIOSSetting, err := r.getBIOSSettingsByName(ctx, server.Spec.BIOSSettingsRef.Name)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				log.V(1).Info("Referred server contains reference to non-existing BIOSSettings object, updating reference to the current BIOSSettings")
+				if err := r.patchBIOSSettingsRefForServer(ctx, server, settings); err != nil {
+					return ctrl.Result{}, err
+				}
+				// need to requeue to make sure that reconcile re-happens here. updating server object does not trigger reconcile here.
+				return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+			}
 			log.V(1).Info("Server contains a reference to a different BIOSSettings object", "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
 			return ctrl.Result{}, err
 		}
@@ -420,8 +431,40 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 		return ctrl.Result{}, err
 	}
 
+	condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionWaiting)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if ok := r.isServerInMaintenance(ctx, settings, server); !ok {
 		log.V(1).Info("Server is not yet in Maintenance status, skipping")
+		if condition.Status != metav1.ConditionTrue {
+			if err := r.Conditions.Update(
+				condition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", settings.Spec.ServerMaintenanceRef.Name)),
+			); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
+			}
+			if err := r.updateStatus(ctx, settings, settings.Status.State, condition); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings ServerMaintenance waiting conditions: %w", err)
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+	// once in maintenance, clear the waiting condition if present
+	if condition.Reason != ServerMaintenanceReasonApproved {
+		if err := r.Conditions.Update(
+			condition,
+			conditionutils.UpdateStatus(corev1.ConditionFalse),
+			conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
+			conditionutils.UpdateMessage("Server is now in Maintenance mode"),
+		); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
+		}
+		if err := r.updateStatus(ctx, settings, settings.Status.State, condition); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings ServerMaintenance waiting conditions: %w", err)
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -760,6 +803,17 @@ func (r *BIOSSettingsReconciler) verifySettingsUpdateComplete(ctx context.Contex
 		}
 
 		log.V(1).Info("Waiting on the BIOS setting to take place")
+		if verifySettingUpdate.Reason != BIOSSettingsReasonVerificationNotCompleted {
+			if err := r.Conditions.Update(
+				verifySettingUpdate,
+				conditionutils.UpdateStatus(corev1.ConditionFalse),
+				conditionutils.UpdateReason(BIOSSettingsReasonVerificationNotCompleted),
+				conditionutils.UpdateMessage("Required BIOS settings has not yet verified on the server"),
+			); err != nil {
+				return false, fmt.Errorf("failed to update verify BIOSSetting condition: %w", err)
+			}
+			return false, r.updateFlowStatus(ctx, biosSettings, flowStatus.State, flowStatus, verifySettingUpdate)
+		}
 		return true, nil
 	}
 
@@ -852,9 +906,9 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 	if err != nil {
 		return fmt.Errorf("failed to get pending BIOS settings: %w", err)
 	}
-	var pendingSettingsDiff redfish.SettingsAttributes
+	var pendingSettingsDiff schemas.SettingsAttributes
 	if len(pendingSettings) == 0 {
-		log.V(1).Info("Applying settings", "settingsDiff", settingsDiff, "SettingsName", flowItem.Name)
+		log.V(1).Info("Issuing settings Update on BMC", "settingsDiff", settingsDiff, "SettingsName", flowItem.Name)
 		err = bmcClient.SetBiosAttributesOnReset(ctx, server.Spec.SystemURI, settingsDiff)
 		if err != nil {
 			return fmt.Errorf("failed to set BMC settings: %w", err)
@@ -885,7 +939,7 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 		return errors.Join(err, fmt.Errorf("bios setting issued to bmc not accepted"))
 	}
 
-	pendingSettingsDiff = make(redfish.SettingsAttributes, len(settingsDiff))
+	pendingSettingsDiff = make(schemas.SettingsAttributes, len(settingsDiff))
 	for name, value := range settingsDiff {
 		if pendingValue, ok := pendingSettings[name]; ok && value != pendingValue {
 			pendingSettingsDiff[name] = pendingValue
@@ -978,6 +1032,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		biosSettingsBase := settings.DeepCopy()
 		settings.Status.AutoRetryCountRemaining = nil
 		settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
+		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 		annotations := settings.GetAnnotations()
 		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
 		if err != nil {
@@ -1051,24 +1106,24 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsReconciler) getPendingBIOSSettings(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (redfish.SettingsAttributes, error) {
+func (r *BIOSSettingsReconciler) getPendingBIOSSettings(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (schemas.SettingsAttributes, error) {
 	if server == nil {
-		return redfish.SettingsAttributes{}, fmt.Errorf("server is nil")
+		return schemas.SettingsAttributes{}, fmt.Errorf("server is nil")
 	}
 	return bmcClient.GetBiosPendingAttributeValues(ctx, server.Spec.SystemURI)
 }
 
-func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings map[string]string, server *metalv1alpha1.Server) (redfish.SettingsAttributes, error) {
+func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings map[string]string, server *metalv1alpha1.Server) (schemas.SettingsAttributes, error) {
 	keys := slices.Collect(maps.Keys(settings))
 
 	// get the accepted type/values from the server BIOS for given keys
 	actualSettings, err := bmcClient.GetBiosAttributeValues(ctx, server.Spec.SystemURI, keys)
 	if err != nil {
-		return redfish.SettingsAttributes{}, fmt.Errorf("failed to get BIOSSettings: %w", err)
+		return schemas.SettingsAttributes{}, fmt.Errorf("failed to get BIOSSettings: %w", err)
 	}
 
 	// check if the given settings match the accepted setting's type/values from server BIOS
-	diff := redfish.SettingsAttributes{}
+	diff := schemas.SettingsAttributes{}
 	var errs []error
 	for key, value := range settings {
 		res, ok := actualSettings[key]
@@ -1104,7 +1159,7 @@ func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient 
 	return diff, errors.Join(errs...)
 }
 
-func (r *BIOSSettingsReconciler) getBIOSVersionAndSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (string, redfish.SettingsAttributes, error) {
+func (r *BIOSSettingsReconciler) getBIOSVersionAndSettingsDiff(ctx context.Context, bmcClient bmc.BMC, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (string, schemas.SettingsAttributes, error) {
 	log := ctrl.LoggerFrom(ctx)
 	completeSettings := make(map[string]string)
 	for _, flowItem := range settings.Spec.SettingsFlow {
@@ -1153,7 +1208,38 @@ func (r *BIOSSettingsReconciler) isServerInMaintenance(ctx context.Context, sett
 func (r *BIOSSettingsReconciler) requestMaintenanceForServer(ctx context.Context, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if settings.Spec.ServerMaintenanceRef != nil {
-		return false, nil
+		// Verify the referenced ServerMaintenance still exists
+		if _, err := GetServerMaintenanceForObjectReference(ctx, r.Client, settings.Spec.ServerMaintenanceRef); apierrors.IsNotFound(err) {
+			log.V(1).Info("Referenced ServerMaintenance no longer exists, clearing ref to allow re-creation")
+			if err := r.patchMaintenanceRef(ctx, settings, nil); err != nil {
+				return false, fmt.Errorf("failed to clear stale ServerMaintenance ref: %w", err)
+			}
+			return true, nil // requeue to re-create
+		} else if err != nil {
+			return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", err)
+		}
+		condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionCreated)
+		if err != nil {
+			return false, err
+		}
+		if condition.Status == metav1.ConditionTrue {
+			log.V(1).Info("ServerMaintenance already present for BIOSSettings", "ServerMaintenance", settings.Spec.ServerMaintenanceRef.Name)
+			return false, nil
+		}
+		log.V(1).Info("ServerMaintenance present for BIOSSettings create condition")
+		if err := r.Conditions.Update(
+			condition,
+			conditionutils.UpdateStatus(corev1.ConditionTrue),
+			conditionutils.UpdateReason(ServerMaintenanceReasonCreated),
+			conditionutils.UpdateMessage(fmt.Sprintf("Created/present %v at %v", settings.Spec.ServerMaintenanceRef.Name, time.Now())),
+		); err != nil {
+			return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
+		}
+		// Update condition to reflect creation
+		if err := r.updateStatus(ctx, settings, settings.Status.State, condition); err != nil {
+			return false, fmt.Errorf("failed to patch BIOSSettings conditions: %w", err)
+		}
+		return true, nil
 	}
 
 	serverMaintenance := &metalv1alpha1.ServerMaintenance{
@@ -1176,20 +1262,7 @@ func (r *BIOSSettingsReconciler) requestMaintenanceForServer(ctx context.Context
 	}
 	log.V(1).Info("Created/Patched ServerMaintenance", "ServerMaintenance", serverMaintenance.Name, "Operation", opResult)
 
-	condition, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSServerMaintenanceConditionCreated)
-	if err != nil {
-		return false, err
-	}
-	if err := r.Conditions.Update(
-		condition,
-		conditionutils.UpdateStatus(corev1.ConditionTrue),
-		conditionutils.UpdateReason(BIOSServerMaintenanceReasonCreated),
-		conditionutils.UpdateMessage(fmt.Sprintf("Created %v at %v", serverMaintenance.Name, time.Now())),
-	); err != nil {
-		return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
-	}
-
-	if err := r.patchMaintenanceRef(ctx, settings, serverMaintenance, condition); err != nil {
+	if err := r.patchMaintenanceRef(ctx, settings, serverMaintenance); err != nil {
 		return false, fmt.Errorf("failed to patch serverMaintenance ref in biosSettings status: %w", err)
 	}
 
@@ -1225,7 +1298,7 @@ func (r *BIOSSettingsReconciler) patchBIOSSettingsRefForServer(ctx context.Conte
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
-func (r *BIOSSettingsReconciler) patchMaintenanceRef(ctx context.Context, settings *metalv1alpha1.BIOSSettings, maintenance *metalv1alpha1.ServerMaintenance, condition *metav1.Condition) error {
+func (r *BIOSSettingsReconciler) patchMaintenanceRef(ctx context.Context, settings *metalv1alpha1.BIOSSettings, maintenance *metalv1alpha1.ServerMaintenance) error {
 	biosSettingsBase := settings.DeepCopy()
 
 	if maintenance == nil {
@@ -1239,24 +1312,8 @@ func (r *BIOSSettingsReconciler) patchMaintenanceRef(ctx context.Context, settin
 			UID:        maintenance.UID,
 		}
 	}
-	if condition != nil {
-		if err := r.Conditions.UpdateSlice(
-			&settings.Status.Conditions,
-			condition.Type,
-			conditionutils.UpdateStatus(condition.Status),
-			conditionutils.UpdateReason(condition.Reason),
-			conditionutils.UpdateMessage(condition.Message),
-		); err != nil {
-			return fmt.Errorf("failed to patch BIOSSettings condition: %w", err)
-		}
-	}
-
 	if err := r.Patch(ctx, settings, client.MergeFrom(biosSettingsBase)); err != nil {
 		return fmt.Errorf("failed to patch ServerMaintenance ref in BIOSSettings: %w", err)
-	}
-
-	if err := r.updateStatus(ctx, settings, settings.Status.State, condition); err != nil {
-		return fmt.Errorf("failed to patch BIOSSettings conditions: %w", err)
 	}
 
 	return nil
@@ -1312,7 +1369,7 @@ func (r *BIOSSettingsReconciler) updateFlowStatus(ctx context.Context, settings 
 					return fmt.Errorf("failed to patch BIOSettings condition: %w", err)
 				}
 			} else {
-				settings.Status.FlowState[idx].Conditions = nil
+				settings.Status.FlowState[idx].Conditions = []metav1.Condition{}
 			}
 			currentIdx = idx
 			continue
@@ -1364,7 +1421,7 @@ func (r *BIOSSettingsReconciler) updateStatus(ctx context.Context, settings *met
 		}
 	} else if state == metalv1alpha1.BIOSSettingsStatePending {
 		// reset, when we restart the setting update
-		settings.Status.Conditions = nil
+		settings.Status.Conditions = []metav1.Condition{}
 		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 	}
 

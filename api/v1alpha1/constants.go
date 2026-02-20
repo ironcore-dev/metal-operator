@@ -3,7 +3,7 @@
 
 package v1alpha1
 
-import "github.com/stmcginnis/gofish/redfish"
+import "github.com/stmcginnis/gofish/schemas"
 
 // establishing general rule for constants naming for Annotations
 // "Key" for Annotation constants should be named OperationAnnotation.
@@ -69,11 +69,11 @@ const (
 	GracefulRestartBMC = "graceful-restart-bmc"
 )
 
-var AnnotationToRedfishMapping = map[string]redfish.ResetType{
-	GracefulRestartServerPower: redfish.GracefulRestartResetType,
-	HardRestartServerPower:     redfish.ForceRestartResetType,
-	PowerCycleServerPower:      redfish.PowerCycleResetType,
-	ForceOffServerPower:        redfish.ForceOffResetType,
-	ForceOnServerPower:         redfish.ForceOnResetType,
-	GracefulRestartBMC:         redfish.GracefulRestartResetType,
+var AnnotationToRedfishMapping = map[string]schemas.ResetType{
+	GracefulRestartServerPower: schemas.GracefulRestartResetType,
+	HardRestartServerPower:     schemas.ForceRestartResetType,
+	PowerCycleServerPower:      schemas.PowerCycleResetType,
+	ForceOffServerPower:        schemas.ForceOffResetType,
+	ForceOnServerPower:         schemas.ForceOnResetType,
+	GracefulRestartBMC:         schemas.GracefulRestartResetType,
 }

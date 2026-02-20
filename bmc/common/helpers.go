@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 type InvalidBMCSettingsError struct {
@@ -21,8 +21,8 @@ func (e *InvalidBMCSettingsError) Error() string {
 }
 
 func CheckAttribues(
-	attrs redfish.SettingsAttributes,
-	filtered map[string]redfish.Attribute,
+	attrs schemas.SettingsAttributes,
+	filtered map[string]schemas.Attributes,
 ) (reset bool, err error) {
 	reset = false
 	var errs []error
@@ -42,7 +42,7 @@ func CheckAttribues(
 			reset = true
 		}
 		switch entryAttribute.Type {
-		case redfish.IntegerAttributeType:
+		case schemas.IntegerAttributeType:
 			if _, ok := value.(int); !ok {
 				err := &InvalidBMCSettingsError{
 					SettingName:  name,
@@ -53,7 +53,7 @@ func CheckAttribues(
 				}
 				errs = append(errs, err)
 			}
-		case redfish.StringAttributeType:
+		case schemas.StringAttributeType:
 			if _, ok := value.(string); !ok {
 				err := &InvalidBMCSettingsError{
 					SettingName:  name,
@@ -64,7 +64,7 @@ func CheckAttribues(
 				}
 				errs = append(errs, err)
 			}
-		case redfish.EnumerationAttributeType:
+		case schemas.EnumerationAttributeType:
 			if _, ok := value.(string); !ok {
 				err := &InvalidBMCSettingsError{
 					SettingName:  name,

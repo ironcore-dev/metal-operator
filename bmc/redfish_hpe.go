@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
-	"k8s.io/utils/ptr"
 )
 
 // HPERedfishBMC is the HPE-specific implementation of the BMC interface.
@@ -67,10 +67,18 @@ func (r *HPERedfishBMC) hpeExtractTaskMonitorURI(response *http.Response) (strin
 		TaskMonitor string
 	}
 	if err = json.Unmarshal(rawBody, &tResp); err != nil {
-		return tResp.TaskMonitor, fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
+		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
 	}
 
-	return tResp.TaskMonitor, nil
+	if tResp.TaskMonitor != "" {
+		return tResp.TaskMonitor, nil
+	}
+
+	if loc := response.Header.Get("Location"); loc != "" {
+		return loc, nil
+	}
+
+	return "", fmt.Errorf("task monitor URI not found in response body or Location header")
 }
 
 func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorResponse *http.Response) (*schemas.Task, error) {
@@ -101,7 +109,7 @@ func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorRespon
 		if len(tTask.Error.ExtendedInfo) > 0 {
 			if msgID, ok := tTask.Error.ExtendedInfo[0]["MessageId"]; ok && strings.Contains(msgID, "Success") {
 				task.TaskState = schemas.CompletedTaskState
-				task.PercentComplete = ptr.To(uint(100))
+				task.PercentComplete = gofish.ToRef(uint(100))
 				task.TaskStatus = schemas.OKHealth
 				return task, nil
 			}

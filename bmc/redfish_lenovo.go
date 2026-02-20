@@ -73,7 +73,11 @@ func (r *LenovoRedfishBMC) lenovoExtractTaskMonitorURI(response *http.Response) 
 		TaskMonitor string `json:"@odata.id,omitempty"`
 	}
 	if err = json.Unmarshal(rawBody, &tResp); err != nil {
-		return tResp.TaskMonitor, fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
+		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
+	}
+
+	if tResp.TaskMonitor == "" {
+		return "", fmt.Errorf("lenovoExtractTaskMonitorURI: missing @odata.id in response")
 	}
 
 	return tResp.TaskMonitor, nil

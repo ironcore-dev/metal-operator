@@ -20,3 +20,13 @@ jobs:
           BRANCH="release-${TAG%.*}"
           git switch -c "${BRANCH}"
           git push origin "${BRANCH}"
+      - name: Update release target to release branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          BRANCH="release-${TAG%.*}"
+          # Update the release target_commitish so release-drafter
+          # (with filter-by-commitish) can find it as the baseline
+          # when drafting patch releases on the release branch.
+          gh release edit "${TAG}" --target "${BRANCH}"

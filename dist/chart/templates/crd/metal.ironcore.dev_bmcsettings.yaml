@@ -73,6 +73,12 @@ spec:
                 x-kubernetes-validations:
                 - message: BMCRef is immutable
                   rule: self == oldSelf
+              failedAutoRetryCount:
+                description: FailedAutoRetryCount is the number of times the controller
+                  should automatically retry the bios upgrade in case of failure before
+                  giving up.
+                format: int32
+                type: integer
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
                   applied on the server.
@@ -132,6 +138,12 @@ spec:
           status:
             description: BMCSettingsStatus defines the observed state of BMCSettings.
             properties:
+              autoRetryCountRemaining:
+                description: AutoRetryCountRemaining is the number of remaining times
+                  the controller will automatically retry the bios upgrade in case
+                  of failure before giving up.
+                format: int32
+                type: integer
               conditions:
                 description: Conditions represents the latest available observations
                   of the BMC Settings Resource state.

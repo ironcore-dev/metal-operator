@@ -10,20 +10,22 @@ import (
 
 // RedfishMockUps is an implementation of the BMC interface for Redfish.
 type RedfishMockUps struct {
-	BIOSSettingAttr       map[string]map[string]any
-	PendingBIOSSetting    map[string]map[string]any
-	BIOSVersion           string
-	BIOSUpgradingVersion  string
-	BIOSUpgradeTaskIndex  int
-	BIOSUpgradeTaskStatus []redfish.Task
+	BIOSSettingAttr             map[string]map[string]any
+	PendingBIOSSetting          map[string]map[string]any
+	BIOSVersion                 string
+	BIOSUpgradingVersion        string
+	BIOSUpgradeTaskIndex        int
+	BIOSUpgradeTaskStatus       []redfish.Task
+	BIOSUpgradeTaskFailedStatus []redfish.Task
 
 	BMCSettingAttr    map[string]map[string]any
 	PendingBMCSetting map[string]map[string]any
 
-	BMCVersion           string
-	BMCUpgradingVersion  string
-	BMCUpgradeTaskIndex  int
-	BMCUpgradeTaskStatus []redfish.Task
+	BMCVersion                 string
+	BMCUpgradingVersion        string
+	BMCUpgradeTaskIndex        int
+	BMCUpgradeTaskStatus       []redfish.Task
+	BMCUpgradeTaskFailedStatus []redfish.Task
 
 	Accounts              map[string]*redfish.ManagerAccount
 	SimulateUnvailableBMC bool
@@ -73,6 +75,36 @@ func (r *RedfishMockUps) InitializeDefaults() {
 			PercentComplete: 100,
 		},
 	}
+	r.BIOSUpgradeTaskFailedStatus = []redfish.Task{
+		{
+			TaskState:       redfish.NewTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.PendingTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.StartingTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 10,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 20,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 98,
+		},
+		{
+			TaskState:       redfish.ExceptionTaskState,
+			PercentComplete: 99,
+		},
+	}
 
 	r.PendingBMCSetting = map[string]map[string]any{}
 
@@ -108,6 +140,37 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		{
 			TaskState:       redfish.CompletedTaskState,
 			PercentComplete: 100,
+		},
+	}
+
+	r.BMCUpgradeTaskFailedStatus = []redfish.Task{
+		{
+			TaskState:       redfish.NewTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.PendingTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.StartingTaskState,
+			PercentComplete: 0,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 10,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 20,
+		},
+		{
+			TaskState:       redfish.RunningTaskState,
+			PercentComplete: 98,
+		},
+		{
+			TaskState:       redfish.ExceptionTaskState,
+			PercentComplete: 99,
 		},
 	}
 

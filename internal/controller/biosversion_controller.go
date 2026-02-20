@@ -166,7 +166,7 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, biosVersion *meta
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 
-	log.V(1).Info("Reconciled BIOSVersion")
+	log.V(1).Info("Reconciled BIOSVersion", "State", biosVersion.Status.State, "annotations", biosVersion.GetAnnotations(), "Conditions", biosVersion.Status.Conditions)
 	return ctrl.Result{}, nil
 }
 
@@ -193,6 +193,18 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 
 	switch biosVersion.Status.State {
 	case "", metalv1alpha1.BIOSVersionStatePending:
+		// remove the retry annotation if it's present as we are retrying now
+		annotations := biosVersion.GetAnnotations()
+		if annotations[metalv1alpha1.OperationAnnotation] != "" {
+			biosVersionBase := biosVersion.DeepCopy()
+			delete(annotations, metalv1alpha1.OperationAnnotation)
+			biosVersion.SetAnnotations(annotations)
+			if err := r.Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+				return true, fmt.Errorf("failed to patch BIOSVersion for retrying: %w", err)
+			}
+			log.V(1).Info("Removed retry annotation from BIOSVersion for retrying", "BIOSVersion", biosVersion.Annotations)
+			return false, nil
+		}
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateInProgress:
 		if biosVersion.Spec.ServerMaintenanceRef == nil {
@@ -219,62 +231,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 	case metalv1alpha1.BIOSVersionStateCompleted:
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateFailed:
-		if shouldRetryReconciliation(biosVersion) {
-			log.V(1).Info("Retrying ...")
-			biosVersionBase := biosVersion.DeepCopy()
-			biosVersion.Status.AutoRetryCountRemaining = nil
-			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
-			annotations := biosVersion.GetAnnotations()
-			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
-			if err != nil {
-				return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
-			}
-			r.Conditions.Update(retryCondition,
-				conditionutils.UpdateStatus(metav1.ConditionTrue),
-				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
-				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
-			)
-			biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
-			delete(annotations, metalv1alpha1.OperationAnnotation)
-			biosVersion.SetAnnotations(annotations)
-
-			if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
-				return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)
-			}
-			return true, nil
-		}
-		if biosVersion.Spec.FailedAutoRetryCount != nil {
-			remaining := biosVersion.Status.AutoRetryCountRemaining
-			if remaining == nil || *remaining > 0 {
-				log.V(1).Info("Retrying automatically...", "RetryCount", remaining)
-				biosVersionBase := biosVersion.DeepCopy()
-				biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
-				retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
-				if err != nil {
-					return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
-				}
-				if retryCondition.Status == metav1.ConditionTrue {
-					// keep the condition if it's already true,
-					// otherwise SET resource will patch the retry annotation again.
-					biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
-				} else {
-					biosVersion.Status.Conditions = nil
-				}
-
-				if remaining == nil {
-					*biosVersion.Status.AutoRetryCountRemaining = *biosVersion.Status.AutoRetryCountRemaining - 1
-				} else {
-					*biosVersion.Status.AutoRetryCountRemaining--
-				}
-
-				if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
-					return true, fmt.Errorf("failed to patch BIOSVersion status for auto-retrying: %w", err)
-				}
-				return true, nil
-			}
-		}
-		log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion, "Server", server.Name)
-		return false, nil
+		return r.processFailedState(ctx, biosVersion, server)
 	}
 
 	log.V(1).Info("Unknown State found", "State", biosVersion.Status.State)
@@ -400,6 +357,70 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 	return false, nil
 }
 
+func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	if shouldRetryReconciliation(biosVersion) {
+		log.V(1).Info("Retrying BIOSVersion as per annotation")
+		biosVersionBase := biosVersion.DeepCopy()
+		biosVersion.Status.AutoRetryCountRemaining = nil
+		biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+		annotations := biosVersion.GetAnnotations()
+		retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		if err != nil {
+			return true, fmt.Errorf("failed to get retry condition for BIOSVersion: %w", err)
+		}
+		// update only once
+		if retryCondition.Status != metav1.ConditionTrue {
+			err := r.Conditions.Update(retryCondition,
+				conditionutils.UpdateStatus(metav1.ConditionTrue),
+				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
+			)
+			if err != nil {
+				return true, fmt.Errorf("failed to update retry condition for BIOSVersion: %w", err)
+			}
+			biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
+		}
+		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+			return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)
+		}
+		return true, nil
+	}
+	if biosVersion.Spec.FailedAutoRetryCount != nil {
+		remaining := biosVersion.Status.AutoRetryCountRemaining
+		if remaining == nil || *remaining > 0 {
+			log.V(1).Info("Retrying BIOSVersion automatically as per the spec 'FailedAutoRetryCount'", "RetryCount", remaining)
+			biosVersionBase := biosVersion.DeepCopy()
+			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			if err != nil {
+				return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
+			}
+			if retryCondition.Status == metav1.ConditionTrue {
+				// keep the condition if it's already true,
+				// otherwise SET resource will patch the retry annotation again.
+				biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
+			} else {
+				biosVersion.Status.Conditions = nil
+			}
+
+			if remaining == nil {
+				val := *biosVersion.Spec.FailedAutoRetryCount - 1
+				biosVersion.Status.AutoRetryCountRemaining = &val
+			} else {
+				*biosVersion.Status.AutoRetryCountRemaining--
+			}
+
+			if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+				return true, fmt.Errorf("failed to patch BIOSVersion status for auto-retrying: %w", err)
+			}
+			return true, nil
+		}
+	}
+	log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion, "Server", server.Name)
+	return false, nil
+}
+
 func (r *BIOSVersionReconciler) handleBMCReset(
 	ctx context.Context,
 	bmcClient bmc.BMC,
@@ -485,6 +506,13 @@ func (r *BIOSVersionReconciler) cleanup(ctx context.Context, bmcClient bmc.BMC, 
 
 		log.V(1).Info("Upgraded BIOS version", "Version", currentBiosVersion, "Server", server.Name)
 		return r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateCompleted, nil, nil)
+	}
+	retryFailedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+	if err != nil {
+		return fmt.Errorf("failed to get retry condition for BIOSVersion: %w", err)
+	}
+	if retryFailedCondition.Status == metav1.ConditionTrue {
+		return r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateInProgress, nil, retryFailedCondition)
 	}
 	return r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateInProgress, nil, nil)
 }

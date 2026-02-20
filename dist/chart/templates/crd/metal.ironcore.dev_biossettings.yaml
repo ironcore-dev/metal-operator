@@ -66,6 +66,12 @@ spec:
           spec:
             description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
+              failedAutoRetryCount:
+                description: FailedAutoRetryCount is the number of times the controller
+                  should automatically retry the bios upgrade in case of failure before
+                  giving up.
+                format: int32
+                type: integer
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
                   enforced on the server.
@@ -153,6 +159,12 @@ spec:
           status:
             description: BIOSSettingsStatus defines the observed state of BIOSSettings.
             properties:
+              autoRetryCountRemaining:
+                description: AutoRetryCountRemaining is the number of remaining times
+                  the controller will automatically retry the bios upgrade in case
+                  of failure before giving up.
+                format: int32
+                type: integer
               conditions:
                 description: Conditions represents the latest available observations
                   of the BIOSSettings's current state.

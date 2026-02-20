@@ -293,6 +293,17 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 		return ctrl.Result{}, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateApplied, nil)
 	}
 
+	annotations := settings.GetAnnotations()
+	if annotations[metalv1alpha1.OperationAnnotation] != "" {
+		settingsBase := settings.DeepCopy()
+		delete(annotations, metalv1alpha1.OperationAnnotation)
+		settings.SetAnnotations(annotations)
+		if err := r.Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings for removing retrying annotation: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	pendingSettings, err := r.getPendingBIOSSettings(ctx, bmcClient, server)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get pending BIOS settings: %w", err)
@@ -618,7 +629,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 					return false, fmt.Errorf("failed to update Invalid Settings condition: %w", errCond)
 				}
 				err = r.updateFlowStatus(ctx, settings, metalv1alpha1.BIOSSettingsFlowStateFailed, flowStatus, inValidSettings)
-				return true, errors.Join(err, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil))
+				return false, errors.Join(err, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil))
 			}
 			return false, err
 		}
@@ -965,17 +976,61 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 	if shouldRetryReconciliation(settings) {
 		log.V(1).Info("Retrying reconciliation")
 		biosSettingsBase := settings.DeepCopy()
+		settings.Status.AutoRetryCountRemaining = nil
 		settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
-		// todo: add FlowState reset after the #403 is merged
-		settings.Status.Conditions = nil
 		annotations := settings.GetAnnotations()
-		delete(annotations, metalv1alpha1.OperationAnnotation)
-		settings.SetAnnotations(annotations)
+		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get retry condition for BIOSSettings: %w", err)
+		}
+		// update only once
+		if retryCondition.Status != metav1.ConditionTrue {
+			err := r.Conditions.Update(retryCondition,
+				conditionutils.UpdateStatus(metav1.ConditionTrue),
+				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
+			)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update retry condition for BIOSSettings: %w", err)
+			}
+			settings.Status.Conditions = []metav1.Condition{*retryCondition}
+		}
 
 		if err := r.Status().Patch(ctx, settings, client.MergeFrom(biosSettingsBase)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for retrying: %w", err)
 		}
 		return ctrl.Result{}, nil
+	}
+	if settings.Spec.FailedAutoRetryCount != nil {
+		remaining := settings.Status.AutoRetryCountRemaining
+		if remaining == nil || *remaining > 0 {
+			log.V(1).Info("Retrying BIOSSettings automatically as per the spec 'FailedAutoRetryCount'", "RetryCount", remaining)
+			biosSettingsBase := settings.DeepCopy()
+			settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
+			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to get Retry condition for BIOSSettings: %w", err)
+			}
+			if retryCondition.Status == metav1.ConditionTrue {
+				// keep the condition if it's already true,
+				// otherwise SET resource will patch the retry annotation again.
+				settings.Status.Conditions = []metav1.Condition{*retryCondition}
+			} else {
+				settings.Status.Conditions = nil
+			}
+
+			if remaining == nil {
+				val := *settings.Spec.FailedAutoRetryCount - 1
+				settings.Status.AutoRetryCountRemaining = &val
+			} else {
+				*settings.Status.AutoRetryCountRemaining--
+			}
+
+			if err := r.Status().Patch(ctx, settings, client.MergeFrom(biosSettingsBase)); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for auto-retrying: %w", err)
+			}
+			return ctrl.Result{}, nil
+		}
 	}
 
 	log.V(1).Info("Failed to update BIOS settings", "Server", server.Name)

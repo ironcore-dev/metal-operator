@@ -6,6 +6,7 @@ package controller
 import (
 	"fmt"
 	"net/netip"
+	"time"
 
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
@@ -505,6 +506,180 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
 		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
+
+	It("Should successfully retry failed state child resources once", func(ctx SpecContext) {
+
+		retryCount := 2
+
+		By("Create resource")
+		bmcVersionSet := &metalv1alpha1.BMCVersionSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmcsversion-set-",
+				Namespace:    ns.Name,
+			},
+			Spec: metalv1alpha1.BMCVersionSetSpec{
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion + " fail",
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
+				},
+				BMCSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"metal.ironcore.dev/Manufacturer": "bar",
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcVersionSet)).To(Succeed())
+
+		By("Ensuring that the BMCVersion resource has been created")
+		var bmcVersionList metalv1alpha1.BMCVersionList
+		Eventually(ObjectList(&bmcVersionList)).Should(HaveField("Items", HaveLen(2)))
+
+		By("Checking if the BMCVersion has been created")
+		bmcVersion02 := &metalv1alpha1.BMCVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcVersionList.Items[0].Name,
+			},
+		}
+		Eventually(Get(bmcVersion02)).Should(Succeed())
+
+		By("Checking if the 2nd BMCVersion has been created")
+		bmcVersion03 := &metalv1alpha1.BMCVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcVersionList.Items[1].Name,
+			},
+		}
+		Eventually(Get(bmcVersion03)).Should(Succeed())
+
+		By("Checking if the status has been updated")
+		Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBMCVersion", BeNumerically("==", 0)),
+		))
+
+		By("Ensuring that the BMCVersion02 has failed")
+		Eventually(Object(bmcVersion02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BMCVersion03 has failed")
+		Eventually(Object(bmcVersion03)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Checking if the status has been updated to failed")
+		Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBMCVersion", BeNumerically("==", 2)),
+		))
+
+		By("Ensuring that the BMCVersion02 has not been changed")
+		Consistently(Object(bmcVersion02), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BMCVersion03 has not been changed")
+		Consistently(Object(bmcVersion03), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Updating the BMCVersionSet with retry annotation")
+		Eventually(Update(bmcVersionSet, func() {
+			bmcVersionSet.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryChildAndSelf,
+			}
+		})).Should(Succeed())
+
+		By("Ensuring that the BMCVersion02 has been retried ")
+		Eventually(Object(bmcVersion02)).WithPolling(10 * time.Microsecond).MustPassRepeatedly(1).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCVersionStateFailed))),
+			HaveField("Status.AutoRetryCountRemaining", BeNil()),
+		))
+		By("Ensuring that the BMCVersion03 has been retried")
+		Eventually(Object(bmcVersion02)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
+			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
+		))
+
+		By("Ensuring that the BMCVersion02 has failed again")
+		Eventually(Object(bmcVersion02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BMCVersion03 has failed again")
+		Eventually(Object(bmcVersion03)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BMCVersion02 has not been changed")
+		Consistently(Object(bmcVersion02), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BMCVersion03 has not been changed")
+		Consistently(Object(bmcVersion03), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Checking if the status has been updated to failed again")
+		Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBMCVersion", BeNumerically("==", 2)),
+		))
+
+		By("Ensuring that the BMCVersion02 has not been retried again")
+		Consistently(Object(bmcVersion02), "25ms").Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Ensuring that the BMCVersion03 has not been retried again")
+		Consistently(Object(bmcVersion03), "25ms").Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Updating the BMCVersionSet with NO retry annotation")
+		Eventually(Update(bmcVersionSet, func() {
+			delete(bmcVersionSet.GetAnnotations(), metalv1alpha1.OperationAnnotation)
+			bmcVersionSet.Spec.BMCVersionTemplate.Version = upgradeServerBMCVersion
+			bmcVersionSet.Spec.BMCVersionTemplate.Image.URI = upgradeServerBMCVersion
+		})).Should(Succeed())
+
+		By("Checking if the status has been updated to completed (retried automatically)")
+		Eventually(Object(bmcVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBMCVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBMCVersion", BeNumerically("==", 0)),
+			HaveField("Status.CompletedBMCVersion", BeNumerically("==", 2)),
+		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmcVersionSet)).To(Succeed())
+		Eventually(Get(bmcVersionSet)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, bmcVersion02)).To(Succeed())
+		Eventually(Get(bmcVersion02)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, bmcVersion03)).To(Succeed())
+		Eventually(Get(bmcVersion03)).Should(Satisfy(apierrors.IsNotFound))
+
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
 	})

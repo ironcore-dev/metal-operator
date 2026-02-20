@@ -404,4 +404,176 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
 	})
+
+	It("Should successfully retry failed state child resources once", func(ctx SpecContext) {
+
+		retryCount := 2
+		By("Create resource")
+		biosVersionSet := &metalv1alpha1.BIOSVersionSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-biosversion-set-",
+				Namespace:    ns.Name,
+			},
+			Spec: metalv1alpha1.BIOSVersionSetSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 upgradeServerBiosVersion + " fail",
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion + " fail"},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
+				},
+				ServerSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"metal.ironcore.dev/Manufacturer": "bar",
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosVersionSet)).To(Succeed())
+
+		By("Checking if the BIOSVersion has been created")
+		biosVersion02 := &metalv1alpha1.BIOSVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosVersionSet.Name + "-" + server02.Name,
+			},
+		}
+		Eventually(Get(biosVersion02)).Should(Succeed())
+
+		By("Checking if the 2nd BIOSVersion has been created")
+		biosVersion03 := &metalv1alpha1.BIOSVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosVersionSet.Name + "-" + server03.Name,
+			},
+		}
+		Eventually(Get(biosVersion03)).Should(Succeed())
+
+		By("Checking if the status has been updated")
+		Eventually(Object(biosVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
+		))
+
+		By("Ensuring that the BIOSVersion 02 has failed")
+		Eventually(Object(biosVersion02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BIOSVersion 03 has failed")
+		Eventually(Object(biosVersion03)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Checking if the status has been updated to failed")
+		Eventually(Object(biosVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSVersion", BeNumerically("==", 2)),
+		))
+
+		By("Ensuring that the BIOSVersion 02 has not been changed")
+		Consistently(Object(biosVersion02), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BIOSVersion 03 has not been changed")
+		Consistently(Object(biosVersion03), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Updating the BIOSVersionSet with retry annotation")
+		Eventually(Update(biosVersionSet, func() {
+			biosVersionSet.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryChildAndSelf,
+			}
+		})).Should(Succeed())
+
+		By("Ensuring that the BIOSVersion 02 has been retried ")
+		Eventually(Object(biosVersion02)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSVersionStateFailed))),
+			HaveField("Status.AutoRetryCountRemaining", BeNil()),
+		))
+
+		By("Ensuring that the BIOSVersion 03 has been retried")
+		Eventually(Object(biosVersion03)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSVersionStateFailed))),
+			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
+		))
+
+		By("Ensuring that the BIOSVersion 02 has failed again")
+		Eventually(Object(biosVersion02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BIOSVersion 03 has failed again")
+		Eventually(Object(biosVersion03)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BIOSVersion 02 has not been changed")
+		Consistently(Object(biosVersion02), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Ensuring that the BIOSVersion 03 has not been changed")
+		Consistently(Object(biosVersion02), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		By("Checking if the status has been updated to failed again")
+		Eventually(Object(biosVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSVersion", BeNumerically("==", 2)),
+		))
+
+		By("Ensuring that the BIOSVersion 02 has not been retried again")
+		Consistently(Object(biosVersion02), "25ms").Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Ensuring that the BIOSVersion 03 has not been retried again")
+		Consistently(Object(biosVersion03), "25ms").Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Updating the BIOSVersionSet with NO retry annotation")
+		Eventually(Update(biosVersionSet, func() {
+			delete(biosVersionSet.Annotations, metalv1alpha1.OperationAnnotation)
+			biosVersionSet.Spec.BIOSVersionTemplate.Version = upgradeServerBiosVersion
+			biosVersionSet.Spec.BIOSVersionTemplate.Image.URI = upgradeServerBiosVersion
+		})).Should(Succeed())
+
+		By("Checking if the status has been updated to completed (retried automatically)")
+		Eventually(Object(biosVersionSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSVersion", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSVersion", BeNumerically("==", 0)),
+			HaveField("Status.CompletedBIOSVersion", BeNumerically("==", 2)),
+		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, biosVersionSet)).To(Succeed())
+		Eventually(Get(biosVersionSet)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosVersion02)).To(Succeed())
+		Eventually(Get(biosVersion02)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosVersion03)).To(Succeed())
+		Eventually(Get(biosVersion03)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
 })

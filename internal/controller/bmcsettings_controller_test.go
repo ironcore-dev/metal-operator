@@ -4,6 +4,8 @@
 package controller
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -464,7 +466,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
 		bmcSetting := make(map[string]string)
-		bmcSetting["fooreboot"] = "145"
+		bmcSetting["UnknownData"] = "145"
+
+		retryCount := 2
 
 		By("update the server state to Available  state")
 		Eventually(UpdateStatus(server, func() {
@@ -477,6 +481,9 @@ var _ = Describe("BMCSettings Controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+				},
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
@@ -484,31 +491,44 @@ var _ = Describe("BMCSettings Controller", func() {
 					Version:                 "1.45.455b66-rev4",
 					SettingsMap:             bmcSetting,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
 				}},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
 
-		By("Moving to Failed state")
-		Eventually(UpdateStatus(bmcSettings, func() {
-			bmcSettings.Status.State = metalv1alpha1.BMCSettingsStateFailed
-		})).Should(Succeed())
+		Eventually(func(g Gomega) bool {
+			g.Expect(Get(bmcSettings)()).To(Succeed())
+			return bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateFailed && bmcSettings.Status.AutoRetryCountRemaining == nil
+		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
 
-		Eventually(Update(bmcSettings, func() {
-			bmcSettings.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
-			}
-		})).Should(Succeed())
+		Eventually(func(g Gomega) bool {
+			g.Expect(Get(bmcSettings)()).To(Succeed())
+			return bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateFailed && bmcSettings.Status.AutoRetryCountRemaining != nil && *bmcSettings.Status.AutoRetryCountRemaining == int32(1)
+		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
+
+		Eventually(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
 
 		Eventually(Object(bmcSettings)).Should(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		)
 
-		Eventually(Object(bmcSettings)).Should(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
-		)
+		By("Ensuring that the BMC setting has not been changed")
+		Consistently(Object(bmcSettings), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
+		// clean up maintenance if any, as the test not auto delete child objects
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		for _, maintenance := range serverMaintenanceList.Items {
+			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+		}
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)

@@ -10,7 +10,16 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-// todo: merge with checkBiosAttribues after #298
+type InvalidBMCSettingsError struct {
+	SettingName  string
+	SettingValue any
+	Message      string
+}
+
+func (e *InvalidBMCSettingsError) Error() string {
+	return fmt.Sprintf("invalid BMC setting %s=%v: %s", e.SettingName, e.SettingValue, e.Message)
+}
+
 func CheckAttribues(
 	attrs redfish.SettingsAttributes,
 	filtered map[string]redfish.Attribute,
@@ -21,7 +30,12 @@ func CheckAttribues(
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
-			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
+			err := &InvalidBMCSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message:      "attribute not found or is immutable/hidden",
+			}
+			errs = append(errs, err)
 			continue
 		}
 		if entryAttribute.ResetRequired {
@@ -30,39 +44,36 @@ func CheckAttribues(
 		switch entryAttribute.Type {
 		case redfish.IntegerAttributeType:
 			if _, ok := value.(int); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 			}
 		case redfish.StringAttributeType:
 			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 			}
 		case redfish.EnumerationAttributeType:
 			if _, ok := value.(string); !ok {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name,
-						value,
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 						entryAttribute.Type,
-						entryAttribute,
-					))
+					),
+				}
+				errs = append(errs, err)
 				break
 			}
 			var validEnum bool
@@ -73,18 +84,22 @@ func CheckAttribues(
 				}
 			}
 			if !validEnum {
-				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message:      fmt.Sprintf("attributes value is unknown. Valid Attributes %v", entryAttribute.Value),
+				}
+				errs = append(errs, err)
 			}
 		default:
-			errs = append(
-				errs,
-				fmt.Errorf(
-					"attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-					name,
-					value,
+			err := &InvalidBMCSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
 					entryAttribute.Type,
-					entryAttribute,
-				))
+				),
+			}
+			errs = append(errs, err)
 		}
 	}
 	return reset, errors.Join(errs...)

@@ -264,8 +264,8 @@ func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Cont
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersion", version.Name, "Operation", opResult)
-			opResult, err = controllerutil.CreateOrPatch(ctx, r.Client, &version, func() error {
-				version.Status.AutoRetryCountRemaining = version.Spec.BIOSVersionTemplate.FailedAutoRetryCount
+			_, err = controllerutil.CreateOrPatch(ctx, r.Client, &version, func() error {
+				version.Status.AutoRetryCountRemaining = version.Spec.FailedAutoRetryCount
 				return nil
 			})
 			if err != nil {

@@ -283,9 +283,16 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
-		childObj, ok := obj.(client.Object)
+		cObj, ok := obj.(client.Object)
 		if !ok {
 			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
+			return nil
+		}
+		// Always fetch the latest version from the API server
+		childObj := cObj.DeepCopyObject().(client.Object)
+		err := c.Get(ctx, client.ObjectKeyFromObject(cObj), childObj)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to fetch latest child %s: %w", cObj.GetName(), err))
 			return nil
 		}
 		// if the child is being deleted, we don't need to propagate
@@ -301,7 +308,6 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 				delete(annotations, metalv1alpha1.OperationAnnotation)
 				childObj.SetAnnotations(annotations)
 			}
-
 			// Use reflection to access the Status.Conditions field, assuming given child objects have it.
 			v := reflect.ValueOf(childObj).Elem()
 			statusField := v.FieldByName("Status")
@@ -312,7 +318,8 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 					// Same as above, if there's no Conditions field, we can't check this.
 					conditions, ok := conditionsField.Interface().([]metav1.Condition)
 					if ok {
-						retriedCondition, err := GetCondition(nil, conditions, RetryOfFailedResourceConditionIssued)
+						acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+						retriedCondition, err := GetCondition(acc, conditions, RetryOfFailedResourceConditionIssued)
 
 						if err == nil && retriedCondition != nil &&
 							retriedCondition.Status == metav1.ConditionTrue &&

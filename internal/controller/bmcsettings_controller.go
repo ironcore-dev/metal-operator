@@ -24,6 +24,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/common"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/stmcginnis/gofish/redfish"
 )
@@ -46,6 +47,8 @@ const (
 	BMCPoweredOffReason               = "BMCPowerIsCurrentlyPoweredOff"
 	BMCVersionUpdatePendingCondition  = "BMCVersionUpdatePending"
 	BMCVersionUpgradePendingReason    = "BMCVersionUpgradeIsPending"
+	BMCSettingsConditionWrongSettings = "SettingsProvidedNotValid"
+	BMCSettingsReasonWrongSettings    = "SettingsProvidedAreNotValid"
 )
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete
@@ -279,6 +282,17 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(
 	defer bmcClient.Logout()
 	switch bmcSetting.Status.State {
 	case "", metalv1alpha1.BMCSettingsStatePending:
+		// remove the retry annotation if it's present as we are retrying now
+		annotations := bmcSetting.GetAnnotations()
+		if annotations[metalv1alpha1.OperationAnnotation] != "" {
+			bmcSettingBase := bmcSetting.DeepCopy()
+			delete(annotations, metalv1alpha1.OperationAnnotation)
+			bmcSetting.SetAnnotations(annotations)
+			if err := r.Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingBase)); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to patch BMCSettings for removing retrying annotation: %w", err)
+			}
+			return ctrl.Result{}, nil
+		}
 		var state = metalv1alpha1.BMCSettingsStateInProgress
 		versionCheckCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCVersionUpdatePendingCondition)
 		if err != nil {
@@ -418,6 +432,24 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 		if len(pendingAttr) == 0 {
 			resetBMCReq, err := bmcClient.CheckBMCAttributes(ctx, BMC.Spec.BMCUUID, settingsDiff)
 			if err != nil {
+				log.Error(err, "could not validate settings and determine if reboot needed")
+				var invalidSettingsErr *common.InvalidBMCSettingsError
+				if errors.As(err, &invalidSettingsErr) {
+					inValidSettings, errCond := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCSettingsConditionWrongSettings)
+					if errCond != nil {
+						return ctrl.Result{}, fmt.Errorf("failed to get Condition for skip reboot post setting update %v", err)
+					}
+					if errCond := r.Conditions.Update(
+						inValidSettings,
+						conditionutils.UpdateStatus(corev1.ConditionTrue),
+						conditionutils.UpdateReason(BMCSettingsReasonWrongSettings),
+						conditionutils.UpdateMessage(fmt.Sprintf("Settings provided is invalid. error: %v", err)),
+					); errCond != nil {
+						return ctrl.Result{}, fmt.Errorf("failed to update Invalid Settings condition: %w", errCond)
+					}
+					err := r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, inValidSettings)
+					return ctrl.Result{}, err
+				}
 				return ctrl.Result{}, fmt.Errorf("failed to check BMC settings provided: %w", err)
 			}
 
@@ -572,16 +604,61 @@ func (r *BMCSettingsReconciler) handleFailedState(
 ) error {
 	log := ctrl.LoggerFrom(ctx)
 	if shouldRetryReconciliation(bmcSetting) {
-		log.V(1).Info("Retrying BMCSettings reconciliation")
+		log.V(1).Info("Retrying BMCSettings as per annotation")
 		bmcSettingsBase := bmcSetting.DeepCopy()
+		bmcSetting.Status.AutoRetryCountRemaining = nil
 		bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
 		annotations := bmcSetting.GetAnnotations()
-		delete(annotations, metalv1alpha1.OperationAnnotation)
-		bmcSetting.SetAnnotations(annotations)
+		retryCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		if err != nil {
+			return fmt.Errorf("failed to get retry condition for BIOSSettings: %w", err)
+		}
+		if retryCondition.Status != metav1.ConditionTrue {
+			err := r.Conditions.Update(retryCondition,
+				conditionutils.UpdateStatus(metav1.ConditionTrue),
+				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to update retry condition for BMCSettings: %w", err)
+			}
+			bmcSetting.Status.Conditions = []metav1.Condition{*retryCondition}
+		}
 		if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingsBase)); err != nil {
 			return fmt.Errorf("failed to patch BMCSettings status for retrying: %w", err)
 		}
 		return nil
+	}
+	if bmcSetting.Spec.FailedAutoRetryCount != nil {
+		remaining := bmcSetting.Status.AutoRetryCountRemaining
+		if remaining == nil || *remaining > 0 {
+			log.V(1).Info("Retrying BMCSettings automatically as per the spec 'FailedAutoRetryCount'", "RetryCount", remaining)
+			biosSettingsBase := bmcSetting.DeepCopy()
+			bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
+			retryCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			if err != nil {
+				return fmt.Errorf("failed to get Retry condition for BMCSettings: %w", err)
+			}
+			if retryCondition.Status == metav1.ConditionTrue {
+				// keep the condition if it's already true,
+				// otherwise SET resource will patch the retry annotation again.
+				bmcSetting.Status.Conditions = []metav1.Condition{*retryCondition}
+			} else {
+				bmcSetting.Status.Conditions = nil
+			}
+
+			if remaining == nil {
+				val := *bmcSetting.Spec.FailedAutoRetryCount - 1
+				bmcSetting.Status.AutoRetryCountRemaining = &val
+			} else {
+				*bmcSetting.Status.AutoRetryCountRemaining--
+			}
+
+			if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(biosSettingsBase)); err != nil {
+				return fmt.Errorf("failed to patch BMCSettings status for auto-retrying: %w", err)
+			}
+			return nil
+		}
 	}
 	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bmc settings maintenance
 	log.V(1).Info("Failed to update BMC setting", "ctx", ctx, "bmcSetting", bmcSetting, "BMC", BMC)

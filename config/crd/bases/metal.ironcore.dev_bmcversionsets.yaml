@@ -119,8 +119,8 @@ spec:
                 properties:
                   failedAutoRetryCount:
                     description: FailedAutoRetryCount is the number of times the controller
-                      should automatically retry the bios upgrade in case of failure
-                      before giving up.
+                      should automatically retry the BMCVersion upgrade in case of
+                      failure before giving up.
                     format: int32
                     type: integer
                   image:

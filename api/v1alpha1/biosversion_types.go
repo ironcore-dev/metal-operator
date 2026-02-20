@@ -45,7 +45,7 @@ type BIOSVersionTemplate struct {
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
-	// FailedAutoRetryCount is the number of times the controller should automatically retry the bios upgrade in case of failure before giving up.
+	// FailedAutoRetryCount is the number of times the controller should automatically retry the BIOSVersion upgrade in case of failure before giving up.
 	// +optional
 	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
 }
@@ -89,7 +89,7 @@ type BIOSVersionStatus struct {
 	// +optional
 	UpgradeTask *Task `json:"upgradeTask,omitempty"`
 
-	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the bios upgrade in case of failure before giving up.
+	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BIOSVersion upgrade in case of failure before giving up.
 	// +optional
 	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
 

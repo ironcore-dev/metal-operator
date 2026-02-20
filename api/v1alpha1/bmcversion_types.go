@@ -34,7 +34,7 @@ type BMCVersionTemplate struct {
 	// +required
 	Image ImageSpec `json:"image"`
 
-	// FailedAutoRetryCount is the number of times the controller should automatically retry the bios upgrade in case of failure before giving up.
+	// FailedAutoRetryCount is the number of times the controller should automatically retry the BMCVersion upgrade in case of failure before giving up.
 	// +optional
 	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
 
@@ -65,7 +65,7 @@ type BMCVersionStatus struct {
 	// UpgradeTask contains the state of the upgrade task created by the BMC.
 	UpgradeTask *Task `json:"upgradeTask,omitempty"`
 
-	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the bios upgrade in case of failure before giving up.
+	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BMCVersion upgrade in case of failure before giving up.
 	// +optional
 	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
 

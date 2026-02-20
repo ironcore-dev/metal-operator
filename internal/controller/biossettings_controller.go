@@ -303,10 +303,10 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 		log.V(1).Info("Skipping BIOSSettings because no settings flow found")
 		return ctrl.Result{}, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateApplied, nil)
 	}
-
-	annotations := settings.GetAnnotations()
-	if annotations[metalv1alpha1.OperationAnnotation] != "" {
+	// remove the retry annotation if it's present as we are retrying now
+	if shouldRetryReconciliation(settings) {
 		settingsBase := settings.DeepCopy()
+		annotations := settings.GetAnnotations()
 		delete(annotations, metalv1alpha1.OperationAnnotation)
 		settings.SetAnnotations(annotations)
 		if err := r.Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {

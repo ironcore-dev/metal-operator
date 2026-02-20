@@ -167,7 +167,7 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, biosVersion *meta
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 
-	log.V(1).Info("Reconciled BIOSVersion", "State", biosVersion.Status.State, "annotations", biosVersion.GetAnnotations(), "Conditions", biosVersion.Status.Conditions)
+	log.V(1).Info("Reconciled BIOSVersion")
 	return ctrl.Result{}, nil
 }
 
@@ -195,9 +195,9 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 	switch biosVersion.Status.State {
 	case "", metalv1alpha1.BIOSVersionStatePending:
 		// remove the retry annotation if it's present as we are retrying now
-		annotations := biosVersion.GetAnnotations()
-		if annotations[metalv1alpha1.OperationAnnotation] != "" {
+		if shouldRetryReconciliation(biosVersion) {
 			biosVersionBase := biosVersion.DeepCopy()
+			annotations := biosVersion.GetAnnotations()
 			delete(annotations, metalv1alpha1.OperationAnnotation)
 			biosVersion.SetAnnotations(annotations)
 			if err := r.Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {

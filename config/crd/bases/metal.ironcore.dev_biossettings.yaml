@@ -62,8 +62,8 @@ spec:
             properties:
               failedAutoRetryCount:
                 description: FailedAutoRetryCount is the number of times the controller
-                  should automatically retry the bios upgrade in case of failure before
-                  giving up.
+                  should automatically retry the BIOSSettings upgrade in case of failure
+                  before giving up.
                 format: int32
                 type: integer
               serverMaintenancePolicy:
@@ -155,8 +155,8 @@ spec:
             properties:
               autoRetryCountRemaining:
                 description: AutoRetryCountRemaining is the number of remaining times
-                  the controller will automatically retry the bios upgrade in case
-                  of failure before giving up.
+                  the controller will automatically retry the BIOSSettings upgrade
+                  in case of failure before giving up.
                 format: int32
                 type: integer
               conditions:

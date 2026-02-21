@@ -47,6 +47,28 @@ var (
 // Power state categories for BMC reset actions.
 var powerResetBMCStates = []string{"GracefulRestart", "ForceRestart"}
 
+// Delays holds configurable timing for mock server operations.
+type Delays struct {
+	PowerOff          time.Duration
+	PowerOn           time.Duration
+	PowerResetOff     time.Duration
+	PowerResetTransit time.Duration
+	BMCResetOff       time.Duration
+	BMCResetTransit   time.Duration
+}
+
+// DefaultDelays returns the default production-like delays.
+func DefaultDelays() Delays {
+	return Delays{
+		PowerOff:          150 * time.Millisecond,
+		PowerOn:           150 * time.Millisecond,
+		PowerResetOff:     150 * time.Millisecond,
+		PowerResetTransit: 50 * time.Millisecond,
+		BMCResetOff:       150 * time.Millisecond,
+		BMCResetTransit:   150 * time.Millisecond,
+	}
+}
+
 // Sentinel errors for HTTP response mapping.
 var (
 	errNotFound    = errors.New("resource not found")
@@ -61,13 +83,19 @@ type MockServer struct {
 	handler   http.Handler
 	mu        sync.RWMutex
 	overrides map[string]any
+	delays    Delays
 }
 
-func NewMockServer(log logr.Logger, addr string) *MockServer {
+func NewMockServer(log logr.Logger, addr string, opts ...func(*MockServer)) *MockServer {
 	s := &MockServer{
 		addr:      addr,
 		log:       log,
 		overrides: make(map[string]any),
+		delays:    DefaultDelays(),
+	}
+
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	mux := http.NewServeMux()
@@ -75,6 +103,13 @@ func NewMockServer(log logr.Logger, addr string) *MockServer {
 	s.handler = mux
 
 	return s
+}
+
+// WithDelays sets custom delays for the mock server.
+func WithDelays(d Delays) func(*MockServer) {
+	return func(s *MockServer) {
+		s.delays = d
+	}
 }
 
 func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +319,7 @@ func (s *MockServer) parseResetType(body []byte, offStates, onStates, resetState
 }
 
 func (s *MockServer) doPowerOff(systemPath string) {
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(s.delays.PowerOff)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -296,7 +331,7 @@ func (s *MockServer) doPowerOff(systemPath string) {
 }
 
 func (s *MockServer) doPowerOn(systemPath, basePath string) {
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(s.delays.PowerOn)
 	s.mu.Lock()
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
 		base["PowerState"] = PowerOnState
@@ -311,7 +346,7 @@ func (s *MockServer) doPowerOn(systemPath, basePath string) {
 }
 
 func (s *MockServer) doPowerReset(systemPath, basePath string) {
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(s.delays.PowerResetOff)
 	s.mu.Lock()
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
 		base["PowerState"] = PowerOffState
@@ -319,7 +354,7 @@ func (s *MockServer) doPowerReset(systemPath, basePath string) {
 	}
 	s.mu.Unlock()
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(s.delays.PowerResetTransit)
 
 	s.mu.Lock()
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
@@ -335,7 +370,7 @@ func (s *MockServer) doPowerReset(systemPath, basePath string) {
 }
 
 func (s *MockServer) doBMCReset(bmcPath string) {
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(s.delays.BMCResetOff)
 	s.mu.Lock()
 	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
 		base["PowerState"] = PowerOffState
@@ -343,7 +378,7 @@ func (s *MockServer) doBMCReset(bmcPath string) {
 	}
 	s.mu.Unlock()
 
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(s.delays.BMCResetTransit)
 
 	s.mu.Lock()
 	if base, ok := s.overrides[bmcPath].(map[string]any); ok {

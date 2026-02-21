@@ -578,7 +578,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))
-		Consistently(Object(server)).WithTimeout(6 * time.Second).WithPolling(2 * time.Second).Should(SatisfyAny(
+		Consistently(Object(server)).WithTimeout(3 * time.Second).WithPolling(500 * time.Millisecond).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 		))

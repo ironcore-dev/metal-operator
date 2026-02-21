@@ -111,9 +111,9 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer s
 	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
 	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
 	go func() {
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskInit)
 		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskStep)
 			UnitTestMockUps.BIOSUpgradeTaskIndex++
 		}
 	}()
@@ -139,7 +139,7 @@ func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetTy
 	log.V(1).Info("Simulating BMC reset", "UUID", UUID, "ResetType", resetType)
 	go func() {
 		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
-			time.Sleep(150 * time.Millisecond)
+			time.Sleep(UnitTestMockUps.MockDelays.ResetSettingsApply)
 			for key, data := range UnitTestMockUps.PendingBMCSetting {
 				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
 					UnitTestMockUps.BMCSettingAttr[key] = data
@@ -248,9 +248,9 @@ func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer st
 	UnitTestMockUps.BMCUpgradeTaskIndex = 0
 	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
 	go func() {
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskInit)
 		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskStep)
 			UnitTestMockUps.BMCUpgradeTaskIndex++
 		}
 	}()

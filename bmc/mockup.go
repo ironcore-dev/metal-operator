@@ -4,6 +4,8 @@
 package bmc
 
 import (
+	"time"
+
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 )
@@ -27,6 +29,18 @@ type RedfishMockUps struct {
 
 	Accounts              map[string]*schemas.ManagerAccount
 	SimulateUnvailableBMC bool
+
+	// MockDelays controls timing for simulated async operations.
+	MockDelays MockDelays
+}
+
+// MockDelays holds configurable delays for mock BMC operations.
+type MockDelays struct {
+	UpgradeTaskInit     time.Duration
+	UpgradeTaskStep     time.Duration
+	ResetSettingsApply  time.Duration
+	PowerStateChange    time.Duration
+	PendingSettingApply time.Duration
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -145,6 +159,13 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		},
 	}
 	r.SimulateUnvailableBMC = false
+	r.MockDelays = MockDelays{
+		UpgradeTaskInit:     20 * time.Millisecond,
+		UpgradeTaskStep:     5 * time.Millisecond,
+		ResetSettingsApply:  150 * time.Millisecond,
+		PowerStateChange:    150 * time.Millisecond,
+		PendingSettingApply: 50 * time.Millisecond,
+	}
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {

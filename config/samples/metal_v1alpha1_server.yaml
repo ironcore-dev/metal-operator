@@ -9,7 +9,6 @@ metadata:
     app.kubernetes.io/created-by: metal-operator
   name: endpoint-sample-system-0
 spec:
-  uuid: "12345"
   bmcRef:
     name: bmc-sample
   power: "Off"

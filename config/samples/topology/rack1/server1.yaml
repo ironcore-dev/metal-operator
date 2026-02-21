@@ -6,7 +6,6 @@ metadata:
     topology.metal.ironcore.dev/heightunit: "1"
   name: server-1-1
 spec:
-  uuid: "12345"
   bmcRef:
     name: sample-bmc
   power: "Off"

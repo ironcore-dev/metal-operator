@@ -182,7 +182,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme:                 k8sManager.GetScheme(),
 			Insecure:               true,
 			ManagerNamespace:       ns.Name,
-			BMCResetWaitTime:       100 * time.Millisecond,
+			BMCResetWaitTime:       150 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
 			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,

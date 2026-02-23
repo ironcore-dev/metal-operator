@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -278,7 +279,18 @@ var _ = Describe("BMCUser Controller", func() {
 		Eventually(Get(newSecret)).Should(Succeed())
 		Expect(newSecret.Data).To(Not(HaveKeyWithValue("password", []byte("bar"))))
 		Expect(k8sClient.Delete(ctx, adminUser)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, newSecret)).To(Succeed())
+		// The 1s rotation period may trigger additional rotations that create
+		// extra BMCSecrets before we can delete. Clean up all remaining secrets
+		// owned by this user since envtest has no garbage collector.
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for _, s := range secretList.Items {
+			for _, ref := range s.OwnerReferences {
+				if ref.UID == adminUser.UID {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &s))).To(Succeed())
+				}
+			}
+		}
 	})
 
 	It("Should delete bmc user and secret on User deletion", func(ctx SpecContext) {

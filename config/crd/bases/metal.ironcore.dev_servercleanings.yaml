@@ -1,0 +1,369 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: servercleanings.metal.ironcore.dev
+spec:
+  group: metal.ironcore.dev
+  names:
+    kind: ServerCleaning
+    listKind: ServerCleaningList
+    plural: servercleanings
+    shortNames:
+    - scl
+    singular: servercleaning
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.selectedServers
+      name: Selected
+      type: integer
+    - jsonPath: .status.completedCleanings
+      name: Completed
+      type: integer
+    - jsonPath: .status.inProgressCleanings
+      name: InProgress
+      type: integer
+    - jsonPath: .status.failedCleanings
+      name: Failed
+      type: integer
+    - jsonPath: .status.state
+      name: State
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServerCleaning is the Schema for the servercleaning API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServerCleaningSpec defines the desired cleaning operations
+            properties:
+              biosReset:
+                description: BIOSReset specifies if BIOS should be reset to defaults
+                type: boolean
+              bmcReset:
+                description: BMCReset specifies if BMC should be reset to defaults
+                type: boolean
+              diskWipe:
+                description: DiskWipe specifies disk erasing configuration
+                properties:
+                  includeBootDrives:
+                    description: IncludeBootDrives specifies whether to erase boot
+                      drives
+                    type: boolean
+                  method:
+                    default: quick
+                    description: Method specifies the disk erasing method
+                    enum:
+                    - quick
+                    - secure
+                    - dod
+                    type: string
+                required:
+                - method
+                type: object
+              networkCleanup:
+                description: NetworkCleanup specifies if network configurations should
+                  be cleared
+                type: boolean
+              serverBootConfigurationTemplate:
+                description: |-
+                  ServerBootConfigurationTemplate defines the boot configuration for cleaning agent
+                  If not specified, cleaning operations are performed via BMC APIs
+                properties:
+                  name:
+                    description: Name specifies the name of the boot configuration.
+                    type: string
+                  spec:
+                    description: Spec specifies the boot configuration to be rendered.
+                    properties:
+                      ignitionSecretRef:
+                        description: |-
+                          IgnitionSecretRef is a reference to the Secret object that contains
+                          the ignition configuration for the server.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      image:
+                        description: Image specifies the boot image to be used for
+                          the server.
+                        type: string
+                      serverRef:
+                        description: ServerRef is a reference to the server for which
+                          this boot configuration is intended.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                    required:
+                    - serverRef
+                    type: object
+                required:
+                - name
+                - spec
+                type: object
+              serverRef:
+                description: |-
+                  ServerRef references a specific Server to be cleaned.
+                  Mutually exclusive with ServerSelector.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              serverSelector:
+                description: |-
+                  ServerSelector specifies a label selector to identify servers to be cleaned.
+                  Mutually exclusive with ServerRef.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+            type: object
+            x-kubernetes-validations:
+            - message: either serverRef or serverSelector must be specified
+              rule: has(self.serverRef) || has(self.serverSelector)
+          status:
+            description: ServerCleaningStatus defines the observed state of ServerCleaning
+            properties:
+              completedCleanings:
+                description: CompletedCleanings is the number of servers successfully
+                  cleaned
+                format: int32
+                type: integer
+              conditions:
+                description: Conditions represents the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              failedCleanings:
+                description: FailedCleanings is the number of servers where cleaning
+                  failed
+                format: int32
+                type: integer
+              inProgressCleanings:
+                description: InProgressCleanings is the number of servers currently
+                  being cleaned
+                format: int32
+                type: integer
+              pendingCleanings:
+                description: PendingCleanings is the number of servers with pending
+                  cleaning
+                format: int32
+                type: integer
+              selectedServers:
+                description: SelectedServers is the total number of servers selected
+                  for cleaning
+                format: int32
+                type: integer
+              serverCleaningStatuses:
+                description: ServerCleaningStatuses contains per-server cleaning status
+                items:
+                  description: ServerCleaningStatusEntry represents the cleaning status
+                    for a single server
+                  properties:
+                    cleaningTasks:
+                      description: CleaningTasks contains information about the cleaning
+                        tasks for this server
+                      items:
+                        description: CleaningTaskStatus represents the status of a
+                          cleaning task
+                        properties:
+                          lastUpdateTime:
+                            description: LastUpdateTime is the last time this task
+                              status was updated
+                            format: date-time
+                            type: string
+                          message:
+                            description: Message provides additional information about
+                              the task
+                            type: string
+                          percentComplete:
+                            description: PercentComplete indicates the completion
+                              percentage (0-100)
+                            type: integer
+                          state:
+                            description: State is the current state of the task
+                            type: string
+                          targetID:
+                            description: TargetID identifies the target resource (e.g.,
+                              drive ID for disk erase)
+                            type: string
+                          taskType:
+                            description: TaskType indicates what type of cleaning
+                              task this is
+                            type: string
+                          taskURI:
+                            description: TaskURI is the URI to monitor the task
+                            type: string
+                        required:
+                        - taskType
+                        type: object
+                      type: array
+                    lastUpdateTime:
+                      description: LastUpdateTime is the last time this status was
+                        updated
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message provides additional information about the
+                        cleaning state
+                      type: string
+                    serverName:
+                      description: ServerName is the name of the server
+                      type: string
+                    state:
+                      description: State is the cleaning state for this server
+                      type: string
+                  required:
+                  - serverName
+                  - state
+                  type: object
+                type: array
+              state:
+                description: State represents the current state of the cleaning process
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

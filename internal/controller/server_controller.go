@@ -103,6 +103,7 @@ type ServerReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverconfigurations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servercleanings,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
@@ -284,6 +285,8 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, bmcC
 		return r.handleAvailableState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateReserved:
 		return r.handleReservedState(ctx, bmcClient, server)
+	case metalv1alpha1.ServerStateTainted:
+		return r.handleTaintedState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateMaintenance:
 		return r.handleMaintenanceState(ctx, bmcClient, server)
 	default:
@@ -416,8 +419,17 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
 	// 		 back to available state.
 	if server.Spec.ServerClaimRef == nil {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-			return true, err
+		// Check if server has taints
+		if len(server.Spec.Taints) > 0 {
+			log.V(1).Info("Server has taints, transitioning to Tainted state for cleaning")
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateTainted); err != nil || modified {
+				return true, err
+			}
+		} else {
+			// No taints, transition directly to Available
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+				return true, err
+			}
 		}
 	}
 
@@ -463,6 +475,54 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
 	log.V(1).Info("Reconciled reserved state")
+	return true, nil
+}
+
+func (r *ServerReconciler) handleTaintedState(ctx context.Context, _ bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Check if ServerCleaning exists for this server
+	cleaningList := &metalv1alpha1.ServerCleaningList{}
+	if err := r.List(ctx, cleaningList); err != nil {
+		return false, fmt.Errorf("failed to list ServerCleaning resources: %w", err)
+	}
+
+	var activeCleaning *metalv1alpha1.ServerCleaning
+	for i := range cleaningList.Items {
+		cleaning := &cleaningList.Items[i]
+		if cleaning.Spec.ServerRef.Name != server.Name {
+			continue
+		}
+		if cleaning.Status.State == metalv1alpha1.ServerCleaningStateCompleted {
+			// Cleaning completed, remove taints and transition to Available
+			log.V(1).Info("Cleaning completed, removing taints")
+			serverBase := server.DeepCopy()
+			server.Spec.Taints = nil
+			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return false, fmt.Errorf("failed to remove taints: %w", err)
+			}
+
+			// Transition to Available
+			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
+				return modified, err
+			}
+			return false, nil
+		}
+		if cleaning.Status.State == metalv1alpha1.ServerCleaningStatePending ||
+			cleaning.Status.State == metalv1alpha1.ServerCleaningStateInProgress {
+			activeCleaning = cleaning
+			break
+		}
+	}
+
+	if activeCleaning == nil {
+		log.V(1).Info("No active ServerCleaning found, waiting for cleaning to be created")
+		// A separate controller or operator should create ServerCleaning
+		// Requeue to check again
+		return true, nil
+	}
+
+	log.V(1).Info("Server cleaning in progress", "cleaningState", activeCleaning.Status.State)
 	return true, nil
 }
 

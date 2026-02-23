@@ -113,6 +113,12 @@ type BMC interface {
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
+	// CreateEventSubscription creates an event subscription for the manager.
+	CreateEventSubscription(ctx context.Context, destination string, eventType redfish.EventFormatType, protocol redfish.DeliveryRetryPolicy) (string, error)
+
+	// DeleteEventSubscription deletes an event subscription for the manager.
+	DeleteEventSubscription(ctx context.Context, uri string) error
+
 	// CreateOrUpdateAccount creates or updates a BMC user account.
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 

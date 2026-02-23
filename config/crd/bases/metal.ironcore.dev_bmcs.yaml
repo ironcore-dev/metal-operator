@@ -246,6 +246,10 @@ spec:
                   - type
                   type: object
                 type: array
+              eventsSubscriptionLink:
+                description: EventsSubscriptionLink is the link to the events subscription
+                  of the bmc.
+                type: string
               firmwareVersion:
                 description: FirmwareVersion is the version of the firmware currently
                   running on the BMC.
@@ -264,6 +268,10 @@ spec:
                 type: string
               manufacturer:
                 description: Manufacturer is the name of the BMC manufacturer.
+                type: string
+              metricsReportSubscriptionLink:
+                description: MetricsReportSubscriptionLink is the link to the metrics
+                  report subscription of the bmc.
                 type: string
               model:
                 description: Model is the model number or name of the BMC.

@@ -24,6 +24,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/ironcore-dev/metal-operator/internal/serverevents"
 
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
@@ -61,6 +62,7 @@ type BMCReconciler struct {
 	BMCFailureResetDelay time.Duration
 	BMCOptions           bmc.Options
 	ManagerNamespace     string
+	EventURL             string
 	// BMCResetWaitTime defines the duration to wait after a BMC reset before attempting reconciliation again.
 	BMCResetWaitTime time.Duration
 	// BMCClientRetryInterval defines the duration to requeue reconciliation after a BMC client error/reset/unavailablility.
@@ -104,6 +106,14 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 		}
 		if err := r.Delete(ctx, bmcSettings); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to delete referred BMCSettings. %w", err)
+		}
+	}
+
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	if err == nil {
+		defer bmcClient.Logout()
+		if err := r.deleteEventSubscription(ctx, bmcClient, bmcObj); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to delete event subscriptions: %w", err)
 		}
 	}
 
@@ -183,6 +193,10 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 		return ctrl.Result{}, fmt.Errorf("failed to discover servers: %w", err)
 	}
 	log.V(1).Info("Discovered servers")
+
+	if modified, err := r.handleEventSubscriptions(ctx, bmcClient, bmcObj); err != nil || modified {
+		return ctrl.Result{}, err
+	}
 
 	log.V(1).Info("Reconciled BMC")
 	return ctrl.Result{}, nil
@@ -527,6 +541,61 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 	}
 	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return fmt.Errorf("failed to patch BMC conditions: %w", err)
+	}
+	return nil
+}
+
+func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	if r.EventURL == "" {
+		return false, nil
+	}
+	log.V(1).Info("Handling event subscriptions for BMC")
+	modified := false
+
+	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
+		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
+		if err != nil {
+			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
+		}
+		bmcBase := bmcObj.DeepCopy()
+		bmcObj.Status.MetricsReportSubscriptionLink = link
+		modified = true
+		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+		}
+	}
+	if bmcObj.Status.EventsSubscriptionLink == "" {
+		link, err := serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
+		if err != nil {
+			return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
+		}
+		bmcBase := bmcObj.DeepCopy()
+		bmcObj.Status.EventsSubscriptionLink = link
+		modified = true
+		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+		}
+	}
+	return modified, nil
+}
+
+func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
+	if r.EventURL == "" {
+		return nil
+	}
+	if bmcObj.Status.MetricsReportSubscriptionLink != "" {
+		if err := bmcClient.DeleteEventSubscription(ctx, bmcObj.Status.MetricsReportSubscriptionLink); err != nil {
+			return fmt.Errorf("failed to unsubscribe from server metrics report: %w", err)
+		}
+		log.V(1).Info("Unsubscribed from server metrics report")
+	}
+	if bmcObj.Status.EventsSubscriptionLink != "" {
+		if err := bmcClient.DeleteEventSubscription(ctx, bmcObj.Status.EventsSubscriptionLink); err != nil {
+			return fmt.Errorf("failed to unsubscribe from server events: %w", err)
+		}
+		log.V(1).Info("Unsubscribed from server events")
 	}
 	return nil
 }

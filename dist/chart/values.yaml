@@ -36,6 +36,8 @@ controllerManager:
       capabilities:
         drop:
           - "ALL"
+  dnsRecordTemplate:
+    enabled: false
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:

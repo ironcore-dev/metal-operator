@@ -509,6 +509,10 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		)
 
+		By("Ensuring that the Maintenance resource has been deleted")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
 		Eventually(Object(server)).Should(
@@ -618,6 +622,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(bmcSettings2)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
+
+		By("Ensuring that the Maintenance resource has been deleted")
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 
 		Expect(k8sClient.Delete(ctx, bmcSettings2)).To(Succeed())
 		Eventually(Get(bmcSettings2)).Should(Satisfy(apierrors.IsNotFound))

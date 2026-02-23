@@ -191,7 +191,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			DefaultProtocol:        metalv1alpha1.HTTPProtocolScheme,
 			SkipCertValidation:     true,
 			ManagerNamespace:       ns.Name,
-			BMCResetWaitTime:       100 * time.Millisecond,
+			BMCResetWaitTime:       150 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
 			EventURL:               "http://localhost:8008",
 			DNSRecordTemplate:      dnsTemplate,

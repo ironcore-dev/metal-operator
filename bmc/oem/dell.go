@@ -464,5 +464,5 @@ func (d *DellIdracManager) CheckBMCAttributes(
 	if len(filteredAttr) == 0 {
 		return false, nil
 	}
-	return helpers.CheckAttribues(attributes, filteredAttr)
+	return helpers.CheckAttributes(attributes, filteredAttr)
 }

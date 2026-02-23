@@ -510,7 +510,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.List(ctx, &maintList)).To(Succeed())
 		})
 
-		It("Should successfully retry failed state child resources once", func(ctx SpecContext) {
+		It("Should successfully retry failed state child resources", func(ctx SpecContext) {
 
 			retryCount := 2
 			bmcSetting := make(map[string]string)

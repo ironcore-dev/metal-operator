@@ -20,7 +20,7 @@ func (e *InvalidBMCSettingsError) Error() string {
 	return fmt.Sprintf("invalid BMC setting %s=%v: %s", e.SettingName, e.SettingValue, e.Message)
 }
 
-func CheckAttribues(
+func CheckAttributes(
 	attrs schemas.SettingsAttributes,
 	filtered map[string]schemas.Attributes,
 ) (reset bool, err error) {

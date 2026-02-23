@@ -92,6 +92,7 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
+		defaultFailedAutoRetryCount        int
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -150,6 +151,8 @@ func main() { // nolint: gocyclo
 		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
+	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
+		"The default number of auto retries for a CRD when it fails. 0 for no retries.")
 
 	opts := zap.Options{
 		Development: true,
@@ -417,7 +420,8 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		TimeoutExpiry: biosSettingsApplyTimeout,
+		TimeoutExpiry:               biosSettingsApplyTimeout,
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettings")
 		os.Exit(1)
@@ -436,6 +440,7 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersion")
 		os.Exit(1)
@@ -454,6 +459,7 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettings")
 		os.Exit(1)
@@ -472,6 +478,7 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersion")
 		os.Exit(1)

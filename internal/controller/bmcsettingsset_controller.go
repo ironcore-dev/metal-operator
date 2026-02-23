@@ -111,7 +111,7 @@ func (r *BMCSettingsSetReconciler) delete(
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
 		}
-		log.V(1).Info("Updated BIOSSettingsSet state", "Status", currentStatus)
+		log.V(1).Info("Updated BMCSettingsSet state", "Status", currentStatus)
 
 		// Handle propagation of retry annotation to child when parent is being deleted.
 		// That way the deleted annotations can be passed to children before parent is deleted.
@@ -346,11 +346,9 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BMCSettings with updated spec", "BMCSettings", bmcSettings.Name, "Operation", opResult)
-			_, err = controllerutil.CreateOrPatch(ctx, r.Client, &bmcSettings, func() error {
-				bmcSettings.Status.AutoRetryCountRemaining = bmcSettings.Spec.FailedAutoRetryCount
-				return nil
-			})
-			if err != nil {
+			settingsBase := bmcSettings.DeepCopy()
+			bmcSettings.Status.AutoRetryCountRemaining = bmcSettings.Spec.FailedAutoRetryCount
+			if err = r.Status().Patch(ctx, &bmcSettings, client.MergeFrom(settingsBase)); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -366,11 +364,11 @@ func (r *BMCSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context.
 	}
 
 	if len(ownedBMCSettings.Items) == 0 {
-		log.V(1).Info("No BIOSSettings found, skipping retry annotation propagation")
+		log.V(1).Info("No BMCSettings found, skipping retry annotation propagation")
 		return nil
 	}
 
-	log.V(1).Info("Propagating retry annotation to owned BIOSSettings resources")
+	log.V(1).Info("Propagating retry annotation to owned BMCSettings resources")
 	return handleRetryAnnotationPropagation(ctx, r.Client, set, ownedBMCSettings)
 }
 

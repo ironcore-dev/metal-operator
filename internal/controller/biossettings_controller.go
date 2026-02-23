@@ -69,13 +69,14 @@ const (
 // BIOSSettingsReconciler reconciles a BIOSSettings object
 type BIOSSettingsReconciler struct {
 	client.Client
-	ManagerNamespace string
-	Insecure         bool
-	Scheme           *runtime.Scheme
-	BMCOptions       bmc.Options
-	ResyncInterval   time.Duration
-	TimeoutExpiry    time.Duration
-	Conditions       *conditionutils.Accessor
+	ManagerNamespace            string
+	Insecure                    bool
+	Scheme                      *runtime.Scheme
+	BMCOptions                  bmc.Options
+	ResyncInterval              time.Duration
+	TimeoutExpiry               time.Duration
+	Conditions                  *conditionutils.Accessor
+	DefaultFailedAutoRetryCount int32
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings,verbs=get;list;watch;create;update;patch;delete
@@ -661,7 +662,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			if errors.As(err, &invalidSettingsErr) {
 				inValidSettings, errCond := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionWrongSettings)
 				if errCond != nil {
-					return false, fmt.Errorf("failed to get Condition for skip reboot post setting update %v", err)
+					return false, fmt.Errorf("failed to get Condition for skip reboot post setting update %v", errors.Join(err, errCond))
 				}
 				if errCond := r.Conditions.Update(
 					inValidSettings,
@@ -669,7 +670,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 					conditionutils.UpdateReason(BIOSSettingsReasonWrongSettings),
 					conditionutils.UpdateMessage(fmt.Sprintf("Settings provided is invalid. error: %v", err)),
 				); errCond != nil {
-					return false, fmt.Errorf("failed to update Invalid Settings condition: %w", errCond)
+					return false, fmt.Errorf("failed to update Invalid Settings condition: %w", errors.Join(err, errCond))
 				}
 				err = r.updateFlowStatus(ctx, settings, metalv1alpha1.BIOSSettingsFlowStateFailed, flowStatus, inValidSettings)
 				return false, errors.Join(err, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil))
@@ -1056,10 +1057,23 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		}
 		return ctrl.Result{}, nil
 	}
+
+	var retryCount int32
 	if settings.Spec.FailedAutoRetryCount != nil {
+		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
+		retryCount = *settings.Spec.FailedAutoRetryCount
+	} else if r.DefaultFailedAutoRetryCount > 0 {
+		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
+		retryCount = r.DefaultFailedAutoRetryCount
+	} else {
+		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
+		retryCount = 0
+	}
+
+	if retryCount > 0 {
 		remaining := settings.Status.AutoRetryCountRemaining
 		if remaining == nil || *remaining > 0 {
-			log.V(1).Info("Retrying BIOSSettings automatically as per the spec 'FailedAutoRetryCount'", "RetryCount", remaining)
+			log.V(1).Info("Retrying BIOSSettings automatically", "RetryCount", remaining)
 			biosSettingsBase := settings.DeepCopy()
 			settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
 			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
@@ -1075,8 +1089,8 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 			}
 
 			if remaining == nil {
-				val := *settings.Spec.FailedAutoRetryCount - 1
-				settings.Status.AutoRetryCountRemaining = &val
+				newRemaining := retryCount - 1
+				settings.Status.AutoRetryCountRemaining = &newRemaining
 			} else {
 				*settings.Status.AutoRetryCountRemaining--
 			}

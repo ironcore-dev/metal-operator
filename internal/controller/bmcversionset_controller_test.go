@@ -510,7 +510,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		)
 	})
 
-	It("Should successfully retry failed state child resources once", func(ctx SpecContext) {
+	It("Should successfully retry failed state child resources", func(ctx SpecContext) {
 
 		retryCount := 2
 
@@ -607,8 +607,8 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			HaveField("Status.AutoRetryCountRemaining", BeNil()),
 		))
 		By("Ensuring that the BMCVersion03 has been retried")
-		Eventually(Object(bmcVersion02)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
+		Eventually(Object(bmcVersion03)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCVersionStateFailed))),
 			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
 		))
 

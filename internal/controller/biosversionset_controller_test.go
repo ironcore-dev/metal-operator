@@ -405,7 +405,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		)
 	})
 
-	It("Should successfully retry failed state child resources once", func(ctx SpecContext) {
+	It("Should successfully retry failed state child resources", func(ctx SpecContext) {
 
 		retryCount := 2
 		By("Create resource")
@@ -522,7 +522,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		))
 
 		By("Ensuring that the BIOSVersion 03 has not been changed")
-		Consistently(Object(biosVersion02), "25ms").Should(SatisfyAll(
+		Consistently(Object(biosVersion03), "25ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))

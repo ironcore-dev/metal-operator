@@ -31,6 +31,33 @@ type RedfishMockUps struct {
 	SimulateUnvailableBMC bool
 }
 
+// defaultUpgradeFailedTaskStatus returns a canonical failed upgrade task
+// sequence ending in ExceptionTaskState at 99 % completion.
+func defaultUpgradeFailedTaskStatus() []schemas.Task {
+	return []schemas.Task{
+		{TaskState: schemas.NewTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.PendingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.StartingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(10))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(20))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(98))},
+		{TaskState: schemas.ExceptionTaskState, PercentComplete: gofish.ToRef(uint(99))},
+	}
+}
+
+// defaultUpgradeTaskStatus returns a canonical upgrade task sequence ending in CompletedTaskState at 100 % completion.
+func defaultUpgradeTaskStatus() []schemas.Task {
+	return []schemas.Task{
+		{TaskState: schemas.NewTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.PendingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.StartingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(10))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(20))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(100))},
+		{TaskState: schemas.CompletedTaskState, PercentComplete: gofish.ToRef(uint(100))},
+	}
+}
+
 func (r *RedfishMockUps) InitializeDefaults() {
 	r.BIOSSettingAttr = map[string]map[string]any{
 		"abc":       {"type": "string", "reboot": false, "value": "bar"},
@@ -45,66 +72,8 @@ func (r *RedfishMockUps) InitializeDefaults() {
 	r.BIOSUpgradingVersion = ""
 
 	r.BIOSUpgradeTaskIndex = 0
-	r.BIOSUpgradeTaskStatus = []schemas.Task{
-		{
-			TaskState:       schemas.NewTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.PendingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.StartingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(10)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(20)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(100)),
-		},
-		{
-			TaskState:       schemas.CompletedTaskState,
-			PercentComplete: gofish.ToRef(uint(100)),
-		},
-	}
-	r.BIOSUpgradeTaskFailedStatus = []schemas.Task{
-		{
-			TaskState:       schemas.NewTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.PendingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.StartingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(10)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(20)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(98)),
-		},
-		{
-			TaskState:       schemas.ExceptionTaskState,
-			PercentComplete: gofish.ToRef(uint(99)),
-		},
-	}
+	r.BIOSUpgradeTaskStatus = defaultUpgradeTaskStatus()
+	r.BIOSUpgradeTaskFailedStatus = defaultUpgradeFailedTaskStatus()
 
 	r.PendingBMCSetting = map[string]map[string]any{}
 
@@ -112,67 +81,9 @@ func (r *RedfishMockUps) InitializeDefaults() {
 	r.BMCUpgradingVersion = ""
 
 	r.BMCUpgradeTaskIndex = 0
-	r.BMCUpgradeTaskStatus = []schemas.Task{
-		{
-			TaskState:       schemas.NewTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.PendingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.StartingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(10)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(20)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(100)),
-		},
-		{
-			TaskState:       schemas.CompletedTaskState,
-			PercentComplete: gofish.ToRef(uint(100)),
-		},
-	}
+	r.BMCUpgradeTaskStatus = defaultUpgradeTaskStatus()
 
-	r.BMCUpgradeTaskFailedStatus = []schemas.Task{
-		{
-			TaskState:       schemas.NewTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.PendingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.StartingTaskState,
-			PercentComplete: gofish.ToRef(uint(0)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(10)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(20)),
-		},
-		{
-			TaskState:       schemas.RunningTaskState,
-			PercentComplete: gofish.ToRef(uint(98)),
-		},
-		{
-			TaskState:       schemas.ExceptionTaskState,
-			PercentComplete: gofish.ToRef(uint(99)),
-		},
-	}
+	r.BMCUpgradeTaskFailedStatus = defaultUpgradeFailedTaskStatus()
 
 	r.Accounts = map[string]*schemas.ManagerAccount{
 		"foo": {

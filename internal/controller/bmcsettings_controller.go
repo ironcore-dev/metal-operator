@@ -32,12 +32,13 @@ import (
 // BMCSettingsReconciler reconciles a BMCSettings object
 type BMCSettingsReconciler struct {
 	client.Client
-	ManagerNamespace string
-	ResyncInterval   time.Duration
-	Insecure         bool
-	Scheme           *runtime.Scheme
-	BMCOptions       bmc.Options
-	Conditions       *conditionutils.Accessor
+	ManagerNamespace            string
+	ResyncInterval              time.Duration
+	Insecure                    bool
+	Scheme                      *runtime.Scheme
+	BMCOptions                  bmc.Options
+	Conditions                  *conditionutils.Accessor
+	DefaultFailedAutoRetryCount int32
 }
 
 const (
@@ -452,7 +453,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 				if errors.As(err, &invalidSettingsErr) {
 					inValidSettings, errCond := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCSettingsConditionWrongSettings)
 					if errCond != nil {
-						return ctrl.Result{}, fmt.Errorf("failed to get Condition for skip reboot post setting update %v", err)
+						return ctrl.Result{}, fmt.Errorf("failed to get Condition for skip reboot post setting update %v", errors.Join(err, errCond))
 					}
 					if errCond := r.Conditions.Update(
 						inValidSettings,
@@ -460,7 +461,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 						conditionutils.UpdateReason(BMCSettingsReasonWrongSettings),
 						conditionutils.UpdateMessage(fmt.Sprintf("Settings provided is invalid. error: %v", err)),
 					); errCond != nil {
-						return ctrl.Result{}, fmt.Errorf("failed to update Invalid Settings condition: %w", errCond)
+						return ctrl.Result{}, fmt.Errorf("failed to update Invalid Settings condition: %w", errors.Join(err, errCond))
 					}
 					err := r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, inValidSettings)
 					return ctrl.Result{}, err
@@ -593,7 +594,7 @@ func (r *BMCSettingsReconciler) handleBMCPowerState(
 				conditionutils.UpdateReason("BMCPoweredBackOn"),
 				conditionutils.UpdateMessage(fmt.Sprintf("BMC in Powered On, Power State: %v", BMC.Status.PowerState)),
 			); err != nil {
-				return fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+				return fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
 			}
 			err = r.updateBMCSettingsStatus(ctx, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCondition)
 			return err
@@ -610,7 +611,7 @@ func (r *BMCSettingsReconciler) handleBMCPowerState(
 			conditionutils.UpdateReason(BMCPoweredOffReason),
 			conditionutils.UpdateMessage(fmt.Sprintf("BMC in not Powered On, Power State: %v", BMC.Status.PowerState)),
 		); err != nil {
-			return fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+			return fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
 		}
 		err = r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
 		return err
@@ -714,7 +715,7 @@ func (r *BMCSettingsReconciler) handleFailedState(
 		annotations := bmcSetting.GetAnnotations()
 		retryCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, RetryOfFailedResourceConditionIssued)
 		if err != nil {
-			return fmt.Errorf("failed to get retry condition for BIOSSettings: %w", err)
+			return fmt.Errorf("failed to get retry condition for BMCSettings: %w", err)
 		}
 		if retryCondition.Status != metav1.ConditionTrue {
 			err := r.Conditions.Update(retryCondition,
@@ -732,11 +733,22 @@ func (r *BMCSettingsReconciler) handleFailedState(
 		}
 		return nil
 	}
+	var retryCount int32
 	if bmcSetting.Spec.FailedAutoRetryCount != nil {
+		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
+		retryCount = *bmcSetting.Spec.FailedAutoRetryCount
+	} else if r.DefaultFailedAutoRetryCount > 0 {
+		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
+		retryCount = r.DefaultFailedAutoRetryCount
+	} else {
+		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
+		retryCount = 0
+	}
+	if retryCount > 0 {
 		remaining := bmcSetting.Status.AutoRetryCountRemaining
 		if remaining == nil || *remaining > 0 {
-			log.V(1).Info("Retrying BMCSettings automatically as per the spec 'FailedAutoRetryCount'", "RetryCount", remaining)
-			biosSettingsBase := bmcSetting.DeepCopy()
+			log.V(1).Info("Retrying BMCSettings automatically", "RetryCount", remaining)
+			bmcSettingsBase := bmcSetting.DeepCopy()
 			bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
 			retryCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, RetryOfFailedResourceConditionIssued)
 			if err != nil {
@@ -751,13 +763,13 @@ func (r *BMCSettingsReconciler) handleFailedState(
 			}
 
 			if remaining == nil {
-				val := *bmcSetting.Spec.FailedAutoRetryCount - 1
-				bmcSetting.Status.AutoRetryCountRemaining = &val
+				newRemaining := retryCount - 1
+				bmcSetting.Status.AutoRetryCountRemaining = &newRemaining
 			} else {
 				*bmcSetting.Status.AutoRetryCountRemaining--
 			}
 
-			if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(biosSettingsBase)); err != nil {
+			if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingsBase)); err != nil {
 				return fmt.Errorf("failed to patch BMCSettings status for auto-retrying: %w", err)
 			}
 			return nil

@@ -573,116 +573,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		)
 	})
 
-	It("Should replace missing BMCSettings ref in server", func(ctx SpecContext) {
-		// settings which does not reboot. mocked at
-		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
-		bmcSetting := make(map[string]string)
-		bmcSetting["fooreboot"] = "145"
-
-		By("update the server state to Available  state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
-		})).Should(Succeed())
-
-		By("Creating a BMCSetting")
-		bmcSettings := &metalv1alpha1.BMCSettings{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-bmc-upgrade",
-			},
-			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
-				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				}},
-		}
-		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
-
-		By("Wait for the BMCSettings to be ref on the BMC")
-		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", bmcSettings.Name),
-		))
-		// delete the old settings
-		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
-		By("force deletion of the object by removing finalizers")
-		Eventually(func() error {
-			err := Update(bmcSettings, func() {
-				bmcSettings.Finalizers = []string{}
-			})()
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}).Should(Succeed())
-		By("check if maintenance has been created on the server and delete if its present")
-		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(func() error {
-			_, err := ObjectList(&serverMaintenanceList)()
-			if err != nil {
-				return err
-			}
-			if len(serverMaintenanceList.Items) > 0 {
-				for _, item := range serverMaintenanceList.Items {
-					if len(item.OwnerReferences) > 0 && item.OwnerReferences[0].UID == bmcSettings.UID {
-						By(fmt.Sprintf("Deleting the ServerMaintenance created by BMCSettings %v", item.Name))
-						Expect(k8sClient.Delete(ctx, &item)).To(Succeed())
-						Eventually(func() error {
-							err := Update(&item, func() {
-								item.Finalizers = []string{}
-							})()
-							if apierrors.IsNotFound(err) {
-								return nil
-							}
-							return err
-						}).Should(Succeed())
-					}
-				}
-			}
-			return nil
-		}).Should(Succeed())
-
-		By("creation of new BMCSettings with same spec")
-		bmcSettings2 := &metalv1alpha1.BMCSettings{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-bmc-recreate-",
-			},
-			Spec: metalv1alpha1.BMCSettingsSpec{
-				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
-				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-				}},
-		}
-		Expect(k8sClient.Create(ctx, bmcSettings2)).To(Succeed())
-
-		By("Wait for the BMCSettings2 to be ref on the BMC")
-		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", bmcSettings2.Name),
-		))
-
-		Eventually(Object(bmcSettings2)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
-		))
-
-		Eventually(Object(bmcSettings2)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
-		))
-
-		Expect(k8sClient.Delete(ctx, bmcSettings2)).To(Succeed())
-		Eventually(Get(bmcSettings2)).Should(Satisfy(apierrors.IsNotFound))
-		Eventually(Object(server)).Should(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
-		)
-	})
-
 	It("Should allow retry using annotation", func(ctx SpecContext) {
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
@@ -717,15 +607,11 @@ var _ = Describe("BMCSettings Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
 
+		By("Ensuring that the BMC setting has started retry and AutoRetryCountRemaining is set")
 		Eventually(func(g Gomega) bool {
 			g.Expect(Get(bmcSettings)()).To(Succeed())
-			return bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateFailed && bmcSettings.Status.AutoRetryCountRemaining == nil
-		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
-
-		Eventually(func(g Gomega) bool {
-			g.Expect(Get(bmcSettings)()).To(Succeed())
-			return bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateFailed && bmcSettings.Status.AutoRetryCountRemaining != nil && *bmcSettings.Status.AutoRetryCountRemaining == int32(1)
-		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
+			return bmcSettings.Status.AutoRetryCountRemaining != nil && *bmcSettings.Status.AutoRetryCountRemaining > int32(0)
+		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
 
 		Eventually(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),

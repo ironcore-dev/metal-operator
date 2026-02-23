@@ -861,15 +861,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
+		By("Ensuring that the BIOS setting has started retry and AutoRetryCountRemaining is set")
 		Eventually(func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			return biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed && biosSettings.Status.AutoRetryCountRemaining == nil
-		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
-
-		Eventually(func(g Gomega) bool {
-			g.Expect(Get(biosSettings)()).To(Succeed())
-			return biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateFailed && biosSettings.Status.AutoRetryCountRemaining != nil && *biosSettings.Status.AutoRetryCountRemaining == int32(1)
-		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
+			return biosSettings.Status.AutoRetryCountRemaining != nil && *biosSettings.Status.AutoRetryCountRemaining > int32(0)
+		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),

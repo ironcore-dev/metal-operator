@@ -46,6 +46,7 @@ type BIOSVersionTemplate struct {
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 
 	// FailedAutoRetryCount is the number of times the controller should automatically retry the BIOSVersion upgrade in case of failure before giving up.
+	// kubebuilder:validation:Minimum=0
 	// +optional
 	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
 }

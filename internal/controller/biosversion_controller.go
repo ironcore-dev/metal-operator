@@ -30,12 +30,13 @@ import (
 // BIOSVersionReconciler reconciles a BIOSVersion object
 type BIOSVersionReconciler struct {
 	client.Client
-	ManagerNamespace string
-	Insecure         bool
-	Scheme           *runtime.Scheme
-	BMCOptions       bmc.Options
-	ResyncInterval   time.Duration
-	Conditions       *conditionutils.Accessor
+	ManagerNamespace            string
+	Insecure                    bool
+	Scheme                      *runtime.Scheme
+	BMCOptions                  bmc.Options
+	ResyncInterval              time.Duration
+	Conditions                  *conditionutils.Accessor
+	DefaultFailedAutoRetryCount int32
 }
 
 const (
@@ -461,10 +462,21 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 		}
 		return true, nil
 	}
+	var retryCount int32
 	if biosVersion.Spec.FailedAutoRetryCount != nil {
+		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
+		retryCount = *biosVersion.Spec.FailedAutoRetryCount
+	} else if r.DefaultFailedAutoRetryCount > 0 {
+		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
+		retryCount = r.DefaultFailedAutoRetryCount
+	} else {
+		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
+		retryCount = 0
+	}
+	if retryCount > 0 {
 		remaining := biosVersion.Status.AutoRetryCountRemaining
 		if remaining == nil || *remaining > 0 {
-			log.V(1).Info("Retrying BIOSVersion automatically as per the spec 'FailedAutoRetryCount'", "RetryCount", remaining)
+			log.V(1).Info("Retrying BIOSVersion automatically", "RetryCount", remaining)
 			biosVersionBase := biosVersion.DeepCopy()
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
 			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
@@ -480,8 +492,8 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 			}
 
 			if remaining == nil {
-				val := *biosVersion.Spec.FailedAutoRetryCount - 1
-				biosVersion.Status.AutoRetryCountRemaining = &val
+				newRemaining := retryCount - 1
+				biosVersion.Status.AutoRetryCountRemaining = &newRemaining
 			} else {
 				*biosVersion.Status.AutoRetryCountRemaining--
 			}

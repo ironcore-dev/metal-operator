@@ -43,12 +43,13 @@ const (
 // BMCVersionReconciler reconciles a BMCVersion object
 type BMCVersionReconciler struct {
 	client.Client
-	ManagerNamespace string
-	Insecure         bool
-	Scheme           *runtime.Scheme
-	BMCOptions       bmc.Options
-	ResyncInterval   time.Duration
-	Conditions       *conditionutils.Accessor
+	ManagerNamespace            string
+	Insecure                    bool
+	Scheme                      *runtime.Scheme
+	BMCOptions                  bmc.Options
+	ResyncInterval              time.Duration
+	Conditions                  *conditionutils.Accessor
+	DefaultFailedAutoRetryCount int32
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
@@ -202,11 +203,11 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 	case "", metalv1alpha1.BMCVersionStatePending:
 		// remove the retry annotation if it's present as we are retrying now
 		if shouldRetryReconciliation(bmcVersion) {
-			biosVersionBase := bmcVersion.DeepCopy()
+			bmcVersionBase := bmcVersion.DeepCopy()
 			annotations := bmcVersion.GetAnnotations()
 			delete(annotations, metalv1alpha1.OperationAnnotation)
 			bmcVersion.SetAnnotations(annotations)
-			if err := r.Patch(ctx, bmcVersion, client.MergeFrom(biosVersionBase)); err != nil {
+			if err := r.Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion for retrying: %w", err)
 			}
 			return ctrl.Result{}, nil
@@ -435,10 +436,21 @@ func (r *BMCVersionReconciler) handleFailedState(
 		}
 		return nil
 	}
+	var retryCount int32
 	if bmcVersion.Spec.FailedAutoRetryCount != nil {
+		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
+		retryCount = *bmcVersion.Spec.FailedAutoRetryCount
+	} else if r.DefaultFailedAutoRetryCount > 0 {
+		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
+		retryCount = r.DefaultFailedAutoRetryCount
+	} else {
+		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
+		retryCount = 0
+	}
+	if retryCount > 0 {
 		remaining := bmcVersion.Status.AutoRetryCountRemaining
 		if remaining == nil || *remaining > 0 {
-			log.V(1).Info("Retrying BMCVersion automatically as per the spec 'FailedAutoRetryCount'", "RetryCount", remaining)
+			log.V(1).Info("Retrying BMCVersion automatically", "RetryCount", remaining)
 			bmcVersionBase := bmcVersion.DeepCopy()
 			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
 			retryCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
@@ -454,8 +466,8 @@ func (r *BMCVersionReconciler) handleFailedState(
 			}
 
 			if remaining == nil {
-				val := *bmcVersion.Spec.FailedAutoRetryCount - 1
-				bmcVersion.Status.AutoRetryCountRemaining = &val
+				newRemaining := retryCount - 1
+				bmcVersion.Status.AutoRetryCountRemaining = &newRemaining
 			} else {
 				*bmcVersion.Status.AutoRetryCountRemaining--
 			}

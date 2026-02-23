@@ -77,9 +77,9 @@ spec:
                   resource to be applied to the servers.
                 properties:
                   failedAutoRetryCount:
-                    description: FailedAutoRetryCount is the number of times the controller
-                      should automatically retry the BIOSSettings upgrade in case
-                      of failure before giving up.
+                    description: |-
+                      FailedAutoRetryCount is the number of times the controller should automatically retry the BIOSSettings upgrade in case of failure before giving up.
+                      kubebuilder:validation:Minimum=0
                     format: int32
                     type: integer
                   serverMaintenancePolicy:

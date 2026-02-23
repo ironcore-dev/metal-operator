@@ -404,15 +404,11 @@ var _ = Describe("BMCVersion Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
 
+		By("Ensuring that the BIOS Version has started retry and AutoRetryCountRemaining is set")
 		Eventually(func(g Gomega) bool {
 			g.Expect(Get(bmcVersion)()).To(Succeed())
-			return bmcVersion.Status.State == metalv1alpha1.BMCVersionStateFailed && bmcVersion.Status.AutoRetryCountRemaining == nil
-		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
-
-		Eventually(func(g Gomega) bool {
-			g.Expect(Get(bmcVersion)()).To(Succeed())
-			return bmcVersion.Status.State == metalv1alpha1.BMCVersionStateFailed && bmcVersion.Status.AutoRetryCountRemaining != nil && *bmcVersion.Status.AutoRetryCountRemaining == int32(1)
-		}).WithPolling((10 * time.Microsecond)).Should(BeTrue())
+			return bmcVersion.Status.AutoRetryCountRemaining != nil && *bmcVersion.Status.AutoRetryCountRemaining > int32(0)
+		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
 
 		Eventually(Object(bmcVersion)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),

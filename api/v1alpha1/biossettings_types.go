@@ -18,6 +18,7 @@ type BIOSSettingsTemplate struct {
 	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
 	// FailedAutoRetryCount is the number of times the controller should automatically retry the BIOSSettings upgrade in case of failure before giving up.
+	// kubebuilder:validation:Minimum=0
 	// +optional
 	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
 

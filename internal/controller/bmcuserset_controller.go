@@ -91,6 +91,12 @@ func (r *BMCUserSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCUsers: %w", err)
 	}
 
+	// Re-fetch owned BMCUsers after mutations to avoid stale list
+	ownedBMCUsers, err = r.getOwnedBMCUsers(ctx, bmcUserSet)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to re-fetch owned BMCUsers: %w", err)
+	}
+
 	if err := r.patchBMCUsersFromTemplate(ctx, log, bmcUserSet, ownedBMCUsers); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCUsers from template: %w", err)
 	}
@@ -244,7 +250,7 @@ func (r *BMCUserSetReconciler) createMissingBMCUsers(
 			}
 			newBMCUser.Spec.BMCSecretRef = nil
 			if bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef != nil {
-				newBMCUser.Spec.BMCSecretRef = bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef
+				newBMCUser.Spec.BMCSecretRef = &corev1.LocalObjectReference{Name: bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef.Name}
 			}
 			newBMCUser.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}
 			syncBMCUserAnnotationsFromSet(newBMCUser, bmcUserSet)
@@ -252,8 +258,9 @@ func (r *BMCUserSetReconciler) createMissingBMCUsers(
 		})
 		if err != nil {
 			errs = append(errs, err)
+		} else {
+			log.V(1).Info("Created BMCUser", "BMCUser", newBMCUser.Name, "bmc ref", bmc.Name, "operation", opResult)
 		}
-		log.V(1).Info("Created BMCUser", "BMCUser", newBMCUser.Name, "bmc ref", bmc.Name, "operation", opResult)
 	}
 	return errors.Join(errs...)
 }
@@ -311,6 +318,7 @@ func (r *BMCUserSetReconciler) patchBMCUsersFromTemplate(
 			if bmcUserSet.Spec.BMCUserTemplate.RotationPeriod != nil {
 				bmcUser.Spec.RotationPeriod = &metav1.Duration{Duration: bmcUserSet.Spec.BMCUserTemplate.RotationPeriod.Duration}
 			}
+			bmcUser.Spec.BMCSecretRef = nil
 			if bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef != nil {
 				bmcUser.Spec.BMCSecretRef = &corev1.LocalObjectReference{Name: bmcUserSet.Spec.BMCUserTemplate.BMCSecretRef.Name}
 			}
@@ -333,6 +341,14 @@ func syncBMCUserAnnotationsFromSet(bmcUser *metalv1alpha1.BMCUser, bmcUserSet *m
 		annotations = map[string]string{}
 	}
 	for key, value := range bmcUserSet.GetAnnotations() {
+		// Filter out system and operator-internal annotations
+		if key == metalv1alpha1.OperationAnnotation {
+			continue
+		}
+		// Skip kubernetes.io and k8s.io system annotations
+		if len(key) >= 13 && (key[:13] == "kubernetes.io" || key[:6] == "k8s.io") {
+			continue
+		}
 		annotations[key] = value
 	}
 	bmcUser.SetAnnotations(annotations)
@@ -356,7 +372,7 @@ func (r *BMCUserSetReconciler) enqueueByBMC(
 		selector, err := metav1.LabelSelectorAsSelector(&bmcUserSet.Spec.BMCSelector)
 		if err != nil {
 			log.Error(err, "Failed to parse BMCSelector", "BMCUserSet", bmcUserSet.Name)
-			return nil
+			continue
 		}
 		if selector.Matches(labels.Set(bmc.GetLabels())) {
 			reqs = append(reqs, ctrl.Request{
@@ -369,7 +385,7 @@ func (r *BMCUserSetReconciler) enqueueByBMC(
 			ownedBMCUsers, err := r.getOwnedBMCUsers(ctx, &bmcUserSet)
 			if err != nil {
 				log.Error(err, "Failed to list owned BMCUsers")
-				return nil
+				continue
 			}
 			for _, bmcUser := range ownedBMCUsers.Items {
 				if bmcUser.Spec.BMCRef != nil && bmcUser.Spec.BMCRef.Name == bmc.Name {

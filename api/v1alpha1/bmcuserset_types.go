@@ -34,7 +34,7 @@ type BMCUserSetSpec struct {
 
 	// BMCUserTemplate defines the template for the BMCUser Resource to be applied to the BMCs.
 	// +required
-	BMCUserTemplate BMCUserTemplate `json:"bmcUserTemplate,omitempty"`
+	BMCUserTemplate BMCUserTemplate `json:"bmcUserTemplate"`
 }
 
 // BMCUserSetStatus defines the observed state of BMCUserSet.

@@ -212,8 +212,18 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
-	if err := system.SetBoot(&setBoot); err != nil {
+	resetRequired, err := r.setBoot(system, &setBoot)
+	if err != nil {
 		return fmt.Errorf("failed to set the boot order: %w", err)
+	}
+
+	// When boot properties were applied via @Redfish.Settings (e.g., AMI BMCs),
+	// they are pending and require a system reset to take effect.
+	if resetRequired && system.PowerState == schemas.OnPowerState {
+		log.V(1).Info("Resetting system to apply pending boot settings", "SystemURI", systemURI)
+		if _, err := system.Reset(schemas.ForceRestartResetType); err != nil {
+			return fmt.Errorf("failed to reset system to apply boot settings: %w", err)
+		}
 	}
 	return nil
 }
@@ -221,6 +231,46 @@ func (r *RedfishBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error
 func isSuperMicroSystem(system *schemas.ComputerSystem) bool {
 	m := strings.TrimSpace(system.Manufacturer)
 	return strings.EqualFold(m, string(ManufacturerSupermicro))
+}
+
+// hasSettingsObject checks if the ComputerSystem has a @Redfish.Settings object
+// pointing to a separate settings URI. Some BMCs (e.g., AMI) require changes to be
+// applied via this settings URI, taking effect only after a system reset.
+func hasSettingsObject(system *schemas.ComputerSystem) bool {
+	var tmp struct {
+		Settings struct {
+			SettingsObject struct {
+				ODataID string `json:"@odata.id"`
+			} `json:"SettingsObject"`
+		} `json:"@Redfish.Settings"`
+	}
+	if err := json.Unmarshal(system.RawData, &tmp); err != nil {
+		return false
+	}
+	return tmp.Settings.SettingsObject.ODataID != ""
+}
+
+// setBoot sets boot properties on the system using UpdateBootAttributesApplyAt
+// which respects the @Redfish.Settings pattern. Some BMCs (e.g., AMI) require boot
+// properties to be set via a separate settings URI (e.g., /redfish/v1/Systems/Self/SD)
+// rather than directly on the system resource. UpdateBootAttributesApplyAt handles
+// this transparently by PATCHing the settings target URI, which falls back to the
+// system URI when @Redfish.Settings is not present.
+// Returns true if the settings were applied via the settings URI and a system reset
+// is required for them to take effect.
+func (r *RedfishBMC) setBoot(system *schemas.ComputerSystem, boot *schemas.Boot) (bool, error) {
+	attrs := schemas.SettingsAttributes{
+		"BootSourceOverrideEnabled": string(boot.BootSourceOverrideEnabled),
+		"BootSourceOverrideTarget":  string(boot.BootSourceOverrideTarget),
+	}
+	if boot.BootSourceOverrideMode != "" {
+		attrs["BootSourceOverrideMode"] = string(boot.BootSourceOverrideMode)
+	}
+	if len(boot.BootOrder) > 0 {
+		attrs["BootOrder"] = boot.BootOrder
+	}
+	resetRequired := hasSettingsObject(system)
+	return resetRequired, system.UpdateBootAttributesApplyAt(attrs, "")
 }
 
 func (r *RedfishBMC) GetManager(bmcUUID string) (*schemas.Manager, error) {
@@ -507,12 +557,12 @@ func (r *RedfishBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrd
 	if err != nil {
 		return err
 	}
-	return system.SetBoot(&schemas.Boot{
+	_, err = r.setBoot(system, &schemas.Boot{
 		BootSourceOverrideEnabled: schemas.ContinuousBootSourceOverrideEnabled,
 		BootSourceOverrideTarget:  schemas.NoneBootSource,
 		BootOrder:                 bootOrder,
-	},
-	)
+	})
+	return err
 }
 
 func (r *RedfishBMC) getFilteredBiosRegistryAttributes(readOnly bool, immutable bool) (map[string]RegistryEntryAttributes, error) {

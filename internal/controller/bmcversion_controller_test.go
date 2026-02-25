@@ -455,9 +455,11 @@ func ensureBMCVersionConditionTransition(ctx context.Context, acc *conditionutil
 	}).Should(BeTrue())
 
 	By("Ensuring that BMCVersion has updated the task Status with task URI")
-	Eventually(Object(bmcVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
-	)
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(bmcVersion), bmcVersion)).To(Succeed())
+		g.Expect(bmcVersion.Status.UpgradeTask).NotTo(BeNil())
+		g.Expect(bmcVersion.Status.UpgradeTask.URI).To(Equal(bmc.DummyMockTaskForUpgrade))
+	}).Should(Succeed())
 
 	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeCompleted'")
 	condComplete := &metav1.Condition{}

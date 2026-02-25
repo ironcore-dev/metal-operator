@@ -566,6 +566,9 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
+		By("Ensuring that the Maintenance resource has been deleted")
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+
 		Expect(k8sClient.Delete(ctx, bmcSettings2)).To(Succeed())
 		Eventually(Get(bmcSettings2)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Object(server)).Should(

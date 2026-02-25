@@ -627,9 +627,11 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 		}).Should(BeTrue())
 
 	By("Ensuring that BIOSVersion has updated the taskStatus with taskURI")
-	Eventually(Object(biosVersion)).Should(
-		HaveField("Status.UpgradeTask.URI", bmc.DummyMockTaskForUpgrade),
-	)
+	Eventually(func(g Gomega) {
+		g.Expect(Get(biosVersion)()).To(Succeed())
+		g.Expect(biosVersion.Status.UpgradeTask).NotTo(BeNil())
+		g.Expect(biosVersion.Status.UpgradeTask.URI).To(Equal(bmc.DummyMockTaskForUpgrade))
+	}).Should(Succeed())
 
 	By("Ensuring that BIOS Conditions have reached expected state 'biosVersionUpgradeCompleted'")
 	condComplete := &metav1.Condition{}

@@ -128,15 +128,15 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer s
 // GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
 func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
 	index := UnitTestMockUps.BIOSUpgradeTaskIndex
-	taskSatus := UnitTestMockUps.BIOSUpgradeTaskStatus
+	taskStatus := UnitTestMockUps.BIOSUpgradeTaskStatus
 	if strings.Contains(UnitTestMockUps.BIOSUpgradingVersion, "fail") {
-		taskSatus = UnitTestMockUps.BIOSUpgradeTaskFailedStatus
+		taskStatus = UnitTestMockUps.BIOSUpgradeTaskFailedStatus
 	}
 
-	if index >= len(taskSatus) {
-		index = len(taskSatus) - 1
+	if index >= len(taskStatus) {
+		index = len(taskStatus) - 1
 	}
-	task := &taskSatus[index]
+	task := &taskStatus[index]
 	if task.TaskState == schemas.CompletedTaskState {
 		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
 	}

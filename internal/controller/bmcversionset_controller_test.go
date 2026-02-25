@@ -602,7 +602,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		})).Should(Succeed())
 
 		By("Ensuring that the BMCVersion02 has been retried ")
-		Eventually(Object(bmcVersion02)).WithPolling(10 * time.Microsecond).MustPassRepeatedly(1).Should(SatisfyAll(
+		Eventually(Object(bmcVersion02)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCVersionStateFailed))),
 			HaveField("Status.AutoRetryCountRemaining", BeNil()),
 		))

@@ -1076,6 +1076,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 			log.V(1).Info("Retrying BIOSSettings automatically", "RetryCount", remaining)
 			biosSettingsBase := settings.DeepCopy()
 			settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
+			settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Retry condition for BIOSSettings: %w", err)

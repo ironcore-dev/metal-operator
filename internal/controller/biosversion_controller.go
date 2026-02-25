@@ -504,7 +504,7 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 			return true, nil
 		}
 	}
-	log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion, "Server", server.Name)
+	log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion.Name, "Status", biosVersion.Status, "Server", server.Name)
 	return false, nil
 }
 

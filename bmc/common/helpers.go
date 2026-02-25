@@ -26,7 +26,7 @@ func CheckAttributes(
 ) (reset bool, err error) {
 	reset = false
 	var errs []error
-	// TODO: add more types like maps and Enumerations
+	// TODO: add support for Map/Object attribute types
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
@@ -88,6 +88,17 @@ func CheckAttributes(
 					SettingName:  name,
 					SettingValue: value,
 					Message:      fmt.Sprintf("attributes value is unknown. Valid Attributes %v", entryAttribute.Value),
+				}
+				errs = append(errs, err)
+			}
+		case schemas.BooleanAttributeType:
+			if _, ok := value.(bool); !ok {
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
 				}
 				errs = append(errs, err)
 			}

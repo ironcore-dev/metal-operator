@@ -453,7 +453,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 				if errors.As(err, &invalidSettingsErr) {
 					inValidSettings, errCond := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCSettingsConditionWrongSettings)
 					if errCond != nil {
-						return ctrl.Result{}, fmt.Errorf("failed to get Condition for skip reboot post setting update %v", errors.Join(err, errCond))
+						return ctrl.Result{}, fmt.Errorf("failed to get Condition for invalid BMC settings %v", errors.Join(err, errCond))
 					}
 					if errCond := r.Conditions.Update(
 						inValidSettings,

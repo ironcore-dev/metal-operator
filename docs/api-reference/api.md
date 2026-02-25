@@ -202,6 +202,7 @@ _Appears in:_
 | `flowState` _[BIOSSettingsFlowStatus](#biossettingsflowstatus) array_ | FlowState is a list of individual BIOSSettings operation flows. |  |  |
 | `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
 | `autoRetryCountRemaining` _integer_ | AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BIOSSettings upgrade in case of failure before giving up. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOSSettings's current state. |  |  |
 
 
@@ -358,6 +359,7 @@ _Appears in:_
 | `state` _[BIOSVersionState](#biosversionstate)_ | State represents the current state of the BIOS upgrade task. |  |  |
 | `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the Upgrade Task created by the BMC |  |  |
 | `autoRetryCountRemaining` _integer_ | AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BIOSVersion upgrade in case of failure before giving up. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOS version upgrade state. |  |  |
 
 
@@ -592,6 +594,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `state` _[BMCSettingsState](#bmcsettingsstate)_ | State represents the current state of the BMC configuration task. |  |  |
 | `autoRetryCountRemaining` _integer_ | AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BMCSettings upgrade in case of failure before giving up. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC Settings Resource state. |  |  |
 
 
@@ -874,6 +877,7 @@ _Appears in:_
 | `state` _[BMCVersionState](#bmcversionstate)_ | State represents the current state of the BMC configuration task. |  |  |
 | `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the upgrade task created by the BMC. |  |  |
 | `autoRetryCountRemaining` _integer_ | AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BMCVersion upgrade in case of failure before giving up. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC version upgrade state. |  |  |
 
 

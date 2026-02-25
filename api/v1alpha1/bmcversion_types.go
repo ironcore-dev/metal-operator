@@ -70,6 +70,10 @@ type BMCVersionStatus struct {
 	// +optional
 	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
 
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Conditions represents the latest available observations of the BMC version upgrade state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type

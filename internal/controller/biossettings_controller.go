@@ -1034,6 +1034,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		settings.Status.AutoRetryCountRemaining = nil
 		settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
 		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
+		settings.Status.ObservedGeneration = settings.Generation
 		annotations := settings.GetAnnotations()
 		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
 		if err != nil {
@@ -1072,11 +1073,16 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 
 	if retryCount > 0 {
 		remaining := settings.Status.AutoRetryCountRemaining
+		if settings.Status.ObservedGeneration != settings.Generation {
+			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
+			remaining = nil
+		}
 		if remaining == nil || *remaining > 0 {
 			log.V(1).Info("Retrying BIOSSettings automatically", "RetryCount", remaining)
 			biosSettingsBase := settings.DeepCopy()
 			settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
 			settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
+			settings.Status.ObservedGeneration = settings.Generation
 			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Retry condition for BIOSSettings: %w", err)
@@ -1439,7 +1445,7 @@ func (r *BIOSSettingsReconciler) updateStatus(ctx context.Context, settings *met
 		settings.Status.Conditions = []metav1.Condition{}
 		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 	}
-
+	settings.Status.ObservedGeneration = settings.Generation
 	if err := r.Status().Patch(ctx, settings, client.MergeFrom(biosSettingsBase)); err != nil {
 		return fmt.Errorf("failed to patch BIOSSettings status: %w", err)
 	}

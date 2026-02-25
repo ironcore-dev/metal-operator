@@ -238,6 +238,11 @@ spec:
                   - type
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               state:
                 description: State represents the current state of the BMC configuration
                   task.

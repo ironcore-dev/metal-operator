@@ -435,8 +435,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 
 	if resetBMC.Reason != BMCReasonReset {
 		// apply the BMC Settings if not done.
-		err := r.handleBMCPowerState(ctx, BMC, bmcSetting)
-		if err != nil {
+		if ok, err := r.handleBMCPowerState(ctx, BMC, bmcSetting); err != nil || ok {
 			return ctrl.Result{}, err
 		}
 
@@ -577,46 +576,46 @@ func (r *BMCSettingsReconciler) handleBMCPowerState(
 	ctx context.Context,
 	BMC *metalv1alpha1.BMC,
 	bmcSetting *metalv1alpha1.BMCSettings,
-) error {
+) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	switch BMC.Status.PowerState {
 	case metalv1alpha1.OnPowerState:
 		fallthrough
 	case metalv1alpha1.UnknownPowerState:
-		BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
+		BMCPoweredOffCond, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
 		if err != nil {
-			return fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
+			return false, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
 		}
-		if BMCPoweredOffCondition.Status == metav1.ConditionTrue {
+		if BMCPoweredOffCond.Status == metav1.ConditionTrue {
 			if err := r.Conditions.Update(
-				BMCPoweredOffCondition,
+				BMCPoweredOffCond,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
 				conditionutils.UpdateReason("BMCPoweredBackOn"),
 				conditionutils.UpdateMessage(fmt.Sprintf("BMC in Powered On, Power State: %v", BMC.Status.PowerState)),
 			); err != nil {
-				return fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
+				return false, fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
 			}
-			err = r.updateBMCSettingsStatus(ctx, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCondition)
-			return err
+			err = r.updateBMCSettingsStatus(ctx, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCond)
+			return true, err
 		}
 	default:
 		log.V(1).Info("BMC is not Powered On. Can not proceed", "PowerState", BMC.Status.PowerState)
-		BMCPoweredOffCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
+		BMCPoweredOffCond, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCPoweredOffCondition)
 		if err != nil {
-			return fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
+			return false, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
 		}
 		if err := r.Conditions.Update(
-			BMCPoweredOffCondition,
+			BMCPoweredOffCond,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
 			conditionutils.UpdateReason(BMCPoweredOffReason),
 			conditionutils.UpdateMessage(fmt.Sprintf("BMC in not Powered On, Power State: %v", BMC.Status.PowerState)),
 		); err != nil {
-			return fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
+			return false, fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
 		}
-		err = r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
-		return err
+		err = r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCond)
+		return true, err
 	}
-	return nil
+	return false, nil
 }
 
 func (r *BMCSettingsReconciler) handleBMCReset(
@@ -712,6 +711,7 @@ func (r *BMCSettingsReconciler) handleFailedState(
 		bmcSettingsBase := bmcSetting.DeepCopy()
 		bmcSetting.Status.AutoRetryCountRemaining = nil
 		bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
+		bmcSetting.Status.ObservedGeneration = bmcSetting.Generation
 		annotations := bmcSetting.GetAnnotations()
 		retryCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, RetryOfFailedResourceConditionIssued)
 		if err != nil {
@@ -746,10 +746,15 @@ func (r *BMCSettingsReconciler) handleFailedState(
 	}
 	if retryCount > 0 {
 		remaining := bmcSetting.Status.AutoRetryCountRemaining
+		if bmcSetting.Status.ObservedGeneration != bmcSetting.Generation {
+			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
+			remaining = nil
+		}
 		if remaining == nil || *remaining > 0 {
 			log.V(1).Info("Retrying BMCSettings automatically", "RetryCount", remaining)
 			bmcSettingsBase := bmcSetting.DeepCopy()
 			bmcSetting.Status.State = metalv1alpha1.BMCSettingsStatePending
+			bmcSetting.Status.ObservedGeneration = bmcSetting.Generation
 			retryCondition, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, RetryOfFailedResourceConditionIssued)
 			if err != nil {
 				return fmt.Errorf("failed to get Retry condition for BMCSettings: %w", err)

@@ -676,7 +676,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcVersion03)).To(Succeed())
 		Eventually(Get(bmcVersion03)).Should(Satisfy(apierrors.IsNotFound))
 
-		Eventually(Object(server01)).Should(
+		Eventually(Object(server03)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
 		Eventually(Object(server02)).Should(

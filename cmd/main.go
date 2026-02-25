@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -208,8 +209,8 @@ func main() { // nolint: gocyclo
 		registryURL = fmt.Sprintf("%s://%s:%d", registryProtocol, registryAddr, registryPort)
 	}
 
-	if defaultFailedAutoRetryCount < 0 {
-		setupLog.Error(nil, "--default-failed-auto-retry-count can not be negative value")
+	if defaultFailedAutoRetryCount < 0 || defaultFailedAutoRetryCount > math.MaxInt32 {
+		setupLog.Error(nil, "--default-failed-auto-retry-count can not be negative value or greater than int32 max value")
 		os.Exit(1)
 	}
 

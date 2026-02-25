@@ -440,6 +440,7 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 		biosVersionBase := biosVersion.DeepCopy()
 		biosVersion.Status.AutoRetryCountRemaining = nil
 		biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+		biosVersion.Status.ObservedGeneration = biosVersion.Generation
 		annotations := biosVersion.GetAnnotations()
 		retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
 		if err != nil {
@@ -475,10 +476,15 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 	}
 	if retryCount > 0 {
 		remaining := biosVersion.Status.AutoRetryCountRemaining
+		if biosVersion.Status.ObservedGeneration != biosVersion.Generation {
+			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
+			remaining = nil
+		}
 		if remaining == nil || *remaining > 0 {
 			log.V(1).Info("Retrying BIOSVersion automatically", "RetryCount", remaining)
 			biosVersionBase := biosVersion.DeepCopy()
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+			biosVersion.Status.ObservedGeneration = biosVersion.Generation
 			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
 			if err != nil {
 				return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
@@ -630,6 +636,7 @@ func (r *BIOSVersionReconciler) updateStatus(
 
 	biosVersionBase := biosVersion.DeepCopy()
 	biosVersion.Status.State = state
+	biosVersion.Status.ObservedGeneration = biosVersion.Generation
 
 	if condition != nil {
 		if err := r.Conditions.UpdateSlice(

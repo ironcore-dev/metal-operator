@@ -429,7 +429,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
 		// clean up maintenance if any, as the test not auto delete child objects
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
 		for _, maintenance := range serverMaintenanceList.Items {
 			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
 		}

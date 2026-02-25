@@ -307,6 +307,11 @@ spec:
                   setting was successfully applied.
                 format: date-time
                 type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               state:
                 description: State represents the current state of the BIOS settings
                   update.

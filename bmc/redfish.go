@@ -848,7 +848,9 @@ func (r *RedfishBMC) getSystemFromUri(ctx context.Context, systemURI string) (*s
 		}); err != nil {
 		return nil, fmt.Errorf("failed to wait for for server systems to be ready: %w", err)
 	}
-	if system.UUID != "" {
+	// System is considered ready even if UUID is empty - allow graceful handling of systems
+	// that don't expose System.UUID in their Redfish payload
+	if system != nil {
 		return system, nil
 	}
 	return nil, fmt.Errorf("no system found for %v", systemURI)

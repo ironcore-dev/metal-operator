@@ -23,6 +23,8 @@ require (
 	sigs.k8s.io/yaml v1.6.0
 )
 
+replace github.com/stmcginnis/gofish => github.com/xkonni/gofish v0.0.0-20260225155216-a0b6101e61ba
+
 require (
 	cel.dev/expr v0.24.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect

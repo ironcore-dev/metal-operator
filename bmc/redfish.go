@@ -13,6 +13,7 @@ import (
 	"maps"
 	"math/big"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -1202,6 +1203,92 @@ func shuffleRunes(a []rune) error {
 		}
 		j := n.Int64()
 		a[i], a[j] = a[j], a[i]
+	}
+	return nil
+}
+
+type subscriptionPayload struct {
+	Destination         string                           `json:"Destination,omitempty"`
+	EventTypes          []redfish.EventType              `json:"EventTypes,omitempty"`
+	EventFormatType     redfish.EventFormatType          `json:"EventFormatType,omitempty"`
+	RegistryPrefixes    []string                         `json:"RegistryPrefixes,omitempty"`
+	ResourceTypes       []string                         `json:"ResourceTypes,omitempty"`
+	DeliveryRetryPolicy redfish.DeliveryRetryPolicy      `json:"DeliveryRetryPolicy,omitempty"`
+	HTTPHeaders         map[string]string                `json:"HttpHeaders,omitempty"`
+	Oem                 any                              `json:"Oem,omitempty"`
+	Protocol            redfish.EventDestinationProtocol `json:"Protocol,omitempty"`
+	Context             string                           `json:"Context,omitempty"`
+}
+
+func (r *RedfishBMC) CreateEventSubscription(
+	ctx context.Context,
+	destination string,
+	eventFormatType redfish.EventFormatType,
+	retry redfish.DeliveryRetryPolicy,
+) (string, error) {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return "", fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return "", fmt.Errorf("event service is not enabled")
+	}
+	payload := &subscriptionPayload{
+		Destination:         destination,
+		EventFormatType:     eventFormatType, // event or metricreport
+		Protocol:            redfish.RedfishEventDestinationProtocol,
+		DeliveryRetryPolicy: retry,
+		Context:             "metal3-operator",
+	}
+	client := ev.GetClient()
+	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
+	if len(ev.ResourceTypes) == 0 {
+		payload.EventTypes = []redfish.EventType{}
+	} else {
+		payload.RegistryPrefixes = []string{""} // Filters by the prefix of the event's MessageId, which points to a Message Registry: [Base, ResourceEvent, iLOEvents]
+		payload.ResourceTypes = []string{""}    // Filters by the schema name (Resource Type) of the event's OriginOfCondition:	[Chassis, ComputerSystem, Power]
+	}
+	resp, err := client.Post(ev.Subscriptions, payload)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+	}
+	// return subscription link from returned location
+	subscriptionLink := resp.Header.Get("Location")
+	if subscriptionLink == "" {
+		return "", fmt.Errorf("failed to get subscription link from response header")
+	}
+	urlParser, err := url.ParseRequestURI(subscriptionLink)
+	if err == nil {
+		subscriptionLink = urlParser.RequestURI()
+	}
+	return subscriptionLink, nil
+}
+
+func (r *RedfishBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return fmt.Errorf("event service is not enabled")
+	}
+	event, err := ev.GetEventSubscription(uri)
+	if err != nil {
+		return fmt.Errorf("failed to get event subscription: %w", err)
+	}
+	if event == nil {
+		return nil
+	}
+	if err := ev.DeleteEventSubscription(uri); err != nil {
+		return fmt.Errorf("failed to delete event subscription: %w", err)
 	}
 	return nil
 }

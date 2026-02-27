@@ -670,6 +670,8 @@ _Appears in:_
 | `state` _[BMCState](#bmcstate)_ | State represents the current state of the BMC.<br />kubebuilder:validation:Enum=Enabled;Error;Pending | Pending |  |
 | `powerState` _[BMCPowerState](#bmcpowerstate)_ | PowerState represents the current power state of the BMC. |  |  |
 | `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  |  |
+| `metricsReportSubscriptionLink` _string_ | MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc. |  |  |
+| `eventsSubscriptionLink` _string_ | EventsSubscriptionLink is the link to the events subscription of the bmc. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  |  |
 
 

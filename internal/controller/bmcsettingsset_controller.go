@@ -111,6 +111,13 @@ func (r *BMCSettingsSetReconciler) delete(
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
 		}
+		log.V(1).Info("Updated BMCSettingsSet state", "Status", currentStatus)
+
+		// Handle propagation of retry annotation to child when parent is being deleted.
+		// That way the deleted annotations can be passed to children before parent is deleted.
+		if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+			return ctrl.Result{}, err
+		}
 		log.Info("Waiting on the created BMCSettings to reach terminal status")
 		return ctrl.Result{}, nil
 
@@ -218,6 +225,11 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 	currentStatus.FullyLabeledBMCs = int32(len(bmcList.Items))
 	if err := r.updateStatus(ctx, currentStatus, bmcSettingsSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
+	}
+
+	// handle retry annotation - remove the annotation after retrying reconciliation
+	if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -334,9 +346,30 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BMCSettings with updated spec", "BMCSettings", bmcSettings.Name, "Operation", opResult)
+			settingsBase := bmcSettings.DeepCopy()
+			bmcSettings.Status.AutoRetryCountRemaining = bmcSettings.Spec.FailedAutoRetryCount
+			if err = r.Status().Patch(ctx, &bmcSettings, client.MergeFrom(settingsBase)); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func (r *BMCSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, set *metalv1alpha1.BMCSettingsSet) error {
+	log := ctrl.LoggerFrom(ctx)
+	ownedBMCSettings, err := r.getOwnedBMCSettings(ctx, set)
+	if err != nil {
+		return err
+	}
+
+	if len(ownedBMCSettings.Items) == 0 {
+		log.V(1).Info("No BMCSettings found, skipping retry annotation propagation")
+		return nil
+	}
+
+	log.V(1).Info("Propagating retry annotation to owned BMCSettings resources")
+	return handleRetryAnnotationPropagation(ctx, r.Client, set, ownedBMCSettings)
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(

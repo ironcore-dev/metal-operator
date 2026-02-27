@@ -6,6 +6,7 @@ package bmc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ironcore-dev/metal-operator/bmc/common"
@@ -112,7 +113,11 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer s
 	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
+		lenTask := len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
+		if strings.Contains(params.ImageURI, "fail") {
+			lenTask = len(UnitTestMockUps.BIOSUpgradeTaskFailedStatus) - 1
+		}
+		for UnitTestMockUps.BIOSUpgradeTaskIndex < lenTask {
 			time.Sleep(5 * time.Millisecond)
 			UnitTestMockUps.BIOSUpgradeTaskIndex++
 		}
@@ -123,10 +128,15 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer s
 // GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
 func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
 	index := UnitTestMockUps.BIOSUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BIOSUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
+	taskStatus := UnitTestMockUps.BIOSUpgradeTaskStatus
+	if strings.Contains(UnitTestMockUps.BIOSUpgradingVersion, "fail") {
+		taskStatus = UnitTestMockUps.BIOSUpgradeTaskFailedStatus
 	}
-	task := &UnitTestMockUps.BIOSUpgradeTaskStatus[index]
+
+	if index >= len(taskStatus) {
+		index = len(taskStatus) - 1
+	}
+	task := &taskStatus[index]
 	if task.TaskState == schemas.CompletedTaskState {
 		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
 	}
@@ -228,7 +238,7 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, a
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return common.CheckAttribues(attrs, filtered)
+	return common.CheckAttributes(attrs, filtered)
 }
 
 // GetBMCVersion retrieves the BMC version.
@@ -249,7 +259,11 @@ func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer st
 	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+		lenTask := len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+		if strings.Contains(params.ImageURI, "fail") {
+			lenTask = len(UnitTestMockUps.BMCUpgradeTaskFailedStatus) - 1
+		}
+		for UnitTestMockUps.BMCUpgradeTaskIndex < lenTask {
 			time.Sleep(5 * time.Millisecond)
 			UnitTestMockUps.BMCUpgradeTaskIndex++
 		}
@@ -260,10 +274,16 @@ func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer st
 // GetBMCUpgradeTask retrieves the status of a BMC upgrade task.
 func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
 	index := UnitTestMockUps.BMCUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BMCUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+
+	taskStatus := UnitTestMockUps.BMCUpgradeTaskStatus
+	if strings.Contains(UnitTestMockUps.BMCUpgradingVersion, "fail") {
+		taskStatus = UnitTestMockUps.BMCUpgradeTaskFailedStatus
 	}
-	task := &UnitTestMockUps.BMCUpgradeTaskStatus[index]
+
+	if index >= len(taskStatus) {
+		index = len(taskStatus) - 1
+	}
+	task := &taskStatus[index]
 	if task.TaskState == schemas.CompletedTaskState {
 		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
 	}

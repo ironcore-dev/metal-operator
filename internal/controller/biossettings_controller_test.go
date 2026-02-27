@@ -832,13 +832,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
-		biosSetting["ProcCores"] = "2"
+		biosSetting["UnknownData"] = "2"
+
+		retryCount := 2
 
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-from-server-avail",
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+				},
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
@@ -849,35 +854,43 @@ var _ = Describe("BIOSSettings Controller", func() {
 						Name:     "one",
 					}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
-		By("Moving to Failed state")
-		Eventually(UpdateStatus(biosSettings, func() {
-			biosSettings.Status.State = metalv1alpha1.BIOSSettingsStateFailed
-		})).Should(Succeed())
-
-		Eventually(Update(biosSettings, func() {
-			biosSettings.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
-			}
-		})).Should(Succeed())
-
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-		))
+		By("Ensuring that the BIOS setting has started retry and AutoRetryCountRemaining is set")
+		Eventually(func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			return biosSettings.Status.AutoRetryCountRemaining != nil && *biosSettings.Status.AutoRetryCountRemaining > int32(0)
+		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
-			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
-			HaveField("Status.LastAppliedTime.IsZero()", false),
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+		))
+
+		Eventually(Object(biosSettings)).Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Ensuring that the BIOS setting has not been changed")
+		Consistently(Object(biosSettings), "25ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
 
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
 		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
+		// clean up maintenance if any, as the test not auto delete child objects
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
+		for _, maintenance := range serverMaintenanceList.Items {
+			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+		}
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)

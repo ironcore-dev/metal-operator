@@ -326,7 +326,7 @@ func (r *RedfishKubeBMC) CheckBMCAttributes(ctx context.Context, UUID string, at
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return common.CheckAttribues(attrs, filtered)
+	return common.CheckAttributes(attrs, filtered)
 }
 
 // GetBMCVersion retrieves the BMC version.

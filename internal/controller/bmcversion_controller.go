@@ -43,12 +43,13 @@ const (
 // BMCVersionReconciler reconciles a BMCVersion object
 type BMCVersionReconciler struct {
 	client.Client
-	ManagerNamespace string
-	Insecure         bool
-	Scheme           *runtime.Scheme
-	BMCOptions       bmc.Options
-	ResyncInterval   time.Duration
-	Conditions       *conditionutils.Accessor
+	ManagerNamespace            string
+	Insecure                    bool
+	Scheme                      *runtime.Scheme
+	BMCOptions                  bmc.Options
+	ResyncInterval              time.Duration
+	Conditions                  *conditionutils.Accessor
+	DefaultFailedAutoRetryCount int32
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
@@ -200,6 +201,17 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 
 	switch bmcVersion.Status.State {
 	case "", metalv1alpha1.BMCVersionStatePending:
+		// remove the retry annotation if it's present as we are retrying now
+		if shouldRetryReconciliation(bmcVersion) {
+			bmcVersionBase := bmcVersion.DeepCopy()
+			annotations := bmcVersion.GetAnnotations()
+			delete(annotations, metalv1alpha1.OperationAnnotation)
+			bmcVersion.SetAnnotations(annotations)
+			if err := r.Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion for retrying: %w", err)
+			}
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, r.removeServerMaintenanceRefAndResetConditions(ctx, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateInProgress:
 		servers, err := r.getServersForBMCVersion(ctx, bmcClient, bmcVersion)
@@ -263,22 +275,9 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 	case metalv1alpha1.BMCVersionStateCompleted:
 		return ctrl.Result{}, r.removeServerMaintenanceRefAndResetConditions(ctx, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateFailed:
-		if shouldRetryReconciliation(bmcVersion) {
-			log.V(1).Info("Retrying BMCVersion reconciliation")
-			bmcVersionBase := bmcVersion.DeepCopy()
-			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
-			bmcVersion.Status.Conditions = []metav1.Condition{}
-			annotations := bmcVersion.GetAnnotations()
-			delete(annotations, metalv1alpha1.OperationAnnotation)
-			bmcVersion.SetAnnotations(annotations)
-			if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion status for retrying: %w", err)
-			}
-			return ctrl.Result{}, nil
-		}
-		log.V(1).Info("Failed to upgrade BMC via BMCVersion", "BMCVersion", bmcVersion.Name, "BMC", bmcObj.Name)
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.handleFailedState(ctx, bmcVersion, bmcObj)
 	}
+
 	log.V(1).Info("Unknown State found", "State", bmcVersion.Status.State)
 	return ctrl.Result{}, nil
 }
@@ -404,6 +403,91 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 	return ctrl.Result{}, nil
 }
 
+func (r *BMCVersionReconciler) handleFailedState(
+	ctx context.Context,
+	bmcVersion *metalv1alpha1.BMCVersion,
+	BMC *metalv1alpha1.BMC,
+) error {
+	log := ctrl.LoggerFrom(ctx)
+	if shouldRetryReconciliation(bmcVersion) {
+		log.V(1).Info("Retrying BMCVersion as per annotation")
+		bmcVersionBase := bmcVersion.DeepCopy()
+		bmcVersion.Status.AutoRetryCountRemaining = nil
+		bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
+		bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
+		annotations := bmcVersion.GetAnnotations()
+
+		retryCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		if err != nil {
+			return fmt.Errorf("failed to get retry condition for BMCVersion: %w", err)
+		}
+		if retryCondition.Status != metav1.ConditionTrue {
+			err := r.Conditions.Update(retryCondition,
+				conditionutils.UpdateStatus(metav1.ConditionTrue),
+				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to update retry condition for BMCVersion: %w", err)
+			}
+			bmcVersion.Status.Conditions = []metav1.Condition{*retryCondition}
+		}
+		if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+			return fmt.Errorf("failed to patch BMCVersion status for retrying: %w", err)
+		}
+		return nil
+	}
+	var retryCount int32
+	if bmcVersion.Spec.FailedAutoRetryCount != nil {
+		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
+		retryCount = *bmcVersion.Spec.FailedAutoRetryCount
+	} else if r.DefaultFailedAutoRetryCount > 0 {
+		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
+		retryCount = r.DefaultFailedAutoRetryCount
+	} else {
+		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
+		retryCount = 0
+	}
+	if retryCount > 0 {
+		remaining := bmcVersion.Status.AutoRetryCountRemaining
+		if bmcVersion.Status.ObservedGeneration != bmcVersion.Generation {
+			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
+			remaining = nil
+		}
+		if remaining == nil || *remaining > 0 {
+			log.V(1).Info("Retrying BMCVersion automatically", "RetryCount", remaining)
+			bmcVersionBase := bmcVersion.DeepCopy()
+			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
+			bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
+			retryCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			if err != nil {
+				return fmt.Errorf("failed to get Retry condition for BMCVersion: %w", err)
+			}
+			if retryCondition.Status == metav1.ConditionTrue {
+				// keep the condition if it's already true,
+				// otherwise SET resource will patch the retry annotation again.
+				bmcVersion.Status.Conditions = []metav1.Condition{*retryCondition}
+			} else {
+				bmcVersion.Status.Conditions = nil
+			}
+
+			if remaining == nil {
+				newRemaining := retryCount - 1
+				bmcVersion.Status.AutoRetryCountRemaining = &newRemaining
+			} else {
+				*bmcVersion.Status.AutoRetryCountRemaining--
+			}
+
+			if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+				return fmt.Errorf("failed to patch BMCVersion status for auto-retrying: %w", err)
+			}
+			return nil
+		}
+	}
+	log.V(1).Info("Failed to upgrade BMC via BMCVersion", "BMCVersion", bmcVersion.Name, "BMC", BMC.Name)
+	return nil
+}
+
 func (r *BMCVersionReconciler) getBMCVersionFromBMC(ctx context.Context, bmcClient bmc.BMC, BMC *metalv1alpha1.BMC) (string, error) {
 	currentBMCVersion, err := bmcClient.GetBMCVersion(ctx, BMC.Spec.BMCUUID)
 	if err != nil {
@@ -476,6 +560,14 @@ func (r *BMCVersionReconciler) removeServerMaintenanceRefAndResetConditions(
 		log.V(1).Info("Upgraded BMC version", "BMCVersion", currentBMCVersion, "BMC", BMC.Name)
 		state = metalv1alpha1.BMCVersionStateCompleted
 	}
+	retryFailedCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+	if err != nil {
+		return fmt.Errorf("failed to get retry condition for BMCVersion: %w", err)
+	}
+	if retryFailedCondition.Status == metav1.ConditionTrue {
+		return r.patchBMCVersionStatusAndCondition(ctx, bmcVersion, state, nil, retryFailedCondition)
+	}
+
 	err = r.patchBMCVersionStatusAndCondition(ctx, bmcVersion, state, nil, nil)
 	return err
 }
@@ -681,6 +773,7 @@ func (r *BMCVersionReconciler) patchBMCVersionStatusAndCondition(
 	}
 
 	bmcVersion.Status.UpgradeTask = upgradeTask
+	bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
 
 	if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 		return fmt.Errorf("failed to patch BMCVersion status: %w", err)

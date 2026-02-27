@@ -264,6 +264,11 @@ func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Cont
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersion", version.Name, "Operation", opResult)
+			versionBase := version.DeepCopy()
+			version.Status.AutoRetryCountRemaining = version.Spec.FailedAutoRetryCount
+			if err = r.Status().Patch(ctx, &version, client.MergeFrom(versionBase)); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return errors.Join(errs...)

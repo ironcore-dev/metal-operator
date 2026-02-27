@@ -286,6 +286,11 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BMCVersion with updated spec", "BMCVersions", bmcVersion.Name, "Operation", opResult)
+			versionBase := bmcVersion.DeepCopy()
+			bmcVersion.Status.AutoRetryCountRemaining = bmcVersion.Spec.FailedAutoRetryCount
+			if err = r.Status().Patch(ctx, &bmcVersion, client.MergeFrom(versionBase)); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return errors.Join(errs...)

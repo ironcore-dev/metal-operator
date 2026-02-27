@@ -123,6 +123,13 @@ spec:
                 description: BMCVersionTemplate defines the template for the BMCVersion
                   resource to be applied to the BMCs.
                 properties:
+                  failedAutoRetryCount:
+                    description: FailedAutoRetryCount is the number of times the controller
+                      should automatically retry the BMCVersion upgrade in case of
+                      failure before giving up.
+                    format: int32
+                    minimum: 0
+                    type: integer
                   image:
                     description: Image specifies the image to use to upgrade to the
                       given BMC version.

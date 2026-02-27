@@ -291,6 +291,11 @@ func (r *BIOSSettingsSetReconciler) patchBIOSSettingsFromTemplate(ctx context.Co
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BIOSSettings with updated spec", "BIOSSettings", settings.Name, "Operation", opResult)
+			settingsBase := settings.DeepCopy()
+			settings.Status.AutoRetryCountRemaining = settings.Spec.FailedAutoRetryCount
+			if err = r.Status().Patch(ctx, &settings, client.MergeFrom(settingsBase)); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return errors.Join(errs...)

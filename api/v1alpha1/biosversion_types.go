@@ -44,6 +44,11 @@ type BIOSVersionTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+
+	// FailedAutoRetryCount is the number of times the controller should automatically retry the BIOSVersion upgrade in case of failure before giving up.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
 }
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
@@ -84,6 +89,14 @@ type BIOSVersionStatus struct {
 	// UpgradeTask contains the state of the Upgrade Task created by the BMC
 	// +optional
 	UpgradeTask *Task `json:"upgradeTask,omitempty"`
+
+	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BIOSVersion upgrade in case of failure before giving up.
+	// +optional
+	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOS version upgrade state.
 	// +patchStrategy=merge

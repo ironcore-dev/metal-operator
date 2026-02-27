@@ -115,6 +115,13 @@ spec:
                 description: BMCSettingsTemplate defines the template for the BMCSettings
                   resource to be applied to the BMCs.
                 properties:
+                  failedAutoRetryCount:
+                    description: FailedAutoRetryCount is the number of times the controller
+                      should automatically retry the BMCSettings upgrade in case of
+                      failure before giving up.
+                    format: int32
+                    minimum: 0
+                    type: integer
                   serverMaintenancePolicy:
                     description: ServerMaintenancePolicy is a maintenance policy to
                       be applied on the server.

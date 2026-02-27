@@ -17,6 +17,11 @@ type BIOSSettingsTemplate struct {
 	// +optional
 	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
+	// FailedAutoRetryCount is the number of times the controller should automatically retry the BIOSSettings upgrade in case of failure before giving up.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
+
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
@@ -93,6 +98,14 @@ type BIOSSettingsStatus struct {
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
 	// +optional
 	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
+
+	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BIOSSettings upgrade in case of failure before giving up.
+	// +optional
+	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOSSettings's current state.
 	// +patchStrategy=merge

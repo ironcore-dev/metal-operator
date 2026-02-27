@@ -76,6 +76,13 @@ spec:
                 description: BIOSSettingsTemplate defines the template for the BIOSSettings
                   resource to be applied to the servers.
                 properties:
+                  failedAutoRetryCount:
+                    description: FailedAutoRetryCount is the number of times the controller
+                      should automatically retry the BIOSSettings upgrade in case
+                      of failure before giving up.
+                    format: int32
+                    minimum: 0
+                    type: integer
                   serverMaintenancePolicy:
                     description: ServerMaintenancePolicy is a maintenance policy to
                       be enforced on the server.

@@ -75,6 +75,13 @@ spec:
           spec:
             description: BIOSVersionSpec defines the desired state of BIOSVersion.
             properties:
+              failedAutoRetryCount:
+                description: FailedAutoRetryCount is the number of times the controller
+                  should automatically retry the BIOSVersion upgrade in case of failure
+                  before giving up.
+                format: int32
+                minimum: 0
+                type: integer
               image:
                 description: Image specifies the image to use to upgrade to the given
                   BIOS version.
@@ -165,6 +172,12 @@ spec:
           status:
             description: BIOSVersionStatus defines the observed state of BIOSVersion.
             properties:
+              autoRetryCountRemaining:
+                description: AutoRetryCountRemaining is the number of remaining times
+                  the controller will automatically retry the BIOSVersion upgrade
+                  in case of failure before giving up.
+                format: int32
+                type: integer
               conditions:
                 description: Conditions represents the latest available observations
                   of the BIOS version upgrade state.
@@ -223,6 +236,11 @@ spec:
                   - type
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               state:
                 description: State represents the current state of the BIOS upgrade
                   task.

@@ -132,12 +132,17 @@ func (r *BMCVersionReconciler) removeServerMaintenances(ctx context.Context, bmc
 	// Delete all ServerMaintenance objects owned by this BMCVersion
 	for i := range serverMaintenanceList.Items {
 		serverMaintenance := &serverMaintenanceList.Items[i]
-		if serverMaintenance.DeletionTimestamp.IsZero() {
+		if serverMaintenance.DeletionTimestamp.IsZero() && metav1.IsControlledBy(serverMaintenance, bmcVersion) {
 			log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
 			if err := r.Delete(ctx, serverMaintenance); err != nil {
 				log.V(1).Info("Failed to delete ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
 				finalErr = append(finalErr, err)
 			}
+		} else {
+			log.V(1).Info(
+				"Skipping deletion of ServerMaintenance as it has a different owner",
+				"ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance),
+				"State", serverMaintenance.Status.State)
 		}
 	}
 

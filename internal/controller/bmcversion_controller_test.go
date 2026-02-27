@@ -532,6 +532,9 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
+
+		// Wait for garbage collection to delete owned ServerMaintenance objects
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 	})
 
 	It("Should maintain cleanup functionality with populated spec.serverMaintenanceRefs", func(ctx SpecContext) {

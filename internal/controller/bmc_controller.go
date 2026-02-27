@@ -124,7 +124,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 	}
 	if r.waitForBMCReset(bmcObj, r.BMCResetWaitTime) {
 		log.V(1).Info("Skipped BMC reconciliation while waiting for BMC reset to complete")
-		err := r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
+		err := r.updateBMCStateToPending(ctx, bmcObj)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -468,12 +468,12 @@ func (r *BMCReconciler) shouldResetBMC(bmcObj *metalv1alpha1.BMC) bool {
 	return false
 }
 
-func (r *BMCReconciler) updateBMCState(ctx context.Context, bmcObj *metalv1alpha1.BMC, state metalv1alpha1.BMCState) error {
-	if bmcObj.Status.State == state {
+func (r *BMCReconciler) updateBMCStateToPending(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+	if bmcObj.Status.State == metalv1alpha1.BMCStatePending {
 		return nil
 	}
 	bmcBase := bmcObj.DeepCopy()
-	bmcObj.Status.State = state
+	bmcObj.Status.State = metalv1alpha1.BMCStatePending
 	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return fmt.Errorf("failed to patch BMC state to Pending: %w", err)
 	}
@@ -489,25 +489,35 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 	if bmcClient != nil {
 		if err = bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.GracefulRestartResetType); err == nil {
 			log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)
-			return r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
+			return r.updateBMCStateToPending(ctx, bmcObj)
 		}
-	}
-	// BMC Unavailable, currently can not perform reset via Redfish
-	log.Error(err, "Could not reset BMC via Redfish", "BMC", bmcObj.Name)
+		// BMC Unavailable, currently can not perform reset via Redfish
+		log.Error(err, "Could not reset BMC via Redfish", "BMC", bmcObj.Name)
 
-	// Try SSH reset for 5xx server errors (BMC is having issues)
-	// For 4xx client errors (auth/permission), SSH won't help
-	if httpErr, ok := err.(*schemas.Error); ok {
-		if httpErr.HTTPReturnedStatusCode >= 500 && httpErr.HTTPReturnedStatusCode < 600 {
-			// 5xx server error - attempt SSH-based reset via goroutine
-			go r.resetBMCViaSSH(context.Background(), bmcObj)
-			log.Info("Initiated SSH-based BMC reset in background due to Redfish 5xx error", "BMC", bmcObj.Name)
-			return r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
+		// Try SSH reset for 5xx server errors (BMC is having issues)
+		// For 4xx client errors (auth/permission), SSH won't help
+		if httpErr, ok := err.(*schemas.Error); ok {
+			if httpErr.HTTPReturnedStatusCode >= 500 && httpErr.HTTPReturnedStatusCode < 600 {
+				// 5xx server error - attempt SSH-based reset via goroutine with proper context
+				// The bmcResetConditionType condition (set to True above) acts as idempotency guard:
+				// - waitForBMCReset() will prevent new resets during the delay period
+				// - After delay, we retry BMC connection
+				// - Condition is cleared when connection succeeds (via handlePreviousBMCResetAnnotations)
+				resetCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				go func() {
+					defer cancel()
+					r.resetBMCViaSSH(resetCtx, bmcObj)
+				}()
+				log.Info("Initiated SSH-based BMC reset in background due to Redfish 5xx error", "BMC", bmcObj.Name)
+				return r.updateBMCStateToPending(ctx, bmcObj)
+			}
+			// 4xx or other status code - don't try SSH
+			return errors.Join(r.updateBMCStateToPending(ctx, bmcObj), fmt.Errorf("cannot reset bmc: %w", err))
 		}
-		// 4xx or other status code - don't try SSH
-		return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("cannot reset bmc: %w", err))
+		return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
 	}
-	return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
+	// bmcClient is nil - cannot perform any reset
+	return errors.Join(r.updateBMCStateToPending(ctx, bmcObj), fmt.Errorf("cannot reset bmc: client unavailable"))
 }
 
 func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcObj *metalv1alpha1.BMC) {
@@ -543,9 +553,10 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcObj *metalv1alpha
 		return
 	}
 	log.Info("Successfully reset BMC via SSH")
-	if err := r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, "BMCResetComplete", "BMC reset via SSH completed successfully"); err != nil {
-		log.Error(err, "Failed to clear BMC reset condition")
-	}
+
+	// Note: We don't clear the condition here. The condition will be cleared automatically
+	// when BMC connection succeeds in the next reconciliation via handlePreviousBMCResetAnnotations()
+
 	if err := r.updateLastResetTime(ctx, currentBMC); err != nil {
 		log.Error(err, "Failed to update LastResetTime after SSH reset")
 	}

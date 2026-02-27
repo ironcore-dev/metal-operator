@@ -223,12 +223,10 @@ func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
 	// If Redfish reset fails, try SSH-based reset for known manufacturers
 	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{ssh.Password(password)},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			return nil
-		},
-		Timeout: timeout,
+		User:            username,
+		Auth:            []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         timeout,
 	}
 	resetCMD := ""
 	switch manufacturer {

@@ -492,15 +492,75 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 			return r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
 		}
 	}
-	// BMC Unavailable, currently can not perform reset. try to reset with ssh when available
-	log.Error(err, "failed to reset BMC via Redfish, falling back to rest via ssh", "BMC", bmcObj.Name)
+	// BMC Unavailable, currently can not perform reset via Redfish
+	log.Error(err, "Could not reset BMC via Redfish", "BMC", bmcObj.Name)
+
+	// Try SSH reset for 5xx server errors (BMC is having issues)
+	// For 4xx client errors (auth/permission), SSH won't help
 	if httpErr, ok := err.(*schemas.Error); ok {
-		// only handle 5xx errors
-		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-			return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("cannot reset bmc: %w", err))
+		if httpErr.HTTPReturnedStatusCode >= 500 && httpErr.HTTPReturnedStatusCode < 600 {
+			// 5xx server error - attempt SSH-based reset via goroutine
+			go r.resetBMCViaSSH(context.Background(), bmcObj)
+			log.Info("Initiated SSH-based BMC reset in background due to Redfish 5xx error", "BMC", bmcObj.Name)
+			return r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
 		}
-	} else {
-		return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
+		// 4xx or other status code - don't try SSH
+		return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("cannot reset bmc: %w", err))
+	}
+	return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
+}
+
+func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcObj *metalv1alpha1.BMC) {
+	log := ctrl.LoggerFrom(ctx).WithValues("BMC", bmcObj.Name)
+	log.V(1).Info("Starting SSH-based BMC reset")
+
+	currentBMC := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Name}, currentBMC); err != nil {
+		log.Error(err, "Failed to fetch BMC object for SSH reset")
+		return
+	}
+	address, err := bmcutils.GetBMCAddressForBMC(ctx, r.Client, currentBMC)
+	if err != nil {
+		log.Error(err, "Failed to get BMC address for SSH reset")
+		_ = r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, bmcConnectionFailedReason, fmt.Sprintf("Failed to get BMC address: %v", err))
+		return
+	}
+	if currentBMC.Status.Manufacturer == "" {
+		log.Error(nil, "BMC manufacturer not available for SSH reset")
+		_ = r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, bmcInternalErrorReason, "BMC manufacturer not available")
+		return
+	}
+	username, password, err := bmcutils.GetBMCCredentialsForBMCSecretName(ctx, r.Client, currentBMC.Spec.BMCSecretRef.Name)
+	if err != nil {
+		log.Error(err, "Failed to get BMC credentials for SSH reset")
+		_ = r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, fmt.Sprintf("Failed to get credentials: %v", err))
+		return
+	}
+	sshTimeout := 2 * time.Minute
+	if err := bmcutils.SSHResetBMC(ctx, address, currentBMC.Status.Manufacturer, username, password, sshTimeout); err != nil {
+		log.Error(err, "Failed to reset BMC via SSH")
+		_ = r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, bmcInternalErrorReason, fmt.Sprintf("SSH reset failed: %v", err))
+		return
+	}
+	log.Info("Successfully reset BMC via SSH")
+	if err := r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, "BMCResetComplete", "BMC reset via SSH completed successfully"); err != nil {
+		log.Error(err, "Failed to clear BMC reset condition")
+	}
+	if err := r.updateLastResetTime(ctx, currentBMC); err != nil {
+		log.Error(err, "Failed to update LastResetTime after SSH reset")
+	}
+}
+
+func (r *BMCReconciler) updateLastResetTime(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+	currentBMC := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Name}, currentBMC); err != nil {
+		return fmt.Errorf("failed to fetch BMC: %w", err)
+	}
+	bmcBase := currentBMC.DeepCopy()
+	now := metav1.Now()
+	currentBMC.Status.LastResetTime = &now
+	if err := r.Status().Patch(ctx, currentBMC, client.MergeFrom(bmcBase)); err != nil {
+		return fmt.Errorf("failed to patch LastResetTime: %w", err)
 	}
 	return nil
 }

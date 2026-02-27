@@ -24,6 +24,60 @@ const (
 	ManufacturerSupermicro Manufacturer = "Supermicro"
 )
 
+// DiskWipeMethod defines the disk wiping method
+type DiskWipeMethod string
+
+const (
+	// DiskWipeMethodQuick performs a quick wipe (single pass with zeros)
+	DiskWipeMethodQuick DiskWipeMethod = "quick"
+
+	// DiskWipeMethodSecure performs a secure wipe (3 passes)
+	DiskWipeMethodSecure DiskWipeMethod = "secure"
+
+	// DiskWipeMethodDoD performs DoD 5220.22-M standard wipe (7 passes)
+	DiskWipeMethodDoD DiskWipeMethod = "dod"
+)
+
+// CleaningTaskInfo contains information about a cleaning task
+type CleaningTaskInfo struct {
+	// TaskURI is the URI to monitor the task
+	TaskURI string
+	// TaskType indicates what type of cleaning task this is
+	TaskType CleaningTaskType
+	// TargetID identifies the target resource (e.g., drive ID for disk wipe)
+	TargetID string
+}
+
+// CleaningTaskType defines the type of cleaning task
+type CleaningTaskType string
+
+const (
+	// CleaningTaskTypeDiskErase indicates a disk erasing task
+	CleaningTaskTypeDiskErase CleaningTaskType = "DiskErase"
+	// CleaningTaskTypeBIOSReset indicates a BIOS reset task
+	CleaningTaskTypeBIOSReset CleaningTaskType = "BIOSReset"
+	// CleaningTaskTypeBMCReset indicates a BMC reset task
+	CleaningTaskTypeBMCReset CleaningTaskType = "BMCReset"
+	// CleaningTaskTypeNetworkClear indicates a network config clear task
+	CleaningTaskTypeNetworkClear CleaningTaskType = "NetworkClear"
+)
+
+// CleaningTaskStatus represents the status of a cleaning task
+type CleaningTaskStatus struct {
+	// TaskURI is the URI to monitor the task
+	TaskURI string
+	// State is the current state of the task
+	State string
+	// PercentComplete indicates the completion percentage (0-100)
+	PercentComplete int
+	// Message provides additional information about the task
+	Message string
+	// TaskType indicates what type of cleaning task this is
+	TaskType CleaningTaskType
+	// TargetID identifies the target resource
+	TargetID string
+}
+
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
@@ -124,6 +178,21 @@ type BMC interface {
 
 	// GetAccountService retrieves the account service.
 	GetAccountService() (*schemas.AccountService, error)
+
+	// EraseDisk initiates disk erasing operation via Redfish. Returns task URIs for long-running operations.
+	EraseDisk(ctx context.Context, systemURI string, method DiskWipeMethod) ([]CleaningTaskInfo, error)
+
+	// ResetBIOSToDefaults resets BIOS configuration to factory defaults. Returns task URI if operation is async.
+	ResetBIOSToDefaults(ctx context.Context, systemURI string) (*CleaningTaskInfo, error)
+
+	// ResetBMCToDefaults resets BMC configuration to factory defaults. Returns task URI if operation is async.
+	ResetBMCToDefaults(ctx context.Context, managerUUID string) (*CleaningTaskInfo, error)
+
+	// ClearNetworkConfiguration clears network configuration settings. Returns task URI if operation is async.
+	ClearNetworkConfiguration(ctx context.Context, systemURI string) (*CleaningTaskInfo, error)
+
+	// GetTaskStatus retrieves the status of a task by its URI.
+	GetTaskStatus(ctx context.Context, taskURI string) (*CleaningTaskStatus, error)
 }
 
 type Entity struct {

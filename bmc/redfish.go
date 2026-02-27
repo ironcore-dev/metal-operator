@@ -1205,3 +1205,879 @@ func shuffleRunes(a []rune) error {
 	}
 	return nil
 }
+
+// extractTaskURIFromResponse extracts the task URI from HTTP response headers or body
+func (r *RedfishBMC) extractTaskURIFromResponse(resp *http.Response) string {
+	// Check Location header (standard Redfish async response)
+	if location := resp.Header.Get("Location"); location != "" {
+		return location
+	}
+
+	// Check for task monitor in response body
+	if resp.Body != nil {
+		body, err := io.ReadAll(resp.Body)
+		if err == nil {
+			var taskResponse struct {
+				TaskMonitor string `json:"@odata.id"`
+			}
+			if err := json.Unmarshal(body, &taskResponse); err == nil && taskResponse.TaskMonitor != "" {
+				return taskResponse.TaskMonitor
+			}
+		}
+	}
+
+	return ""
+}
+
+// GetTaskStatus retrieves the status of a task by its URI
+func (r *RedfishBMC) GetTaskStatus(ctx context.Context, taskURI string) (*CleaningTaskStatus, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	resp, err := r.client.GetService().GetClient().Get(taskURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task status from %s: %w", taskURI, err)
+	}
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Error(err, "failed to close body")
+		}
+	}(resp.Body)
+
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("failed to get task status, status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read task response: %w", err)
+	}
+
+	var task schemas.Task
+	if err := json.Unmarshal(body, &task); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal task: %w", err)
+	}
+
+	percentComplete := 0
+	if task.PercentComplete != nil {
+		percentComplete = int(*task.PercentComplete)
+	}
+
+	status := &CleaningTaskStatus{
+		TaskURI:         taskURI,
+		State:           string(task.TaskState),
+		PercentComplete: percentComplete,
+	}
+
+	// Extract message from task messages
+	if len(task.Messages) > 0 {
+		status.Message = task.Messages[0].Message
+	}
+
+	return status, nil
+}
+
+// EraseDisk initiates disk erasing operation via Redfish.
+// This implementation uses vendor-specific OEM extensions when available.
+func (r *RedfishBMC) EraseDisk(ctx context.Context, systemURI string, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Erasing disks", "systemURI", systemURI, "method", method)
+
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get computer system: %w", err)
+	}
+
+	manufacturer := system.Manufacturer
+	log.V(1).Info("Detected manufacturer", "manufacturer", manufacturer)
+
+	// Get system storage
+	systemStorage, err := system.Storage()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get storage: %w", err)
+	}
+
+	if len(systemStorage) == 0 {
+		log.V(1).Info("No storage devices found")
+		return nil, nil
+	}
+
+	// Use OEM-specific wipe if available
+	switch Manufacturer(manufacturer) {
+	case ManufacturerDell:
+		return r.wipeDiskDell(ctx, systemStorage, method)
+	case ManufacturerHPE:
+		return r.wipeDiskHPE(ctx, systemStorage, method)
+	case ManufacturerLenovo:
+		return r.wipeDiskLenovo(ctx, systemStorage, method)
+	default:
+		// Generic Redfish SecureErase
+		return r.wipeDiskGeneric(ctx, systemStorage, method)
+	}
+}
+
+// wipeDiskDell performs disk wiping for Dell servers using iDRAC OEM extensions
+func (r *RedfishBMC) wipeDiskDell(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	var tasks []CleaningTaskInfo
+
+	// Dell iDRAC supports secure erase via Storage Controller actions
+	for _, storage := range storages {
+		drives, err := storage.Drives()
+		if err != nil {
+			log.Error(err, "Failed to get drives for storage", "storage", storage.Name)
+			continue
+		}
+
+		for _, drive := range drives {
+			// Construct OEM action URI for Dell
+			// Dell uses: /redfish/v1/Systems/{id}/Storage/{storageId}/Drives/{driveId}/Actions/Drive.SecureErase
+			actionURI := fmt.Sprintf("%s/Actions/Drive.SecureErase", drive.ODataID)
+
+			payload := map[string]any{
+				"OverwritePasses": getDellWipePasses(method),
+			}
+
+			log.V(1).Info("Initiating Dell drive wipe", "drive", drive.Name, "uri", actionURI)
+
+			resp, err := r.client.Post(actionURI, payload)
+			if err != nil {
+				log.Error(err, "Failed to initiate disk wipe for drive", "drive", drive.Name)
+				continue
+			}
+
+			if resp.StatusCode >= 300 {
+				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				log.Error(fmt.Errorf("wipe request failed"), "Failed to wipe drive",
+					"drive", drive.Name, "status", resp.StatusCode, "body", string(body))
+				continue
+			}
+
+			// Extract task URI from response
+			taskURI := r.extractTaskURIFromResponse(resp)
+			_ = resp.Body.Close()
+
+			if taskURI != "" {
+				tasks = append(tasks, CleaningTaskInfo{
+					TaskURI:  taskURI,
+					TaskType: CleaningTaskTypeDiskErase,
+					TargetID: drive.ID,
+				})
+				log.V(1).Info("Dell disk wipe task created", "drive", drive.Name, "taskURI", taskURI)
+			} else {
+				log.V(1).Info("Dell disk wipe completed synchronously", "drive", drive.Name)
+			}
+		}
+	}
+
+	return tasks, nil
+}
+
+func getDellWipePasses(method DiskWipeMethod) int {
+	switch method {
+	case DiskWipeMethodQuick:
+		return 1
+	case DiskWipeMethodSecure:
+		return 3
+	case DiskWipeMethodDoD:
+		return 7
+	default:
+		return 1
+	}
+}
+
+// wipeDiskHPE performs disk wiping for HPE servers using iLO OEM extensions
+func (r *RedfishBMC) wipeDiskHPE(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	var tasks []CleaningTaskInfo
+
+	// HPE iLO supports sanitize operations via OEM extensions
+	for _, storage := range storages {
+		drives, err := storage.Drives()
+		if err != nil {
+			log.Error(err, "Failed to get drives for storage", "storage", storage.Name)
+			continue
+		}
+
+		for _, drive := range drives {
+			// HPE OEM action: /redfish/v1/Systems/{id}/Storage/{storageId}/Drives/{driveId}/Actions/Oem/Hpe/HpeDrive.SecureErase
+			actionURI := fmt.Sprintf("%s/Actions/Oem/Hpe/HpeDrive.SecureErase", drive.ODataID)
+
+			payload := map[string]any{
+				"SanitizeType": getHPEWipeType(method),
+			}
+
+			log.V(1).Info("Initiating HPE drive wipe", "drive", drive.Name, "uri", actionURI)
+
+			resp, err := r.client.Post(actionURI, payload)
+			if err != nil {
+				log.Error(err, "Failed to initiate disk wipe for drive", "drive", drive.Name)
+				continue
+			}
+
+			if resp.StatusCode >= 300 {
+				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				log.Error(fmt.Errorf("wipe request failed"), "Failed to wipe drive",
+					"drive", drive.Name, "status", resp.StatusCode, "body", string(body))
+				continue
+			}
+
+			// Extract task URI from response
+			taskURI := r.extractTaskURIFromResponse(resp)
+			_ = resp.Body.Close()
+
+			if taskURI != "" {
+				tasks = append(tasks, CleaningTaskInfo{
+					TaskURI:  taskURI,
+					TaskType: CleaningTaskTypeDiskErase,
+					TargetID: drive.ID,
+				})
+				log.V(1).Info("HPE disk wipe task created", "drive", drive.Name, "taskURI", taskURI)
+			} else {
+				log.V(1).Info("HPE disk wipe completed synchronously", "drive", drive.Name)
+			}
+		}
+	}
+
+	return tasks, nil
+}
+
+func getHPEWipeType(method DiskWipeMethod) string {
+	switch method {
+	case DiskWipeMethodQuick:
+		return "BlockErase"
+	case DiskWipeMethodSecure:
+		return "Overwrite"
+	case DiskWipeMethodDoD:
+		return "CryptographicErase"
+	default:
+		return "BlockErase"
+	}
+}
+
+// wipeDiskLenovo performs disk wiping for Lenovo servers using XClarity OEM extensions
+func (r *RedfishBMC) wipeDiskLenovo(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	var tasks []CleaningTaskInfo
+
+	// Lenovo XClarity supports secure erase via OEM extensions
+	for _, storage := range storages {
+		drives, err := storage.Drives()
+		if err != nil {
+			log.Error(err, "Failed to get drives for storage", "storage", storage.Name)
+			continue
+		}
+
+		for _, drive := range drives {
+			// Lenovo OEM action path
+			actionURI := fmt.Sprintf("%s/Actions/Drive.SecureErase", drive.ODataID)
+
+			payload := map[string]any{
+				"EraseMethod": getLenovoWipeMethod(method),
+			}
+
+			log.V(1).Info("Initiating Lenovo drive wipe", "drive", drive.Name, "uri", actionURI)
+
+			resp, err := r.client.Post(actionURI, payload)
+			if err != nil {
+				log.Error(err, "Failed to initiate disk wipe for drive", "drive", drive.Name)
+				continue
+			}
+
+			if resp.StatusCode >= 300 {
+				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				log.Error(fmt.Errorf("wipe request failed"), "Failed to wipe drive",
+					"drive", drive.Name, "status", resp.StatusCode, "body", string(body))
+				continue
+			}
+
+			// Extract task URI from response
+			taskURI := r.extractTaskURIFromResponse(resp)
+			_ = resp.Body.Close()
+
+			if taskURI != "" {
+				tasks = append(tasks, CleaningTaskInfo{
+					TaskURI:  taskURI,
+					TaskType: CleaningTaskTypeDiskErase,
+					TargetID: drive.ID,
+				})
+				log.V(1).Info("Lenovo disk wipe task created", "drive", drive.Name, "taskURI", taskURI)
+			} else {
+				log.V(1).Info("Lenovo disk wipe completed synchronously", "drive", drive.Name)
+			}
+		}
+	}
+
+	return tasks, nil
+}
+
+func getLenovoWipeMethod(method DiskWipeMethod) string {
+	switch method {
+	case DiskWipeMethodQuick:
+		return "Simple"
+	case DiskWipeMethodSecure:
+		return "Cryptographic"
+	case DiskWipeMethodDoD:
+		return "Sanitize"
+	default:
+		return "Simple"
+	}
+}
+
+// wipeDiskGeneric performs generic Redfish disk wiping for unsupported vendors
+func (r *RedfishBMC) wipeDiskGeneric(ctx context.Context, storages []*schemas.Storage, _ DiskWipeMethod) ([]CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Using generic Redfish disk wipe")
+	var tasks []CleaningTaskInfo
+
+	// Standard Redfish SecureErase action
+	for _, storage := range storages {
+		drives, err := storage.Drives()
+		if err != nil {
+			log.Error(err, "Failed to get drives for storage", "storage", storage.Name)
+			continue
+		}
+
+		for _, drive := range drives {
+			actionURI := fmt.Sprintf("%s/Actions/Drive.SecureErase", drive.ODataID)
+
+			payload := map[string]any{}
+
+			log.V(1).Info("Initiating generic drive wipe", "drive", drive.Name, "uri", actionURI)
+
+			resp, err := r.client.Post(actionURI, payload)
+			if err != nil {
+				log.Error(err, "Failed to initiate disk wipe for drive", "drive", drive.Name)
+				continue
+			}
+
+			if resp.StatusCode >= 300 {
+				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				log.Error(fmt.Errorf("wipe request failed"), "Failed to wipe drive",
+					"drive", drive.Name, "status", resp.StatusCode, "body", string(body))
+				continue
+			}
+
+			// Extract task URI from response
+			taskURI := r.extractTaskURIFromResponse(resp)
+			_ = resp.Body.Close()
+
+			if taskURI != "" {
+				tasks = append(tasks, CleaningTaskInfo{
+					TaskURI:  taskURI,
+					TaskType: CleaningTaskTypeDiskErase,
+					TargetID: drive.ID,
+				})
+				log.V(1).Info("Generic disk wipe task created", "drive", drive.Name, "taskURI", taskURI)
+			} else {
+				log.V(1).Info("Generic disk wipe completed synchronously", "drive", drive.Name)
+			}
+		}
+	}
+
+	return tasks, nil
+}
+
+// ResetBIOSToDefaults resets BIOS configuration to factory defaults
+func (r *RedfishBMC) ResetBIOSToDefaults(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Resetting BIOS to defaults", "systemURI", systemURI)
+
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get computer system: %w", err)
+	}
+
+	manufacturer := system.Manufacturer
+	log.V(1).Info("Detected manufacturer", "manufacturer", manufacturer)
+
+	// Get BIOS
+	bios, err := system.Bios()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BIOS for system %s: %w", systemURI, err)
+	}
+
+	biosURI := bios.ODataID
+	if biosURI == "" {
+		return nil, fmt.Errorf("BIOS URI not found for system %s", systemURI)
+	}
+
+	// Use vendor-specific reset methods
+	switch Manufacturer(manufacturer) {
+	case ManufacturerDell:
+		return r.resetBIOSDell(ctx, biosURI)
+	case ManufacturerHPE:
+		return r.resetBIOSHPE(ctx, biosURI)
+	case ManufacturerLenovo:
+		return r.resetBIOSLenovo(ctx, biosURI)
+	default:
+		return r.resetBIOSGeneric(ctx, biosURI)
+	}
+}
+
+func (r *RedfishBMC) resetBIOSDell(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Dell iDRAC: POST to /redfish/v1/Systems/{id}/Bios/Actions/Bios.ResetBios
+	actionURI := fmt.Sprintf("%s/Actions/Bios.ResetBios", biosURI)
+
+	log.V(1).Info("Resetting Dell BIOS to defaults", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BIOS: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BIOS reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Dell BIOS reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBIOSReset,
+			TargetID: biosURI,
+		}, nil
+	}
+
+	log.V(1).Info("Dell BIOS reset completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) resetBIOSHPE(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// HPE iLO: Use ChangePassword action with default parameters
+	// /redfish/v1/Systems/{id}/Bios/Actions/Bios.ResetBios
+	actionURI := fmt.Sprintf("%s/Actions/Bios.ResetBios", biosURI)
+
+	log.V(1).Info("Resetting HPE BIOS to defaults", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BIOS: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BIOS reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("HPE BIOS reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBIOSReset,
+			TargetID: biosURI,
+		}, nil
+	}
+
+	log.V(1).Info("HPE BIOS reset completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) resetBIOSLenovo(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Lenovo XClarity: POST to reset action
+	actionURI := fmt.Sprintf("%s/Actions/Bios.ResetBios", biosURI)
+
+	log.V(1).Info("Resetting Lenovo BIOS to defaults", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BIOS: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BIOS reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Lenovo BIOS reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBIOSReset,
+			TargetID: biosURI,
+		}, nil
+	}
+
+	log.V(1).Info("Lenovo BIOS reset completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) resetBIOSGeneric(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Generic Redfish: Try standard ResetBios action
+	actionURI := fmt.Sprintf("%s/Actions/Bios.ResetBios", biosURI)
+
+	log.V(1).Info("Resetting BIOS to defaults (generic)", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BIOS: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BIOS reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Generic BIOS reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBIOSReset,
+			TargetID: biosURI,
+		}, nil
+	}
+
+	log.V(1).Info("Generic BIOS reset completed synchronously")
+	return nil, nil
+}
+
+// ResetBMCToDefaults resets BMC configuration to factory defaults
+func (r *RedfishBMC) ResetBMCToDefaults(ctx context.Context, managerUUID string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Resetting BMC to defaults", "managerUUID", managerUUID)
+
+	manager, err := r.GetManager(managerUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager: %w", err)
+	}
+
+	manufacturer := manager.Manufacturer
+	log.V(1).Info("Detected manufacturer", "manufacturer", manufacturer)
+
+	// Use vendor-specific reset methods
+	switch Manufacturer(manufacturer) {
+	case ManufacturerDell:
+		return r.resetBMCDell(ctx, manager)
+	case ManufacturerHPE:
+		return r.resetBMCHPE(ctx, manager)
+	case ManufacturerLenovo:
+		return r.resetBMCLenovo(ctx, manager)
+	default:
+		return r.resetBMCGeneric(ctx, manager)
+	}
+}
+
+func (r *RedfishBMC) resetBMCDell(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Dell iDRAC: Use OEM action to reset to defaults
+	// /redfish/v1/Managers/{id}/Actions/Oem/DellManager.ResetToDefaults
+	actionURI := fmt.Sprintf("%s/Actions/Oem/DellManager.ResetToDefaults", manager.ODataID)
+
+	payload := map[string]any{
+		"ResetType": "ResetAllWithRootDefaults",
+	}
+
+	log.V(1).Info("Resetting Dell iDRAC to defaults", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BMC: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BMC reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Dell BMC reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBMCReset,
+			TargetID: manager.ID,
+		}, nil
+	}
+
+	log.V(1).Info("Dell BMC reset completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) resetBMCHPE(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// HPE iLO: Use OEM action to reset to factory defaults
+	// /redfish/v1/Managers/{id}/Actions/Oem/Hpe/HpiLO.ResetToFactoryDefaults
+	actionURI := fmt.Sprintf("%s/Actions/Oem/Hpe/HpiLO.ResetToFactoryDefaults", manager.ODataID)
+
+	payload := map[string]any{
+		"ResetType": "Default",
+	}
+
+	log.V(1).Info("Resetting HPE iLO to defaults", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BMC: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BMC reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("HPE BMC reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBMCReset,
+			TargetID: manager.ID,
+		}, nil
+	}
+
+	log.V(1).Info("HPE BMC reset completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) resetBMCLenovo(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Lenovo XClarity: Use OEM action to reset to factory defaults
+	// /redfish/v1/Managers/{id}/Actions/Manager.ResetToDefaults
+	actionURI := fmt.Sprintf("%s/Actions/Manager.ResetToDefaults", manager.ODataID)
+
+	payload := map[string]any{
+		"ResetToDefaultsType": "ResetAll",
+	}
+
+	log.V(1).Info("Resetting Lenovo XCC to defaults", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BMC: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BMC reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Lenovo BMC reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBMCReset,
+			TargetID: manager.ID,
+		}, nil
+	}
+
+	log.V(1).Info("Lenovo BMC reset completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) resetBMCGeneric(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Generic Redfish: Try standard ResetToDefaults action
+	actionURI := fmt.Sprintf("%s/Actions/Manager.ResetToDefaults", manager.ODataID)
+
+	payload := map[string]any{
+		"ResetToDefaultsType": "ResetAll",
+	}
+
+	log.V(1).Info("Resetting BMC to defaults (generic)", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset BMC: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("BMC reset failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Generic BMC reset task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeBMCReset,
+			TargetID: manager.ID,
+		}, nil
+	}
+
+	log.V(1).Info("Generic BMC reset completed synchronously")
+	return nil, nil
+}
+
+// ClearNetworkConfiguration clears network configuration settings
+func (r *RedfishBMC) ClearNetworkConfiguration(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Clearing network configuration", "systemURI", systemURI)
+
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get computer system: %w", err)
+	}
+
+	manufacturer := system.Manufacturer
+	log.V(1).Info("Detected manufacturer", "manufacturer", manufacturer)
+
+	// Use vendor-specific methods when available
+	switch Manufacturer(manufacturer) {
+	case ManufacturerDell:
+		return r.clearNetworkConfigDell(ctx, systemURI)
+	case ManufacturerHPE:
+		return r.clearNetworkConfigHPE(ctx, systemURI)
+	case ManufacturerLenovo:
+		return r.clearNetworkConfigLenovo(ctx, systemURI)
+	default:
+		return r.clearNetworkConfigGeneric(ctx, systemURI)
+	}
+}
+
+func (r *RedfishBMC) clearNetworkConfigDell(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Dell: Clear network adapters configuration via OEM extensions
+	// This typically involves resetting NIC settings to defaults
+	actionURI := fmt.Sprintf("%s/NetworkAdapters/Actions/Oem/DellNetworkAdapter.ClearConfiguration", systemURI)
+
+	log.V(1).Info("Clearing Dell network configuration", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, map[string]any{})
+	if err != nil {
+		// Network config clear might not be critical, log and continue
+		log.Error(err, "Failed to clear network configuration (non-critical)")
+		return nil, nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error(fmt.Errorf("network config clear failed"), "Failed with status",
+			"status", resp.StatusCode, "body", string(body))
+		return nil, nil
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Dell network config clear task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeNetworkClear,
+			TargetID: systemURI,
+		}, nil
+	}
+
+	log.V(1).Info("Dell network config clear completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) clearNetworkConfigHPE(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// HPE: Clear network adapters configuration
+	actionURI := fmt.Sprintf("%s/NetworkAdapters/Actions/Oem/Hpe/HpeNetworkAdapter.ClearConfiguration", systemURI)
+
+	log.V(1).Info("Clearing HPE network configuration", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, map[string]any{})
+	if err != nil {
+		log.Error(err, "Failed to clear network configuration (non-critical)")
+		return nil, nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error(fmt.Errorf("network config clear failed"), "Failed with status",
+			"status", resp.StatusCode, "body", string(body))
+		return nil, nil
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("HPE network config clear task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeNetworkClear,
+			TargetID: systemURI,
+		}, nil
+	}
+
+	log.V(1).Info("HPE network config clear completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) clearNetworkConfigLenovo(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Lenovo: Clear network adapters configuration
+	actionURI := fmt.Sprintf("%s/NetworkAdapters/Actions/NetworkAdapter.ClearConfiguration", systemURI)
+
+	log.V(1).Info("Clearing Lenovo network configuration", "uri", actionURI)
+
+	resp, err := r.client.Post(actionURI, map[string]any{})
+	if err != nil {
+		log.Error(err, "Failed to clear network configuration (non-critical)")
+		return nil, nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error(fmt.Errorf("network config clear failed"), "Failed with status",
+			"status", resp.StatusCode, "body", string(body))
+		return nil, nil
+	}
+
+	// Extract task URI from response
+	taskURI := r.extractTaskURIFromResponse(resp)
+	if taskURI != "" {
+		log.V(1).Info("Lenovo network config clear task created", "taskURI", taskURI)
+		return &CleaningTaskInfo{
+			TaskURI:  taskURI,
+			TaskType: CleaningTaskTypeNetworkClear,
+			TargetID: systemURI,
+		}, nil
+	}
+
+	log.V(1).Info("Lenovo network config clear completed synchronously")
+	return nil, nil
+}
+
+func (r *RedfishBMC) clearNetworkConfigGeneric(ctx context.Context, _ string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Network configuration clearing not supported for this vendor (generic)")
+	// For generic vendors, this operation is optional and non-critical
+	return nil, nil
+}

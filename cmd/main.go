@@ -403,6 +403,13 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "ServerMaintenance")
 		os.Exit(1)
 	}
+	if err = (&controller.ServerCleaningReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "ServerCleaning")
+		os.Exit(1)
+	}
 	if err = (&controller.BIOSSettingsReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),

@@ -269,3 +269,48 @@ func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, t
 	}
 	return task, nil
 }
+
+// EraseDisk simulates disk erasing for testing
+func (r *RedfishLocalBMC) EraseDisk(ctx context.Context, systemURI string, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating disk erase", "systemURI", systemURI, "method", method)
+	// Mock implementation - does nothing but succeeds
+	return nil, nil
+}
+
+// ResetBIOSToDefaults simulates BIOS reset for testing
+func (r *RedfishLocalBMC) ResetBIOSToDefaults(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating BIOS reset", "systemURI", systemURI)
+	// Mock implementation - does nothing but succeeds
+	return nil, nil
+}
+
+// ResetBMCToDefaults simulates BMC reset for testing
+func (r *RedfishLocalBMC) ResetBMCToDefaults(ctx context.Context, managerUUID string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating BMC reset", "managerUUID", managerUUID)
+	// Mock implementation - does nothing but succeeds
+	return nil, nil
+}
+
+// ClearNetworkConfiguration simulates network config clearing for testing
+func (r *RedfishLocalBMC) ClearNetworkConfiguration(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating network config clear", "systemURI", systemURI)
+	// Mock implementation - does nothing but succeeds
+	return nil, nil
+}
+
+// GetTaskStatus simulates task status retrieval for testing
+func (r *RedfishLocalBMC) GetTaskStatus(ctx context.Context, taskURI string) (*CleaningTaskStatus, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating task status check", "taskURI", taskURI)
+	// Mock implementation - returns completed status
+	return &CleaningTaskStatus{
+		TaskURI:         taskURI,
+		State:           "Completed",
+		PercentComplete: 100,
+		Message:         "Mock task completed",
+	}, nil
+}

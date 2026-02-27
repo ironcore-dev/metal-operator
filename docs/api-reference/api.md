@@ -26,6 +26,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [Server](#server)
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
+- [ServerCleaning](#servercleaning)
 - [ServerMaintenance](#servermaintenance)
 
 
@@ -904,6 +905,28 @@ _Appears in:_
 | `device` _string_ | Device is the device to boot from. |  |  |
 
 
+#### CleaningTaskStatus
+
+
+
+CleaningTaskStatus represents the status of a cleaning task
+
+
+
+_Appears in:_
+- [ServerCleaningStatusEntry](#servercleaningstatusentry)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `taskURI` _string_ | TaskURI is the URI to monitor the task |  |  |
+| `taskType` _string_ | TaskType indicates what type of cleaning task this is |  |  |
+| `targetID` _string_ | TargetID identifies the target resource (e.g., drive ID for disk erase) |  |  |
+| `state` _string_ | State is the current state of the task |  |  |
+| `percentComplete` _integer_ | PercentComplete indicates the completion percentage (0-100) |  |  |
+| `message` _string_ | Message provides additional information about the task |  |  |
+| `lastUpdateTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastUpdateTime is the last time this task status was updated |  |  |
+
+
 #### ConsoleProtocol
 
 
@@ -937,6 +960,41 @@ _Appears in:_
 | `IPMI` | ConsoleProtocolNameIPMI represents the IPMI console protocol.<br /> |
 | `SSH` | ConsoleProtocolNameSSH represents the SSH console protocol.<br /> |
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
+
+
+#### DiskWipeConfig
+
+
+
+DiskWipeConfig defines disk erasing behavior
+
+
+
+_Appears in:_
+- [ServerCleaningSpec](#servercleaningspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `method` _[DiskWipeMethod](#diskwipemethod)_ | Method specifies the disk erasing method | quick | Enum: [quick secure dod] <br /> |
+| `includeBootDrives` _boolean_ | IncludeBootDrives specifies whether to erase boot drives |  |  |
+
+
+#### DiskWipeMethod
+
+_Underlying type:_ _string_
+
+DiskWipeMethod defines the available disk erasing methods
+
+
+
+_Appears in:_
+- [DiskWipeConfig](#diskwipeconfig)
+
+| Field | Description |
+| --- | --- |
+| `quick` | DiskWipeMethodQuick performs a quick erase (single pass)<br /> |
+| `secure` | DiskWipeMethodSecure performs a secure erase (3 passes)<br /> |
+| `dod` | DiskWipeMethodDoD performs DoD 5220.22-M standard erase (7 passes)<br /> |
 
 
 #### Endpoint
@@ -1346,6 +1404,7 @@ ServerBootConfigurationTemplate defines the parameters to be used for rendering 
 
 
 _Appears in:_
+- [ServerCleaningSpec](#servercleaningspec)
 - [ServerMaintenanceSpec](#servermaintenancespec)
 
 | Field | Description | Default | Validation |
@@ -1407,6 +1466,110 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `phase` _[Phase](#phase)_ | Phase represents the current phase of the server claim. |  |  |
+
+
+#### ServerCleaning
+
+
+
+ServerCleaning is the Schema for the servercleaning API
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `ServerCleaning` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[ServerCleaningSpec](#servercleaningspec)_ |  |  |  |
+| `status` _[ServerCleaningStatus](#servercleaningstatus)_ |  |  |  |
+
+
+#### ServerCleaningSpec
+
+
+
+ServerCleaningSpec defines the desired cleaning operations
+
+
+
+_Appears in:_
+- [ServerCleaning](#servercleaning)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef references a specific Server to be cleaned.<br />Mutually exclusive with ServerSelector. |  |  |
+| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify servers to be cleaned.<br />Mutually exclusive with ServerRef. |  |  |
+| `diskWipe` _[DiskWipeConfig](#diskwipeconfig)_ | DiskWipe specifies disk erasing configuration |  |  |
+| `bmcReset` _boolean_ | BMCReset specifies if BMC should be reset to defaults |  |  |
+| `biosReset` _boolean_ | BIOSReset specifies if BIOS should be reset to defaults |  |  |
+| `networkCleanup` _boolean_ | NetworkCleanup specifies if network configurations should be cleared |  |  |
+| `serverBootConfigurationTemplate` _[ServerBootConfigurationTemplate](#serverbootconfigurationtemplate)_ | ServerBootConfigurationTemplate defines the boot configuration for cleaning agent<br />If not specified, cleaning operations are performed via BMC APIs |  |  |
+
+
+#### ServerCleaningState
+
+_Underlying type:_ _string_
+
+ServerCleaningState defines the state of the cleaning process
+
+
+
+_Appears in:_
+- [ServerCleaningStatus](#servercleaningstatus)
+- [ServerCleaningStatusEntry](#servercleaningstatusentry)
+
+| Field | Description |
+| --- | --- |
+| `Pending` | ServerCleaningStatePending indicates cleaning is waiting to start<br /> |
+| `InProgress` | ServerCleaningStateInProgress indicates cleaning is in progress<br /> |
+| `Completed` | ServerCleaningStateCompleted indicates cleaning completed successfully<br /> |
+| `Failed` | ServerCleaningStateFailed indicates cleaning failed<br /> |
+
+
+#### ServerCleaningStatus
+
+
+
+ServerCleaningStatus defines the observed state of ServerCleaning
+
+
+
+_Appears in:_
+- [ServerCleaning](#servercleaning)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `state` _[ServerCleaningState](#servercleaningstate)_ | State represents the current state of the cleaning process |  |  |
+| `selectedServers` _integer_ | SelectedServers is the total number of servers selected for cleaning |  |  |
+| `pendingCleanings` _integer_ | PendingCleanings is the number of servers with pending cleaning |  |  |
+| `inProgressCleanings` _integer_ | InProgressCleanings is the number of servers currently being cleaned |  |  |
+| `completedCleanings` _integer_ | CompletedCleanings is the number of servers successfully cleaned |  |  |
+| `failedCleanings` _integer_ | FailedCleanings is the number of servers where cleaning failed |  |  |
+| `serverCleaningStatuses` _[ServerCleaningStatusEntry](#servercleaningstatusentry) array_ | ServerCleaningStatuses contains per-server cleaning status |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations |  |  |
+
+
+#### ServerCleaningStatusEntry
+
+
+
+ServerCleaningStatusEntry represents the cleaning status for a single server
+
+
+
+_Appears in:_
+- [ServerCleaningStatus](#servercleaningstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `serverName` _string_ | ServerName is the name of the server |  |  |
+| `state` _[ServerCleaningState](#servercleaningstate)_ | State is the cleaning state for this server |  |  |
+| `message` _string_ | Message provides additional information about the cleaning state |  |  |
+| `lastUpdateTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastUpdateTime is the last time this status was updated |  |  |
+| `cleaningTasks` _[CleaningTaskStatus](#cleaningtaskstatus) array_ | CleaningTasks contains information about the cleaning tasks for this server |  |  |
 
 
 #### ServerMaintenance
@@ -1569,6 +1732,7 @@ _Appears in:_
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
+| `taints` _[Taint](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#taint-v1-core) array_ | Taints is a list of taints that affect this server. |  |  |
 
 
 #### ServerState
@@ -1588,6 +1752,7 @@ _Appears in:_
 | `Discovery` | ServerStateDiscovery indicates that the server is in its discovery state.<br /> |
 | `Available` | ServerStateAvailable indicates that the server is available for use.<br /> |
 | `Reserved` | ServerStateReserved indicates that the server is reserved for a specific use or user.<br /> |
+| `Tainted` | ServerStateTainted indicates that the server is tainted and requires cleaning<br />before transitioning back to Available.<br /> |
 | `Error` | ServerStateError indicates that there is an error with the server.<br /> |
 | `Maintenance` | ServerStateMaintenance indicates that the server is in maintenance.<br /> |
 

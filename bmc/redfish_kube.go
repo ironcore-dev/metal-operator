@@ -64,8 +64,7 @@ func NewRedfishKubeBMCClient(
 
 // setSystemPowerState updates the power state of a system.
 func (r *RedfishKubeBMC) setSystemPowerState(ctx context.Context, systemURI string, state schemas.PowerState) error {
-	// Apply a 150ms delay before performing the power state change.
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(UnitTestMockUps.MockDelays.PowerStateChange)
 
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
@@ -90,7 +89,7 @@ func (r *RedfishKubeBMC) PowerOn(ctx context.Context, systemURI string) error {
 
 		// Apply pending BIOS settings after a delay (mock for testing).
 		if len(UnitTestMockUps.PendingBIOSSetting) > 0 {
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(UnitTestMockUps.MockDelays.PendingSettingApply)
 			for key, data := range UnitTestMockUps.PendingBIOSSetting {
 				if _, ok := UnitTestMockUps.BIOSSettingAttr[key]; ok {
 					UnitTestMockUps.BIOSSettingAttr[key] = data
@@ -211,9 +210,9 @@ func (r *RedfishKubeBMC) UpgradeBiosVersion(ctx context.Context, manufacturer st
 	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
 	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
 	go func() {
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskInit)
 		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskStep)
 			UnitTestMockUps.BIOSUpgradeTaskIndex++
 		}
 	}()
@@ -237,7 +236,7 @@ func (r *RedfishKubeBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, t
 func (r *RedfishKubeBMC) ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error {
 	go func() {
 		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
-			time.Sleep(150 * time.Millisecond)
+			time.Sleep(UnitTestMockUps.MockDelays.ResetSettingsApply)
 			for key, data := range UnitTestMockUps.PendingBMCSetting {
 				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
 					UnitTestMockUps.BMCSettingAttr[key] = data
@@ -346,9 +345,9 @@ func (r *RedfishKubeBMC) UpgradeBMCVersion(ctx context.Context, manufacturer str
 	UnitTestMockUps.BMCUpgradeTaskIndex = 0
 	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
 	go func() {
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskInit)
 		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(UnitTestMockUps.MockDelays.UpgradeTaskStep)
 			UnitTestMockUps.BMCUpgradeTaskIndex++
 		}
 	}()

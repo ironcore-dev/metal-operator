@@ -41,7 +41,7 @@ import (
 const (
 	pollingInterval      = 50 * time.Millisecond
 	eventuallyTimeout    = 5 * time.Second
-	consistentlyDuration = 1 * time.Second
+	consistentlyDuration = 250 * time.Millisecond
 	MockServerIP         = "127.0.0.1"
 	MockServerPort       = 8000
 )
@@ -102,6 +102,14 @@ var _ = BeforeSuite(func() {
 	SetClient(k8sClient)
 
 	bmc.InitMockUp()
+	// Reduce mock delays for faster test execution while preserving async behavior.
+	bmc.UnitTestMockUps.MockDelays = bmc.MockDelays{
+		UpgradeTaskInit:     5 * time.Millisecond,
+		UpgradeTaskStep:     1 * time.Millisecond,
+		ResetSettingsApply:  25 * time.Millisecond,
+		PowerStateChange:    25 * time.Millisecond,
+		PendingSettingApply: 10 * time.Millisecond,
+	}
 })
 
 func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
@@ -174,7 +182,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme:                 k8sManager.GetScheme(),
 			Insecure:               true,
 			ManagerNamespace:       ns.Name,
-			BMCResetWaitTime:       400 * time.Millisecond,
+			BMCResetWaitTime:       150 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
 			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
@@ -316,11 +324,20 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			return nil
 		}))).Should(Succeed())
 
+		testDelays := server.Delays{
+			PowerOff:          25 * time.Millisecond,
+			PowerOn:           25 * time.Millisecond,
+			PowerResetOff:     25 * time.Millisecond,
+			PowerResetTransit: 10 * time.Millisecond,
+			BMCResetOff:       25 * time.Millisecond,
+			BMCResetTransit:   25 * time.Millisecond,
+		}
+
 		if len(redfishMockServers) > 0 {
 			for _, serverAddr := range redfishMockServers {
 				By(fmt.Sprintf("Starting the mock Redfish servers %v", serverAddr))
 				Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-					mockServer := server.NewMockServer(GinkgoLogr, serverAddr.String())
+					mockServer := server.NewMockServer(GinkgoLogr, serverAddr.String(), server.WithDelays(testDelays))
 					if err := mockServer.Start(ctx); err != nil {
 						return fmt.Errorf("failed to start mock Redfish server %v", serverAddr)
 					}
@@ -331,7 +348,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		} else {
 			By("Starting the default mock Redfish server")
 			Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-				mockServer := server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort))
+				mockServer := server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort), server.WithDelays(testDelays))
 				if err := mockServer.Start(ctx); err != nil {
 					return fmt.Errorf("failed to start mock Redfish server: %w", err)
 				}

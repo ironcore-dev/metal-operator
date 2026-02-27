@@ -405,4 +405,214 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
 	})
+
+	It("Should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
+		By("Create SET resource")
+		biosSettingsSet1 := &metalv1alpha1.BIOSSettingsSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-biossettings-set1-",
+				Namespace:    ns.Name,
+			},
+			// settings mocked at
+			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
+			Spec: metalv1alpha1.BIOSSettingsSetSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{Settings: map[string]string{"AdminPhone": "foo-bar"}, Priority: 10, Name: "foo-bar"},
+					},
+				},
+				ServerSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"metal.ironcore.dev/Manufacturer": "bar",
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettingsSet1)).To(Succeed())
+
+		By("Checking if the BIOSSettings has been created")
+		biosSettings02 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosSettingsSet1.Name + "-" + server02.Name,
+			},
+		}
+		Eventually(Get(biosSettings02)).Should(Succeed())
+
+		By("Checking if the 2nd BIOSSettings has been created")
+		biosSettings03 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosSettingsSet1.Name + "-" + server03.Name,
+			},
+		}
+		Eventually(Get(biosSettings03)).Should(Succeed())
+
+		By("Checking if the status has been updated to completed")
+		Eventually(Object(biosSettingsSet1)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.InProgressBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+		))
+
+		By("Create duplicate SET resource")
+		biosSettingsSet2 := &metalv1alpha1.BIOSSettingsSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-biossettings-set2-",
+				Namespace:    ns.Name,
+			},
+			// settings mocked at
+			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
+			Spec: metalv1alpha1.BIOSSettingsSetSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 defaultMockUpServerBiosVersion,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{Settings: map[string]string{"AdminPhone": "foo-bar"}, Priority: 10, Name: "foo-bar"},
+					},
+				},
+				ServerSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"metal.ironcore.dev/Manufacturer": "bar",
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettingsSet2)).To(Succeed())
+
+		By("Re-Checking if the status at SET 1")
+		Eventually(Object(biosSettingsSet1)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.InProgressBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+		))
+
+		By("Checking if the server BIOSSetting Ref has not be overritten by the 2nd SET")
+		Eventually(Object(server02)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02.Name)),
+		)
+		Consistently(Object(server02)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02.Name)),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03.Name)),
+		)
+		Consistently(Object(server03)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03.Name)),
+		)
+
+		By("Checking the status at SET 2")
+		Eventually(Object(biosSettingsSet2)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.InProgressBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+		))
+
+		By("Pausing the SET 2")
+		Eventually(Update(biosSettingsSet2, func() {
+			biosSettingsSet2.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
+			}
+		})).Should(Succeed())
+
+		By("Deleting the SET 1")
+		Expect(k8sClient.Delete(ctx, biosSettingsSet1)).To(Succeed())
+		Eventually(Get(biosSettingsSet1)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettings02)).To(Succeed())
+		Eventually(Get(biosSettings02)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettings03)).To(Succeed())
+		Eventually(Get(biosSettings03)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Checking if the server BIOSSetting Ref is empty")
+		Eventually(Object(server02)).Should(
+			HaveField("Spec.BIOSSettingsRef", BeNil()),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Spec.BIOSSettingsRef", BeNil()),
+		)
+
+		By("Checking the status at SET 2")
+		Eventually(Object(biosSettingsSet2)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.InProgressBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+		))
+
+		By("Re enable the SET 2")
+		Eventually(Update(biosSettingsSet2, func() {
+			delete(biosSettingsSet2.Annotations, metalv1alpha1.OperationAnnotation)
+		})).Should(Succeed())
+
+		By("Checking if the status has been updated by SET 2")
+		Eventually(Object(biosSettingsSet2)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+		))
+
+		By("Checking if the BIOSSettings has been created by set 2")
+		biosSettings02_02 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosSettingsSet2.Name + "-" + server02.Name,
+			},
+		}
+		Eventually(Get(biosSettings02_02)).Should(Succeed())
+
+		By("Checking if the 2nd BIOSSettings has been created")
+		biosSettings03_02 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosSettingsSet2.Name + "-" + server03.Name,
+			},
+		}
+		Eventually(Get(biosSettings03_02)).Should(Succeed())
+
+		By("Checking if the server BIOSSetting Ref has been set by the 2nd SET")
+		Eventually(Object(server02)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02_02.Name)),
+		)
+		Consistently(Object(server02)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02_02.Name)),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03_02.Name)),
+		)
+		Consistently(Object(server03)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03_02.Name)),
+		)
+
+		By("Checking if the status has been updated")
+		Eventually(Object(biosSettingsSet2)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.InProgressBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+		))
+
+		// cleanup
+		Eventually(Get(biosSettingsSet1)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettingsSet2)).To(Succeed())
+		Eventually(Get(biosSettingsSet2)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettings02_02)).To(Succeed())
+		Eventually(Get(biosSettings02_02)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettings03_02)).To(Succeed())
+		Eventually(Get(biosSettings03_02)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
 })

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +28,8 @@ import (
 // BMCVersionSetReconciler reconciles a BMCVersionSet object
 type BMCVersionSetReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	ResyncInterval time.Duration
 }
 
 const BMCVersionSetFinalizer = "metal.ironcore.dev/bmcversionset"
@@ -178,7 +180,8 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCVersion resources %w", err)
 	}
 
-	if err := r.patchBMCVersionfromTemplate(ctx, bmcVersionSet, ownedBMCVersions); err != nil {
+	var pendingPatchingVersion bool
+	if pendingPatchingVersion, err = r.patchBMCVersionfromTemplate(ctx, bmcVersionSet, ownedBMCVersions); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCVersion spec from template %w", err)
 	}
 
@@ -193,6 +196,12 @@ func (r *BMCVersionSetReconciler) reconcile(
 	if err := r.handleRetryAnnotationPropagation(ctx, bmcVersionSet); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	if currentStatus.FullyLabeledBMCs != currentStatus.AvailableBMCVersion || pendingPatchingVersion {
+		log.V(1).Info("Waiting for all BMCVersion to be created/Patched for the labeled BMCs", "Status", currentStatus)
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+	}
+
 	// wait for any updates from owned resources
 	return ctrl.Result{}, nil
 }
@@ -264,17 +273,19 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 	ctx context.Context,
 	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 	bmcVersionList *metalv1alpha1.BMCVersionList,
-) error {
+) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if len(bmcVersionList.Items) == 0 {
 		log.V(1).Info("No BMCVersion found, skipping spec template update")
-		return nil
+		return false, nil
 	}
 
+	var pendingPatchingVersion bool
 	var errs []error
 	for _, bmcVersion := range bmcVersionList.Items {
 		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress && bmcVersion.Status.UpgradeTask != nil {
 			log.V(1).Info("Skipping BMCVersion spec patching as it is in InProgress state with an active UpgradeTask")
+			pendingPatchingVersion = true
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
@@ -288,7 +299,7 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 			log.V(1).Info("Patched BMCVersion with updated spec", "BMCVersions", bmcVersion.Name, "Operation", opResult)
 		}
 	}
-	return errors.Join(errs...)
+	return pendingPatchingVersion, errors.Join(errs...)
 }
 
 func (r *BMCVersionSetReconciler) getOwnedBMCVersionSetStatus(

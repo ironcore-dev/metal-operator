@@ -508,5 +508,167 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.List(ctx, &maintList)).To(Succeed())
 		})
 
+		It("Should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
+			bmcSetting := make(map[string]string)
+			bmcSetting["abc"] = changedBMCSetting
+			bmcSettingNew := make(map[string]string)
+			bmcSettingNew["abc"] = "new-bmc-setting"
+
+			By("Create SET resource")
+			bmcSettingsSet1 := &metalv1alpha1.BMCSettingsSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-bmcsettingsset1-"},
+				Spec: metalv1alpha1.BMCSettingsSetSpec{
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						SettingsMap:             bmcSetting,
+					},
+					BMCSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"metal.ironcore.dev/Manufacturer": "foo",
+							"metal.ironcore.dev/Model":        "bar",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSettingsSet1)).To(Succeed())
+
+			By("Checking if the BMCSetting has been created")
+			bmcSettings01 := &metalv1alpha1.BMCSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: bmcSettingsSet1.Name + "-" + bmc01.Name,
+				},
+			}
+			Eventually(Get(bmcSettings01)).Should(Succeed())
+
+			By("Checking if the status has been updated to completed")
+			Eventually(Object(bmcSettingsSet1)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.CompletedBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.InProgressBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 0)),
+			))
+
+			By("Create duplicate SET resource")
+			bmcSettingsSet2 := &metalv1alpha1.BMCSettingsSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-bmcsettingsset2-"},
+				Spec: metalv1alpha1.BMCSettingsSetSpec{
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						SettingsMap:             bmcSetting,
+					},
+					BMCSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"metal.ironcore.dev/Manufacturer": "foo",
+							"metal.ironcore.dev/Model":        "bar",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSettingsSet2)).To(Succeed())
+
+			By("Re-Checking if the status at SET 1")
+			Eventually(Object(bmcSettingsSet1)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.CompletedBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.InProgressBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 0)),
+			))
+
+			By("Checking if the BMC BMCSetting Ref has not be overritten by the 2nd SET")
+			Eventually(Object(bmc01)).Should(
+				HaveField("Spec.BMCSettingRef.Name", Equal(bmcSettings01.Name)),
+			)
+			Consistently(Object(bmc01)).Should(
+				HaveField("Spec.BMCSettingRef.Name", Equal(bmcSettings01.Name)),
+			)
+
+			By("Checking the status at SET 2")
+			Eventually(Object(bmcSettingsSet2)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.CompletedBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.InProgressBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 0)),
+			))
+
+			By("Pausing the SET 2")
+			Eventually(Update(bmcSettingsSet2, func() {
+				bmcSettingsSet2.Annotations = map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
+				}
+			})).Should(Succeed())
+
+			By("Deleting the SET 1")
+			Expect(k8sClient.Delete(ctx, bmcSettingsSet1)).To(Succeed())
+			Eventually(Get(bmcSettingsSet1)).Should(Satisfy(apierrors.IsNotFound))
+			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
+			Eventually(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+
+			By("Checking if the BMC BMCSetting Ref is empty")
+			Eventually(Object(bmc01)).Should(
+				HaveField("Spec.BMCSettingRef", BeNil()),
+			)
+
+			By("Checking the status at SET 2")
+			Eventually(Object(bmcSettingsSet2)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.CompletedBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.InProgressBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 0)),
+			))
+
+			By("Re enable the SET 2")
+			Eventually(Update(bmcSettingsSet2, func() {
+				delete(bmcSettingsSet2.Annotations, metalv1alpha1.OperationAnnotation)
+			})).Should(Succeed())
+
+			By("Checking if the status has been updated by SET 2")
+			Eventually(Object(bmcSettingsSet2)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 0)),
+			))
+
+			By("Checking if the BMCSetting has been created by set 2")
+			bmcSettings01_02 := &metalv1alpha1.BMCSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: bmcSettingsSet2.Name + "-" + bmc01.Name,
+				},
+			}
+			Eventually(Get(bmcSettings01_02)).Should(Succeed())
+
+			By("Checking if the BMC BMCSetting Ref has been set by the 2nd SET")
+			Eventually(Object(bmc01)).Should(
+				HaveField("Spec.BMCSettingRef.Name", Equal(bmcSettings01_02.Name)),
+			)
+			Consistently(Object(bmc01)).Should(
+				HaveField("Spec.BMCSettingRef.Name", Equal(bmcSettings01_02.Name)),
+			)
+
+			By("Checking if the status has been updated")
+			Eventually(Object(bmcSettingsSet2)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.CompletedBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.InProgressBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 0)),
+			))
+
+			// cleanup
+			Eventually(Get(bmcSettingsSet1)).Should(Satisfy(apierrors.IsNotFound))
+			Expect(k8sClient.Delete(ctx, bmcSettingsSet2)).To(Succeed())
+			Eventually(Get(bmcSettingsSet2)).Should(Satisfy(apierrors.IsNotFound))
+			Expect(k8sClient.Delete(ctx, bmcSettings01_02)).To(Succeed())
+			Eventually(Get(bmcSettings01_02)).Should(Satisfy(apierrors.IsNotFound))
+		})
 	})
 })

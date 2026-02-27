@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ironcore-dev/metal-operator/bmc/common"
 	"github.com/stmcginnis/gofish/schemas"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +32,7 @@ type KubeClient struct {
 
 // RedfishKubeBMC is an implementation of the BMC interface for Redfish.
 type RedfishKubeBMC struct {
-	*RedfishBMC
+	*RedfishBaseBMC
 	*KubeClient
 }
 
@@ -44,7 +43,7 @@ func NewRedfishKubeBMCClient(
 	c client.Client,
 	ns string,
 ) (BMC, error) {
-	bmc, err := NewRedfishBMCClient(ctx, options)
+	bmc, err := newRedfishBaseBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +51,7 @@ func NewRedfishKubeBMCClient(
 		InitMockUp()
 	}
 	redfishKubeBMC := &RedfishKubeBMC{
-		RedfishBMC: bmc,
+		RedfishBaseBMC: bmc,
 		KubeClient: &KubeClient{
 			kclient:   c,
 			namespace: ns,
@@ -198,7 +197,7 @@ func (r *RedfishKubeBMC) CheckBiosAttributes(attrs schemas.SettingsAttributes) (
 func (r *RedfishKubeBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BIOSVersion == "" {
 		var err error
-		UnitTestMockUps.BIOSVersion, err = r.RedfishBMC.GetBiosVersion(ctx, systemUUID)
+		UnitTestMockUps.BIOSVersion, err = r.RedfishBaseBMC.GetBiosVersion(ctx, systemUUID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get BIOS version: %w", err)
 		}
@@ -326,14 +325,14 @@ func (r *RedfishKubeBMC) CheckBMCAttributes(ctx context.Context, UUID string, at
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return common.CheckAttribues(attrs, filtered)
+	return checkAttributes(attrs, filtered)
 }
 
 // GetBMCVersion retrieves the BMC version.
 func (r *RedfishKubeBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BMCVersion == "" {
 		var err error
-		UnitTestMockUps.BMCVersion, err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
+		UnitTestMockUps.BMCVersion, err = r.RedfishBaseBMC.GetBMCVersion(ctx, systemUUID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get BMC version: %w", err)
 		}

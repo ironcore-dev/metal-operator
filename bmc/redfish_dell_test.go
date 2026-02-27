@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package oem
+package bmc
 
 import (
 	"io"
@@ -20,10 +20,10 @@ func TestDellOEM(t *testing.T) {
 }
 
 var _ = Describe("Dell OEM", func() {
-	var dell *Dell
+	var dell *DellRedfishBMC
 
 	BeforeEach(func() {
-		dell = &Dell{}
+		dell = &DellRedfishBMC{}
 	})
 
 	Describe("GetUpdateRequestBody", func() {
@@ -36,7 +36,7 @@ var _ = Describe("Dell OEM", func() {
 				Targets:     []string{"/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate"},
 			}
 
-			body := dell.GetUpdateRequestBody(params)
+			body := dell.dellBuildRequestBody(params)
 
 			Expect(body.ImageURI).To(Equal(params.ImageURI))
 			Expect(body.Username).To(Equal(params.Username))
@@ -55,7 +55,7 @@ var _ = Describe("Dell OEM", func() {
 			}
 			resp.Header.Set("Location", "/redfish/v1/TaskService/Tasks/1")
 
-			uri, err := dell.GetUpdateTaskMonitorURI(resp)
+			uri, err := dell.dellExtractTaskMonitorURI(resp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(uri).To(Equal("/redfish/v1/TaskService/Tasks/1"))
 		})
@@ -66,7 +66,7 @@ var _ = Describe("Dell OEM", func() {
 				Body:   io.NopCloser(strings.NewReader(`{"@odata.id": "/redfish/v1/TaskService/Tasks/2"}`)),
 			}
 
-			uri, err := dell.GetUpdateTaskMonitorURI(resp)
+			uri, err := dell.dellExtractTaskMonitorURI(resp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(uri).To(Equal("/redfish/v1/TaskService/Tasks/2"))
 		})
@@ -77,7 +77,7 @@ var _ = Describe("Dell OEM", func() {
 				Body:   io.NopCloser(strings.NewReader("{}")),
 			}
 
-			_, err := dell.GetUpdateTaskMonitorURI(resp)
+			_, err := dell.dellExtractTaskMonitorURI(resp)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unable to extract task monitor URI"))
 		})

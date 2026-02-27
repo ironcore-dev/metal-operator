@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ironcore-dev/metal-operator/bmc/common"
-
 	"github.com/stmcginnis/gofish/schemas"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -22,7 +20,7 @@ const (
 
 // RedfishLocalBMC implements the BMC interface for Redfish.
 type RedfishLocalBMC struct {
-	*RedfishBMC
+	*RedfishBaseBMC
 }
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
@@ -36,14 +34,14 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 		}
 		return nil, err
 	}
-	bmc, err := NewRedfishBMCClient(ctx, options)
+	bmc, err := newRedfishBaseBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	if acc, ok := UnitTestMockUps.Accounts[options.Username]; ok {
 		if acc.Password == options.Password {
 			// authenticated
-			return &RedfishLocalBMC{RedfishBMC: bmc}, nil
+			return &RedfishLocalBMC{RedfishBaseBMC: bmc}, nil
 		}
 	}
 	return nil, &schemas.Error{
@@ -98,7 +96,7 @@ func (r *RedfishLocalBMC) DeleteAccount(ctx context.Context, userName, id string
 func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BIOSVersion == "" {
 		var err error
-		UnitTestMockUps.BIOSVersion, err = r.RedfishBMC.GetBiosVersion(ctx, systemUUID)
+		UnitTestMockUps.BIOSVersion, err = r.RedfishBaseBMC.GetBiosVersion(ctx, systemUUID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get BIOS version: %w", err)
 		}
@@ -228,14 +226,14 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, a
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return common.CheckAttribues(attrs, filtered)
+	return checkAttributes(attrs, filtered)
 }
 
 // GetBMCVersion retrieves the BMC version.
 func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BMCVersion == "" {
 		var err error
-		UnitTestMockUps.BMCVersion, err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
+		UnitTestMockUps.BMCVersion, err = r.RedfishBaseBMC.GetBMCVersion(ctx, systemUUID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get BMC version: %w", err)
 		}

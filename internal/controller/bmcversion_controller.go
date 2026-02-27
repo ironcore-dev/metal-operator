@@ -135,6 +135,9 @@ func (r *BMCVersionReconciler) removeServerMaintenances(ctx context.Context, bmc
 		if serverMaintenance.DeletionTimestamp.IsZero() && metav1.IsControlledBy(serverMaintenance, bmcVersion) {
 			log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
 			if err := r.Delete(ctx, serverMaintenance); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
 				log.V(1).Info("Failed to delete ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
 				finalErr = append(finalErr, err)
 			}

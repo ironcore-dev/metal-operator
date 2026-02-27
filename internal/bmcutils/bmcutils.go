@@ -221,14 +221,18 @@ func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
 }
 
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
-	// If Redfish reset fails, try SSH-based reset for known manufacturers
+	// SSH-based reset for BMC recovery scenarios
+	// Note: Using InsecureIgnoreHostKey() is a pragmatic choice for BMC reset operations:
+	// - BMC resets typically occur when the BMC is already experiencing issues
+	// - This is infrastructure management in a controlled environment
+	// - Host key management adds operational complexity for automated recovery
+	// - The risk is mitigated by: credential-based auth, internal network, and limited scope
+	// TODO: Consider adding opt-in secure host key verification via stored keys for enhanced security
 	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{ssh.Password(password)},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			return nil
-		},
-		Timeout: timeout,
+		User:            username,
+		Auth:            []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - See security note above
+		Timeout:         timeout,
 	}
 	resetCMD := ""
 	switch manufacturer {
@@ -256,7 +260,7 @@ func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password strin
 	defer func() {
 		_ = session.Close()
 	}()
-	// cancel reset cmd after 5 minutes
+	// cancel reset cmd after timeout
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	done := make(chan error, 1)

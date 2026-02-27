@@ -970,9 +970,9 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		conditionutils.UpdateStatus(corev1.ConditionFalse),
 		conditionutils.UpdateReason(taskCurrentStatus.TaskState),
 		conditionutils.UpdateMessage(
-			fmt.Sprintf("BMC upgrade in state: %v: PercentageCompleted %v",
+			fmt.Sprintf("BMC upgrade in state: %v: PercentageCompleted %d",
 				taskCurrentStatus.TaskState,
-				taskCurrentStatus.PercentComplete),
+				upgradeCurrentTaskStatus.PercentComplete),
 		),
 	); err != nil {
 		log.Error(err, "failed to update the conditions status. retrying... ")

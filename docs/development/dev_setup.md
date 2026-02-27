@@ -62,7 +62,7 @@ This `Makefile` directive will:
 
 ```shell
 ‹kind-metal› kubectl get server
-NAME                            UUID                                   MANUFACTURER   POWERSTATE   STATE       AGE
+NAME                            SYSTEMUUID                             MANUFACTURER   POWERSTATE   STATE       AGE
 compute-0-bmc-endpoint-sample   38947555-7742-3448-3784-823347823834   Contoso        On           Available   3m21s
 ```
 

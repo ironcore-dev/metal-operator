@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Example ServerClaim using Virtual Media boot method
+# The ServerClaim controller will create a ServerBootConfiguration and copy bootMethod to it
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerClaim
+metadata:
+  labels:
+    app.kubernetes.io/name: serverclaim
+    app.kubernetes.io/instance: serverclaim-virtualmedia-sample
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: serverclaim-virtualmedia-sample
+spec:
+  serverRef:
+    name: endpoint-sample-system-0
+  # For VirtualMedia boot, image should reference an OCI image containing a bootable ISO layer
+  image: ghcr.io/example/bootable-os:latest
+  ignitionSecretRef:
+    name: ignition-sample
+  # BootMethod VirtualMedia will mount the ISO from the image as virtual CD/DVD
+  # Requires boot-operator to extract ISO from OCI image and serve it via HTTP
+  bootMethod: VirtualMedia
+  power: "On"

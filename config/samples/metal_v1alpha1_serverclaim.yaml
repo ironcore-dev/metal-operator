@@ -17,4 +17,5 @@ spec:
   image: os-image:latest
   ignitionSecretRef:
     name: ignition-sample
+  bootMethod: PXE  # or VirtualMedia
   power: "On"

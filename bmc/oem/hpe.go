@@ -247,3 +247,82 @@ func (h *HPEILOManager) GetBMCPendingAttributeValues(ctx context.Context) (schem
 	// We do not have any option to get pending attributes for Dell iDRAC
 	return schemas.SettingsAttributes{}, nil
 }
+
+func (r *HPE) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	managers, err := r.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.InsertMedia", manager.ODataID, slotID)
+
+	payload := map[string]any{
+		"Image":          mediaURL,
+		"Inserted":       true,
+		"WriteProtected": true,
+	}
+
+	resp, err := r.Service.GetClient().Post(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to mount virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to mount virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (r *HPE) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	managers, err := r.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.EjectMedia", manager.ODataID, slotID)
+
+	resp, err := r.Service.GetClient().Post(vmURI, map[string]any{})
+	if err != nil {
+		return fmt.Errorf("failed to eject virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to eject virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (r *HPE) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
+	managers, err := r.Service.Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	return manager.VirtualMedia()
+}

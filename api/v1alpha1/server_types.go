@@ -218,6 +218,13 @@ type ServerStatus struct {
 	// +optional
 	State ServerState `json:"state,omitempty"`
 
+	// NetworkCheck indicates the network configuration validation status.
+	// Possible values: "Pass" (all interfaces match Netbox), "Fail" (mismatches detected), "Unknown" (not yet validated).
+	// +kubebuilder:validation:Enum=Pass;Fail;Unknown
+	// +kubebuilder:default=Unknown
+	// +optional
+	NetworkCheck string `json:"networkCheck,omitempty"`
+
 	// NetworkInterfaces is a list of network interfaces associated with the server.
 	// +optional
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`

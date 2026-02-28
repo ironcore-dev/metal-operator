@@ -376,6 +376,16 @@ spec:
               model:
                 description: Model is the model of the server.
                 type: string
+              networkCheck:
+                default: Unknown
+                description: |-
+                  NetworkCheck indicates the network configuration validation status.
+                  Possible values: "Pass" (all interfaces match Netbox), "Fail" (mismatches detected), "Unknown" (not yet validated).
+                enum:
+                - Pass
+                - Fail
+                - Unknown
+                type: string
               networkInterfaces:
                 description: NetworkInterfaces is a list of network interfaces associated
                   with the server.

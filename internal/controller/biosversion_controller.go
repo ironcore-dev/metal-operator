@@ -477,7 +477,7 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 			annotations := bmcObj.GetAnnotations()
 			if annotations != nil {
 				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
-					if op == metalv1alpha1.GracefulRestartBMC {
+					if op == metalv1alpha1.ForceResetBMC {
 						log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
 						return false, nil
 					}

@@ -1557,7 +1557,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `uuid` _string_ | UUID is the unique identifier for the server.<br />Deprecated in favor of systemUUID. |  |  |
-| `systemUUID` _string_ | SystemUUID is the unique identifier for the server. |  |  |
+| `systemUUID` _string_ | SystemUUID is the unique identifier for the server.<br />If not provided, it will be derived from the serial |  |  |
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
 | `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |

@@ -97,6 +97,27 @@ Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project
 kubectl apply -f https://raw.githubusercontent.com/<org>/metal-operator/<tag or branch>/dist/install.yaml
 ```
 
+## Monitoring
+
+The metal-operator exposes custom Prometheus metrics for monitoring server state, power operations, and reconciliation performance. Metrics are available at the `/metrics` endpoint and include:
+
+- **Server State Distribution** - Count of servers by state (Available, Reserved, Error, etc.)
+- **Server Power State** - Count of servers by power state (On, Off, PoweringOn, etc.)
+- **Server Conditions** - Health status of server conditions (Ready, Discovered, etc.)
+- **Reconciliation Metrics** - Success/error counts for reconciliation operations
+
+For detailed metrics documentation, example queries, and alerting rules, see [docs/metrics.md](docs/metrics.md).
+
+### Quick Example
+
+```bash
+# Port-forward to metrics endpoint
+kubectl -n metal-operator-system port-forward deployment/metal-operator-controller-manager 8443:8443
+
+# Query server metrics
+curl -k https://localhost:8443/metrics | grep metal_server
+```
+
 ## Contributing
 
 **NOTE:** Run `make help` for more information on all potential `make` targets

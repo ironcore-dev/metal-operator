@@ -1,0 +1,79 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: metal-operator-server-alerts
+  namespace: metal-operator-system
+  labels:
+    control-plane: controller-manager
+spec:
+  groups:
+  - name: metal_operator_servers
+    interval: 30s
+    rules:
+    - alert: NoAvailableServers
+      expr: metal_server_state{state="Available"} == 0
+      for: 5m
+      annotations:
+        summary: "No available servers in the fleet"
+        description: "All servers are either Reserved, in Maintenance, or in Error state"
+      labels:
+        severity: warning
+
+    - alert: ServersInErrorState
+      expr: metal_server_state{state="Error"} > 0
+      for: 2m
+      annotations:
+        summary: "Servers are in Error state"
+        description: "{{ $value }} server(s) are in Error state and require attention"
+      labels:
+        severity: critical
+
+    - alert: ServersPoweringOnTooLong
+      expr: metal_server_power_state{power_state="PoweringOn"} > 0
+      for: 10m
+      annotations:
+        summary: "Servers stuck in PoweringOn state"
+        description: "{{ $value }} server(s) have been in PoweringOn state for over 10 minutes"
+      labels:
+        severity: warning
+
+    - alert: ServersPoweringOffTooLong
+      expr: metal_server_power_state{power_state="PoweringOff"} > 0
+      for: 10m
+      annotations:
+        summary: "Servers stuck in PoweringOff state"
+        description: "{{ $value }} server(s) have been in PoweringOff state for over 10 minutes"
+      labels:
+        severity: warning
+
+    - alert: HighReconciliationErrorRate
+      expr: rate(metal_server_reconciliation_total{result=~"error_.*"}[5m]) > 0.1
+      for: 5m
+      annotations:
+        summary: "High server reconciliation error rate"
+        description: "Server reconciliation errors are occurring at {{ $value | humanize }} per second"
+      labels:
+        severity: warning
+
+    - alert: LowAvailableServerCapacity
+      expr: metal_server_state{state="Available"} < 2
+      for: 5m
+      annotations:
+        summary: "Low available server capacity"
+        description: "Only {{ $value }} server(s) are available"
+      labels:
+        severity: warning
+
+    - alert: ServerReconciliationFailureSpike
+      expr: |
+        (
+          rate(metal_server_reconciliation_total{result=~"error_.*"}[5m])
+          /
+          rate(metal_server_reconciliation_total[5m])
+        ) > 0.5
+      for: 10m
+      annotations:
+        summary: "High rate of server reconciliation failures"
+        description: "More than 50% of server reconciliations are failing"
+      labels:
+        severity: critical

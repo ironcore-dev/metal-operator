@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -250,15 +251,15 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 			if bmc.Spec.BMCSettingRef != nil {
 				if err := r.Get(ctx, client.ObjectKey{Name: bmc.Spec.BMCSettingRef.Name}, &metalv1alpha1.BMCSettings{}); err != nil {
 					if apierrors.IsNotFound(err) {
-						log.Error(err, "failed to get BMCSettings referenced by Server", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-						// we will go ahead and create a new BMCSettings for this server. the ref will be updated when the new BMCSettings is created
+						log.V(1).Info("BMCSettings referenced by BMC not found, will create a new one", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+						// proceed to create a new BMCSettings; the ref will be updated when it is created
 					} else {
 						log.Error(err, "error when trying to get BMCSettings referenced by Server", "Server", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
 						// we will try this again in next reconciliation loop
 						continue
 					}
 				} else {
-					// the referenced BMCSettings exists or unable to determining, so we skip creating a new one
+					// the referenced BMCSettings exists, so we skip creating a new one
 					log.V(1).Info("BMC already has a BMCSettings ref", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
 					continue
 				}
@@ -418,7 +419,13 @@ func (r *BMCSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// Watch BMC resources for label changes to trigger reconciliation
 			&metalv1alpha1.BMC{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByBMC),
-			builder.WithPredicates(predicate.LabelChangedPredicate{})).
+			builder.WithPredicates(predicate.Funcs{
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldBMC := e.ObjectOld.(*metalv1alpha1.BMC)
+					newBMC := e.ObjectNew.(*metalv1alpha1.BMC)
+					return labelChangeOrAnyFieldChangeInObject(e, []any{oldBMC.Spec.BMCSettingRef}, []any{newBMC.Spec.BMCSettingRef})
+				},
+			})).
 		Named("bmcsettingsset").
 		Complete(r)
 }

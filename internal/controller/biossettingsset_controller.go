@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -410,6 +411,12 @@ func (r *BIOSSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&metalv1alpha1.BIOSSettings{}).
 		Watches(&metalv1alpha1.Server{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
-			builder.WithPredicates(predicate.LabelChangedPredicate{})).
+			builder.WithPredicates(predicate.Funcs{
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldServer := e.ObjectOld.(*metalv1alpha1.Server)
+					newServer := e.ObjectNew.(*metalv1alpha1.Server)
+					return labelChangeOrAnyFieldChangeInObject(e, []any{oldServer.Spec.BIOSSettingsRef}, []any{newServer.Spec.BIOSSettingsRef})
+				},
+			})).
 		Complete(r)
 }

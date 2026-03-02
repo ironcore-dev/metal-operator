@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"reflect"
 	"slices"
@@ -340,4 +341,42 @@ func GetImageCredentialsForSecretRef(ctx context.Context, c client.Client, secre
 	}
 
 	return string(username), string(password), nil
+}
+
+func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFields []any) bool {
+	isNil := func(arg any) bool {
+		if v := reflect.ValueOf(arg); !v.IsValid() || ((v.Kind() == reflect.Ptr ||
+			v.Kind() == reflect.Interface ||
+			v.Kind() == reflect.Slice ||
+			v.Kind() == reflect.Map ||
+			v.Kind() == reflect.Chan ||
+			v.Kind() == reflect.Func) && v.IsNil()) {
+			return true
+		}
+		return false
+	}
+	if isNil(e.ObjectOld) {
+		return false
+	}
+	if isNil(e.ObjectNew) {
+		return false
+	}
+
+	labelChange := !maps.Equal(e.ObjectNew.GetLabels(), e.ObjectOld.GetLabels())
+	if labelChange {
+		return true
+	}
+
+	if len(oldFields) != len(newFields) {
+		// This indicates a programming error, but we can handle it defensively.
+		return true
+	}
+
+	for i := range oldFields {
+		if !reflect.DeepEqual(oldFields[i], newFields[i]) {
+			return true
+		}
+	}
+
+	return false
 }

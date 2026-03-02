@@ -72,6 +72,10 @@ type BMCReconciler struct {
 
 	// SSH reset worker infrastructure
 	sshResetQueue chan *sshResetRequest
+	// SSHResetTimeout defines the timeout for SSH reset operations.
+	SSHResetTimeout time.Duration
+	// SSHResetWorkerTimeout defines the timeout for SSH reset worker processing.
+	SSHResetWorkerTimeout time.Duration
 }
 
 // sshResetRequest represents a BMC SSH reset work item
@@ -560,8 +564,7 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcName, bmcNamespac
 		_ = r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, fmt.Sprintf("Failed to get credentials: %v", err))
 		return
 	}
-	sshTimeout := 2 * time.Minute
-	if err := bmcutils.SSHResetBMC(ctx, address, currentBMC.Status.Manufacturer, username, password, sshTimeout); err != nil {
+	if err := bmcutils.SSHResetBMCFunc(ctx, address, currentBMC.Status.Manufacturer, username, password, r.SSHResetTimeout); err != nil {
 		log.Error(err, "Failed to reset BMC via SSH")
 		_ = r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, bmcInternalErrorReason, fmt.Sprintf("SSH reset failed: %v", err))
 		return
@@ -664,7 +667,7 @@ func (r *BMCReconciler) runSSHResetWorker(ctx context.Context) error {
 			return nil
 		case req := <-r.sshResetQueue:
 			// Create a timeout context for each reset operation
-			resetCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			resetCtx, cancel := context.WithTimeout(ctx, r.SSHResetWorkerTimeout)
 			log.V(1).Info("Processing SSH reset request", "BMC", req.bmcName)
 			r.resetBMCViaSSH(resetCtx, req.bmcName, req.bmcNamespace)
 			cancel()

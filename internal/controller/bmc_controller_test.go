@@ -4,6 +4,8 @@
 package controller
 
 import (
+	"context"
+	"fmt"
 	"maps"
 	"time"
 
@@ -688,5 +690,391 @@ var _ = Describe("BMC Conditions", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
+	})
+})
+
+// Helper to create BMCSecret for SSH tests
+func createBMCSecretForSSHTest(ctx context.Context) *metalv1alpha1.BMCSecret {
+	bmcSecret := &metalv1alpha1.BMCSecret{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-ssh-",
+		},
+		Data: map[string][]byte{
+			metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+			metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+		},
+	}
+	Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+	return bmcSecret
+}
+
+// Helper to create BMC for SSH reset tests
+func createBMCForSSHTest(ctx context.Context, bmcSecret *metalv1alpha1.BMCSecret) *metalv1alpha1.BMC {
+	bmc := &metalv1alpha1.BMC{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-bmc-ssh-",
+		},
+		Spec: metalv1alpha1.BMCSpec{
+			Endpoint: &metalv1alpha1.InlineEndpoint{
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
+				MACAddress: "aa:bb:cc:dd:ee:ff",
+			},
+			Protocol: metalv1alpha1.Protocol{
+				Name: metalv1alpha1.ProtocolRedfishLocal,
+				Port: MockServerPort,
+			},
+			BMCSecretRef: v1.LocalObjectReference{
+				Name: bmcSecret.Name,
+			},
+		},
+	}
+	Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+	return bmc
+}
+
+var _ = Describe("BMC SSH Reset", func() {
+	_ = SetupTest(nil)
+
+	AfterEach(func(ctx SpecContext) {
+		EnsureCleanState()
+		// Restore real SSH function
+		bmcutils.SSHResetBMCFunc = bmcutils.SSHResetBMC
+		// Reset mock flag
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = false
+	})
+
+	// Test 1.1: Successful SSH Reset After Redfish 503 Error
+	It("Should successfully perform SSH reset after Redfish 503 error", func(ctx SpecContext) {
+		// Setup mock SSH function
+		sshResetCalled := false
+		var capturedIP, capturedManufacturer, capturedUsername, capturedPassword string
+		var capturedTimeout time.Duration
+
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			sshResetCalled = true
+			capturedIP = ip
+			capturedManufacturer = manufacturer
+			capturedUsername = username
+			capturedPassword = password
+			capturedTimeout = timeout
+			return nil
+		}
+
+		// Create BMC with Redfish available first to get manufacturer info
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		// Wait for BMC to become Ready and get manufacturer info
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", "Ready"),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
+		// Now simulate Redfish unavailability to trigger SSH reset
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		// Wait for BMC to fail with connection errors
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionFalse),
+			HaveField("Reason", "ConnectionFailed"),
+		))))
+
+		// Wait for auto-reset to trigger and SSH to be called
+		Eventually(func() bool {
+			return sshResetCalled
+		}).WithTimeout(10 * time.Second).WithPolling(100 * time.Millisecond).Should(BeTrue())
+
+		// Verify SSH was called with correct parameters
+		Expect(capturedIP).To(Equal(MockServerIP))
+		Expect(capturedManufacturer).NotTo(BeEmpty())
+		Expect(capturedUsername).To(Equal("foo"))
+		Expect(capturedPassword).To(Equal("bar"))
+		Expect(capturedTimeout).To(Equal(2 * time.Minute))
+
+		// Verify Reset condition was created
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionTrue),
+			HaveField("Reason", "AutoResetting"),
+		))))
+
+		// Verify LastResetTime was updated
+		Eventually(Object(bmc)).Should(HaveField("Status.LastResetTime", Not(BeNil())))
+
+		// Cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	// Test 1.2: SSH Reset Failure - Connection Error
+	It("Should handle SSH reset connection failure gracefully", func(ctx SpecContext) {
+		// Setup mock SSH function to return error
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			return fmt.Errorf("connection refused")
+		}
+
+		// Create BMC and let it get manufacturer info first
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		// Wait for BMC to become Ready and get manufacturer
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", "Ready"),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
+		// Now simulate Redfish unavailability
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		// Wait for BMC to become unavailable
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionFalse),
+		))))
+
+		// Wait for SSH reset to be attempted and fail
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionFalse),
+			HaveField("Reason", "InternalServerError"),
+			HaveField("Message", ContainSubstring("SSH reset failed")),
+		))))
+
+		// Cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	// Test 1.3: SSH Reset Timeout
+	It("Should handle SSH reset timeout", func(ctx SpecContext) {
+		// Setup mock SSH function to return timeout error
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			return fmt.Errorf("timeout waiting for BMC reset command to complete")
+		}
+
+		// Create BMC and let it get manufacturer info first
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		// Wait for BMC to become Ready
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", "Ready"),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
+		// Now simulate Redfish unavailability
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		// Wait for timeout error in conditions
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionFalse),
+			HaveField("Reason", "InternalServerError"),
+			HaveField("Message", ContainSubstring("timeout")),
+		))))
+
+		// Cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	// Test 3.3: Idempotency - No Duplicate SSH Resets
+	It("Should not trigger duplicate SSH resets during wait period", func(ctx SpecContext) {
+		// Setup mock SSH function with call counter
+		callCount := 0
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			callCount++
+			return nil
+		}
+
+		// Create BMC and let it get manufacturer info first
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		// Wait for BMC to become Ready
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", "Ready"),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
+		// Now simulate Redfish unavailability
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		// Wait for first SSH reset
+		Eventually(func() int {
+			return callCount
+		}).Should(Equal(1))
+
+		// Wait through the reset wait period
+		time.Sleep(500 * time.Millisecond)
+
+		// Verify SSH was only called once (idempotency guard works)
+		Expect(callCount).To(Equal(1))
+
+		// Verify Reset condition prevents re-triggering
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionTrue),
+		))))
+
+		// Cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	// Test 3.2: Redfish 401 Error Does Not Trigger SSH
+	It("Should not trigger SSH reset for authentication errors", func(ctx SpecContext) {
+		// Setup mock SSH function with call tracker
+		sshCalled := false
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			sshCalled = true
+			return nil
+		}
+
+		// Create BMC with invalid credentials (will get 401)
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-ssh-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("invalid"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("invalid"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		// Wait for authentication failure
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionFalse),
+			HaveField("Reason", "AuthenticationFailed"),
+		))))
+
+		// Wait a bit to ensure SSH is not triggered
+		Consistently(func() bool {
+			return sshCalled
+		}).WithTimeout(2 * time.Second).Should(BeFalse())
+
+		// Verify no Reset condition was created
+		Consistently(Object(bmc)).Should(HaveField("Status.Conditions", Not(ContainElement(HaveField("Type", "Reset")))))
+
+		// Cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	// Test 4.2: BMC Deleted During SSH Processing
+	It("Should handle BMC deletion during SSH processing", func(ctx SpecContext) {
+		// Setup mock SSH function with delay and panic detection
+		panicOccurred := false
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			defer func() {
+				if r := recover(); r != nil {
+					panicOccurred = true
+				}
+			}()
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		}
+
+		// Create BMC and let it get manufacturer info first
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		// Wait for BMC to be created and get manufacturer
+		Eventually(Object(bmc)).Should(HaveField("Status.Manufacturer", Not(BeEmpty())))
+
+		// Now simulate Redfish unavailability
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		// Delete BMC while processing
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+
+		// Wait to ensure worker continues without panic
+		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
+
+		// Verify no panic occurred
+		Consistently(func() bool {
+			return panicOccurred
+		}).WithTimeout(1 * time.Second).Should(BeFalse())
+	})
+
+	// Test 4.3: Invalid Credentials for SSH
+	It("Should handle missing BMC secret gracefully", func(ctx SpecContext) {
+		// Setup mock SSH function
+		sshCalled := false
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			sshCalled = true
+			return nil
+		}
+
+		// Create BMC with non-existent secret reference (first let it get basic info)
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-ssh-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: MockServerPort,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		// Wait for BMC to get manufacturer
+		Eventually(Object(bmc)).Should(HaveField("Status.Manufacturer", Not(BeEmpty())))
+
+		// Delete the secret to simulate missing credentials
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+
+		// Now simulate Redfish unavailability
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		// Wait for connection failure
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionFalse),
+		))))
+
+		// Verify SSH was not called due to missing credentials
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionFalse),
+			HaveField("Reason", "AuthenticationFailed"),
+			HaveField("Message", ContainSubstring("Failed to get credentials")),
+		))))
+
+		// Verify SSH was never called
+		Consistently(func() bool {
+			return sshCalled
+		}).WithTimeout(2 * time.Second).Should(BeFalse())
+
+		// Cleanup
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 	})
 })

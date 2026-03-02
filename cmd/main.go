@@ -89,6 +89,8 @@ func main() { // nolint: gocyclo
 		bmcFailureResetDelay               time.Duration
 		bmcResetResyncInterval             time.Duration
 		bmcResetWaitingInterval            time.Duration
+		sshResetTimeout                    time.Duration
+		sshResetWorkerTimeout              time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
@@ -115,6 +117,10 @@ func main() { // nolint: gocyclo
 		"Defines the interval at which the bmc is polled when bmc reset is in-progress.")
 	flag.DurationVar(&bmcResetWaitingInterval, "bmc-reset-waiting-interval", 2*time.Minute,
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
+	flag.DurationVar(&sshResetTimeout, "ssh-reset-timeout", 2*time.Minute,
+		"Timeout for SSH reset operations.")
+	flag.DurationVar(&sshResetWorkerTimeout, "ssh-reset-worker-timeout", 5*time.Minute,
+		"Timeout for SSH reset worker processing.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
@@ -347,6 +353,8 @@ func main() { // nolint: gocyclo
 		ManagerNamespace:       managerNamespace,
 		DNSRecordTemplate:      dnsRecordTemplate,
 		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		SSHResetTimeout:        sshResetTimeout,
+		SSHResetWorkerTimeout:  sshResetWorkerTimeout,
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},

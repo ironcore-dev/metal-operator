@@ -220,6 +220,10 @@ func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmcObj.Name, "system", index)
 }
 
+// SSHResetBMCFunc is a function variable that defaults to SSHResetBMC.
+// It allows tests to replace the SSH implementation with mocks.
+var SSHResetBMCFunc = SSHResetBMC
+
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
 	// SSH-based reset for BMC recovery scenarios
 	// Note: Using InsecureIgnoreHostKey() is a pragmatic choice for BMC reset operations:

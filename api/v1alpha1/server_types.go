@@ -77,11 +77,6 @@ type BootOrder struct {
 
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
-	// UUID is the unique identifier for the server.
-	// Deprecated in favor of systemUUID.
-	// +optional
-	UUID string `json:"uuid,omitempty"`
-
 	// SystemUUID is the unique identifier for the server.
 	// +required
 	SystemUUID string `json:"systemUUID"`

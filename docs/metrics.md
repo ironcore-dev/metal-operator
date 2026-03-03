@@ -48,7 +48,7 @@ spec:
 - `state`: ServerState value (Initial, Discovery, Available, Reserved, Error, Maintenance)
 
 **Example values:**
-```
+```text
 metal_server_state{state="Available"} 5
 metal_server_state{state="Reserved"} 2
 metal_server_state{state="Error"} 0
@@ -68,7 +68,7 @@ metal_server_state{state="Maintenance"} 1
 - `power_state`: ServerPowerState value (On, Off, PoweringOn, PoweringOff, Paused)
 
 **Example values:**
-```
+```text
 metal_server_power_state{power_state="On"} 7
 metal_server_power_state{power_state="Off"} 1
 metal_server_power_state{power_state="PoweringOn"} 0
@@ -82,13 +82,13 @@ metal_server_power_state{power_state="PoweringOn"} 0
 ### Server Condition Status (`metal_server_condition_status`)
 
 **Type:** Gauge
-**Description:** Status of server conditions (1=True, 0=False, -1=Unknown)
+**Description:** Count of servers with each condition status
 **Labels:**
 - `condition_type`: Condition type (e.g., "Ready", "PoweringOn", "Discovered")
 - `status`: Condition status (True, False, Unknown)
 
 **Example values:**
-```
+```text
 metal_server_condition_status{condition_type="Ready",status="True"} 1
 metal_server_condition_status{condition_type="Discovered",status="True"} 1
 metal_server_condition_status{condition_type="PoweringOn",status="False"} 0
@@ -107,7 +107,7 @@ metal_server_condition_status{condition_type="PoweringOn",status="False"} 0
 - `result`: Operation result (success, error_fetch, error_reconcile)
 
 **Example values:**
-```
+```text
 metal_server_reconciliation_total{result="success"} 1523
 metal_server_reconciliation_total{result="error_fetch"} 2
 metal_server_reconciliation_total{result="error_reconcile"} 15

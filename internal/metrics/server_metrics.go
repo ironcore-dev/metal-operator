@@ -5,11 +5,10 @@ package metrics
 
 import (
 	"context"
-	"strings"
+	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
@@ -60,7 +59,7 @@ func NewServerStateCollector(c client.Client) *ServerStateCollector {
 		),
 		conditionDesc: prometheus.NewDesc(
 			"metal_server_condition_status",
-			"Status of server conditions (1=True, 0=False, -1=Unknown)",
+			"Count of servers with each condition status",
 			[]string{"condition_type", "status"},
 			nil,
 		),
@@ -78,7 +77,10 @@ func (c *ServerStateCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect is called by Prometheus when collecting metrics.
 // It queries all servers and emits aggregated metrics.
 func (c *ServerStateCollector) Collect(ch chan<- prometheus.Metric) {
-	ctx := context.Background()
+	// Add 5-second timeout for metrics collection to prevent hanging scrapes
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	servers := &metalv1alpha1.ServerList{}
 
 	// List all servers in the cluster
@@ -136,22 +138,13 @@ func (c *ServerStateCollector) Collect(ch chan<- prometheus.Metric) {
 		)
 	}
 
-	// Emit condition metrics with numeric values
+	// Emit condition metrics with server counts
 	for conditionType, statusMap := range conditionCounts {
-		for status := range statusMap {
-			// Convert status to numeric value for Prometheus
-			value := float64(-1) // Unknown
-			switch strings.ToLower(status) {
-			case string(metav1.ConditionTrue):
-				value = 1
-			case string(metav1.ConditionFalse):
-				value = 0
-			}
-
+		for status, count := range statusMap {
 			ch <- prometheus.MustNewConstMetric(
 				c.conditionDesc,
 				prometheus.GaugeValue,
-				value,
+				count,
 				conditionType,
 				status,
 			)

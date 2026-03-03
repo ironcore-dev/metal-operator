@@ -503,13 +503,11 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that spec.serverMaintenanceRefs is populated")
-		Eventually(func(g Gomega) bool {
-			Expect(Get(bmcVersion)()).To(Succeed())
-			if len(bmcVersion.Spec.ServerMaintenanceRefs) == 0 {
-				return false
-			}
-			return bmcVersion.Spec.ServerMaintenanceRefs[0].Name == serverMaintenance.Name
-		}).Should(BeTrue())
+		Eventually(Object(bmcVersion)).Should(
+			HaveField("Spec.ServerMaintenanceRefs", ContainElement(
+				HaveField("Name", serverMaintenance.Name),
+			)),
+		)
 
 		By("Simulating cleanup by mocking upgrade completion")
 		Eventually(UpdateStatus(bmcVersion, func() {

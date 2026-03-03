@@ -36,6 +36,14 @@ type ServerClaimSpec struct {
 	// Image specifies the boot image to be used for the server.
 	// +required
 	Image string `json:"image"`
+
+	// BootMethod specifies the boot method to use for the server.
+	// Valid values are "PXE" (default) and "VirtualMedia".
+	// If not specified, defaults to PXE for backwards compatibility.
+	// +kubebuilder:validation:Enum=PXE;VirtualMedia
+	// +kubebuilder:default=PXE
+	// +optional
+	BootMethod BootMethod `json:"bootMethod,omitempty"`
 }
 
 // Phase defines the possible phases of a ServerClaim.
@@ -61,6 +69,7 @@ type ServerClaimStatus struct {
 // +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
 // +kubebuilder:printcolumn:name="Ignition",type="string",JSONPath=".spec.ignitionSecretRef.name"
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image"
+// +kubebuilder:printcolumn:name="BootMethod",type="string",JSONPath=".spec.bootMethod"
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 

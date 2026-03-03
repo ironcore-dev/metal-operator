@@ -466,3 +466,82 @@ func (d *DellIdracManager) CheckBMCAttributes(
 	}
 	return helpers.CheckAttribues(attributes, filteredAttr)
 }
+
+func (r *Dell) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	systems, err := r.Service.Systems()
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if len(systems) == 0 {
+		return fmt.Errorf("no systems found")
+	}
+
+	system := systems[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.InsertMedia", system.ODataID, slotID)
+
+	payload := map[string]any{
+		"Image":          mediaURL,
+		"Inserted":       true,
+		"WriteProtected": true,
+	}
+
+	resp, err := r.Service.GetClient().Post(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to mount virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to mount virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (r *Dell) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	systems, err := r.Service.Systems()
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if len(systems) == 0 {
+		return fmt.Errorf("no systems found")
+	}
+
+	system := systems[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.EjectMedia", system.ODataID, slotID)
+
+	resp, err := r.Service.GetClient().Post(vmURI, map[string]any{})
+	if err != nil {
+		return fmt.Errorf("failed to eject virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to eject virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (r *Dell) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
+	systems, err := r.Service.Systems()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get systems: %w", err)
+	}
+	if len(systems) == 0 {
+		return nil, fmt.Errorf("no systems found")
+	}
+
+	system := systems[0]
+	return system.VirtualMedia()
+}

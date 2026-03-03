@@ -886,6 +886,24 @@ _Appears in:_
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
 
 
+#### BootMethod
+
+_Underlying type:_ _string_
+
+BootMethod defines the boot method to use for server provisioning.
+
+
+
+_Appears in:_
+- [ServerBootConfigurationSpec](#serverbootconfigurationspec)
+- [ServerClaimSpec](#serverclaimspec)
+
+| Field | Description |
+| --- | --- |
+| `PXE` | BootMethodPXE boots the server using PXE network boot.<br /> |
+| `VirtualMedia` | BootMethodVirtualMedia boots the server using virtual media (ISO mounted via BMC).<br /> |
+
+
 #### BootOrder
 
 
@@ -1298,8 +1316,9 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to the server for which this boot configuration is intended. |  |  |
-| `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
+| `image` _string_ | Image specifies the boot image to be used for the server.<br />For PXE boot: OCI image reference containing kernel/initrd.<br />For VirtualMedia boot: OCI image reference containing bootable ISO layer.<br />This field is optional and can be omitted if not specified. |  |  |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
+| `bootMethod` _[BootMethod](#bootmethod)_ | BootMethod specifies the boot method to use for the server.<br />Valid values are "PXE" (default) and "VirtualMedia".<br />If not specified, defaults to PXE for backwards compatibility. | PXE | Enum: [PXE VirtualMedia] <br /> |
 
 
 #### ServerBootConfigurationState
@@ -1335,6 +1354,8 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `state` _[ServerBootConfigurationState](#serverbootconfigurationstate)_ | State represents the current state of the boot configuration. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the ServerBootConfig's current state. |  |  |
+| `bootISOURL` _string_ | BootISOURL is the URL to the bootable OS ISO provided by boot-operator.<br />This field is populated for VirtualMedia boot type. |  |  |
+| `configISOURL` _string_ | ConfigISOURL is the URL to the config drive ISO containing ignition configuration.<br />This field is populated by boot-operator for VirtualMedia boot type. |  |  |
 
 
 #### ServerBootConfigurationTemplate
@@ -1391,6 +1412,7 @@ _Appears in:_
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br /> |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
+| `bootMethod` _[BootMethod](#bootmethod)_ | BootMethod specifies the boot method to use for the server.<br />Valid values are "PXE" (default) and "VirtualMedia".<br />If not specified, defaults to PXE for backwards compatibility. | PXE | Enum: [PXE VirtualMedia] <br /> |
 
 
 #### ServerClaimStatus

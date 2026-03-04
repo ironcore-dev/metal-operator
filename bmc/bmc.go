@@ -6,13 +6,9 @@ package bmc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
-	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	"k8s.io/apimachinery/pkg/api/resource"
-
-	"github.com/ironcore-dev/metal-operator/bmc/oem"
 )
 
 type Manufacturer string
@@ -282,48 +278,4 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
-}
-
-func NewOEMManager(manager *schemas.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
-	var OEMManager oem.ManagerInterface
-	switch manager.Manufacturer {
-	case string(ManufacturerDell):
-		OEMManager = &oem.DellIdracManager{
-			BMC:     manager,
-			Service: service,
-		}
-	case string(ManufacturerHPE):
-		OEMManager = &oem.HPEILOManager{
-			BMC:     manager,
-			Service: service,
-		}
-	case string(ManufacturerLenovo):
-		OEMManager = &oem.LenovoXCCManager{
-			BMC:     manager,
-			Service: service,
-		}
-	default:
-		return nil, fmt.Errorf("unsupported manufacturer: %v", manager.Manufacturer)
-	}
-	return OEMManager, nil
-}
-
-func NewOEMInterface(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
-	var oemInterface oem.OEMInterface
-	switch manufacturer {
-	case string(ManufacturerDell):
-		return &oem.Dell{
-			Service: service,
-		}, nil
-	case string(ManufacturerHPE):
-		return &oem.HPE{
-			Service: service,
-		}, nil
-	case string(ManufacturerLenovo):
-		return &oem.Lenovo{
-			Service: service,
-		}, nil
-	default:
-		return oemInterface, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
-	}
 }

@@ -119,41 +119,34 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1al
 
 func (r *BMCVersionReconciler) removeServerMaintenances(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) error {
 	log := ctrl.LoggerFrom(ctx)
-	if bmcVersion.Spec.ServerMaintenanceRefs == nil {
-		return nil
-	}
 
 	log.V(1).Info("Removing orphan server Maintenances")
-	serverMaintenances, errs := r.getServerMaintenances(ctx, bmcVersion)
 
-	var finalErr []error
-	var missingServerMaintenanceRef []error
-
-	if len(errs) > 0 {
-		for _, err := range errs {
-			if apierrors.IsNotFound(err) {
-				missingServerMaintenanceRef = append(missingServerMaintenanceRef, err)
-			} else {
-				finalErr = append(finalErr, err)
-			}
-		}
+	// List all ServerMaintenance objects owned by this BMCVersion using owner references
+	serverMaintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := clientutils.ListAndFilterControlledBy(ctx, r.Client, bmcVersion, serverMaintenanceList); err != nil {
+		return fmt.Errorf("failed to list ServerMaintenance objects: %w", err)
 	}
 
-	if len(missingServerMaintenanceRef) != len(bmcVersion.Spec.ServerMaintenanceRefs) {
-		// delete the ServerMaintenance if not marked for deletion already
-		for _, serverMaintenance := range serverMaintenances {
-			if serverMaintenance.DeletionTimestamp.IsZero() && metav1.IsControlledBy(serverMaintenance, bmcVersion) {
-				log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
-				if err := r.Delete(ctx, serverMaintenance); err != nil {
-					log.V(1).Info("Failed to delete ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
-					finalErr = append(finalErr, err)
+	var finalErr []error
+
+	// Delete all ServerMaintenance objects owned by this BMCVersion
+	for i := range serverMaintenanceList.Items {
+		serverMaintenance := &serverMaintenanceList.Items[i]
+		if serverMaintenance.DeletionTimestamp.IsZero() && metav1.IsControlledBy(serverMaintenance, bmcVersion) {
+			log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
+			if err := r.Delete(ctx, serverMaintenance); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
 				}
-			} else {
-				log.V(1).Info(
-					"Skipping deletion of ServerMaintenance as it has a different owner",
-					"ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance),
-					"State", serverMaintenance.Status.State)
+				log.V(1).Info("Failed to delete ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance))
+				finalErr = append(finalErr, err)
 			}
+		} else {
+			log.V(1).Info(
+				"Skipping deletion of ServerMaintenance as it has a different owner",
+				"ServerMaintenance", client.ObjectKeyFromObject(serverMaintenance),
+				"State", serverMaintenance.Status.State)
 		}
 	}
 
@@ -1063,9 +1056,9 @@ func (r *BMCVersionReconciler) checkBMCUpgradeStatus(
 		conditionutils.UpdateStatus(corev1.ConditionFalse),
 		conditionutils.UpdateReason(taskCurrentStatus.TaskState),
 		conditionutils.UpdateMessage(
-			fmt.Sprintf("BMC upgrade in state: %v: PercentageCompleted %v",
+			fmt.Sprintf("BMC upgrade in state: %v: PercentageCompleted %d",
 				taskCurrentStatus.TaskState,
-				taskCurrentStatus.PercentComplete),
+				upgradeCurrentTaskStatus.PercentComplete),
 		),
 	); err != nil {
 		log.Error(err, "failed to update the conditions status. retrying... ")

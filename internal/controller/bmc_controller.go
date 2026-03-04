@@ -558,10 +558,19 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 				bmcNamespace: bmcObj.Namespace,
 			}:
 				log.Info("Enqueued SSH-based BMC reset due to Redfish 5xx error", "BMC", bmcObj.Name)
+				return r.updateBMCStateToPending(ctx, bmcObj)
 			default:
-				log.V(1).Info("SSH reset queue full, will retry on next reconciliation", "BMC", bmcObj.Name)
+				log.Error(nil, "SSH reset queue was full; reset was not scheduled", "BMC", bmcObj.Name)
+				_ = r.updateConditions(ctx,
+					bmcObj,
+					false,
+					bmcResetConditionType,
+					corev1.ConditionFalse,
+					bmcUnknownErrorReason,
+					"SSH reset queue was full; reset not scheduled",
+				)
+				return fmt.Errorf("failed to enqueue SSH reset for BMC %s: queue full", bmcObj.Name)
 			}
-			return r.updateBMCStateToPending(ctx, bmcObj)
 		}
 		// 4xx or other status code - don't try SSH
 		return errors.Join(r.updateBMCStateToPending(ctx, bmcObj), fmt.Errorf("cannot reset bmc: %w", err))
@@ -582,7 +591,7 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcName string) {
 	address, err := bmcutils.GetBMCAddressForBMC(ctx, r.Client, currentBMC)
 	if err != nil {
 		log.Error(err, "Failed to get BMC address for SSH reset")
-		if err := r.updateConditionsByName(ctx, bmcName, true, bmcResetConditionType, corev1.ConditionFalse, bmcConnectionFailedReason, fmt.Sprintf("Failed to get BMC address: %v", err)); err != nil {
+		if err := r.updateConditionsByName(ctx, bmcName, bmcResetConditionType, corev1.ConditionFalse, bmcConnectionFailedReason, fmt.Sprintf("Failed to get BMC address: %v", err)); err != nil {
 			log.Error(err, "Failed to update Reset condition")
 		}
 		return
@@ -605,7 +614,7 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcName string) {
 	}
 	if manufacturer == "" {
 		log.Error(nil, "BMC manufacturer not available for SSH reset (checked BMC and Server)")
-		if err := r.updateConditionsByName(ctx, bmcName, true, bmcResetConditionType, corev1.ConditionFalse, bmcInternalErrorReason, "BMC manufacturer not available"); err != nil {
+		if err := r.updateConditionsByName(ctx, bmcName, bmcResetConditionType, corev1.ConditionFalse, bmcInternalErrorReason, "BMC manufacturer not available"); err != nil {
 			log.Error(err, "Failed to update Reset condition")
 		}
 		return
@@ -613,14 +622,14 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcName string) {
 	username, password, err := bmcutils.GetBMCCredentialsForBMCSecretName(ctx, r.Client, currentBMC.Spec.BMCSecretRef.Name)
 	if err != nil {
 		log.Error(err, "Failed to get BMC credentials for SSH reset")
-		if err := r.updateConditionsByName(ctx, bmcName, true, bmcResetConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, fmt.Sprintf("Failed to get credentials: %v", err)); err != nil {
+		if err := r.updateConditionsByName(ctx, bmcName, bmcResetConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, fmt.Sprintf("Failed to get credentials: %v", err)); err != nil {
 			log.Error(err, "Failed to update Reset condition")
 		}
 		return
 	}
 	if err := bmcutils.SSHResetBMCFunc(ctx, address, manufacturer, username, password, r.SSHResetTimeout); err != nil {
 		log.Error(err, "Failed to reset BMC via SSH")
-		if err := r.updateConditionsByName(ctx, bmcName, true, bmcResetConditionType, corev1.ConditionFalse, bmcInternalErrorReason, fmt.Sprintf("SSH reset failed: %v", err)); err != nil {
+		if err := r.updateConditionsByName(ctx, bmcName, bmcResetConditionType, corev1.ConditionFalse, bmcInternalErrorReason, fmt.Sprintf("SSH reset failed: %v", err)); err != nil {
 			log.Error(err, "Failed to update Reset condition after SSH failure")
 		}
 		return
@@ -669,12 +678,12 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 
 // updateConditionsByName fetches the latest BMC object by name and updates its condition.
 // Use this when updating conditions from async workers or when the BMC object might be stale.
-func (r *BMCReconciler) updateConditionsByName(ctx context.Context, bmcName string, createIfNotFound bool, conditionType string, status corev1.ConditionStatus, reason, message string) error {
+func (r *BMCReconciler) updateConditionsByName(ctx context.Context, bmcName string, conditionType string, status corev1.ConditionStatus, reason, message string) error {
 	currentBMC := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, client.ObjectKey{Name: bmcName}, currentBMC); err != nil {
 		return fmt.Errorf("failed to fetch BMC object: %w", err)
 	}
-	return r.updateConditions(ctx, currentBMC, createIfNotFound, conditionType, status, reason, message)
+	return r.updateConditions(ctx, currentBMC, false, conditionType, status, reason, message)
 }
 
 func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {

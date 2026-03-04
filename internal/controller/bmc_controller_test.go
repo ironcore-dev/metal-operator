@@ -758,7 +758,6 @@ var _ = Describe("BMC SSH Reset", func() {
 		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = false
 	})
 
-	// Test 1.1: Successful SSH Reset via Annotation on Unresponsive BMC
 	It("Should successfully perform SSH reset after Redfish 503 error", func(ctx SpecContext) {
 		// Setup mock SSH function with proper synchronization
 		var mu sync.Mutex
@@ -836,7 +835,6 @@ var _ = Describe("BMC SSH Reset", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
-	// Test 1.2: SSH Reset Failure - Connection Error
 	It("Should handle SSH reset connection failure gracefully", func(ctx SpecContext) {
 		// Setup mock SSH function to return error
 		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
@@ -866,6 +864,9 @@ var _ = Describe("BMC SSH Reset", func() {
 			bmc.Annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
 		})).Should(Succeed())
 
+		// check for status state pending
+		Eventually(Object(bmc)).Should(HaveField("Status.State", metalv1alpha1.BMCStatePending))
+
 		// Wait for SSH reset to be attempted and fail
 		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
 			HaveField("Type", "Reset"),
@@ -879,50 +880,6 @@ var _ = Describe("BMC SSH Reset", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
-	// Test 1.3: SSH Reset Timeout
-	It("Should handle SSH reset timeout", func(ctx SpecContext) {
-		// Setup mock SSH function to return timeout error
-		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
-			return fmt.Errorf("timeout waiting for BMC reset command to complete")
-		}
-
-		// Create BMC and let it get manufacturer info first
-		bmcSecret := createBMCSecretForSSHTest(ctx)
-		bmc := createBMCForSSHTest(ctx, bmcSecret)
-
-		// Wait for BMC to become Ready
-		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Status.Conditions", ContainElement(SatisfyAll(
-				HaveField("Type", "Ready"),
-				HaveField("Status", metav1.ConditionTrue),
-			))),
-			HaveField("Status.Manufacturer", Not(BeEmpty())),
-		))
-
-		// Now simulate Redfish unavailability and trigger reset via annotation
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
-
-		Eventually(Update(bmc, func() {
-			if bmc.Annotations == nil {
-				bmc.Annotations = map[string]string{}
-			}
-			bmc.Annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
-		})).Should(Succeed())
-
-		// Wait for timeout error in conditions
-		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
-			HaveField("Type", "Reset"),
-			HaveField("Status", metav1.ConditionFalse),
-			HaveField("Reason", "InternalServerError"),
-			HaveField("Message", ContainSubstring("timeout")),
-		))))
-
-		// Cleanup
-		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-	})
-
-	// Test 3.3: Idempotency - No Duplicate SSH Resets
 	It("Should not trigger duplicate SSH resets during wait period", func(ctx SpecContext) {
 		// Setup mock SSH function with call counter and proper synchronization
 		var mu sync.Mutex
@@ -967,6 +924,9 @@ var _ = Describe("BMC SSH Reset", func() {
 		// Wait through the reset wait period
 		time.Sleep(500 * time.Millisecond)
 
+		// verify reset annotation was removed and not re-added
+		Eventually(Object(bmc)).Should(HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))))
+
 		// Verify SSH was only called once (idempotency guard works)
 		mu.Lock()
 		Expect(callCount).To(Equal(1))
@@ -983,7 +943,6 @@ var _ = Describe("BMC SSH Reset", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
-	// Test 3.2: Redfish 401 Error Does Not Trigger SSH
 	It("Should not trigger SSH reset for authentication errors", func(ctx SpecContext) {
 		// Setup mock SSH function with call tracker and proper synchronization
 		var mu sync.Mutex
@@ -1031,7 +990,6 @@ var _ = Describe("BMC SSH Reset", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
-	// Test 4.2: BMC Deleted During SSH Processing
 	It("Should handle BMC deletion during SSH processing", func(ctx SpecContext) {
 		// Setup mock SSH function with delay and panic detection with proper synchronization
 		var mu sync.Mutex

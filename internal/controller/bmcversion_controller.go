@@ -477,6 +477,18 @@ func (r *BMCVersionReconciler) handleFailedState(
 			return nil
 		}
 	}
+	// Keep status consistent when retries are disabled.
+	if bmcVersion.Status.AutoRetryCountRemaining != nil &&
+		(*bmcVersion.Status.AutoRetryCountRemaining != 0 ||
+			bmcVersion.Status.ObservedGeneration != bmcVersion.Generation) {
+		bmcVersionBase := bmcVersion.DeepCopy()
+		zero := int32(0)
+		bmcVersion.Status.AutoRetryCountRemaining = &zero
+		bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
+		if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+			return fmt.Errorf("failed to patch BMCVersion status for disabled auto-retry: %w", err)
+		}
+	}
 	log.V(1).Info("Failed to upgrade BMC via BMCVersion", "BMCVersion", bmcVersion.Name, "BMC", BMC.Name)
 	return nil
 }

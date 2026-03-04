@@ -510,6 +510,19 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 			return true, nil
 		}
 	}
+
+	// Keep status consistent when retries are disabled.
+	if biosVersion.Status.AutoRetryCountRemaining != nil &&
+		(*biosVersion.Status.AutoRetryCountRemaining != 0 ||
+			biosVersion.Status.ObservedGeneration != biosVersion.Generation) {
+		biosVersionBase := biosVersion.DeepCopy()
+		zero := int32(0)
+		biosVersion.Status.AutoRetryCountRemaining = &zero
+		biosVersion.Status.ObservedGeneration = biosVersion.Generation
+		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+			return true, fmt.Errorf("failed to patch BIOSVersion status for disabled auto-retry: %w", err)
+		}
+	}
 	log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion.Name, "Status", biosVersion.Status, "Server", server.Name)
 	return false, nil
 }

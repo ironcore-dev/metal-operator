@@ -780,6 +780,18 @@ func (r *BMCSettingsReconciler) handleFailedState(
 			return nil
 		}
 	}
+	// Keep status consistent when retries are disabled.
+	if bmcSetting.Status.AutoRetryCountRemaining != nil &&
+		(*bmcSetting.Status.AutoRetryCountRemaining != 0 ||
+			bmcSetting.Status.ObservedGeneration != bmcSetting.Generation) {
+		bmcSettingsBase := bmcSetting.DeepCopy()
+		zero := int32(0)
+		bmcSetting.Status.AutoRetryCountRemaining = &zero
+		bmcSetting.Status.ObservedGeneration = bmcSetting.Generation
+		if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingsBase)); err != nil {
+			return fmt.Errorf("failed to patch BMCSettings status for disabled auto-retry: %w", err)
+		}
+	}
 	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bmc settings maintenance
 	log.V(1).Info("Failed to update BMC setting", "ctx", ctx, "bmcSetting", bmcSetting, "BMC", BMC)
 	return nil

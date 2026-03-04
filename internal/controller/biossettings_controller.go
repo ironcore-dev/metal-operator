@@ -1109,6 +1109,19 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		}
 	}
 
+	// Keep status consistent when retries are disabled.
+	if settings.Status.AutoRetryCountRemaining != nil &&
+		(*settings.Status.AutoRetryCountRemaining != 0 ||
+			settings.Status.ObservedGeneration != settings.Generation) {
+		settingsBase := settings.DeepCopy()
+		zero := int32(0)
+		settings.Status.AutoRetryCountRemaining = &zero
+		settings.Status.ObservedGeneration = settings.Generation
+		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for disabled auto-retry: %w", err)
+		}
+	}
+
 	log.V(1).Info("Failed to update BIOS settings", "Server", server.Name)
 
 	// Create maintenance object only if failure is due to pending settings and maintenance not already present

@@ -15,6 +15,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -892,7 +893,16 @@ var _ = Describe("BIOSSettings Controller", func() {
 				Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
 			}
 		}
-		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Eventually(func(g Gomega) int {
+			g.Expect(k8sClient.List(ctx, &serverMaintenanceList, client.InNamespace(ns.Name))).To(Succeed())
+			owned := 0
+			for i := range serverMaintenanceList.Items {
+				if metav1.IsControlledBy(&serverMaintenanceList.Items[i], biosSettings) {
+					owned++
+				}
+			}
+			return owned
+		}).Should(Equal(0))
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)

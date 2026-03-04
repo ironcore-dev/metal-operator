@@ -726,8 +726,8 @@ func (r *BMCSettingsReconciler) handleFailedState(
 			if err != nil {
 				return fmt.Errorf("failed to update retry condition for BMCSettings: %w", err)
 			}
-			bmcSetting.Status.Conditions = []metav1.Condition{*retryCondition}
 		}
+		bmcSetting.Status.Conditions = []metav1.Condition{*retryCondition}
 		if err := r.Status().Patch(ctx, bmcSetting, client.MergeFrom(bmcSettingsBase)); err != nil {
 			return fmt.Errorf("failed to patch BMCSettings status for retrying: %w", err)
 		}

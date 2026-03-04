@@ -456,8 +456,8 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 			if err != nil {
 				return true, fmt.Errorf("failed to update retry condition for BIOSVersion: %w", err)
 			}
-			biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
 		}
+		biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
 		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 			return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)
 		}

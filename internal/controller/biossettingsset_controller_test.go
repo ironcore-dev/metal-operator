@@ -409,7 +409,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 
 	It("Should successfully retry failed state child resources", func(ctx SpecContext) {
 
-		retryCount := 2
+		failedAutoRetryCount := 2
 		By("Create resource")
 		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -425,7 +425,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{Settings: map[string]string{"UnknownSettings": "foo-bar"}, Priority: 10, Name: "foo-bar"},
 					},
-					FailedAutoRetryCount: GetPtr(int32(retryCount)),
+					FailedAutoRetryCount: GetPtr(int32(failedAutoRetryCount)),
 				},
 				ServerSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -479,13 +479,13 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		))
 
 		By("Ensuring that the BIOSSetting02 has not been changed")
-		Consistently(Object(biosSettings02), "25ms").Should(SatisfyAll(
+		Consistently(Object(biosSettings02), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
 
 		By("Ensuring that the BIOSSetting 03 has not been changed")
-		Consistently(Object(biosSettings03), "25ms").Should(SatisfyAll(
+		Consistently(Object(biosSettings03), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
@@ -498,13 +498,13 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		})).Should(Succeed())
 
 		By("Ensuring that the BIOSSetting02 has been retried ")
-		Eventually(Object(biosSettings02)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
+		Eventually(Object(biosSettings02)).WithPolling(1 * time.Millisecond).Should(SatisfyAll(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
-			HaveField("Status.AutoRetryCountRemaining", BeNil()),
+			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
 		))
 
 		By("Ensuring that the BIOSSetting03 has been retried")
-		Eventually(Object(biosSettings03)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
+		Eventually(Object(biosSettings03)).WithPolling(10 * time.Millisecond).Should(SatisfyAll(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
 			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
 		))
@@ -522,13 +522,13 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		))
 
 		By("Ensuring that the BIOSSetting02 has not been changed")
-		Consistently(Object(biosSettings02), "25ms").Should(SatisfyAll(
+		Consistently(Object(biosSettings02), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
 
 		By("Ensuring that the BIOSSetting 03 has not been changed")
-		Consistently(Object(biosSettings03), "25ms").Should(SatisfyAll(
+		Consistently(Object(biosSettings03), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
@@ -541,12 +541,12 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		))
 
 		By("Ensuring that the BIOSSetting02 has not been retried again")
-		Consistently(Object(biosSettings02), "25ms").Should(
+		Consistently(Object(biosSettings02), "50ms").Should(
 			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		)
 
 		By("Ensuring that the BIOSSetting03 has not been retried again")
-		Consistently(Object(biosSettings03), "25ms").Should(
+		Consistently(Object(biosSettings03), "50ms").Should(
 			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		)
 

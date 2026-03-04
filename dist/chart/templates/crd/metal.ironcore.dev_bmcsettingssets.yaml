@@ -123,8 +123,8 @@ spec:
                 properties:
                   failedAutoRetryCount:
                     description: FailedAutoRetryCount is the number of times the controller
-                      should automatically retry the BMCSettings upgrade in case of
-                      failure before giving up.
+                      should automatically retry applying BMCSettings in case of failure
+                      before giving up.
                     format: int32
                     minimum: 0
                     type: integer

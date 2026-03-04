@@ -19,7 +19,7 @@ type BMCSettingsTemplate struct {
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
-	// FailedAutoRetryCount is the number of times the controller should automatically retry the BMCSettings upgrade in case of failure before giving up.
+	// FailedAutoRetryCount is the number of times the controller should automatically retry applying BMCSettings in case of failure before giving up.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
@@ -71,7 +71,7 @@ type BMCSettingsStatus struct {
 	// +optional
 	State BMCSettingsState `json:"state,omitempty"`
 
-	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry the BMCSettings upgrade in case of failure before giving up.
+	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry applying BMCSettings in case of failure before giving up.
 	// +optional
 	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
 

@@ -582,7 +582,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		bmcSetting := make(map[string]string)
 		bmcSetting["UnknownData"] = "145"
 
-		retryCount := 2
+		failedAutoRetryCount := 2
 
 		By("update the server state to Available  state")
 		Eventually(UpdateStatus(server, func() {
@@ -605,7 +605,7 @@ var _ = Describe("BMCSettings Controller", func() {
 					Version:                 "1.45.455b66-rev4",
 					SettingsMap:             bmcSetting,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
+					FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
 				}},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -626,7 +626,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		)
 
 		By("Ensuring that the BMC setting has not been changed")
-		Consistently(Object(bmcSettings), "25ms").Should(SatisfyAll(
+		Consistently(Object(bmcSettings), "250ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
@@ -637,7 +637,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
 		for _, maintenance := range serverMaintenanceList.Items {
-			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			if metav1.IsControlledBy(&maintenance, bmcSettings) {
+				Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			}
 		}
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),

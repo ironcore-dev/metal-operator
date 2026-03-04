@@ -71,7 +71,7 @@ spec:
             properties:
               failedAutoRetryCount:
                 description: FailedAutoRetryCount is the number of times the controller
-                  should automatically retry the BIOSVersion upgrade in case of failure
+                  should automatically retry applying BIOSVersion in case of failure
                   before giving up.
                 format: int32
                 minimum: 0
@@ -168,8 +168,8 @@ spec:
             properties:
               autoRetryCountRemaining:
                 description: AutoRetryCountRemaining is the number of remaining times
-                  the controller will automatically retry the BIOSVersion upgrade
-                  in case of failure before giving up.
+                  the controller will automatically retry applying BIOSVersion in
+                  case of failure before giving up.
                 format: int32
                 type: integer
               conditions:

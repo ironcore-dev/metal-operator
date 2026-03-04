@@ -834,7 +834,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		biosSetting := make(map[string]string)
 		biosSetting["UnknownData"] = "2"
 
-		retryCount := 2
+		failedAutoRetryCount := 2
 
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
@@ -854,7 +854,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 						Name:     "one",
 					}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
+					FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -877,7 +877,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 
 		By("Ensuring that the BIOS setting has not been changed")
-		Consistently(Object(biosSettings), "25ms").Should(SatisfyAll(
+		Consistently(Object(biosSettings), "250ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
@@ -888,7 +888,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
 		for _, maintenance := range serverMaintenanceList.Items {
-			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			if metav1.IsControlledBy(&maintenance, biosSettings) {
+				Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			}
 		}
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Eventually(Object(server)).Should(

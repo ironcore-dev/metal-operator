@@ -1050,8 +1050,8 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update retry condition for BIOSSettings: %w", err)
 			}
-			settings.Status.Conditions = []metav1.Condition{*retryCondition}
 		}
+		settings.Status.Conditions = []metav1.Condition{*retryCondition}
 
 		if err := r.Status().Patch(ctx, settings, client.MergeFrom(biosSettingsBase)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for retrying: %w", err)

@@ -382,7 +382,7 @@ var _ = Describe("BMCVersion Controller", func() {
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {
-		retryCount := 2
+		failedAutoRetryCount := 2
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
@@ -398,7 +398,7 @@ var _ = Describe("BMCVersion Controller", func() {
 					Version:                 upgradeServerBMCVersion + " fail",
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
+					FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
 				},
 			},
 		}
@@ -420,7 +420,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		)
 
 		By("Ensuring that the BIOS setting has not been changed")
-		Consistently(Object(bmcVersion), "25ms").Should(SatisfyAll(
+		Consistently(Object(bmcVersion), "250ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
@@ -431,7 +431,9 @@ var _ = Describe("BMCVersion Controller", func() {
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
 		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
 		for _, maintenance := range serverMaintenanceList.Items {
-			Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			if metav1.IsControlledBy(&maintenance, bmcVersion) {
+				Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			}
 		}
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable

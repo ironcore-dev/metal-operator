@@ -512,7 +512,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		It("Should successfully retry failed state child resources", func(ctx SpecContext) {
 
-			retryCount := 2
+			failedAutoRetryCount := 2
 			bmcSetting := make(map[string]string)
 			bmcSetting["UnknownSettings"] = changedBMCSetting
 
@@ -526,7 +526,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 						Version:                 "1.45.455b66-rev4",
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 						SettingsMap:             bmcSetting,
-						FailedAutoRetryCount:    GetPtr(int32(retryCount)),
+						FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -566,7 +566,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			))
 
 			By("Ensuring that the BMCSetting01 has not been changed")
-			Consistently(Object(bmcSettings01), "25ms").Should(SatisfyAll(
+			Consistently(Object(bmcSettings01), "50ms").Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
 				HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 			))
@@ -591,7 +591,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			))
 
 			By("Ensuring that the BMCSetting01 has not been changed")
-			Consistently(Object(bmcSettings01), "25ms").Should(SatisfyAll(
+			Consistently(Object(bmcSettings01), "50ms").Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
 				HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 			))
@@ -604,7 +604,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			))
 
 			By("Ensuring that the BMCSetting01 has not been retried again")
-			Consistently(Object(bmcSettings01), "25ms").Should(
+			Consistently(Object(bmcSettings01), "50ms").Should(
 				HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 			)
 

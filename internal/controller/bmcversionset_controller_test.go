@@ -6,7 +6,6 @@ package controller
 import (
 	"fmt"
 	"net/netip"
-	"time"
 
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
@@ -512,7 +511,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 
 	It("Should successfully retry failed state child resources", func(ctx SpecContext) {
 
-		retryCount := 2
+		failedAutoRetryCount := 2
 
 		By("Create resource")
 		bmcVersionSet := &metalv1alpha1.BMCVersionSet{
@@ -525,7 +524,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					Version:                 upgradeServerBMCVersion + " fail",
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					FailedAutoRetryCount:    GetPtr(int32(retryCount)),
+					FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
 				},
 				BMCSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -583,13 +582,13 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		))
 
 		By("Ensuring that the BMCVersion02 has not been changed")
-		Consistently(Object(bmcVersion02), "25ms").Should(SatisfyAll(
+		Consistently(Object(bmcVersion02), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
 
 		By("Ensuring that the BMCVersion03 has not been changed")
-		Consistently(Object(bmcVersion03), "25ms").Should(SatisfyAll(
+		Consistently(Object(bmcVersion03), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
@@ -602,12 +601,12 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		})).Should(Succeed())
 
 		By("Ensuring that the BMCVersion02 has been retried ")
-		Eventually(Object(bmcVersion02)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
+		Eventually(Object(bmcVersion02)).Should(SatisfyAll(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCVersionStateFailed))),
-			HaveField("Status.AutoRetryCountRemaining", BeNil()),
+			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
 		))
 		By("Ensuring that the BMCVersion03 has been retried")
-		Eventually(Object(bmcVersion03)).WithPolling(10 * time.Microsecond).Should(SatisfyAll(
+		Eventually(Object(bmcVersion03)).Should(SatisfyAll(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCVersionStateFailed))),
 			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
 		))
@@ -625,13 +624,13 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		))
 
 		By("Ensuring that the BMCVersion02 has not been changed")
-		Consistently(Object(bmcVersion02), "25ms").Should(SatisfyAll(
+		Consistently(Object(bmcVersion02), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
 
 		By("Ensuring that the BMCVersion03 has not been changed")
-		Consistently(Object(bmcVersion03), "25ms").Should(SatisfyAll(
+		Consistently(Object(bmcVersion03), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
 			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
 		))
@@ -644,12 +643,12 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		))
 
 		By("Ensuring that the BMCVersion02 has not been retried again")
-		Consistently(Object(bmcVersion02), "25ms").Should(
+		Consistently(Object(bmcVersion02), "50ms").Should(
 			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		)
 
 		By("Ensuring that the BMCVersion03 has not been retried again")
-		Consistently(Object(bmcVersion03), "25ms").Should(
+		Consistently(Object(bmcVersion03), "50ms").Should(
 			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		)
 

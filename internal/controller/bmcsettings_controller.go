@@ -24,7 +24,6 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/bmc/common"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/stmcginnis/gofish/schemas"
 )
@@ -448,7 +447,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(
 			resetBMCReq, err := bmcClient.CheckBMCAttributes(ctx, BMC.Spec.BMCUUID, settingsDiff)
 			if err != nil {
 				log.Error(err, "could not validate settings and determine if reboot needed")
-				var invalidSettingsErr *common.InvalidBMCSettingsError
+				var invalidSettingsErr *bmc.InvalidBMCSettingsError
 				if errors.As(err, &invalidSettingsErr) {
 					inValidSettings, errCond := GetCondition(r.Conditions, bmcSetting.Status.Conditions, BMCSettingsConditionWrongSettings)
 					if errCond != nil {

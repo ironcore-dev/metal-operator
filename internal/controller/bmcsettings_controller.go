@@ -493,7 +493,7 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(ctx context.Context, s
 		return r.updateBMCSettingsStatus(ctx, settings, "", nil)
 	}
 
-	log.V(1).Info("Done with BMC setting update", "BMCSetting", settings.Name, "BMC", bmcObj.Name)
+	log.V(1).Info("Done with BMC setting update", "BMCSettings", settings.Name, "BMC", bmcObj.Name)
 	return nil
 }
 
@@ -671,12 +671,15 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(ctx context.Context, s
 	notInMaintenanceState := make([]string, 0, len(servers))
 	for _, server := range servers {
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
-			serverMaintenanceRef := r.getServerMaintenanceRefForServer(settings.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.UID)
-			if server.Spec.ServerMaintenanceRef == nil || serverMaintenanceRef == nil {
+			if server.Spec.ServerMaintenanceRef == nil {
+				log.V(1).Info("Server is in maintenance but has no maintenance ref", "Server", server.Name)
+				notInMaintenanceState = append(notInMaintenanceState, server.Name)
+				continue
+			}
+			if serverMaintenanceRef := r.getServerMaintenanceRefForServer(settings.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.UID); serverMaintenanceRef == nil {
 				log.V(1).Info("Server is already in maintenance for other tasks",
 					"Server", server.Name,
 					"ServerMaintenanceRef", server.Spec.ServerMaintenanceRef,
-					"BMCSettingMaintenanceRef", serverMaintenanceRef,
 				)
 				notInMaintenanceState = append(notInMaintenanceState, server.Name)
 			}
@@ -1043,7 +1046,6 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByServerRefs(ctx context.Conte
 }
 
 func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCRefs(ctx context.Context, obj client.Object) []ctrl.Request {
-
 	log := ctrl.LoggerFrom(ctx)
 	bmcObj := obj.(*metalv1alpha1.BMC)
 	settingsList := &metalv1alpha1.BMCSettingsList{}
@@ -1052,16 +1054,19 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCRefs(ctx context.Context,
 		return nil
 	}
 
+	var requests []ctrl.Request
 	for _, settings := range settingsList.Items {
-		if settings.Spec.BMCRef != nil && settings.Spec.BMCRef.Name == bmcObj.Name {
-			if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied || settings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
-				return nil
-			}
-			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}}}
+		if settings.Spec.BMCRef == nil || settings.Spec.BMCRef.Name != bmcObj.Name {
+			continue
 		}
+		if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied || settings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
+			continue
+		}
+		requests = append(requests, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}})
 	}
-	return nil
+	return requests
 }
+
 func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 	BMCVersion := obj.(*metalv1alpha1.BMCVersion)
@@ -1075,15 +1080,17 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(ctx context.Conte
 		return nil
 	}
 
+	var requests []ctrl.Request
 	for _, settings := range BMCSettingsList.Items {
-		if settings.Spec.BMCRef != nil && settings.Spec.BMCRef.Name == BMCVersion.Spec.BMCRef.Name {
-			if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied || settings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
-				return nil
-			}
-			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}}}
+		if settings.Spec.BMCRef == nil || settings.Spec.BMCRef.Name != BMCVersion.Spec.BMCRef.Name {
+			continue
 		}
+		if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied || settings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
+			continue
+		}
+		requests = append(requests, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}})
 	}
-	return nil
+	return requests
 }
 
 // SetupWithManager sets up the controller with the Manager.

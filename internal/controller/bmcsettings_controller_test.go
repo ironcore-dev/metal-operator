@@ -99,7 +99,7 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	It("Should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
-		setting := make(map[string]string)
+		bmcSetting := make(map[string]string)
 
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
@@ -111,7 +111,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             setting,
+					SettingsMap:             bmcSetting,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}

@@ -951,7 +951,9 @@ func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenan
 }
 
 func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, BMCSettingsReference *corev1.LocalObjectReference) error {
-	if bmcObj.Spec.BMCSettingRef == BMCSettingsReference {
+	if (bmcObj.Spec.BMCSettingRef == nil && BMCSettingsReference == nil) ||
+		(bmcObj.Spec.BMCSettingRef != nil && BMCSettingsReference != nil &&
+			bmcObj.Spec.BMCSettingRef.Name == BMCSettingsReference.Name) {
 		return nil
 	}
 

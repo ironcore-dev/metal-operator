@@ -61,16 +61,16 @@ help: ## Display this help.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	"$(CONTROLLER_GEN)" rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
 generate: controller-gen goimports ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-	$(GOIMPORTS) -w .
+	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	"$(GOIMPORTS)" -w .
 
 .PHONY: fmt
 fmt: goimports ## Run goimports against code.
-	$(GOIMPORTS) -w .
+	"$(GOIMPORTS)" -w .
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -81,8 +81,8 @@ check-gen: generate manifests docs helm fmt ## Run code generation, manifests ge
 
 .PHONY: test-only
 test-only: setup-envtest ginkgo ## Run tests without generating manifests or code.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-	$(GINKGO) --fail-fast --cover --coverprofile=cover.out --skip-package=e2e ./...
+	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" \
+	"$(GINKGO)" --fail-fast --cover --coverprofile=cover.out --skip-package=e2e ./...
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest test-only ## Run tests.
@@ -125,15 +125,15 @@ stopbmc: ## Stop BMC emulator
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) run --max-same-issues=0
+	"$(GOLANGCI_LINT)" run --max-same-issues=0
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) run --fix
+	"$(GOLANGCI_LINT)" run --fix
 
 .PHONY: lint-config
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
-	$(GOLANGCI_LINT) config verify
+	"$(GOLANGCI_LINT)" config verify
 
 .PHONY: startdocs
 startdocs: ## Start the local mkdocs based development environment.
@@ -146,11 +146,11 @@ cleandocs: ## Remove all local mkdocs Docker images (cleanup).
 
 .PHONY: add-license
 add-license: addlicense ## Add license headers to all go files.
-	find . -name '*.go' -exec $(ADDLICENSE) -f hack/license-header.txt {} +
+	find . -name '*.go' -exec "$(ADDLICENSE)" -f hack/license-header.txt {} +
 
 .PHONY: check-license
 check-license: addlicense ## Check that every file has a license header present.
-	find . -name '*.go' -exec $(ADDLICENSE) -check -c 'IronCore authors' {} +
+	find . -name '*.go' -exec "$(ADDLICENSE)" -check -c 'IronCore authors' {} +
 
 .PHONY: check
 check: generate manifests add-license fmt lint test # Generate manifests, code, lint, add licenses, test
@@ -159,7 +159,7 @@ check: generate manifests add-license fmt lint test # Generate manifests, code, 
 
 .PHONY: docs
 docs: crd-ref-docs ## Run go generate to generate API reference documentation.
-	$(CRD_REF_DOCS) --source-path=./api/v1alpha1 --config=./hack/api-reference/config.yaml --renderer=markdown --output-path=./docs/api-reference/api.md
+	"$(CRD_REF_DOCS)" --source-path=./api/v1alpha1 --config=./hack/api-reference/config.yaml --renderer=markdown --output-path=./docs/api-reference/api.md
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
@@ -213,8 +213,8 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${CONTROLLER_IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
+	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${CONTROLLER_IMG}
+	"$(KUSTOMIZE)" build config/default > dist/install.yaml
 
 ##@ Deployment
 
@@ -224,29 +224,29 @@ endif
 
 .PHONY: install
 install: manifests kustomize kubectl ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+	"$(KUSTOMIZE)" build config/crd | "$(KUBECTL)" apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	"$(KUSTOMIZE)" build config/crd | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${CONTROLLER_IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${CONTROLLER_IMG}
+	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" apply -f -
 
 .PHONY: e2e-deploy
 e2e-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${CONTROLLER_IMG}
-	$(KUSTOMIZE) build config/e2e-metrics-validation | $(KUBECTL) apply -f -
+	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${CONTROLLER_IMG}
+	"$(KUSTOMIZE)" build config/e2e-metrics-validation | "$(KUBECTL)" apply -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: helm
 helm: manifests kubebuilder
-	$(KUBEBUILDER) edit --plugins=helm/v1-alpha
+	"$(KUBEBUILDER)" edit --plugins=helm/v1-alpha
 
 ##@ Dependencies
 
@@ -279,10 +279,10 @@ CONTROLLER_TOOLS_VERSION ?= v0.20.1
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d.%d",$$3, $$2}')
-GOLANGCI_LINT_VERSION ?= v2.8.0
+GOLANGCI_LINT_VERSION ?= v2.10
 GOIMPORTS_VERSION ?= v0.38.0
 CRD_REF_DOCS_VERSION ?= v0.2.0
-KUBEBUILDER_VERSION ?= v4.11.1
+KUBEBUILDER_VERSION ?= v4.13.0
 ADDLICENSE_VERSION ?= v1.1.1
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 

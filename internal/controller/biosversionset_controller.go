@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,8 @@ const BIOSVersionSetFinalizer = "metal.ironcore.dev/biosversionset"
 // BIOSVersionSetReconciler reconciles a BIOSVersionSet object
 type BIOSVersionSetReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	ResyncInterval time.Duration
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversionsets,verbs=get;list;watch;create;update;patch;delete
@@ -161,7 +163,8 @@ func (r *BIOSVersionSetReconciler) reconcile(ctx context.Context, versionSet *me
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSVersions: %w", err)
 	}
 
-	if err := r.patchBIOSVersionFromTemplate(ctx, &versionSet.Spec.BIOSVersionTemplate, versions); err != nil {
+	var pendingPatchingVersion bool
+	if pendingPatchingVersion, err = r.patchBIOSVersionFromTemplate(ctx, &versionSet.Spec.BIOSVersionTemplate, versions); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BIOSVersion spec from template: %w", err)
 	}
 
@@ -176,6 +179,11 @@ func (r *BIOSVersionSetReconciler) reconcile(ctx context.Context, versionSet *me
 
 	if err := r.handleRetryAnnotationPropagation(ctx, versionSet); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if status.FullyLabeledServers != status.AvailableBIOSVersion || pendingPatchingVersion {
+		log.V(1).Info("Waiting for all BIOSVersion to be created/Patched for the labeled Servers", "Status", status)
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 
 	log.V(1).Info("Reconciled BIOSVersionSet")
@@ -243,16 +251,18 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(ctx context.Context,
 	return errors.Join(errs...)
 }
 
-func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Context, template *metalv1alpha1.BIOSVersionTemplate, versions *metalv1alpha1.BIOSVersionList) error {
+func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Context, template *metalv1alpha1.BIOSVersionTemplate, versions *metalv1alpha1.BIOSVersionList) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if len(versions.Items) == 0 {
 		log.V(1).Info("No BIOSVersion found, skipping spec template update")
-		return nil
+		return false, nil
 	}
 
+	var pendingPatchingVersion bool
 	var errs []error
 	for _, version := range versions.Items {
 		if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+			pendingPatchingVersion = true
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &version, func() error {
@@ -266,7 +276,7 @@ func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Cont
 			log.V(1).Info("Patched BIOSVersion with updated spec", "BIOSVersion", version.Name, "Operation", opResult)
 		}
 	}
-	return errors.Join(errs...)
+	return pendingPatchingVersion, errors.Join(errs...)
 }
 
 func (r *BIOSVersionSetReconciler) getOwnedBIOSVersionSetStatus(versionList *metalv1alpha1.BIOSVersionList) *metalv1alpha1.BIOSVersionSetStatus {

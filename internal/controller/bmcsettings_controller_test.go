@@ -233,8 +233,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		bmcSetting := make(map[string]string)
 		bmcSetting["abc"] = "changed-to-req-server-maintenance-through-ownerapproved"
 
-		// put server in reserved state. and create a bmc setting in owner approved which needs reboot.
-		// this is needed to check the states traversed.
+		// Put server in reserved state and create a BMC setting with OwnerApproved policy that needs reboot
 		By("Creating an Ignition secret")
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -361,14 +360,14 @@ var _ = Describe("BMCSettings Controller", func() {
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"
 
-		By("update the server state to Available  state")
+		By("Updating the server state to Available")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 		})).Should(Succeed())
 
 		By("Creating a BMCSetting")
-		BMCSettings := &metalv1alpha1.BMCSettings{
+		bmcSettings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
@@ -381,41 +380,33 @@ var _ = Describe("BMCSettings Controller", func() {
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
-		Expect(k8sClient.Create(ctx, BMCSettings)).To(Succeed())
+		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
 
 		By("Ensuring that the BMC has the correct BMC settings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", BMCSettings.Name),
+			HaveField("Spec.BMCSettingRef.Name", bmcSettings.Name),
 		))
 
-		By("Ensuring that the BMCSettings resource state is correct State inVersionUpgrade")
-		Eventually(Object(BMCSettings)).Should(SatisfyAny(
+		By("Ensuring that the BMCSettings resource state is Pending while waiting for version upgrade")
+		Eventually(Object(bmcSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStatePending),
-			HaveField("Status.Conditions", Not(ContainElement(SatisfyAll(
-				HaveField("Type", BMCVersionUpdatePendingCondition),
-				HaveField("Status", metav1.ConditionTrue),
-			)))),
-		))
+		)
 
 		By("Ensuring that the serverMaintenance not ref. while waiting for upgrade")
-		Consistently(Object(BMCSettings)).Should(SatisfyAll(
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		))
 
 		By("Simulate the server BMCSettings version update by matching the spec version")
-		Eventually(Update(BMCSettings, func() {
-			BMCSettings.Spec.Version = "1.45.455b66-rev4"
+		Eventually(Update(bmcSettings, func() {
+			bmcSettings.Spec.Version = "1.45.455b66-rev4"
 		})).Should(Succeed())
 
-		By("Ensuring that the BMCSettings resource has completed Upgrade and setting update, and moved the state")
-		Eventually(Object(BMCSettings)).Should(SatisfyAny(
+		By("Ensuring that the BMCSettings resource has completed upgrade and moved to InProgress")
+		Eventually(Object(bmcSettings)).Should(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
-			HaveField("Status.Conditions", Not(ContainElement(SatisfyAll(
-				HaveField("Type", BMCVersionUpdatePendingCondition),
-				HaveField("Status", metav1.ConditionFalse),
-			)))),
-		))
+		)
 
 		By("Ensuring that the Maintenance resource has been created")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
@@ -430,27 +421,27 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Get(serverMaintenance)).Should(Succeed())
 
 		By("Ensuring that the BMCSettings resource has moved to next state")
-		Eventually(Object(BMCSettings)).Should(SatisfyAny(
+		Eventually(Object(bmcSettings)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
-		Eventually(Object(BMCSettings)).Should(SatisfyAll(
+		Eventually(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
 		By("Ensuring that the Maintenance resource has been deleted")
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
-		Consistently(Object(BMCSettings)).Should(SatisfyAll(
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
 		))
 
 		By("Deleting the BMCSetting resource")
-		Expect(k8sClient.Delete(ctx, BMCSettings)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
 
 		By("Ensuring that the BMCSettings resource is removed")
-		Eventually(Get(BMCSettings)).Should(Satisfy(apierrors.IsNotFound))
-		Consistently(Get(BMCSettings)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(bmcSettings)).Should(Satisfy(apierrors.IsNotFound))
+		Consistently(Get(bmcSettings)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Ensuring that the Server BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
@@ -463,12 +454,11 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	It("Should allow retry using annotation", func(ctx SpecContext) {
-		// settings which does not reboot. mocked at
-		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
+		// Settings that do not require reboot (mocked in bmc/redfish_local.go)
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"
 
-		By("update the server state to Available  state")
+		By("Updating the server state to Available")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
@@ -521,12 +511,11 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	It("Should replace missing BMCSettings ref in server", func(ctx SpecContext) {
-		// settings which does not reboot. mocked at
-		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
+		// Settings that do not require reboot (mocked in bmc/redfish_local.go)
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"
 
-		By("update the server state to Available  state")
+		By("Updating the server state to Available")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
@@ -553,9 +542,8 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Spec.BMCSettingRef", Not(BeNil())),
 			HaveField("Spec.BMCSettingRef.Name", bmcSettings.Name),
 		))
-		// delete the old settings
 		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
-		By("force deletion of the object by removing finalizers")
+		By("Forcing deletion of the object by removing finalizers")
 		Eventually(func() error {
 			err := Update(bmcSettings, func() {
 				bmcSettings.Finalizers = []string{}

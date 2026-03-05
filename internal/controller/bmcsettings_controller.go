@@ -46,6 +46,7 @@ const (
 	BMCPoweredOffReason               = "PoweredOff"
 	BMCVersionUpdatePendingCondition  = "VersionUpdatePending"
 	BMCVersionUpgradePendingReason    = "VersionUpgradePending"
+	BMCVersionMatchingReason          = "VersionMatching"
 
 	BMCSettingsChangesIssuedCondition      = "ChangesIssued"
 	BMCSettingsChangesIssuedReason         = "ChangesIssued"
@@ -119,7 +120,7 @@ func (r *BMCSettingsReconciler) delete(ctx context.Context, settings *metalv1alp
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("BMCSetting is deleted")
+	log.V(1).Info("Deleted BMCSettings")
 	return ctrl.Result{}, nil
 }
 
@@ -274,7 +275,7 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(ctx 
 			if err := r.Conditions.Update(
 				versionCheckCondition,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason("VersionMatching"),
+				conditionutils.UpdateReason(BMCVersionMatchingReason),
 				conditionutils.UpdateMessage(fmt.Sprintf("BMCVersion matches: %v", settings.Spec.Version)),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
@@ -594,7 +595,7 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 		return nil
 	}
 	// TODO: Revisit this logic to either create maintenance if not present or put server in Error state on failed BMC settings maintenance
-	log.V(1).Info("Failed to update BMC setting", "settings", settings.Name, "BMC", bmcObj.Name)
+	log.V(1).Info("Failed to update BMCSettings", "BMC", bmcObj.Name)
 	return nil
 }
 

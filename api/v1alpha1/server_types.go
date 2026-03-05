@@ -128,6 +128,10 @@ type ServerSpec struct {
 	// the BIOS configuration for this server.
 	// +optional
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
+
+	// Taints is a list of taints that affect this server.
+	// +optional
+	Taints []v1.Taint `json:"taints,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -145,6 +149,10 @@ const (
 
 	// ServerStateReserved indicates that the server is reserved for a specific use or user.
 	ServerStateReserved ServerState = "Reserved"
+
+	// ServerStateTainted indicates that the server is tainted and requires cleaning
+	// before transitioning back to Available.
+	ServerStateTainted ServerState = "Tainted"
 
 	// ServerStateError indicates that there is an error with the server.
 	ServerStateError ServerState = "Error"

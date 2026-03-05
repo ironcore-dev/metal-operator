@@ -1,0 +1,58 @@
+# Example 1: Cleaning a single server using serverRef
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerCleaning
+metadata:
+  name: servercleaning-single-server
+  namespace: default
+spec:
+  serverRef:
+    name: server-sample
+  diskWipe:
+    method: secure
+    includeBootDrives: true
+  bmcReset: true
+  biosReset: true
+  networkCleanup: true
+  serverBootConfigurationTemplate:
+    name: cleaning-boot-config
+    spec:
+      serverRef:
+        name: server-sample
+      image: "ghcr.io/ironcore-dev/metal-operator/cleaning-agent:latest"
+      ignitionSecretRef:
+        name: cleaning-ignition-secret
+---
+# Example 2: Cleaning multiple servers using serverSelector
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerCleaning
+metadata:
+  name: servercleaning-multi-server
+  namespace: default
+spec:
+  serverSelector:
+    matchLabels:
+      environment: staging
+      cleanup-required: "true"
+  diskWipe:
+    method: quick
+    includeBootDrives: false
+  bmcReset: false
+  biosReset: false
+  networkCleanup: true
+---
+# Example 3: DoD-compliant cleaning for multiple decommissioned servers
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerCleaning
+metadata:
+  name: servercleaning-decommission
+  namespace: default
+spec:
+  serverSelector:
+    matchLabels:
+      status: decommissioned
+  diskWipe:
+    method: dod
+    includeBootDrives: true
+  bmcReset: true
+  biosReset: true
+  networkCleanup: true

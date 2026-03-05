@@ -815,7 +815,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		Expect(capturedManufacturer).NotTo(BeEmpty())
 		Expect(capturedUsername).To(Equal("foo"))
 		Expect(capturedPassword).To(Equal("bar"))
-		Expect(capturedTimeout).To(Equal(2 * time.Minute))
+		Expect(capturedTimeout).To(Equal(1 * time.Second))
 		mu.Unlock()
 
 		// Verify Reset condition was created
@@ -868,7 +868,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		Eventually(Object(bmc)).Should(HaveField("Status.State", metalv1alpha1.BMCStatePending))
 
 		// Wait for SSH reset to be attempted and fail
-		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+		Eventually(Object(bmc), 2*time.Second).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
 			HaveField("Type", "Reset"),
 			HaveField("Status", metav1.ConditionFalse),
 			HaveField("Reason", "InternalServerError"),

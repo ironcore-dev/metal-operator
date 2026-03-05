@@ -687,12 +687,15 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(ctx context.Context, s
 	notInMaintenanceState := make([]string, 0, len(servers))
 	for _, server := range servers {
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
-			serverMaintenanceRef := r.getServerMaintenanceRefForServer(settings.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.Name, server.Spec.ServerMaintenanceRef.Namespace)
-			if server.Spec.ServerMaintenanceRef == nil || serverMaintenanceRef == nil {
+			if server.Spec.ServerMaintenanceRef == nil {
+				log.V(1).Info("Server is in maintenance but has no maintenance ref", "Server", server.Name)
+				notInMaintenanceState = append(notInMaintenanceState, server.Name)
+				continue
+			}
+			if serverMaintenanceRef := r.getServerMaintenanceRefForServer(settings.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.Name, server.Spec.ServerMaintenanceRef.Namespace); serverMaintenanceRef == nil {
 				log.V(1).Info("Server is already in maintenance for other tasks",
 					"Server", server.Name,
 					"ServerMaintenanceRef", server.Spec.ServerMaintenanceRef,
-					"BMCSettingMaintenanceRef", serverMaintenanceRef,
 				)
 				notInMaintenanceState = append(notInMaintenanceState, server.Name)
 			}

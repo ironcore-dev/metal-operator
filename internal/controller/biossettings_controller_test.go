@@ -742,7 +742,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		)
 
-		By("Creating a BMCSetting")
+		By("Creating a BIOSSettings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,

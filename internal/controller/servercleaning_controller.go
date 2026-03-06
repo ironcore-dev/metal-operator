@@ -630,13 +630,22 @@ func (r *ServerCleaningReconciler) monitorBMCTasks(ctx context.Context, cleaning
 		}
 
 		// Update task information
+		percentComplete := 0
+		if status.PercentComplete != nil {
+			percentComplete = int(*status.PercentComplete)
+		}
+		message := ""
+		if len(status.Messages) > 0 {
+			message = status.Messages[0].Message
+		}
+
 		updatedTask := metalv1alpha1.CleaningTaskStatus{
 			TaskURI:         task.TaskURI,
 			TaskType:        task.TaskType,
 			TargetID:        task.TargetID,
-			State:           status.State,
-			PercentComplete: status.PercentComplete,
-			Message:         status.Message,
+			State:           string(status.TaskState),
+			PercentComplete: percentComplete,
+			Message:         message,
 			LastUpdateTime:  metav1.Now(),
 		}
 		updatedTasks = append(updatedTasks, updatedTask)
@@ -644,15 +653,16 @@ func (r *ServerCleaningReconciler) monitorBMCTasks(ctx context.Context, cleaning
 		log.V(1).Info("Task status updated",
 			"server", server.Name,
 			"taskType", task.TaskType,
-			"state", status.State,
-			"percentComplete", status.PercentComplete)
+			"state", status.TaskState,
+			"percentComplete", percentComplete)
 
 		// Check if task is still running
-		if status.State != taskStateCompleted && status.State != taskStateException && status.State != taskStateCancelled && status.State != taskStateKilled {
+		taskState := string(status.TaskState)
+		if taskState != taskStateCompleted && taskState != taskStateException && taskState != taskStateCancelled && taskState != taskStateKilled {
 			allComplete = false
 		}
 
-		if status.State == taskStateException || status.State == taskStateCancelled || status.State == taskStateKilled {
+		if taskState == taskStateException || taskState == taskStateCancelled || taskState == taskStateKilled {
 			anyFailed = true
 		}
 	}

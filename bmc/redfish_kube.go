@@ -462,27 +462,22 @@ func (r *RedfishKubeBMC) createJob(
 	return nil
 }
 
-// EraseDisk delegates to the underlying RedfishBMC
+// EraseDisk delegates to the underlying RedfishBaseBMC
 func (r *RedfishKubeBMC) EraseDisk(ctx context.Context, systemURI string, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
-	return r.RedfishBMC.EraseDisk(ctx, systemURI, method)
+	return r.RedfishBaseBMC.EraseDisk(ctx, systemURI, method)
 }
 
-// ResetBIOSToDefaults delegates to the underlying RedfishBMC
+// ResetBIOSToDefaults delegates to the underlying RedfishBaseBMC
 func (r *RedfishKubeBMC) ResetBIOSToDefaults(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
-	return r.RedfishBMC.ResetBIOSToDefaults(ctx, systemURI)
+	return r.RedfishBaseBMC.ResetBIOSToDefaults(ctx, systemURI)
 }
 
-// ResetBMCToDefaults delegates to the underlying RedfishBMC
+// ResetBMCToDefaults delegates to the underlying RedfishBaseBMC
 func (r *RedfishKubeBMC) ResetBMCToDefaults(ctx context.Context, managerUUID string) (*CleaningTaskInfo, error) {
-	return r.RedfishBMC.ResetBMCToDefaults(ctx, managerUUID)
+	return r.RedfishBaseBMC.ResetBMCToDefaults(ctx, managerUUID)
 }
 
-// ClearNetworkConfiguration delegates to the underlying RedfishBMC
+// ClearNetworkConfiguration delegates to the underlying RedfishBaseBMC
 func (r *RedfishKubeBMC) ClearNetworkConfiguration(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
-	return r.RedfishBMC.ClearNetworkConfiguration(ctx, systemURI)
-}
-
-// GetTaskStatus delegates to the underlying RedfishBMC
-func (r *RedfishKubeBMC) GetTaskStatus(ctx context.Context, taskURI string) (*CleaningTaskStatus, error) {
-	return r.RedfishBMC.GetTaskStatus(ctx, taskURI)
+	return r.RedfishBaseBMC.ClearNetworkConfiguration(ctx, systemURI)
 }

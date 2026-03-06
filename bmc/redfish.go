@@ -1000,7 +1000,7 @@ func shuffleRunes(a []rune) error {
 }
 
 // extractTaskURIFromResponse extracts the task URI from HTTP response headers or body
-func (r *RedfishBMC) extractTaskURIFromResponse(resp *http.Response) string {
+func (r *RedfishBaseBMC) extractTaskURIFromResponse(resp *http.Response) string {
 	// Check Location header (standard Redfish async response)
 	if location := resp.Header.Get("Location"); location != "" {
 		return location
@@ -1022,56 +1022,9 @@ func (r *RedfishBMC) extractTaskURIFromResponse(resp *http.Response) string {
 	return ""
 }
 
-// GetTaskStatus retrieves the status of a task by its URI
-func (r *RedfishBMC) GetTaskStatus(ctx context.Context, taskURI string) (*CleaningTaskStatus, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	resp, err := r.client.GetService().GetClient().Get(taskURI)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get task status from %s: %w", taskURI, err)
-	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close body")
-		}
-	}(resp.Body)
-
-	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("failed to get task status, status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read task response: %w", err)
-	}
-
-	var task schemas.Task
-	if err := json.Unmarshal(body, &task); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal task: %w", err)
-	}
-
-	percentComplete := 0
-	if task.PercentComplete != nil {
-		percentComplete = int(*task.PercentComplete)
-	}
-
-	status := &CleaningTaskStatus{
-		TaskURI:         taskURI,
-		State:           string(task.TaskState),
-		PercentComplete: percentComplete,
-	}
-
-	// Extract message from task messages
-	if len(task.Messages) > 0 {
-		status.Message = task.Messages[0].Message
-	}
-
-	return status, nil
-}
-
 // EraseDisk initiates disk erasing operation via Redfish.
 // This implementation uses vendor-specific OEM extensions when available.
-func (r *RedfishBMC) EraseDisk(ctx context.Context, systemURI string, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) EraseDisk(ctx context.Context, systemURI string, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Erasing disks", "systemURI", systemURI, "method", method)
 
@@ -1109,7 +1062,7 @@ func (r *RedfishBMC) EraseDisk(ctx context.Context, systemURI string, method Dis
 }
 
 // wipeDiskDell performs disk wiping for Dell servers using iDRAC OEM extensions
-func (r *RedfishBMC) wipeDiskDell(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) wipeDiskDell(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	var tasks []CleaningTaskInfo
 
@@ -1180,7 +1133,7 @@ func getDellWipePasses(method DiskWipeMethod) int {
 }
 
 // wipeDiskHPE performs disk wiping for HPE servers using iLO OEM extensions
-func (r *RedfishBMC) wipeDiskHPE(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) wipeDiskHPE(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	var tasks []CleaningTaskInfo
 
@@ -1250,7 +1203,7 @@ func getHPEWipeType(method DiskWipeMethod) string {
 }
 
 // wipeDiskLenovo performs disk wiping for Lenovo servers using XClarity OEM extensions
-func (r *RedfishBMC) wipeDiskLenovo(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) wipeDiskLenovo(ctx context.Context, storages []*schemas.Storage, method DiskWipeMethod) ([]CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	var tasks []CleaningTaskInfo
 
@@ -1320,7 +1273,7 @@ func getLenovoWipeMethod(method DiskWipeMethod) string {
 }
 
 // wipeDiskGeneric performs generic Redfish disk wiping for unsupported vendors
-func (r *RedfishBMC) wipeDiskGeneric(ctx context.Context, storages []*schemas.Storage, _ DiskWipeMethod) ([]CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) wipeDiskGeneric(ctx context.Context, storages []*schemas.Storage, _ DiskWipeMethod) ([]CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Using generic Redfish disk wipe")
 	var tasks []CleaningTaskInfo
@@ -1375,7 +1328,7 @@ func (r *RedfishBMC) wipeDiskGeneric(ctx context.Context, storages []*schemas.St
 }
 
 // ResetBIOSToDefaults resets BIOS configuration to factory defaults
-func (r *RedfishBMC) ResetBIOSToDefaults(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) ResetBIOSToDefaults(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Resetting BIOS to defaults", "systemURI", systemURI)
 
@@ -1411,7 +1364,7 @@ func (r *RedfishBMC) ResetBIOSToDefaults(ctx context.Context, systemURI string) 
 	}
 }
 
-func (r *RedfishBMC) resetBIOSDell(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBIOSDell(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Dell iDRAC: POST to /redfish/v1/Systems/{id}/Bios/Actions/Bios.ResetBios
@@ -1445,7 +1398,7 @@ func (r *RedfishBMC) resetBIOSDell(ctx context.Context, biosURI string) (*Cleani
 	return nil, nil
 }
 
-func (r *RedfishBMC) resetBIOSHPE(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBIOSHPE(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// HPE iLO: Use ChangePassword action with default parameters
@@ -1480,7 +1433,7 @@ func (r *RedfishBMC) resetBIOSHPE(ctx context.Context, biosURI string) (*Cleanin
 	return nil, nil
 }
 
-func (r *RedfishBMC) resetBIOSLenovo(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBIOSLenovo(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Lenovo XClarity: POST to reset action
@@ -1514,7 +1467,7 @@ func (r *RedfishBMC) resetBIOSLenovo(ctx context.Context, biosURI string) (*Clea
 	return nil, nil
 }
 
-func (r *RedfishBMC) resetBIOSGeneric(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBIOSGeneric(ctx context.Context, biosURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Generic Redfish: Try standard ResetBios action
@@ -1549,7 +1502,7 @@ func (r *RedfishBMC) resetBIOSGeneric(ctx context.Context, biosURI string) (*Cle
 }
 
 // ResetBMCToDefaults resets BMC configuration to factory defaults
-func (r *RedfishBMC) ResetBMCToDefaults(ctx context.Context, managerUUID string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) ResetBMCToDefaults(ctx context.Context, managerUUID string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Resetting BMC to defaults", "managerUUID", managerUUID)
 
@@ -1574,7 +1527,7 @@ func (r *RedfishBMC) ResetBMCToDefaults(ctx context.Context, managerUUID string)
 	}
 }
 
-func (r *RedfishBMC) resetBMCDell(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBMCDell(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Dell iDRAC: Use OEM action to reset to defaults
@@ -1613,7 +1566,7 @@ func (r *RedfishBMC) resetBMCDell(ctx context.Context, manager *schemas.Manager)
 	return nil, nil
 }
 
-func (r *RedfishBMC) resetBMCHPE(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBMCHPE(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// HPE iLO: Use OEM action to reset to factory defaults
@@ -1652,7 +1605,7 @@ func (r *RedfishBMC) resetBMCHPE(ctx context.Context, manager *schemas.Manager) 
 	return nil, nil
 }
 
-func (r *RedfishBMC) resetBMCLenovo(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBMCLenovo(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Lenovo XClarity: Use OEM action to reset to factory defaults
@@ -1691,7 +1644,7 @@ func (r *RedfishBMC) resetBMCLenovo(ctx context.Context, manager *schemas.Manage
 	return nil, nil
 }
 
-func (r *RedfishBMC) resetBMCGeneric(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) resetBMCGeneric(ctx context.Context, manager *schemas.Manager) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Generic Redfish: Try standard ResetToDefaults action
@@ -1730,7 +1683,7 @@ func (r *RedfishBMC) resetBMCGeneric(ctx context.Context, manager *schemas.Manag
 }
 
 // ClearNetworkConfiguration clears network configuration settings
-func (r *RedfishBMC) ClearNetworkConfiguration(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) ClearNetworkConfiguration(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Clearing network configuration", "systemURI", systemURI)
 
@@ -1755,7 +1708,7 @@ func (r *RedfishBMC) ClearNetworkConfiguration(ctx context.Context, systemURI st
 	}
 }
 
-func (r *RedfishBMC) clearNetworkConfigDell(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) clearNetworkConfigDell(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Dell: Clear network adapters configuration via OEM extensions
@@ -1794,7 +1747,7 @@ func (r *RedfishBMC) clearNetworkConfigDell(ctx context.Context, systemURI strin
 	return nil, nil
 }
 
-func (r *RedfishBMC) clearNetworkConfigHPE(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) clearNetworkConfigHPE(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// HPE: Clear network adapters configuration
@@ -1831,7 +1784,7 @@ func (r *RedfishBMC) clearNetworkConfigHPE(ctx context.Context, systemURI string
 	return nil, nil
 }
 
-func (r *RedfishBMC) clearNetworkConfigLenovo(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) clearNetworkConfigLenovo(ctx context.Context, systemURI string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Lenovo: Clear network adapters configuration
@@ -1868,7 +1821,7 @@ func (r *RedfishBMC) clearNetworkConfigLenovo(ctx context.Context, systemURI str
 	return nil, nil
 }
 
-func (r *RedfishBMC) clearNetworkConfigGeneric(ctx context.Context, _ string) (*CleaningTaskInfo, error) {
+func (r *RedfishBaseBMC) clearNetworkConfigGeneric(ctx context.Context, _ string) (*CleaningTaskInfo, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Network configuration clearing not supported for this vendor (generic)")
 	// For generic vendors, this operation is optional and non-critical

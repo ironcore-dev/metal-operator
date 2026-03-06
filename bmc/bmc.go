@@ -189,9 +189,6 @@ type BMC interface {
 
 	// ClearNetworkConfiguration clears network configuration settings. Returns task URI if operation is async.
 	ClearNetworkConfiguration(ctx context.Context, systemURI string) (*CleaningTaskInfo, error)
-
-	// GetTaskStatus retrieves the status of a task by its URI.
-	GetTaskStatus(ctx context.Context, taskURI string) (*CleaningTaskStatus, error)
 }
 
 type Entity struct {

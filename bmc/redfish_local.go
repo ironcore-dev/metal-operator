@@ -301,14 +301,16 @@ func (r *RedfishLocalBMC) ClearNetworkConfiguration(ctx context.Context, systemU
 }
 
 // GetTaskStatus simulates task status retrieval for testing
-func (r *RedfishLocalBMC) GetTaskStatus(ctx context.Context, taskURI string) (*CleaningTaskStatus, error) {
+func (r *RedfishLocalBMC) GetTaskStatus(ctx context.Context, taskURI string) (*schemas.Task, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Simulating task status check", "taskURI", taskURI)
 	// Mock implementation - returns completed status
-	return &CleaningTaskStatus{
-		TaskURI:         taskURI,
-		State:           "Completed",
-		PercentComplete: 100,
-		Message:         "Mock task completed",
+	percentComplete := uint(100)
+	return &schemas.Task{
+		TaskState:       schemas.CompletedTaskState,
+		PercentComplete: &percentComplete,
+		Messages: []schemas.Message{
+			{Message: "Mock task completed"},
+		},
 	}, nil
 }

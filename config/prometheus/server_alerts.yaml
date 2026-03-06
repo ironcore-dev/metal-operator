@@ -11,11 +11,11 @@ spec:
     interval: 30s
     rules:
     - alert: NoAvailableServers
-      expr: sum(metal_server_state{state="Available"} or on() vector(0)) < 1
+      expr: sum(metal_server_state{state="Available"} or on() vector(0)) < 1 AND sum(metal_server_state{state="Reserved"} or on() vector(0)) == 0
       for: 5m
       annotations:
-        summary: "No available servers in the fleet"
-        description: "All servers are either Reserved, in Maintenance, or in Error state"
+        summary: "No available or reserved servers in the fleet"
+        description: "The fleet is completely idle with no servers in Available or Reserved state"
       labels:
         severity: warning
 
@@ -65,7 +65,7 @@ spec:
         severity: warning
 
     - alert: ServerMetricsMissing
-      expr: absent(metal_server_state{state="Available"})
+      expr: absent(metal_server_state)
       for: 5m
       annotations:
         summary: "Server metrics are not being collected"

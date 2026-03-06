@@ -345,10 +345,3 @@ If Prometheus shows cardinality warnings for metal-operator metrics:
 1. Verify no custom labels were added
 2. Check for metric label explosion (should never happen with current implementation)
 3. Review Prometheus storage settings if total metrics exceed capacity
-
-## References
-
-- [Prometheus Best Practices](https://prometheus.io/docs/practices/naming/)
-- [Kubernetes Monitoring Guide](https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/)
-- [Prometheus Operator Documentation](https://prometheus-operator.dev/)
-- [Controller-Runtime Metrics](https://book.kubebuilder.io/reference/metrics.html)

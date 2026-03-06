@@ -4,7 +4,6 @@
 package metrics_test
 
 import (
-	"context"
 	"testing"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -13,6 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	prometheus_io "github.com/prometheus/client_model/go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -90,9 +90,7 @@ var _ = Describe("ServerStateCollector", func() {
 		Expect(count).To(Equal(0))
 	})
 
-	It("should count servers by state", func() {
-		ctx := context.Background()
-
+	It("should count servers by state", func(ctx SpecContext) {
 		// Create servers in different states
 		servers := []metalv1alpha1.Server{
 			{
@@ -121,18 +119,27 @@ var _ = Describe("ServerStateCollector", func() {
 		collector.Collect(ch)
 		close(ch)
 
-		// Verify metrics were emitted
-		metricCount := 0
-		for range ch {
-			metricCount++
+		// Parse metrics and verify exact counts
+		metrics := make(map[string]float64)
+		for metric := range ch {
+			var m = metric
+			dto := &prometheus_io.Metric{}
+			Expect(m.Write(dto)).To(Succeed())
+
+			if dto.GetGauge() != nil && len(dto.GetLabel()) > 0 {
+				label := dto.GetLabel()[0]
+				if label.GetName() == "state" {
+					metrics[label.GetValue()] = dto.GetGauge().GetValue()
+				}
+			}
 		}
 
-		Expect(metricCount).To(BeNumerically(">", 0))
+		// Assert exact label/value pairs
+		Expect(metrics["Available"]).To(Equal(2.0), "Expected 2 Available servers")
+		Expect(metrics["Reserved"]).To(Equal(1.0), "Expected 1 Reserved server")
 	})
 
-	It("should count servers by power state", func() {
-		ctx := context.Background()
-
+	It("should count servers by power state", func(ctx SpecContext) {
 		// Create servers with different power states
 		servers := []metalv1alpha1.Server{
 			{
@@ -170,18 +177,27 @@ var _ = Describe("ServerStateCollector", func() {
 		collector.Collect(ch)
 		close(ch)
 
-		// Verify metrics were emitted
-		metricCount := 0
-		for range ch {
-			metricCount++
+		// Parse metrics and verify exact counts
+		metrics := make(map[string]float64)
+		for metric := range ch {
+			var m = metric
+			dto := &prometheus_io.Metric{}
+			Expect(m.Write(dto)).To(Succeed())
+
+			if dto.GetGauge() != nil && len(dto.GetLabel()) > 0 {
+				label := dto.GetLabel()[0]
+				if label.GetName() == "power_state" {
+					metrics[label.GetValue()] = dto.GetGauge().GetValue()
+				}
+			}
 		}
 
-		Expect(metricCount).To(BeNumerically(">", 0))
+		// Assert exact label/value pairs
+		Expect(metrics["On"]).To(Equal(2.0), "Expected 2 On servers")
+		Expect(metrics["Off"]).To(Equal(1.0), "Expected 1 Off server")
 	})
 
-	It("should emit condition metrics", func() {
-		ctx := context.Background()
-
+	It("should emit condition metrics", func(ctx SpecContext) {
 		// Create server with conditions
 		server := metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{Name: "server1"},
@@ -209,19 +225,38 @@ var _ = Describe("ServerStateCollector", func() {
 		collector.Collect(ch)
 		close(ch)
 
-		// Verify metrics were emitted
-		metricCount := 0
-		for range ch {
-			metricCount++
+		// Parse metrics and verify exact counts
+		conditionMetrics := make(map[string]map[string]float64)
+		for metric := range ch {
+			var m = metric
+			dto := &prometheus_io.Metric{}
+			Expect(m.Write(dto)).To(Succeed())
+
+			if dto.GetGauge() != nil && len(dto.GetLabel()) >= 2 {
+				var condType, status string
+				for _, label := range dto.GetLabel() {
+					if label.GetName() == "condition_type" {
+						condType = label.GetValue()
+					}
+					if label.GetName() == "status" {
+						status = label.GetValue()
+					}
+				}
+				if condType != "" && status != "" {
+					if conditionMetrics[condType] == nil {
+						conditionMetrics[condType] = make(map[string]float64)
+					}
+					conditionMetrics[condType][status] = dto.GetGauge().GetValue()
+				}
+			}
 		}
 
-		// Should have state metric, power state metric, and condition metrics
-		Expect(metricCount).To(BeNumerically(">=", 3))
+		// Assert exact label/value pairs
+		Expect(conditionMetrics["Ready"]["True"]).To(Equal(1.0), "Expected 1 Ready=True condition")
+		Expect(conditionMetrics["Discovered"]["True"]).To(Equal(1.0), "Expected 1 Discovered=True condition")
 	})
 
-	It("should handle servers without state gracefully", func() {
-		ctx := context.Background()
-
+	It("should handle servers without state gracefully", func(ctx SpecContext) {
 		// Create server without state set
 		server := metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{Name: "server1"},

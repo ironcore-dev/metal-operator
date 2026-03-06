@@ -140,41 +140,6 @@ type ServerCleaningStatusEntry struct {
 	// LastUpdateTime is the last time this status was updated
 	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
-
-	// CleaningTasks contains information about the cleaning tasks for this server
-	// +optional
-	CleaningTasks []CleaningTaskStatus `json:"cleaningTasks,omitempty"`
-}
-
-// CleaningTaskStatus represents the status of a cleaning task
-type CleaningTaskStatus struct {
-	// TaskURI is the URI to monitor the task
-	// +optional
-	TaskURI string `json:"taskURI,omitempty"`
-
-	// TaskType indicates what type of cleaning task this is
-	// +required
-	TaskType string `json:"taskType"`
-
-	// TargetID identifies the target resource (e.g., drive ID for disk erase)
-	// +optional
-	TargetID string `json:"targetID,omitempty"`
-
-	// State is the current state of the task
-	// +optional
-	State string `json:"state,omitempty"`
-
-	// PercentComplete indicates the completion percentage (0-100)
-	// +optional
-	PercentComplete int `json:"percentComplete,omitempty"`
-
-	// Message provides additional information about the task
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// LastUpdateTime is the last time this task status was updated
-	// +optional
-	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -300,44 +300,6 @@ spec:
                   description: ServerCleaningStatusEntry represents the cleaning status
                     for a single server
                   properties:
-                    cleaningTasks:
-                      description: CleaningTasks contains information about the cleaning
-                        tasks for this server
-                      items:
-                        description: CleaningTaskStatus represents the status of a
-                          cleaning task
-                        properties:
-                          lastUpdateTime:
-                            description: LastUpdateTime is the last time this task
-                              status was updated
-                            format: date-time
-                            type: string
-                          message:
-                            description: Message provides additional information about
-                              the task
-                            type: string
-                          percentComplete:
-                            description: PercentComplete indicates the completion
-                              percentage (0-100)
-                            type: integer
-                          state:
-                            description: State is the current state of the task
-                            type: string
-                          targetID:
-                            description: TargetID identifies the target resource (e.g.,
-                              drive ID for disk erase)
-                            type: string
-                          taskType:
-                            description: TaskType indicates what type of cleaning
-                              task this is
-                            type: string
-                          taskURI:
-                            description: TaskURI is the URI to monitor the task
-                            type: string
-                        required:
-                        - taskType
-                        type: object
-                      type: array
                     lastUpdateTime:
                       description: LastUpdateTime is the last time this status was
                         updated

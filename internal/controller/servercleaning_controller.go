@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -42,6 +43,7 @@ const (
 	taskStateException = "Exception"
 	taskStateCancelled = "Cancelled"
 	taskStateKilled    = "Killed"
+	taskStateFailed    = "Failed"
 	taskStateNew       = "New"
 )
 
@@ -229,37 +231,57 @@ func (r *ServerCleaningReconciler) handleInProgressState(ctx context.Context, cl
 			continue
 		}
 
-		// Monitor BMC tasks for this server
-		isComplete, err := r.monitorBMCTasks(ctx, cleaning, &server, serverStatus)
+		// Check BMC tasks for this server
+		// Tasks are now in BMC.Status.Tasks and monitored by BMCTask controller
+		tasks, err := r.getTasksForServer(ctx, &server, cleaning.Name)
 		if err != nil {
-			log.Error(err, "Failed to monitor BMC tasks", "server", server.Name)
-			// Don't fail the entire reconciliation, just mark this server as having issues
+			log.Error(err, "Failed to get BMC tasks for server", "server", server.Name)
 			allComplete = false
 			inProgressCount++
 			continue
 		}
 
-		// Update counts based on final server state
-		// Re-fetch the status since monitorBMCTasks updated it
-		for i := range cleaning.Status.ServerCleaningStatuses {
-			if cleaning.Status.ServerCleaningStatuses[i].ServerName == server.Name {
-				serverStatus = &cleaning.Status.ServerCleaningStatuses[i]
-				break
-			}
-		}
+		// Check if all tasks are complete
+		tasksComplete, tasksFailed := r.checkTasksComplete(tasks)
 
-		switch serverStatus.State {
-		case metalv1alpha1.ServerCleaningStateCompleted:
-			completedCount++
-		case metalv1alpha1.ServerCleaningStateFailed:
-			failedCount++
-		default:
+		if tasksComplete {
+			// All tasks finished - update server status
+			if tasksFailed {
+				log.Info("Cleaning completed with failures", "server", server.Name)
+				if err := r.updateServerStatus(ctx, cleaning, server.Name, metalv1alpha1.ServerCleaningStateFailed, "One or more cleaning tasks failed"); err != nil {
+					return ctrl.Result{}, err
+				}
+				failedCount++
+			} else {
+				log.Info("Cleaning completed successfully", "server", server.Name)
+				if err := r.updateServerStatus(ctx, cleaning, server.Name, metalv1alpha1.ServerCleaningStateCompleted, "All cleaning tasks completed successfully"); err != nil {
+					return ctrl.Result{}, err
+				}
+				completedCount++
+			}
+		} else {
+			// Tasks still in progress
 			inProgressCount++
 			allComplete = false
-		}
 
-		if !isComplete {
-			allComplete = false
+			// Calculate progress
+			completedTaskCount := 0
+			totalPercent := int32(0)
+			for _, task := range tasks {
+				if task.State == taskStateCompleted {
+					completedTaskCount++
+				}
+				totalPercent += task.PercentComplete
+			}
+			avgPercent := int32(0)
+			if len(tasks) > 0 {
+				avgPercent = totalPercent / int32(len(tasks))
+			}
+			progressMsg := fmt.Sprintf("Cleaning in progress: %d%% (%d/%d tasks completed)", avgPercent, completedTaskCount, len(tasks))
+
+			if err := r.updateServerStatus(ctx, cleaning, server.Name, metalv1alpha1.ServerCleaningStateInProgress, progressMsg); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -368,6 +390,10 @@ func (r *ServerCleaningReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&metalv1alpha1.Server{},
 			handler.EnqueueRequestsFromMapFunc(r.mapServerToServerCleaning),
 		).
+		Watches(
+			&metalv1alpha1.BMC{},
+			handler.EnqueueRequestsFromMapFunc(r.mapBMCToServerCleaning),
+		).
 		Complete(r)
 }
 
@@ -385,6 +411,52 @@ func (r *ServerCleaningReconciler) mapServerToServerCleaning(ctx context.Context
 			requests = append(requests, reconcile.Request{
 				NamespacedName: client.ObjectKeyFromObject(&cleaning),
 			})
+		}
+	}
+
+	return requests
+}
+
+// mapBMCToServerCleaning maps BMC updates (specifically task status changes) to ServerCleaning reconcile requests
+func (r *ServerCleaningReconciler) mapBMCToServerCleaning(ctx context.Context, obj client.Object) []reconcile.Request {
+	bmcObj := obj.(*metalv1alpha1.BMC)
+
+	// Find all servers that reference this BMC
+	serverList := &metalv1alpha1.ServerList{}
+	if err := r.List(ctx, serverList); err != nil {
+		return nil
+	}
+
+	var affectedServers []string
+	for _, server := range serverList.Items {
+		if server.Spec.BMCRef != nil && server.Spec.BMCRef.Name == bmcObj.Name {
+			affectedServers = append(affectedServers, server.Name)
+		}
+	}
+
+	// Find ServerCleaning objects that are working on these servers
+	cleaningList := &metalv1alpha1.ServerCleaningList{}
+	if err := r.List(ctx, cleaningList); err != nil {
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, cleaning := range cleaningList.Items {
+		// Only reconcile if cleaning is in progress
+		if cleaning.Status.State != metalv1alpha1.ServerCleaningStateInProgress {
+			continue
+		}
+
+		// Check if this cleaning is working on any of the affected servers
+		if cleaning.Spec.ServerRef != nil {
+			for _, serverName := range affectedServers {
+				if cleaning.Spec.ServerRef.Name == serverName {
+					requests = append(requests, reconcile.Request{
+						NamespacedName: client.ObjectKeyFromObject(&cleaning),
+					})
+					break
+				}
+			}
 		}
 	}
 
@@ -491,6 +563,94 @@ func (r *ServerCleaningReconciler) updateCleaningCounts(ctx context.Context, cle
 	return nil
 }
 
+// addTaskToBMC adds a BMCTask to the specified BMC's status
+func (r *ServerCleaningReconciler) addTaskToBMC(ctx context.Context, bmcName, namespace string, task metalv1alpha1.BMCTask) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Get the BMC resource
+	bmcObj := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, types.NamespacedName{Name: bmcName}, bmcObj); err != nil {
+		return fmt.Errorf("failed to get BMC %s: %w", bmcName, err)
+	}
+
+	// Add the task to BMC.Status.Tasks
+	bmcObj.Status.Tasks = append(bmcObj.Status.Tasks, task)
+
+	// Keep only the last 10 tasks to prevent unbounded growth
+	if len(bmcObj.Status.Tasks) > 10 {
+		bmcObj.Status.Tasks = bmcObj.Status.Tasks[len(bmcObj.Status.Tasks)-10:]
+	}
+
+	// Update BMC status
+	if err := r.Status().Update(ctx, bmcObj); err != nil {
+		return fmt.Errorf("failed to update BMC tasks: %w", err)
+	}
+
+	log.V(1).Info("Added task to BMC", "bmc", bmcName, "taskType", task.TaskType, "taskURI", task.TaskURI)
+	return nil
+}
+
+// getTasksForServer retrieves tasks from BMC.Status.Tasks for a specific server's cleaning operation
+func (r *ServerCleaningReconciler) getTasksForServer(ctx context.Context, server *metalv1alpha1.Server, cleaningName string) ([]metalv1alpha1.BMCTask, error) {
+	// Get the BMC for this server
+	if server.Spec.BMCRef == nil {
+		return nil, fmt.Errorf("server %s has no BMCRef", server.Name)
+	}
+
+	bmcObj := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Spec.BMCRef.Name}, bmcObj); err != nil {
+		return nil, fmt.Errorf("failed to get BMC %s: %w", server.Spec.BMCRef.Name, err)
+	}
+
+	// Filter tasks that belong to this cleaning operation
+	// We identify our tasks by checking if they were created recently and match expected types
+	var relevantTasks []metalv1alpha1.BMCTask
+	for _, task := range bmcObj.Status.Tasks {
+		// Check if this is a cleaning-related task type
+		if task.TaskType == metalv1alpha1.BMCTaskTypeDiskErase ||
+			task.TaskType == metalv1alpha1.BMCTaskTypeBIOSReset ||
+			task.TaskType == metalv1alpha1.BMCTaskTypeBMCReset ||
+			task.TaskType == metalv1alpha1.BMCTaskTypeNetworkClear {
+			relevantTasks = append(relevantTasks, task)
+		}
+	}
+
+	return relevantTasks, nil
+}
+
+// checkTasksComplete checks if all tasks are in terminal states and returns completion status
+func (r *ServerCleaningReconciler) checkTasksComplete(tasks []metalv1alpha1.BMCTask) (allComplete bool, anyFailed bool) {
+	if len(tasks) == 0 {
+		return true, false
+	}
+
+	allComplete = true
+	anyFailed = false
+
+	for _, task := range tasks {
+		taskState := task.State
+
+		// Check if task is still running
+		if taskState != taskStateCompleted &&
+			taskState != taskStateException &&
+			taskState != taskStateCancelled &&
+			taskState != taskStateKilled &&
+			taskState != taskStateFailed {
+			allComplete = false
+		}
+
+		// Check if task failed
+		if taskState == taskStateException ||
+			taskState == taskStateCancelled ||
+			taskState == taskStateKilled ||
+			taskState == taskStateFailed {
+			anyFailed = true
+		}
+	}
+
+	return allComplete, anyFailed
+}
+
 // initiateBMCCleaning initiates cleaning operations directly via BMC and stores task information
 func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, cleaning *metalv1alpha1.ServerCleaning, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
@@ -507,7 +667,12 @@ func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, clea
 		return fmt.Errorf("server %s has no system URI", server.Name)
 	}
 
-	var allTasks []metalv1alpha1.CleaningTaskStatus
+	// Get BMC reference for adding tasks
+	if server.Spec.BMCRef == nil {
+		return fmt.Errorf("server %s has no BMCRef", server.Name)
+	}
+	bmcName := server.Spec.BMCRef.Name
+	taskCount := 0
 
 	// Initiate disk wipe if requested
 	if cleaning.Spec.DiskWipe != nil {
@@ -516,14 +681,20 @@ func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, clea
 		if err != nil {
 			return fmt.Errorf("failed to initiate disk wipe: %w", err)
 		}
+		// Add each disk erase task to BMC.Status.Tasks
 		for _, task := range tasks {
-			allTasks = append(allTasks, metalv1alpha1.CleaningTaskStatus{
-				TaskURI:        task.TaskURI,
-				TaskType:       string(task.TaskType),
-				TargetID:       task.TargetID,
-				State:          taskStateNew,
-				LastUpdateTime: metav1.Now(),
-			})
+			bmcTask := metalv1alpha1.BMCTask{
+				TaskURI:         task.TaskURI,
+				TaskType:        metalv1alpha1.BMCTaskTypeDiskErase,
+				TargetID:        task.TargetID,
+				State:           taskStateNew,
+				PercentComplete: 0,
+				LastUpdateTime:  metav1.Now(),
+			}
+			if err := r.addTaskToBMC(ctx, bmcName, server.Namespace, bmcTask); err != nil {
+				return fmt.Errorf("failed to add disk erase task to BMC: %w", err)
+			}
+			taskCount++
 		}
 		log.V(1).Info("Disk wipe tasks created", "server", server.Name, "count", len(tasks))
 	}
@@ -536,13 +707,18 @@ func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, clea
 			return fmt.Errorf("failed to initiate BIOS reset: %w", err)
 		}
 		if task != nil {
-			allTasks = append(allTasks, metalv1alpha1.CleaningTaskStatus{
-				TaskURI:        task.TaskURI,
-				TaskType:       string(task.TaskType),
-				TargetID:       task.TargetID,
-				State:          "New",
-				LastUpdateTime: metav1.Now(),
-			})
+			bmcTask := metalv1alpha1.BMCTask{
+				TaskURI:         task.TaskURI,
+				TaskType:        metalv1alpha1.BMCTaskTypeBIOSReset,
+				TargetID:        task.TargetID,
+				State:           taskStateNew,
+				PercentComplete: 0,
+				LastUpdateTime:  metav1.Now(),
+			}
+			if err := r.addTaskToBMC(ctx, bmcName, server.Namespace, bmcTask); err != nil {
+				return fmt.Errorf("failed to add BIOS reset task to BMC: %w", err)
+			}
+			taskCount++
 			log.V(1).Info("BIOS reset task created", "server", server.Name, "taskURI", task.TaskURI)
 		}
 	}
@@ -564,180 +740,29 @@ func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, clea
 			// Network cleanup is non-critical, log and continue
 			log.Error(err, "Failed to initiate network config clear (non-critical)", "server", server.Name)
 		} else if task != nil {
-			allTasks = append(allTasks, metalv1alpha1.CleaningTaskStatus{
-				TaskURI:        task.TaskURI,
-				TaskType:       string(task.TaskType),
-				TargetID:       task.TargetID,
-				State:          "New",
-				LastUpdateTime: metav1.Now(),
-			})
-			log.V(1).Info("Network config clear task created", "server", server.Name, "taskURI", task.TaskURI)
+			bmcTask := metalv1alpha1.BMCTask{
+				TaskURI:         task.TaskURI,
+				TaskType:        metalv1alpha1.BMCTaskTypeNetworkClear,
+				TargetID:        task.TargetID,
+				State:           taskStateNew,
+				PercentComplete: 0,
+				LastUpdateTime:  metav1.Now(),
+			}
+			if err := r.addTaskToBMC(ctx, bmcName, server.Namespace, bmcTask); err != nil {
+				log.Error(err, "Failed to add network clear task to BMC (non-critical)", "server", server.Name)
+			} else {
+				taskCount++
+				log.V(1).Info("Network config clear task created", "server", server.Name, "taskURI", task.TaskURI)
+			}
 		}
 	}
 
-	// Store task information in server status
-	if len(allTasks) > 0 {
-		if err := r.updateServerTasks(ctx, cleaning, server.Name, allTasks); err != nil {
-			return fmt.Errorf("failed to store task information: %w", err)
-		}
-		log.Info("Cleaning tasks initiated", "server", server.Name, "taskCount", len(allTasks))
+	// Tasks are now in BMC.Status.Tasks and will be monitored by BMCTask controller
+	if taskCount > 0 {
+		log.Info("Cleaning tasks initiated and added to BMC", "server", server.Name, "bmc", bmcName, "taskCount", taskCount)
 	} else {
 		log.Info("No cleaning tasks created (all operations completed synchronously)", "server", server.Name)
 	}
 
-	return nil
-}
-
-// monitorBMCTasks checks the status of BMC tasks and updates progress
-func (r *ServerCleaningReconciler) monitorBMCTasks(ctx context.Context, cleaning *metalv1alpha1.ServerCleaning, server *metalv1alpha1.Server, serverStatus *metalv1alpha1.ServerCleaningStatusEntry) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	if len(serverStatus.CleaningTasks) == 0 {
-		log.V(1).Info("No tasks to monitor", "server", server.Name)
-		return true, nil // No tasks means cleaning is complete
-	}
-
-	// Get BMC client for this server
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, false, bmc.Options{})
-	if err != nil {
-		return false, fmt.Errorf("failed to get BMC client: %w", err)
-	}
-	defer bmcClient.Logout()
-
-	allComplete := true
-	anyFailed := false
-	updatedTasks := make([]metalv1alpha1.CleaningTaskStatus, 0, len(serverStatus.CleaningTasks))
-
-	// Check status of each task
-	for _, task := range serverStatus.CleaningTasks {
-		// Skip already completed/failed tasks
-		if task.State == taskStateCompleted || task.State == taskStateException || task.State == taskStateCancelled || task.State == taskStateKilled {
-			updatedTasks = append(updatedTasks, task)
-			if task.State != taskStateCompleted {
-				anyFailed = true
-			}
-			continue
-		}
-
-		// Query task status from BMC
-		status, err := bmcClient.GetTaskStatus(ctx, task.TaskURI)
-		if err != nil {
-			log.Error(err, "Failed to get task status", "server", server.Name, "taskURI", task.TaskURI)
-			// Keep existing task info, mark as still in progress
-			allComplete = false
-			updatedTasks = append(updatedTasks, task)
-			continue
-		}
-
-		// Update task information
-		percentComplete := 0
-		if status.PercentComplete != nil {
-			percentComplete = int(*status.PercentComplete)
-		}
-		message := ""
-		if len(status.Messages) > 0 {
-			message = status.Messages[0].Message
-		}
-
-		updatedTask := metalv1alpha1.CleaningTaskStatus{
-			TaskURI:         task.TaskURI,
-			TaskType:        task.TaskType,
-			TargetID:        task.TargetID,
-			State:           string(status.TaskState),
-			PercentComplete: percentComplete,
-			Message:         message,
-			LastUpdateTime:  metav1.Now(),
-		}
-		updatedTasks = append(updatedTasks, updatedTask)
-
-		log.V(1).Info("Task status updated",
-			"server", server.Name,
-			"taskType", task.TaskType,
-			"state", status.TaskState,
-			"percentComplete", percentComplete)
-
-		// Check if task is still running
-		taskState := string(status.TaskState)
-		if taskState != taskStateCompleted && taskState != taskStateException && taskState != taskStateCancelled && taskState != taskStateKilled {
-			allComplete = false
-		}
-
-		if taskState == taskStateException || taskState == taskStateCancelled || taskState == taskStateKilled {
-			anyFailed = true
-		}
-	}
-
-	// Update task information in status
-	if err := r.updateServerTasks(ctx, cleaning, server.Name, updatedTasks); err != nil {
-		return false, fmt.Errorf("failed to update task information: %w", err)
-	}
-
-	// Calculate overall progress message
-	completedCount := 0
-	totalPercent := 0
-	for _, task := range updatedTasks {
-		if task.State == "Completed" {
-			completedCount++
-		}
-		totalPercent += task.PercentComplete
-	}
-	avgPercent := 0
-	if len(updatedTasks) > 0 {
-		avgPercent = totalPercent / len(updatedTasks)
-	}
-
-	progressMsg := fmt.Sprintf("Cleaning progress: %d%% (%d/%d tasks completed)", avgPercent, completedCount, len(updatedTasks))
-
-	// Update server status based on task completion
-	if allComplete {
-		if anyFailed {
-			log.Info("Cleaning completed with failures", "server", server.Name)
-			if err := r.updateServerStatus(ctx, cleaning, server.Name, metalv1alpha1.ServerCleaningStateFailed, progressMsg); err != nil {
-				return false, err
-			}
-		} else {
-			log.Info("Cleaning completed successfully", "server", server.Name)
-			if err := r.updateServerStatus(ctx, cleaning, server.Name, metalv1alpha1.ServerCleaningStateCompleted, progressMsg); err != nil {
-				return false, err
-			}
-		}
-	} else {
-		// Update progress message
-		if err := r.updateServerStatus(ctx, cleaning, server.Name, metalv1alpha1.ServerCleaningStateInProgress, progressMsg); err != nil {
-			return false, err
-		}
-	}
-
-	return allComplete, nil
-}
-
-// updateServerTasks updates the cleaning tasks for a specific server
-func (r *ServerCleaningReconciler) updateServerTasks(ctx context.Context, cleaning *metalv1alpha1.ServerCleaning, serverName string, tasks []metalv1alpha1.CleaningTaskStatus) error {
-	cleaningBase := cleaning.DeepCopy()
-
-	// Find and update the server status entry
-	found := false
-	for i := range cleaning.Status.ServerCleaningStatuses {
-		if cleaning.Status.ServerCleaningStatuses[i].ServerName == serverName {
-			cleaning.Status.ServerCleaningStatuses[i].CleaningTasks = tasks
-			cleaning.Status.ServerCleaningStatuses[i].LastUpdateTime = metav1.Now()
-			found = true
-			break
-		}
-	}
-
-	// If not found, create new entry with tasks
-	if !found {
-		cleaning.Status.ServerCleaningStatuses = append(cleaning.Status.ServerCleaningStatuses, metalv1alpha1.ServerCleaningStatusEntry{
-			ServerName:     serverName,
-			State:          metalv1alpha1.ServerCleaningStateInProgress,
-			CleaningTasks:  tasks,
-			LastUpdateTime: metav1.Now(),
-		})
-	}
-
-	if err := r.Status().Patch(ctx, cleaning, client.MergeFrom(cleaningBase)); err != nil {
-		return fmt.Errorf("failed to update server tasks: %w", err)
-	}
 	return nil
 }

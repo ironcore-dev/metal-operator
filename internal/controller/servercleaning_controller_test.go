@@ -251,14 +251,17 @@ var _ = Describe("ServerCleaning Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, cleaning)).To(Succeed())
 
-		By("Ensuring cleaning tasks are tracked in status")
+		By("Ensuring cleaning tasks are tracked in BMC status")
 		Eventually(func(g Gomega) {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cleaning), cleaning)).To(Succeed())
-			if len(cleaning.Status.ServerCleaningStatuses) > 0 {
-				serverStatus := cleaning.Status.ServerCleaningStatuses[0]
-				// Should have tasks for the cleaning operations that return task URIs
-				g.Expect(serverStatus.CleaningTasks).NotTo(BeNil())
-			}
+			// Check that cleaning is in progress
+			g.Expect(cleaning.Status.State).To(Equal(metalv1alpha1.ServerCleaningStateInProgress))
+
+			// Verify tasks are created in BMC.Status.Tasks (not in ServerCleaning status)
+			bmcObj := &metalv1alpha1.BMC{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmcObj)).To(Succeed())
+			// Should have at least one task from the cleaning operations
+			g.Expect(len(bmcObj.Status.Tasks)).To(BeNumerically(">", 0))
 		}).WithTimeout(2 * time.Minute).Should(Succeed())
 
 		// Cleanup
@@ -284,12 +287,6 @@ var _ = Describe("ServerCleaning Controller", func() {
 					SystemURI:  "/redfish/v1/Systems/" + string(rune(i)),
 					BMCRef: &corev1.LocalObjectReference{
 						Name: "test-bmc",
-					},
-					Taints: []corev1.Taint{
-						{
-							Key:    "metal.ironcore.dev/tainted",
-							Effect: corev1.TaintEffectNoSchedule,
-						},
 					},
 				},
 			}

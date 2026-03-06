@@ -109,6 +109,9 @@ type BMC interface {
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
+	// GetTaskStatus retrieves the status of a task by its URI.
+	GetTaskStatus(ctx context.Context, taskURI string) (*schemas.Task, error)
+
 	// CreateOrUpdateAccount creates or updates a BMC user account.
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 

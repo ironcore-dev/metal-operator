@@ -206,6 +206,10 @@ type BMCStatus struct {
 	// +optional
 	LastResetTime *metav1.Time `json:"lastResetTime,omitempty"`
 
+	// Tasks tracks ongoing and recent BMC operations.
+	// +optional
+	Tasks []BMCTask `json:"tasks,omitempty"`
+
 	// Conditions represents the latest available observations of the BMC's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
@@ -225,6 +229,67 @@ const (
 
 	// BMCStatePending indicates that there is an error connecting with the BMC.
 	BMCStatePending BMCState = "Pending"
+)
+
+// BMCTask represents a single BMC operation task.
+type BMCTask struct {
+	// TaskURI is the URI to monitor the task on the BMC.
+	// +required
+	TaskURI string `json:"taskURI"`
+
+	// TaskType indicates the type of operation.
+	// +required
+	// +kubebuilder:validation:Enum=DiskErase;BIOSReset;BMCReset;NetworkClear;FirmwareUpdate;ConfigurationChange;AccountManagement;Other
+	TaskType BMCTaskType `json:"taskType"`
+
+	// TargetID identifies what the task is operating on (e.g., "BIOS", "BMC", "Drive-1").
+	// +optional
+	TargetID string `json:"targetID,omitempty"`
+
+	// State is the current state of the task.
+	// +optional
+	State string `json:"state,omitempty"`
+
+	// PercentComplete indicates completion percentage (0-100).
+	// +optional
+	PercentComplete int32 `json:"percentComplete,omitempty"`
+
+	// Message provides additional information about the task.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// LastUpdateTime is when this task status was last updated.
+	// +optional
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+}
+
+// BMCTaskType defines the type of BMC task.
+type BMCTaskType string
+
+const (
+	// BMCTaskTypeDiskErase indicates a disk erasing task.
+	BMCTaskTypeDiskErase BMCTaskType = "DiskErase"
+
+	// BMCTaskTypeBIOSReset indicates a BIOS reset task.
+	BMCTaskTypeBIOSReset BMCTaskType = "BIOSReset"
+
+	// BMCTaskTypeBMCReset indicates a BMC reset task.
+	BMCTaskTypeBMCReset BMCTaskType = "BMCReset"
+
+	// BMCTaskTypeNetworkClear indicates a network configuration clear task.
+	BMCTaskTypeNetworkClear BMCTaskType = "NetworkClear"
+
+	// BMCTaskTypeFirmwareUpdate indicates a firmware update task (BIOS or BMC).
+	BMCTaskTypeFirmwareUpdate BMCTaskType = "FirmwareUpdate"
+
+	// BMCTaskTypeConfigurationChange indicates a configuration change task.
+	BMCTaskTypeConfigurationChange BMCTaskType = "ConfigurationChange"
+
+	// BMCTaskTypeAccountManagement indicates an account management task.
+	BMCTaskTypeAccountManagement BMCTaskType = "AccountManagement"
+
+	// BMCTaskTypeOther indicates a task type not covered by the specific types.
+	BMCTaskTypeOther BMCTaskType = "Other"
 )
 
 // +kubebuilder:object:root=true

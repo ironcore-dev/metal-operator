@@ -106,9 +106,13 @@ func (r *BMCTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			oldState := task.State
 			oldPercent := task.PercentComplete
 
-			task.State = taskStatus.State
-			task.PercentComplete = int32(taskStatus.PercentComplete)
-			task.Message = taskStatus.Message
+			task.State = string(taskStatus.TaskState)
+			if taskStatus.PercentComplete != nil {
+				task.PercentComplete = int32(*taskStatus.PercentComplete)
+			}
+			if taskStatus.TaskStatus != "" {
+				task.Message = string(taskStatus.TaskStatus)
+			}
 			task.LastUpdateTime = metav1.Now()
 
 			// Log if status changed

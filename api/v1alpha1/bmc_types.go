@@ -206,6 +206,14 @@ type BMCStatus struct {
 	// +optional
 	LastResetTime *metav1.Time `json:"lastResetTime,omitempty"`
 
+	// MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc.
+	// +optional
+	MetricsReportSubscriptionLink string `json:"metricsReportSubscriptionLink,omitempty"`
+
+	// EventsSubscriptionLink is the link to the events subscription of the bmc.
+	// +optional
+	EventsSubscriptionLink string `json:"eventsSubscriptionLink,omitempty"`
+
 	// Conditions represents the latest available observations of the BMC's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type

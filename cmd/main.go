@@ -93,6 +93,7 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
+		taskPollInterval                   time.Duration
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -153,6 +154,8 @@ func main() { // nolint: gocyclo
 		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
+	flag.DurationVar(&taskPollInterval, "task-poll-interval", 30*time.Second,
+		"Interval for polling BMC task status.")
 
 	opts := zap.Options{
 		Development: true,
@@ -525,6 +528,18 @@ func main() { // nolint: gocyclo
 		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCUser")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCTaskReconciler{
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		Insecure:     insecure,
+		PollInterval: taskPollInterval,
+		BMCOptions: bmc.Options{
+			BasicAuth: true,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCTask")
 		os.Exit(1)
 	}
 

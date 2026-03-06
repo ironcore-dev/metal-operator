@@ -311,6 +311,16 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&BMCTaskReconciler{
+			Client:       k8sManager.GetClient(),
+			Scheme:       k8sManager.GetScheme(),
+			Insecure:     true,
+			PollInterval: 50 * time.Millisecond,
+			BMCOptions: bmc.Options{
+				BasicAuth: true,
+			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		By("Starting the registry server")
 		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
 			registryServer := registry.NewServer(GinkgoLogr, ":30000", k8sManager.GetClient())

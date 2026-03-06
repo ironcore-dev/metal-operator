@@ -14,6 +14,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
@@ -176,6 +177,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ManagerNamespace:       ns.Name,
 			BMCResetWaitTime:       400 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
+			EventURL:               "http://localhost:8008",
 			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
 		}).SetupWithManager(k8sManager)).To(Succeed())

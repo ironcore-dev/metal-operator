@@ -330,7 +330,11 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
-	if ok := r.checkIfMaintenanceGranted(ctx, settings, bmcObj, bmcClient); !ok {
+	granted, err := r.checkIfMaintenanceGranted(ctx, settings, bmcObj, bmcClient)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to check if maintenance is granted: %w", err)
+	}
+	if !granted {
 		log.V(1).Info("Waiting for maintenance to be granted before continuing with updating settings")
 		if condition.Status != metav1.ConditionTrue {
 			if err := r.Conditions.Update(
@@ -345,7 +349,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(ctx context.Context
 				return ctrl.Result{}, fmt.Errorf("failed to patch BMCSettings ServerMaintenance waiting conditions: %w", err)
 			}
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	// Once in maintenance, clear the waiting condition if present
@@ -667,22 +671,20 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 	return diff, nil
 }
 
-func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) bool {
+func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if settings.Spec.ServerMaintenanceRefs == nil {
-		return false
+		return false, nil
 	}
 
 	servers, err := r.getServers(ctx, bmcObj, bmcClient)
 	if err != nil {
-		// Cannot return error from bool-returning function; log for observability
-		log.Error(err, "Failed to get referred servers to determine maintenance state")
-		return false
+		return false, fmt.Errorf("failed to get referred servers to determine maintenance state: %w", err)
 	}
 
 	if len(settings.Spec.ServerMaintenanceRefs) != len(servers) {
 		log.V(1).Info("Not all servers have Maintenance", "ServerMaintenanceRefs", settings.Spec.ServerMaintenanceRefs, "Servers", servers)
-		return false
+		return false, nil
 	}
 
 	notInMaintenanceState := make([]string, 0, len(servers))
@@ -710,10 +712,10 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(ctx context.Context, s
 		log.V(1).Info("Some servers not yet in maintenance",
 			"Required maintenances on servers", settings.Spec.ServerMaintenanceRefs,
 			"Servers not in maintenance", notInMaintenanceState)
-		return false
+		return false, nil
 	}
 
-	return true
+	return true, nil
 }
 
 func (r *BMCSettingsReconciler) requestMaintenanceOnServers(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {
@@ -949,7 +951,7 @@ func (r *BMCSettingsReconciler) getReferredBMCSettings(ctx context.Context, refe
 	return settings, nil
 }
 
-func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,name, namespace string) *metalv1alpha1.ObjectReference {
+func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem, name, namespace string) *metalv1alpha1.ObjectReference {
 	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
 		if serverMaintenanceRef.ServerMaintenanceRef.Name == name && serverMaintenanceRef.ServerMaintenanceRef.Namespace == namespace {
 			return serverMaintenanceRef.ServerMaintenanceRef

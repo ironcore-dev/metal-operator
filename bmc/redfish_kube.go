@@ -367,6 +367,12 @@ func (r *RedfishKubeBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, ta
 	return task, nil
 }
 
+// GetTaskStatus retrieves the status of a task by its URI.
+func (r *RedfishKubeBMC) GetTaskStatus(ctx context.Context, taskURI string) (*schemas.Task, error) {
+	// Delegate to the underlying RedfishBaseBMC implementation
+	return r.RedfishBaseBMC.GetTaskStatus(ctx, taskURI)
+}
+
 // SetPXEBootOnce sets the boot device for the next system boot using Redfish.
 func (r *RedfishKubeBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)

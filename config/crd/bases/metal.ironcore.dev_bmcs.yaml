@@ -284,6 +284,52 @@ spec:
                   State represents the current state of the BMC.
                   kubebuilder:validation:Enum=Enabled;Error;Pending
                 type: string
+              tasks:
+                description: Tasks tracks ongoing and recent BMC operations.
+                items:
+                  description: BMCTask represents a single BMC operation task.
+                  properties:
+                    lastUpdateTime:
+                      description: LastUpdateTime is when this task status was last
+                        updated.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message provides additional information about the
+                        task.
+                      type: string
+                    percentComplete:
+                      description: PercentComplete indicates completion percentage
+                        (0-100).
+                      format: int32
+                      type: integer
+                    state:
+                      description: State is the current state of the task.
+                      type: string
+                    targetID:
+                      description: TargetID identifies what the task is operating
+                        on (e.g., "BIOS", "BMC", "Drive-1").
+                      type: string
+                    taskType:
+                      description: TaskType indicates the type of operation.
+                      enum:
+                      - DiskErase
+                      - BIOSReset
+                      - BMCReset
+                      - NetworkClear
+                      - FirmwareUpdate
+                      - ConfigurationChange
+                      - AccountManagement
+                      - Other
+                      type: string
+                    taskURI:
+                      description: TaskURI is the URI to monitor the task on the BMC.
+                      type: string
+                  required:
+                  - taskType
+                  - taskURI
+                  type: object
+                type: array
             type: object
         type: object
     served: true

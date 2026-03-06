@@ -1,9 +1,5 @@
 # BMC Task Tracking
 
-> **Note:** The BMCTask controller is currently implemented but requires API changes to be functional.
-> Specifically, the `BMC.Status.Tasks` field must be added to the BMC API (see PR #XXX).
-> This controller can be merged independently and will become active once the API changes are merged.
-
 ## Overview
 
 All BMC operations are tracked centrally in `BMC.Status.Tasks[]`. This provides a single source of truth for all BMC operations across multiple controllers.

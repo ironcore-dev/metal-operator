@@ -12,6 +12,7 @@ import (
 	"io"
 	"maps"
 	"math/big"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -871,6 +872,28 @@ func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *schem
 
 func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
 	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
+}
+
+// GetTaskStatus retrieves the status of a task by its URI.
+func (r *RedfishBaseBMC) GetTaskStatus(ctx context.Context, taskURI string) (*schemas.Task, error) {
+	client := r.client.GetService().GetClient()
+
+	resp, err := client.Get(taskURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d when getting task status", resp.StatusCode)
+	}
+
+	var task schemas.Task
+	if err := json.NewDecoder(resp.Body).Decode(&task); err != nil {
+		return nil, fmt.Errorf("failed to decode task response: %w", err)
+	}
+
+	return &task, nil
 }
 
 const (

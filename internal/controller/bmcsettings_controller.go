@@ -591,7 +591,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 		if resetBMC.Reason != BMCReasonReset {
 			if annotations != nil {
 				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
-					if op == metalv1alpha1.GracefulRestartBMC {
+					if op == metalv1alpha1.ForceResetBMC {
 						log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
 						if err := r.Conditions.Update(
 							resetBMC,
@@ -614,7 +614,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 			if annotations == nil {
 				annotations = map[string]string{}
 			}
-			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.GracefulRestartBMC
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
 			BMC.SetAnnotations(annotations)
 			if err := r.Patch(ctx, BMC, client.MergeFrom(BMCBase)); err != nil {
 				return false, err
@@ -635,7 +635,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 		// we need to wait until the BMC resource annotation is removed
 		if annotations != nil {
 			if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
-				if op == metalv1alpha1.GracefulRestartBMC {
+				if op == metalv1alpha1.ForceResetBMC {
 					log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
 					return false, nil
 				}

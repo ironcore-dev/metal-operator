@@ -438,3 +438,33 @@ func (r *DellRedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, parame
 func (r *DellRedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.dellParseTaskDetails)
 }
+
+// CheckBMCPendingComponentUpgrade checks for staged component upgrades (Dell: Staged=true).
+func (r *DellRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType string) (bool, error) {
+	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.dellGetComponentFilters, r.dellMatchesComponentFilter, r.dellCheckPending)
+}
+
+func (r *DellRedfishBMC) dellGetComponentFilters(componentType string) []string {
+	switch componentType {
+	case "BMC":
+		return []string{"iDRAC"}
+	case "BIOS":
+		return []string{"BIOS", "BIOS-PRIMARY"}
+	default:
+		return []string{componentType}
+	}
+}
+
+func (r *DellRedfishBMC) dellMatchesComponentFilter(fw *schemas.SoftwareInventory, filters []string) bool {
+	idUpper := strings.ToUpper(fw.ID)
+	for _, filter := range filters {
+		if strings.Contains(idUpper, strings.ToUpper(filter)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *DellRedfishBMC) dellCheckPending(fw *schemas.SoftwareInventory) bool {
+	return fw.Staged
+}

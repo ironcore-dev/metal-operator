@@ -48,10 +48,8 @@ linters:
       - linters:
           - dupl
           - lll
-        path: bmc/*
-      - linters:
           - goconst
-        path: .*_test\.go$
+        path: bmc/*
     paths:
       - third_party$
       - builtin$

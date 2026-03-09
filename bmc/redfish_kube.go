@@ -455,3 +455,8 @@ func (r *RedfishKubeBMC) createJob(
 	}
 	return nil
 }
+
+// CheckBMCPendingComponentUpgrade is a test stub (always returns false).
+func (r *RedfishKubeBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}

@@ -267,3 +267,8 @@ func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, t
 	}
 	return task, nil
 }
+
+// CheckBMCPendingComponentUpgrade is a test stub (always returns false).
+func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}

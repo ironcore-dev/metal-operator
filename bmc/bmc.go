@@ -120,6 +120,9 @@ type BMC interface {
 
 	// GetAccountService retrieves the account service.
 	GetAccountService() (*schemas.AccountService, error)
+
+	// CheckBMCPendingComponentUpgrade checks if there are pending/staged component upgrades for the given component type ("BMC" or "BIOS").
+	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType string) (bool, error)
 }
 
 type Entity struct {

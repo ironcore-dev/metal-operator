@@ -159,3 +159,33 @@ func (r *LenovoRedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, para
 func (r *LenovoRedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.lenovoParseTaskDetails)
 }
+
+// CheckBMCPendingComponentUpgrade checks for pending component upgrades (Lenovo: "-Pending" suffix).
+func (r *LenovoRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType string) (bool, error) {
+	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.lenovoGetComponentFilters, r.lenovoMatchesComponentFilter, r.lenovoCheckPending)
+}
+
+func (r *LenovoRedfishBMC) lenovoGetComponentFilters(componentType string) []string {
+	switch componentType {
+	case "BMC":
+		return []string{"Firmware:BMC"}
+	case "BIOS":
+		return []string{"Firmware:UEFI", "BIOS"}
+	default:
+		return []string{componentType}
+	}
+}
+
+func (r *LenovoRedfishBMC) lenovoMatchesComponentFilter(fw *schemas.SoftwareInventory, filters []string) bool {
+	idUpper := strings.ToUpper(fw.ID)
+	for _, filter := range filters {
+		if strings.Contains(idUpper, strings.ToUpper(filter)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *LenovoRedfishBMC) lenovoCheckPending(fw *schemas.SoftwareInventory) bool {
+	return strings.Contains(strings.ToUpper(fw.ID), "-PENDING")
+}

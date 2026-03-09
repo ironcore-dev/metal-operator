@@ -869,6 +869,11 @@ func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *schem
 	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)
 }
 
+// CheckBMCPendingComponentUpgrade is a fallback for vendors without pending component upgrade checks.
+func (r *RedfishBaseBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ string) (bool, error) {
+	return false, fmt.Errorf("check pending component upgrade is not supported for manufacturer %q", r.manufacturer)
+}
+
 func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
 	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
 }

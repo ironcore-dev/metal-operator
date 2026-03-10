@@ -46,8 +46,6 @@ linters:
           - lll
         path: internal/*
       - linters:
-          - dupl
-          - lll
           - goconst
         path: bmc/*
     paths:

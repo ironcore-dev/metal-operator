@@ -86,6 +86,13 @@ export default withMermaid({
         ]
       },
       {
+        text: 'Observability',
+        collapsed: false,
+        items: [
+          { text: 'Metrics', link: '/observability/metrics' },
+        ]
+      },
+      {
         text: 'Development',
         collapsed: false,
         items: [

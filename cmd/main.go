@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -39,6 +40,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
+	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
@@ -342,6 +344,11 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to start manager")
 		os.Exit(1)
 	}
+
+	// Register custom Prometheus metrics collector for server states
+	serverCollector := metalmetrics.NewServerStateCollector(mgr.GetClient())
+	ctrlmetrics.Registry.MustRegister(serverCollector)
+	setupLog.Info("Registered custom server metrics collector")
 
 	if err = (&controller.EndpointReconciler{
 		Client:      mgr.GetClient(),

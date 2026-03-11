@@ -200,7 +200,8 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout: time.Second, // Force timeout to be quick for tests
+			DiscoveryTimeout:      time.Second, // Force timeout to be quick for tests
+			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{
@@ -250,8 +251,9 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSVersionSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCSettingsReconciler{
@@ -283,18 +285,21 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCSettingsSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCVersionSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSSettingsSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCUserReconciler{

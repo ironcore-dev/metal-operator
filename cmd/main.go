@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -39,6 +40,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
+	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
@@ -82,6 +84,7 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
+		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
 		powerPollingInterval               time.Duration
@@ -121,6 +124,8 @@ func main() { // nolint: gocyclo
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
+	flag.StringVar(&discoveryIgnitionPath, "discovery-ignition-path", "/etc/metal-operator/ignition-template.yaml",
+		"Path to the ignition template file.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
@@ -340,6 +345,11 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 
+	// Register custom Prometheus metrics collector for server states
+	serverCollector := metalmetrics.NewServerStateCollector(mgr.GetClient())
+	ctrlmetrics.Registry.MustRegister(serverCollector)
+	setupLog.Info("Registered custom server metrics collector")
+
 	if err = (&controller.EndpointReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -388,6 +398,7 @@ func main() { // nolint: gocyclo
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		DiscoveryIgnitionPath:   discoveryIgnitionPath,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -497,29 +508,33 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSVersionSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersionSet")
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSSettingsSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettingsSet")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCVersionSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersionSet")
 		os.Exit(1)
 	}
 	if err := (&controller.BMCSettingsSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettingsSet")
 		os.Exit(1)

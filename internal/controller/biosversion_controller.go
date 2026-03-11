@@ -758,9 +758,9 @@ func (r *BIOSVersionReconciler) checkUpdateBiosUpgradeStatus(
 		conditionutils.UpdateStatus(corev1.ConditionFalse),
 		conditionutils.UpdateReason(taskCurrentStatus.TaskState),
 		conditionutils.UpdateMessage(
-			fmt.Sprintf("BIOS upgrade in state: %v: PercentageCompleted %v",
+			fmt.Sprintf("BIOS upgrade in state: %v: PercentageCompleted %d",
 				taskCurrentStatus.TaskState,
-				taskCurrentStatus.PercentComplete),
+				upgradeCurrentTaskStatus.PercentComplete),
 		),
 	); err != nil {
 		return false, fmt.Errorf("failed to update conditions: %w", err)

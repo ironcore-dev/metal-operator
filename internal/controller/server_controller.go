@@ -24,6 +24,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
+	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/stmcginnis/gofish/schemas"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
@@ -94,6 +95,7 @@ type ServerReconciler struct {
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
+	DiscoveryIgnitionPath   string
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -111,10 +113,22 @@ type ServerReconciler struct {
 func (r *ServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, req.NamespacedName, server); err != nil {
+		if !apierrors.IsNotFound(err) {
+			metalmetrics.ServerReconciliationTotal.WithLabelValues("error_fetch").Inc()
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, server)
+	result, err := r.reconcileExists(ctx, server)
+
+	// Record reconciliation result
+	if err != nil {
+		metalmetrics.ServerReconciliationTotal.WithLabelValues("error_reconcile").Inc()
+	} else {
+		metalmetrics.ServerReconciliationTotal.WithLabelValues("success").Inc()
+	}
+
+	return result, err
 }
 
 func (r *ServerReconciler) reconcileExists(ctx context.Context, server *metalv1alpha1.Server) (ctrl.Result, error) {
@@ -719,14 +733,20 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, ss
 		return nil, fmt.Errorf("failed to generate password hash: %w", err)
 	}
 
-	ignitionData, err := ignition.GenerateDefaultIgnitionData(ignition.Config{
+	config := ignition.Config{
 		Image:        r.ProbeImage,
 		Flags:        flags,
 		SSHPublicKey: string(sshPublicKey),
 		PasswordHash: string(passwordHash),
-	})
+	}
+
+	// Load ignition template from file
+	ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+		r.DiscoveryIgnitionPath,
+		config,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate default ignition data: %w", err)
+		return nil, fmt.Errorf("failed to generate ignition data from file %s: %w", r.DiscoveryIgnitionPath, err)
 	}
 
 	return ignitionData, nil
@@ -1142,6 +1162,11 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Validate DiscoveryIgnitionPath is set and accessible
+	if err := r.validateDiscoveryIgnitionPath(); err != nil {
+		return fmt.Errorf("invalid DiscoveryIgnitionPath configuration: %w", err)
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
@@ -1152,6 +1177,20 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			r.enqueueServerByServerBootConfiguration(),
 		).
 		Complete(r)
+}
+
+// validateDiscoveryIgnitionPath ensures the DiscoveryIgnitionPath is set and accessible
+func (r *ServerReconciler) validateDiscoveryIgnitionPath() error {
+	if r.DiscoveryIgnitionPath == "" {
+		return fmt.Errorf("DiscoveryIgnitionPath is empty; must be set to a valid ignition template file path")
+	}
+
+	// Attempt to validate file accessibility by performing a test read
+	if err := ignition.ValidateIgnitionTemplatePath(r.DiscoveryIgnitionPath); err != nil {
+		return fmt.Errorf("DiscoveryIgnitionPath %q is not accessible or not a valid template: %w", r.DiscoveryIgnitionPath, err)
+	}
+
+	return nil
 }
 
 func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.EventHandler {

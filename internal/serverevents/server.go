@@ -65,8 +65,8 @@ func NewServer(log logr.Logger, addr string) *Server {
 }
 
 // SetClient sets the Kubernetes client on the collector for server tainting
-func (s *Server) SetClient(client client.Client) {
-	s.collector.SetClient(client)
+func (s *Server) SetClient(k8sClient client.Client) {
+	s.collector.SetClient(k8sClient)
 }
 
 // SetCriticalEventHandler sets the handler for critical events

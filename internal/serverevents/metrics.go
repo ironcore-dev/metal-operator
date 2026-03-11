@@ -90,10 +90,10 @@ func NewRedfishEventCollector() *RedfishEventCollector {
 }
 
 // SetClient sets the Kubernetes client for the collector
-func (c *RedfishEventCollector) SetClient(client client.Client) {
+func (c *RedfishEventCollector) SetClient(k8sClient client.Client) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	c.client = client
+	c.client = k8sClient
 }
 
 // SetLogger sets the logger for the collector

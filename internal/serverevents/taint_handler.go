@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -46,7 +47,7 @@ func CreateCriticalEventHandler(k8sClient client.Client, log logr.Logger) Critic
 		// Taint each server associated with the BMC
 		for i := range serverList.Items {
 			server := &serverList.Items[i]
-			if err := taintServer(ctx, k8sClient, server, event, log); err != nil {
+			if err := taintServer(ctx, k8sClient, server, event); err != nil {
 				log.Error(err, "Failed to taint server", "server", server.Name, "bmcName", bmcName)
 				continue
 			}
@@ -59,7 +60,8 @@ func CreateCriticalEventHandler(k8sClient client.Client, log logr.Logger) Critic
 // This implementation uses two approaches:
 // 1. Adds a Kubernetes condition to mark the critical event (works immediately)
 // 2. Adds a taint to ServerSpec.Taints (requires PR #672 to be merged)
-func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1alpha1.Server, event Event, log logr.Logger) error {
+func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1alpha1.Server, event Event) error {
+	log := ctrl.LoggerFrom(ctx)
 	if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(server), server); err != nil {
 		return fmt.Errorf("failed to re-fetch server before patching: %w", err)
 	}

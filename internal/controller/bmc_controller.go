@@ -115,6 +115,8 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 		if err := r.deleteEventSubscription(ctx, bmcClient, bmcObj); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to delete event subscriptions: %w", err)
 		}
+	} else {
+		log.Info("Cannot create BMC client during deletion, subscription cleanup will be skipped", "error", err.Error())
 	}
 
 	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil {
@@ -553,30 +555,32 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 	log.V(1).Info("Handling event subscriptions for BMC")
 	modified := false
 
-	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
-		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
-		if err != nil {
-			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
-		}
-		bmcBase := bmcObj.DeepCopy()
-		bmcObj.Status.MetricsReportSubscriptionLink = link
-		modified = true
-		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
-		}
-	}
+	bmcBase := bmcObj.DeepCopy()
+
 	if bmcObj.Status.EventsSubscriptionLink == "" {
 		link, err := serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
 			return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
 		}
-		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.EventsSubscriptionLink = link
 		modified = true
+	}
+
+	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
+		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
+		if err != nil {
+			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
+		}
+		bmcObj.Status.MetricsReportSubscriptionLink = link
+		modified = true
+	}
+
+	if modified {
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+			return false, fmt.Errorf("failed to patch BMC status with subscription links: %w", err)
 		}
 	}
+
 	return modified, nil
 }
 

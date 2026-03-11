@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -75,8 +75,20 @@ func (s *Server) SetCriticalEventHandler(handler CriticalEventHandler) {
 }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("/serverevents/alerts", s.alertHandler)
-	s.mux.HandleFunc("/serverevents/metricsreport", s.metricsreportHandler)
+	s.mux.HandleFunc("/serverevents/alerts/", s.alertHandler)
+	s.mux.HandleFunc("/serverevents/metricsreport/", s.metricsreportHandler)
+}
+
+func hostnameFromPath(requestPath, prefix string) (string, bool) {
+	if !strings.HasPrefix(requestPath, prefix) {
+		return "", false
+	}
+
+	hostname := strings.TrimPrefix(requestPath, prefix)
+	if hostname == "" || strings.Contains(hostname, "/") {
+		return "", false
+	}
+	return hostname, true
 }
 
 func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +98,12 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("Received alert data")
 	// expected path: /serverevents/alerts/{hostname}
-	hostname := path.Base(r.URL.Path)
+	hostname, ok := hostnameFromPath(r.URL.Path, "/serverevents/alerts/")
+	if !ok {
+		s.log.Error(nil, "Invalid hostname in event URL", "path", r.URL.Path, "extracted", hostname)
+		http.Error(w, "Hostname missing in URL path", http.StatusBadRequest)
+		return
+	}
 	eventData := EventData{}
 	if err := json.NewDecoder(r.Body).Decode(&eventData); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -102,7 +119,12 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// expected path: /serverevents/metricsreport/{hostname}
-	hostname := path.Base(r.URL.Path)
+	hostname, ok := hostnameFromPath(r.URL.Path, "/serverevents/metricsreport/")
+	if !ok {
+		s.log.Error(nil, "Invalid hostname in event URL", "path", r.URL.Path, "extracted", hostname)
+		http.Error(w, "Hostname missing in URL path", http.StatusBadRequest)
+		return
+	}
 	s.log.Info("received metrics report", "hostname", hostname)
 	metricsReport := MetricsReport{}
 	if err := json.NewDecoder(r.Body).Decode(&metricsReport); err != nil {

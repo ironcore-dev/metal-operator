@@ -31,7 +31,7 @@ func main() {
 	server := serverevents.NewServer(setupLog, ":8888")
 
 	if err := server.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running telemetry server")
+		setupLog.Error(err, "problem running event server")
 		os.Exit(1)
 	}
 }

@@ -60,9 +60,10 @@ func CreateCriticalEventHandler(k8sClient client.Client, log logr.Logger) Critic
 // 1. Adds a Kubernetes condition to mark the critical event (works immediately)
 // 2. Adds a taint to ServerSpec.Taints (requires PR #672 to be merged)
 func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1alpha1.Server, event Event, log logr.Logger) error {
+	if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(server), server); err != nil {
+		return fmt.Errorf("failed to re-fetch server before patching: %w", err)
+	}
 	serverBase := server.DeepCopy()
-	// Approach 1: Add a condition to mark the critical event
-	// This is a Kubernetes-native way to mark the server and works immediately
 	criticalEventCondition := metav1.Condition{
 		Type:               CriticalEventConditionType,
 		Status:             metav1.ConditionTrue,
@@ -71,13 +72,10 @@ func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1al
 		Reason:             fmt.Sprintf("CriticalEvent%s", event.EventID),
 		Message:            fmt.Sprintf("Critical Redfish event received: %s (Component: %s)", event.Message, event.OriginOfCondition),
 	}
-
-	// Check if condition already exists and is still True
 	conditionExists := false
 	for i, existingCondition := range server.Status.Conditions {
 		if existingCondition.Type == CriticalEventConditionType {
 			conditionExists = true
-			// Update the condition with the latest event
 			server.Status.Conditions[i] = criticalEventCondition
 			break
 		}
@@ -87,7 +85,6 @@ func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1al
 		server.Status.Conditions = append(server.Status.Conditions, criticalEventCondition)
 	}
 
-	// Patch the server status with the new condition
 	if err := k8sClient.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch server status with critical event condition: %w", err)
 	}

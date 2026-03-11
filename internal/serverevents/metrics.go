@@ -26,19 +26,30 @@ type MetricEntry struct {
 	Timestamp     time.Time
 }
 
+type AlertEntry struct {
+	Count    uint64
+	LastSeen time.Time
+}
+
 // CriticalEventHandler is a callback function that handles critical events
 type CriticalEventHandler func(ctx context.Context, bmcName string, event Event)
 
 type RedfishEventCollector struct {
 	lastReadings         map[string]MetricEntry
-	alertCounts          map[EventKey]uint64
+	alertCounts          map[EventKey]AlertEntry
 	mux                  sync.RWMutex
 	sensorDesc           *prometheus.Desc
 	alertDesc            *prometheus.Desc
 	client               client.Client
 	log                  logr.Logger
 	criticalEventHandler CriticalEventHandler
+	eventSem             chan struct{}
 }
+
+const (
+	staleMetricTTL = 10 * time.Minute
+	staleAlertTTL  = 24 * time.Hour
+)
 
 type EventKey struct {
 	Source    string
@@ -51,7 +62,7 @@ type EventKey struct {
 func NewRedfishEventCollector() *RedfishEventCollector {
 	c := &RedfishEventCollector{
 		lastReadings: make(map[string]MetricEntry),
-		alertCounts:  make(map[EventKey]uint64),
+		alertCounts:  make(map[EventKey]AlertEntry),
 		sensorDesc: prometheus.NewDesc(
 			"redfish_monitor_reading",
 			"Latest value pushed via Redfish MetricReport event",
@@ -64,9 +75,17 @@ func NewRedfishEventCollector() *RedfishEventCollector {
 			[]string{"hostname", "severity", "message_id", "component"},
 			nil,
 		),
-		log: logr.Discard(),
+		log:      logr.Discard(),
+		eventSem: make(chan struct{}, 10),
 	}
 	metrics.Registry.MustRegister(c)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			c.cleanupStaleData()
+		}
+	}()
 	return c
 }
 
@@ -146,14 +165,28 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 			EventID:   event.EventID,
 			Component: component,
 		}
-		c.alertCounts[key]++
+		entry := c.alertCounts[key]
+		entry.Count++
+		entry.LastSeen = time.Now()
+		c.alertCounts[key] = entry
 
 		// Handle critical events
 		if strings.EqualFold(event.Severity, "Critical") {
 			c.log.Info("Critical event received", "bmcName", hostname, "eventID", event.EventID, "component", component, "message", event.Message)
 			if c.criticalEventHandler != nil {
 				// Call the handler asynchronously to avoid blocking the HTTP handler
-				go c.criticalEventHandler(context.Background(), hostname, event)
+				go func(h string, e Event) {
+					// Try to acquire semaphore with non-blocking select
+					select {
+					case c.eventSem <- struct{}{}:
+						defer func() { <-c.eventSem }()
+						ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+						defer cancel()
+						c.criticalEventHandler(ctx, h, e)
+					default:
+						c.log.Info("Critical event handler pool exhausted, dropping event", "bmcName", h, "eventID", e.EventID)
+					}
+				}(hostname, event)
 			}
 		}
 	}
@@ -163,6 +196,7 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 // Describe and Collect implement the prometheus.Collector interface to expose metrics.
 func (c *RedfishEventCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.sensorDesc
+	ch <- c.alertDesc
 }
 
 // Collect gathers the latest metrics and sends them to Prometheus.
@@ -171,7 +205,7 @@ func (c *RedfishEventCollector) Collect(ch chan<- prometheus.Metric) {
 	defer c.mux.RUnlock()
 
 	for _, data := range c.lastReadings {
-		if time.Since(data.Timestamp) > 10*time.Minute {
+		if time.Since(data.Timestamp) > staleMetricTTL {
 			continue
 		}
 		ch <- prometheus.MustNewConstMetric(
@@ -185,15 +219,36 @@ func (c *RedfishEventCollector) Collect(ch chan<- prometheus.Metric) {
 			data.OriginContext,
 		)
 	}
-	for key, count := range c.alertCounts {
+	for key, alert := range c.alertCounts {
+		if time.Since(alert.LastSeen) > staleAlertTTL {
+			continue
+		}
 		ch <- prometheus.MustNewConstMetric(
 			c.alertDesc,
 			prometheus.CounterValue,
-			float64(count),
+			float64(alert.Count),
 			key.Source,
 			key.Severity,
 			key.EventID,
 			key.Component,
 		)
+	}
+}
+
+// cleanupStaleData removes stale entries from maps to prevent memory leaks
+func (c *RedfishEventCollector) cleanupStaleData() {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	now := time.Now()
+	for key, entry := range c.lastReadings {
+		if now.Sub(entry.Timestamp) > staleMetricTTL {
+			delete(c.lastReadings, key)
+		}
+	}
+	for key, entry := range c.alertCounts {
+		if now.Sub(entry.LastSeen) > staleAlertTTL {
+			delete(c.alertCounts, key)
+		}
 	}
 }

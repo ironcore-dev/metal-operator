@@ -990,7 +990,7 @@ type subscriptionPayload struct {
 	Context             string                           `json:"Context,omitempty"`
 }
 
-func (r *RedfishBMC) CreateEventSubscription(
+func (r *RedfishBaseBMC) CreateEventSubscription(
 	ctx context.Context,
 	destination string,
 	eventFormatType schemas.EventFormatType,
@@ -1041,7 +1041,7 @@ func (r *RedfishBMC) CreateEventSubscription(
 	return subscriptionLink, nil
 }
 
-func (r *RedfishBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
+func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {

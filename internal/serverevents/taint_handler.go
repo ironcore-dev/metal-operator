@@ -6,9 +6,13 @@ package serverevents
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,7 +24,49 @@ const (
 
 	// CriticalEventConditionType is the condition type for critical events
 	CriticalEventConditionType = "CriticalEventReceived"
+
+	// taintKeyPrefix is the prefix for critical event taint keys (used in commented code until PR #672)
+	taintKeyPrefix = "metal.ironcore.dev/critical-event-" //nolint:unused
+
+	// maxTaintKeyLength is the maximum allowed length for a Kubernetes taint key (used in commented code until PR #672)
+	maxTaintKeyLength = 63 //nolint:unused
 )
+
+var (
+	// invalidTaintKeyCharsRE matches characters not allowed in taint keys (used in commented code until PR #672)
+	invalidTaintKeyCharsRE = regexp.MustCompile(`[^A-Za-z0-9_.-]`) //nolint:unused
+
+	// multiDashRE matches sequences of multiple dashes (used in commented code until PR #672)
+	multiDashRE = regexp.MustCompile(`-+`) //nolint:unused
+
+	// Blank identifier to satisfy unused import check until PR #672 is merged
+	_ = corev1.Taint{}
+)
+
+// sanitizeEventID normalizes an event ID to be valid as part of a Kubernetes taint key.
+// It replaces invalid characters with dashes, collapses multiple dashes, trims non-alphanumerics,
+// and truncates to ensure the full key (with prefix) doesn't exceed maxTaintKeyLength.
+// This function will be used when PR #672 is merged and the taint code is uncommented.
+func sanitizeEventID(eventID string) string { //nolint:unused
+	// Replace invalid characters with dashes
+	sanitized := invalidTaintKeyCharsRE.ReplaceAllString(eventID, "-")
+
+	// Collapse multiple dashes into one
+	sanitized = multiDashRE.ReplaceAllString(sanitized, "-")
+
+	// Trim leading/trailing non-alphanumeric characters
+	sanitized = strings.Trim(sanitized, "-._")
+
+	// Calculate max suffix length to keep total key <= maxTaintKeyLength
+	maxSuffixLen := maxTaintKeyLength - len(taintKeyPrefix)
+	if len(sanitized) > maxSuffixLen {
+		sanitized = sanitized[:maxSuffixLen]
+		// Trim any trailing non-alphanumeric after truncation
+		sanitized = strings.TrimRight(sanitized, "-._")
+	}
+
+	return sanitized
+}
 
 // CreateCriticalEventHandler creates a handler that taints servers when critical events are received
 func CreateCriticalEventHandler(k8sClient client.Client, log logr.Logger) CriticalEventHandler {
@@ -71,21 +117,10 @@ func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1al
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: server.Generation,
 		LastTransitionTime: metav1.Now(),
-		Reason:             fmt.Sprintf("CriticalEvent%s", event.EventID),
+		Reason:             "CriticalEventReceived",
 		Message:            fmt.Sprintf("Critical Redfish event received: %s (Component: %s)", event.Message, event.OriginOfCondition),
 	}
-	conditionExists := false
-	for i, existingCondition := range server.Status.Conditions {
-		if existingCondition.Type == CriticalEventConditionType {
-			conditionExists = true
-			server.Status.Conditions[i] = criticalEventCondition
-			break
-		}
-	}
-
-	if !conditionExists {
-		server.Status.Conditions = append(server.Status.Conditions, criticalEventCondition)
-	}
+	apimeta.SetStatusCondition(&server.Status.Conditions, criticalEventCondition)
 
 	if err := k8sClient.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch server status with critical event condition: %w", err)
@@ -100,34 +135,35 @@ func taintServer(ctx context.Context, k8sClient client.Client, server *metalv1al
 	// Uncomment the following code after PR #672 is merged:
 	/*
 		serverBase = server.DeepCopy()
-		taintKey := fmt.Sprintf("metal.ironcore.dev/critical-event-%s", event.EventID)
+		sanitizedEventID := sanitizeEventID(event.EventID)
+		taintKey := taintKeyPrefix + sanitizedEventID
 		taint := corev1.Taint{
 			Key:    taintKey,
 			Value:  event.OriginOfCondition,
-			Effect: corev1.TaintEffectNoSchedule,
+			Effect: "NoClaim",
 		}
 
-			taintExists := false
-			for _, existingTaint := range server.Spec.Taints {
-				if existingTaint.Key == taint.Key && existingTaint.Effect == taint.Effect {
-					taintExists = true
-					log.V(1).Info("Taint already exists on server", "server", server.Name, "taintKey", taint.Key)
-					break
-				}
+		taintExists := false
+		for _, existingTaint := range server.Spec.Taints {
+			if existingTaint.Key == taint.Key && existingTaint.Effect == taint.Effect {
+				taintExists = true
+				log.V(1).Info("Taint already exists on server", "server", server.Name, "taintKey", taint.Key)
+				break
+			}
+		}
+
+		if !taintExists {
+			server.Spec.Taints = append(server.Spec.Taints, taint)
+
+			if err := k8sClient.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return fmt.Errorf("failed to patch server spec with taint: %w", err)
 			}
 
-			if !taintExists {
-				server.Spec.Taints = append(server.Spec.Taints, taint)
-
-				if err := k8sClient.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-					return fmt.Errorf("failed to patch server spec with taint: %w", err)
-				}
-
-				log.Info("Added taint to server spec",
-					"server", server.Name,
-					"taintKey", taint.Key,
-					"taintValue", taint.Value)
-			}
+			log.Info("Added taint to server spec",
+				"server", server.Name,
+				"taintKey", taint.Key,
+				"taintValue", taint.Value)
+		}
 	*/
 	return nil
 }

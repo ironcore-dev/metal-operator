@@ -137,30 +137,30 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 
 // Start starts the server on the specified address and adds logging for key events.
 func (s *Server) Start(ctx context.Context) error {
-	s.log.Info("Starting registry server", "address", s.addr)
+	s.log.Info("Starting event server", "address", s.addr)
 	server := &http.Server{Addr: s.addr, Handler: s.mux}
 
 	errChan := make(chan error, 1)
 	go func() {
 		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			errChan <- fmt.Errorf("HTTP registry server ListenAndServe: %w", err)
+			errChan <- fmt.Errorf("HTTP event server ListenAndServe: %w", err)
 		}
 	}()
 	select {
 	case <-ctx.Done():
-		s.log.Info("Shutting down registry server...")
+		s.log.Info("Shutting down event server...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("HTTP server Shutdown: %w", err)
 		}
-		s.log.Info("Registry server graciously stopped")
+		s.log.Info("Event server graciously stopped")
 		return nil
 	case err := <-errChan:
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
-			s.log.Error(shutdownErr, "Error shutting down registry server")
+			s.log.Error(shutdownErr, "Error shutting down event server")
 		}
 		return err
 	}

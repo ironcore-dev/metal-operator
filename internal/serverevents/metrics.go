@@ -133,7 +133,7 @@ func (c *RedfishEventCollector) UpdateFromMetricsReport(hostname string, report 
 		if err != nil {
 			continue
 		}
-		key := entry.MetricID + entry.MetricProperty
+		key := hostname + ":" + entry.MetricID + ":" + entry.MetricProperty
 		c.lastReadings[key] = MetricEntry{
 			Value:         val,
 			Type:          mType,

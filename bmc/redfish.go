@@ -870,7 +870,10 @@ func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *schem
 }
 
 // CheckBMCPendingComponentUpgrade is a fallback for vendors without pending component upgrade checks.
-func (r *RedfishBaseBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ string) (bool, error) {
+func (r *RedfishBaseBMC) CheckBMCPendingComponentUpgrade(_ context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
 	return false, fmt.Errorf("check pending component upgrade is not supported for manufacturer %q", r.manufacturer)
 }
 

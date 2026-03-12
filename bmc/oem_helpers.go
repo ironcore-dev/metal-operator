@@ -318,14 +318,14 @@ func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schem
 type pendingCheckFn func(*schemas.SoftwareInventory) bool
 
 // getComponentFiltersFn returns vendor-specific component filters for a component type.
-type getComponentFiltersFn func(string) []string
+type getComponentFiltersFn func(ComponentType) []string
 
 // matchComponentFilterFn checks if a component matches any filter.
 type matchComponentFilterFn func(*schemas.SoftwareInventory, []string) bool
 
 // checkPendingComponentUpgrade is the shared logic for checking pending component upgrades.
 // Vendor-specific behavior is injected via callbacks.
-func checkPendingComponentUpgrade(ctx context.Context, base *RedfishBaseBMC, componentType string, getFilters getComponentFiltersFn, matchFilter matchComponentFilterFn, checkPending pendingCheckFn,
+func checkPendingComponentUpgrade(ctx context.Context, base *RedfishBaseBMC, componentType ComponentType, getFilters getComponentFiltersFn, matchFilter matchComponentFilterFn, checkPending pendingCheckFn,
 ) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 

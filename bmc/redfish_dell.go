@@ -440,18 +440,21 @@ func (r *DellRedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskUR
 }
 
 // CheckBMCPendingComponentUpgrade checks for staged component upgrades (Dell: Staged=true).
-func (r *DellRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType string) (bool, error) {
+func (r *DellRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
 	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.dellGetComponentFilters, r.dellMatchesComponentFilter, r.dellCheckPending)
 }
 
-func (r *DellRedfishBMC) dellGetComponentFilters(componentType string) []string {
+func (r *DellRedfishBMC) dellGetComponentFilters(componentType ComponentType) []string {
 	switch componentType {
-	case "BMC":
+	case ComponentTypeBMC:
 		return []string{"iDRAC"}
-	case "BIOS":
+	case ComponentTypeBIOS:
 		return []string{"BIOS", "BIOS-PRIMARY"}
 	default:
-		return []string{componentType}
+		return []string{}
 	}
 }
 

@@ -300,7 +300,7 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 			return ctrl.Result{}, nil
 		}
 		// Check for pending component upgrade BEFORE issuing upgrade to avoid interrupting staged firmware
-		hasPending, err := bmcClient.CheckBMCPendingComponentUpgrade(ctx, "BMC")
+		hasPending, err := bmcClient.CheckBMCPendingComponentUpgrade(ctx, bmc.ComponentTypeBMC)
 		if err != nil {
 			log.V(1).Info("Failed to check pending component upgrade before BMC upgrade, proceeding anyway", "error", err)
 		} else if hasPending {

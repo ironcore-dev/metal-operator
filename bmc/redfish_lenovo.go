@@ -161,18 +161,21 @@ func (r *LenovoRedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, task
 }
 
 // CheckBMCPendingComponentUpgrade checks for pending component upgrades (Lenovo: "-Pending" suffix).
-func (r *LenovoRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType string) (bool, error) {
+func (r *LenovoRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
 	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.lenovoGetComponentFilters, r.lenovoMatchesComponentFilter, r.lenovoCheckPending)
 }
 
-func (r *LenovoRedfishBMC) lenovoGetComponentFilters(componentType string) []string {
+func (r *LenovoRedfishBMC) lenovoGetComponentFilters(componentType ComponentType) []string {
 	switch componentType {
-	case "BMC":
+	case ComponentTypeBMC:
 		return []string{"Firmware:BMC"}
-	case "BIOS":
+	case ComponentTypeBIOS:
 		return []string{"Firmware:UEFI", "BIOS"}
 	default:
-		return []string{componentType}
+		return []string{}
 	}
 }
 

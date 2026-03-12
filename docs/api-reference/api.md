@@ -670,7 +670,53 @@ _Appears in:_
 | `state` _[BMCState](#bmcstate)_ | State represents the current state of the BMC.<br />kubebuilder:validation:Enum=Enabled;Error;Pending | Pending |  |
 | `powerState` _[BMCPowerState](#bmcpowerstate)_ | PowerState represents the current power state of the BMC. |  |  |
 | `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  |  |
+| `tasks` _[BMCTask](#bmctask) array_ | Tasks tracks ongoing and recent BMC operations. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  |  |
+
+
+#### BMCTask
+
+
+
+BMCTask represents a single BMC operation task.
+
+
+
+_Appears in:_
+- [BMCStatus](#bmcstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `taskURI` _string_ | TaskURI is the URI to monitor the task on the BMC. |  |  |
+| `taskType` _[BMCTaskType](#bmctasktype)_ | TaskType indicates the type of operation. |  | Enum: [DiskErase BIOSReset BMCReset NetworkClear FirmwareUpdate ConfigurationChange AccountManagement Other] <br /> |
+| `targetID` _string_ | TargetID identifies what the task is operating on (e.g., "BIOS", "BMC", "Drive-1"). |  |  |
+| `state` _string_ | State is the current state of the task. |  |  |
+| `percentComplete` _integer_ | PercentComplete indicates completion percentage (0-100). |  |  |
+| `message` _string_ | Message provides additional information about the task. |  |  |
+| `lastUpdateTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastUpdateTime is when this task status was last updated. |  |  |
+
+
+#### BMCTaskType
+
+_Underlying type:_ _string_
+
+BMCTaskType defines the type of BMC task.
+
+
+
+_Appears in:_
+- [BMCTask](#bmctask)
+
+| Field | Description |
+| --- | --- |
+| `DiskErase` | BMCTaskTypeDiskErase indicates a disk erasing task.<br /> |
+| `BIOSReset` | BMCTaskTypeBIOSReset indicates a BIOS reset task.<br /> |
+| `BMCReset` | BMCTaskTypeBMCReset indicates a BMC reset task.<br /> |
+| `NetworkClear` | BMCTaskTypeNetworkClear indicates a network configuration clear task.<br /> |
+| `FirmwareUpdate` | BMCTaskTypeFirmwareUpdate indicates a firmware update task (BIOS or BMC).<br /> |
+| `ConfigurationChange` | BMCTaskTypeConfigurationChange indicates a configuration change task.<br /> |
+| `AccountManagement` | BMCTaskTypeAccountManagement indicates an account management task.<br /> |
+| `Other` | BMCTaskTypeOther indicates a task type not covered by the specific types.<br /> |
 
 
 #### BMCUser

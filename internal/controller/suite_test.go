@@ -110,7 +110,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 	BeforeEach(func(ctx SpecContext) {
 		var mgrCtx context.Context
 		mgrCtx, cancel := context.WithCancel(context.Background())
-		DeferCleanup(cancel)
+		DeferCleanup(func() {
+			cancel()
+			// Give in-flight reconciliations time to complete
+			time.Sleep(200 * time.Millisecond)
+		})
 
 		*ns = corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{

@@ -882,7 +882,7 @@ func (r *RedfishBaseBMC) GetTaskStatus(ctx context.Context, taskURI string) (*sc
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %d when getting task status", resp.StatusCode)

@@ -43,6 +43,14 @@ func (r *BMCTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling BMC tasks")
 
+	// Check if context is canceled (during shutdown)
+	select {
+	case <-ctx.Done():
+		return ctrl.Result{}, nil
+	default:
+		// Continue with reconciliation
+	}
+
 	// Fetch the BMC object
 	bmcObj := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, req.NamespacedName, bmcObj); err != nil {

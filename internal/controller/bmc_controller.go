@@ -113,7 +113,7 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 	if err == nil {
 		defer bmcClient.Logout()
 		if err := r.deleteEventSubscription(ctx, bmcClient, bmcObj); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to delete event subscriptions: %w", err)
+			log.Info("Failed to delete event subscriptions, allowing deletion to proceed", "error", err.Error())
 		}
 	} else {
 		log.Info("Cannot create BMC client during deletion, subscription cleanup will be skipped", "error", err.Error())

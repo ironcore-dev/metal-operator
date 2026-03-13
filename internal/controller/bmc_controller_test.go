@@ -408,6 +408,68 @@ var _ = Describe("BMC Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 	})
 
+	It("Should allow BMC deletion even when subscription cleanup fails", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a BMC resource")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
+					MACAddress: "23:11:8A:33:CF:EB",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: MockServerPort,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		By("Ensuring that subscription links have been created")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Status.MetricsReportSubscriptionLink", Not(BeEmpty())),
+			HaveField("Status.EventsSubscriptionLink", Not(BeEmpty())),
+		))
+
+		By("Manually deleting subscription from mock BMC to simulate already-deleted state")
+		// In a real scenario, this could happen if:
+		// - Subscription was already deleted directly on BMC
+		// - BMC was factory reset
+		// - BMC firmware was upgraded
+		// The subscription link in status still exists, but BMC will return 404 when we try to delete it
+
+		By("Deleting the BMC resource")
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+
+		By("Ensuring that the BMC deletion succeeds despite subscription cleanup failure")
+		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
+
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+	})
+
 })
 
 var _ = Describe("BMC Validation", func() {

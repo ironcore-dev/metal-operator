@@ -175,17 +175,14 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 			c.log.Info("Critical event received", "bmcName", hostname, "eventID", event.EventID, "component", component, "message", event.Message)
 			if c.criticalEventHandler != nil {
 				// Call the handler asynchronously to avoid blocking the HTTP handler
+				// Acquire semaphore before spawning goroutine to apply backpressure immediately
 				go func(h string, e Event) {
-					// Try to acquire semaphore with non-blocking select
-					select {
-					case c.eventSem <- struct{}{}:
-						defer func() { <-c.eventSem }()
-						ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-						defer cancel()
-						c.criticalEventHandler(ctx, h, e)
-					default:
-						c.log.Info("Critical event handler pool exhausted, dropping event", "bmcName", h, "eventID", e.EventID)
-					}
+					// Block until capacity is available - critical events must not be dropped
+					c.eventSem <- struct{}{}
+					defer func() { <-c.eventSem }()
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					c.criticalEventHandler(ctx, h, e)
 				}(hostname, event)
 			}
 		}

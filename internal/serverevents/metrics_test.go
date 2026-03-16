@@ -99,7 +99,7 @@ func TestCriticalEventHandlerBlocksUntilCapacityAvailable(t *testing.T) {
 	numEvents := 5
 	wg.Add(numEvents)
 
-	for i := 0; i < numEvents; i++ {
+	for range numEvents {
 		collector.UpdateFromEvent("test-bmc", EventData{
 			Events: []Event{{
 				EventID:           "CRIT001",
@@ -156,7 +156,7 @@ func TestCriticalEventHandlerWithSlowHandler(t *testing.T) {
 	numEvents := 3
 	wg.Add(numEvents)
 
-	for i := 0; i < numEvents; i++ {
+	for range numEvents {
 		collector.UpdateFromEvent("test-bmc", EventData{
 			Events: []Event{{
 				EventID:           "CRIT001",
@@ -187,7 +187,7 @@ func TestCriticalEventHandlerWithSlowHandler(t *testing.T) {
 	if len(processOrder) != numEvents {
 		t.Fatalf("expected %d events to be processed, got %d", numEvents, len(processOrder))
 	}
-	for i := 0; i < numEvents; i++ {
+	for i := range numEvents {
 		if processOrder[i] != i+1 {
 			t.Fatalf("expected event %d to be processed in order, got process order: %v", i+1, processOrder)
 		}

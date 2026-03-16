@@ -65,7 +65,7 @@ jobs:
         docker context create builders
     - name: Set up Docker Buildx
       timeout-minutes: 5
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
       with:
         version: latest
         endpoint: builders # self-hosted

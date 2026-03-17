@@ -331,6 +331,12 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 	}
 	log.V(1).Info("Set PXE Boot for Server")
 
+	// Ensure registry is clean before Discovery starts (fresh registration)
+	if err := r.cleanupRegistryEntryIfExists(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to clean up registry entry before discovery: %w", err)
+	}
+	log.V(1).Info("Ensured registry is clean for discovery")
+
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
 		return false, err
 	}
@@ -379,12 +385,24 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 	}
 	log.V(1).Info("Extracted Server details")
 
+	// Power off the server first to terminate the metalprobe process
+	server.Spec.Power = metalv1alpha1.PowerOff
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to update server power state: %w", err)
+	}
+
+	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
+		return false, fmt.Errorf("failed to power off server: %w", err)
+	}
+	log.V(1).Info("Powered off server, terminated metalprobe")
+
+	// Now safe to delete registry entry - metalprobe is dead and can't re-register
 	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
 	}
 	log.V(1).Info("Removed Server from Registry")
 
-	log.V(1).Info("Setting Server state set to available")
+	log.V(1).Info("Setting Server state to available")
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
 		return false, err
 	}
@@ -1089,7 +1107,44 @@ func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context,
 			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
+
+	// Validate successful deletion
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete registry entry for server: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
 	return nil
+}
+
+func (r *ServerReconciler) cleanupRegistryEntryIfExists(ctx context.Context, server *metalv1alpha1.Server) error {
+	log := ctrl.LoggerFrom(ctx)
+	url := fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID)
+
+	// Check if registry entry exists
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to check registry entry for server: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// If entry doesn't exist, nothing to clean
+	if resp.StatusCode == http.StatusNotFound {
+		log.V(1).Info("Registry entry not found, nothing to clean")
+		return nil
+	}
+
+	// If entry exists, delete it
+	if resp.StatusCode == http.StatusOK {
+		if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
+			return fmt.Errorf("failed to delete registry entry during cleanup: %w", err)
+		}
+		log.V(1).Info("Cleaned up existing registry entry")
+		return nil
+	}
+
+	// Unexpected status code
+	return fmt.Errorf("unexpected status code when checking registry entry: HTTP %d", resp.StatusCode)
 }
 
 func (r *ServerReconciler) applyBootOrder(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {

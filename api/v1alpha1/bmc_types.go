@@ -18,6 +18,16 @@ const (
 	ProtocolRedfishLocal = "RedfishLocal"
 	// ProtocolRedfishKube is the RedfishKube protocol.
 	ProtocolRedfishKube = "RedfishKube"
+
+	// BMCCertificateReadyCondition indicates that the BMC certificate is ready.
+	BMCCertificateReadyCondition = "CertificateReady"
+
+	// BMCCertificateReadyReasonIssued indicates that the certificate was successfully issued.
+	BMCCertificateReadyReasonIssued = "Issued"
+	// BMCCertificateReadyReasonPending indicates that the certificate request is pending.
+	BMCCertificateReadyReasonPending = "Pending"
+	// BMCCertificateReadyReasonFailed indicates that the certificate request failed.
+	BMCCertificateReadyReasonFailed = "Failed"
 )
 
 // BMCSpec defines the desired state of BMC
@@ -61,6 +71,46 @@ type BMCSpec struct {
 	// Hostname is the hostname of the BMC.
 	// +optional
 	Hostname *string `json:"hostname,omitempty"`
+
+	// Certificate specifies the certificate configuration for the BMC.
+	// +optional
+	Certificate *BMCCertificateSpec `json:"certificate,omitempty"`
+}
+
+// BMCCertificateSpec defines the desired certificate configuration for a BMC.
+type BMCCertificateSpec struct {
+	// IssuerRef is a reference to the cert-manager Issuer or ClusterIssuer.
+	// +required
+	IssuerRef CertificateIssuerRef `json:"issuerRef"`
+
+	// Duration is the requested duration for the certificate.
+	// +optional
+	Duration *metav1.Duration `json:"duration,omitempty"`
+
+	// CommonName is the common name to be used on the certificate.
+	// +optional
+	CommonName string `json:"commonName,omitempty"`
+
+	// DNSNames is a list of DNS names to be used on the certificate.
+	// +optional
+	DNSNames []string `json:"dnsNames,omitempty"`
+
+	// IPAddresses is a list of IP addresses to be used on the certificate.
+	// +optional
+	IPAddresses []string `json:"ipAddresses,omitempty"`
+}
+
+// CertificateIssuerRef defines a reference to a cert-manager Issuer or ClusterIssuer.
+type CertificateIssuerRef struct {
+	// Name is the name of the Issuer or ClusterIssuer.
+	// +required
+	Name string `json:"name"`
+
+	// Kind is the type of the issuer (Issuer or ClusterIssuer).
+	// +kubebuilder:validation:Enum=Issuer;ClusterIssuer
+	// +kubebuilder:default=Issuer
+	// +optional
+	Kind string `json:"kind,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.
@@ -213,6 +263,14 @@ type BMCStatus struct {
 	// EventsSubscriptionLink is the link to the events subscription of the bmc.
 	// +optional
 	EventsSubscriptionLink string `json:"eventsSubscriptionLink,omitempty"`
+
+	// CertificateSecretRef is a reference to the secret containing the BMC certificate.
+	// +optional
+	CertificateSecretRef *v1.LocalObjectReference `json:"certificateSecretRef,omitempty"`
+
+	// CertificateRequestName is the name of the cert-manager CertificateRequest.
+	// +optional
+	CertificateRequestName string `json:"certificateRequestName,omitempty"`
 
 	// Conditions represents the latest available observations of the BMC's current state.
 	// +patchStrategy=merge

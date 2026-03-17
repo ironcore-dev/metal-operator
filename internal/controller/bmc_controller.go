@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -70,6 +71,9 @@ type BMCReconciler struct {
 	// DNSRecordTemplatePath is the path to the file containing the DNSRecord template.
 	DNSRecordTemplate string
 	Conditions        *conditionutils.Accessor
+	// Certificate management
+	EnableCertificateManagement bool
+	CertificateRetryInterval    time.Duration
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -77,6 +81,9 @@ type BMCReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificaterequests,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificaterequests/status,verbs=get
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -132,6 +139,12 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
 	}
+
+	// Certificate reconciliation (before BMC operations)
+	if result, err := r.reconcileCertificate(ctx, bmcObj); err != nil || !result.IsZero() {
+		return result, err
+	}
+
 	if r.waitForBMCReset(bmcObj, r.BMCResetWaitTime) {
 		log.V(1).Info("Skipped BMC reconciliation while waiting for BMC reset to complete")
 		err := r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
@@ -617,10 +630,37 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
-		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
-		Complete(r)
+		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret))
+
+	// Watch CertificateRequests if certificate management enabled
+	if r.EnableCertificateManagement {
+		builder = builder.Watches(
+			&certmanagerv1.CertificateRequest{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueBMCForCertificateRequest),
+		)
+	}
+
+	return builder.Complete(r)
+}
+
+// enqueueBMCForCertificateRequest maps CertificateRequest events to BMC reconciliation
+func (r *BMCReconciler) enqueueBMCForCertificateRequest(ctx context.Context, obj client.Object) []ctrl.Request {
+	certReq, ok := obj.(*certmanagerv1.CertificateRequest)
+	if !ok {
+		return nil
+	}
+
+	// Find BMC that owns this CertificateRequest
+	bmcName, found := certReq.Labels["metal.ironcore.dev/bmc"]
+	if !found {
+		return nil
+	}
+
+	return []ctrl.Request{
+		{NamespacedName: client.ObjectKey{Name: bmcName}},
+	}
 }

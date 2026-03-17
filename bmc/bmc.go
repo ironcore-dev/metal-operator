@@ -126,6 +126,17 @@ type BMC interface {
 
 	// GetAccountService retrieves the account service.
 	GetAccountService() (*schemas.AccountService, error)
+
+	// GenerateCSR generates a Certificate Signing Request (CSR) with the provided parameters.
+	// The CSR can be submitted to a Certificate Authority for signing.
+	GenerateCSR(ctx context.Context, params CSRParameters) ([]byte, error)
+
+	// ReplaceCertificate replaces the BMC's TLS certificate with the provided certificate and private key.
+	// The certificate and privateKey should be PEM-encoded strings.
+	ReplaceCertificate(ctx context.Context, certificate, privateKey string) error
+
+	// GetCertificateInfo retrieves information about the BMC's current TLS certificate.
+	GetCertificateInfo(ctx context.Context) (*CertificateInfo, error)
 }
 
 type Entity struct {
@@ -284,4 +295,40 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
+}
+
+// CSRParameters contains the parameters for generating a Certificate Signing Request.
+type CSRParameters struct {
+	// CommonName is the fully qualified domain name (FQDN) or IP address of the BMC.
+	CommonName string
+	// AlternativeNames is a list of Subject Alternative Names (SANs) for the certificate.
+	AlternativeNames []string
+	// Organization is the organization name for the certificate subject.
+	Organization string
+	// OrganizationalUnit is the organizational unit name for the certificate subject.
+	OrganizationalUnit string
+	// City is the city or locality name for the certificate subject.
+	City string
+	// State is the state or province name for the certificate subject.
+	State string
+	// Country is the two-letter country code for the certificate subject.
+	Country string
+	// KeyPairAlgorithm specifies the algorithm used for key pair generation (e.g., "RSA", "EC").
+	KeyPairAlgorithm string
+	// KeyBitLength specifies the bit length of the key (e.g., 2048, 4096 for RSA).
+	KeyBitLength int
+}
+
+// CertificateInfo contains information about a TLS certificate.
+type CertificateInfo struct {
+	// Subject contains the certificate subject information (e.g., "CN=bmc.example.com,O=Example Org").
+	Subject string
+	// Issuer contains the certificate issuer information.
+	Issuer string
+	// ValidFrom is the certificate's validity start date.
+	ValidFrom string
+	// ValidUntil is the certificate's validity end date.
+	ValidUntil string
+	// SerialNumber is the certificate's serial number.
+	SerialNumber string
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 
@@ -71,7 +72,10 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "config", "crd", "bases"),
+			filepath.Join("..", "..", "config", "crd", "cert-manager"),
+		},
 		ErrorIfCRDPathMissing: true,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
@@ -92,6 +96,7 @@ var _ = BeforeSuite(func() {
 	DeferCleanup(testEnv.Stop)
 
 	Expect(metalv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(certmanagerv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
 
@@ -171,15 +176,16 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect((&BMCReconciler{
-			Client:                 k8sManager.GetClient(),
-			Scheme:                 k8sManager.GetScheme(),
-			Insecure:               true,
-			ManagerNamespace:       ns.Name,
-			BMCResetWaitTime:       400 * time.Millisecond,
-			BMCClientRetryInterval: 25 * time.Millisecond,
-			EventURL:               "http://localhost:8008",
-			DNSRecordTemplate:      dnsTemplate,
-			Conditions:             accessor,
+			Client:                      k8sManager.GetClient(),
+			Scheme:                      k8sManager.GetScheme(),
+			Insecure:                    true,
+			ManagerNamespace:            ns.Name,
+			BMCResetWaitTime:            400 * time.Millisecond,
+			BMCClientRetryInterval:      25 * time.Millisecond,
+			EventURL:                    "http://localhost:8008",
+			DNSRecordTemplate:           dnsTemplate,
+			Conditions:                  accessor,
+			EnableCertificateManagement: true,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{

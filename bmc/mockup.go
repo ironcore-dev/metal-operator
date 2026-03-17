@@ -30,19 +30,11 @@ type RedfishMockUps struct {
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
-	r.BIOSSettingAttr = map[string]map[string]any{
-		"abc":       {"type": "string", "reboot": false, "value": "bar"},
-		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
-	}
-	r.BMCSettingAttr = map[string]map[string]any{
-		"abc":       {"type": schemas.StringAttributeType, "reboot": false, "value": "bar"},
-		"fooreboot": {"type": schemas.IntegerAttributeType, "reboot": true, "value": 123},
-	}
-	r.PendingBIOSSetting = map[string]map[string]any{}
-	r.BIOSVersion = ""
-	r.BIOSUpgradingVersion = ""
+	r.ResetBIOSSettings()
+	r.ResetBMCSettings()
+	r.ResetBIOSVersionUpdate()
+	r.ResetBMCVersionUpdate()
 
-	r.BIOSUpgradeTaskIndex = 0
 	r.BIOSUpgradeTaskStatus = []schemas.Task{
 		{
 			TaskState:       schemas.NewTaskState,
@@ -74,12 +66,6 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		},
 	}
 
-	r.PendingBMCSetting = map[string]map[string]any{}
-
-	r.BMCVersion = ""
-	r.BMCUpgradingVersion = ""
-
-	r.BMCUpgradeTaskIndex = 0
 	r.BMCUpgradeTaskStatus = []schemas.Task{
 		{
 			TaskState:       schemas.NewTaskState,
@@ -174,6 +160,7 @@ func (r *RedfishMockUps) ResetBMCSettings() {
 	r.BMCSettingAttr = map[string]map[string]any{
 		"abc":       {"type": schemas.StringAttributeType, "reboot": false, "value": "bar"},
 		"fooreboot": {"type": schemas.IntegerAttributeType, "reboot": true, "value": 123},
+		"123":       {"type": schemas.StringAttributeType, "reboot": false, "value": "foo"},
 	}
 	r.PendingBMCSetting = map[string]map[string]any{}
 }

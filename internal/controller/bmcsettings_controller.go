@@ -106,6 +106,10 @@ func (r *BMCSettingsReconciler) shouldDelete(
 	if controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) &&
 		bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
 		log := ctrl.LoggerFrom(ctx)
+		if _, err := r.getBMC(ctx, bmcSetting); apierrors.IsNotFound(err) {
+			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcSetting.Spec.BMCRef.Name)
+			return true
+		}
 		log.V(1).Info("postponing delete as Settings update is in progress")
 		return false
 	}
@@ -237,7 +241,7 @@ func (r *BMCSettingsReconciler) reconcile(
 	// if referred BMC contains reference to different BMCSettings object - stop reconciliation
 	BMC, err := r.getBMC(ctx, bmcSetting)
 	if err != nil {
-		log.V(1).Info("Referred server object could not be fetched")
+		log.V(1).Info("Referred BMC object could not be fetched")
 		return ctrl.Result{}, err
 	}
 	// patch BMC with BMCSettings reference
@@ -685,7 +689,16 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 	bmcClient bmc.BMC,
 ) (diff schemas.SettingsAttributes, err error) {
 	log := ctrl.LoggerFrom(ctx)
-	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.BMCUUID, bmcSetting.Spec.SettingsMap)
+	// convert go Template to strings
+	convertedSettings := make(map[string]string)
+	for key, value := range bmcSetting.Spec.SettingsMap {
+		tmpl, err := ConvertTemplate(ctx, r.Client, map[string]any{"labels": BMC.GetLabels()}, value)
+		if err != nil {
+			return diff, fmt.Errorf("failed to process template for key %s: %w", key, err)
+		}
+		convertedSettings[key] = tmpl
+	}
+	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, BMC.Spec.BMCUUID, convertedSettings)
 	if err != nil {
 		return diff, fmt.Errorf("failed to get BMC settings: %w", err)
 	}
@@ -694,7 +707,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(
 
 	diff = schemas.SettingsAttributes{}
 	var errs []error
-	for key, value := range bmcSetting.Spec.SettingsMap {
+	for key, value := range convertedSettings {
 		res, ok := currentSettings[key]
 		if ok {
 			switch data := res.(type) {

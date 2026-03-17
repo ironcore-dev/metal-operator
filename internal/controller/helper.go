@@ -4,6 +4,7 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -11,7 +12,10 @@ import (
 	"maps"
 	"math/big"
 	"reflect"
+	"regexp"
 	"slices"
+	"strings"
+	"text/template"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -406,4 +410,102 @@ func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFiel
 	}
 
 	return false
+}
+
+func RegexInsertOrReplace(s, pattern, repl string) string {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return s // or handle error as needed
+	}
+
+	return re.ReplaceAllString(s, repl)
+}
+
+func ConvertTemplate(ctx context.Context, c client.Client, data map[string]any, tmplStr string) (string, error) {
+	// Data to pass to the template
+	// data = map[string]interface{}{
+	// 	"labels": obj.GetLabels(),
+	// }
+	log := ctrl.LoggerFrom(ctx)
+	tmpl := template.New("BMCTemplate").Funcs(template.FuncMap{
+		"RegexInsertOrReplace": RegexInsertOrReplace,
+		"GetSecretFrom": func(name, ns, key string) string {
+			return fmt.Sprintf("secret__RefObj__:::%s:::%s:::%s", name, ns, key)
+		},
+		"GetConfigData": func(name, ns, key string) string {
+			return fmt.Sprintf("config__RefObj__:::%s:::%s:::%s", name, ns, key)
+		},
+	})
+
+	if !IsGoTemplateFormat(tmpl, tmplStr) {
+		return tmplStr, nil
+	}
+
+	tmpl, err := tmpl.Parse(tmplStr)
+	if err != nil {
+		log.V(1).Info("Template parsing error:", "Error", err)
+		return "", err
+	}
+
+	output := &bytes.Buffer{}
+	err = tmpl.Execute(output, data)
+	if err != nil {
+		log.V(1).Info("Template execute error", "Error", err)
+		return "", err
+	}
+
+	re := regexp.MustCompile(`.*__RefObj__:::(.+?):::(.+?):::(.+)`)
+
+	// check for se
+	result := re.ReplaceAllStringFunc(output.String(), func(marker string) string {
+		matches := re.FindStringSubmatch(marker)
+		if len(matches) > 3 {
+			if strings.HasPrefix(marker, "secret__RefObj__") {
+				log.V(1).Info("String is a Go template secret fetch format", "data", matches)
+				s, err := GetSecretsData(ctx, c, matches[1], matches[2], matches[3])
+				if err == nil {
+					return s
+				}
+				log.V(1).Info("Error fetching secret data for Go template", "Error", err)
+			} else if strings.HasPrefix(marker, "config__RefObj__") {
+				log.V(1).Info("String is a Go template config fetch format", "data", matches)
+				s, err := GetConfigData(ctx, c, matches[1], matches[2], matches[3])
+				if err == nil {
+					return s
+				}
+			}
+			return marker // fallback to original if no match
+		}
+		return marker // fallback to original if error
+	})
+
+	log.V(1).Info("String is a Go template format", "String", result)
+	return result, nil
+}
+
+func IsGoTemplateFormat(tmpl *template.Template, s string) bool {
+	_, err := tmpl.Parse(s)
+	return err == nil
+}
+
+func GetSecretsData(ctx context.Context, c client.Client, name, ns, key string) (string, error) {
+	secret := &corev1.Secret{}
+	err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: ns}, secret)
+
+	secretData, ok := secret.Data[key]
+	if !ok {
+		return "", fmt.Errorf("key not found in secret: %v", secret)
+	}
+	return string(secretData), err
+}
+
+func GetConfigData(ctx context.Context, c client.Client, name, ns, key string) (string, error) {
+	secret := &corev1.ConfigMap{}
+	err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: ns}, secret)
+
+	configData, ok := secret.Data[key]
+	if !ok {
+		return "", fmt.Errorf("key not found in config map: %v", secret.Data)
+	}
+	return configData, err
 }

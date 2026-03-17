@@ -50,6 +50,7 @@ var _ = Describe("BMCSettings Controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
 				Namespace:    ns.Name,
+				Labels:       map[string]string{"name": "test-bmc"},
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -628,6 +629,89 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		Expect(k8sClient.Delete(ctx, bmcSettings2)).To(Succeed())
 		Eventually(Get(bmcSettings2)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
+
+	It("Should update the setting if BMCSettings Spec are in go template format", func(ctx SpecContext) {
+		bmcSetting := make(map[string]string)
+		bmcSetting["abc"] = "{{ RegexInsertOrReplace .labels.name \"-\" \"-r\" }}"
+		bmcSetting["123"] = fmt.Sprintf("{{ GetSecretFrom .labels.name \"%v\" \"test-key\" }}", ns.Name)
+
+		By("update the server state to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
+
+		By("Creating an secret")
+		someSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      bmc.Labels["name"],
+			},
+			StringData: map[string]string{
+				"test-key": "bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, someSecret)).To(Succeed())
+
+		By("Creating a BMCSetting")
+		bmcSettings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-bmc-change",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version:                 "1.45.455b66-rev4",
+					SettingsMap:             bmcSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				}},
+		}
+		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
+
+		By("Ensuring that the BMC has the BMCSettings ref")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: bmcSettings.Name}),
+		))
+
+		By("Ensuring that the BMCSettings has reached next state")
+		Eventually(Object(bmcSettings)).Should(SatisfyAny(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateInProgress),
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+		Eventually(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
+		By("Ensuring that the Maintenance resource has been deleted")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
+		Consistently(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Spec.ServerMaintenanceRefs", BeNil()),
+		))
+
+		// check if the setting has been rendered correctly by the go template function
+		Expect(bmcPkg.UnitTestMockUps.BMCSettingAttr["abc"]).Should(
+			HaveKeyWithValue("value", "test-rbmc"),
+		)
+		Expect(bmcPkg.UnitTestMockUps.BMCSettingAttr["123"]).Should(
+			HaveKeyWithValue("value", "bar"),
+		)
+
+		By("Deleting the BMCSettings")
+		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
+
+		By("Ensuring that the BMCSettings ref is empty on BMC")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", BeNil()),
+		))
+
+		// cleanup
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)

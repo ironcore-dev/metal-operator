@@ -85,8 +85,9 @@ type ServerReconciler struct {
 	Insecure                bool
 	ManagerNamespace        string
 	ProbeImage              string
-	RegistryURL             string
 	ProbeOSImage            string
+	RegistryURL             string
+	RegistryTimeout         time.Duration
 	RegistryResyncInterval  time.Duration
 	EnforceFirstBoot        bool
 	EnforcePowerOff         bool
@@ -386,6 +387,7 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 	log.V(1).Info("Extracted Server details")
 
 	// Power off the server first to terminate the metalprobe process
+	serverBase = server.DeepCopy()
 	server.Spec.Power = metalv1alpha1.PowerOff
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to update server power state: %w", err)
@@ -846,18 +848,29 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 
 func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID))
-	if resp != nil && resp.StatusCode == http.StatusNotFound {
+	url := fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID)
+	c := &http.Client{Timeout: r.RegistryTimeout}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error(err, "Failed to close response body")
+		}
+	}(resp.Body)
+
+	if resp.StatusCode == http.StatusNotFound {
 		log.V(1).Info("Did not find server information in registry")
 		return false, nil
-	}
-
-	if resp == nil {
-		return false, fmt.Errorf("failed to find server information in registry")
-	}
-
-	if err != nil {
-		return false, fmt.Errorf("failed to fetch server details: %w", err)
 	}
 
 	serverDetails := &registry.Server{}
@@ -1087,11 +1100,9 @@ func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.C
 func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 	url := fmt.Sprintf("%s/delete/%s", r.RegistryURL, server.Spec.SystemUUID)
+	c := &http.Client{Timeout: r.RegistryTimeout}
 
-	c := &http.Client{}
-
-	// Create the DELETE request
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -1110,7 +1121,7 @@ func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context,
 
 	// Validate successful deletion
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Limit to 1KB
 		return fmt.Errorf("failed to delete registry entry for server: HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -1120,13 +1131,22 @@ func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context,
 func (r *ServerReconciler) cleanupRegistryEntryIfExists(ctx context.Context, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 	url := fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID)
+	c := &http.Client{Timeout: r.RegistryTimeout}
 
-	// Check if registry entry exists
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create registry check request: %w", err)
+	}
+	resp, err := c.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to check registry entry for server: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error(err, "Failed to close response body")
+		}
+	}(resp.Body)
 
 	// If entry doesn't exist, nothing to clean
 	if resp.StatusCode == http.StatusNotFound {

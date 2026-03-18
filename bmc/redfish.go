@@ -994,7 +994,7 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 	ctx context.Context,
 	destination string,
 	eventFormatType schemas.EventFormatType,
-	retry schemas.DeliveryRetryPolicy,
+	deliveryRetryPolicy schemas.DeliveryRetryPolicy,
 ) (string, error) {
 	service := r.client.GetService()
 	ev, err := service.EventService()
@@ -1008,7 +1008,7 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		Destination:         destination,
 		EventFormatType:     eventFormatType, // event or metricreport
 		Protocol:            schemas.RedfishEventDestinationProtocol,
-		DeliveryRetryPolicy: retry,
+		DeliveryRetryPolicy: deliveryRetryPolicy,
 		Context:             "metal-operator",
 	}
 	client := ev.GetClient()

@@ -110,7 +110,7 @@ type BMC interface {
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
 	// CreateEventSubscription creates an event subscription for the manager.
-	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
+	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, deliveryRetryPolicy schemas.DeliveryRetryPolicy) (string, error)
 
 	// DeleteEventSubscription deletes an event subscription for the manager.
 	DeleteEventSubscription(ctx context.Context, uri string) error

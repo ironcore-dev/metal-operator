@@ -11,7 +11,7 @@ import (
 	"github.com/stmcginnis/gofish/schemas"
 )
 
-// SubscribeMetricsReport subscribes to Redfish metric reporting events for the given hostname and callback URL.
+// SubscribeMetricsReport subscribes to sRedfish metric reporting events for the given hostname and callback URL.
 func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,

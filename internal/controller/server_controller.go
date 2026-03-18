@@ -67,6 +67,8 @@ const (
 	InternalAnnotationTypeValue = "Internal"
 	// PoweringOnCondition is the condition type for powering on a server
 	PoweringOnCondition = "PoweringOn"
+	// RegistryDataMaxAge is the maximum age of registry data to accept for discovery completion
+	RegistryDataMaxAge = 5 * time.Minute
 )
 
 const (
@@ -344,6 +346,14 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 	return false, nil
 }
 
+// isRegistryDataFresh checks if the registry data timestamp is recent enough
+func (r *ServerReconciler) isRegistryDataFresh(serverDetails *registry.Server, maxAge time.Duration) bool {
+	if serverDetails == nil || serverDetails.Timestamp == nil {
+		return false
+	}
+	return time.Since(serverDetails.Timestamp.Time) < maxAge
+}
+
 func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
@@ -375,7 +385,8 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		}
 	}
 
-	ready, err := r.extractServerDetailsFromRegistry(ctx, server)
+	serverDetails := &registry.Server{}
+	ready, err := r.extractServerDetailsFromRegistry(ctx, server, serverDetails)
 	if !ready && err == nil {
 		log.V(1).Info("Server agent did not post info to registry")
 		return true, nil
@@ -384,7 +395,23 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		log.V(1).Info("Could not get server details from registry.")
 		return false, err
 	}
+
+	// Check if the registry data is fresh enough to proceed with discovery completion
+	if !r.isRegistryDataFresh(serverDetails, RegistryDataMaxAge) {
+		if serverDetails.Timestamp != nil {
+			log.V(1).Info("Registry data is stale, waiting for fresh update", "age", time.Since(serverDetails.Timestamp.Time))
+		} else {
+			log.V(1).Info("Registry data has no timestamp, waiting for fresh update")
+		}
+		return true, nil
+	}
+
 	log.V(1).Info("Extracted Server details")
+
+	// Re-fetch server to get latest state before patching
+	if err := r.Get(ctx, client.ObjectKeyFromObject(server), server); err != nil {
+		return false, fmt.Errorf("failed to re-fetch server: %w", err)
+	}
 
 	// Power off the server first to terminate the metalprobe process
 	serverBase = server.DeepCopy()
@@ -846,7 +873,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 	return nil
 }
 
-func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server, serverDetails *registry.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	url := fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID)
 	c := &http.Client{Timeout: r.RegistryTimeout}
@@ -873,7 +900,6 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 		return false, nil
 	}
 
-	serverDetails := &registry.Server{}
 	if err := json.NewDecoder(resp.Body).Decode(serverDetails); err != nil {
 		return false, fmt.Errorf("failed to decode server details: %w", err)
 	}

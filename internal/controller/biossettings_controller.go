@@ -280,7 +280,23 @@ func (r *BIOSSettingsReconciler) reconcile(ctx context.Context, settings *metalv
 			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 		}
 		if apierrors.IsNotFound(err) {
-			log.V(1).Info("BMC/BMCSecret not found", "BMC", server.Spec.BMCRef, "Server", server.Name, "error", err)
+			var statusErr *apierrors.StatusError
+			if errors.As(err, &statusErr) && statusErr.ErrStatus.Details != nil {
+				d := statusErr.ErrStatus.Details
+				log.V(1).Info("Referenced resource not found while creating BMC client",
+					"group", d.Group,
+					"kind", d.Kind,
+					"name", d.Name,
+					"server", server.Name,
+					"message", statusErr.ErrStatus.Message,
+				)
+			} else {
+				log.V(1).Info("BMC or BMCSecret resource not found while creating BMC client",
+					"BMC", server.Spec.BMCRef,
+					"Server", server.Name,
+					"error", err,
+				)
+			}
 			// if BMC is not found, then it means the server is not ready for BIOS Settings upgrade
 			return ctrl.Result{}, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil)
 		}

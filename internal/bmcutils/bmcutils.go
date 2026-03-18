@@ -115,7 +115,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 		b := &metalv1alpha1.BMC{}
 		bmcName := server.Spec.BMCRef.Name
 		if err := c.Get(ctx, client.ObjectKey{Name: bmcName}, b); err != nil {
-			return nil, fmt.Errorf("failed to get BMC: %w", err)
+			return nil, err
 		}
 
 		return GetBMCClientFromBMC(ctx, c, b, insecure, options)
@@ -124,7 +124,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 	if server.Spec.BMC != nil {
 		bmcSecret := &metalv1alpha1.BMCSecret{}
 		if err := c.Get(ctx, client.ObjectKey{Name: server.Spec.BMC.BMCSecretRef.Name}, bmcSecret); err != nil {
-			return nil, fmt.Errorf("failed to get BMC secret: %w", err)
+			return nil, err
 		}
 
 		protocolScheme := GetProtocolScheme(server.Spec.BMC.Protocol.Scheme, insecure)

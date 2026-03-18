@@ -99,13 +99,17 @@ func (r *BMCSettingsReconciler) shouldDelete(
 	ctx context.Context,
 	bmcSetting *metalv1alpha1.BMCSettings,
 ) bool {
+	log := ctrl.LoggerFrom(ctx)
 	if bmcSetting.DeletionTimestamp.IsZero() {
 		return false
 	}
 
 	if controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) &&
 		bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
-		log := ctrl.LoggerFrom(ctx)
+		if _, err := r.getBMC(ctx, bmcSetting); apierrors.IsNotFound(err) {
+			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcSetting.Spec.BMCRef.Name)
+			return true
+		}
 		log.V(1).Info("postponing delete as Settings update is in progress")
 		return false
 	}
@@ -237,7 +241,7 @@ func (r *BMCSettingsReconciler) reconcile(
 	// if referred BMC contains reference to different BMCSettings object - stop reconciliation
 	BMC, err := r.getBMC(ctx, bmcSetting)
 	if err != nil {
-		log.V(1).Info("Referred server object could not be fetched")
+		log.V(1).Info("Referred BMC object could not be fetched")
 		return ctrl.Result{}, err
 	}
 	// patch BMC with BMCSettings reference

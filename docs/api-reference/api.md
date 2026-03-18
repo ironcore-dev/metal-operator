@@ -955,8 +955,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `objectKeyRef` _[ObjectReference](#objectreference) array_ |  |  |  |
-| `variables` _[DynamicVaribles](#dynamicvaribles) array_ |  |  |  |
+| `objectKeyRefs` _[ObjectReference](#objectreference) array_ |  |  |  |
+| `variables` _[DynamicVariables](#dynamicvariables) array_ |  |  |  |
 
 
 #### DynamicSettingSourceType
@@ -968,7 +968,7 @@ _Underlying type:_ _string_
 
 
 _Appears in:_
-- [DynamicVaribles](#dynamicvaribles)
+- [DynamicVariables](#dynamicvariables)
 
 | Field | Description |
 | --- | --- |
@@ -977,7 +977,7 @@ _Appears in:_
 | `Secret` | Secret specifies that the dynamic setting source is a Secret.<br /> |
 
 
-#### DynamicVaribles
+#### DynamicVariables
 
 
 
@@ -990,11 +990,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `objectIdentifier` _string_ | ObjectName is used to specify the identifier of the object which contains the value of the variable.<br />For example, if the variable is supposed to get its value from a Secret object, this field along with ObjectKind can be used to identify the Secret in 'ObjectKeyRefs' and fetch the value of the variable from the Secret's data using the key specified in 'Key' field.<br />This is not needed for the Type "labels" as the value can be fetched directly from the labels of the BMC. |  |  |
-| `type` _[DynamicSettingSourceType](#dynamicsettingsourcetype)_ | ObjectKind specifies the type of the Object, which determines where the controller should look for the value of the variable.<br />example: if ObjectKind is "ConfigMap", 'ObjectName' along ObjectKind  is used to identify the object in 'ObjectKeyRefs' and fetch ConfigMap and use the value of the 'key' specified in Key to fetch the value of the required variable.<br />In case of "labels" data for variable is fetched directly from the labels of the BMC. |  | Enum: [ConfigMap labels Secret] <br /> |
+| `objectName` _string_ | ObjectName is used to specify the identifier of the object which contains the value of the variable.<br />For example, if the variable is supposed to get its value from a Secret object, this field along with ObjectKind can be used to identify the Secret in 'ObjectKeyRefs' and fetch the value of the variable from the Secret's data using the key specified in 'Key' field.<br />This is not needed for the Type "labels" as the value can be fetched directly from the labels of the BMC. |  |  |
+| `objectKind` _[DynamicSettingSourceType](#dynamicsettingsourcetype)_ | ObjectKind specifies the type of the Object, which determines where the controller should look for the value of the variable.<br />example: if ObjectKind is "ConfigMap", 'ObjectName' along ObjectKind  is used to identify the object in 'ObjectKeyRefs' and fetch ConfigMap and use the value of the 'key' specified in Key to fetch the value of the required variable.<br />In case of "labels" data for variable is fetched directly from the labels of the BMC. |  | Enum: [ConfigMap labels Secret] <br /> |
 | `key` _string_ | Key is used to specify the key of the value in data from the object identified by 'ObjectName' and 'ObjectKind'  in 'ObjectKeyRefs'.<br />For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectName' along with ObjectKind can be used to identify the ConfigMap object in 'ObjectKeyRefs' and 'Key' can be used to specify the key of the value in the ConfigMap's data. |  |  |
-| `name` _string_ | this field is used to specify the name of the variable which can be used in the BMC settings with \{\{ <variable Name> \}\} syntax |  | MaxLength: 256 <br />MinLength: 1 <br /> |
-| `regexReplaces` _[RegexPattern](#regexpattern)_ | RegexReplace defines regex replacement rules applied to the resolved variable. |  |  |
+| `name` _string_ | Name specifies the variable name, referenced in BMC settings using the `\{\{ .Name \}\}` syntax. |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+| `regexReplace` _[RegexPattern](#regexpattern)_ | RegexReplace defines regex replacement rules applied to the resolved variable. |  |  |
 
 
 #### Endpoint
@@ -1313,7 +1313,7 @@ RegexPattern defines a single regex replacement rule.
 
 
 _Appears in:_
-- [DynamicVaribles](#dynamicvaribles)
+- [DynamicVariables](#dynamicvariables)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |

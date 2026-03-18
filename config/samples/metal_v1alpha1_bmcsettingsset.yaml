@@ -22,31 +22,28 @@ spec:
   dynamicSettings:
     variables:
       - name: inventory_hostname
-        objectIdentifier: my-configmap
+        objectName: my-configmap
         key: remote-bmc-dns-name
-        type: configmap
+        objectKind: ConfigMap
         regexReplace:
           pattern: "-"
           replacement: "r-"
       - name: region
         key: metal.ironcore.dev/region
-        type: label
+        objectKind: labels
       - name: licence_type
-        objectIdentifier: my-secret
+        objectName: my-secret
         key: licence_type
-        type: secret
-    ObjectKeyRefs:
-      - identifier: my-configmap
-        type: configmap
-        objectRef:
-          kind: ConfigMap
-          name: my-configmap
-          namespace: default
-      - identifier: my-secret
-        type: secret
-        objectRef:
-          kind: Secret
-          name: my-secret
-          namespace: default
-
+        objectKind: Secret
+    objectKeyRefs:
+      - apiVersion: v1
+        kind: ConfigMap
+        name: my-configmap
+        namespace: default
+        uid: ""
+      - apiVersion: v1
+        kind: Secret
+        name: my-secret
+        namespace: default
+        uid: ""
 

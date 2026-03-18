@@ -271,9 +271,6 @@ func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, t
 // CheckBMCPendingComponentUpgrade returns false for local provider.
 // This is the expected behavior for non-real hardware environments; vendor implementations
 // (Dell, HPE, Lenovo) override this to check actual firmware inventory.
-func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, componentType ComponentType) (bool, error) {
-	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
-		return false, fmt.Errorf("unsupported component type: %q", componentType)
-	}
+func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
 	return false, nil
 }

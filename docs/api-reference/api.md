@@ -507,6 +507,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
+| `dynamicSettings` _[DynamicBMCSettings](#dynamicbmcsettings)_ | DynamicSettings defines the dynamic settings for the BMCSettingsSet which allows users to specify variables in the BMC settings and their sources which will be resolved by the controller at runtime and injected into the BMC settings before applying them to the BMCs. |  |  |
 | `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
 
 
@@ -941,6 +942,61 @@ _Appears in:_
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
 
 
+#### DynamicBMCSettings
+
+
+
+
+
+
+
+_Appears in:_
+- [BMCSettingsSetSpec](#bmcsettingssetspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `objectKeyRef` _[ObjectReference](#objectreference) array_ |  |  |  |
+| `variables` _[DynamicVaribles](#dynamicvaribles) array_ |  |  |  |
+
+
+#### DynamicSettingSourceType
+
+_Underlying type:_ _string_
+
+
+
+
+
+_Appears in:_
+- [DynamicVaribles](#dynamicvaribles)
+
+| Field | Description |
+| --- | --- |
+| `ConfigMap` | ConfigMap specifies that the dynamic setting source is a ConfigMap.<br /> |
+| `labels` | Labels specifies that the dynamic setting source is labels.<br /> |
+| `Secret` | Secret specifies that the dynamic setting source is a Secret.<br /> |
+
+
+#### DynamicVaribles
+
+
+
+
+
+
+
+_Appears in:_
+- [DynamicBMCSettings](#dynamicbmcsettings)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `objectIdentifier` _string_ | ObjectName is used to specify the identifier of the object which contains the value of the variable.<br />For example, if the variable is supposed to get its value from a Secret object, this field along with ObjectKind can be used to identify the Secret in 'ObjectKeyRefs' and fetch the value of the variable from the Secret's data using the key specified in 'Key' field.<br />This is not needed for the Type "labels" as the value can be fetched directly from the labels of the BMC. |  |  |
+| `type` _[DynamicSettingSourceType](#dynamicsettingsourcetype)_ | ObjectKind specifies the type of the Object, which determines where the controller should look for the value of the variable.<br />example: if ObjectKind is "ConfigMap", 'ObjectName' along ObjectKind  is used to identify the object in 'ObjectKeyRefs' and fetch ConfigMap and use the value of the 'key' specified in Key to fetch the value of the required variable.<br />In case of "labels" data for variable is fetched directly from the labels of the BMC. |  | Enum: [ConfigMap labels Secret] <br /> |
+| `key` _string_ | Key is used to specify the key of the value in data from the object identified by 'ObjectName' and 'ObjectKind'  in 'ObjectKeyRefs'.<br />For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectName' along with ObjectKind can be used to identify the ConfigMap object in 'ObjectKeyRefs' and 'Key' can be used to specify the key of the value in the ConfigMap's data. |  |  |
+| `name` _string_ | this field is used to specify the name of the variable which can be used in the BMC settings with \{\{ <variable Name> \}\} syntax |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+| `regexReplaces` _[RegexPattern](#regexpattern)_ | RegexReplace defines regex replacement rules applied to the resolved variable. |  |  |
+
+
 #### Endpoint
 
 
@@ -1121,6 +1177,7 @@ _Appears in:_
 - [BIOSSettingsSpec](#biossettingsspec)
 - [BIOSVersionSpec](#biosversionspec)
 - [BMCVersionSpec](#bmcversionspec)
+- [DynamicBMCSettings](#dynamicbmcsettings)
 - [ServerMaintenanceRefItem](#servermaintenancerefitem)
 - [ServerSpec](#serverspec)
 
@@ -1245,6 +1302,23 @@ _Appears in:_
 | --- | --- |
 | `http` | HTTPProtocolScheme is the http protocol scheme<br /> |
 | `https` | HTTPSProtocolScheme is the https protocol scheme<br /> |
+
+
+#### RegexPattern
+
+
+
+RegexPattern defines a single regex replacement rule.
+
+
+
+_Appears in:_
+- [DynamicVaribles](#dynamicvaribles)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `pattern` _string_ | Pattern is the regular expression to match against the variable value. |  |  |
+| `replacement` _string_ | Replacement is the string to replace the matched pattern with. |  |  |
 
 
 #### Server

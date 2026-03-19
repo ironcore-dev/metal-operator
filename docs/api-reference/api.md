@@ -507,6 +507,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
+| `dynamicVariables` _[DynamicVariables](#dynamicvariables) array_ | DynamicVariables defines the dynamic variables for the BMCSettingsSet which allows users to specify variables in the BMC settings and their sources which will be resolved by the controller at runtime and injected into the BMC settings before applying them to the BMCs. |  |  |
 | `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
 
 
@@ -941,6 +942,25 @@ _Appears in:_
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
 
 
+#### DynamicVariables
+
+
+
+
+
+
+
+_Appears in:_
+- [BMCSettingsSetSpec](#bmcsettingssetspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `objectKeyRef` _[ObjectReference](#objectreference)_ | ObjectKeyRef is used to specify the reference to the object which contains the value of the variable. |  |  |
+| `key` _string_ | Key is used to specify the key of the value in data from the object defined in 'ObjectKeyRef'.<br />For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectKeyRef' contains the reference to the ConfigMap and 'Key' can be used to specify the key of the value in the ConfigMap's data. |  |  |
+| `bmcLabel` _string_ | BMCLabel is used to specify the label of the BMC from which the variable value will be sourced. The controller will look for the label in the BMC's labels and use its value as the variable's value. |  |  |
+| `name` _string_ | Name specifies the variable name, referenced in BMC settings using the `\{\{ .Name \}\}` syntax. |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+
+
 #### Endpoint
 
 
@@ -1121,6 +1141,7 @@ _Appears in:_
 - [BIOSSettingsSpec](#biossettingsspec)
 - [BIOSVersionSpec](#biosversionspec)
 - [BMCVersionSpec](#bmcversionspec)
+- [DynamicVariables](#dynamicvariables)
 - [ServerMaintenanceRefItem](#servermaintenancerefitem)
 - [ServerSpec](#serverspec)
 

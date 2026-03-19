@@ -131,6 +131,74 @@ spec:
                 required:
                 - version
                 type: object
+              dynamicVariables:
+                description: DynamicVariables defines the dynamic variables for the
+                  BMCSettingsSet which allows users to specify variables in the BMC
+                  settings and their sources which will be resolved by the controller
+                  at runtime and injected into the BMC settings before applying them
+                  to the BMCs.
+                items:
+                  properties:
+                    bmcLabel:
+                      description: BMCLabel is used to specify the label of the BMC
+                        from which the variable value will be sourced. The controller
+                        will look for the label in the BMC's labels and use its value
+                        as the variable's value.
+                      type: string
+                    key:
+                      description: |-
+                        Key is used to specify the key of the value in data from the object defined in 'ObjectKeyRef'.
+                        For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectKeyRef' contains the reference to the ConfigMap and 'Key' can be used to specify the key of the value in the ConfigMap's data.
+                      type: string
+                    name:
+                      description: Name specifies the variable name, referenced in
+                        BMC settings using the `{{ .Name }}` syntax.
+                      maxLength: 256
+                      minLength: 1
+                      type: string
+                    objectKeyRef:
+                      description: ObjectKeyRef is used to specify the reference to
+                        the object which contains the value of the variable.
+                      properties:
+                        apiVersion:
+                          description: APIVersion is the API version of the referenced
+                            object.
+                          type: string
+                        kind:
+                          description: Kind is the kind of the referenced object.
+                          type: string
+                        name:
+                          description: Name is the name of the referenced object.
+                          type: string
+                        namespace:
+                          description: Namespace is the namespace of the referenced
+                            object.
+                          type: string
+                        uid:
+                          description: UID is the uid of the referenced object.
+                          type: string
+                      required:
+                      - apiVersion
+                      - kind
+                      - name
+                      - namespace
+                      - uid
+                      type: object
+                  required:
+                  - name
+                  type: object
+                  x-kubernetes-validations:
+                  - message: key must be provided when objectKeyRef is set
+                    rule: '!has(self.objectKeyRef) || (has(self.key) && size(self.key)
+                      > 0)'
+                  - message: objectKeyRef.kind must be provided when objectKeyRef
+                      is set
+                    rule: '!has(self.objectKeyRef) || size(self.objectKeyRef.kind)
+                      > 0'
+                  - message: either objectKeyRef or bmcLabel must be provided
+                    rule: has(self.objectKeyRef) || (has(self.bmcLabel) && size(self.bmcLabel)
+                      > 0)
+                type: array
             required:
             - bmcSelector
             - bmcSettingsTemplate

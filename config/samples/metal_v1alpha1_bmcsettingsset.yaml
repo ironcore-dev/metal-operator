@@ -12,7 +12,26 @@ spec:
     settings:
       foo: bar
       foo2: bar2
+      dynamicfoo: "{{ inventory_hostname }}"
+      dynamicfoo2: "{{ region }}"
+      dynamicfoo3: "{{ licence_type }}"
   bmcSelector:
     matchLabels:
       manufacturer: "dell"
       model: "poweredge-r840"
+  dynamicVariables:
+      - name: inventory_hostname
+        key: remote-bmc-dns-name
+        objectKeyRef: 
+            kind: ConfigMap
+            name: my-configmap
+            namespace: default
+      - name: region
+        bmcLabel: metal.ironcore.dev/region
+      - name: licence_type
+        objectKeyRef: 
+            kind: Secret
+            name: my-secret
+            namespace: default
+        key: licence_type
+

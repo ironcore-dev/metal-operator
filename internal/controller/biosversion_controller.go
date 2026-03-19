@@ -192,33 +192,6 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
 			return true, nil
 		}
-		if apierrors.IsNotFound(err) {
-			var statusErr *apierrors.StatusError
-			if errors.As(err, &statusErr) && statusErr.ErrStatus.Details != nil {
-				d := statusErr.ErrStatus.Details
-				log.V(1).Info("Referenced resource not found while creating BMC client",
-					"group", d.Group,
-					"kind", d.Kind,
-					"name", d.Name,
-					"server", server.Name,
-					"message", statusErr.ErrStatus.Message,
-				)
-			} else {
-				log.V(1).Info("BMC or BMCSecret resource not found while creating BMC client",
-					"BMC", server.Spec.BMCRef,
-					"Server", server.Name,
-					"error", err,
-				)
-			}
-			// if BMC is not found, then it means the server is not ready for BIOS upgrade
-			var condition *metav1.Condition
-			if len(biosVersion.Status.Conditions) != 0 {
-				condition = &biosVersion.Status.Conditions[len(biosVersion.Status.Conditions)-1]
-			} else {
-				condition = nil
-			}
-			return false, r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateFailed, biosVersion.Status.UpgradeTask, condition)
-		}
 		return false, fmt.Errorf("failed to get BMC client for server %s: %w", server.Name, err)
 	}
 	defer bmcClient.Logout()

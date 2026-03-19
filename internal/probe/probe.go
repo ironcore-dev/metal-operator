@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -94,7 +95,9 @@ func (a *Agent) Init(ctx context.Context) error {
 		pciDevices = []registry.PCIDevice{}
 	}
 
+	now := metav1.Now()
 	a.Server = &registry.Server{
+		Timestamp:         &now,
 		SystemInfo:        systeminfo,
 		CPU:               cpuInfos,
 		NetworkInterfaces: interfaces,
@@ -170,6 +173,8 @@ func (a *Agent) RefreshLLDP(ctx context.Context) error {
 		return err
 	}
 	a.Server.LLDP = lldp.Interfaces
+	now := metav1.Now()
+	a.Server.Timestamp = &now
 	a.log.Info("Refreshed LLDP info", "interfaces", len(a.Server.LLDP))
 	return nil
 }

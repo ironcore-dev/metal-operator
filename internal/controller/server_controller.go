@@ -900,6 +900,11 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 		return false, nil
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return false, fmt.Errorf("failed to fetch server details from registry: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
 	if err := json.NewDecoder(resp.Body).Decode(serverDetails); err != nil {
 		return false, fmt.Errorf("failed to decode server details: %w", err)
 	}

@@ -19,31 +19,19 @@ spec:
     matchLabels:
       manufacturer: "dell"
       model: "poweredge-r840"
-  dynamicSettings:
-    variables:
+  dynamicVariables:
       - name: inventory_hostname
-        objectName: my-configmap
         key: remote-bmc-dns-name
-        objectKind: ConfigMap
-        regexReplace:
-          pattern: "-"
-          replacement: "r-"
+        objectKeyRef: 
+            kind: ConfigMap
+            name: my-configmap
+            namespace: default
       - name: region
-        key: metal.ironcore.dev/region
-        objectKind: labels
+        bmcLabel: metal.ironcore.dev/region
       - name: licence_type
-        objectName: my-secret
+        objectKeyRef: 
+            kind: Secret
+            name: my-secret
+            namespace: default
         key: licence_type
-        objectKind: Secret
-    objectKeyRefs:
-      - apiVersion: v1
-        kind: ConfigMap
-        name: my-configmap
-        namespace: default
-        uid: ""
-      - apiVersion: v1
-        kind: Secret
-        name: my-secret
-        namespace: default
-        uid: ""
 

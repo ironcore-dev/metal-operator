@@ -137,17 +137,34 @@ spec:
                 required:
                 - version
                 type: object
-              dynamicSettings:
-                description: DynamicSettings defines the dynamic settings for the
+              dynamicVariables:
+                description: DynamicVariables defines the dynamic variables for the
                   BMCSettingsSet which allows users to specify variables in the BMC
                   settings and their sources which will be resolved by the controller
                   at runtime and injected into the BMC settings before applying them
                   to the BMCs.
-                properties:
-                  objectKeyRefs:
-                    items:
-                      description: ObjectReference is the namespaced name reference
-                        to an object.
+                items:
+                  properties:
+                    bmcLabel:
+                      description: BMCLabel is used to specify the label of the BMC
+                        from which the variable value will be sourced. The controller
+                        will look for the label in the BMC's labels and use its value
+                        as the variable's value.
+                      type: string
+                    key:
+                      description: |-
+                        Key is used to specify the key of the value in data from the object defined in 'ObjectKeyRef'.
+                        For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectKeyRef' contains the reference to the ConfigMap and 'Key' can be used to specify the key of the value in the ConfigMap's data.
+                      type: string
+                    name:
+                      description: Name specifies the variable name, referenced in
+                        BMC settings using the `{{ .Name }}` syntax.
+                      maxLength: 256
+                      minLength: 1
+                      type: string
+                    objectKeyRef:
+                      description: ObjectKeyRef is used to specify the reference to
+                        the object which contains the value of the variable.
                       properties:
                         apiVersion:
                           description: APIVersion is the API version of the referenced
@@ -173,60 +190,21 @@ spec:
                       - namespace
                       - uid
                       type: object
-                    type: array
-                  variables:
-                    items:
-                      properties:
-                        key:
-                          description: |-
-                            Key is used to specify the key of the value in data from the object identified by 'ObjectName' and 'ObjectKind'  in 'ObjectKeyRefs'.
-                            For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectName' along with ObjectKind can be used to identify the ConfigMap object in 'ObjectKeyRefs' and 'Key' can be used to specify the key of the value in the ConfigMap's data.
-                          type: string
-                        name:
-                          description: Name specifies the variable name, referenced
-                            in BMC settings using the `{{ .Name }}` syntax.
-                          maxLength: 256
-                          minLength: 1
-                          type: string
-                        objectKind:
-                          description: |-
-                            ObjectKind specifies the type of the Object, which determines where the controller should look for the value of the variable.
-                            example: if ObjectKind is "ConfigMap", 'ObjectName' along ObjectKind  is used to identify the object in 'ObjectKeyRefs' and fetch ConfigMap and use the value of the 'key' specified in Key to fetch the value of the required variable.
-                            In case of "labels" data for variable is fetched directly from the labels of the BMC.
-                          enum:
-                          - ConfigMap
-                          - labels
-                          - Secret
-                          type: string
-                        objectName:
-                          description: |-
-                            ObjectName is used to specify the identifier of the object which contains the value of the variable.
-                            For example, if the variable is supposed to get its value from a Secret object, this field along with ObjectKind can be used to identify the Secret in 'ObjectKeyRefs' and fetch the value of the variable from the Secret's data using the key specified in 'Key' field.
-                            This is not needed for the Type "labels" as the value can be fetched directly from the labels of the BMC.
-                          type: string
-                        regexReplace:
-                          description: RegexReplace defines regex replacement rules
-                            applied to the resolved variable.
-                          properties:
-                            pattern:
-                              description: Pattern is the regular expression to match
-                                against the variable value.
-                              type: string
-                            replacement:
-                              description: Replacement is the string to replace the
-                                matched pattern with.
-                              type: string
-                          required:
-                          - pattern
-                          - replacement
-                          type: object
-                      required:
-                      - key
-                      - name
-                      - objectKind
-                      type: object
-                    type: array
-                type: object
+                  required:
+                  - name
+                  type: object
+                  x-kubernetes-validations:
+                  - message: key must be provided when objectKeyRef is set
+                    rule: '!has(self.objectKeyRef) || (has(self.key) && size(self.key)
+                      > 0)'
+                  - message: objectKeyRef.kind must be provided when objectKeyRef
+                      is set
+                    rule: '!has(self.objectKeyRef) || size(self.objectKeyRef.kind)
+                      > 0'
+                  - message: either objectKeyRef or bmcLabel must be provided
+                    rule: has(self.objectKeyRef) || (has(self.bmcLabel) && size(self.bmcLabel)
+                      > 0)
+                type: array
             required:
             - bmcSelector
             - bmcSettingsTemplate

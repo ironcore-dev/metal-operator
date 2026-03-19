@@ -370,6 +370,28 @@ func GetImageCredentialsForSecretRef(ctx context.Context, c client.Client, secre
 	return string(username), string(password), nil
 }
 
+func clearDeprecatedObjectRefFields(ref *metalv1alpha1.ObjectReference) bool {
+	if ref == nil {
+		return false
+	}
+	changed := ref.APIVersion != "" || ref.Kind != "" || ref.UID != "" //nolint:staticcheck // clearing deprecated fields
+	ref.APIVersion = ""                                                //nolint:staticcheck // clearing deprecated fields
+	ref.Kind = ""                                                      //nolint:staticcheck // clearing deprecated fields
+	ref.UID = ""                                                       //nolint:staticcheck // clearing deprecated fields
+	return changed
+}
+
+func clearDeprecatedImmutableObjectRefFields(ref *metalv1alpha1.ImmutableObjectReference) bool {
+	if ref == nil {
+		return false
+	}
+	changed := ref.APIVersion != "" || ref.Kind != "" || ref.UID != "" //nolint:staticcheck // clearing deprecated fields
+	ref.APIVersion = ""                                                //nolint:staticcheck // clearing deprecated fields
+	ref.Kind = ""                                                      //nolint:staticcheck // clearing deprecated fields
+	ref.UID = ""                                                       //nolint:staticcheck // clearing deprecated fields
+	return changed
+}
+
 func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFields []any) bool {
 	isNil := func(arg any) bool {
 		if v := reflect.ValueOf(arg); !v.IsValid() || ((v.Kind() == reflect.Ptr ||

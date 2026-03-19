@@ -113,7 +113,7 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 	}
 
 	if server.Spec.ServerMaintenanceRef != nil {
-		if server.Spec.ServerMaintenanceRef.UID != maintenance.UID {
+		if server.Spec.ServerMaintenanceRef.Name != maintenance.Name || server.Spec.ServerMaintenanceRef.Namespace != maintenance.Namespace {
 			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
 			return ctrl.Result{}, nil
 		}
@@ -207,7 +207,7 @@ func (r *ServerMaintenanceReconciler) shouldDeferToHigherPriorityMaintenance(ctx
 
 	for i := range maintenanceList.Items {
 		other := &maintenanceList.Items[i]
-		if other.UID == maintenance.UID {
+		if other.Name == maintenance.Name && other.Namespace == maintenance.Namespace {
 			continue
 		}
 		if !other.DeletionTimestamp.IsZero() {
@@ -305,11 +305,8 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 	log.V(1).Info("Created or patched Config", "Config", config.Name, "Operation", opResult)
 	serverBase := server.DeepCopy()
 	server.Spec.MaintenanceBootConfigurationRef = &metalv1alpha1.ObjectReference{
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-		Kind:       "ServerBootConfiguration",
-		Namespace:  config.Namespace,
-		Name:       config.Name,
-		UID:        config.UID,
+		Namespace: config.Namespace,
+		Name:      config.Name,
 	}
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return config, fmt.Errorf("failed to patch server maintenance boot configuration ref: %w", err)
@@ -330,11 +327,8 @@ func (r *ServerMaintenanceReconciler) updateServerRef(ctx context.Context, maint
 		return nil
 	}
 	server.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-		Kind:       "ServerMaintenance",
-		Namespace:  maintenance.Namespace,
-		Name:       maintenance.Name,
-		UID:        maintenance.UID,
+		Namespace: maintenance.Namespace,
+		Name:      maintenance.Name,
 	}
 	// use update to not overwrite ServerMaintenanceRef if another maintenance was quicker
 	if err := r.Update(ctx, server); err != nil {

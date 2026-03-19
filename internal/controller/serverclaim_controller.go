@@ -196,12 +196,9 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, cl
 
 	if server.Spec.ServerClaimRef == nil {
 		serverBase := server.DeepCopy()
-		server.Spec.ServerClaimRef = &metalv1alpha1.ObjectReference{
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerClaim",
-			Namespace:  claim.Namespace,
-			Name:       claim.Name,
-			UID:        claim.UID,
+		server.Spec.ServerClaimRef = &metalv1alpha1.ImmutableObjectReference{
+			Namespace: claim.Namespace,
+			Name:      claim.Name,
 		}
 		if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
 			return fmt.Errorf("failed to patch claim ref for server: %w", err)
@@ -275,11 +272,8 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, serv
 
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
-		Namespace:  config.Namespace,
-		Name:       config.Name,
-		UID:        config.UID,
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-		Kind:       "ServerBootConfiguration",
+		Namespace: config.Namespace,
+		Name:      config.Name,
 	}
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
@@ -316,7 +310,7 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1a
 	for _, server := range serverList.Items {
 		// find previously claimed server
 		if ref := server.Spec.ServerClaimRef; ref != nil {
-			if ref.UID == claim.UID && ref.Name == claim.Name && ref.Namespace == claim.Namespace {
+			if ref.Name == claim.Name && ref.Namespace == claim.Namespace {
 				return &server, nil
 			}
 		}
@@ -395,8 +389,8 @@ func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, ser
 
 func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) bool {
 	log := ctrl.LoggerFrom(ctx)
-	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && claimRef.UID != claim.UID {
-		log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
+	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && (claimRef.Name != claim.Name || claimRef.Namespace != claim.Namespace) {
+		log.V(1).Info("Server claim ref does not match claim", "Server", server.Name, "ClaimName", claimRef.Name)
 		return false
 	}
 	if server.Status.State != metalv1alpha1.ServerStateAvailable {

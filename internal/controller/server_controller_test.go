@@ -238,11 +238,8 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerBootConfiguration",
-				Namespace:  ns.Name,
-				Name:       server.Name,
-				UID:        bootConfig.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: ns.Name,
+				Name:      server.Name,
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.Conditions", ContainElement(
@@ -432,11 +429,8 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerBootConfiguration",
-				Namespace:  ns.Name,
-				Name:       server.Name,
-				UID:        bootConfig.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: ns.Name,
+				Name:      server.Name,
 			}),
 			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.BIOSVersion", "P79 v1.45 (12/06/2017)"),

@@ -227,6 +227,18 @@ func (r *BMCSettingsReconciler) reconcile(
 		return ctrl.Result{}, nil
 	}
 
+	base := bmcSetting.DeepCopy()
+	changed := false
+	for i := range bmcSetting.Spec.ServerMaintenanceRefs {
+		changed = clearDeprecatedObjectRefFields(bmcSetting.Spec.ServerMaintenanceRefs[i].ServerMaintenanceRef) || changed
+	}
+	if changed {
+		if err := r.Patch(ctx, bmcSetting, client.MergeFrom(base)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BMCSettings: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// if object does not refer to BMC object - stop reconciliation
 	// todo length
 	if bmcSetting.Spec.BMCRef == nil {
@@ -758,7 +770,7 @@ func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(
 	notInMaintenanceState := make([]string, 0, len(servers))
 	for _, server := range servers {
 		if server.Status.State == metalv1alpha1.ServerStateMaintenance {
-			serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.UID)
+			serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, server.Spec.ServerMaintenanceRef.Name, server.Spec.ServerMaintenanceRef.Namespace)
 			if server.Spec.ServerMaintenanceRef == nil || serverMaintenanceRef == nil {
 				// server in maintenance for other tasks. or
 				// server maintenance ref is wrong in either server or bmcSetting
@@ -822,11 +834,8 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 						ServerMaintenanceRefs,
 						metalv1alpha1.ServerMaintenanceRefItem{
 							ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
-								APIVersion: metalv1alpha1.GroupVersion.String(),
-								Kind:       "ServerMaintenance",
-								Namespace:  maintenance.ServerMaintenanceRef.Namespace,
-								Name:       maintenance.ServerMaintenanceRef.Name,
-								UID:        maintenance.ServerMaintenanceRef.UID,
+								Namespace: maintenance.ServerMaintenanceRef.Namespace,
+								Name:      maintenance.ServerMaintenanceRef.Name,
 							}})
 				}
 
@@ -904,11 +913,8 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 				ServerMaintenanceRefs,
 				metalv1alpha1.ServerMaintenanceRefItem{
 					ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
-						APIVersion: metalv1alpha1.GroupVersion.String(),
-						Kind:       "ServerMaintenance",
-						Namespace:  maintenance.Namespace,
-						Name:       maintenance.Name,
-						UID:        maintenance.UID,
+						Namespace: maintenance.Namespace,
+						Name:      maintenance.Name,
 					}})
 			continue
 		}
@@ -938,11 +944,8 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(
 			ServerMaintenanceRefs,
 			metalv1alpha1.ServerMaintenanceRefItem{
 				ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
-					APIVersion: metalv1alpha1.GroupVersion.String(),
-					Kind:       "ServerMaintenance",
-					Namespace:  serverMaintenance.Namespace,
-					Name:       serverMaintenance.Name,
-					UID:        serverMaintenance.UID,
+					Namespace: serverMaintenance.Namespace,
+					Name:      serverMaintenance.Name,
 				}})
 	}
 
@@ -1078,10 +1081,10 @@ func (r *BMCSettingsReconciler) getReferredBMCSettings(
 
 func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(
 	ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem,
-	serverMaintenanceUID types.UID,
+	name, namespace string,
 ) *metalv1alpha1.ObjectReference {
 	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
-		if serverMaintenanceRef.ServerMaintenanceRef.UID == serverMaintenanceUID {
+		if serverMaintenanceRef.ServerMaintenanceRef.Name == name && serverMaintenanceRef.ServerMaintenanceRef.Namespace == namespace {
 			return serverMaintenanceRef.ServerMaintenanceRef
 		}
 	}
@@ -1195,7 +1198,7 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByServerRefs(ctx context.Conte
 		if host.Spec.ServerMaintenanceRef == nil {
 			continue
 		}
-		serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, host.Spec.ServerMaintenanceRef.UID)
+		serverMaintenanceRef := r.getServerMaintenanceRefForServer(bmcSetting.Spec.ServerMaintenanceRefs, host.Spec.ServerMaintenanceRef.Name, host.Spec.ServerMaintenanceRef.Namespace)
 		if serverMaintenanceRef != nil {
 			req = append(req, ctrl.Request{
 				NamespacedName: types.NamespacedName{Namespace: bmcSetting.Namespace, Name: bmcSetting.Name},

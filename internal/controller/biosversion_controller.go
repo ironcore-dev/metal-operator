@@ -155,6 +155,14 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, biosVersion *meta
 		return ctrl.Result{}, nil
 	}
 
+	base := biosVersion.DeepCopy()
+	if biosVersion.Spec.ServerMaintenanceRef != nil && clearDeprecatedObjectRefFields(biosVersion.Spec.ServerMaintenanceRef) {
+		if err := r.Patch(ctx, biosVersion, client.MergeFrom(base)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BIOSVersion: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersion, BIOSVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -225,7 +233,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 			return false, nil
 		}
 
-		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosVersion.Spec.ServerMaintenanceRef.UID {
+		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.Name != biosVersion.Spec.ServerMaintenanceRef.Name || server.Spec.ServerMaintenanceRef.Namespace != biosVersion.Spec.ServerMaintenanceRef.Namespace {
 			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
 			if condition.Status != metav1.ConditionTrue {
 				if err := r.Conditions.Update(
@@ -581,11 +589,8 @@ func (r *BIOSVersionReconciler) patchServerMaintenanceRef(ctx context.Context, b
 		biosVersion.Spec.ServerMaintenanceRef = nil
 	} else {
 		biosVersion.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
-			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
-			Kind:       "ServerMaintenance",
-			Namespace:  serverMaintenance.Namespace,
-			Name:       serverMaintenance.Name,
-			UID:        serverMaintenance.UID,
+			Namespace: serverMaintenance.Namespace,
+			Name:      serverMaintenance.Name,
 		}
 	}
 

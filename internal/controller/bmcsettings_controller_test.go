@@ -302,11 +302,8 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ServerMaintenanceRefItem{{
 					ServerMaintenanceRef: &metalv1alpha1.ObjectReference{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: metalv1alpha1.GroupVersion.String(),
+						Namespace: serverMaintenance.Namespace,
+						Name:      serverMaintenance.Name,
 					}}}),
 		)
 

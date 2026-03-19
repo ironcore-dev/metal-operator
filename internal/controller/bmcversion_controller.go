@@ -89,6 +89,10 @@ func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *met
 
 	if controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) &&
 		bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
+			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcVersion.Spec.BMCRef.Name)
+			return true
+		}
 		log.V(1).Info("Postponing deletion as BMC version update is in progress")
 		return false
 	}

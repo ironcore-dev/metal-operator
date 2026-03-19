@@ -92,6 +92,10 @@ func (r *BIOSVersionReconciler) shouldDelete(ctx context.Context, biosVersion *m
 
 	if controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) &&
 		biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+		if _, err := GetServerByName(ctx, r.Client, biosVersion.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+			log.V(1).Info("Server not found, proceeding with deletion", "Server", biosVersion.Spec.ServerRef.Name)
+			return true
+		}
 		log.V(1).Info("Postponing deletion as BIOS version update is in progress")
 		return false
 	}
@@ -196,72 +200,9 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 	case "", metalv1alpha1.BIOSVersionStatePending:
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateInProgress:
-		if biosVersion.Spec.ServerMaintenanceRef == nil {
-			if requeue, err := r.requestServerMaintenance(ctx, biosVersion, server); err != nil || requeue {
-				return false, err
-			}
-		}
-
-		condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ServerMaintenanceConditionWaiting)
-		if err != nil {
+		if ok, err := r.handleServerMaintenance(ctx, bmcClient, biosVersion, server); err != nil || !ok {
 			return false, err
 		}
-
-		if server.Status.State != metalv1alpha1.ServerStateMaintenance {
-			log.V(1).Info("Server is not in maintenance. waiting...", "server State", server.Status.State, "server", server.Name)
-			if condition.Status != metav1.ConditionTrue {
-				if err := r.Conditions.Update(
-					condition,
-					conditionutils.UpdateStatus(corev1.ConditionTrue),
-					conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
-					conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", biosVersion.Spec.ServerMaintenanceRef.Name)),
-				); err != nil {
-					return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
-				}
-				if err := r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, condition); err != nil {
-					return false, fmt.Errorf("failed to patch BIOSVersion ServerMaintenance waiting conditions: %w", err)
-				}
-			}
-			return false, nil
-		}
-
-		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosVersion.Spec.ServerMaintenanceRef.UID {
-			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
-			if condition.Status != metav1.ConditionTrue {
-				if err := r.Conditions.Update(
-					condition,
-					conditionutils.UpdateStatus(corev1.ConditionTrue),
-					conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
-					conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", biosVersion.Spec.ServerMaintenanceRef.Name)),
-				); err != nil {
-					return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
-				}
-				if err := r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, condition); err != nil {
-					return false, fmt.Errorf("failed to patch BIOSVersion ServerMaintenance waiting conditions: %w", err)
-				}
-			}
-			return false, nil
-		}
-
-		if condition.Reason != ServerMaintenanceReasonApproved {
-			if err := r.Conditions.Update(
-				condition,
-				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
-				conditionutils.UpdateMessage("Server is now in Maintenance mode"),
-			); err != nil {
-				return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
-			}
-			if err := r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, condition); err != nil {
-				return false, fmt.Errorf("failed to patch BIOSVersion ServerMaintenance waiting conditions: %w", err)
-			}
-			return false, nil
-		}
-
-		if ok, err := r.handleBMCReset(ctx, bmcClient, biosVersion, server); !ok || err != nil {
-			return false, err
-		}
-
 		return r.processInProgressState(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateCompleted:
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
@@ -286,6 +227,76 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 
 	log.V(1).Info("Unknown State found", "State", biosVersion.Status.State)
 	return false, nil
+}
+
+func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	if biosVersion.Spec.ServerMaintenanceRef == nil {
+		if requeue, err := r.requestServerMaintenance(ctx, biosVersion, server); err != nil || requeue {
+			return false, err
+		}
+	}
+
+	condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ServerMaintenanceConditionWaiting)
+	if err != nil {
+		return false, err
+	}
+
+	if server.Status.State != metalv1alpha1.ServerStateMaintenance {
+		log.V(1).Info("Server is not in maintenance. waiting...", "server State", server.Status.State, "server", server.Name)
+		if condition.Status != metav1.ConditionTrue {
+			if err := r.Conditions.Update(
+				condition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", biosVersion.Spec.ServerMaintenanceRef.Name)),
+			); err != nil {
+				return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
+			}
+			if err := r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, condition); err != nil {
+				return false, fmt.Errorf("failed to patch BIOSVersion ServerMaintenance waiting conditions: %w", err)
+			}
+		}
+		return false, nil
+	}
+
+	if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosVersion.Spec.ServerMaintenanceRef.UID {
+		log.V(1).Info("Server is already in maintenance", "Server", server.Name)
+		if condition.Status != metav1.ConditionTrue {
+			if err := r.Conditions.Update(
+				condition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", biosVersion.Spec.ServerMaintenanceRef.Name)),
+			); err != nil {
+				return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
+			}
+			if err := r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, condition); err != nil {
+				return false, fmt.Errorf("failed to patch BIOSVersion ServerMaintenance waiting conditions: %w", err)
+			}
+		}
+		return false, nil
+	}
+
+	if condition.Reason != ServerMaintenanceReasonApproved {
+		if err := r.Conditions.Update(
+			condition,
+			conditionutils.UpdateStatus(corev1.ConditionFalse),
+			conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
+			conditionutils.UpdateMessage("Server is now in Maintenance mode"),
+		); err != nil {
+			return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
+		}
+		if err := r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, condition); err != nil {
+			return false, fmt.Errorf("failed to patch BIOSVersion ServerMaintenance waiting conditions: %w", err)
+		}
+		return false, nil
+	}
+
+	if ok, err := r.handleBMCReset(ctx, bmcClient, biosVersion, server); !ok || err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {

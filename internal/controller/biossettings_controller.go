@@ -114,6 +114,10 @@ func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *met
 
 	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) &&
 		settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+		if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+			log.V(1).Info("Server not found, proceeding with deletion", "Server", settings.Spec.ServerRef.Name)
+			return true
+		}
 		log.V(1).Info("Postponing delete as BIOSSettings update is in progress")
 		return false
 	}

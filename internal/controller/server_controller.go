@@ -146,6 +146,16 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 
 	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
 		server.Status.State == metalv1alpha1.ServerStateMaintenance {
+		if server.Spec.BMCRef != nil {
+			b := &metalv1alpha1.BMC{}
+			bmcName := server.Spec.BMCRef.Name
+			if err := r.Get(ctx, client.ObjectKey{Name: bmcName}, b); err != nil {
+				if apierrors.IsNotFound(err) {
+					log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcName, "Server", server.Name)
+					return true
+				}
+			}
+		}
 		log.V(1).Info("Postponing delete as server is in Maintenance state")
 		return false
 	}
@@ -209,6 +219,27 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
+		if apierrors.IsNotFound(err) {
+			var statusErr *apierrors.StatusError
+			if errors.As(err, &statusErr) && statusErr.ErrStatus.Details != nil {
+				d := statusErr.ErrStatus.Details
+				log.V(1).Info("Referenced resource not found while creating BMC client",
+					"group", d.Group,
+					"kind", d.Kind,
+					"name", d.Name,
+					"server", server.Name,
+					"message", statusErr.ErrStatus.Message,
+				)
+			} else {
+				log.V(1).Info("BMC or BMCSecret resource not found while creating BMC client",
+					"BMC", server.Spec.BMCRef,
+					"Server", server.Name,
+					"error", err,
+				)
+			}
+			// if BMC is not found, requeue until BMC is available
 			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)

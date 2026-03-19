@@ -114,6 +114,10 @@ func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *met
 
 	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) &&
 		settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+		if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+			log.V(1).Info("Server not found, proceeding with deletion", "Server", settings.Spec.ServerRef.Name)
+			return true
+		}
 		log.V(1).Info("Postponing delete as BIOSSettings update is in progress")
 		return false
 	}
@@ -274,6 +278,11 @@ func (r *BIOSSettingsReconciler) reconcile(ctx context.Context, settings *metalv
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "Message", err.Error())
 			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info("BMC/BMCSecret not found", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
+			// if BMC is not found, then it means the server is not ready for BIOS Settings upgrade, hence requeue until BMC is available
+			return ctrl.Result{}, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStateFailed, nil)
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
 	}

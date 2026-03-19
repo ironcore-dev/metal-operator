@@ -11,4 +11,7 @@ spec:
   version: 1.45.455b66-rev4
   settings:
       abc: "3"
+      # fqdn: `{{ RegexInsertOrReplace .labels.name "-" "r" }}` ->  endpoint-sample CRD will be used to get the value of "name" key from its labels (metadata) and replace using regex pattern "-" with "r"
+      # license: `{{ GetSecretFrom "my-secret" "my-namespace" "key" }}` -> it will get the value of "key" from the secret "my-secret" in "my-namespace"
+      # data: `{{ GetConfigData "my-config" "my-namespace" "key" }}` -> it will get the value of "key" from the configmap "my-config" in "my-namespace"
   serverMaintenancePolicy: Enforced

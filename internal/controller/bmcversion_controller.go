@@ -298,6 +298,14 @@ func (r *BMCVersionReconciler) handleUpgradeInProgressState(
 			log.V(1).Info("BMC is not powered on. Can not proceed", "BMC", BMC.Name, "PowerState", BMC.Status.PowerState)
 			return ctrl.Result{}, nil
 		}
+		// Check for pending component upgrade BEFORE issuing upgrade to avoid interrupting staged firmware
+		hasPending, err := bmcClient.CheckBMCPendingComponentUpgrade(ctx, bmc.ComponentTypeBMC)
+		if err != nil {
+			log.V(1).Info("Failed to check pending component upgrade before BMC upgrade, proceeding anyway", "error", err)
+		} else if hasPending {
+			log.V(1).Info("Pending component upgrade detected, deferring BMC upgrade to avoid interruption", "BMC", BMC.Name)
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
 		return ctrl.Result{}, r.issueBMCUpgrade(ctx, bmcVersion, bmcClient, BMC, issuedCondition)
 	}
 

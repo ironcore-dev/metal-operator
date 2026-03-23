@@ -24,6 +24,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
+	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/stmcginnis/gofish/schemas"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
@@ -112,10 +113,22 @@ type ServerReconciler struct {
 func (r *ServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, req.NamespacedName, server); err != nil {
+		if !apierrors.IsNotFound(err) {
+			metalmetrics.ServerReconciliationTotal.WithLabelValues("error_fetch").Inc()
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, server)
+	result, err := r.reconcileExists(ctx, server)
+
+	// Record reconciliation result
+	if err != nil {
+		metalmetrics.ServerReconciliationTotal.WithLabelValues("error_reconcile").Inc()
+	} else {
+		metalmetrics.ServerReconciliationTotal.WithLabelValues("success").Inc()
+	}
+
+	return result, err
 }
 
 func (r *ServerReconciler) reconcileExists(ctx context.Context, server *metalv1alpha1.Server) (ctrl.Result, error) {
@@ -173,7 +186,6 @@ func (r *ServerReconciler) delete(ctx context.Context, server *metalv1alpha1.Ser
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer has been removed")
-
 	log.V(1).Info("Deleted server")
 	return ctrl.Result{}, nil
 }

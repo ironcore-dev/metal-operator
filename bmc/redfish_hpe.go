@@ -135,3 +135,37 @@ func (r *HPERedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, paramet
 func (r *HPERedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.hpeParseTaskDetails)
 }
+
+// CheckBMCPendingComponentUpgrade checks for staged component upgrades (HPE: Staged=true).
+// NOTE: HPE firmware entries use numeric IDs, so matching is done via fw.Name.
+func (r *HPERedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
+	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.hpeGetComponentFilters, r.hpeMatchesComponentFilter, r.hpeCheckPending)
+}
+
+func (r *HPERedfishBMC) hpeGetComponentFilters(componentType ComponentType) []string {
+	switch componentType {
+	case ComponentTypeBMC:
+		return []string{"iLO"}
+	case ComponentTypeBIOS:
+		return []string{"System ROM"}
+	default:
+		return []string{}
+	}
+}
+
+func (r *HPERedfishBMC) hpeMatchesComponentFilter(fw *schemas.SoftwareInventory, filters []string) bool {
+	nameUpper := strings.ToUpper(fw.Name)
+	for _, filter := range filters {
+		if strings.Contains(nameUpper, strings.ToUpper(filter)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *HPERedfishBMC) hpeCheckPending(fw *schemas.SoftwareInventory) bool {
+	return fw.Staged
+}

@@ -455,3 +455,10 @@ func (r *RedfishKubeBMC) createJob(
 	}
 	return nil
 }
+
+// CheckBMCPendingComponentUpgrade returns false for local provider.
+// This is the expected behavior for non-real hardware environments; vendor implementations
+// (Dell, HPE, Lenovo) override this to check actual firmware inventory.
+func (r *RedfishKubeBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
+	return false, nil
+}

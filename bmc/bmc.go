@@ -20,6 +20,14 @@ const (
 	ManufacturerSupermicro Manufacturer = "Supermicro"
 )
 
+// ComponentType represents a firmware component type.
+type ComponentType string
+
+const (
+	ComponentTypeBMC  ComponentType = "BMC"
+	ComponentTypeBIOS ComponentType = "BIOS"
+)
+
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
@@ -109,6 +117,12 @@ type BMC interface {
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
+	// CreateEventSubscription creates an event subscription for the manager.
+	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
+
+	// DeleteEventSubscription deletes an event subscription for the manager.
+	DeleteEventSubscription(ctx context.Context, uri string) error
+
 	// CreateOrUpdateAccount creates or updates a BMC user account.
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 
@@ -120,6 +134,10 @@ type BMC interface {
 
 	// GetAccountService retrieves the account service.
 	GetAccountService() (*schemas.AccountService, error)
+
+	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
+	// for the given component type.
+	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
 }
 
 type Entity struct {

@@ -20,6 +20,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/ironcore-dev/metal-operator/internal/probe"
+	metaltoken "github.com/ironcore-dev/metal-operator/internal/token"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -195,18 +196,35 @@ var _ = Describe("Server Controller", func() {
 		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
 		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
 
-		// Generate expected ignition data using the same template file the controller uses
-		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
-			ignition.Config{
-				Image:        "foo:latest",
-				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-				PasswordHash: passwordHash,
-			},
-		)
-		Expect(err).NotTo(HaveOccurred())
+		// Extract the actual discovery token from the metalprobe service in the ignition
+		ignitionYAML := ignitionSecret.Data[DefaultIgnitionSecretKeyName]
+		var ignitionConfig map[string]any
+		Expect(yaml.Unmarshal(ignitionYAML, &ignitionConfig)).To(Succeed())
 
+		systemd, ok := ignitionConfig["systemd"].(map[string]any)
+		Expect(ok).To(BeTrue(), "systemd section should exist")
+
+		units, ok := systemd["units"].([]any)
+		Expect(ok).To(BeTrue(), "units should be a list")
+
+		// Find metalprobe service unit
+		var metalprobeUnit map[string]any
+		for _, unit := range units {
+			u, ok := unit.(map[string]any)
+			if ok && u["name"] == "metalprobe.service" {
+				metalprobeUnit = u
+				break
+			}
+		}
+		Expect(metalprobeUnit).NotTo(BeNil(), "metalprobe.service should exist")
+
+		contents, ok := metalprobeUnit["contents"].(string)
+		Expect(ok).To(BeTrue(), "contents should be a string")
+		Expect(contents).To(ContainSubstring("--registry-url=http://localhost:30000"))
+		Expect(contents).To(ContainSubstring("--server-uuid=38947555-7742-3448-3784-823347823834"))
+		Expect(contents).To(ContainSubstring("--discovery-token="))
+
+		// Verify ignition secret has owner references
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
@@ -217,7 +235,6 @@ var _ = Describe("Server Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
 		))
 
 		By("Patching the boot configuration to a Ready state")
@@ -251,7 +268,24 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
+		// The controller generates signed tokens automatically
+		// We need to get the signing secret and generate a matching token
+		signingSecret := &v1.Secret{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{
+				Name:      "discovery-token-signing-secret",
+				Namespace: ns.Name,
+			}, signingSecret)
+		}).Should(Succeed())
+
+		signingKey := signingSecret.Data["signing-key"]
+		Expect(signingKey).To(HaveLen(32))
+
+		// Generate a signed token for this server
+		testToken, err := metaltoken.GenerateSignedDiscoveryToken(signingKey, server.Spec.SystemUUID)
+		Expect(err).NotTo(HaveOccurred())
+
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, testToken, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -450,7 +484,23 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
+		// Get the signing secret and generate a matching token
+		signingSecret2 := &v1.Secret{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{
+				Name:      "discovery-token-signing-secret",
+				Namespace: ns.Name,
+			}, signingSecret2)
+		}).Should(Succeed())
+
+		signingKey2 := signingSecret2.Data["signing-key"]
+		Expect(signingKey2).To(HaveLen(32))
+
+		// Generate a signed token for this server
+		testToken2, err := metaltoken.GenerateSignedDiscoveryToken(signingKey2, server.Spec.SystemUUID)
+		Expect(err).NotTo(HaveOccurred())
+
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, testToken2, 50*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

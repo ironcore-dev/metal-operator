@@ -18,6 +18,7 @@ import (
 type Agent struct {
 	SystemUUID       string
 	RegistryURL      string
+	DiscoveryToken   string // Authentication token for registry
 	Duration         time.Duration
 	Server           *registry.Server // Pointer to Server for late initialization.
 	log              logr.Logger
@@ -25,12 +26,13 @@ type Agent struct {
 	LLDPSyncDuration time.Duration
 }
 
-// NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
+// NewAgent creates a new Agent with the specified system UUID, registry URL, and discovery token.
+func NewAgent(log logr.Logger, systemUUID, registryURL, discoveryToken string, duration, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
 	return &Agent{
 		log:              log,
 		SystemUUID:       systemUUID,
 		RegistryURL:      registryURL,
+		DiscoveryToken:   discoveryToken,
 		Duration:         duration,
 		LLDPSyncInterval: LLDPSyncInterval,
 		LLDPSyncDuration: LLDPSyncDuration,
@@ -175,10 +177,12 @@ func (a *Agent) RefreshLLDP(ctx context.Context) error {
 }
 
 // registerServer handles the server registration with exponential backoff on failure.
+// Includes the discovery token in the payload for authentication with the registry.
 func (a *Agent) registerServer(ctx context.Context) error {
 	payload := registry.RegistrationPayload{
-		SystemUUID: a.SystemUUID,
-		Data:       *a.Server, // Dereference the pointer to Server.
+		SystemUUID:     a.SystemUUID,
+		DiscoveryToken: a.DiscoveryToken,
+		Data:           *a.Server, // Dereference the pointer to Server.
 	}
 
 	return wait.ExponentialBackoffWithContext(
@@ -207,8 +211,15 @@ func (a *Agent) registerServer(ctx context.Context) error {
 				}
 			}()
 
+			// Handle authentication errors explicitly
+			if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+				a.log.Error(nil, "authentication failed with registry", "statusCode", resp.StatusCode)
+				// Don't retry on auth errors - token is invalid
+				return false, nil
+			}
+
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				a.log.Error(err, "failed to register server", "url", a.RegistryURL)
+				a.log.Error(err, "failed to register server", "url", a.RegistryURL, "statusCode", resp.StatusCode)
 				return false, nil
 			}
 

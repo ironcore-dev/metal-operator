@@ -3,6 +3,8 @@
 
 package registry
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 // NetworkInterface represents a network interface on a server,
 // including its IP and MAC addresses.
 type NetworkInterface struct {
@@ -15,6 +17,7 @@ type NetworkInterface struct {
 
 // Server represents a server with a list of network interfaces.
 type Server struct {
+	Timestamp         *metav1.Time       `json:"timestamp,omitempty"`
 	SystemInfo        DMI                `json:"systemInfo,omitempty"`
 	CPU               []CPUInfo          `json:"cpu,omitempty"`
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`

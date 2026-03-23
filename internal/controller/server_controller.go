@@ -85,8 +85,10 @@ type ServerReconciler struct {
 	Insecure                bool
 	ManagerNamespace        string
 	ProbeImage              string
-	RegistryURL             string
 	ProbeOSImage            string
+	RegistryURL             string
+	RegistryClientTimeout   time.Duration
+	RegistryDataMaxAge      time.Duration
 	RegistryResyncInterval  time.Duration
 	EnforceFirstBoot        bool
 	EnforcePowerOff         bool
@@ -345,10 +347,24 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 	}
 	log.V(1).Info("Set PXE Boot for Server")
 
+	// Ensure registry is clean before Discovery starts (fresh registration)
+	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to clean up registry entry before discovery: %w", err)
+	}
+	log.V(1).Info("Ensured registry is clean for discovery")
+
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
 		return false, err
 	}
 	return false, nil
+}
+
+// isRegistryDataFresh checks if the registry data timestamp is recent enough
+func (r *ServerReconciler) isRegistryDataFresh(serverDetails *registry.Server, maxAge time.Duration) bool {
+	if serverDetails == nil || serverDetails.Timestamp == nil {
+		return false
+	}
+	return time.Since(serverDetails.Timestamp.Time) < maxAge
 }
 
 func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
@@ -382,7 +398,8 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		}
 	}
 
-	ready, err := r.extractServerDetailsFromRegistry(ctx, server)
+	serverDetails := &registry.Server{}
+	ready, err := r.extractServerDetailsFromRegistry(ctx, server, serverDetails)
 	if !ready && err == nil {
 		log.V(1).Info("Server agent did not post info to registry")
 		return true, nil
@@ -391,17 +408,29 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		log.V(1).Info("Could not get server details from registry.")
 		return false, err
 	}
+
+	// Check if the registry data is fresh enough to proceed with discovery completion
+	if !r.isRegistryDataFresh(serverDetails, r.RegistryDataMaxAge) {
+		if serverDetails.Timestamp != nil {
+			log.V(1).Info("Registry data is stale, waiting for fresh update", "age", time.Since(serverDetails.Timestamp.Time))
+		} else {
+			log.V(1).Info("Registry data has no timestamp, waiting for fresh update")
+		}
+		return true, nil
+	}
+
 	log.V(1).Info("Extracted Server details")
+
+	log.V(1).Info("Setting Server state to available")
+	_, err = r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
+	if err != nil {
+		return false, err
+	}
 
 	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
 	}
 	log.V(1).Info("Removed Server from Registry")
-
-	log.V(1).Info("Setting Server state set to available")
-	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-		return false, err
-	}
 	return false, nil
 }
 
@@ -837,23 +866,38 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 	return nil
 }
 
-func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server, serverDetails *registry.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID))
-	if resp != nil && resp.StatusCode == http.StatusNotFound {
+	url := fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID)
+	c := &http.Client{Timeout: r.RegistryClientTimeout}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error(err, "Failed to close response body")
+		}
+	}(resp.Body)
+
+	if resp.StatusCode == http.StatusNotFound {
 		log.V(1).Info("Did not find server information in registry")
 		return false, nil
 	}
 
-	if resp == nil {
-		return false, fmt.Errorf("failed to find server information in registry")
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return false, fmt.Errorf("failed to fetch server details from registry: HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
-	if err != nil {
-		return false, fmt.Errorf("failed to fetch server details: %w", err)
-	}
-
-	serverDetails := &registry.Server{}
 	if err := json.NewDecoder(resp.Body).Decode(serverDetails); err != nil {
 		return false, fmt.Errorf("failed to decode server details: %w", err)
 	}
@@ -1080,11 +1124,9 @@ func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.C
 func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 	url := fmt.Sprintf("%s/delete/%s", r.RegistryURL, server.Spec.SystemUUID)
+	c := &http.Client{Timeout: r.RegistryClientTimeout}
 
-	c := &http.Client{}
-
-	// Create the DELETE request
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -1100,6 +1142,17 @@ func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context,
 			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
+
+	// If the entry is not found, we can consider it already invalidated, so we return nil
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("failed to delete registry entry for server: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
 	return nil
 }
 

@@ -392,6 +392,8 @@ func main() { // nolint: gocyclo
 		ProbeImage:              probeImage,
 		ProbeOSImage:            probeOSImage,
 		RegistryURL:             registryURL,
+		RegistryClientTimeout:   5 * time.Second,
+		RegistryDataMaxAge:      2 * time.Minute,
 		RegistryResyncInterval:  registryResyncInterval,
 		ResyncInterval:          serverResyncInterval,
 		EnforceFirstBoot:        enforceFirstBoot,

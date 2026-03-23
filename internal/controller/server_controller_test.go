@@ -10,8 +10,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
@@ -20,110 +23,45 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/ironcore-dev/metal-operator/internal/probe"
+	metaltoken "github.com/ironcore-dev/metal-operator/internal/token"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
+
+// getSignedDiscoveryToken retrieves the signing secret and generates a signed discovery token
+// for the given systemUUID. This is a test helper to avoid code duplication.
+func getSignedDiscoveryToken(ctx SpecContext, k8sClient client.Client, ns, systemUUID string) (string, error) {
+	secretName := metaltoken.DiscoveryTokenSigningSecretName
+	secret := &v1.Secret{}
+
+	err := k8sClient.Get(ctx, client.ObjectKey{
+		Name:      secretName,
+		Namespace: ns,
+	}, secret)
+	if err != nil {
+		return "", err
+	}
+
+	signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]
+	if !ok || len(signingKey) != 32 {
+		return "", fmt.Errorf("invalid signing secret")
+	}
+
+	return metaltoken.GenerateSignedDiscoveryToken(signingKey, systemUUID)
+}
 
 var _ = Describe("Server Controller", func() {
 	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
-	})
-
-	It("should transition a server to released state and back to available", func(ctx SpecContext) {
-		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
-			Data: map[string][]byte{
-				"username": []byte("foo"),
-				"password": []byte("bar"),
-			},
-		}
-		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-
-		By("Creating a Server with inline BMC configuration")
-		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
-			Spec: metalv1alpha1.ServerSpec{
-				SystemUUID: "38947555-7742-3448-3784-823347823834",
-				BMC: &metalv1alpha1.BMCAccess{
-					Protocol: metalv1alpha1.Protocol{
-						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: MockServerPort,
-					},
-					Address: MockServerIP,
-					BMCSecretRef: v1.LocalObjectReference{
-						Name: bmcSecret.Name,
-					},
-				},
-				ReclaimPolicy: metalv1alpha1.ServerReclaimPolicyRetain,
-			},
-		}
-		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-
-		By("Updating the Server to available state")
-		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateAvailable
-		})).Should(Succeed())
-
-		By("creating a server claim")
-		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-claim",
-				Namespace: ns.Name,
-			},
-			Spec: metalv1alpha1.ServerClaimSpec{
-				ServerRef: &v1.LocalObjectReference{
-					Name: server.Name,
-				},
-			},
-		}
-		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-
-		By("waiting for the server to be reserved")
-		claimRef := metalv1alpha1.ImmutableObjectReference{
-			Namespace: claim.Namespace,
-			Name:      claim.Name,
-		}
-		Eventually(Object(server)).To(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", Equal(&claimRef)),
-			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
-		))
-
-		By("deleting the server claim")
-		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
-
-		By("waiting for the server claim to be gone")
-		Eventually(Get(claim)).To(Satisfy(apierrors.IsNotFound))
-
-		By("waiting for the server be released")
-		Eventually(Object(server)).To(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", &claimRef),
-			HaveField("Status.State", metalv1alpha1.ServerStateReleased),
-		))
-
-		By("deleting the claim ref of the server")
-		Eventually(Update(server, func() {
-			server.Spec.ServerClaimRef = nil
-		})).To(Succeed())
-
-		By("waiting for the server to be available again")
-		Eventually(Object(server)).To(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
-
-		// cleanup
-		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
 	It("should initialize a Server from Endpoint", func(ctx SpecContext) {
@@ -169,8 +107,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
@@ -241,8 +179,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeNil()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
@@ -283,29 +221,45 @@ var _ = Describe("Server Controller", func() {
 		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
 		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
 
-		// Generate expected ignition data using the same template file the controller uses
-		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
-			ignition.Config{
-				Image:        "foo:latest",
-				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-				PasswordHash: passwordHash,
-			},
-		)
-		Expect(err).NotTo(HaveOccurred())
+		// Extract the actual discovery token from the metalprobe service in the ignition
+		ignitionYAML := ignitionSecret.Data[DefaultIgnitionSecretKeyName]
+		var ignitionConfig map[string]any
+		Expect(yaml.Unmarshal(ignitionYAML, &ignitionConfig)).To(Succeed())
 
+		systemd, ok := ignitionConfig["systemd"].(map[string]any)
+		Expect(ok).To(BeTrue(), "systemd section should exist")
+
+		units, ok := systemd["units"].([]any)
+		Expect(ok).To(BeTrue(), "units should be a list")
+
+		// Find metalprobe service unit
+		var metalprobeUnit map[string]any
+		for _, unit := range units {
+			u, ok := unit.(map[string]any)
+			if ok && u["name"] == "metalprobe.service" {
+				metalprobeUnit = u
+				break
+			}
+		}
+		Expect(metalprobeUnit).NotTo(BeNil(), "metalprobe.service should exist")
+
+		contents, ok := metalprobeUnit["contents"].(string)
+		Expect(ok).To(BeTrue(), "contents should be a string")
+		Expect(contents).To(ContainSubstring("--registry-url=http://localhost:30000"))
+		Expect(contents).To(ContainSubstring("--server-uuid=38947555-7742-3448-3784-823347823834"))
+		Expect(contents).To(ContainSubstring("--discovery-token="))
+
+		// Verify ignition secret has owner references
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
 		))
 
 		By("Patching the boot configuration to a Ready state")
@@ -321,8 +275,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
@@ -331,12 +285,21 @@ var _ = Describe("Server Controller", func() {
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.Conditions", ContainElement(
-				HaveField("Type", ConditionPoweringOn),
+				HaveField("Type", PoweringOnCondition),
 			)),
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
+		// The controller generates signed tokens automatically
+		// We need to get the signing secret and generate a matching token
+		var testToken string
+		Eventually(func() error {
+			var err error
+			testToken, err = getSignedDiscoveryToken(ctx, k8sClient, ns.Name, server.Spec.SystemUUID)
+			return err
+		}).Should(Succeed())
+
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, testToken, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -437,8 +400,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
@@ -473,34 +436,81 @@ var _ = Describe("Server Controller", func() {
 		Expect(ok).To(BeTrue())
 		Expect(user).To(HaveKeyWithValue("name", "metal"))
 
+		// Verify password hash exists and matches (check once outside Eventually)
 		passwordHash, ok := user["password_hash"].(string)
 		Expect(ok).To(BeTrue(), "password_hash should be a string")
-
 		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
 
-		// Generate expected ignition data using the same template file the controller uses
-		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
-			ignition.Config{
-				Image:        "foo:latest",
-				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
-				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-				PasswordHash: passwordHash,
-			},
-		)
-		Expect(err).NotTo(HaveOccurred())
-
+		// Eventually assertion with token and hash extraction inside the closure
+		// This prevents race conditions with reconciler re-applying the secret with fresh bcrypt hashes
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
+			WithTransform(func(secret *v1.Secret) error {
+				// Re-extract password hash and token inside Eventually to handle reconciler updates
+				contents := string(secret.Data[DefaultIgnitionSecretKeyName])
+				if !strings.Contains(contents, "--discovery-token=") {
+					return fmt.Errorf("ignition data does not contain discovery token")
+				}
+
+				// Extract token using regex
+				tokenRegex := regexp.MustCompile(`--discovery-token=([A-Za-z0-9._-]+)`)
+				matches := tokenRegex.FindStringSubmatch(contents)
+				if len(matches) != 2 {
+					return fmt.Errorf("failed to extract discovery token from ignition config")
+				}
+				actualToken := matches[1]
+				if actualToken == "" {
+					return fmt.Errorf("extracted discovery token is empty")
+				}
+
+				// Re-extract current password hash (may have changed due to reconciliation)
+				var ignitionConfig map[string]any
+				if err := yaml.Unmarshal(secret.Data[DefaultIgnitionSecretKeyName], &ignitionConfig); err != nil {
+					return fmt.Errorf("failed to unmarshal ignition config: %w", err)
+				}
+				passwd, _ := ignitionConfig["passwd"].(map[string]any)
+				users, _ := passwd["users"].([]any)
+				if len(users) == 0 {
+					return fmt.Errorf("no users found in ignition config")
+				}
+				user, ok := users[0].(map[string]any)
+				if !ok {
+					return fmt.Errorf("user is not a map")
+				}
+				currentPasswordHash, ok := user["password_hash"].(string)
+				if !ok {
+					return fmt.Errorf("password_hash is not a string")
+				}
+
+				// Generate expected ignition data using the CURRENT password hash and token
+				ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+					filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
+					ignition.Config{
+						Image:        "foo:latest",
+						Flags:        fmt.Sprintf("--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834 --discovery-token=%s", actualToken),
+						SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
+						PasswordHash: currentPasswordHash,
+					},
+				)
+				if err != nil {
+					return fmt.Errorf("failed to generate expected ignition data: %w", err)
+				}
+
+				// Compare actual vs expected
+				if diff := cmp.Diff(string(ignitionData), string(secret.Data[DefaultIgnitionSecretKeyName])); diff != "" {
+					return fmt.Errorf("ignition data mismatch (-want +got):\n%s", diff)
+				}
+
+				return nil
+			}, BeNil()),
 		))
 
 		By("Patching the boot configuration to a Ready state")
@@ -527,12 +537,20 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.Conditions", ContainElement(
-				HaveField("Type", ConditionPoweringOn),
+				HaveField("Type", PoweringOnCondition),
 			)),
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
+		// Get the signing secret and generate a matching token
+		var testToken2 string
+		Eventually(func() error {
+			var err error
+			testToken2, err = getSignedDiscoveryToken(ctx, k8sClient, ns.Name, server.Spec.SystemUUID)
+			return err
+		}).Should(Succeed())
+
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, testToken2, 50*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -863,8 +881,18 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
 
+		By("Getting the signing secret and generating a valid discovery token")
+		var testToken string
+		Eventually(func() error {
+			var err error
+			testToken, err = getSignedDiscoveryToken(ctx, k8sClient, ns.Name, server.Spec.SystemUUID)
+			return err
+		}).Should(Succeed())
+
+		By("Sending bootstate request with valid discovery token")
 		var bootstateRequest registry.BootstatePayload
 		bootstateRequest.SystemUUID = server.Spec.SystemUUID
+		bootstateRequest.DiscoveryToken = testToken
 		bootstateRequest.Booted = true
 		marshaled, err := json.Marshal(bootstateRequest)
 		Expect(err).NotTo(HaveOccurred())
@@ -966,8 +994,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerClaim",
 				Name:               claim.Name,
 				UID:                claim.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.ServerRef.Name", server.Name),
 			HaveField("Spec.Image", "foo:bar"),

@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 type Agent struct {
 	SystemUUID            string
 	RegistryURL           string
+	DiscoveryToken        string // Authentication token for registry
 	Duration              time.Duration
 	RegistryClientTimeout time.Duration
 	Server                *registry.Server // Pointer to Server for late initialization.
@@ -29,12 +29,13 @@ type Agent struct {
 	LLDPSyncDuration      time.Duration
 }
 
-// NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
+// NewAgent creates a new Agent with the specified system UUID, registry URL, and discovery token.
+func NewAgent(log logr.Logger, systemUUID, registryURL, discoveryToken string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
 	return &Agent{
 		log:                   log,
 		SystemUUID:            systemUUID,
 		RegistryURL:           registryURL,
+		DiscoveryToken:        discoveryToken,
 		Duration:              duration,
 		RegistryClientTimeout: registryClientTimeout,
 		LLDPSyncInterval:      LLDPSyncInterval,
@@ -184,10 +185,12 @@ func (a *Agent) RefreshLLDP(ctx context.Context) error {
 }
 
 // registerServer handles the server registration with exponential backoff on failure.
+// Includes the discovery token in the payload for authentication with the registry.
 func (a *Agent) registerServer(ctx context.Context) error {
 	payload := registry.RegistrationPayload{
-		SystemUUID: a.SystemUUID,
-		Data:       *a.Server, // Dereference the pointer to Server.
+		SystemUUID:     a.SystemUUID,
+		DiscoveryToken: a.DiscoveryToken,
+		Data:           *a.Server, // Dereference the pointer to Server.
 	}
 
 	return wait.ExponentialBackoffWithContext(
@@ -222,13 +225,16 @@ func (a *Agent) registerServer(ctx context.Context) error {
 				}
 			}()
 
+			// Handle authentication errors explicitly
+			if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+				err := fmt.Errorf("authentication failed with status %d", resp.StatusCode)
+				a.log.Error(err, "Authentication failed with registry")
+				// Don't retry on auth errors - token is invalid
+				return false, err
+			}
+
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1024))
-				if readErr != nil {
-					a.log.Error(fmt.Errorf("HTTP %d: failed to read response body: %w", resp.StatusCode, readErr), "Failed to register server", "url", a.RegistryURL)
-					return false, nil
-				}
-				a.log.Error(fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body)), "Failed to register server", "url", a.RegistryURL)
+				a.log.Info("Failed to register server", "url", a.RegistryURL, "statusCode", resp.StatusCode)
 				return false, nil
 			}
 

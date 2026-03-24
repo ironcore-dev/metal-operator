@@ -32,6 +32,9 @@ spec:
     - jsonPath: .spec.ignitionSecretRef.name
       name: IgnitionRef
       type: string
+    - jsonPath: .spec.bootMethod
+      name: BootMethod
+      type: string
     - jsonPath: .status.state
       name: State
       type: string
@@ -65,6 +68,16 @@ spec:
             description: ServerBootConfigurationSpec defines the desired state of
               ServerBootConfiguration.
             properties:
+              bootMethod:
+                default: PXE
+                description: |-
+                  BootMethod specifies the boot method to use for the server.
+                  Valid values are "PXE" (default) and "VirtualMedia".
+                  If not specified, defaults to PXE for backwards compatibility.
+                enum:
+                - PXE
+                - VirtualMedia
+                type: string
               ignitionSecretRef:
                 description: |-
                   IgnitionSecretRef is a reference to the Secret object that contains
@@ -82,7 +95,11 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               image:
-                description: Image specifies the boot image to be used for the server.
+                description: |-
+                  Image specifies the boot image to be used for the server.
+                  For PXE boot: OCI image reference containing kernel/initrd.
+                  For VirtualMedia boot: OCI image reference containing bootable ISO layer.
+                  This field is optional and can be omitted if not specified.
                 type: string
               serverRef:
                 description: ServerRef is a reference to the server for which this
@@ -106,6 +123,11 @@ spec:
             description: ServerBootConfigurationStatus defines the observed state
               of ServerBootConfiguration.
             properties:
+              bootISOURL:
+                description: |-
+                  BootISOURL is the URL to the bootable OS ISO provided by boot-operator.
+                  This field is populated for VirtualMedia boot type.
+                type: string
               conditions:
                 description: Conditions represents the latest available observations
                   of the ServerBootConfig's current state.
@@ -164,6 +186,11 @@ spec:
                   - type
                   type: object
                 type: array
+              configISOURL:
+                description: |-
+                  ConfigISOURL is the URL to the config drive ISO containing ignition configuration.
+                  This field is populated by boot-operator for VirtualMedia boot type.
+                type: string
               state:
                 description: State represents the current state of the boot configuration.
                 type: string

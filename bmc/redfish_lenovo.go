@@ -192,3 +192,95 @@ func (r *LenovoRedfishBMC) lenovoMatchesComponentFilter(fw *schemas.SoftwareInve
 func (r *LenovoRedfishBMC) lenovoCheckPending(fw *schemas.SoftwareInventory) bool {
 	return strings.Contains(strings.ToUpper(fw.ID), "-PENDING")
 }
+
+// --- VirtualMedia methods ---
+
+// MountVirtualMedia mounts a virtual media image to the specified slot.
+// Lenovo uses Manager endpoints and PATCH requests with EXT-prefixed slot IDs.
+func (r *LenovoRedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
+
+	payload := map[string]interface{}{
+		"Image":          mediaURL,
+		"Inserted":       true,
+		"WriteProtected": true,
+	}
+
+	resp, err := r.client.Service.GetClient().Patch(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to mount virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to mount virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// EjectVirtualMedia ejects virtual media from the specified slot.
+// Lenovo uses Manager endpoints and PATCH requests with EXT-prefixed slot IDs.
+func (r *LenovoRedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
+
+	payload := map[string]interface{}{
+		"Image":    "",
+		"Inserted": false,
+	}
+
+	resp, err := r.client.Service.GetClient().Patch(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to eject virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to eject virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetVirtualMediaStatus retrieves the status of all virtual media slots.
+// Lenovo uses Manager endpoints for VirtualMedia.
+func (r *LenovoRedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
+	}
+
+	manager := managers[0]
+	return manager.VirtualMedia()
+}

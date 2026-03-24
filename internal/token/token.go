@@ -4,13 +4,11 @@
 package token
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
-	"strconv"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // GenerateSigningSecret generates a cryptographically secure signing secret
@@ -23,101 +21,92 @@ func GenerateSigningSecret() ([]byte, error) {
 	return secret, nil
 }
 
-// GenerateSignedDiscoveryToken generates an HMAC-SHA256 signed discovery token.
-// The token format is: base64url(systemUUID||timestamp||signature)
+// GenerateSignedDiscoveryToken generates a JWT-based signed discovery token.
+// The token uses HMAC-SHA256 (HS256) signing with standard JWT claims.
 //
 // This allows the registry to verify the token was issued by the controller
 // for a specific systemUUID without storing any state.
 //
 // signingSecret: 32-byte shared secret between controller and registry
 // systemUUID: The server's system UUID
-// Returns: signed token (base64url encoded)
+// Returns: signed JWT token
 func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string) (string, error) {
 	if len(signingSecret) != 32 {
 		return "", fmt.Errorf("signing secret must be exactly 32 bytes")
 	}
 
-	// Create payload: systemUUID||timestamp (Unix seconds)
-	timestamp := time.Now().Unix()
-	payload := fmt.Sprintf("%s||%d", systemUUID, timestamp)
+	// Create JWT claims
+	claims := jwt.MapClaims{
+		"sub": systemUUID,                                        // Subject: scoped to this server
+		"iat": jwt.NewNumericDate(time.Now()),                    // Issued at
+		"exp": jwt.NewNumericDate(time.Now().Add(1 * time.Hour)), // Expires in 1 hour
+	}
 
-	// Sign the payload with HMAC-SHA256
-	mac := hmac.New(sha256.New, signingSecret)
-	mac.Write([]byte(payload))
-	signature := mac.Sum(nil)
+	// Create token with HS256 signing method
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// Encode as: payload+signature (then base64url, no separator)
-	tokenBytes := append([]byte(payload), signature...)
-	token := base64.RawURLEncoding.EncodeToString(tokenBytes)
+	// Sign token with secret key
+	tokenString, err := token.SignedString(signingSecret)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign JWT token: %w", err)
+	}
 
-	return token, nil
+	return tokenString, nil
 }
 
-// VerifySignedDiscoveryToken verifies and extracts information from a signed token.
+// VerifySignedDiscoveryToken verifies and extracts information from a JWT token.
 // Returns (systemUUID, timestamp, valid, error).
 // For invalid tokens, returns ("", 0, false, nil) - error is only for system errors.
-func VerifySignedDiscoveryToken(signingSecret []byte, token string) (string, int64, bool, error) {
+func VerifySignedDiscoveryToken(signingSecret []byte, tokenString string) (string, int64, bool, error) {
 	if len(signingSecret) != 32 {
 		return "", 0, false, fmt.Errorf("signing secret must be exactly 32 bytes")
 	}
 
-	// Decode base64url
-	tokenBytes, err := base64.RawURLEncoding.DecodeString(token)
-	if err != nil {
-		return "", 0, false, nil // Invalid encoding = invalid token, not system error
-	}
-
-	// Token format: systemUUID||timestamp||signature (32 bytes)
-	if len(tokenBytes) < 32 {
-		return "", 0, false, nil // Too short = invalid token
-	}
-
-	// Split payload and signature
-	payloadBytes := tokenBytes[:len(tokenBytes)-32]
-	receivedSignature := tokenBytes[len(tokenBytes)-32:]
-
-	// Parse payload: systemUUID||timestamp
-	payload := string(payloadBytes)
-
-	// Find the first occurrence of "||" to split systemUUID from timestamp
-	var systemUUID string
-	var timestamp int64
-
-	// Parse by splitting on "||"
-	firstDelim := -1
-	for i := 0; i < len(payload)-1; i++ {
-		if payload[i] == '|' && payload[i+1] == '|' {
-			firstDelim = i
-			break
+	// Parse and validate JWT token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+		// Verify signing method is exactly HS256 (HMAC-SHA256)
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-	}
+		return signingSecret, nil
+	})
 
-	if firstDelim == -1 {
-		return "", 0, false, nil // Invalid format
-	}
-
-	systemUUID = payload[:firstDelim]
-	timestampStr := payload[firstDelim+2:]
-
-	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
 	if err != nil {
-		return "", 0, false, nil // Invalid timestamp
+		return "", 0, false, nil // Invalid token, not system error
 	}
 
-	// Verify signature
-	mac := hmac.New(sha256.New, signingSecret)
-	mac.Write(payloadBytes)
-	expectedSignature := mac.Sum(nil)
-
-	if !hmac.Equal(receivedSignature, expectedSignature) {
-		return "", 0, false, nil // Invalid signature
+	// Verify token is valid and not expired
+	if !token.Valid {
+		return "", 0, false, nil
 	}
 
-	// Check token age (reject tokens older than 1 hour to prevent replay)
-	tokenAge := time.Now().Unix() - timestamp
-	if tokenAge > 3600 || tokenAge < -300 { // 1 hour max age, 5 min clock skew allowance
-		return "", 0, false, nil // Token expired or clock skew
+	// Extract claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", 0, false, nil
 	}
 
-	return systemUUID, timestamp, true, nil
+	// Extract systemUUID from "sub" claim
+	systemUUID, ok := claims["sub"].(string)
+	if !ok || systemUUID == "" {
+		return "", 0, false, nil
+	}
+
+	// Extract issued-at timestamp from "iat" claim
+	var issuedAt int64
+	if iatClaim, ok := claims["iat"]; ok {
+		switch v := iatClaim.(type) {
+		case float64:
+			issuedAt = int64(v)
+		case int64:
+			issuedAt = v
+		default:
+			return "", 0, false, nil
+		}
+	} else {
+		// If no iat claim, use current time (backward compatible)
+		issuedAt = time.Now().Unix()
+	}
+
+	return systemUUID, issuedAt, true, nil
 }

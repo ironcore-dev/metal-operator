@@ -4,9 +4,11 @@
 package token
 
 import (
-	"regexp"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -44,14 +46,14 @@ var _ = Describe("GenerateSignedDiscoveryToken", func() {
 	})
 
 	Context("Token Format", func() {
-		It("should generate a valid base64url token", func() {
+		It("should generate a valid JWT token", func() {
 			token, err := GenerateSignedDiscoveryToken(signingSecret, "test-uuid-123")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(token).NotTo(BeEmpty())
 
-			// Base64URL uses: A-Z, a-z, 0-9, -, _
-			validPattern := regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
-			Expect(validPattern.MatchString(token)).To(BeTrue())
+			// JWT format: header.payload.signature (3 parts separated by dots)
+			parts := strings.Split(token, ".")
+			Expect(parts).To(HaveLen(3))
 		})
 
 		It("should generate different tokens for different UUIDs", func() {
@@ -132,6 +134,26 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 			Expect(valid).To(BeFalse())
 		})
 
+		It("should reject expired token", func() {
+			systemUUID := "test-uuid-expired"
+
+			// Create token with expiration in the past
+			claims := jwt.MapClaims{
+				"sub": systemUUID,
+				"iat": jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),    // Issued 2 hours ago
+				"exp": jwt.NewNumericDate(time.Now().Add(-30 * time.Minute)), // Expired 30 minutes ago
+			}
+
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			expiredToken, err := token.SignedString(signingSecret)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify expired token should fail
+			_, _, valid, err := VerifySignedDiscoveryToken(signingSecret, expiredToken)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(valid).To(BeFalse())
+		})
+
 		It("should reject tampered token", func() {
 			token, err := GenerateSignedDiscoveryToken(signingSecret, "test-uuid")
 			Expect(err).NotTo(HaveOccurred())
@@ -144,12 +166,22 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 			Expect(valid).To(BeFalse())
 		})
 
-		It("should reject invalid base64", func() {
-			invalidToken := "not-valid-base64!@#$%"
+		It("should reject invalid JWT format", func() {
+			testCases := []struct {
+				name  string
+				token string
+			}{
+				{"empty", ""},
+				{"malformed", "not.a.valid.jwt"},
+				{"incomplete", "header.payload"},
+				{"random", "random-string-not-jwt"},
+			}
 
-			_, _, valid, err := VerifySignedDiscoveryToken(signingSecret, invalidToken)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(valid).To(BeFalse())
+			for _, tc := range testCases {
+				_, _, valid, err := VerifySignedDiscoveryToken(signingSecret, tc.token)
+				Expect(err).NotTo(HaveOccurred(), "test case: "+tc.name)
+				Expect(valid).To(BeFalse(), "test case: "+tc.name)
+			}
 		})
 
 		It("should reject token with invalid secret length", func() {
@@ -161,8 +193,8 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 	})
 
 	Context("Token Security", func() {
-		It("should use constant-time comparison (HMAC)", func() {
-			// HMAC provides constant-time comparison internally
+		It("should use JWT library constant-time comparison", func() {
+			// JWT library provides constant-time comparison via HMAC
 			// This test verifies the signature mechanism works
 			token, err := GenerateSignedDiscoveryToken(signingSecret, "test-uuid")
 			Expect(err).NotTo(HaveOccurred())
@@ -183,6 +215,26 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 			Expect(valid).To(BeTrue())
 			Expect(extractedUUID).To(Equal("uuid-1"))
 			Expect(extractedUUID).NotTo(Equal("uuid-2"))
+		})
+
+		It("should reject tokens with wrong algorithm", func() {
+			systemUUID := "test-uuid-alg"
+
+			// Create token with HS512 instead of HS256
+			claims := jwt.MapClaims{
+				"sub": systemUUID,
+				"iat": jwt.NewNumericDate(time.Now()),
+				"exp": jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			}
+
+			token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims) // Wrong algorithm
+			wrongAlgToken, err := token.SignedString(signingSecret)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify should fail due to algorithm mismatch
+			_, _, valid, err := VerifySignedDiscoveryToken(signingSecret, wrongAlgToken)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(valid).To(BeFalse())
 		})
 	})
 })

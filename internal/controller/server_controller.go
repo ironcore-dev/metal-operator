@@ -25,6 +25,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
+	metaltoken "github.com/ironcore-dev/metal-operator/internal/token"
 	"github.com/stmcginnis/gofish/schemas"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
@@ -657,6 +658,20 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 		return fmt.Errorf("failed to generate SSH keypair: %w", err)
 	}
 
+	// Get or create signing secret for discovery tokens
+	signingSecret, err := r.getOrCreateSigningSecret(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get signing secret: %w", err)
+	}
+
+	// Generate signed discovery token
+	discoveryToken, err := metaltoken.GenerateSignedDiscoveryToken(signingSecret, server.Spec.SystemUUID)
+	if err != nil {
+		return fmt.Errorf("failed to generate discovery token: %w", err)
+	}
+
+	log.V(1).Info("Generated signed discovery token", "systemUUID", server.Spec.SystemUUID)
+
 	ownerRef := metav1apply.OwnerReference().
 		WithAPIVersion("metal.ironcore.dev/v1alpha1").
 		WithKind("ServerBootConfiguration").
@@ -681,7 +696,8 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 	sshKeyPairNamespacedName := fmt.Sprintf("%s/%s", ptr.Deref(sshSecretApply.Namespace, ""), ptr.Deref(sshSecretApply.Name, ""))
 	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", sshKeyPairNamespacedName)
 
-	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
+	// Include discovery token in probe flags
+	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s --discovery-token=%s", registryURL, server.Spec.SystemUUID, discoveryToken)
 	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey, password)
 	if err != nil {
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
@@ -710,6 +726,85 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 	log.V(1).Info("Applied Ignition Secret")
 
 	return nil
+}
+
+// getOrCreateSigningSecret retrieves or creates the shared signing secret for discovery tokens.
+// The secret is shared between the controller and registry for HMAC token signing/verification.
+func (r *ServerReconciler) getOrCreateSigningSecret(ctx context.Context) ([]byte, error) {
+	secretName := metaltoken.DiscoveryTokenSigningSecretName
+	secret := &v1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      secretName,
+		Namespace: r.ManagerNamespace,
+	}, secret)
+
+	if err == nil {
+		// Secret exists, return the signing key
+		if signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]; ok && len(signingKey) == 32 {
+			return signingKey, nil
+		}
+		// Secret exists but is invalid, regenerate
+		return nil, fmt.Errorf("existing signing secret is invalid")
+	}
+
+	if !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get signing secret: %w", err)
+	}
+
+	// Generate new signing secret
+	signingKey, err := metaltoken.GenerateSigningSecret()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate signing secret: %w", err)
+	}
+
+	// Create the secret
+	newSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: r.ManagerNamespace,
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			metaltoken.DiscoveryTokenSigningSecretKey: signingKey,
+		},
+	}
+
+	if err := r.Create(ctx, newSecret); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			// Another reconciler won the race - fetch the existing secret
+			ctrl.LoggerFrom(ctx).Info("Signing secret already exists, retrieving it")
+
+			secret := &v1.Secret{}
+			if err := r.Get(ctx, types.NamespacedName{
+				Name:      secretName,
+				Namespace: r.ManagerNamespace,
+			}, secret); err != nil {
+				return nil, fmt.Errorf("failed to retrieve existing signing secret: %w", err)
+			}
+
+			if signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]; ok && len(signingKey) == 32 {
+				return signingKey, nil
+			}
+
+			// Existing secret is invalid - update it
+			signingKey, err := metaltoken.GenerateSigningSecret()
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate replacement signing secret: %w", err)
+			}
+
+			secret.Data[metaltoken.DiscoveryTokenSigningSecretKey] = signingKey
+			if err := r.Update(ctx, secret); err != nil {
+				return nil, fmt.Errorf("failed to update invalid signing secret: %w", err)
+			}
+
+			ctrl.LoggerFrom(ctx).Info("Updated invalid signing secret")
+			return signingKey, nil
+		}
+		return nil, fmt.Errorf("failed to create signing secret: %w", err)
+	}
+
+	ctrl.LoggerFrom(ctx).Info("Created discovery token signing secret", "name", secretName)
+	return signingKey, nil
 }
 
 func generateSSHKeyPairAndPassword() ([]byte, []byte, []byte, error) {

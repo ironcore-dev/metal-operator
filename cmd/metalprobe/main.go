@@ -20,12 +20,14 @@ var (
 func main() {
 	var registryURL string
 	var serverUUID string
+	var discoveryToken string
 	var duration time.Duration
 	var LLDPSyncInterval time.Duration
 	var LLDPSyncDuration time.Duration
 
 	flag.StringVar(&registryURL, "registry-url", "", "Registry URL where the probe will register itself.")
 	flag.StringVar(&serverUUID, "server-uuid", "", "Agent UUID to register with the registry.")
+	flag.StringVar(&discoveryToken, "discovery-token", "", "Discovery token for authenticating with the registry.")
 	flag.DurationVar(&duration, "duration", 5*time.Second, "Duration of time to wait between checks.")
 	flag.DurationVar(&LLDPSyncInterval, "lldp-sync-interval", 5*time.Second,
 		"Duration of time to wait between lldpctl runs.")
@@ -50,10 +52,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	if discoveryToken == "" {
+		setupLog.Error(nil, "discovery token is missing")
+		os.Exit(1)
+	}
+
 	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting registry agent")
-	agent := probe.NewAgent(setupLog, serverUUID, registryURL, duration, LLDPSyncInterval, LLDPSyncDuration)
+	agent := probe.NewAgent(
+		setupLog, serverUUID, registryURL, discoveryToken,
+		duration, LLDPSyncInterval, LLDPSyncDuration,
+	)
 	if err := agent.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running probe agent")
 		os.Exit(1)

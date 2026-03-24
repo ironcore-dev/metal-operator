@@ -34,7 +34,7 @@ var _ = BeforeSuite(func() {
 	DeferCleanup(cancel)
 
 	// Initialize the registry
-	registryServer = registry.NewServer(GinkgoLogr, registryAddr, nil)
+	registryServer = registry.NewServer(GinkgoLogr, registryAddr, nil, "", "")
 	go func() {
 		defer GinkgoRecover()
 		Expect(registryServer.Start(ctx)).To(Succeed(), "failed to start registry agent")
@@ -46,7 +46,7 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 
 	// Initialize your probe server
-	probeAgent = probe.NewAgent(GinkgoLogr, systemUUID, registryURL, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
+	probeAgent = probe.NewAgent(GinkgoLogr, systemUUID, registryURL, "test-discovery-token-123", 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

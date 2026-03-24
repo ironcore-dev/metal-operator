@@ -146,6 +146,16 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 
 	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
 		server.Status.State == metalv1alpha1.ServerStateMaintenance {
+		if server.Spec.BMCRef != nil {
+			b := &metalv1alpha1.BMC{}
+			bmcName := server.Spec.BMCRef.Name
+			if err := r.Get(ctx, client.ObjectKey{Name: bmcName}, b); err != nil {
+				if apierrors.IsNotFound(err) {
+					log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcName, "Server", server.Name)
+					return true
+				}
+			}
+		}
 		log.V(1).Info("Postponing delete as server is in Maintenance state")
 		return false
 	}

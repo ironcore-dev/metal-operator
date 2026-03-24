@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -213,9 +214,10 @@ func (a *Agent) registerServer(ctx context.Context) error {
 
 			// Handle authentication errors explicitly
 			if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-				a.log.Error(nil, "authentication failed with registry", "statusCode", resp.StatusCode)
+				err := fmt.Errorf("authentication failed with status %d", resp.StatusCode)
+				a.log.Error(err, "Authentication failed with registry")
 				// Don't retry on auth errors - token is invalid
-				return false, nil
+				return false, err
 			}
 
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {

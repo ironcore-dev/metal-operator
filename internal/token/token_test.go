@@ -70,11 +70,11 @@ var _ = Describe("GenerateSignedDiscoveryToken", func() {
 			token1, err := GenerateSignedDiscoveryToken(signingSecret, "test-uuid")
 			Expect(err).NotTo(HaveOccurred())
 
-			// Small delay to ensure different timestamp
-			Eventually(func() string {
-				token2, _ := GenerateSignedDiscoveryToken(signingSecret, "test-uuid")
-				return token2
-			}).ShouldNot(Equal(token1))
+			// Wait 1+ second to ensure different timestamp
+			time.Sleep(1100 * time.Millisecond)
+			token2, err := GenerateSignedDiscoveryToken(signingSecret, "test-uuid")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(token2).NotTo(Equal(token1))
 		})
 
 		It("should return error for invalid secret length", func() {

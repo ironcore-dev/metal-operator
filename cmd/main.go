@@ -42,6 +42,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/controller"
 	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
+	metaltoken "github.com/ironcore-dev/metal-operator/internal/token"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -628,7 +629,7 @@ func main() { // nolint: gocyclo
 			setupLog,
 			fmt.Sprintf(":%d", registryPort),
 			mgr.GetClient(),
-			"discovery-token-signing-secret",
+			metaltoken.DiscoveryTokenSigningSecretName,
 			managerNamespace,
 		)
 		if err := registryServer.Start(ctx); err != nil {

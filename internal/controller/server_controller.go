@@ -720,7 +720,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 // getOrCreateSigningSecret retrieves or creates the shared signing secret for discovery tokens.
 // The secret is shared between the controller and registry for HMAC token signing/verification.
 func (r *ServerReconciler) getOrCreateSigningSecret(ctx context.Context) ([]byte, error) {
-	secretName := "discovery-token-signing-secret"
+	secretName := metaltoken.DiscoveryTokenSigningSecretName
 	secret := &v1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      secretName,
@@ -729,7 +729,7 @@ func (r *ServerReconciler) getOrCreateSigningSecret(ctx context.Context) ([]byte
 
 	if err == nil {
 		// Secret exists, return the signing key
-		if signingKey, ok := secret.Data["signing-key"]; ok && len(signingKey) == 32 {
+		if signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]; ok && len(signingKey) == 32 {
 			return signingKey, nil
 		}
 		// Secret exists but is invalid, regenerate
@@ -754,11 +754,41 @@ func (r *ServerReconciler) getOrCreateSigningSecret(ctx context.Context) ([]byte
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"signing-key": signingKey,
+			metaltoken.DiscoveryTokenSigningSecretKey: signingKey,
 		},
 	}
 
 	if err := r.Create(ctx, newSecret); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			// Another reconciler won the race - fetch the existing secret
+			ctrl.LoggerFrom(ctx).Info("Signing secret already exists, retrieving it")
+
+			secret := &v1.Secret{}
+			if err := r.Get(ctx, types.NamespacedName{
+				Name:      secretName,
+				Namespace: r.ManagerNamespace,
+			}, secret); err != nil {
+				return nil, fmt.Errorf("failed to retrieve existing signing secret: %w", err)
+			}
+
+			if signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]; ok && len(signingKey) == 32 {
+				return signingKey, nil
+			}
+
+			// Existing secret is invalid - update it
+			signingKey, err := metaltoken.GenerateSigningSecret()
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate replacement signing secret: %w", err)
+			}
+
+			secret.Data[metaltoken.DiscoveryTokenSigningSecretKey] = signingKey
+			if err := r.Update(ctx, secret); err != nil {
+				return nil, fmt.Errorf("failed to update invalid signing secret: %w", err)
+			}
+
+			ctrl.LoggerFrom(ctx).Info("Updated invalid signing secret")
+			return signingKey, nil
+		}
 		return nil, fmt.Errorf("failed to create signing secret: %w", err)
 	}
 

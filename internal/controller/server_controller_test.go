@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -32,6 +32,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
+
+// getSignedDiscoveryToken retrieves the signing secret and generates a signed discovery token
+// for the given systemUUID. This is a test helper to avoid code duplication.
+func getSignedDiscoveryToken(ctx SpecContext, k8sClient client.Client, ns, systemUUID string) (string, error) {
+	secretName := metaltoken.DiscoveryTokenSigningSecretName
+	secret := &v1.Secret{}
+
+	err := k8sClient.Get(ctx, client.ObjectKey{
+		Name:      secretName,
+		Namespace: ns,
+	}, secret)
+	if err != nil {
+		return "", err
+	}
+
+	signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]
+	if !ok || len(signingKey) != 32 {
+		return "", fmt.Errorf("invalid signing secret")
+	}
+
+	return metaltoken.GenerateSignedDiscoveryToken(signingKey, systemUUID)
+}
 
 var _ = Describe("Server Controller", func() {
 	ns := SetupTest(nil)
@@ -271,20 +293,12 @@ var _ = Describe("Server Controller", func() {
 		By("Starting the probe agent")
 		// The controller generates signed tokens automatically
 		// We need to get the signing secret and generate a matching token
-		signingSecret := &v1.Secret{}
+		var testToken string
 		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{
-				Name:      "discovery-token-signing-secret",
-				Namespace: ns.Name,
-			}, signingSecret)
+			var err error
+			testToken, err = getSignedDiscoveryToken(ctx, k8sClient, ns.Name, server.Spec.SystemUUID)
+			return err
 		}).Should(Succeed())
-
-		signingKey := signingSecret.Data["signing-key"]
-		Expect(signingKey).To(HaveLen(32))
-
-		// Generate a signed token for this server
-		testToken, err := metaltoken.GenerateSignedDiscoveryToken(signingKey, server.Spec.SystemUUID)
-		Expect(err).NotTo(HaveOccurred())
 
 		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, testToken, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
@@ -433,17 +447,11 @@ var _ = Describe("Server Controller", func() {
 		contents := string(ignitionSecret.Data[DefaultIgnitionSecretKeyName])
 		Expect(contents).To(ContainSubstring("--discovery-token="))
 
-		// Extract token using regex or string parsing
-		tokenStart := strings.Index(contents, "--discovery-token=")
-		Expect(tokenStart).To(BeNumerically(">", 0))
-		tokenValueStart := tokenStart + len("--discovery-token=")
-		tokenEnd := strings.IndexAny(contents[tokenValueStart:], " \n\t\"'")
-		var actualToken string
-		if tokenEnd == -1 {
-			actualToken = contents[tokenValueStart:]
-		} else {
-			actualToken = contents[tokenValueStart : tokenValueStart+tokenEnd]
-		}
+		// Extract token using regex
+		tokenRegex := regexp.MustCompile(`--discovery-token=([A-Za-z0-9._-]+)`)
+		matches := tokenRegex.FindStringSubmatch(contents)
+		Expect(matches).To(HaveLen(2), "Should find discovery token in ignition config")
+		actualToken := matches[1]
 		Expect(actualToken).ToNot(BeEmpty())
 
 		// Generate expected ignition data using the same template file the controller uses
@@ -504,20 +512,12 @@ var _ = Describe("Server Controller", func() {
 
 		By("Starting the probe agent")
 		// Get the signing secret and generate a matching token
-		signingSecret2 := &v1.Secret{}
+		var testToken2 string
 		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{
-				Name:      "discovery-token-signing-secret",
-				Namespace: ns.Name,
-			}, signingSecret2)
+			var err error
+			testToken2, err = getSignedDiscoveryToken(ctx, k8sClient, ns.Name, server.Spec.SystemUUID)
+			return err
 		}).Should(Succeed())
-
-		signingKey2 := signingSecret2.Data["signing-key"]
-		Expect(signingKey2).To(HaveLen(32))
-
-		// Generate a signed token for this server
-		testToken2, err := metaltoken.GenerateSignedDiscoveryToken(signingKey2, server.Spec.SystemUUID)
-		Expect(err).NotTo(HaveOccurred())
 
 		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, testToken2, 50*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
@@ -851,20 +851,12 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
 
 		By("Getting the signing secret and generating a valid discovery token")
-		signingSecret := &v1.Secret{}
+		var testToken string
 		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{
-				Name:      "discovery-token-signing-secret",
-				Namespace: ns.Name,
-			}, signingSecret)
+			var err error
+			testToken, err = getSignedDiscoveryToken(ctx, k8sClient, ns.Name, server.Spec.SystemUUID)
+			return err
 		}).Should(Succeed())
-
-		signingKey := signingSecret.Data["signing-key"]
-		Expect(signingKey).To(HaveLen(32))
-
-		// Generate a signed token for this server
-		testToken, err := metaltoken.GenerateSignedDiscoveryToken(signingKey, server.Spec.SystemUUID)
-		Expect(err).NotTo(HaveOccurred())
 
 		By("Sending bootstate request with valid discovery token")
 		var bootstateRequest registry.BootstatePayload

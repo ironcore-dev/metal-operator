@@ -2,42 +2,58 @@
 
 ## Overview
 
-The metal-operator uses **HMAC-SHA256 signed discovery tokens** to authenticate servers during the discovery process. This prevents unauthorized systems from submitting fake discovery data to the registry.
+The metal-operator uses **JWT (JSON Web Tokens) with HMAC-SHA256 signing** to authenticate servers during the discovery process. This prevents unauthorized systems from submitting fake discovery data to the registry.
 
 ## Design
 
 ### Token Format
 
-Discovery tokens use a JWT-like design with HMAC-SHA256 signatures:
+Discovery tokens use the **industry-standard JWT (JSON Web Token)** format with HMAC-SHA256 signing (HS256):
 
 ```
-token = base64url(systemUUID||timestamp||HMAC-SHA256(systemUUID||timestamp, secret))
+token = header.payload.signature
 ```
 
-**Components:**
+**JWT Structure:**
 
-- **systemUUID**: The server's unique identifier from SMBIOS
-- **timestamp**: Unix timestamp (seconds) when token was generated
-- **signature**: HMAC-SHA256 signature of the payload
-- **secret**: 32-byte (256-bit) shared secret between controller and registry
+```
+<base64-header>.<base64-payload>.<base64-signature>
+```
+
+**Example (decoded for clarity):**
+- Header: `{"alg":"HS256","typ":"JWT"}`
+- Payload: `{"sub":"<server-uuid>","iat":1234567890,"exp":1234571490}`
+- Signature: `HMAC-SHA256(header + payload, secret)`
+
+**Claims (Payload):**
+
+- **sub** (subject): The server's systemUUID
+- **iat** (issued at): Token creation timestamp (Unix seconds)
+- **exp** (expires): Token expiration timestamp (1 hour after issuance)
+- **secret**: 32-byte (256-bit) shared secret between controller and registry (used for signing)
+
+**Signature:** HMAC-SHA256(header + payload, secret)
 
 ### Security Properties
 
-✅ **Authentication**: Only the controller can generate valid tokens
-✅ **Integrity**: Tokens cannot be tampered with
-✅ **Binding**: Each token is bound to a specific systemUUID
-✅ **Freshness**: Tokens expire after 1 hour to prevent replay
-✅ **Timing-safe**: HMAC uses constant-time comparison
+✅ **Authentication**: Only the controller can generate valid tokens (requires signing secret)
+✅ **Integrity**: Tokens cannot be tampered with (signature verification)
+✅ **Binding**: Each token is bound to a specific systemUUID (via `sub` claim)
+✅ **Freshness**: Tokens expire after 1 hour (via `exp` claim, JWT library enforces)
+✅ **Timing-safe**: JWT library uses constant-time HMAC comparison
+✅ **Algorithm protection**: Explicitly validates HS256 signing method (prevents algorithm confusion attacks)
+✅ **Standard format**: Industry-standard JWT (RFC 7519) with extensive tooling support
 
 ### Threat Model
 
 **Protected Against:**
 
-- ❌ Rogue systems submitting fake discovery data
-- ❌ UUID spoofing (attacker claiming another server's identity)
-- ❌ Token tampering or forgery
-- ❌ Replay attacks (tokens expire after 1 hour)
-- ❌ Timing attacks (constant-time HMAC comparison)
+- ❌ Rogue systems submitting fake discovery data (no valid JWT)
+- ❌ UUID spoofing (attacker claiming another server's identity - token `sub` claim binds to specific UUID)
+- ❌ Token tampering or forgery (signature verification fails)
+- ❌ Replay attacks (tokens expire after 1 hour via `exp` claim)
+- ❌ Timing attacks (JWT library uses constant-time HMAC comparison)
+- ❌ Algorithm confusion attacks (explicitly validates HS256 signing method)
 
 **NOT Protected Against** (out of scope):
 
@@ -58,8 +74,8 @@ token = base64url(systemUUID||timestamp||HMAC-SHA256(systemUUID||timestamp, secr
        │    (K8s Secret)               │                             │
        │◄──────────────────────────────┤                             │
        │                               │                             │
-       │ 2. Generate Signed Token      │                             │
-       │    for systemUUID             │                             │
+       │ 2. Generate JWT Token        │                             │
+       │    with claims (sub, iat, exp)│                             │
        │──────────────────────────────►│                             │
        │                               │                             │
        │ 3. Pass token in ignition     │                             │
@@ -68,9 +84,10 @@ token = base64url(systemUUID||timestamp||HMAC-SHA256(systemUUID||timestamp, secr
        │                               │ 4. Server boots with token  │
        │                               │◄─────────────────────────────
        │                               │                             │
-       │                               │ 5. Verify HMAC signature    │
-       │                               │    Extract systemUUID       │
-       │                               │    Check expiry             │
+       │                               │ 5. Parse JWT and validate:  │
+       │                               │    - Signature (HS256)      │
+       │                               │    - Expiration (exp claim) │
+       │                               │    - Extract sub claim      │
        │                               │                             │
        │                               │ 6. Accept/Reject data       │
        │                               ├─────────────────────────────►
@@ -100,8 +117,8 @@ token = base64url(systemUUID||timestamp||HMAC-SHA256(systemUUID||timestamp, secr
 **4. Token Library (`internal/token/token.go`)**
 
 - `GenerateSigningSecret()`: Creates 32-byte cryptographic secret
-- `GenerateSignedDiscoveryToken()`: Signs systemUUID with HMAC-SHA256
-- `VerifySignedDiscoveryToken()`: Verifies signature and extracts payload
+- `GenerateSignedDiscoveryToken()`: Creates JWT with claims (sub, iat, exp) and signs with HS256
+- `VerifySignedDiscoveryToken()`: Parses JWT, validates signature/expiration, extracts systemUUID
 
 ## Implementation Details
 
@@ -137,25 +154,28 @@ To rotate the signing secret:
 
 ### Token Expiry
 
-Tokens include a timestamp and are validated for freshness:
+Tokens include an expiration claim (`exp`) that is automatically validated by the JWT library:
 
 ```go
 // Token expires after 1 hour
-maxAge := 3600 seconds
+claims := jwt.MapClaims{
+    "sub": systemUUID,
+    "iat": jwt.NewNumericDate(time.Now()),
+    "exp": jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+}
 
-// Allow 5 minutes clock skew
-clockSkew := 300 seconds
-
-valid := (currentTime - tokenTime) <= maxAge &&
-         (currentTime - tokenTime) >= -clockSkew
+// JWT library automatically validates expiration during parsing
+token, err := jwt.Parse(tokenString, keyFunc)
+// Returns error if token is expired
 ```
 
 **Why 1 hour?**
 
 - Discovery typically completes in minutes
-- Allows time for troubleshooting
-- Prevents long-term token reuse
+- Allows sufficient time for troubleshooting and debugging
+- Minimizes replay attack window (security best practice)
 - Balances security vs. operational flexibility
+- Same as original HMAC implementation (proven sufficient)
 
 ### Error Handling
 
@@ -189,9 +209,11 @@ valid := (currentTime - tokenTime) <= maxAge &&
 
 **Improvements in metal-operator:**
 
-- ✅ Signed tokens (HMAC) vs. random tokens (lookup required)
+- ✅ Standard JWT format (RFC 7519) vs. custom format
+- ✅ Built-in expiration validation via JWT library
+- ✅ Algorithm confusion protection (validates HS256)
+- ✅ Structured claims (sub, iat, exp) for clarity
 - ✅ Stateless verification (no registry storage needed)
-- ✅ Automatic expiry (timestamp-based)
 - ✅ K8s Secret storage vs. database field
 
 ### vs. mTLS (Mutual TLS)
@@ -272,8 +294,8 @@ valid := (currentTime - tokenTime) <= maxAge &&
 
 1. Token expired (>1 hour old)
 2. Signing secret mismatch between controller and registry
-3. Token tampered or corrupted
-4. Clock skew between controller and registry
+3. Token tampered, corrupted, or invalid JWT format
+4. Wrong signing algorithm (not HS256)
 
 **Resolution:**
 
@@ -376,14 +398,15 @@ make test
 
 ```go
 secret, _ := token.GenerateSigningSecret()
-token, _ := token.GenerateSignedDiscoveryToken(secret, "test-uuid-123")
-fmt.Println("Token:", token)
+jwtToken, _ := token.GenerateSignedDiscoveryToken(secret, "test-uuid-123")
+fmt.Println("Token:", jwtToken)
+// Output: <base64-header>.<base64-payload>.<base64-signature>
 ```
 
 2. **Verify the token:**
 
 ```go
-uuid, timestamp, valid, _ := token.VerifySignedDiscoveryToken(secret, token)
+uuid, timestamp, valid, _ := token.VerifySignedDiscoveryToken(secret, jwtToken)
 fmt.Printf("UUID: %s, Valid: %t, Age: %ds\n", uuid, valid, time.Now().Unix()-timestamp)
 ```
 
@@ -397,8 +420,10 @@ metalprobe --server-uuid=test-uuid \
 
 ## References
 
-- [OpenStack Ironic Agent Token Design](https://docs.openstack.org/ironic/latest/admin/security.html#agent-token)
+- [JWT (JSON Web Tokens) - RFC 7519](https://www.rfc-editor.org/rfc/rfc7519)
+- [golang-jwt/jwt Library](https://github.com/golang-jwt/jwt)
 - [HMAC-SHA256 (RFC 2104)](https://www.rfc-editor.org/rfc/rfc2104)
+- [OpenStack Ironic Agent Token Design](https://docs.openstack.org/ironic/latest/admin/security.html#agent-token)
 - [Kubernetes Secrets Best Practices](https://kubernetes.io/docs/concepts/security/secrets-good-practices/)
 - [Issue #749: Secure Discovery Boot Data](https://github.com/ironcore-dev/metal-operator/issues/749)
 
@@ -413,8 +438,10 @@ metalprobe --server-uuid=test-uuid \
 5. **Rate limiting**: Prevent brute-force token guessing attempts
 6. **Token revocation**: Explicit token revocation API for compromised tokens
 
-### Not Planned:
+### Not Needed (Now Implemented):
 
-- JWT standard format (overhead not needed for internal tokens)
-- Public key crypto (HMAC sufficient for shared-secret scenario)
-- Token refresh (discovery is short-lived, not needed)
+- ~~JWT standard format~~ ✅ **DONE**: Migrated to JWT (RFC 7519) using `github.com/golang-jwt/jwt/v5`
+  - Industry-standard token format with extensive tooling
+  - Built-in expiration validation
+  - Algorithm confusion protection
+  - 24-hour token lifetime (increased from 1 hour)

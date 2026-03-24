@@ -624,7 +624,13 @@ func main() { // nolint: gocyclo
 	// Run registry server as a runnable to ensure it stops when the manager stops
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		setupLog.Info("starting registry server", "RegistryURL", registryURL)
-		registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort), mgr.GetClient())
+		registryServer := registry.NewServer(
+			setupLog,
+			fmt.Sprintf(":%d", registryPort),
+			mgr.GetClient(),
+			"discovery-token-signing-secret",
+			managerNamespace,
+		)
 		if err := registryServer.Start(ctx); err != nil {
 			return fmt.Errorf("unable to start registry server: %w", err)
 		}

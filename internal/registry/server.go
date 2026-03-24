@@ -24,55 +24,60 @@ import (
 
 // Server holds the HTTP server's state, including the systems store and signing secret.
 type Server struct {
-	addr          string
-	mux           *http.ServeMux
-	systemsStore  *sync.Map
-	signingSecret []byte // Shared secret for HMAC token verification
-	log           logr.Logger
-	k8sClient     client.Client
+	addr              string
+	mux               *http.ServeMux
+	systemsStore      *sync.Map
+	signingSecret     []byte // Shared secret for HMAC token verification
+	signingSecretName string // Name of the signing secret
+	signingSecretNs   string // Namespace of the signing secret
+	log               logr.Logger
+	k8sClient         client.Client
 }
 
 // NewServer initializes and returns a new Server instance.
 // It loads the signing secret from Kubernetes for token verification.
-func NewServer(logger logr.Logger, addr string, k8sClient client.Client) *Server {
+func NewServer(logger logr.Logger, addr string, k8sClient client.Client, signingSecretName, signingSecretNamespace string) *Server {
 	mux := http.NewServeMux()
 
-	// Load signing secret from Kubernetes (will be loaded asynchronously)
+	// Load signing secret from Kubernetes
 	var signingSecret []byte
-	if k8sClient != nil {
-		// Try to load the signing secret from any namespace (for test flexibility)
+	if k8sClient != nil && signingSecretName != "" && signingSecretNamespace != "" {
 		ctx := context.Background()
-		secretList := &corev1.SecretList{}
-		err := k8sClient.List(ctx, secretList)
+		secret := &corev1.Secret{}
+		err := k8sClient.Get(ctx, client.ObjectKey{
+			Name:      signingSecretName,
+			Namespace: signingSecretNamespace,
+		}, secret)
 
 		if err != nil {
-			logger.Error(err, "Failed to list secrets")
+			logger.Error(err, "Failed to load signing secret",
+				"name", signingSecretName, "namespace", signingSecretNamespace)
 		} else {
-			// Find the discovery token signing secret by name
-			for _, secret := range secretList.Items {
-				if secret.Name == "discovery-token-signing-secret" {
-					if key, ok := secret.Data["signing-key"]; ok && len(key) == 32 {
-						signingSecret = key
-						logger.Info("Loaded discovery token signing secret", "namespace", secret.Namespace)
-						break
-					} else {
-						logger.Error(nil, "Signing secret found but invalid", "namespace", secret.Namespace)
-					}
-				}
+			if key, ok := secret.Data["signing-key"]; ok && len(key) == 32 {
+				signingSecret = key
+				logger.Info("Loaded discovery token signing secret",
+					"name", signingSecretName, "namespace", signingSecretNamespace)
+			} else {
+				logger.Error(nil, "Signing secret found but invalid",
+					"name", signingSecretName, "namespace", signingSecretNamespace)
 			}
-			if len(signingSecret) == 0 {
-				logger.Info("Signing secret not found, token validation will fail until secret is created")
-			}
+		}
+
+		if len(signingSecret) == 0 {
+			logger.Info("Signing secret not loaded, token validation will fail until secret is available",
+				"name", signingSecretName, "namespace", signingSecretNamespace)
 		}
 	}
 
 	server := &Server{
-		addr:          addr,
-		mux:           mux,
-		systemsStore:  &sync.Map{},
-		signingSecret: signingSecret,
-		log:           logger,
-		k8sClient:     k8sClient,
+		addr:              addr,
+		mux:               mux,
+		systemsStore:      &sync.Map{},
+		signingSecret:     signingSecret,
+		signingSecretName: signingSecretName,
+		signingSecretNs:   signingSecretNamespace,
+		log:               logger,
+		k8sClient:         k8sClient,
 	}
 	server.routes()
 	return server
@@ -98,31 +103,31 @@ func (s *Server) validateDiscoveryToken(receivedToken string) (string, bool) {
 
 	// If signing secret not loaded yet, try to load it now
 	if len(s.signingSecret) != 32 {
-		ctx := context.Background()
-		secretList := &corev1.SecretList{}
-		err := s.k8sClient.List(ctx, secretList)
-
-		if err != nil {
-			s.log.Error(err, "Failed to list secrets while loading signing secret")
+		if s.signingSecretName == "" || s.signingSecretNs == "" {
+			s.log.Error(nil, "Cannot load signing secret: name or namespace not configured")
 			return "", false
 		}
 
-		// Find the discovery token signing secret by name
-		for _, secret := range secretList.Items {
-			if secret.Name == "discovery-token-signing-secret" {
-				if key, ok := secret.Data["signing-key"]; ok && len(key) == 32 {
-					s.signingSecret = key
-					s.log.Info("Loaded discovery token signing secret on demand", "namespace", secret.Namespace)
-					break
-				} else {
-					s.log.Error(nil, "Signing secret found but invalid", "namespace", secret.Namespace)
-				}
-			}
+		ctx := context.Background()
+		secret := &corev1.Secret{}
+		err := s.k8sClient.Get(ctx, client.ObjectKey{
+			Name:      s.signingSecretName,
+			Namespace: s.signingSecretNs,
+		}, secret)
+
+		if err != nil {
+			s.log.Error(err, "Failed to load signing secret on demand",
+				"name", s.signingSecretName, "namespace", s.signingSecretNs)
+			return "", false
 		}
 
-		// Still not loaded? Reject
-		if len(s.signingSecret) != 32 {
-			s.log.Error(nil, "Signing secret not loaded, cannot validate tokens")
+		if key, ok := secret.Data["signing-key"]; ok && len(key) == 32 {
+			s.signingSecret = key
+			s.log.Info("Loaded discovery token signing secret on demand",
+				"name", s.signingSecretName, "namespace", s.signingSecretNs)
+		} else {
+			s.log.Error(nil, "Signing secret found but invalid",
+				"name", s.signingSecretName, "namespace", s.signingSecretNs)
 			return "", false
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -427,12 +428,30 @@ var _ = Describe("Server Controller", func() {
 
 		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
 
+		// Extract the discovery token from the actual ignition secret
+		// The controller generates the token and includes it in the probe flags
+		contents := string(ignitionSecret.Data[DefaultIgnitionSecretKeyName])
+		Expect(contents).To(ContainSubstring("--discovery-token="))
+
+		// Extract token using regex or string parsing
+		tokenStart := strings.Index(contents, "--discovery-token=")
+		Expect(tokenStart).To(BeNumerically(">", 0))
+		tokenValueStart := tokenStart + len("--discovery-token=")
+		tokenEnd := strings.IndexAny(contents[tokenValueStart:], " \n\t\"'")
+		var actualToken string
+		if tokenEnd == -1 {
+			actualToken = contents[tokenValueStart:]
+		} else {
+			actualToken = contents[tokenValueStart : tokenValueStart+tokenEnd]
+		}
+		Expect(actualToken).ToNot(BeEmpty())
+
 		// Generate expected ignition data using the same template file the controller uses
 		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
 			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 			ignition.Config{
 				Image:        "foo:latest",
-				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				Flags:        fmt.Sprintf("--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834 --discovery-token=%s", actualToken),
 				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
 				PasswordHash: passwordHash,
 			},
@@ -831,8 +850,26 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
 
+		By("Getting the signing secret and generating a valid discovery token")
+		signingSecret := &v1.Secret{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{
+				Name:      "discovery-token-signing-secret",
+				Namespace: ns.Name,
+			}, signingSecret)
+		}).Should(Succeed())
+
+		signingKey := signingSecret.Data["signing-key"]
+		Expect(signingKey).To(HaveLen(32))
+
+		// Generate a signed token for this server
+		testToken, err := metaltoken.GenerateSignedDiscoveryToken(signingKey, server.Spec.SystemUUID)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Sending bootstate request with valid discovery token")
 		var bootstateRequest registry.BootstatePayload
 		bootstateRequest.SystemUUID = server.Spec.SystemUUID
+		bootstateRequest.DiscoveryToken = testToken
 		bootstateRequest.Booted = true
 		marshaled, err := json.Marshal(bootstateRequest)
 		Expect(err).NotTo(HaveOccurred())

@@ -10,13 +10,13 @@ The metal-operator uses **JWT (JSON Web Tokens) with HMAC-SHA256 signing** to au
 
 Discovery tokens use the **industry-standard JWT (JSON Web Token)** format with HMAC-SHA256 signing (HS256):
 
-```
+```text
 token = header.payload.signature
 ```
 
 **JWT Structure:**
 
-```
+```text
 <base64-header>.<base64-payload>.<base64-signature>
 ```
 
@@ -30,9 +30,10 @@ token = header.payload.signature
 - **sub** (subject): The server's systemUUID
 - **iat** (issued at): Token creation timestamp (Unix seconds)
 - **exp** (expires): Token expiration timestamp (1 hour after issuance)
-- **secret**: 32-byte (256-bit) shared secret between controller and registry (used for signing)
 
 **Signature:** HMAC-SHA256(header + payload, secret)
+
+**Note:** The signing secret is never included in the token. It's used only to generate and verify the signature.
 
 ### Security Properties
 
@@ -65,7 +66,7 @@ token = header.payload.signature
 
 ### Token Lifecycle
 
-```
+```text
 ┌──────────────┐                  ┌──────────┐                  ┌──────────┐
 │  Controller  │                  │ Registry │                  │  Server  │
 └──────┬───────┘                  └────┬─────┘                  └────┬─────┘
@@ -336,9 +337,9 @@ kubectl rollout restart deployment/metal-operator-registry -n metal-operator-sys
 kubectl delete serverbootconfiguration <name> -n <namespace>
 # (Controller will recreate it, generating secret in the process)
 
-# Or manually create the secret
-kubectl create secret generic discovery-token-signing-secret \
-  --from-literal=signing-key=$(openssl rand -base64 32) \
+# Or manually create the secret (generates 32 raw bytes)
+openssl rand 32 | kubectl create secret generic discovery-token-signing-secret \
+  --from-file=signing-key=/dev/stdin \
   -n metal-operator-system
 
 # Verify registry can read it
@@ -444,4 +445,4 @@ metalprobe --server-uuid=test-uuid \
   - Industry-standard token format with extensive tooling
   - Built-in expiration validation
   - Algorithm confusion protection
-  - 24-hour token lifetime (increased from 1 hour)
+  - 1-hour token lifetime (same as original HMAC implementation)

@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
 
 package token
 
@@ -54,6 +55,7 @@ func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string) (stri
 
 // VerifySignedDiscoveryToken verifies and extracts information from a signed token.
 // Returns (systemUUID, timestamp, valid, error).
+// For invalid tokens, returns ("", 0, false, nil) - error is only for system errors.
 func VerifySignedDiscoveryToken(signingSecret []byte, token string) (string, int64, bool, error) {
 	if len(signingSecret) != 32 {
 		return "", 0, false, fmt.Errorf("signing secret must be exactly 32 bytes")
@@ -62,12 +64,12 @@ func VerifySignedDiscoveryToken(signingSecret []byte, token string) (string, int
 	// Decode base64url
 	tokenBytes, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
-		return "", 0, false, fmt.Errorf("failed to decode token: %w", err)
+		return "", 0, false, nil // Invalid encoding = invalid token, not system error
 	}
 
 	// Token format: systemUUID||timestamp||signature (32 bytes)
 	if len(tokenBytes) < 32 {
-		return "", 0, false, fmt.Errorf("token too short: %d bytes", len(tokenBytes))
+		return "", 0, false, nil // Too short = invalid token
 	}
 
 	// Split payload and signature
@@ -91,7 +93,7 @@ func VerifySignedDiscoveryToken(signingSecret []byte, token string) (string, int
 	}
 
 	if firstDelim == -1 {
-		return "", 0, false, fmt.Errorf("invalid format: no delimiter found")
+		return "", 0, false, nil // Invalid format
 	}
 
 	systemUUID = payload[:firstDelim]
@@ -99,7 +101,7 @@ func VerifySignedDiscoveryToken(signingSecret []byte, token string) (string, int
 
 	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
 	if err != nil {
-		return "", 0, false, fmt.Errorf("invalid timestamp: %w", err)
+		return "", 0, false, nil // Invalid timestamp
 	}
 
 	// Verify signature
@@ -108,13 +110,13 @@ func VerifySignedDiscoveryToken(signingSecret []byte, token string) (string, int
 	expectedSignature := mac.Sum(nil)
 
 	if !hmac.Equal(receivedSignature, expectedSignature) {
-		return "", 0, false, fmt.Errorf("invalid HMAC signature")
+		return "", 0, false, nil // Invalid signature
 	}
 
 	// Check token age (reject tokens older than 1 hour to prevent replay)
 	tokenAge := time.Now().Unix() - timestamp
 	if tokenAge > 3600 || tokenAge < -300 { // 1 hour max age, 5 min clock skew allowance
-		return "", 0, false, fmt.Errorf("token expired or clock skew: age=%d seconds", tokenAge)
+		return "", 0, false, nil // Token expired or clock skew
 	}
 
 	return systemUUID, timestamp, true, nil

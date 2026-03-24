@@ -355,7 +355,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 
 		By("Starting the registry server")
 		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			registryServer := registry.NewServer(GinkgoLogr, fmt.Sprintf(":%d", RegistryPort), k8sManager.GetClient())
+			registryServer := registry.NewServer(
+				GinkgoLogr,
+				fmt.Sprintf(":%d", RegistryPort),
+				k8sManager.GetClient(),
+				"discovery-token-signing-secret",
+				ns.Name,
+			)
 			if err := registryServer.Start(ctx); err != nil {
 				return fmt.Errorf("failed to start registry server: %w", err)
 			}

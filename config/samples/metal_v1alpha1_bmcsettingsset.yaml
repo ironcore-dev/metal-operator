@@ -7,31 +7,37 @@ metadata:
   name: bmcsettingsset-sample
 spec:
   bmcSettingsTemplate:
-    version: 2.10.3 # version to apply settings to
-    serverMaintenancePolicy: OwnerApproval
+    version: "1.45.455b66-rev4"
+    serverMaintenancePolicy: Enforced
     settings:
-      foo: bar
-      foo2: bar2
-      dynamicfoo: "{{ inventory_hostname }}"
-      dynamicfoo2: "{{ region }}"
-      dynamicfoo3: "{{ licence_type }}"
+      BootMode: "UEFI"
+      HyperThreading: "Enabled"
   bmcSelector:
     matchLabels:
       manufacturer: "dell"
       model: "poweredge-r840"
-  dynamicVariables:
-      - name: inventory_hostname
-        key: remote-bmc-dns-name
-        objectKeyRef: 
-            kind: ConfigMap
-            name: my-configmap
-            namespace: default
-      - name: region
-        bmcLabel: metal.ironcore.dev/region
-      - name: licence_type
-        objectKeyRef: 
-            kind: Secret
-            name: my-secret
-            namespace: default
-        key: licence_type
+  dynamicSettings:
+    - key: "AssetTag"
+      valueFrom:
+        bmcLabel: "metal.ironcore.dev/asset-tag"
+    - key: "FQDN"
+      format: "$(hostname).$(domain)"
+      variables:
+        hostname:
+          bmcLabel: "metal.ironcore.dev/hostname"
+        domain:
+          configMapKeyRef:
+            name: "network-config"
+            namespace: "metal-system"
+            key: "domain-suffix"
+    - key: "LicenseKey"
+      format: "$(region)-$(key)"
+      variables:
+        region:
+          bmcLabel: "metal.ironcore.dev/region"
+        key:
+          secretKeyRef:
+            name: "bmc-licenses"
+            namespace: "metal-system"
+            key: "{{ .bmcName }}"
 

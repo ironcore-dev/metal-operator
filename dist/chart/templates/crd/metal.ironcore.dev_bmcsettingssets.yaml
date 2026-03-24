@@ -137,73 +137,137 @@ spec:
                 required:
                 - version
                 type: object
-              dynamicVariables:
-                description: DynamicVariables defines the dynamic variables for the
-                  BMCSettingsSet which allows users to specify variables in the BMC
-                  settings and their sources which will be resolved by the controller
-                  at runtime and injected into the BMC settings before applying them
-                  to the BMCs.
+              dynamicSettings:
+                description: DynamicSettings defines dynamic settings to resolve per
+                  BMC when creating BMCSettings resources.
                 items:
                   properties:
-                    bmcLabel:
-                      description: BMCLabel is used to specify the label of the BMC
-                        from which the variable value will be sourced. The controller
-                        will look for the label in the BMC's labels and use its value
-                        as the variable's value.
+                    format:
+                      description: Format defines a composite setting format with
+                        placeholders like $(name).
                       type: string
                     key:
-                      description: |-
-                        Key is used to specify the key of the value in data from the object defined in 'ObjectKeyRef'.
-                        For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectKeyRef' contains the reference to the ConfigMap and 'Key' can be used to specify the key of the value in the ConfigMap's data.
-                      type: string
-                    name:
-                      description: Name specifies the variable name, referenced in
-                        BMC settings using the `{{ .Name }}` syntax.
-                      maxLength: 256
+                      description: Key is the BMC setting key to set.
                       minLength: 1
                       type: string
-                    objectKeyRef:
-                      description: ObjectKeyRef is used to specify the reference to
-                        the object which contains the value of the variable.
+                    valueFrom:
+                      description: ValueFrom defines a simple single source for the
+                        setting value.
                       properties:
-                        apiVersion:
-                          description: APIVersion is the API version of the referenced
-                            object.
+                        bmcLabel:
+                          description: BMCLabel is sourced from a label on the selected
+                            BMC.
                           type: string
-                        kind:
-                          description: Kind is the kind of the referenced object.
-                          type: string
-                        name:
-                          description: Name is the name of the referenced object.
-                          type: string
-                        namespace:
-                          description: Namespace is the namespace of the referenced
-                            object.
-                          type: string
-                        uid:
-                          description: UID is the uid of the referenced object.
-                          type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - uid
+                        configMapKeyRef:
+                          description: ConfigMapKeyRef points to a namespaced ConfigMap
+                            key.
+                          properties:
+                            key:
+                              description: Key is the key within the referenced object.
+                              type: string
+                            name:
+                              description: Name is the referenced object name.
+                              type: string
+                            namespace:
+                              description: Namespace is the referenced object namespace.
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                        secretKeyRef:
+                          description: SecretKeyRef points to a namespaced Secret
+                            key.
+                          properties:
+                            key:
+                              description: Key is the key within the referenced object.
+                              type: string
+                            name:
+                              description: Name is the referenced object name.
+                              type: string
+                            namespace:
+                              description: Namespace is the referenced object namespace.
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                      type: object
+                      x-kubernetes-validations:
+                      - message: exactly one of bmcLabel, configMapKeyRef, or secretKeyRef
+                          must be provided
+                        rule: '(has(self.bmcLabel) ? 1 : 0) + (has(self.configMapKeyRef)
+                          ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
+                    variables:
+                      additionalProperties:
+                        properties:
+                          bmcLabel:
+                            description: BMCLabel is sourced from a label on the selected
+                              BMC.
+                            type: string
+                          configMapKeyRef:
+                            description: ConfigMapKeyRef points to a namespaced ConfigMap
+                              key.
+                            properties:
+                              key:
+                                description: Key is the key within the referenced
+                                  object.
+                                type: string
+                              name:
+                                description: Name is the referenced object name.
+                                type: string
+                              namespace:
+                                description: Namespace is the referenced object namespace.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            - namespace
+                            type: object
+                          secretKeyRef:
+                            description: SecretKeyRef points to a namespaced Secret
+                              key.
+                            properties:
+                              key:
+                                description: Key is the key within the referenced
+                                  object.
+                                type: string
+                              name:
+                                description: Name is the referenced object name.
+                                type: string
+                              namespace:
+                                description: Namespace is the referenced object namespace.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            - namespace
+                            type: object
+                        type: object
+                        x-kubernetes-validations:
+                        - message: exactly one of bmcLabel, configMapKeyRef, or secretKeyRef
+                            must be provided
+                          rule: '(has(self.bmcLabel) ? 1 : 0) + (has(self.configMapKeyRef)
+                            ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
+                      description: Variables maps format placeholder names to their
+                        sources.
                       type: object
                   required:
-                  - name
+                  - key
                   type: object
                   x-kubernetes-validations:
-                  - message: key must be provided when objectKeyRef is set
-                    rule: '!has(self.objectKeyRef) || (has(self.key) && size(self.key)
+                  - message: exactly one of valueFrom or non-empty format must be
+                      provided
+                    rule: '(has(self.valueFrom) ? 1 : 0) + (has(self.format) && size(self.format)
+                      > 0 ? 1 : 0) == 1'
+                  - message: variables must be provided when format is set
+                    rule: '!has(self.format) || size(self.format) == 0 || (has(self.variables)
+                      && size(self.variables) > 0)'
+                  - message: variables can only be provided when format is set
+                    rule: '!has(self.variables) || (has(self.format) && size(self.format)
                       > 0)'
-                  - message: objectKeyRef.kind must be provided when objectKeyRef
-                      is set
-                    rule: '!has(self.objectKeyRef) || size(self.objectKeyRef.kind)
-                      > 0'
-                  - message: either objectKeyRef or bmcLabel must be provided
-                    rule: has(self.objectKeyRef) || (has(self.bmcLabel) && size(self.bmcLabel)
-                      > 0)
                 type: array
             required:
             - bmcSelector

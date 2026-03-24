@@ -507,7 +507,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
-| `dynamicVariables` _[DynamicVariables](#dynamicvariables) array_ | DynamicVariables defines the dynamic variables for the BMCSettingsSet which allows users to specify variables in the BMC settings and their sources which will be resolved by the controller at runtime and injected into the BMC settings before applying them to the BMCs. |  |  |
+| `dynamicSettings` _[DynamicSetting](#dynamicsetting) array_ | DynamicSettings defines dynamic settings to resolve per BMC when creating BMCSettings resources. |  |  |
 | `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
 
 
@@ -942,7 +942,7 @@ _Appears in:_
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
 
 
-#### DynamicVariables
+#### DynamicSetting
 
 
 
@@ -955,10 +955,28 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `objectKeyRef` _[ObjectReference](#objectreference)_ | ObjectKeyRef is used to specify the reference to the object which contains the value of the variable. |  |  |
-| `key` _string_ | Key is used to specify the key of the value in data from the object defined in 'ObjectKeyRef'.<br />For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectKeyRef' contains the reference to the ConfigMap and 'Key' can be used to specify the key of the value in the ConfigMap's data. |  |  |
-| `bmcLabel` _string_ | BMCLabel is used to specify the label of the BMC from which the variable value will be sourced. The controller will look for the label in the BMC's labels and use its value as the variable's value. |  |  |
-| `name` _string_ | Name specifies the variable name, referenced in BMC settings using the `\{\{ .Name \}\}` syntax. |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+| `key` _string_ | Key is the BMC setting key to set. |  | MinLength: 1 <br /> |
+| `valueFrom` _[DynamicSettingSource](#dynamicsettingsource)_ | ValueFrom defines a simple single source for the setting value. |  |  |
+| `format` _string_ | Format defines a composite setting format with placeholders like $(name). |  |  |
+| `variables` _object (keys:string, values:[DynamicSettingSource](#dynamicsettingsource))_ | Variables maps format placeholder names to their sources. |  |  |
+
+
+#### DynamicSettingSource
+
+
+
+
+
+
+
+_Appears in:_
+- [DynamicSetting](#dynamicsetting)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `bmcLabel` _string_ | BMCLabel is sourced from a label on the selected BMC. |  |  |
+| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
+| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
 
 
 #### Endpoint
@@ -1108,6 +1126,24 @@ _Appears in:_
 | `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
 
 
+#### NamespacedKeySelector
+
+
+
+
+
+
+
+_Appears in:_
+- [DynamicSettingSource](#dynamicsettingsource)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the referenced object name. |  |  |
+| `namespace` _string_ | Namespace is the referenced object namespace. |  |  |
+| `key` _string_ | Key is the key within the referenced object. |  |  |
+
+
 #### NetworkInterface
 
 
@@ -1141,7 +1177,6 @@ _Appears in:_
 - [BIOSSettingsSpec](#biossettingsspec)
 - [BIOSVersionSpec](#biosversionspec)
 - [BMCVersionSpec](#bmcversionspec)
-- [DynamicVariables](#dynamicvariables)
 - [ServerMaintenanceRefItem](#servermaintenancerefitem)
 - [ServerSpec](#serverspec)
 

@@ -11,36 +11,64 @@ import (
 type BMCSettingsSetSpec struct {
 	// BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs.
 	// +required
-	BMCSettingsTemplate BMCSettingsTemplate `json:"bmcSettingsTemplate,omitempty"`
-	// DynamicVariables defines the dynamic variables for the BMCSettingsSet which allows users to specify variables in the BMC settings and their sources which will be resolved by the controller at runtime and injected into the BMC settings before applying them to the BMCs.
+	BMCSettingsTemplate BMCSettingsTemplate `json:"bmcSettingsTemplate"`
+	// DynamicSettings defines dynamic settings to resolve per BMC when creating BMCSettings resources.
 	// +optional
-	DynamicVariables []DynamicVariables `json:"dynamicVariables,omitempty"`
+	DynamicSettings []DynamicSetting `json:"dynamicSettings,omitempty"`
 	// BMCSelector specifies a label selector to identify the BMCs to be selected.
 	// +required
 	BMCSelector metav1.LabelSelector `json:"bmcSelector"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(self.objectKeyRef) || (has(self.key) && size(self.key) > 0)",message="key must be provided when objectKeyRef is set"
-// +kubebuilder:validation:XValidation:rule="!has(self.objectKeyRef) || size(self.objectKeyRef.kind) > 0",message="objectKeyRef.kind must be provided when objectKeyRef is set"
-// +kubebuilder:validation:XValidation:rule="has(self.objectKeyRef) || (has(self.bmcLabel) && size(self.bmcLabel) > 0)",message="either objectKeyRef or bmcLabel must be provided"
-type DynamicVariables struct {
-	// ObjectKeyRef is used to specify the reference to the object which contains the value of the variable.
-	// +optional
-	ObjectKeyRef *ObjectReference `json:"objectKeyRef,omitempty"`
-	// Key is used to specify the key of the value in data from the object defined in 'ObjectKeyRef'.
-	// For example, if the variable is supposed to get its value from a ConfigMap, 'ObjectKeyRef' contains the reference to the ConfigMap and 'Key' can be used to specify the key of the value in the ConfigMap's data.
-	// +optional
-	Key string `json:"key,omitempty"`
+// +kubebuilder:validation:XValidation:rule="(has(self.valueFrom) ? 1 : 0) + (has(self.format) && size(self.format) > 0 ? 1 : 0) == 1",message="exactly one of valueFrom or non-empty format must be provided"
+// +kubebuilder:validation:XValidation:rule="!has(self.format) || size(self.format) == 0 || (has(self.variables) && size(self.variables) > 0)",message="variables must be provided when format is set"
+// +kubebuilder:validation:XValidation:rule="!has(self.variables) || (has(self.format) && size(self.format) > 0)",message="variables can only be provided when format is set"
+type DynamicSetting struct {
+	// Key is the BMC setting key to set.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Key string `json:"key"`
 
-	// BMCLabel is used to specify the label of the BMC from which the variable value will be sourced. The controller will look for the label in the BMC's labels and use its value as the variable's value.
+	// ValueFrom defines a simple single source for the setting value.
+	// +optional
+	ValueFrom *DynamicSettingSource `json:"valueFrom,omitempty"`
+
+	// Format defines a composite setting format with placeholders like $(name).
+	// +optional
+	Format string `json:"format,omitempty"`
+
+	// Variables maps format placeholder names to their sources.
+	// +optional
+	Variables map[string]DynamicSettingSource `json:"variables,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="(has(self.bmcLabel) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of bmcLabel, configMapKeyRef, or secretKeyRef must be provided"
+type DynamicSettingSource struct {
+	// BMCLabel is sourced from a label on the selected BMC.
 	// +optional
 	BMCLabel string `json:"bmcLabel,omitempty"`
 
-	// Name specifies the variable name, referenced in BMC settings using the `{{ .Name }}` syntax.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=256
+	// ConfigMapKeyRef points to a namespaced ConfigMap key.
+	// +optional
+	ConfigMapKeyRef *NamespacedKeySelector `json:"configMapKeyRef,omitempty"`
+
+	// SecretKeyRef points to a namespaced Secret key.
+	// +optional
+	SecretKeyRef *NamespacedKeySelector `json:"secretKeyRef,omitempty"`
+}
+
+type NamespacedKeySelector struct {
+	// Name is the referenced object name.
 	// +required
 	Name string `json:"name"`
+
+	// Namespace is the referenced object namespace.
+	// +required
+	Namespace string `json:"namespace"`
+
+	// Key is the key within the referenced object.
+	// +required
+	Key string `json:"key"`
 }
 
 // BMCSettingsSetStatus defines the observed state of BMCSettingsSet.

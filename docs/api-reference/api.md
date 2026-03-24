@@ -1031,6 +1031,27 @@ _Appears in:_
 | `URI` _string_ | URI is the URI of the software image to install. |  |  |
 
 
+#### ImmutableObjectReference
+
+
+
+ImmutableObjectReference is a namespaced name reference whose name and namespace
+cannot be changed once set (the entire reference can still be set or cleared).
+
+
+
+_Appears in:_
+- [ServerSpec](#serverspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
+| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
+| `namespace` _string_ | Namespace is the namespace of the referenced object. |  | MaxLength: 63 <br /> |
+| `name` _string_ | Name is the name of the referenced object. |  | MaxLength: 253 <br /> |
+| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
+
+
 #### IndicatorLED
 
 _Underlying type:_ _string_
@@ -1126,11 +1147,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `apiVersion` _string_ | APIVersion is the API version of the referenced object. |  |  |
-| `kind` _string_ | Kind is the kind of the referenced object. |  |  |
+| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
+| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  |  |
 | `name` _string_ | Name is the name of the referenced object. |  |  |
-| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | UID is the uid of the referenced object. |  |  |
+| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
 
 
 #### Phase
@@ -1562,7 +1583,7 @@ _Appears in:_
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
 | `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |
-| `serverClaimRef` _[ObjectReference](#objectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |
+| `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server. |  |  |
 | `bmc` _[BMCAccess](#bmcaccess)_ | BMC contains the access details for the BMC. |  |  |

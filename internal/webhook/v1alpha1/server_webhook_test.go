@@ -65,4 +65,38 @@ var _ = Describe("Server Webhook", func() {
 			})).Should(Succeed())
 		})
 	})
+
+	Context("When updating ServerClaimRef under CEL validation", func() {
+		It("Should reject changing the name of an existing ServerClaimRef", func() {
+			By("Setting a ServerClaimRef")
+			Eventually(Update(server, func() {
+				server.Spec.ServerClaimRef = &metalv1alpha1.ImmutableObjectReference{
+					Namespace: "default",
+					Name:      "claim-a",
+				}
+			})).Should(Succeed())
+
+			By("Trying to change the name")
+			Eventually(Object(server)).Should(HaveField("Spec.ServerClaimRef.Name", "claim-a"))
+			Expect(Update(server, func() {
+				server.Spec.ServerClaimRef.Name = "claim-b"
+			})()).To(Not(Succeed()))
+		})
+
+		It("Should reject changing the namespace of an existing ServerClaimRef", func() {
+			By("Setting a ServerClaimRef")
+			Eventually(Update(server, func() {
+				server.Spec.ServerClaimRef = &metalv1alpha1.ImmutableObjectReference{
+					Namespace: "ns-a",
+					Name:      "claim",
+				}
+			})).Should(Succeed())
+
+			By("Trying to change the namespace")
+			Eventually(Object(server)).Should(HaveField("Spec.ServerClaimRef.Namespace", "ns-a"))
+			Expect(Update(server, func() {
+				server.Spec.ServerClaimRef.Namespace = "ns-b"
+			})()).To(Not(Succeed()))
+		})
+	})
 })

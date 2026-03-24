@@ -1182,7 +1182,8 @@ passwd:
 				RegistryURL:           registryURL,
 				ManagerNamespace:      ns.Name,
 				ProbeImage:            "custom-probe:v1.0.0",
-				Insecure:              true,
+				DefaultProtocol:       metalv1alpha1.HTTPProtocolScheme,
+				SkipCertValidation:    true,
 				DiscoveryIgnitionPath: tmpFile.Name(),
 			}
 

@@ -47,6 +47,9 @@ type Options struct {
 	Password  string
 	BasicAuth bool
 
+	// TLS configuration
+	InsecureTLS bool // Skip TLS certificate verification
+
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
@@ -87,7 +90,7 @@ func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBase
 		Endpoint:  options.Endpoint,
 		Username:  options.Username,
 		Password:  options.Password,
-		Insecure:  true,
+		Insecure:  options.InsecureTLS,
 		BasicAuth: options.BasicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)

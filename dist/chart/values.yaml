@@ -82,6 +82,7 @@ webhook:
 
 # [PROMETHEUS]: To enable a ServiceMonitor to export metrics to Prometheus set true
 prometheus:
+  additionalLabels: {}
   enable: false
 
 # [CERT-MANAGER]: To enable cert-manager injection to webhooks set true
@@ -101,4 +102,3 @@ ignition:
   # Template content that can be customized - this will be created as a ConfigMap
   # and mounted to override the default template
   # template: |
-    

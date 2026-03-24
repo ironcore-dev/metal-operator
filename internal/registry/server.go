@@ -27,9 +27,12 @@ type Server struct {
 	addr              string
 	mux               *http.ServeMux
 	systemsStore      *sync.Map
-	signingSecret     []byte // Shared secret for HMAC token verification
-	signingSecretName string // Name of the signing secret
-	signingSecretNs   string // Namespace of the signing secret
+	signingSecret     []byte       // Shared secret for HMAC token verification
+	signingSecretName string       // Name of the signing secret
+	signingSecretNs   string       // Namespace of the signing secret
+	signingSecretOnce sync.Once    // One-time initialization for signing secret
+	signingSecretMu   sync.RWMutex // Read-write mutex for signing secret access
+	signingSecretErr  error        // Error from signing secret load attempt
 	log               logr.Logger
 	k8sClient         client.Client
 }
@@ -53,7 +56,7 @@ func NewServer(logger logr.Logger, addr string, k8sClient client.Client, signing
 			logger.Error(err, "Failed to load signing secret",
 				"name", signingSecretName, "namespace", signingSecretNamespace)
 		} else {
-			if key, ok := secret.Data["signing-key"]; ok && len(key) == 32 {
+			if key, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]; ok && len(key) == 32 {
 				signingSecret = key
 				logger.Info("Loaded discovery token signing secret",
 					"name", signingSecretName, "namespace", signingSecretNamespace)
@@ -83,13 +86,65 @@ func NewServer(logger logr.Logger, addr string, k8sClient client.Client, signing
 	return server
 }
 
-// validateDiscoveryToken verifies an HMAC-signed discovery token.
+// loadSigningSecret loads the signing secret from Kubernetes using sync.Once for one-time initialization.
+// This method is thread-safe and will only execute the loading logic once.
+func (s *Server) loadSigningSecret() {
+	s.signingSecretOnce.Do(func() {
+		if s.signingSecretName == "" || s.signingSecretNs == "" {
+			s.signingSecretErr = fmt.Errorf("signing secret name or namespace not configured")
+			s.log.Error(s.signingSecretErr, "Cannot load signing secret")
+			return
+		}
+
+		ctx := context.Background()
+		secret := &corev1.Secret{}
+		err := s.k8sClient.Get(ctx, client.ObjectKey{
+			Name:      s.signingSecretName,
+			Namespace: s.signingSecretNs,
+		}, secret)
+
+		if err != nil {
+			s.signingSecretErr = fmt.Errorf("failed to load signing secret: %w", err)
+			s.log.Error(err, "Failed to load signing secret on demand")
+			return
+		}
+
+		key, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]
+		if !ok || len(key) != 32 {
+			s.signingSecretErr = fmt.Errorf("signing secret invalid or missing")
+			s.log.Error(nil, "Signing secret found but invalid")
+			return
+		}
+
+		s.signingSecretMu.Lock()
+		s.signingSecret = key
+		s.signingSecretMu.Unlock()
+
+		s.log.Info("Loaded discovery token signing secret", "name", s.signingSecretName)
+	})
+}
+
+// getSigningSecret returns the signing secret, loading it if necessary.
+// This method is thread-safe and returns an error if the secret cannot be loaded.
+func (s *Server) getSigningSecret() ([]byte, error) {
+	s.loadSigningSecret()
+
+	if s.signingSecretErr != nil {
+		return nil, s.signingSecretErr
+	}
+
+	s.signingSecretMu.RLock()
+	defer s.signingSecretMu.RUnlock()
+	return s.signingSecret, nil
+}
+
+// validateDiscoveryToken verifies a JWT-signed discovery token.
 // Returns (systemUUID, valid) where systemUUID is extracted from the token.
 // If k8sClient is nil (unit test mode), validation is skipped.
 func (s *Server) validateDiscoveryToken(receivedToken string) (string, bool) {
-	// Skip validation in unit test mode (no k8s client)
+	// Skip validation in test mode (no k8s client)
 	if s.k8sClient == nil {
-		s.log.V(1).Info("Skipping token validation (no K8s client - unit test mode)")
+		s.log.V(1).Info("Running in TEST MODE without K8s client - skipping secret loading")
 		// In test mode, extract systemUUID from token if possible, otherwise return empty
 		// For now, just allow all requests in test mode
 		return "", true
@@ -101,39 +156,15 @@ func (s *Server) validateDiscoveryToken(receivedToken string) (string, bool) {
 		return "", false
 	}
 
-	// If signing secret not loaded yet, try to load it now
-	if len(s.signingSecret) != 32 {
-		if s.signingSecretName == "" || s.signingSecretNs == "" {
-			s.log.Error(nil, "Cannot load signing secret: name or namespace not configured")
-			return "", false
-		}
-
-		ctx := context.Background()
-		secret := &corev1.Secret{}
-		err := s.k8sClient.Get(ctx, client.ObjectKey{
-			Name:      s.signingSecretName,
-			Namespace: s.signingSecretNs,
-		}, secret)
-
-		if err != nil {
-			s.log.Error(err, "Failed to load signing secret on demand",
-				"name", s.signingSecretName, "namespace", s.signingSecretNs)
-			return "", false
-		}
-
-		if key, ok := secret.Data["signing-key"]; ok && len(key) == 32 {
-			s.signingSecret = key
-			s.log.Info("Loaded discovery token signing secret on demand",
-				"name", s.signingSecretName, "namespace", s.signingSecretNs)
-		} else {
-			s.log.Error(nil, "Signing secret found but invalid",
-				"name", s.signingSecretName, "namespace", s.signingSecretNs)
-			return "", false
-		}
+	// Get signing secret (thread-safe, loads on first call)
+	secret, err := s.getSigningSecret()
+	if err != nil {
+		s.log.Error(err, "Signing secret not available")
+		return "", false
 	}
 
 	// Verify the signed token
-	systemUUID, timestamp, valid, err := metaltoken.VerifySignedDiscoveryToken(s.signingSecret, receivedToken)
+	systemUUID, timestamp, valid, err := metaltoken.VerifySignedDiscoveryToken(secret, receivedToken)
 	if err != nil {
 		s.log.Error(err, "Error verifying discovery token")
 		return "", false

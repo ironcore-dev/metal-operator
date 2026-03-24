@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -179,7 +180,15 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 		}
 		// If resource collection (has "Members"), add a new member
 		if len(base.Members) > 0 {
-			newID := fmt.Sprintf("%d", len(base.Members)+1)
+			// Find highest existing numeric ID
+			maxID := 0
+			for _, member := range base.Members {
+				idStr := path.Base(member.OdataID)
+				if id, err := strconv.Atoi(idStr); err == nil && id > maxID {
+					maxID = id
+				}
+			}
+			newID := fmt.Sprintf("%d", maxID+1)
 			location := path.Join(r.URL.Path, newID)
 			newMemberPath := resolvePath(location)
 			base.Members = append(base.Members, Member{
@@ -194,12 +203,14 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 		} else {
 			base.Members = make([]Member, 0)
 			location := r.URL.JoinPath("1").String()
+			newMemberPath := resolvePath(location)
 			base.Members = []Member{
 				{
 					OdataID: r.URL.JoinPath("1").String(),
 				},
 			}
 			s.overrides[urlPath] = base
+			s.overrides[newMemberPath] = update
 			if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
 				w.Header().Set("Location", location)
 			}
@@ -256,12 +267,15 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	s.mu.Lock()
-	delete(s.overrides, filePath)
-	s.mu.Unlock()
 
-	// get collection of the resource
-	collectionPath := path.Dir(filePath)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.overrides, filePath)
+
+	// Derive collection path from request URL, not file path
+	collectionPath := resolvePath(path.Dir(r.URL.Path))
+
 	cached, hasOverride := s.overrides[collectionPath]
 	var collection Collection
 	if hasOverride {
@@ -272,7 +286,7 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		data, err := dataFS.ReadFile(collectionPath + "/index.json")
+		data, err := dataFS.ReadFile(collectionPath)
 		if err != nil {
 			http.NotFound(w, r)
 			return
@@ -291,9 +305,7 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("Removing member from collection", "members", newMembers, "collection", collectionPath)
 	collection.Members = newMembers
-	s.mu.Lock()
 	s.overrides[collectionPath] = collection
-	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
 

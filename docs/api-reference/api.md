@@ -507,6 +507,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
+| `dynamicSettings` _[DynamicSetting](#dynamicsetting) array_ | DynamicSettings defines dynamic settings to resolve per BMC when creating BMCSettings resources. |  |  |
 | `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
 
 
@@ -941,6 +942,43 @@ _Appears in:_
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
 
 
+#### DynamicSetting
+
+
+
+
+
+
+
+_Appears in:_
+- [BMCSettingsSetSpec](#bmcsettingssetspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the BMC setting key to set. |  | MinLength: 1 <br /> |
+| `valueFrom` _[DynamicSettingSource](#dynamicsettingsource)_ | ValueFrom defines a simple single source for the setting value. |  |  |
+| `format` _string_ | Format defines a composite setting format with placeholders like $(name). |  |  |
+| `variables` _object (keys:string, values:[DynamicSettingSource](#dynamicsettingsource))_ | Variables maps format placeholder names to their sources. |  |  |
+
+
+#### DynamicSettingSource
+
+
+
+
+
+
+
+_Appears in:_
+- [DynamicSetting](#dynamicsetting)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `bmcLabel` _string_ | BMCLabel is sourced from a label on the selected BMC. |  |  |
+| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
+| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
+
+
 #### Endpoint
 
 
@@ -1107,6 +1145,24 @@ _Appears in:_
 | `portDescription` _string_ | PortDescription is the port description of the LLDP neighbor. |  |  |
 | `systemName` _string_ | SystemName is the system name of the LLDP neighbor. |  |  |
 | `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
+
+
+#### NamespacedKeySelector
+
+
+
+
+
+
+
+_Appears in:_
+- [DynamicSettingSource](#dynamicsettingsource)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the referenced object name. |  |  |
+| `namespace` _string_ | Namespace is the referenced object namespace. |  |  |
+| `key` _string_ | Key is the key within the referenced object. |  |  |
 
 
 #### NetworkInterface

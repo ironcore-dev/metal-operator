@@ -190,6 +190,8 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ProbeImage:              "foo:latest",
 			ProbeOSImage:            "fooOS:latest",
 			RegistryURL:             registryURL,
+			RegistryClientTimeout:   5 * time.Second,
+			RegistryDataMaxAge:      2 * time.Minute,
 			RegistryResyncInterval:  50 * time.Millisecond,
 			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
@@ -200,7 +202,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout:      time.Second, // Force timeout to be quick for tests
+			DiscoveryTimeout:      30 * time.Second, // Set a short discovery timeout for testing
 			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

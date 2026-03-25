@@ -1016,20 +1016,25 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		return "", fmt.Errorf("event service is not enabled")
 	}
 	payload := &subscriptionPayload{
-		Destination:         destination,
-		EventFormatType:     eventFormatType, // event or metricreport
-		Protocol:            schemas.RedfishEventDestinationProtocol,
-		DeliveryRetryPolicy: retry,
-		Context:             "metal-operator",
+		Destination:     destination,
+		EventFormatType: eventFormatType, // event or metricreport
+		Protocol:        schemas.RedfishEventDestinationProtocol,
+		Context:         "metal-operator",
+	}
+	// Only set DeliveryRetryPolicy if the BMC supports it.
+	// HPE iLO systems don't support this property and will reject the request with 400 error.
+	// We detect support by checking if the EventService advertises retry capabilities.
+	// As a safe default, we omit this field to maximize compatibility across vendors.
+	if ev.DeliveryRetryAttempts > 0 {
+		payload.DeliveryRetryPolicy = retry
 	}
 	client := ev.GetClient()
 	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
 	if len(ev.ResourceTypes) == 0 {
 		payload.EventTypes = []schemas.EventType{}
-	} else {
-		payload.RegistryPrefixes = []string{""} // Filters by the prefix of the event's MessageId, which points to a Message Registry: [Base, ResourceEvent, iLOEvents]
-		payload.ResourceTypes = []string{""}    // Filters by the schema name (Resource Type) of the event's OriginOfCondition:	[Chassis, ComputerSystem, Power]
 	}
+	// Omit RegistryPrefixes and ResourceTypes to allow all events.
+	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
 	resp, err := client.Post(ev.SubscriptionsLink, payload)
 	if err != nil {
 		return "", err

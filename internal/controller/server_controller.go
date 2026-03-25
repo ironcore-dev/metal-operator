@@ -359,14 +359,6 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 	return false, nil
 }
 
-// isRegistryDataFresh checks if the registry data timestamp is recent enough
-func (r *ServerReconciler) isRegistryDataFresh(serverDetails *registry.Server, maxAge time.Duration) bool {
-	if serverDetails == nil || serverDetails.Timestamp == nil {
-		return false
-	}
-	return time.Since(serverDetails.Timestamp.Time) < maxAge
-}
-
 func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
@@ -409,21 +401,20 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		return false, err
 	}
 
-	// Check if the registry data is fresh enough to proceed with discovery completion
-	if !r.isRegistryDataFresh(serverDetails, r.RegistryDataMaxAge) {
-		if serverDetails.Timestamp != nil {
-			log.V(1).Info("Registry data is stale, waiting for fresh update", "age", time.Since(serverDetails.Timestamp.Time))
-		} else {
-			log.V(1).Info("Registry data has no timestamp, waiting for fresh update")
-		}
+	// Check if the registry data has timestamp and is fresh enough to proceed with discovery completion
+	if serverDetails.Timestamp == nil {
+		log.V(1).Info("Registry data has no timestamp, waiting for fresh update")
+		return true, nil
+	}
+	if time.Since(serverDetails.Timestamp.Time) >= r.RegistryDataMaxAge {
+		log.V(1).Info("Registry data is stale, waiting for fresh update", "age", time.Since(serverDetails.Timestamp.Time))
 		return true, nil
 	}
 
 	log.V(1).Info("Extracted Server details")
 
 	log.V(1).Info("Setting Server state to available")
-	_, err = r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
-	if err != nil {
+	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
 		return false, err
 	}
 

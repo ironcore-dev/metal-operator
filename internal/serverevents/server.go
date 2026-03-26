@@ -62,8 +62,8 @@ func NewServer(log logr.Logger, addr string) *Server {
 }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("/serverevents/alerts", s.alertHandler)
-	s.mux.HandleFunc("/serverevents/metricsreport", s.metricsreportHandler)
+	s.mux.HandleFunc("/serverevents/alerts/", s.alertHandler)
+	s.mux.HandleFunc("/serverevents/metricsreport/", s.metricsreportHandler)
 }
 
 func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {

@@ -1016,17 +1016,11 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		return "", fmt.Errorf("event service is not enabled")
 	}
 	payload := &subscriptionPayload{
-		Destination:     destination,
-		EventFormatType: eventFormatType, // event or metricreport
-		Protocol:        schemas.RedfishEventDestinationProtocol,
-		Context:         "metal-operator",
-	}
-	// Only set DeliveryRetryPolicy if the BMC supports it.
-	// HPE iLO systems don't support this property and will reject the request with 400 error.
-	// We detect support by checking if the EventService advertises retry capabilities.
-	// As a safe default, we omit this field to maximize compatibility across vendors.
-	if ev.DeliveryRetryAttempts > 0 {
-		payload.DeliveryRetryPolicy = retry
+		Destination:         destination,
+		EventFormatType:     eventFormatType, // event or metricreport
+		Protocol:            schemas.RedfishEventDestinationProtocol,
+		DeliveryRetryPolicy: retry, // Note: HPE iLO doesn't support this field; HPERedfishBMC overrides this method to omit it
+		Context:             "metal-operator",
 	}
 	client := ev.GetClient()
 	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes

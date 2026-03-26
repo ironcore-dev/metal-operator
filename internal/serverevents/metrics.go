@@ -65,7 +65,7 @@ func (c *RedfishEventCollector) UpdateFromMetricsReport(hostname string, report 
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	for _, entry := range report.MetricsValues {
+	for _, entry := range report.MetricValues {
 		unit := entry.Units
 		if unit == "" {
 			unit = "seconds"

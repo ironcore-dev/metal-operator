@@ -24,10 +24,16 @@ type Server struct {
 }
 
 type MetricsReport struct {
-	MetricsValues []MetricsValue `json:"MetricsValues"`
+	// Standard Redfish fields
+	ODataID   string `json:"@odata.id,omitempty"`
+	ODataType string `json:"@odata.type,omitempty"`
+	ID        string `json:"Id,omitempty"`
+	Name      string `json:"Name,omitempty"`
+	// Metric values array - correct Redfish field name
+	MetricValues []MetricValue `json:"MetricValues,omitempty"`
 }
 
-type MetricsValue struct {
+type MetricValue struct {
 	MetricID        string `json:"MetricId"`
 	MetricProperty  string `json:"MetricProperty"`
 	MetricValue     string `json:"MetricValue"`
@@ -137,10 +143,10 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(metricsReport.MetricsValues) == 0 {
+	if len(metricsReport.MetricValues) == 0 {
 		s.log.Info("Received empty metrics report - check payload format", "hostname", hostname, "payload", string(bodyBytes))
 	} else {
-		s.log.Info("Processed metrics successfully", "hostname", hostname, "count", len(metricsReport.MetricsValues))
+		s.log.Info("Processed metrics successfully", "hostname", hostname, "count", len(metricsReport.MetricValues))
 	}
 
 	s.collector.UpdateFromMetricsReport(hostname, metricsReport)

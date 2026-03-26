@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"time"
@@ -37,8 +38,17 @@ type MetricsValue struct {
 }
 
 type EventData struct {
-	Events []Event `json:"Alerts"`
+	Events []Event `json:"Events,omitempty"` // Standard Redfish field
+	Alerts []Event `json:"Alerts,omitempty"` // Alternative vendor field
 	Name   string  `json:"Name"`
+}
+
+// GetEvents returns events from whichever field is populated
+func (e *EventData) GetEvents() []Event {
+	if len(e.Events) > 0 {
+		return e.Events
+	}
+	return e.Alerts
 }
 
 type Event struct {
@@ -71,14 +81,33 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	s.log.Info("Received alert data")
-	// expected path: /serverevents/alerts/{hostname}
 	hostname := path.Base(r.URL.Path)
+
+	// Read body into buffer so we can log it
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.log.Error(err, "Failed to read request body", "hostname", hostname)
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	// Log raw payload at V(1) for debugging
+	s.log.V(1).Info("Received alert payload", "hostname", hostname, "payload", string(bodyBytes))
+
 	eventData := EventData{}
-	if err := json.NewDecoder(r.Body).Decode(&eventData); err != nil {
+	if err := json.Unmarshal(bodyBytes, &eventData); err != nil {
+		s.log.Error(err, "Failed to decode alert data", "hostname", hostname, "payload", string(bodyBytes))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	events := eventData.GetEvents()
+	if len(events) == 0 {
+		s.log.Info("Received empty event data - check payload format", "hostname", hostname, "payload", string(bodyBytes))
+	} else {
+		s.log.Info("Processed events successfully", "hostname", hostname, "count", len(events))
+	}
+
 	s.collector.UpdateFromEvent(hostname, eventData)
 	w.WriteHeader(http.StatusOK)
 }
@@ -88,14 +117,32 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// expected path: /serverevents/metricsreport/{hostname}
 	hostname := path.Base(r.URL.Path)
-	s.log.Info("received metrics report", "hostname", hostname)
+
+	// Read body into buffer
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.log.Error(err, "Failed to read request body", "hostname", hostname)
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	// Log raw payload at V(1) for debugging
+	s.log.V(1).Info("Received metrics payload", "hostname", hostname, "payload", string(bodyBytes))
+
 	metricsReport := MetricsReport{}
-	if err := json.NewDecoder(r.Body).Decode(&metricsReport); err != nil {
+	if err := json.Unmarshal(bodyBytes, &metricsReport); err != nil {
+		s.log.Error(err, "Failed to decode metrics report", "hostname", hostname, "payload", string(bodyBytes))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	if len(metricsReport.MetricsValues) == 0 {
+		s.log.Info("Received empty metrics report - check payload format", "hostname", hostname, "payload", string(bodyBytes))
+	} else {
+		s.log.Info("Processed metrics successfully", "hostname", hostname, "count", len(metricsReport.MetricsValues))
+	}
+
 	s.collector.UpdateFromMetricsReport(hostname, metricsReport)
 	w.WriteHeader(http.StatusOK)
 }

@@ -101,7 +101,8 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	for _, event := range data.Events {
+	events := data.GetEvents() // Use new method to get events from either field
+	for _, event := range events {
 		// Determine the component from the URI (e.g., .../Sensors/Fan1 -> Fan1)
 		component := "system"
 		if event.OriginOfCondition != "" {

@@ -98,7 +98,7 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 		var redfishError struct {
 			Error struct {
 				MessageExtendedInfo []struct {
-					MessageId string `json:"MessageId"`
+					MessageID string `json:"MessageId"`
 					Message   string `json:"Message"`
 				} `json:"@Message.ExtendedInfo"`
 			} `json:"error"`
@@ -107,10 +107,10 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
 			// Check if it's a "resource already exists" error
 			for _, info := range redfishError.Error.MessageExtendedInfo {
-				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
-					strings.Contains(info.MessageId, "PropertyValueModified") {
+				if strings.Contains(info.MessageID, "ResourceAlreadyExists") ||
+					strings.Contains(info.MessageID, "PropertyValueModified") {
 					// Handle duplicate subscription - find and return existing one
-					return r.RedfishBaseBMC.findExistingSubscription(ctx, destination, eventFormatType)
+					return r.findExistingSubscription(destination, eventFormatType)
 				}
 			}
 		}

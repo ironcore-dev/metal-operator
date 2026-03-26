@@ -1059,7 +1059,7 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
 					strings.Contains(info.MessageId, "PropertyValueModified") {
 					// Handle duplicate subscription - find and return existing one
-					return r.findExistingSubscription(ctx, destination, eventFormatType)
+					return r.findExistingSubscription(destination, eventFormatType)
 				}
 			}
 		}
@@ -1082,7 +1082,6 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 // findExistingSubscription queries the BMC for an existing subscription with the given destination.
 // Returns the subscription URI if found, error otherwise.
 func (r *RedfishBaseBMC) findExistingSubscription(
-	ctx context.Context,
 	destination string,
 	eventFormatType schemas.EventFormatType,
 ) (string, error) {

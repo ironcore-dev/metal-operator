@@ -1,59 +1,118 @@
 # BIOSSettings
 
-`BIOSSettings` represents a BIOS settings update operation for a physical server (compute system). It applies BIOS settings on a physical server's BIOS in a controlled, ordered manner.
+`BIOSSettings` applies ordered BIOS configuration changes on exactly one `Server`.
 
-## Key Points
+It is intended for granular, per-server Day-2 operations where you need deterministic sequencing (`settingsFlow`) and safety gates (version check, maintenance, verification).
 
-- `BIOSSettings` uses a `settingsFlow` to apply BIOS settings in a defined order based on priority.
-- Each flow item contains a name, a map of settings, and a priority (lower numbers are applied first).
-- Only one `BIOSSettings` can be active per `Server` at a time.
-- `BIOSSettings` changes are applied once the BIOS version matches the specified `version`.
-- `BIOSSettings` handles server reboots (if required) using a `ServerMaintenance` resource.
-- Once `BIOSSettings` moves to `Failed` state, it stays in this state unless manually moved out.
+## What It Does
 
-## Spec Fields
+- Ensures one target server (`spec.serverRef`) converges to the desired BIOS settings.
+- Applies settings in priority order from `spec.settingsFlow`.
+- Waits until the server BIOS version equals `spec.version` before mutating settings.
+- Requests or reuses `ServerMaintenance` to safely apply potentially disruptive changes.
+- Verifies resulting settings and records progress in status and conditions.
 
-| Field | Description |
-|-------|-------------|
-| `serverRef` | Reference to the target `Server` (immutable once set) |
-| `version` | The BIOS version this settings configuration applies to |
-| `settingsFlow` | List of settings flow items to apply in priority order |
-| `serverMaintenancePolicy` | Policy for maintenance: `OwnerApproval` or `Enforced` |
-| `serverMaintenanceRef` | Optional reference to an existing `ServerMaintenance` resource |
+## Spec Reference
 
-### SettingsFlowItem Fields
+| Field | Required | Description |
+|---|---|---|
+| `spec.serverRef.name` | Yes | Target server name. Immutable after creation. |
+| `spec.version` | Yes | BIOS version gate. Settings are applied only when this version is active. |
+| `spec.settingsFlow[]` | No | Ordered list of settings batches to apply. If empty, object is marked `Applied`. |
+| `spec.settingsFlow[].name` | Yes | Logical flow step name. Must be unique within the object. |
+| `spec.settingsFlow[].priority` | Yes | Execution order; lower number executes first. |
+| `spec.settingsFlow[].settings` | No | Map of BIOS key/value pairs for the step. |
+| `spec.serverMaintenancePolicy` | No | Maintenance policy used when creating maintenance. |
+| `spec.serverMaintenanceRef` | No | Optional existing `ServerMaintenance` reference. |
 
-| Field | Description |
-|-------|-------------|
-| `name` | Name identifier for this flow item (1-1000 characters) |
-| `settings` | Map of BIOS setting key-value pairs to apply |
-| `priority` | Execution order (1-2147483645); lower numbers are applied first |
+## Status Fields In Detail
 
-## Status Fields
+| Field | What it means | How to use it for debugging |
+|---|---|---|
+| `status.state` | High-level lifecycle (`Pending`, `InProgress`, `Applied`, `Failed`). | First signal to decide if issue is a prerequisite wait vs active failure. |
+| `status.flowState[].name` | Name of the flow item from `spec.settingsFlow`. | Identifies which step is currently blocked/failing. |
+| `status.flowState[].priority` | Priority of the flow item. | Confirms execution ordering and whether a lower-priority step is waiting by design. |
+| `status.flowState[].flowState` | Per-step state (`Pending`, `InProgress`, `Applied`, `Failed`). | Pinpoints exact stage that failed instead of only top-level state. |
+| `status.flowState[].conditions[]` | Per-step detailed conditions. | Look for reason/message around validation, apply, and verification. |
+| `status.lastAppliedTime` | Last time a setting step was successfully applied. | Useful to detect stuck progression if time does not move. |
+| `status.conditions[]` | Resource-level conditions (version gate, maintenance wait, duplicate keys, verification, reboot). | Primary source for error reason and next action. |
 
-| Field | Description |
-|-------|-------------|
-| `state` | Overall state: `Pending`, `InProgress`, `Applied`, or `Failed` |
-| `flowState` | List of individual flow item states with their conditions |
-| `lastAppliedTime` | Timestamp when the last setting was successfully applied |
-| `conditions` | Standard Kubernetes conditions for the resource |
+## Detailed State Machine
 
-## Workflow
+```mermaid
+stateDiagram-v2
+    [*] --> Pending
 
-1. A separate operator (e.g., `BIOSSettingsSet`) or user creates a `BIOSSettings` resource referencing a specific `Server`.
-2. Settings from `settingsFlow` are processed in priority order (lowest priority number first).
-3. For each flow item:
-   - The provided settings are checked against the current BIOS settings.
-   - If settings already match, the flow item state moves to `Applied`.
-   - If settings need to be updated, `BIOSSettings` checks the BIOS version. If it does not match, it waits.
-4. If `ServerMaintenance` is not already provided, it requests one and waits for the server to enter `Maintenance` state.
-   - The `serverMaintenancePolicy` determines how maintenance is handled (`OwnerApproval` or `Enforced`).
-5. `BIOSSettings` checks if the setting update requires a physical server reboot.
-6. The setting update process is started and the server is rebooted if required.
-7. `BIOSSettings` verifies the settings have been applied and transitions the flow item state to `Applied`.
-8. Once all flow items are applied, the overall state moves to `Applied` and the `ServerMaintenance` resource is removed if it was created by this resource.
-9. Any further update to the `BIOSSettings` spec will restart the process.
-10. If `BIOSSettings` fails to apply any setting, it moves to `Failed` state until manually moved out.
+    state Pending {
+      [*] --> Precheck
+      Precheck --> WaitVersion: BIOS version mismatch
+      Precheck --> WaitMaintenance: maintenance required
+      Precheck --> StartApply: prerequisites met
+      Precheck --> FailedPrecheck: duplicate keys or pending BIOS jobs
+    }
+
+    Pending --> InProgress: StartApply
+    Pending --> Failed: FailedPrecheck
+
+    state InProgress {
+      [*] --> FlowSelection
+      FlowSelection --> ApplyStep
+      ApplyStep --> RebootIfNeeded
+      RebootIfNeeded --> VerifyStep
+      VerifyStep --> NextStep: success
+      NextStep --> FlowSelection: more steps
+      VerifyStep --> ApplyFailed: verification mismatch/timeout
+      ApplyStep --> ApplyFailed: update call failed
+    }
+
+    InProgress --> Applied: all flow steps verified
+    InProgress --> Failed: ApplyFailed
+    Applied --> InProgress: spec updated
+    Failed --> Pending: retry annotation/manual recovery
+```
+
+## Detailed Workflow (All Main Cases)
+
+1. Request intake:
+  - Controller reads `spec.serverRef` and binds server ownership reference.
+  - If server does not exist, object stays `Pending`.
+2. Flow validation:
+  - Checks duplicate flow names and duplicate settings keys across the flow.
+  - Checks pending BIOS jobs on the target BMC.
+  - Validation errors move resource to `Failed`.
+3. Drift detection:
+  - Controller computes desired-vs-actual settings diff.
+  - Empty diff with no pending conditions moves to `Applied`.
+4. Version gate:
+  - If `spec.version` does not match current BIOS version, remain `Pending`.
+  - Processing continues automatically when BIOS upgrade converges.
+5. Maintenance orchestration:
+  - Reuses `spec.serverMaintenanceRef` when provided.
+  - Otherwise requests maintenance according to `spec.serverMaintenancePolicy`.
+  - Waits until server enters maintenance mode.
+6. Step execution:
+  - Select next non-applied flow step by priority.
+  - Issue settings update for that step.
+  - Track per-step condition updates in `status.flowState[].conditions`.
+7. Reboot path:
+  - If vendor reports reboot required, controller performs power off/on sequence.
+  - If not required, controller skips reboot and continues.
+8. Verification:
+  - Re-read settings and compare with desired values for current step.
+  - On mismatch/timeouts, mark step and resource `Failed`.
+9. Completion and cleanup:
+  - When all steps are applied, top-level state becomes `Applied`.
+  - Self-managed maintenance refs are removed.
+
+## Troubleshooting Guide
+
+| Symptom | Where to check | Likely cause | Action |
+|---|---|---|---|
+| Stuck in `Pending` | `status.conditions[]` | BIOS version mismatch or maintenance not approved | Complete `BIOSVersion` first or approve maintenance. |
+| Immediate `Failed` after create | `status.conditions[]`, `spec.settingsFlow` | Duplicate flow names/settings keys or pending BIOS jobs | Fix flow uniqueness or wait/clear pending BIOS tasks, then retry. |
+| `InProgress` for long time | `status.flowState[]`, `status.lastAppliedTime` | Slow apply, reboot not completed, or BMC connectivity issues | Check server power state and BMC reachability; inspect per-step condition message. |
+| `Applied` but expected changes missing | `status.flowState[].conditions`, actual BIOS settings | Vendor normalization or wrong setting keys/values | Validate vendor-supported key/value pair naming and expected normalized value. |
+| Cannot delete resource | resource finalizers and maintenance refs | Update still active or maintenance refs not yet cleaned | Wait for non-`InProgress` terminal state or resolve orphan maintenance resources. |
 
 ## Example
 
@@ -65,17 +124,17 @@ metadata:
 spec:
   serverRef:
     name: endpoint-sample-system-0
-  version: 2.10.3
+  version: P79 v1.45 (12/06/2017)
   settingsFlow:
-    - name: pxe-settings
-      priority: 1
+    - name: boot-order
+      priority: 10
       settings:
-        PxeDev1EnDis: Disabled
-        PxeDev2EnDis: Enabled
-    - name: other-settings
-      priority: 2
-      settings:
-        OtherSetting: "123"
-        AnotherSetting: Disabled
+        OneTimeBootMode: Enabled
+        BootMode: Uefi
   serverMaintenancePolicy: OwnerApproval
 ```
+
+## Related Resources
+
+- Use `BIOSSettingsSet` for fleet rollout.
+- Use `BIOSVersion`/`BIOSVersionSet` when firmware version must be changed.

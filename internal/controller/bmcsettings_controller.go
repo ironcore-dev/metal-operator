@@ -596,18 +596,7 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 	log := ctrl.LoggerFrom(ctx)
 	if shouldRetryReconciliation(settings) {
 		log.V(1).Info("Retrying BMCSettings reconciliation")
-
-		// Remove the retry annotation via a spec-level patch
 		settingsBase := settings.DeepCopy()
-		annotations := settings.GetAnnotations()
-		delete(annotations, metalv1alpha1.OperationAnnotation)
-		settings.SetAnnotations(annotations)
-		if err := r.Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
-			return fmt.Errorf("failed to patch BMCSettings annotation for retrying: %w", err)
-		}
-
-		// Update the status via status subresource patch
-		settingsBase = settings.DeepCopy()
 		settings.Status.State = metalv1alpha1.BMCSettingsStatePending
 		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
 			return fmt.Errorf("failed to patch BMCSettings status for retrying: %w", err)

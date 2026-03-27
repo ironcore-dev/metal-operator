@@ -295,6 +295,14 @@ var _ = Describe("BMCUser Controller", func() {
 
 	It("Should delete bmc user and secret on User deletion", func(ctx SpecContext) {
 		metalBMC.UnitTestMockUps.InitializeDefaults()
+		// Re-apply fast test delays that InitializeDefaults() overwrites.
+		metalBMC.UnitTestMockUps.MockDelays = metalBMC.MockDelays{
+			UpgradeTaskInit:     5 * time.Millisecond,
+			UpgradeTaskStep:     1 * time.Millisecond,
+			ResetSettingsApply:  25 * time.Millisecond,
+			PowerStateChange:    25 * time.Millisecond,
+			PendingSettingApply: 10 * time.Millisecond,
+		}
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{

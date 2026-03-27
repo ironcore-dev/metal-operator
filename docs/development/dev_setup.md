@@ -71,3 +71,141 @@ The local development environment can be deleted via
 ```shell
 make kind-delete
 ```
+
+### Connecting a Remote BMC in the Tilt Environment
+
+By default, Tilt runs against a local Redfish mock server. To point the environment at real hardware instead, apply the following changes.
+
+#### Prerequisites: Claim the server on its origin cluster
+
+Before pointing your local environment at a real BMC, ensure the server is not being reconciled by another metal-operator instance. On the cluster that originally owns the server, create a `ServerMaintenance` to claim it and power it off:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerMaintenance
+metadata:
+  name: <maintenance-name>
+  namespace: default
+  annotations:
+    metal.ironcore.dev/maintenance-reason: "<maintenance-name>"
+spec:
+  policy: Enforced
+  serverRef:
+    name: <server-name>
+  serverPower: "Off"
+```
+
+```shell
+# Run against the remote cluster
+kubectl apply -f servermaintenance-<node-name>.yaml
+```
+
+To release the server back when done:
+
+```shell
+# Run against the remote cluster
+kubectl delete -f servermaintenance-<node-name>.yaml
+```
+
+> **Note:** All `kubectl` commands from this point on target the **local** Kind cluster.
+
+#### 1. Replace the mockup endpoint with a real BMC resource
+
+Edit `config/redfish-mockup/redfish_mockup_endpoint.yaml` to define a `BMC` resource targeting the real hardware:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMC
+metadata:
+  name: <node-name>
+spec:
+  bmcSecretRef:
+    name: <node-name>
+  hostname: <bmc-hostname>
+  consoleProtocol:
+    name: SSH
+    port: 22
+  access:
+    ip: <bmc-ip>
+  protocol:
+    name: Redfish
+    port: 443
+    scheme: https
+```
+
+#### 2. Create a BMCSecret with credentials
+
+Apply a `BMCSecret` with base64-encoded credentials for the BMC:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCSecret
+metadata:
+  name: <node-name>
+data:
+  username: <base64-encoded-username>
+  password: <base64-encoded-password>
+```
+
+#### 3. Enable HTTPS for the BMC connection
+
+The manager defaults to `--insecure=true`, which uses plain HTTP. For a real BMC on port 443, set `--insecure=false` in the `Tiltfile` to use HTTPS instead:
+
+```python
+settings = {
+    "new_args": {
+        "metal": [
+            # ...
+            "--insecure=false",
+        ],
+    }
+}
+```
+
+#### 4. Claim the server with a ServerMaintenance
+
+Once the `Server` resource has been discovered and is `Available`, create a `ServerMaintenance` to claim it for local development. This prevents the server from being allocated by other consumers and powers it off:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerMaintenance
+metadata:
+  name: <maintenance-name>
+  namespace: default
+  annotations:
+    metal.ironcore.dev/maintenance-reason: "<maintenance-name>"
+spec:
+  policy: Enforced
+  serverRef:
+    name: <server-name>
+  serverPower: "Off"
+```
+
+Apply and delete it with:
+
+```shell
+kubectl apply -f servermaintenance-<node-name>.yaml
+kubectl delete -f servermaintenance-<node-name>.yaml
+```
+
+#### Optional: Use the debug manager image
+
+To get a shell-accessible manager image with `curl` and `ca-certificates` (useful for diagnosing BMC connectivity), switch the Tilt build target to `manager-debug`:
+
+In `Tiltfile`:
+```python
+docker_build('controller', '.', target = 'manager-debug')
+```
+
+And add the corresponding stage to `Dockerfile`:
+```dockerfile
+FROM debian:testing-slim AS manager-debug
+LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
+WORKDIR /
+COPY --from=manager-builder /workspace/manager .
+COPY config/manager/ignition-template.yaml /etc/metal-operator/ignition-template.yaml
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl && \
+    rm -rf /var/lib/apt/lists/*
+ENTRYPOINT ["/manager"]
+```

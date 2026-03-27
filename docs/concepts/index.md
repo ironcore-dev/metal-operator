@@ -15,5 +15,6 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**BIOSVersion**](/concepts/biosversion): Handles upgrading the BIOS Version on the physical server's BIOS.
 - [**BIOSVersionSet**](/concepts/biosversionset): Handles creation of multiple `BIOSVersion` by selecting physical server's through labels.
 - [**BMCSettings**](/concepts/bmcsettings): Handles updating the BMC setting on the physical server's Manager.
+- [**BMCSettingsSet**](/concepts/bmcsettingsset): Handles creation of multiple `BMCSettings` by selecting BMCs through labels.
 - [**BMCVersion**](/concepts/bmcversion): Handles upgrading the BMC Version on the physical server's Manager.
 - [**BMCVersionSet**](/concepts/bmcversionset): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.

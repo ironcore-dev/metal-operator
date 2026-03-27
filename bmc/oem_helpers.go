@@ -33,6 +33,16 @@ type upgradeTaskMonitorURIFn func(response *http.Response) (string, error)
 // taskMonitorDetailsFn parses vendor-specific task monitor details.
 type taskMonitorDetailsFn func(ctx context.Context, response *http.Response) (*schemas.Task, error)
 
+type InvalidBMCSettingsError struct {
+	SettingName  string
+	SettingValue any
+	Message      string
+}
+
+func (e *InvalidBMCSettingsError) Error() string {
+	return fmt.Sprintf("invalid BMC setting %s=%v: %s", e.SettingName, e.SettingValue, e.Message)
+}
+
 // upgradeVersion is the common firmware upgrade flow shared by all vendors.
 // Vendor-specific parts are injected via callbacks.
 func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.UpdateServiceSimpleUpdateParameters, requestBodyFn upgradeRequestBodyFn, taskMonitorURIFn upgradeTaskMonitorURIFn) (string, bool, error) {
@@ -263,13 +273,22 @@ func isSubMap(main, sub map[string]any) bool {
 
 // checkAttributes validates attributes against a filtered registry, returning
 // whether a reset is required and any validation errors.
-func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schemas.Attributes) (reset bool, err error) {
+func checkAttributes(
+	attrs schemas.SettingsAttributes,
+	filtered map[string]schemas.Attributes,
+) (reset bool, err error) {
 	reset = false
 	var errs []error
+	// TODO: add support for Map/Object attribute types
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
-			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
+			err := &InvalidBMCSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message:      "attribute not found or is immutable/hidden",
+			}
+			errs = append(errs, err)
 			continue
 		}
 		if entryAttribute.ResetRequired {
@@ -278,21 +297,36 @@ func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schem
 		switch entryAttribute.Type {
 		case schemas.IntegerAttributeType:
 			if _, ok := value.(int); !ok {
-				errs = append(errs,
-					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name, value, entryAttribute.Type, entryAttribute))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		case schemas.StringAttributeType:
 			if _, ok := value.(string); !ok {
-				errs = append(errs,
-					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name, value, entryAttribute.Type, entryAttribute))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		case schemas.EnumerationAttributeType:
 			if _, ok := value.(string); !ok {
-				errs = append(errs,
-					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name, value, entryAttribute.Type, entryAttribute))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 				break
 			}
 			var validEnum bool
@@ -303,12 +337,33 @@ func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schem
 				}
 			}
 			if !validEnum {
-				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message:      fmt.Sprintf("attributes value is unknown. Valid Attributes %v", entryAttribute.Value),
+				}
+				errs = append(errs, err)
+			}
+		case schemas.BooleanAttributeType:
+			if _, ok := value.(bool); !ok {
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		default:
-			errs = append(errs,
-				fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-					name, value, entryAttribute.Type, entryAttribute))
+			err := &InvalidBMCSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+					entryAttribute.Type,
+				),
+			}
+			errs = append(errs, err)
 		}
 	}
 	return reset, errors.Join(errs...)

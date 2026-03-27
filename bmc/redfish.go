@@ -539,7 +539,7 @@ func (r *RedfishBaseBMC) CheckBiosAttributes(attrs schemas.SettingsAttributes) (
 func (r *RedfishBaseBMC) checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
-	// TODO: add more types like maps and Enumerations
+	// TODO: add support for Map/Object attribute types
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {

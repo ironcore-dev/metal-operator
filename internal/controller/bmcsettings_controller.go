@@ -248,7 +248,12 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 			if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
 				return ctrl.Result{}, err
 			}
+			// Requeue to reconcile with the updated BMC reference
+			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 		}
+		// This BMCSettings does not own the BMC — stop reconciliation
+		log.V(1).Info("BMC is owned by a newer or equal version BMCSettings, skipping reconciliation")
+		return ctrl.Result{}, nil
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, settings, BMCSettingFinalizer); err != nil || modified {
@@ -1056,15 +1061,16 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCRefs(ctx context.Context,
 		return nil
 	}
 
+	var requests []ctrl.Request
 	for _, settings := range settingsList.Items {
 		if settings.Spec.BMCRef != nil && settings.Spec.BMCRef.Name == bmcObj.Name {
 			if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied || settings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
-				return nil
+				continue
 			}
-			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}}}
+			requests = append(requests, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}})
 		}
 	}
-	return nil
+	return requests
 }
 func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
@@ -1079,15 +1085,16 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(ctx context.Conte
 		return nil
 	}
 
+	var requests []ctrl.Request
 	for _, settings := range BMCSettingsList.Items {
 		if settings.Spec.BMCRef != nil && settings.Spec.BMCRef.Name == BMCVersion.Spec.BMCRef.Name {
 			if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied || settings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
-				return nil
+				continue
 			}
-			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}}}
+			requests = append(requests, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}})
 		}
 	}
-	return nil
+	return requests
 }
 
 // SetupWithManager sets up the controller with the Manager.

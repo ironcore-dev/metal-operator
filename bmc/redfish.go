@@ -1037,7 +1037,35 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+		// Read error response body
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+		}
+
+		// Parse Redfish error response
+		var redfishError struct {
+			Error struct {
+				MessageExtendedInfo []struct {
+					MessageId string `json:"MessageId"`
+					Message   string `json:"Message"`
+				} `json:"@Message.ExtendedInfo"`
+			} `json:"error"`
+		}
+
+		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
+			// Check if it's a "resource already exists" error
+			for _, info := range redfishError.Error.MessageExtendedInfo {
+				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
+					strings.Contains(info.MessageId, "PropertyValueModified") {
+					// Handle duplicate subscription - find and return existing one
+					return r.findExistingSubscription(destination, eventFormatType)
+				}
+			}
+		}
+
+		// Not a duplicate error - return original error with details
+		return "", fmt.Errorf("failed to create event subscription status code: %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 	// return subscription link from returned location
 	subscriptionLink := resp.Header.Get("Location")
@@ -1049,6 +1077,37 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		subscriptionLink = urlParser.RequestURI()
 	}
 	return subscriptionLink, nil
+}
+
+// findExistingSubscription queries the BMC for an existing subscription with the given destination.
+// Returns the subscription URI if found, error otherwise.
+func (r *RedfishBaseBMC) findExistingSubscription(
+	destination string,
+	eventFormatType schemas.EventFormatType,
+) (string, error) {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return "", fmt.Errorf("failed to get event service: %w", err)
+	}
+
+	// Get all subscriptions
+	subscriptions, err := ev.Subscriptions()
+	if err != nil {
+		return "", fmt.Errorf("failed to list subscriptions: %w", err)
+	}
+
+	// Find subscription matching our destination and event format
+	for _, sub := range subscriptions {
+		if sub.Destination == destination && sub.EventFormatType == eventFormatType {
+			// Extract URI from OData ID
+			if sub.ODataID != "" {
+				return sub.ODataID, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("existing subscription not found for destination: %s", destination)
 }
 
 func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string) error {

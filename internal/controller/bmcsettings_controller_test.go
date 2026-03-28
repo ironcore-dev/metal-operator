@@ -95,7 +95,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		})).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {

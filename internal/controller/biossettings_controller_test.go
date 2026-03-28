@@ -81,7 +81,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should successfully patch its reference to referred server", func(ctx SpecContext) {
@@ -1051,7 +1051,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
@@ -1383,7 +1383,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should successfully apply sequence of settings", func(ctx SpecContext) {

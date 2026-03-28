@@ -139,8 +139,24 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 
 	// do late state initialization
 	if claim.Status.Phase == "" {
-		if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseUnbound); err != nil || modified {
-			return ctrl.Result{}, err
+		// Check bidirectional binding to restore Bound phase
+		if claim.Spec.ServerRef != nil {
+			server := &metalv1alpha1.Server{}
+			if err := r.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err == nil {
+				if server.Spec.ServerClaimRef != nil &&
+					server.Spec.ServerClaimRef.Name == claim.Name &&
+					server.Spec.ServerClaimRef.Namespace == claim.Namespace {
+					log.V(1).Info("Detected bidirectional binding, restoring Bound phase")
+					if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseBound); err != nil || modified {
+						return ctrl.Result{}, err
+					}
+				}
+			}
+		}
+		if claim.Status.Phase == "" {
+			if modified, err := r.patchServerClaimPhase(ctx, claim, metalv1alpha1.PhaseUnbound); err != nil || modified {
+				return ctrl.Result{}, err
+			}
 		}
 	}
 

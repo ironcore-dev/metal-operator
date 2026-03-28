@@ -23,6 +23,9 @@ flowchart LR
     ServerReconciler -- Manages state/Power --> Server
     ServerReconciler -- Uses --> metalprobe
     ServerReconciler -- Waits for --> ServerBootConfiguration
+    ServerReconciler -- Creates/Updates --> ServerMetadata
+
+    ServerMetadata -- Owned by --> Server
     
     ServerMaintenanceReconciler -- Manages --> ServerMaintenance
     ServerMaintenanceReconciler -- Creates/Deletes --> ServerBootConfiguration
@@ -62,7 +65,7 @@ flowchart LR
     classDef external fill:#f48fb1, stroke:#000, stroke-width:2px, color:#000;
 
     class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler,BiosSettingsReconciler,BiosVersionReconciler,BMCSettingsReconciler,BMCVersionReconciler operator;
-    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCSettings,BMCVersion,BIOSVersion,BIOSSettings crd;
+    class Endpoint,BMC,BMCSecret,Server,ServerMetadata,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCSettings,BMCVersion,BIOSVersion,BIOSSettings crd;
     class BootOperator external;
 ```
 
@@ -74,6 +77,7 @@ flowchart LR
 - [**BMC**](concepts/bmcs.md): Models Baseboard Management Controllers (BMCs), allowing interaction with server hardware.
 - [**BMCSecret**](concepts/bmcsecrets.md): Securely stores credentials required to access BMCs.
 - [**Server**](concepts/servers.md): Represents physical servers, managing their state, power, and configurations.
+- [**ServerMetadata**](concepts/servermetadata.md): Persists server discovery data (network interfaces, CPUs, storage, etc.) to enable status restoration without rediscovery.
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
@@ -91,7 +95,7 @@ flowchart LR
 
 - **BMCReconciler**: Manages `BMC` resources by connecting to BMC devices using credentials from `BMCSecret`. It retrieves hardware information, updates the BMC status, and detects managed servers, creating `Server` resources for them.
 
-- **ServerReconciler**: Manages `Server` resources and their lifecycle states. During the **Discovery** phase, it interacts with BMCs and uses the **metalprobe** agent to collect in-band hardware information, updating the server's status. It handles power management, BIOS configurations, and transitions servers through various states (e.g., Initial, Discovery, Available, Reserved).
+- **ServerReconciler**: Manages `Server` resources and their lifecycle states. During the **Discovery** phase, it interacts with BMCs and uses the **metalprobe** agent to collect in-band hardware information, storing it in a [`ServerMetadata`](concepts/servermetadata.md) resource and updating the server's status. It handles power management, BIOS configurations, and transitions servers through various states (e.g., Initial, Discovery, Available, Reserved). If a server's status is empty but a `ServerMetadata` exists, it restores the server state without requiring a full rediscovery.
 
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
 
@@ -117,7 +121,8 @@ flowchart LR
     - The **metalprobe** agent runs on the servers, collecting detailed hardware information (e.g., network interfaces, storage devices) and reporting back to update the `Server` status.
 
 3. **Server Availability**:
-    - Once discovery is complete, servers transition to the **Available** state, ready to be claimed.
+    - Once discovery is complete, a [`ServerMetadata`](concepts/servermetadata.md) resource is created to persist the discovery data.
+    - Servers transition to the **Available** state, ready to be claimed.
 
 4. **Server Reservation and Boot Configuration**:
     - Users create `ServerClaim` resources to reserve servers, specifying desired OS images and ignition configurations.

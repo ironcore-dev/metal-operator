@@ -35,7 +35,7 @@ var _ = Describe("Server Controller", func() {
 	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
@@ -1202,6 +1202,293 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("e2e-user"), "Should use custom username")
 			Expect(ignitionStr).To(ContainSubstring("custom-probe:v1.0.0"), "Should include custom probe image")
 		})
+	})
+
+	It("Should create ServerMetadata after discovery", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Ensuring the boot configuration has been created")
+		bootConfig := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      server.Name,
+			},
+		}
+		Eventually(Get(bootConfig)).Should(Succeed())
+
+		By("Patching the boot configuration to a Ready state")
+		Eventually(UpdateStatus(bootConfig, func() {
+			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+
+		By("Waiting for the server to reach Discovery state")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
+
+		By("Posting registry data via /register endpoint")
+		regPayload := registry.RegistrationPayload{
+			SystemUUID: server.Spec.SystemUUID,
+			Data: registry.Server{
+				Timestamp: &metav1.Time{Time: time.Now()},
+				NetworkInterfaces: []registry.NetworkInterface{
+					{
+						Name:        "eth0",
+						IPAddresses: []string{"192.168.1.100"},
+						MACAddress:  "aa:bb:cc:dd:ee:ff",
+					},
+				},
+			},
+		}
+		regDataBytes, err := json.Marshal(regPayload)
+		Expect(err).NotTo(HaveOccurred())
+		resp, err := http.Post(registryURL+"/register", "application/json", bytes.NewReader(regDataBytes))
+		Expect(err).NotTo(HaveOccurred())
+		defer resp.Body.Close() //nolint:errcheck
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+		By("Ensuring that the server reaches available state")
+		Eventually(Object(server), 30*time.Second).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
+		By("Ensuring that the ServerMetadata has been created")
+		serverMetadata := &metalv1alpha1.ServerMetadata{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: server.Name,
+			},
+		}
+		Eventually(Object(serverMetadata)).Should(SatisfyAll(
+			HaveField("OwnerReferences", Not(BeEmpty())),
+			HaveField("NetworkInterfaces", Not(BeEmpty())),
+		))
+
+		// cleanup
+		deleteRegistrySystemIfExists(server.Spec.SystemUUID)
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+	})
+
+	It("Should restore Server status from ServerMetadata on empty status", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a ServerMetadata first (simulating pre-existing metadata)")
+		serverMetadata := &metalv1alpha1.ServerMetadata{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "server-restore-avail",
+			},
+			NetworkInterfaces: []metalv1alpha1.MetaDataNetworkInterface{
+				{
+					Name:       "eth0",
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+					IPAddresses: []string{
+						"192.168.1.100",
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMetadata)).To(Succeed())
+
+		By("Creating a Server with the same name")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "server-restore-avail",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Ensuring that the Server status is restored to Available with network interfaces")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Status.NetworkInterfaces", HaveLen(1)),
+		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+	})
+
+	It("Should restore Server to Reserved state from ServerMetadata when ServerClaimRef is set", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a ServerMetadata first (simulating pre-existing metadata)")
+		serverMetadata := &metalv1alpha1.ServerMetadata{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "server-restore-reserved",
+			},
+			NetworkInterfaces: []metalv1alpha1.MetaDataNetworkInterface{
+				{
+					Name:       "eth0",
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMetadata)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration and a ServerClaimRef")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "server-restore-reserved",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+				ServerClaimRef: &metalv1alpha1.ImmutableObjectReference{
+					Namespace: ns.Name,
+					Name:      "some-claim",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Ensuring that the Server status is restored to Reserved")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Status.NetworkInterfaces", HaveLen(1)),
+		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+	})
+
+	It("Should handle rediscover annotation by deleting ServerMetadata and setting Initial state", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a ServerMetadata first (simulating existing metadata)")
+		serverMetadata := &metalv1alpha1.ServerMetadata{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "server-rediscover",
+			},
+			NetworkInterfaces: []metalv1alpha1.MetaDataNetworkInterface{
+				{
+					Name:       "eth0",
+					MACAddress: "aa:bb:cc:dd:ee:ff",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMetadata)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "server-rediscover",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Ensuring the server reaches Available state via metadata restoration")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
+		By("Adding the rediscover annotation")
+		Eventually(Update(server, func() {
+			metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationRediscover)
+		})).Should(Succeed())
+
+		By("Ensuring the annotation is removed and state is Initial")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		))
+
+		By("Ensuring the ServerMetadata is deleted")
+		Eventually(Get(serverMetadata)).Should(Satisfy(apierrors.IsNotFound))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 })
 

@@ -69,7 +69,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should successfully claim a server in available state", func(ctx SpecContext) {
@@ -491,6 +491,41 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring that the ServerClaim is deleted")
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("Should restore Bound phase from bidirectional binding", func(ctx SpecContext) {
+		By("Setting up Server with a ServerClaimRef pointing to our claim")
+		Eventually(Update(server, func() {
+			server.Spec.ServerClaimRef = &metalv1alpha1.ImmutableObjectReference{
+				Namespace: ns.Name,
+				Name:      "test-bound-claim",
+			}
+		})).Should(Succeed())
+
+		By("Setting server to Reserved state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateReserved
+		})).Should(Succeed())
+
+		By("Creating a ServerClaim with ServerRef pointing back to the server (simulating post-move state with empty status)")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      "test-bound-claim",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				Image:     "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring the ServerClaim phase is restored to Bound")
+		Eventually(Object(claim)).Should(HaveField("Status.Phase", metalv1alpha1.PhaseBound))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+	})
 })
 
 var _ = Describe("ServerClaim Validation", func() {
@@ -536,7 +571,7 @@ var _ = Describe("ServerClaim Validation", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, claimWithSelector)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should deny if the ServerRef changes", func() {
@@ -674,7 +709,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for _, server := range serverList.Items {
 			Expect(k8sClient.Delete(ctx, &server)).To(Succeed())
 		}
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Binds four out of ten server for four best effort claims", func(ctx SpecContext) {

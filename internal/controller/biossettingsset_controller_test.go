@@ -126,7 +126,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should successfully reconcile the resource", func(ctx SpecContext) {

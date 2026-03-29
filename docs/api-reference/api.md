@@ -27,6 +27,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
 - [ServerMaintenance](#servermaintenance)
+- [ServerMetadata](#servermetadata)
 
 
 
@@ -1147,6 +1148,265 @@ _Appears in:_
 | `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
 
 
+#### MetaDataBIOSInformation
+
+
+
+
+
+
+
+_Appears in:_
+- [MetaDataSystemInfo](#metadatasysteminfo)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `vendor` _string_ |  |  |  |
+| `version` _string_ |  |  |  |
+| `date` _string_ |  |  |  |
+
+
+#### MetaDataBlockDevice
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `path` _string_ |  |  |  |
+| `name` _string_ |  |  |  |
+| `rotational` _boolean_ |  |  |  |
+| `removable` _boolean_ |  |  |  |
+| `readOnly` _boolean_ |  |  |  |
+| `vendor` _string_ |  |  |  |
+| `model` _string_ |  |  |  |
+| `serial` _string_ |  |  |  |
+| `wwid` _string_ |  |  |  |
+| `physicalBlockSize` _integer_ |  |  |  |
+| `logicalBlockSize` _integer_ |  |  |  |
+| `hWSectorSize` _integer_ |  |  |  |
+| `sizeBytes` _integer_ |  |  |  |
+| `numaNodeID` _integer_ |  |  |  |
+
+
+#### MetaDataBoardInformation
+
+
+
+
+
+
+
+_Appears in:_
+- [MetaDataSystemInfo](#metadatasysteminfo)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `manufacturer` _string_ |  |  |  |
+| `product` _string_ |  |  |  |
+| `version` _string_ |  |  |  |
+| `serialNumber` _string_ |  |  |  |
+| `assetTag` _string_ |  |  |  |
+
+
+#### MetaDataCPU
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `id` _integer_ |  |  |  |
+| `totalCores` _integer_ |  |  |  |
+| `totalHardwareThreads` _integer_ |  |  |  |
+| `vendor` _string_ |  |  |  |
+| `model` _string_ |  |  |  |
+| `capabilities` _string array_ |  |  |  |
+
+
+#### MetaDataLLDPInterface
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ |  |  |  |
+| `neighbors` _[MetaDataLLDPNeighbor](#metadatalldpneighbor) array_ |  |  |  |
+
+
+#### MetaDataLLDPNeighbor
+
+
+
+
+
+
+
+_Appears in:_
+- [MetaDataLLDPInterface](#metadatalldpinterface)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `chassisId` _string_ |  |  |  |
+| `portId` _string_ |  |  |  |
+| `portDescription` _string_ |  |  |  |
+| `systemName` _string_ |  |  |  |
+| `systemDescription` _string_ |  |  |  |
+| `mgmtIp` _string_ |  |  |  |
+| `capabilities` _string array_ |  |  |  |
+| `vlanId` _string_ |  |  |  |
+
+
+#### MetaDataMemoryDevice
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `size` _integer_ |  |  |  |
+| `deviceSet` _string_ |  |  |  |
+| `deviceLocator` _string_ |  |  |  |
+| `bankLocator` _string_ |  |  |  |
+| `memoryType` _string_ |  |  |  |
+| `speed` _string_ |  |  |  |
+| `vendor` _string_ |  |  |  |
+| `serialNumber` _string_ |  |  |  |
+| `assetTag` _string_ |  |  |  |
+| `partNumber` _string_ |  |  |  |
+| `configuredMemorySpeed` _string_ |  |  |  |
+| `minimumVoltage` _string_ |  |  |  |
+| `maximumVoltage` _string_ |  |  |  |
+| `configuredVoltage` _string_ |  |  |  |
+
+
+#### MetaDataNIC
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ |  |  |  |
+| `mac` _string_ |  |  |  |
+| `pciAddress` _string_ |  |  |  |
+| `speed` _string_ |  |  |  |
+| `linkModes` _string array_ |  |  |  |
+| `supportedPorts` _string array_ |  |  |  |
+| `firmwareVersion` _string_ |  |  |  |
+
+
+#### MetaDataNetworkInterface
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ |  |  |  |
+| `ipAddresses` _string array_ |  |  |  |
+| `macAddress` _string_ |  |  |  |
+| `carrierStatus` _string_ |  |  |  |
+
+
+#### MetaDataPCIDevice
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `address` _string_ |  |  |  |
+| `vendor` _string_ |  |  |  |
+| `vendorID` _string_ |  |  |  |
+| `product` _string_ |  |  |  |
+| `productID` _string_ |  |  |  |
+| `numaNodeID` _integer_ |  |  |  |
+
+
+#### MetaDataServerInformation
+
+
+
+
+
+
+
+_Appears in:_
+- [MetaDataSystemInfo](#metadatasysteminfo)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `manufacturer` _string_ |  |  |  |
+| `productName` _string_ |  |  |  |
+| `version` _string_ |  |  |  |
+| `serialNumber` _string_ |  |  |  |
+| `uuid` _string_ |  |  |  |
+| `skuNumber` _string_ |  |  |  |
+| `family` _string_ |  |  |  |
+
+
+#### MetaDataSystemInfo
+
+
+
+
+
+
+
+_Appears in:_
+- [ServerMetadata](#servermetadata)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `biosInformation` _[MetaDataBIOSInformation](#metadatabiosinformation)_ |  |  |  |
+| `systemInformation` _[MetaDataServerInformation](#metadataserverinformation)_ |  |  |  |
+| `boardInformation` _[MetaDataBoardInformation](#metadataboardinformation)_ |  |  |  |
+
+
 #### NamespacedKeySelector
 
 
@@ -1600,6 +1860,34 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `state` _[ServerMaintenanceState](#servermaintenancestate)_ | State specifies the current state of the server maintenance. |  |  |
+
+
+#### ServerMetadata
+
+
+
+ServerMetadata is a flat data object (no spec/status) that persists the full
+probe agent discovery payload. Similar to how Endpoints or ConfigMap store
+data directly at the root level. The relationship to its Server is
+established by using the same name and an owner reference.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `ServerMetadata` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `systemInfo` _[MetaDataSystemInfo](#metadatasysteminfo)_ | SystemInfo contains BIOS, system, and board information from DMI/SMBIOS. |  |  |
+| `cpu` _[MetaDataCPU](#metadatacpu) array_ | CPU is a list of CPUs discovered on the server. |  |  |
+| `networkInterfaces` _[MetaDataNetworkInterface](#metadatanetworkinterface) array_ | NetworkInterfaces is a list of network interfaces discovered on the server. |  |  |
+| `lldp` _[MetaDataLLDPInterface](#metadatalldpinterface) array_ | LLDP contains LLDP neighbor information per interface. |  |  |
+| `storage` _[MetaDataBlockDevice](#metadatablockdevice) array_ | Storage is a list of block devices discovered on the server. |  |  |
+| `memory` _[MetaDataMemoryDevice](#metadatamemorydevice) array_ | Memory is a list of memory devices discovered on the server. |  |  |
+| `nics` _[MetaDataNIC](#metadatanic) array_ | NICs is a list of raw NIC details (PCI address, speed, firmware). |  |  |
+| `pciDevices` _[MetaDataPCIDevice](#metadatapcidevice) array_ | PCIDevices is a list of PCI devices discovered on the server. |  |  |
 
 
 #### ServerPowerState

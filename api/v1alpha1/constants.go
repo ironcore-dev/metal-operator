@@ -51,6 +51,9 @@ const (
 
 	// OperationAnnotationRotateCredentials is used to indicate that credentials should be rotated.
 	OperationAnnotationRotateCredentials = "rotate-credentials"
+
+	// OperationAnnotationRediscover deletes the ServerMetadata and re-triggers discovery.
+	OperationAnnotationRediscover = "rediscover"
 )
 
 const (

@@ -69,6 +69,7 @@ export default withMermaid({
           { text: 'BMCVersion', link: '/concepts/bmcversion' },
           { text: 'BMCVersionSet', link: '/concepts/bmcversionset' },
           { text: 'Servers', link: '/concepts/servers' },
+          { text: 'ServerMetadata', link: '/concepts/servermetadata' },
           { text: 'ServerClaims', link: '/concepts/serverclaims' },
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
           { text: 'ServerMaintenance', link: '/concepts/servermaintenance' },

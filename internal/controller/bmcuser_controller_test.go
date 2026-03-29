@@ -74,7 +74,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should create a bmc user and secret", func(ctx SpecContext) {

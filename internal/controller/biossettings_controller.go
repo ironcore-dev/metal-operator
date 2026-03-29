@@ -46,8 +46,6 @@ const (
 	BIOSSettingsReasonUpdateTimedOut            = "BIOSSettingsTimedOutDuringUpdate"
 	BIOSSettingsConditionServerPowerOn          = "ServerPowerOnCondition"
 	BIOSSettingsReasonServerPoweredOn           = "ServerPoweredHasBeenPoweredOn"
-	BMCConditionReset                           = "BMCResetIssued"
-	BMCReasonReset                              = "BMCResetIssued"
 	BIOSSettingsConditionIssuedUpdate           = "SettingsUpdateIssued"
 	BIOSSettingReasonIssuedUpdate               = "BIOSSettingUpdateIssued"
 	BIOSSettingsConditionUnknownPendingSettings = "UnknownPendingSettingState"

@@ -37,6 +37,9 @@ const (
 	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
 	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
 	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
+
+	BMCConditionReset = "BMCResetIssued"
+	BMCReasonReset    = "BMCResetIssued"
 )
 
 type BMCTaskFetchFailedError struct {

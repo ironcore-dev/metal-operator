@@ -107,12 +107,12 @@ func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	cached, hasOverride := s.overrides[filePath]
-	s.mu.RUnlock()
-
 	if hasOverride {
-		s.writeJSON(w, http.StatusOK, cached)
+		s.writeJSON(w, http.StatusOK, deepCopyAny(cached))
+		s.mu.RUnlock()
 		return
 	}
+	s.mu.RUnlock()
 
 	content, err := dataFS.ReadFile(filePath)
 	if err != nil {
@@ -124,7 +124,6 @@ func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(content); err != nil {
 		s.log.Error(err, "Failed to write response")
 	}
-
 }
 
 func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
@@ -256,9 +255,10 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// Hold a single lock for the entire delete + collection update to avoid
+	// unsynchronised reads of s.overrides between the two operations.
 	s.mu.Lock()
 	delete(s.overrides, filePath)
-	s.mu.Unlock()
 
 	// get collection of the resource
 	collectionPath := path.Dir(filePath)
@@ -268,10 +268,12 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 		var ok bool
 		collection, ok = cached.(Collection)
 		if !ok {
+			s.mu.Unlock()
 			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
 			return
 		}
 	} else {
+		s.mu.Unlock()
 		data, err := dataFS.ReadFile(collectionPath + "/index.json")
 		if err != nil {
 			http.NotFound(w, r)
@@ -281,6 +283,7 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
 			return
 		}
+		s.mu.Lock()
 	}
 	// remove member from collection
 	newMembers := make([]Member, 0)
@@ -291,7 +294,6 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("Removing member from collection", "members", newMembers, "collection", collectionPath)
 	collection.Members = newMembers
-	s.mu.Lock()
 	s.overrides[collectionPath] = collection
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
@@ -660,13 +662,24 @@ func resolvePath(urlPath string) string {
 func deepCopy(m map[string]any) map[string]any {
 	c := make(map[string]any)
 	for k, v := range m {
-		if vMap, ok := v.(map[string]any); ok {
-			c[k] = deepCopy(vMap)
-		} else {
-			c[k] = v
-		}
+		c[k] = deepCopyAny(v)
 	}
 	return c
+}
+
+func deepCopyAny(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopy(val)
+	case []any:
+		c := make([]any, len(val))
+		for i, elem := range val {
+			c[i] = deepCopyAny(elem)
+		}
+		return c
+	default:
+		return v
+	}
 }
 
 func mergeJSON(base, update map[string]any) {

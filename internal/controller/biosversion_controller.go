@@ -17,6 +17,7 @@ import (
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -240,10 +241,8 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, version *me
 
 func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmcClient bmc.BMC, version *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	if version.Spec.ServerMaintenanceRef == nil {
-		if requeue, err := r.requestServerMaintenance(ctx, version, server); err != nil || requeue {
-			return false, err
-		}
+	if requeue, err := r.requestServerMaintenance(ctx, version, server); err != nil || requeue {
+		return false, err
 	}
 
 	condition, err := GetCondition(r.Conditions, version.Status.Conditions, ServerMaintenanceConditionWaiting)
@@ -558,10 +557,8 @@ func (r *BIOSVersionReconciler) cleanup(ctx context.Context, bmcClient bmc.BMC, 
 		}
 
 		log.V(1).Info("Upgraded BIOS version", "Version", currentVersion, "Server", server.Name)
-		version.Status.Conditions = nil
 		return r.updateStatus(ctx, version, metalv1alpha1.BIOSVersionStateCompleted, nil, nil)
 	}
-	version.Status.Conditions = nil
 	return r.updateStatus(ctx, version, metalv1alpha1.BIOSVersionStateInProgress, nil, nil)
 }
 
@@ -579,11 +576,8 @@ func (r *BIOSVersionReconciler) getServerMaintenanceForRef(ctx context.Context, 
 }
 
 func (r *BIOSVersionReconciler) updateStatus(ctx context.Context, version *metalv1alpha1.BIOSVersion, state metalv1alpha1.BIOSVersionState, upgradeTask *metalv1alpha1.Task, condition *metav1.Condition) error {
-	if version.Status.State == state && condition == nil && upgradeTask == nil {
-		return nil
-	}
-
 	versionBase := version.DeepCopy()
+
 	version.Status.State = state
 
 	if condition != nil {
@@ -599,6 +593,10 @@ func (r *BIOSVersionReconciler) updateStatus(ctx context.Context, version *metal
 	}
 
 	version.Status.UpgradeTask = upgradeTask
+
+	if equality.Semantic.DeepEqual(version.Status, versionBase.Status) {
+		return nil
+	}
 
 	if err := r.Status().Patch(ctx, version, client.MergeFrom(versionBase)); err != nil {
 		return fmt.Errorf("failed to patch BIOSVersion status: %w", err)
@@ -806,7 +804,7 @@ func (r *BIOSVersionReconciler) upgradeBIOSVersion(ctx context.Context, bmcClien
 	var username, password string
 	if version.Spec.Image.SecretRef != nil {
 		var err error
-		password, username, err = GetImageCredentialsForSecretRef(ctx, r.Client, version.Spec.Image.SecretRef)
+		username, password, err = GetImageCredentialsForSecretRef(ctx, r.Client, version.Spec.Image.SecretRef)
 		if err != nil {
 			return fmt.Errorf("failed to get image credentials: %w", err)
 		}

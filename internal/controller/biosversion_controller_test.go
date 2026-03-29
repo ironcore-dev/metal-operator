@@ -217,6 +217,68 @@ var _ = Describe("BIOSVersion Controller", func() {
 		)
 	})
 
+	It("Should preserve conditions during upgrade and through completion", func(ctx SpecContext) {
+		By("Ensuring that the Server has Available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		)
+
+		By("Creating a BIOSVersion that requires an upgrade")
+		version := &metalv1alpha1.BIOSVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BIOSVersionSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 upgradeServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, version)).To(Succeed())
+
+		By("Ensuring that the BIOSVersion has entered InProgress state")
+		Eventually(Object(version)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateInProgress),
+		)
+
+		By("Ensuring that the Maintenance resource has been created")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", Not(BeEmpty())))
+
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      version.Name,
+			},
+		}
+		Eventually(Get(serverMaintenance)).Should(Succeed())
+
+		By("Ensuring that the Server is in Maintenance state")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
+			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
+			}),
+		))
+
+		By("Driving through condition transitions")
+		ensureBiosVersionConditionTransition(version, server)
+
+		By("Verifying that conditions are preserved when state transitions to Completed")
+		Eventually(Object(version)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+			HaveField("Status.Conditions", Not(BeEmpty())),
+		))
+
+		By("Deleting the BIOSVersion")
+		Expect(k8sClient.Delete(ctx, version)).To(Succeed())
+		Eventually(Get(version)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
 	It("Should upgrade servers BIOS when in reserved state", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
@@ -560,6 +622,11 @@ func ensureBiosVersionConditionTransition(version *metalv1alpha1.BIOSVersion, se
 		g.Expect(version.Status.UpgradeTask).NotTo(BeNil())
 		g.Expect(version.Status.UpgradeTask.URI).To(Equal(bmc.DummyMockTaskForUpgrade))
 	}).Should(Succeed())
+
+	By("Waiting for the upgrade issued condition")
+	Eventually(Object(version)).Should(
+		HaveField("Status.Conditions", conditionMatcher(ConditionBIOSUpgradeIssued)),
+	)
 
 	By("Waiting for the upgrade task to complete")
 	Eventually(Object(version)).Should(

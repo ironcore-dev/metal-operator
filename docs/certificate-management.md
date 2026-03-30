@@ -610,7 +610,7 @@ To completely disable certificate management:
 - [cert-manager documentation](https://cert-manager.io/docs/)
 - [Redfish API specification](https://www.dmtf.org/standards/redfish)
 - [Kubernetes TLS management](https://kubernetes.io/docs/tasks/tls/)
-- [metal-operator API reference](../api-reference/api)
+- [metal-operator API reference](./api-reference/api)
 
 ## Support
 

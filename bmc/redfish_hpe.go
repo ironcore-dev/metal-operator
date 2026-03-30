@@ -109,8 +109,14 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 			for _, info := range redfishError.Error.MessageExtendedInfo {
 				if strings.Contains(info.MessageID, "ResourceAlreadyExists") ||
 					strings.Contains(info.MessageID, "PropertyValueModified") {
-					// Handle duplicate subscription - find and return existing one
-					return r.findExistingSubscription(destination, eventFormatType)
+					// Handle duplicate subscription - try to find existing one
+					if existingLink, findErr := r.findExistingSubscription(destination, eventFormatType); findErr == nil {
+						// Successfully found existing subscription
+						return existingLink, nil
+					}
+					// Failed to find existing subscription - fall through to return original error
+					// This preserves the detailed Redfish error message for troubleshooting
+					break
 				}
 			}
 		}

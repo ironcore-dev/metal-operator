@@ -23,6 +23,12 @@ type Server struct {
 	collector *RedfishEventCollector
 }
 
+const (
+	// maxEventBodyBytes is the maximum allowed size for event payloads (1MB)
+	// This prevents DoS attacks via large request bodies
+	maxEventBodyBytes = 1 << 20 // 1 MB
+)
+
 type MetricsReport struct {
 	// Standard Redfish fields
 	ODataID   string `json:"@odata.id,omitempty"`
@@ -89,9 +95,18 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	hostname := path.Base(r.URL.Path)
 
+	// Limit request body size to prevent DoS attacks
+	r.Body = http.MaxBytesReader(w, r.Body, maxEventBodyBytes)
+
 	// Read body into buffer so we can log it
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
+		// Check if error is due to exceeding size limit
+		if err.Error() == "http: request body too large" {
+			s.log.Info("Request body too large", "hostname", hostname, "maxBytes", maxEventBodyBytes)
+			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		s.log.Error(err, "Failed to read request body", "hostname", hostname)
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return
@@ -125,9 +140,18 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	hostname := path.Base(r.URL.Path)
 
+	// Limit request body size to prevent DoS attacks
+	r.Body = http.MaxBytesReader(w, r.Body, maxEventBodyBytes)
+
 	// Read body into buffer
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
+		// Check if error is due to exceeding size limit
+		if err.Error() == "http: request body too large" {
+			s.log.Info("Request body too large", "hostname", hostname, "maxBytes", maxEventBodyBytes)
+			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		s.log.Error(err, "Failed to read request body", "hostname", hostname)
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return

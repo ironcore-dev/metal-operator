@@ -20,6 +20,14 @@ const (
 	ManufacturerSupermicro Manufacturer = "Supermicro"
 )
 
+// ComponentType represents a firmware component type.
+type ComponentType string
+
+const (
+	ComponentTypeBMC  ComponentType = "BMC"
+	ComponentTypeBIOS ComponentType = "BIOS"
+)
+
 // BMC defines an interface for interacting with a Baseboard Management Controller.
 type BMC interface {
 	// PowerOn powers on the system.
@@ -137,6 +145,10 @@ type BMC interface {
 
 	// GetCertificateInfo retrieves information about the BMC's current TLS certificate.
 	GetCertificateInfo(ctx context.Context) (*CertificateInfo, error)
+
+	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
+	// for the given component type.
+	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
 }
 
 type Entity struct {

@@ -114,6 +114,10 @@ func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *met
 
 	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) &&
 		settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+		if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+			log.V(1).Info("Server not found, proceeding with deletion", "Server", settings.Spec.ServerRef.Name)
+			return true
+		}
 		log.V(1).Info("Postponing delete as BIOSSettings update is in progress")
 		return false
 	}
@@ -217,6 +221,14 @@ func (r *BIOSSettingsReconciler) reconcile(ctx context.Context, settings *metalv
 	log := ctrl.LoggerFrom(ctx)
 	if shouldIgnoreReconciliation(settings) {
 		log.V(1).Info("Skipping BIOSSettings reconciliation")
+		return ctrl.Result{}, nil
+	}
+
+	base := settings.DeepCopy()
+	if settings.Spec.ServerMaintenanceRef != nil && clearDeprecatedObjectRefFields(settings.Spec.ServerMaintenanceRef) {
+		if err := r.Patch(ctx, settings, client.MergeFrom(base)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BIOSSettings: %w", err)
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -1137,7 +1149,7 @@ func (r *BIOSSettingsReconciler) isServerInMaintenance(ctx context.Context, sett
 	}
 
 	if server.Status.State == metalv1alpha1.ServerStateMaintenance {
-		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != settings.Spec.ServerMaintenanceRef.UID {
+		if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.Name != settings.Spec.ServerMaintenanceRef.Name || server.Spec.ServerMaintenanceRef.Namespace != settings.Spec.ServerMaintenanceRef.Namespace {
 			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
 			return false
 		}
@@ -1249,11 +1261,8 @@ func (r *BIOSSettingsReconciler) patchMaintenanceRef(ctx context.Context, settin
 		settings.Spec.ServerMaintenanceRef = nil
 	} else {
 		settings.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
-			APIVersion: metalv1alpha1.GroupVersion.String(),
-			Kind:       "ServerMaintenance",
-			Namespace:  maintenance.Namespace,
-			Name:       maintenance.Name,
-			UID:        maintenance.UID,
+			Namespace: maintenance.Namespace,
+			Name:      maintenance.Name,
 		}
 	}
 	if err := r.Patch(ctx, settings, client.MergeFrom(biosSettingsBase)); err != nil {
@@ -1409,7 +1418,8 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByServerRefs(ctx context.Con
 	for _, settings := range settingsList.Items {
 		if settings.Spec.ServerMaintenanceRef == nil ||
 			(server.Spec.ServerMaintenanceRef != nil &&
-				server.Spec.ServerMaintenanceRef.UID != settings.Spec.ServerMaintenanceRef.UID) ||
+				(server.Spec.ServerMaintenanceRef.Name != settings.Spec.ServerMaintenanceRef.Name ||
+					server.Spec.ServerMaintenanceRef.Namespace != settings.Spec.ServerMaintenanceRef.Namespace)) ||
 			settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
 			settings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
 			continue

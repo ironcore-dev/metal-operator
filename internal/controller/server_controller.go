@@ -85,8 +85,10 @@ type ServerReconciler struct {
 	Insecure                bool
 	ManagerNamespace        string
 	ProbeImage              string
-	RegistryURL             string
 	ProbeOSImage            string
+	RegistryURL             string
+	RegistryClientTimeout   time.Duration
+	RegistryDataMaxAge      time.Duration
 	RegistryResyncInterval  time.Duration
 	EnforceFirstBoot        bool
 	EnforcePowerOff         bool
@@ -146,6 +148,16 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 
 	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
 		server.Status.State == metalv1alpha1.ServerStateMaintenance {
+		if server.Spec.BMCRef != nil {
+			b := &metalv1alpha1.BMC{}
+			bmcName := server.Spec.BMCRef.Name
+			if err := r.Get(ctx, client.ObjectKey{Name: bmcName}, b); err != nil {
+				if apierrors.IsNotFound(err) {
+					log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcName, "Server", server.Name)
+					return true
+				}
+			}
+		}
 		log.V(1).Info("Postponing delete as server is in Maintenance state")
 		return false
 	}
@@ -196,6 +208,10 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	if shouldIgnoreReconciliation(server) {
 		log.V(1).Info("Skipped Server reconciliation")
 		return ctrl.Result{}, nil
+	}
+
+	if modified, err := r.clearDeprecatedRefFields(ctx, server); err != nil || modified {
+		return ctrl.Result{}, err
 	}
 
 	// do late state initialization
@@ -331,6 +347,12 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 	}
 	log.V(1).Info("Set PXE Boot for Server")
 
+	// Ensure registry is clean before Discovery starts (fresh registration)
+	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to clean up registry entry before discovery: %w", err)
+	}
+	log.V(1).Info("Ensured registry is clean for discovery")
+
 	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
 		return false, err
 	}
@@ -368,7 +390,8 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		}
 	}
 
-	ready, err := r.extractServerDetailsFromRegistry(ctx, server)
+	serverDetails := &registry.Server{}
+	ready, err := r.extractServerDetailsFromRegistry(ctx, server, serverDetails)
 	if !ready && err == nil {
 		log.V(1).Info("Server agent did not post info to registry")
 		return true, nil
@@ -377,17 +400,28 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		log.V(1).Info("Could not get server details from registry.")
 		return false, err
 	}
+
+	// Check if the registry data has timestamp and is fresh enough to proceed with discovery completion
+	if serverDetails.Timestamp == nil {
+		log.V(1).Info("Registry data has no timestamp, waiting for fresh update")
+		return true, nil
+	}
+	if time.Since(serverDetails.Timestamp.Time) >= r.RegistryDataMaxAge {
+		log.V(1).Info("Registry data is stale, waiting for fresh update", "age", time.Since(serverDetails.Timestamp.Time))
+		return true, nil
+	}
+
 	log.V(1).Info("Extracted Server details")
+
+	log.V(1).Info("Setting Server state to available")
+	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
+		return false, err
+	}
 
 	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
 	}
 	log.V(1).Info("Removed Server from Registry")
-
-	log.V(1).Info("Setting Server state set to available")
-	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
-		return false, err
-	}
 	return false, nil
 }
 
@@ -503,11 +537,8 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
-		Namespace:  config.Namespace,
-		Name:       config.Name,
-		UID:        config.UID,
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-		Kind:       "ServerBootConfiguration",
+		Namespace: config.Namespace,
+		Name:      config.Name,
 	}
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
@@ -826,23 +857,38 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 	return nil
 }
 
-func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server, serverDetails *registry.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	resp, err := http.Get(fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID))
-	if resp != nil && resp.StatusCode == http.StatusNotFound {
+	url := fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID)
+	c := &http.Client{Timeout: r.RegistryClientTimeout}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error(err, "Failed to close response body")
+		}
+	}(resp.Body)
+
+	if resp.StatusCode == http.StatusNotFound {
 		log.V(1).Info("Did not find server information in registry")
 		return false, nil
 	}
 
-	if resp == nil {
-		return false, fmt.Errorf("failed to find server information in registry")
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return false, fmt.Errorf("failed to fetch server details from registry: HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
-	if err != nil {
-		return false, fmt.Errorf("failed to fetch server details: %w", err)
-	}
-
-	serverDetails := &registry.Server{}
 	if err := json.NewDecoder(resp.Body).Decode(serverDetails); err != nil {
 		return false, fmt.Errorf("failed to decode server details: %w", err)
 	}
@@ -1069,11 +1115,9 @@ func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.C
 func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 	url := fmt.Sprintf("%s/delete/%s", r.RegistryURL, server.Spec.SystemUUID)
+	c := &http.Client{Timeout: r.RegistryClientTimeout}
 
-	c := &http.Client{}
-
-	// Create the DELETE request
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -1089,6 +1133,17 @@ func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context,
 			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
+
+	// If the entry is not found, we can consider it already invalidated, so we return nil
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("failed to delete registry entry for server: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
 	return nil
 }
 
@@ -1158,6 +1213,21 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 		}
 	}
 	return false
+}
+
+func (r *ServerReconciler) clearDeprecatedRefFields(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	base := server.DeepCopy()
+	changed := clearDeprecatedImmutableObjectRefFields(server.Spec.ServerClaimRef)
+	changed = clearDeprecatedObjectRefFields(server.Spec.BootConfigurationRef) || changed
+	changed = clearDeprecatedObjectRefFields(server.Spec.MaintenanceBootConfigurationRef) || changed
+	changed = clearDeprecatedObjectRefFields(server.Spec.ServerMaintenanceRef) || changed
+	if !changed {
+		return false, nil
+	}
+	if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+		return false, fmt.Errorf("failed to clear deprecated ObjectReference fields on Server: %w", err)
+	}
+	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

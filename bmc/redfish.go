@@ -886,6 +886,17 @@ func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *schem
 	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)
 }
 
+// CheckBMCPendingComponentUpgrade is a fallback for unknown vendors.
+// Returns an error indicating the feature is not supported.
+// Vendor-specific implementations (Dell, HPE, Lenovo) override this to check actual firmware inventory
+// and return whether a pending component upgrade exists for the specified component type.
+func (r *RedfishBaseBMC) CheckBMCPendingComponentUpgrade(_ context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
+	return false, fmt.Errorf("check pending component upgrade is not supported for manufacturer %q", r.manufacturer)
+}
+
 func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
 	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
 }
@@ -1024,17 +1035,16 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		Destination:         destination,
 		EventFormatType:     eventFormatType, // event or metricreport
 		Protocol:            schemas.RedfishEventDestinationProtocol,
-		DeliveryRetryPolicy: retry,
+		DeliveryRetryPolicy: retry, // Note: HPE iLO doesn't support this field; HPERedfishBMC overrides this method to omit it
 		Context:             "metal-operator",
 	}
 	client := ev.GetClient()
 	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
 	if len(ev.ResourceTypes) == 0 {
 		payload.EventTypes = []schemas.EventType{}
-	} else {
-		payload.RegistryPrefixes = []string{""} // Filters by the prefix of the event's MessageId, which points to a Message Registry: [Base, ResourceEvent, iLOEvents]
-		payload.ResourceTypes = []string{""}    // Filters by the schema name (Resource Type) of the event's OriginOfCondition:	[Chassis, ComputerSystem, Power]
 	}
+	// Omit RegistryPrefixes and ResourceTypes to allow all events.
+	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
 	resp, err := client.Post(ev.SubscriptionsLink, payload)
 	if err != nil {
 		return "", err

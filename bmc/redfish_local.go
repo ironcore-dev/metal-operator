@@ -275,3 +275,10 @@ func (r *RedfishLocalBMC) GenerateCSR(ctx context.Context, params CSRParameters)
 	}
 	return r.RedfishBaseBMC.GenerateCSR(ctx, params)
 }
+
+// CheckBMCPendingComponentUpgrade returns false for local provider.
+// This is the expected behavior for non-real hardware environments; vendor implementations
+// (Dell, HPE, Lenovo) override this to check actual firmware inventory.
+func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
+	return false, nil
+}

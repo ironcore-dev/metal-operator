@@ -134,6 +134,36 @@ func (r *ServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *ServerReconciler) reconcileExists(ctx context.Context, server *metalv1alpha1.Server) (ctrl.Result, error) {
+	// If BMC referenced by Server doesn't exist, remove finalizer and delete to allow cleanup
+	// This handles the case where BMC is deleted but Server's OwnerReference hasn't triggered deletion yet
+	if server.Spec.BMCRef != nil {
+		bmc := &metalv1alpha1.BMC{}
+		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmc); err != nil {
+			if apierrors.IsNotFound(err) {
+				log := ctrl.LoggerFrom(ctx)
+				log.Info("BMC not found for Server, removing finalizer to allow cleanup", "BMC", server.Spec.BMCRef.Name, "Server", server.Name)
+
+				// Remove finalizer first to allow deletion
+				if controllerutil.ContainsFinalizer(server, ServerFinalizer) {
+					if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, server, ServerFinalizer); err != nil {
+						return ctrl.Result{}, fmt.Errorf("failed to remove finalizer: %w", err)
+					} else if modified {
+						// Finalizer was removed, requeue to trigger deletion
+						return ctrl.Result{Requeue: true}, nil
+					}
+				}
+
+				// Finalizer is gone, now delete the Server
+				if err := r.Client.Delete(ctx, server); err != nil && !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, fmt.Errorf("failed to delete Server: %w", err)
+				}
+				return ctrl.Result{}, nil
+			}
+			// Other errors (e.g., API server issues) should be retried
+			return ctrl.Result{}, fmt.Errorf("failed to get BMC for server: %w", err)
+		}
+	}
+
 	if r.shouldDelete(ctx, server) {
 		return r.delete(ctx, server)
 	}
@@ -226,6 +256,11 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
 			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+		}
+		// If Server is being deleted and BMC is not found, skip reconciliation and allow deletion to proceed
+		if !server.DeletionTimestamp.IsZero() && apierrors.IsNotFound(err) {
+			log.Info("BMC not found for Server during deletion, skipping reconciliation to allow deletion", "Server", server.Name)
+			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client for server: %w", err)
 	}

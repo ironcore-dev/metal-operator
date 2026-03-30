@@ -313,3 +313,45 @@ func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schem
 	}
 	return reset, errors.Join(errs...)
 }
+
+// pendingCheckFn checks if a single firmware inventory item is pending/staged.
+type pendingCheckFn func(*schemas.SoftwareInventory) bool
+
+// getComponentFiltersFn returns vendor-specific component filters for a component type.
+type getComponentFiltersFn func(ComponentType) []string
+
+// matchComponentFilterFn checks if a component matches any filter.
+type matchComponentFilterFn func(*schemas.SoftwareInventory, []string) bool
+
+// checkPendingComponentUpgrade is the shared logic for checking pending component upgrades.
+// Vendor-specific behavior is injected via callbacks.
+func checkPendingComponentUpgrade(ctx context.Context, base *RedfishBaseBMC, componentType ComponentType, getFilters getComponentFiltersFn, matchFilter matchComponentFilterFn, checkPending pendingCheckFn,
+) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	service := base.client.GetService()
+	updateService, err := service.UpdateService()
+	if err != nil {
+		return false, fmt.Errorf("failed to get UpdateService: %w", err)
+	}
+
+	firmwareInventory, err := updateService.FirmwareInventory()
+	if err != nil {
+		return false, fmt.Errorf("failed to get FirmwareInventory: %w", err)
+	}
+
+	filters := getFilters(componentType)
+	for _, fw := range firmwareInventory {
+		if !matchFilter(fw, filters) {
+			continue
+		}
+		if checkPending(fw) {
+			log.V(1).Info("Found pending component upgrade",
+				"id", fw.ID,
+				"version", fw.Version)
+			return true, nil
+		}
+	}
+
+	return false, nil
+}

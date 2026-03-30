@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/stmcginnis/gofish"
@@ -42,6 +43,64 @@ func (r *HPERedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ strin
 
 func (r *HPERedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ schemas.SettingsAttributes) (bool, error) {
 	return false, nil
+}
+
+// CreateEventSubscription overrides the base implementation to omit DeliveryRetryPolicy.
+// HPE iLO firmware does not support the DeliveryRetryPolicy property in EventDestination
+// POST requests and returns: "PropertyNotWritableOrUnknown: DeliveryRetryPolicy is not writable or unknown"
+// Even when the EventService advertises retry capabilities, iLO rejects this field.
+func (r *HPERedfishBMC) CreateEventSubscription(
+	ctx context.Context,
+	destination string,
+	eventFormatType schemas.EventFormatType,
+	retry schemas.DeliveryRetryPolicy,
+) (string, error) {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return "", fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return "", fmt.Errorf("event service is not enabled")
+	}
+
+	payload := &subscriptionPayload{
+		Destination:     destination,
+		EventFormatType: eventFormatType,
+		Protocol:        schemas.RedfishEventDestinationProtocol,
+		Context:         "metal-operator",
+		// NOTE: DeliveryRetryPolicy is intentionally omitted for HPE iLO compatibility
+	}
+
+	client := ev.GetClient()
+	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
+	if len(ev.ResourceTypes) == 0 {
+		payload.EventTypes = []schemas.EventType{}
+	}
+	// Omit RegistryPrefixes and ResourceTypes to allow all events.
+	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
+
+	resp, err := client.Post(ev.SubscriptionsLink, payload)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+	}
+
+	// return subscription link from returned location
+	subscriptionLink := resp.Header.Get("Location")
+	if subscriptionLink == "" {
+		return "", fmt.Errorf("failed to get subscription link from response header")
+	}
+	urlParser, err := url.ParseRequestURI(subscriptionLink)
+	if err == nil {
+		subscriptionLink = urlParser.RequestURI()
+	}
+	return subscriptionLink, nil
 }
 
 // --- Firmware upgrade overrides ---
@@ -134,4 +193,38 @@ func (r *HPERedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, paramet
 
 func (r *HPERedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.hpeParseTaskDetails)
+}
+
+// CheckBMCPendingComponentUpgrade checks for staged component upgrades (HPE: Staged=true).
+// NOTE: HPE firmware entries use numeric IDs, so matching is done via fw.Name.
+func (r *HPERedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
+	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.hpeGetComponentFilters, r.hpeMatchesComponentFilter, r.hpeCheckPending)
+}
+
+func (r *HPERedfishBMC) hpeGetComponentFilters(componentType ComponentType) []string {
+	switch componentType {
+	case ComponentTypeBMC:
+		return []string{"iLO"}
+	case ComponentTypeBIOS:
+		return []string{"System ROM"}
+	default:
+		return []string{}
+	}
+}
+
+func (r *HPERedfishBMC) hpeMatchesComponentFilter(fw *schemas.SoftwareInventory, filters []string) bool {
+	nameUpper := strings.ToUpper(fw.Name)
+	for _, filter := range filters {
+		if strings.Contains(nameUpper, strings.ToUpper(filter)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *HPERedfishBMC) hpeCheckPending(fw *schemas.SoftwareInventory) bool {
+	return fw.Staged
 }

@@ -550,13 +550,13 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 	if r.EventURL == "" {
 		return false, nil
 	}
-	log.V(1).Info("Handling event subscriptions for BMC")
+	log.V(1).Info("Handling event subscriptions for BMC", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP)
 	modified := false
 
 	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
 		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
-			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
+			return false, fmt.Errorf("failed to subscribe to server metrics report for BMC %s (%s): %w", bmcObj.Name, bmcObj.Status.IP, err)
 		}
 		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.MetricsReportSubscriptionLink = link
@@ -564,11 +564,12 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
 		}
+		log.Info("Created metrics report subscription", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "link", link)
 	}
 	if bmcObj.Status.EventsSubscriptionLink == "" {
 		link, err := serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
-			return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
+			return false, fmt.Errorf("failed to subscribe to server alerts for BMC %s (%s): %w", bmcObj.Name, bmcObj.Status.IP, err)
 		}
 		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.EventsSubscriptionLink = link
@@ -576,6 +577,7 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
 		}
+		log.Info("Created events subscription", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "link", link)
 	}
 	return modified, nil
 }

@@ -12,28 +12,31 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type Agent struct {
-	SystemUUID       string
-	RegistryURL      string
-	Duration         time.Duration
-	Server           *registry.Server // Pointer to Server for late initialization.
-	log              logr.Logger
-	LLDPSyncInterval time.Duration
-	LLDPSyncDuration time.Duration
+	SystemUUID            string
+	RegistryURL           string
+	Duration              time.Duration
+	RegistryClientTimeout time.Duration
+	Server                *registry.Server // Pointer to Server for late initialization.
+	log                   logr.Logger
+	LLDPSyncInterval      time.Duration
+	LLDPSyncDuration      time.Duration
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
+func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
 	return &Agent{
-		log:              log,
-		SystemUUID:       systemUUID,
-		RegistryURL:      registryURL,
-		Duration:         duration,
-		LLDPSyncInterval: LLDPSyncInterval,
-		LLDPSyncDuration: LLDPSyncDuration,
+		log:                   log,
+		SystemUUID:            systemUUID,
+		RegistryURL:           registryURL,
+		Duration:              duration,
+		RegistryClientTimeout: registryClientTimeout,
+		LLDPSyncInterval:      LLDPSyncInterval,
+		LLDPSyncDuration:      LLDPSyncDuration,
 	}
 }
 
@@ -94,7 +97,9 @@ func (a *Agent) Init(ctx context.Context) error {
 		pciDevices = []registry.PCIDevice{}
 	}
 
+	now := metav1.Now()
 	a.Server = &registry.Server{
+		Timestamp:         &now,
 		SystemInfo:        systeminfo,
 		CPU:               cpuInfos,
 		NetworkInterfaces: interfaces,
@@ -170,6 +175,8 @@ func (a *Agent) RefreshLLDP(ctx context.Context) error {
 		return err
 	}
 	a.Server.LLDP = lldp.Interfaces
+	now := metav1.Now()
+	a.Server.Timestamp = &now
 	a.log.Info("Refreshed LLDP info", "interfaces", len(a.Server.LLDP))
 	return nil
 }
@@ -195,7 +202,13 @@ func (a *Agent) registerServer(ctx context.Context) error {
 				return false, err
 			}
 
-			resp, err := http.Post(a.RegistryURL+"/register", "application/json", bytes.NewBuffer(jsonData))
+			c := &http.Client{Timeout: a.RegistryClientTimeout}
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.RegistryURL+"/register", bytes.NewBuffer(jsonData))
+			if err != nil {
+				return false, err
+			}
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := c.Do(req)
 			if err != nil {
 				a.log.Error(err, "failed to post registration data", "url", a.RegistryURL)
 				return false, nil

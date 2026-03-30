@@ -190,11 +190,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ObjectReference{
 					{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: metalv1alpha1.GroupVersion.String(),
+						Namespace: serverMaintenance.Namespace,
+						Name:      serverMaintenance.Name,
 					},
 				},
 			),
@@ -204,11 +201,8 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		))
 
@@ -315,11 +309,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ObjectReference{
 					{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: metalv1alpha1.GroupVersion.String(),
+						Namespace: serverMaintenance.Namespace,
+						Name:      serverMaintenance.Name,
 					},
 				},
 			))
@@ -339,11 +330,8 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		))
 

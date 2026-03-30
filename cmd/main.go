@@ -82,6 +82,8 @@ func main() { // nolint: gocyclo
 		eventPort                          int
 		eventURL                           string
 		eventProtocol                      string
+		registryClientTimeout              time.Duration
+		registryDataMaxAge                 time.Duration
 		registryResyncInterval             time.Duration
 		webhookPort                        int
 		enforceFirstBoot                   bool
@@ -116,6 +118,10 @@ func main() { // nolint: gocyclo
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
 	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
 		"Defines the interval at which the registry is polled for new server information.")
+	flag.DurationVar(&registryClientTimeout, "registry-client-timeout", 5*time.Second,
+		"Timeout for HTTP requests to the registry.")
+	flag.DurationVar(&registryDataMaxAge, "registry-data-max-age", 2*time.Minute,
+		"Maximum age of registry data to accept for discovery completion.")
 	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 2*time.Minute,
 		"Defines the interval at which the server is polled.")
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
@@ -436,6 +442,8 @@ func main() { // nolint: gocyclo
 		ProbeImage:              probeImage,
 		ProbeOSImage:            probeOSImage,
 		RegistryURL:             registryURL,
+		RegistryClientTimeout:   registryClientTimeout,
+		RegistryDataMaxAge:      registryDataMaxAge,
 		RegistryResyncInterval:  registryResyncInterval,
 		ResyncInterval:          serverResyncInterval,
 		EnforceFirstBoot:        enforceFirstBoot,

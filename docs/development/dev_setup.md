@@ -21,7 +21,7 @@ graph TD
 
 ### Run the local test suite
 
-The local test suite can be run via 
+The local test suite can be run via
 
 ```shell
 make test
@@ -53,6 +53,7 @@ make tilt-up
 ```
 
 This `Makefile` directive will:
+
 - create a local Kind cluster with local registry
 - install cert-manager
 - install [boot-operator](https://github.com/ironcore-dev/boot-operator) to reconcile the `ServerBootConfiguration` CRD
@@ -76,9 +77,17 @@ make kind-delete
 
 By default, Tilt runs against a local Redfish mock server. To point the environment at real hardware instead, apply the following changes.
 
-#### Prerequisites: Claim the server on its origin cluster
+#### Prerequisites: Ensure the BMC is not actively managed
 
-Before pointing your local environment at a real BMC, ensure the server is not being reconciled by another metal-operator instance. On the cluster that originally owns the server, create a `ServerMaintenance` to claim it and power it off:
+Before connecting a real BMC to your local Tilt environment, make sure it is not actively reconciled by another `metal-operator` instance to avoid conflicts. Some common ways to achieve this:
+
+- **ServerMaintenance**: Create a `ServerMaintenance` resource on the production cluster to claim the server and optionally power it off.
+- **Exclude from automation**: Remove the server from the production `metal-operator`'s scope, for example via label selectors or namespace isolation, so it is no longer reconciled.
+- **Decommission temporarily**: If the server is not in active use, you can power it off or disconnect it from the production cluster before testing.
+
+> **Note:** Refer to your production cluster's runbooks for the appropriate procedure.
+
+If you use the `ServerMaintenance` approach, apply a manifest like this on the cluster that currently owns the server:
 
 ```yaml
 apiVersion: metal.ironcore.dev/v1alpha1
@@ -87,12 +96,12 @@ metadata:
   name: <maintenance-name>
   namespace: default
   annotations:
-    metal.ironcore.dev/maintenance-reason: "<maintenance-name>"
+    metal.ironcore.dev/maintenance-reason: '<maintenance-name>'
 spec:
   policy: Enforced
   serverRef:
     name: <server-name>
-  serverPower: "Off"
+  serverPower: 'Off'
 ```
 
 ```shell
@@ -149,7 +158,7 @@ data:
 
 #### 3. Enable HTTPS for the BMC connection
 
-The manager defaults to `--insecure=true`, which uses plain HTTP. For a real BMC on port 443, set `--insecure=false` in the `Tiltfile` to use HTTPS instead:
+The manager defaults to `--insecure=true`, which uses plain HTTP. This is fine for the default mock server but may not work for real servers. Make sure to adapt this to the target if necessary. E.g. for a real BMC that uses HTTPS on port 443, set `--insecure=false` in the `Tiltfile`:
 
 ```python
 settings = {
@@ -162,30 +171,52 @@ settings = {
 }
 ```
 
-#### 4. Claim the server with a ServerMaintenance
+#### 4. Start Tilt and verify
 
-Once the `Server` resource has been discovered and is `Available`, create a `ServerMaintenance` to claim it for local development. This prevents the server from being allocated by other consumers and powers it off:
+Start the environment:
+
+```shell
+make tilt-up
+```
+
+Once the manager is running, apply the `BMCSecret` to the local Kind cluster (it is not part of the kustomize config and must be applied manually):
+
+A `BMCSecret` looks like:
 
 ```yaml
 apiVersion: metal.ironcore.dev/v1alpha1
-kind: ServerMaintenance
+kind: BMCSecret
 metadata:
-  name: <maintenance-name>
-  namespace: default
-  annotations:
-    metal.ironcore.dev/maintenance-reason: "<maintenance-name>"
-spec:
-  policy: Enforced
-  serverRef:
-    name: <server-name>
-  serverPower: "Off"
+  name: <node-name>
+data:
+  username: <base64-encoded-username>
+  password: <base64-encoded-password>
 ```
 
-Apply and delete it with:
+> **Note:** The `username` and `password` values must be base64-encoded. You can encode them with `echo -n '<value>' | base64`.
 
 ```shell
-kubectl apply -f servermaintenance-<node-name>.yaml
-kubectl delete -f servermaintenance-<node-name>.yaml
+# Run against the local Kind cluster
+kubectl apply -f bmcsecret-<node-name>.yaml
+```
+
+The metal-operator will pick up the `BMC` resource, connect to the remote hardware, and create a matching `Server` resource. Watch the resources come up:
+
+```shell
+kubectl get bmc -w
+kubectl get server -w
+```
+
+You can monitor the manager logs to verify the connection succeeds:
+
+```shell
+kubectl logs -n metal-operator-system deployment/metal-operator-controller-manager -c manager -f
+```
+
+To tear down the environment:
+
+```shell
+make kind-delete
 ```
 
 #### Optional: Use the debug manager image
@@ -193,11 +224,13 @@ kubectl delete -f servermaintenance-<node-name>.yaml
 To get a shell-accessible manager image with `curl` and `ca-certificates` (useful for diagnosing BMC connectivity), switch the Tilt build target to `manager-debug`:
 
 In `Tiltfile`:
+
 ```python
-docker_build('controller', '.', target = 'manager-debug')
+docker_build('controller', '../..', dockerfile='./Dockerfile', only=['ironcore-dev/metal-operator', 'gofish'], target = 'manager-debug')
 ```
 
 And add the corresponding stage to `Dockerfile`:
+
 ```dockerfile
 FROM debian:testing-slim AS manager-debug
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"

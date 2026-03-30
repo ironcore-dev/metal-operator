@@ -107,12 +107,16 @@ func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	cached, hasOverride := s.overrides[filePath]
+	var copied any
 	if hasOverride {
-		s.writeJSON(w, http.StatusOK, deepCopyAny(cached))
-		s.mu.RUnlock()
-		return
+		copied = deepCopyAny(cached)
 	}
 	s.mu.RUnlock()
+
+	if hasOverride {
+		s.writeJSON(w, http.StatusOK, copied)
+		return
+	}
 
 	content, err := dataFS.ReadFile(filePath)
 	if err != nil {
@@ -273,17 +277,17 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		s.mu.Unlock()
 		data, err := dataFS.ReadFile(collectionPath + "/index.json")
 		if err != nil {
+			s.mu.Unlock()
 			http.NotFound(w, r)
 			return
 		}
 		if err := json.Unmarshal(data, &collection); err != nil {
+			s.mu.Unlock()
 			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
 			return
 		}
-		s.mu.Lock()
 	}
 	// remove member from collection
 	newMembers := make([]Member, 0)
@@ -677,6 +681,10 @@ func deepCopyAny(v any) any {
 			c[i] = deepCopyAny(elem)
 		}
 		return c
+	case Collection:
+		members := make([]Member, len(val.Members))
+		copy(members, val.Members)
+		return Collection{Members: members}
 	default:
 		return v
 	}

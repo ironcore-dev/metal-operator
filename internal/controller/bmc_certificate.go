@@ -249,8 +249,9 @@ func (r *BMCReconciler) createOrGetCertificateRequest(ctx context.Context, bmcOb
 		Spec: certmanagerv1.CertificateRequestSpec{
 			Request: csrPEM,
 			IssuerRef: cmmeta.ObjectReference{
-				Name: bmcObj.Spec.Certificate.IssuerRef.Name,
-				Kind: bmcObj.Spec.Certificate.IssuerRef.Kind,
+				Name:  bmcObj.Spec.Certificate.IssuerRef.Name,
+				Kind:  bmcObj.Spec.Certificate.IssuerRef.Kind,
+				Group: bmcObj.Spec.Certificate.IssuerRef.Group,
 			},
 			Usages: []certmanagerv1.KeyUsage{
 				certmanagerv1.UsageDigitalSignature,
@@ -577,10 +578,91 @@ func (r *BMCReconciler) verifyCertificateValidity(ctx context.Context, bmcObj *m
 
 // getCACertificateFromIssuer retrieves the CA certificate from the Issuer or ClusterIssuer.
 func (r *BMCReconciler) getCACertificateFromIssuer(ctx context.Context, issuerRef metalv1alpha1.CertificateIssuerRef) (string, error) {
-	// For simplicity, we'll try to get the CA from a well-known secret
-	// In a real implementation, this would need to query the issuer and extract the CA
-	// This is a placeholder implementation
+	log := ctrl.LoggerFrom(ctx)
+
+	// Determine if we're dealing with a ClusterIssuer or namespaced Issuer
+	if issuerRef.Kind == "ClusterIssuer" {
+		// Fetch ClusterIssuer
+		clusterIssuer := &certmanagerv1.ClusterIssuer{}
+		if err := r.Get(ctx, client.ObjectKey{Name: issuerRef.Name}, clusterIssuer); err != nil {
+			return "", fmt.Errorf("failed to get ClusterIssuer %s: %w", issuerRef.Name, err)
+		}
+		return r.extractCAFromIssuerSpec(ctx, &clusterIssuer.Spec, "", issuerRef.Name)
+	}
+
+	// Fetch namespaced Issuer
+	issuer := &certmanagerv1.Issuer{}
+	// Note: Issuer must be in the same namespace as the BMC
+	// For cluster-scoped BMC resources, we would need to determine the namespace differently
+	if err := r.Get(ctx, client.ObjectKey{Name: issuerRef.Name, Namespace: r.ManagerNamespace}, issuer); err != nil {
+		log.V(1).Info("Failed to get Issuer, trying without namespace", "issuer", issuerRef.Name, "error", err)
+		// Try without namespace for cluster-scoped resources
+		if err := r.Get(ctx, client.ObjectKey{Name: issuerRef.Name}, issuer); err != nil {
+			return "", fmt.Errorf("failed to get Issuer %s: %w", issuerRef.Name, err)
+		}
+	}
+	return r.extractCAFromIssuerSpec(ctx, &issuer.Spec, issuer.Namespace, issuerRef.Name)
+}
+
+// extractCAFromIssuerSpec extracts CA certificate from an issuer spec.
+func (r *BMCReconciler) extractCAFromIssuerSpec(ctx context.Context, spec *certmanagerv1.IssuerSpec, namespace, issuerName string) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Handle CA issuer type
+	if spec.CA != nil && spec.CA.SecretName != "" {
+		return r.getCAFromSecret(ctx, spec.CA.SecretName, namespace)
+	}
+
+	// Handle SelfSigned issuer - self-signed certs don't have a separate CA
+	if spec.SelfSigned != nil {
+		log.V(1).Info("SelfSigned issuer detected, no separate CA certificate available", "issuer", issuerName)
+		return "", nil
+	}
+
+	// Handle ACME issuer - ACME certificates are signed by Let's Encrypt or other ACME providers
+	if spec.ACME != nil {
+		log.V(1).Info("ACME issuer detected, CA certificates are managed by ACME provider", "issuer", issuerName)
+		// ACME providers like Let's Encrypt have well-known CA certificates
+		// In practice, the system's trusted CA bundle will handle these
+		return "", nil
+	}
+
+	// Handle Vault issuer
+	if spec.Vault != nil {
+		log.V(1).Info("Vault issuer detected, CA certificate retrieval from Vault not yet implemented", "issuer", issuerName)
+		// Vault CA would need to be retrieved from Vault's PKI backend
+		// This would require additional Vault API calls
+		return "", nil
+	}
+
+	// Handle Venafi issuer
+	if spec.Venafi != nil {
+		log.V(1).Info("Venafi issuer detected, CA certificate retrieval from Venafi not yet implemented", "issuer", issuerName)
+		return "", nil
+	}
+
+	log.V(1).Info("Issuer type does not provide CA certificate or is not yet supported", "issuer", issuerName)
 	return "", nil
+}
+
+// getCAFromSecret retrieves the CA certificate from a Kubernetes Secret.
+func (r *BMCReconciler) getCAFromSecret(ctx context.Context, secretName, namespace string) (string, error) {
+	secret := &corev1.Secret{}
+	key := client.ObjectKey{Name: secretName, Namespace: namespace}
+
+	if err := r.Get(ctx, key, secret); err != nil {
+		return "", fmt.Errorf("failed to get CA secret %s/%s: %w", namespace, secretName, err)
+	}
+
+	// Try common CA certificate keys
+	caCertKeys := []string{"ca.crt", "tls.crt", "ca-cert.pem"}
+	for _, key := range caCertKeys {
+		if caCert, exists := secret.Data[key]; exists && len(caCert) > 0 {
+			return string(caCert), nil
+		}
+	}
+
+	return "", fmt.Errorf("no CA certificate found in secret %s/%s (tried keys: %v)", namespace, secretName, caCertKeys)
 }
 
 // buildCSRParameters builds CSR parameters from BMC spec.
@@ -686,6 +768,6 @@ func (r *BMCReconciler) handleCertificateError(ctx context.Context, bmcObj *meta
 	// Continue with Insecure=true (graceful degradation)
 	log.V(1).Info("Certificate management failed, continuing with insecure connection")
 
-	// Requeue after 5 minutes to retry
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	// Requeue after configured interval to retry
+	return ctrl.Result{RequeueAfter: r.CertificateRetryInterval}, nil
 }

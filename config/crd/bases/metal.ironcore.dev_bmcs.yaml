@@ -146,6 +146,13 @@ spec:
                     description: IssuerRef is a reference to the cert-manager Issuer
                       or ClusterIssuer.
                     properties:
+                      group:
+                        default: cert-manager.io
+                        description: |-
+                          Group is the API group of the Issuer or ClusterIssuer.
+                          Defaults to cert-manager.io if not specified.
+                          This field allows referencing issuers from external cert-manager implementations.
+                        type: string
                       kind:
                         default: Issuer
                         description: Kind is the type of the issuer (Issuer or ClusterIssuer).

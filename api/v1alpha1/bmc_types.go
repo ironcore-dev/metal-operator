@@ -111,6 +111,13 @@ type CertificateIssuerRef struct {
 	// +kubebuilder:default=Issuer
 	// +optional
 	Kind string `json:"kind,omitempty"`
+
+	// Group is the API group of the Issuer or ClusterIssuer.
+	// Defaults to cert-manager.io if not specified.
+	// This field allows referencing issuers from external cert-manager implementations.
+	// +kubebuilder:default=cert-manager.io
+	// +optional
+	Group string `json:"group,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.

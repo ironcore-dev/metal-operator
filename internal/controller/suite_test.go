@@ -5,7 +5,13 @@ package controller
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net/netip"
 	"path/filepath"
 	"runtime"
@@ -387,4 +393,35 @@ func EnsureCleanState() {
 	for _, list := range objectLists {
 		Eventually(ObjectList(list)).Should(HaveField("Items", HaveLen(0)))
 	}
+}
+
+// generateTestCertificate creates a test X.509 certificate with specified validity duration.
+// This is a shared helper function used across unit and integration tests.
+func generateTestCertificate(validityDuration time.Duration, commonName string) []byte {
+	GinkgoHelper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).NotTo(HaveOccurred())
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(validityDuration),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	Expect(err).NotTo(HaveOccurred())
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certDER,
+	})
+
+	return certPEM
 }

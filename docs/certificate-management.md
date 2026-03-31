@@ -41,7 +41,7 @@ kubectl get pods -n cert-manager
 ```
 
 Expected output:
-```
+```text
 NAME                                       READY   STATUS    RESTARTS   AGE
 cert-manager-7d9f6d9d8c-xxxxx              1/1     Running   0          1m
 cert-manager-cainjector-5c7d9f5f5-xxxxx    1/1     Running   0          1m
@@ -541,10 +541,13 @@ To completely disable certificate management:
 
    Set `--enable-bmc-certificate-management=false` or remove the flag.
 
-3. **Optional: Clean up certificates:**
+3. **Optional: Clean up certificate requests:**
    ```bash
-   # Delete Certificate resources
-   kubectl delete certificate -l app.kubernetes.io/managed-by=metal-operator
+   # Delete CertificateRequest resources created by metal-operator
+   kubectl delete certificaterequest -l app.kubernetes.io/managed-by=metal-operator
+
+   # Or list and delete individual certificate requests referenced in BMC status
+   kubectl get bmc -o json | jq -r '.items[] | select(.status.certificateRequestName != null) | .status.certificateRequestName' | xargs -I {} kubectl delete certificaterequest {}
    ```
 
 ## Best Practices

@@ -8,10 +8,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"math/big"
 	"net"
 	"time"
 
@@ -276,7 +274,7 @@ var _ = Describe("BMC Certificate Management", func() {
 	Context("Certificate Validation", func() {
 		It("should validate certificate with valid expiry (> 30 days)", func() {
 			// Create a valid certificate that expires in 60 days
-			cert := createTestCertificate(60 * 24 * time.Hour)
+			cert := generateTestCertificate(60*24*time.Hour, "test-bmc.example.com")
 			secret := createCertificateSecret(cert)
 
 			// Create client with secret
@@ -296,7 +294,7 @@ var _ = Describe("BMC Certificate Management", func() {
 
 		It("should invalidate certificate expiring soon (< 30 days)", func() {
 			// Create certificate that expires in 20 days
-			cert := createTestCertificate(20 * 24 * time.Hour)
+			cert := generateTestCertificate(20*24*time.Hour, "test-bmc.example.com")
 			secret := createCertificateSecret(cert)
 
 			k8sClient = fake.NewClientBuilder().
@@ -315,7 +313,7 @@ var _ = Describe("BMC Certificate Management", func() {
 
 		It("should invalidate expired certificate", func() {
 			// Create certificate that expired 10 days ago
-			cert := createTestCertificate(-10 * 24 * time.Hour)
+			cert := generateTestCertificate(-10*24*time.Hour, "test-bmc.example.com")
 			secret := createCertificateSecret(cert)
 
 			k8sClient = fake.NewClientBuilder().
@@ -550,7 +548,7 @@ var _ = Describe("BMC Certificate Management", func() {
 
 		It("should skip provisioning when valid certificate exists", func() {
 			// Create a valid certificate that expires in 60 days
-			cert := createTestCertificate(60 * 24 * time.Hour)
+			cert := generateTestCertificate(60*24*time.Hour, "test-bmc.example.com")
 			secret := createCertificateSecret(cert)
 
 			bmcObj.Status.CertificateSecretRef = &corev1.LocalObjectReference{Name: "test-secret"}
@@ -569,7 +567,7 @@ var _ = Describe("BMC Certificate Management", func() {
 
 		It("should renew certificate when it expires soon", func() {
 			// Create certificate that expires in 20 days
-			cert := createTestCertificate(20 * 24 * time.Hour)
+			cert := generateTestCertificate(20*24*time.Hour, "test-bmc.example.com")
 			secret := createCertificateSecret(cert)
 
 			bmcObj.Status.CertificateSecretRef = &corev1.LocalObjectReference{Name: "test-secret"}
@@ -635,34 +633,6 @@ var _ = Describe("BMC Certificate Management", func() {
 })
 
 // Helper functions
-
-// createTestCertificate creates a test certificate with specified validity duration
-func createTestCertificate(validityDuration time.Duration) []byte {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	Expect(err).NotTo(HaveOccurred())
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "test-bmc.example.com",
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(validityDuration),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
-	Expect(err).NotTo(HaveOccurred())
-
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certDER,
-	})
-
-	return certPEM
-}
 
 // createCertificateSecret creates a Kubernetes secret with the given certificate
 func createCertificateSecret(certPEM []byte) *corev1.Secret {

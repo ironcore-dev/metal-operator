@@ -4,12 +4,8 @@
 package controller
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
-	"math/big"
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
@@ -700,31 +696,3 @@ var _ = Describe("BMC Certificate Integration", func() {
 })
 
 // Helper functions
-
-// generateTestCertificate creates a test X.509 certificate with specified validity duration.
-func generateTestCertificate(validityDuration time.Duration, commonName string) []byte {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	Expect(err).NotTo(HaveOccurred())
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: commonName,
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(validityDuration),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
-	Expect(err).NotTo(HaveOccurred())
-
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certDER,
-	})
-
-	return certPEM
-}

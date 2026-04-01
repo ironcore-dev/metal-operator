@@ -12,7 +12,7 @@ go install https://github.com/ironcore-dev/metal-operator/cmd/metalctl@latest
 
 ### visualizer, vis
 
-The `metalctl visualalizer` (or `metalctl vis`) command allows you to visualize the topology of your bare metal `Server`s.
+The `metalctl visualizer` (or `metalctl viz`) command allows you to visualize the topology of your bare metal `Server`s.
 
 To run the visualizer run
 
@@ -23,6 +23,60 @@ metalctl visualizer --kubeconfig="path-to-kubeconfig.yaml"
 In order to access the 3D visualization, open your browser and navigate to `http://localhost:8080`.
 
 You can configure the port by setting the `--port` flag.
+
+#### Visualizer with Enrichment Data
+
+When `ServerMetadata` resources contain enrichment data (populated by external controllers), the visualizer
+automatically displays additional information. Enrichment is optional — servers without it are displayed
+normally with only their base topology data.
+
+**Location drill-down**: Use the Site, Building, and Room dropdowns in the top-right filter panel to
+narrow the 3D view to a specific datacenter location. For example, select `DC1 > Building-A > Room-101`
+to see only the servers in that room. Servers without location enrichment are always visible regardless
+of the selected filters.
+
+**Hardware details panel**: Click any server in the 3D view to open a side panel with detailed information:
+- System info: manufacturer, model, serial number, UUID
+- BIOS: vendor and version
+- CPU: model, total sockets, cores, and threads
+- Memory: total capacity and module count
+- Storage: total capacity and device count
+- Network: interface count, upstream switch and port (from enrichment)
+- Location: full hierarchy path (site, building, room, rack, position)
+- Asset info: asset tag, owner, purchase date
+- External system: link back to the source system (e.g., Netbox device page)
+
+**Enhanced tooltips**: Hover over any server to see a compact summary including hardware specs
+(CPU model, memory, storage), the location breadcrumb (e.g., `DC1 > Building-A > Room-101`),
+upstream network connectivity, and asset tag.
+
+**Custom enrichment keys**: Any additional keys written to `ServerMetadata.Enrichment` beyond the
+well-known keys are displayed in the details panel under a raw key-value listing. This allows
+custom metadata to be visible without any visualizer changes.
+
+Enrichment data is read from the `ServerMetadata.Enrichment` field using well-known keys defined in
+`api/v1alpha1/constants.go`. See the [Server Enrichment](../concepts/server-enrichment.md) documentation
+for details on populating enrichment data and building enrichment controllers.
+
+**Example**: To test with manual enrichment data:
+
+```bash
+kubectl patch servermetadata my-server --type=merge -p '{
+  "enrichment": {
+    "datacenter.location/site": "DC1",
+    "datacenter.location/building": "Building-A",
+    "datacenter.location/room": "Room-101",
+    "datacenter.location/rack": "Rack-5",
+    "datacenter.location/position": "U12",
+    "network.topology/upstream-switch": "sw-tor-01",
+    "network.topology/upstream-port": "Ethernet1/1",
+    "asset.management/asset-tag": "ASSET-12345"
+  }
+}'
+```
+
+After patching, refresh the visualizer at `http://localhost:8080`. The patched server should now
+show location filters, enriched tooltips, and a full hardware details panel when clicked.
 
 ### console
 

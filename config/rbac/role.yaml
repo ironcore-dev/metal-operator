@@ -56,6 +56,7 @@ rules:
   - serverclaims
   - serverconfigurations
   - servermaintenances
+  - servermetadata
   - servers
   verbs:
   - create
@@ -83,6 +84,7 @@ rules:
   - serverbootconfigurations/finalizers
   - serverclaims/finalizers
   - servermaintenances/finalizers
+  - servermetadata/finalizers
   - servers/finalizers
   verbs:
   - update
@@ -104,6 +106,7 @@ rules:
   - serverbootconfigurations/status
   - serverclaims/status
   - servermaintenances/status
+  - servermetadata/status
   - servers/status
   verbs:
   - get

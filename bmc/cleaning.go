@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package oem
+package bmc
 
 import (
 	"context"
@@ -24,20 +24,6 @@ type CleaningInterface interface {
 	// ClearNetworkConfig clears network configuration
 	ClearNetworkConfig(ctx context.Context, systemURI string) error
 }
-
-// DiskWipeMethod defines the disk wiping method
-type DiskWipeMethod string
-
-const (
-	// DiskWipeMethodQuick performs a quick wipe (single pass with zeros)
-	DiskWipeMethodQuick DiskWipeMethod = "quick"
-
-	// DiskWipeMethodSecure performs a secure wipe (3 passes)
-	DiskWipeMethodSecure DiskWipeMethod = "secure"
-
-	// DiskWipeMethodDoD performs DoD 5220.22-M standard wipe (7 passes)
-	DiskWipeMethodDoD DiskWipeMethod = "dod"
-)
 
 // HTTPClient interface for making HTTP requests
 type HTTPClient interface {

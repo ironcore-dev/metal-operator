@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package oem
+package bmc
 
 import (
 	"context"
@@ -61,19 +61,6 @@ func (h *HPECleaning) EraseDisk(ctx context.Context, storages []*schemas.Storage
 	}
 
 	return nil
-}
-
-func getHPEWipeType(method DiskWipeMethod) string {
-	switch method {
-	case DiskWipeMethodQuick:
-		return "BlockErase"
-	case DiskWipeMethodSecure:
-		return "Overwrite"
-	case DiskWipeMethodDoD:
-		return "CryptographicErase"
-	default:
-		return "BlockErase"
-	}
 }
 
 // ResetBIOS resets BIOS configuration to factory defaults for HPE servers

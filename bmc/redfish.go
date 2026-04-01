@@ -876,13 +876,18 @@ func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string
 
 // GetTaskStatus retrieves the status of a task by its URI.
 func (r *RedfishBaseBMC) GetTaskStatus(ctx context.Context, taskURI string) (*schemas.Task, error) {
+	log := ctrl.LoggerFrom(ctx)
 	client := r.client.GetService().GetClient()
 
 	resp, err := client.Get(taskURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Error(closeErr, "Failed to close response body")
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %d when getting task status", resp.StatusCode)

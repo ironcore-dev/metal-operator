@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package oem
+package bmc
 
 import (
 	"context"
@@ -61,19 +61,6 @@ func (l *LenovoCleaning) EraseDisk(ctx context.Context, storages []*schemas.Stor
 	}
 
 	return nil
-}
-
-func getLenovoWipeMethod(method DiskWipeMethod) string {
-	switch method {
-	case DiskWipeMethodQuick:
-		return "Simple"
-	case DiskWipeMethodSecure:
-		return "Cryptographic"
-	case DiskWipeMethodDoD:
-		return "Sanitize"
-	default:
-		return "Simple"
-	}
 }
 
 // ResetBIOS resets BIOS configuration to factory defaults for Lenovo servers

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package oem
+package bmc
 
 import (
 	"context"
@@ -62,19 +62,6 @@ func (d *DellCleaning) EraseDisk(ctx context.Context, storages []*schemas.Storag
 	}
 
 	return nil
-}
-
-func getDellWipePasses(method DiskWipeMethod) int {
-	switch method {
-	case DiskWipeMethodQuick:
-		return 1
-	case DiskWipeMethodSecure:
-		return 3
-	case DiskWipeMethodDoD:
-		return 7
-	default:
-		return 1
-	}
 }
 
 // ResetBIOS resets BIOS configuration to factory defaults for Dell servers

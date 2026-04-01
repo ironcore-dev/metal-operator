@@ -261,7 +261,7 @@ var _ = Describe("ServerCleaning Controller", func() {
 			bmcObj := &metalv1alpha1.BMC{}
 			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmcObj)).To(Succeed())
 			// Should have at least one task from the cleaning operations
-			g.Expect(len(bmcObj.Status.Tasks)).To(BeNumerically(">", 0))
+			g.Expect(bmcObj.Status.Tasks).ToNot(BeEmpty())
 		}).WithTimeout(2 * time.Minute).Should(Succeed())
 
 		// Cleanup

@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -449,13 +450,10 @@ func (r *ServerCleaningReconciler) mapBMCToServerCleaning(ctx context.Context, o
 
 		// Check if this cleaning is working on any of the affected servers
 		if cleaning.Spec.ServerRef != nil {
-			for _, serverName := range affectedServers {
-				if cleaning.Spec.ServerRef.Name == serverName {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: client.ObjectKeyFromObject(&cleaning),
-					})
-					break
-				}
+			if slices.Contains(affectedServers, cleaning.Spec.ServerRef.Name) {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: client.ObjectKeyFromObject(&cleaning),
+				})
 			}
 		}
 	}
@@ -564,7 +562,7 @@ func (r *ServerCleaningReconciler) updateCleaningCounts(ctx context.Context, cle
 }
 
 // addTaskToBMC adds a BMCTask to the specified BMC's status
-func (r *ServerCleaningReconciler) addTaskToBMC(ctx context.Context, bmcName, namespace string, task metalv1alpha1.BMCTask) error {
+func (r *ServerCleaningReconciler) addTaskToBMC(ctx context.Context, bmcName string, task metalv1alpha1.BMCTask) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Get the BMC resource
@@ -591,7 +589,7 @@ func (r *ServerCleaningReconciler) addTaskToBMC(ctx context.Context, bmcName, na
 }
 
 // getTasksForServer retrieves tasks from BMC.Status.Tasks for a specific server's cleaning operation
-func (r *ServerCleaningReconciler) getTasksForServer(ctx context.Context, server *metalv1alpha1.Server, cleaningName string) ([]metalv1alpha1.BMCTask, error) {
+func (r *ServerCleaningReconciler) getTasksForServer(ctx context.Context, server *metalv1alpha1.Server, _ string) ([]metalv1alpha1.BMCTask, error) {
 	// Get the BMC for this server
 	if server.Spec.BMCRef == nil {
 		return nil, fmt.Errorf("server %s has no BMCRef", server.Name)
@@ -691,7 +689,7 @@ func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, clea
 				PercentComplete: 0,
 				LastUpdateTime:  metav1.Now(),
 			}
-			if err := r.addTaskToBMC(ctx, bmcName, server.Namespace, bmcTask); err != nil {
+			if err := r.addTaskToBMC(ctx, bmcName, bmcTask); err != nil {
 				return fmt.Errorf("failed to add disk erase task to BMC: %w", err)
 			}
 			taskCount++
@@ -715,7 +713,7 @@ func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, clea
 				PercentComplete: 0,
 				LastUpdateTime:  metav1.Now(),
 			}
-			if err := r.addTaskToBMC(ctx, bmcName, server.Namespace, bmcTask); err != nil {
+			if err := r.addTaskToBMC(ctx, bmcName, bmcTask); err != nil {
 				return fmt.Errorf("failed to add BIOS reset task to BMC: %w", err)
 			}
 			taskCount++
@@ -748,7 +746,7 @@ func (r *ServerCleaningReconciler) initiateBMCCleaning(ctx context.Context, clea
 				PercentComplete: 0,
 				LastUpdateTime:  metav1.Now(),
 			}
-			if err := r.addTaskToBMC(ctx, bmcName, server.Namespace, bmcTask); err != nil {
+			if err := r.addTaskToBMC(ctx, bmcName, bmcTask); err != nil {
 				log.Error(err, "Failed to add network clear task to BMC (non-critical)", "server", server.Name)
 			} else {
 				taskCount++

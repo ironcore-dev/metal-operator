@@ -357,7 +357,7 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 	if err != nil {
 		return false, fmt.Errorf("failed to get BMC address: %w", err)
 	}
-	_, err = bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions, r.SkipCertValidation)
+	bmcClient, err := bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions, r.SkipCertValidation)
 	if err != nil {
 		var httpErr *schemas.Error
 		if errors.As(err, &httpErr) {
@@ -367,6 +367,7 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 		}
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
+	defer bmcClient.Logout()
 	return false, nil
 }
 

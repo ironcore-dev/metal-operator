@@ -160,6 +160,12 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		accessor := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 
 		// register reconciler here
+		// NOTE: The test suite uses HTTP protocol with SkipCertValidation=true because
+		// the mock Redfish server only supports HTTP (no TLS). Full HTTPS + certificate
+		// verification testing should be performed in E2E tests against real BMC hardware
+		// or production-like environments with valid TLS certificates.
+		// TODO: Consider adding HTTPS support to the mock server for more comprehensive
+		// unit test coverage of the TLS certificate validation path.
 		Expect((&EndpointReconciler{
 			Client:             k8sManager.GetClient(),
 			Scheme:             k8sManager.GetScheme(),

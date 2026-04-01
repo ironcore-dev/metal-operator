@@ -88,7 +88,41 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+		// Read error response body
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+		}
+
+		// Parse Redfish error response
+		var redfishError struct {
+			Error struct {
+				MessageExtendedInfo []struct {
+					MessageID string `json:"MessageId"`
+					Message   string `json:"Message"`
+				} `json:"@Message.ExtendedInfo"`
+			} `json:"error"`
+		}
+
+		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
+			// Check if it's a "resource already exists" error
+			for _, info := range redfishError.Error.MessageExtendedInfo {
+				if strings.Contains(info.MessageID, "ResourceAlreadyExists") ||
+					strings.Contains(info.MessageID, "PropertyValueModified") {
+					// Handle duplicate subscription - try to find existing one
+					if existingLink, findErr := r.findExistingSubscription(destination, eventFormatType); findErr == nil {
+						// Successfully found existing subscription
+						return existingLink, nil
+					}
+					// Failed to find existing subscription - fall through to return original error
+					// This preserves the detailed Redfish error message for troubleshooting
+					break
+				}
+			}
+		}
+
+		// Not a duplicate error - return original error with details
+		return "", fmt.Errorf("failed to create event subscription status code: %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	// return subscription link from returned location

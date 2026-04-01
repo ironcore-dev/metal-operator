@@ -291,7 +291,14 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 			errs = append(errs, fmt.Errorf("failed to create or patch server %s: %w", server.Name, err))
 			continue
 		}
-		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
+		switch opResult {
+		case controllerutil.OperationResultCreated:
+			log.V(1).Info("Created Server", "Server", server.Name)
+		case controllerutil.OperationResultUpdated:
+			log.V(1).Info("Updated Server", "Server", server.Name)
+		default:
+			log.V(1).Info("Server already up to date", "Server", server.Name)
+		}
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("errors occurred during server discovery: %v", errs)

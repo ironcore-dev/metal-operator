@@ -220,11 +220,18 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, version *me
 		if shouldRetryReconciliation(version) {
 			log.V(1).Info("Retrying BIOSVersion reconciliation")
 			versionBase := version.DeepCopy()
-			version.Status.State = metalv1alpha1.BIOSVersionStatePending
-			version.Status.Conditions = []metav1.Condition{}
+
 			annotations := version.GetAnnotations()
 			delete(annotations, metalv1alpha1.OperationAnnotation)
 			version.SetAnnotations(annotations)
+
+			if err := r.Patch(ctx, version, client.MergeFrom(versionBase)); err != nil {
+				return true, fmt.Errorf("failed to patch BIOSVersion metadata for retrying: %w", err)
+			}
+
+			versionBase = version.DeepCopy()
+			version.Status.State = metalv1alpha1.BIOSVersionStatePending
+			version.Status.Conditions = []metav1.Condition{}
 
 			if err := r.Status().Patch(ctx, version, client.MergeFrom(versionBase)); err != nil {
 				return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)

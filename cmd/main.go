@@ -428,6 +428,7 @@ func main() { // nolint: gocyclo
 	}
 	if err = (&controller.ServerClaimReconciler{
 		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
 		Cache:                   mgr.GetCache(),
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,

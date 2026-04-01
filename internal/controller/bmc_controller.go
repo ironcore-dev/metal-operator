@@ -145,6 +145,11 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 		return result, err
 	}
 
+	// Re-fetch BMC after certificate reconciliation to get latest status
+	if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Name}, bmcObj); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
 	if r.waitForBMCReset(bmcObj, r.BMCResetWaitTime) {
 		log.V(1).Info("Skipped BMC reconciliation while waiting for BMC reset to complete")
 		err := r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)

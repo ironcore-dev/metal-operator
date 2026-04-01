@@ -147,8 +147,8 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 	// the Server should be deleted (handles cascade deletion via OwnerReference)
 	if server.DeletionTimestamp.IsZero() {
 		if server.Spec.BMCRef != nil {
-			bmc := &metalv1alpha1.BMC{}
-			if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmc); err != nil {
+			bmcObj := &metalv1alpha1.BMC{}
+			if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmcObj); err != nil {
 				if apierrors.IsNotFound(err) {
 					log.V(1).Info("BMC not found, Server should be deleted", "BMC", server.Spec.BMCRef.Name, "Server", server.Name)
 					return true
@@ -161,9 +161,23 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 	}
 
 	// Server has DeletionTimestamp, check if we should postpone deletion
+	// Only postpone if Server is in Maintenance state AND the BMC is still reachable
 	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
 		server.Status.State == metalv1alpha1.ServerStateMaintenance {
-		log.V(1).Info("Postponing delete as server is in Maintenance state")
+		// Check if BMC still exists before postponing deletion
+		if server.Spec.BMCRef != nil {
+			bmcObj := &metalv1alpha1.BMC{}
+			if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmcObj); err != nil {
+				if apierrors.IsNotFound(err) {
+					log.V(1).Info("BMC not found, proceeding with deletion despite Maintenance state", "BMC", server.Spec.BMCRef.Name)
+					return true
+				}
+				// On API errors, log but don't postpone indefinitely
+				log.Error(err, "Failed to check BMC existence during deletion, proceeding", "BMC", server.Spec.BMCRef.Name)
+				return true
+			}
+		}
+		log.V(1).Info("Postponing delete as server is in Maintenance state and BMC is reachable")
 		return false
 	}
 	return true
@@ -171,21 +185,22 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 
 func (r *ServerReconciler) delete(ctx context.Context, server *metalv1alpha1.Server) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	if !controllerutil.ContainsFinalizer(server, ServerFinalizer) {
-		return ctrl.Result{}, nil
-	}
-
-	log.V(1).Info("Deleting server")
 
 	// If Server doesn't have DeletionTimestamp yet, initiate deletion first
 	if server.DeletionTimestamp.IsZero() {
 		log.V(1).Info("Server not marked for deletion yet, initiating deletion")
-		if err := r.Client.Delete(ctx, server); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.Delete(ctx, server); err != nil && !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("failed to delete Server: %w", err)
 		}
 		// Requeue to allow the deletion to be processed and for us to clean up resources
 		return ctrl.Result{Requeue: true}, nil
 	}
+
+	if !controllerutil.ContainsFinalizer(server, ServerFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
+	log.V(1).Info("Deleting Server")
 
 	if server.Spec.BootConfigurationRef != nil {
 		if err := r.Delete(ctx, &metalv1alpha1.ServerBootConfiguration{

@@ -388,7 +388,10 @@ var _ = Describe("BMC Certificate Integration", func() {
 		})
 	})
 
-	Context("Graceful Degradation", func() {
+	Context("Graceful Degradation", Pending, func() {
+		// TODO: This test requires cert-manager controller to run, which is not available in envtest.
+		// The test expects CertificateRequest to be marked as Failed by cert-manager when referencing
+		// a non-existent issuer, but without cert-manager controller it stays Pending forever.
 		It("should continue reconciliation when certificate management fails", func(ctx SpecContext) {
 			By("Creating a BMCSecret")
 			bmcSecret := &metalv1alpha1.BMCSecret{

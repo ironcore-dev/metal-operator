@@ -39,12 +39,12 @@ var _ = Describe("BMC Certificate Management", Ordered, func() {
 		}
 		Eventually(verifyCertManagerReady, 2*time.Minute, 5*time.Second).Should(Succeed())
 
-		By("creating self-signed ClusterIssuer for testing")
-		cmd := exec.Command("kubectl", "apply", "-f", selfSignedIssuerFile)
+		By("creating self-signed Issuer for testing")
+		cmd := exec.Command("kubectl", "apply", "-f", selfSignedIssuerFile, "-n", bmcTestNamespace)
 		_, err := utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to create self-signed issuer")
 
-		By("waiting for ClusterIssuer to be ready")
+		By("waiting for Issuer to be ready")
 		verifyIssuerReady := func(g Gomega) {
 			cmd := exec.Command("kubectl", "get", "issuer", "selfsigned-issuer", "-n", bmcTestNamespace,
 				"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
@@ -66,7 +66,7 @@ var _ = Describe("BMC Certificate Management", Ordered, func() {
 		_, _ = utils.Run(cmd)
 
 		By("cleaning up self-signed issuer")
-		cmd = exec.Command("kubectl", "delete", "-f", selfSignedIssuerFile, "--ignore-not-found=true")
+		cmd = exec.Command("kubectl", "delete", "-f", selfSignedIssuerFile, "-n", bmcTestNamespace, "--ignore-not-found=true")
 		_, _ = utils.Run(cmd)
 
 		By("cleaning up BMC secret")
@@ -111,7 +111,7 @@ var _ = Describe("BMC Certificate Management", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(Equal("selfsigned-issuer"))
 			}
-			Eventually(verifyCertificateIssuer, certificatePolling, certificatePolling).Should(Succeed())
+			Eventually(verifyCertificateIssuer, certificateTimeout, certificatePolling).Should(Succeed())
 		})
 
 		It("should provision the certificate via cert-manager", func() {
@@ -135,7 +135,7 @@ var _ = Describe("BMC Certificate Management", Ordered, func() {
 				_, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred(), "Certificate Secret should exist")
 			}
-			Eventually(verifySecretExists, certificatePolling, certificatePolling).Should(Succeed())
+			Eventually(verifySecretExists, certificateTimeout, certificatePolling).Should(Succeed())
 		})
 
 		It("should update BMC status with certificate information", func() {
@@ -154,12 +154,12 @@ var _ = Describe("BMC Certificate Management", Ordered, func() {
 			verifyCertificateRef := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "bmc", bmcWithCertName,
 					"-n", bmcTestNamespace,
-					"-o", "jsonpath={.status.certificateRef.name}")
+					"-o", "jsonpath={.status.certificateSecretRef.name}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(Equal(fmt.Sprintf("%s-cert", bmcWithCertName)))
 			}
-			Eventually(verifyCertificateRef, certificatePolling, certificatePolling).Should(Succeed())
+			Eventually(verifyCertificateRef, certificateTimeout, certificatePolling).Should(Succeed())
 		})
 
 		It("should have certificate Secret with expected keys", func() {
@@ -295,12 +295,15 @@ spec:
 `, invalidBMCName, bmcTestNamespace)
 
 			// Write YAML to temp file and apply
-			tmpFile := "/tmp/bmc-invalid-issuer.yaml"
-			err := os.WriteFile(tmpFile, []byte(invalidBMCYAML), 0644)
+			tmpFile, err := os.CreateTemp("", "bmc-invalid-issuer-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			defer func() { _ = os.Remove(tmpFile) }()
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
-			cmd := exec.Command("kubectl", "apply", "-f", tmpFile)
+			_, err = tmpFile.Write([]byte(invalidBMCYAML))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tmpFile.Close()).To(Succeed())
+
+			cmd := exec.Command("kubectl", "apply", "-f", tmpFile.Name())
 			_, err = utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred(), "BMC should be created even with invalid issuer")
 
@@ -409,7 +412,7 @@ spec:
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(Equal("BMC"))
 			}
-			Eventually(verifyCertificateOwner, certificatePolling, certificatePolling).Should(Succeed())
+			Eventually(verifyCertificateOwner, certificateTimeout, certificatePolling).Should(Succeed())
 
 			By("verifying owner reference points to correct BMC")
 			cmd := exec.Command("kubectl", "get", "certificate",

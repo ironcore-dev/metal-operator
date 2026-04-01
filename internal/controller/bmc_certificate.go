@@ -86,11 +86,22 @@ func (r *BMCReconciler) reconcileCertificate(ctx context.Context, bmcObj *metalv
 			log.V(1).Info("CertificateRequest is ready, installing certificate")
 			return r.installAndStoreCertificate(ctx, bmcObj, certReq)
 		} else if r.isCertificateRequestFailed(certReq) {
-			// Request failed, create new one
-			log.V(1).Info("CertificateRequest failed, creating new one")
-			if err := r.Delete(ctx, certReq); err != nil {
-				log.Error(err, "Failed to delete failed CertificateRequest")
+			// Request failed, set condition and delete for recreation
+			log.V(1).Info("CertificateRequest failed, setting condition and deleting for recreation")
+
+			// Set Failed condition before deletion
+			if err := r.setCertificateCondition(ctx, bmcObj, corev1.ConditionFalse,
+				metalv1alpha1.BMCCertificateReadyReasonFailed, "Certificate request failed"); err != nil {
+				return ctrl.Result{}, err
 			}
+
+			// Delete the failed request
+			if err := r.Delete(ctx, certReq); err != nil && !apierrors.IsNotFound(err) {
+				log.Error(err, "Failed to delete failed CertificateRequest")
+				return ctrl.Result{Requeue: true}, err
+			}
+			// Return to allow deletion to complete before creating new request
+			return ctrl.Result{Requeue: true}, nil
 		} else {
 			// Request is still pending
 			log.V(1).Info("CertificateRequest is pending")
@@ -199,10 +210,12 @@ func (r *BMCReconciler) generateOperatorCSR(ctx context.Context, bmcObj *metalv1
 	// Add IP addresses
 	ipAddresses, err := r.getCertificateIPAddresses(ctx, bmcObj)
 	if err != nil {
+		// Log error but don't fail - certificate can still be valid without IP SANs
+		// This is especially important if status.IP hasn't been populated yet
 		log.Error(err, "Failed to parse IP addresses, continuing without them")
-	} else {
-		template.IPAddresses = ipAddresses
+		ipAddresses = []net.IP{}
 	}
+	template.IPAddresses = ipAddresses
 
 	// Create CSR
 	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, privateKey)
@@ -398,8 +411,16 @@ func (r *BMCReconciler) storeCertificateSecret(ctx context.Context, bmcObj *meta
 				"metal.ironcore.dev/bmc":       bmcObj.Name,
 			},
 		},
-		Type: corev1.SecretTypeTLS,
 		Data: map[string][]byte{},
+	}
+
+	// Set secret type based on whether we have a private key
+	// SecretTypeTLS requires both tls.crt and tls.key
+	// Use SecretTypeOpaque when privateKey is unavailable (BMC-generated CSR case)
+	if privateKeyPEM != "" {
+		secret.Type = corev1.SecretTypeTLS
+	} else {
+		secret.Type = corev1.SecretTypeOpaque
 	}
 
 	// Add certificate

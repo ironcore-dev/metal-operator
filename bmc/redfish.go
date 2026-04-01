@@ -1162,10 +1162,10 @@ func (r *RedfishBaseBMC) ReplaceCertificate(ctx context.Context, certificate, pr
 
 	// For now, use the first certificate URI if available
 	// TODO: Make certificate URI selection more configurable
-	var certURI string
-	if len(certificates) > 0 {
-		certURI = certificates[0].ODataID
+	if len(certificates) == 0 {
+		return fmt.Errorf("no certificate URI available for replacement")
 	}
+	certURI := certificates[0].ODataID
 
 	// Build ReplaceCertificate action payload
 	replaceParams := &schemas.CertificateServiceReplaceCertificateParameters{

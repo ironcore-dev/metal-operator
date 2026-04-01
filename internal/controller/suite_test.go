@@ -184,6 +184,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 
 		Expect((&ServerReconciler{
 			Client:                  k8sManager.GetClient(),
+			APIReader:               k8sManager.GetAPIReader(),
 			Scheme:                  k8sManager.GetScheme(),
 			Insecure:                true,
 			ManagerNamespace:        ns.Name,

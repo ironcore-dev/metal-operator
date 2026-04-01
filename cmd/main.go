@@ -392,6 +392,7 @@ func main() { // nolint: gocyclo
 	}
 	if err = (&controller.ServerReconciler{
 		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
 		Scheme:                  mgr.GetScheme(),
 		Insecure:                insecure,
 		ManagerNamespace:        managerNamespace,

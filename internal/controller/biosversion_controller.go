@@ -558,6 +558,10 @@ func (r *BIOSVersionReconciler) cleanup(ctx context.Context, bmcClient bmc.BMC, 
 		return err
 	}
 
+	// Clear stale conditions from previous reconciliation cycles so they do not
+	// interfere when the resource is re-reconciled after a spec update.
+	version.Status.Conditions = nil
+
 	if currentVersion == version.Spec.Version {
 		if err := r.cleanupServerMaintenanceReferences(ctx, version); err != nil {
 			return err

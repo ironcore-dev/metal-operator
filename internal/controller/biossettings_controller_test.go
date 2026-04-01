@@ -38,7 +38,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
@@ -51,7 +50,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
@@ -97,7 +95,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting V1")
 		biosSettingsV1 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-reference",
 			},
 			// settings mocked at
@@ -137,7 +134,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettingsV1)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionVerifySettings),
+					HaveField("Type", ConditionSettingsVerified),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -146,7 +143,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting V2")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -200,7 +196,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -237,7 +232,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionVerifySettings),
+					HaveField("Type", ConditionSettingsVerified),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -264,7 +259,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -290,9 +284,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.FlowState", ContainElement(SatisfyAll(
 				HaveField("Conditions", ContainElement(SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
-					HaveField("Reason", BIOSSettingsReasonRebootNeeded),
-					HaveField("Status", metav1.ConditionFalse)),
+					HaveField("Type", ConditionRebootRequired),
+					HaveField("Reason", ReasonRebootRequired),
+					HaveField("Status", metav1.ConditionTrue)),
 				)),
 				HaveField("Name", "one"),
 			))),
@@ -359,7 +353,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -508,7 +501,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -617,7 +609,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -736,7 +727,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSettings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-upgrade-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -828,7 +818,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -883,7 +872,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-from-server-avail-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -947,7 +935,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		biosSettings2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-from-server-recreated-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -1001,7 +988,6 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	BeforeEach(func(ctx SpecContext) {
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
 			},
 			Data: map[string][]byte{
@@ -1013,7 +999,6 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		bmcObj = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -1098,7 +1083,6 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -1263,7 +1247,6 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-pending-changes",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
@@ -1340,7 +1323,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
@@ -1353,7 +1335,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
@@ -1390,7 +1371,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
@@ -1436,7 +1416,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
@@ -1470,8 +1449,8 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 					SatisfyAll(
 						HaveField("Conditions", ContainElement(
 							SatisfyAll(
-								HaveField("Type", BIOSSettingsConditionWrongSettings),
-								HaveField("Reason", BIOSSettingsReasonWrongSettings),
+								HaveField("Type", ConditionSettingsInvalid),
+								HaveField("Reason", ReasonInvalidSettings),
 							),
 						)),
 						HaveField("Name", "100"),
@@ -1500,7 +1479,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
@@ -1541,7 +1519,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionDuplicateKey),
+					HaveField("Type", ConditionDuplicateKeys),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1549,7 +1527,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 
 		biosSettings2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
@@ -1590,7 +1567,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Eventually(Object(biosSettings2)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionDuplicateKey),
+					HaveField("Type", ConditionDuplicateKeys),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1609,7 +1586,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a BIOSSetting sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-differnet-",
 			},
 			// settings mocked at
@@ -1679,7 +1655,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
@@ -1715,7 +1690,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 				HaveField("Status.FlowState", Not(ContainElement(
 					SatisfyAll(
 						HaveField("Conditions", ContainElement(
-							HaveField("Type", BIOSSettingsConditionIssuedUpdate),
+							HaveField("Type", ConditionSettingsUpdateIssued),
 						)),
 						HaveField("Name", oldNames[1]),
 					),
@@ -1779,7 +1754,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	By("Ensuring the wait for version upgrade condition has NOT been added")
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", Not(ContainElement(
-			HaveField("Type", BIOSVersionUpdateConditionPending),
+			HaveField("Type", ConditionBIOSVersionUpgrade),
 		))),
 	)
 
@@ -1800,28 +1775,28 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 		flowStateMatcher := SatisfyAll(
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingConditionUpdateStartTime),
+					HaveField("Type", ConditionUpdateStarted),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionServerPowerOn),
+					HaveField("Type", ConditionServerPowerOn),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
 			HaveField("Conditions", ContainElement(
-				HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
+				HaveField("Type", ConditionRebootRequired),
 			)),
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionIssuedUpdate),
+					HaveField("Type", ConditionSettingsUpdateIssued),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionVerifySettings),
+					HaveField("Type", ConditionSettingsVerified),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1877,7 +1852,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSVersionUpdateConditionPending),
+					HaveField("Type", ConditionBIOSVersionUpgrade),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1886,7 +1861,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		By("Ensuring the wait for version upgrade condition has NOT been added")
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.Conditions", Not(ContainElement(
-				HaveField("Type", BIOSVersionUpdateConditionPending),
+				HaveField("Type", ConditionBIOSVersionUpgrade),
 			))),
 		)
 	}
@@ -1906,7 +1881,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		HaveField("Status.FlowState", ContainElement(
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingConditionUpdateStartTime),
+					HaveField("Type", ConditionUpdateStarted),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1918,7 +1893,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		HaveField("Status.FlowState", ContainElement(
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", BIOSSettingsConditionServerPowerOn),
+					HaveField("Type", ConditionServerPowerOn),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1932,12 +1907,12 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 				HaveField("Conditions", SatisfyAll(
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
-							HaveField("Status", metav1.ConditionTrue),
+							HaveField("Type", ConditionRebootRequired),
+							HaveField("Status", metav1.ConditionFalse),
 						),
 					),
-					Not(ContainElement(HaveField("Type", BIOSSettingsConditionRebootPowerOff))),
-					Not(ContainElement(HaveField("Type", BIOSSettingsConditionRebootPowerOn))),
+					Not(ContainElement(HaveField("Type", ConditionRebootPowerOff))),
+					Not(ContainElement(HaveField("Type", ConditionRebootPowerOn))),
 				)),
 			)),
 		)
@@ -1948,19 +1923,19 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 				HaveField("Conditions", SatisfyAll(
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", BIOSSettingsConditionRebootPostUpdate),
-							HaveField("Status", metav1.ConditionFalse),
-						),
-					),
-					ContainElement(
-						SatisfyAll(
-							HaveField("Type", BIOSSettingsConditionRebootPowerOff),
+							HaveField("Type", ConditionRebootRequired),
 							HaveField("Status", metav1.ConditionTrue),
 						),
 					),
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", BIOSSettingsConditionRebootPowerOn),
+							HaveField("Type", ConditionRebootPowerOff),
+							HaveField("Status", metav1.ConditionTrue),
+						),
+					),
+					ContainElement(
+						SatisfyAll(
+							HaveField("Type", ConditionRebootPowerOn),
 							HaveField("Status", metav1.ConditionTrue),
 						),
 					),
@@ -1974,7 +1949,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		HaveField("Status.FlowState", ContainElements(
 			SatisfyAll(
 				HaveField("Conditions", ContainElements(
-					HaveField("Type", BIOSSettingsConditionIssuedUpdate),
+					HaveField("Type", ConditionSettingsUpdateIssued),
 					HaveField("Status", metav1.ConditionTrue),
 				)),
 			),
@@ -1986,7 +1961,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		HaveField("Status.FlowState", ContainElements(
 			SatisfyAll(
 				HaveField("Conditions", ContainElements(
-					HaveField("Type", BIOSSettingsConditionVerifySettings),
+					HaveField("Type", ConditionSettingsVerified),
 					HaveField("Status", metav1.ConditionTrue),
 				)),
 			),

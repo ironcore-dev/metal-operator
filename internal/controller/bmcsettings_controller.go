@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -622,47 +621,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 
 	log.V(1).Info("Current BMC settings fetched", "Settings", currentSettings)
 
-	diff = schemas.SettingsAttributes{}
-	var errs []error
-	for key, value := range settings.Spec.SettingsMap {
-		res, ok := currentSettings[key]
-		if ok {
-			switch data := res.(type) {
-			case int:
-				intvalue, err := strconv.Atoi(value)
-				if err != nil {
-					log.Error(err, "failed to check type for", "Setting name", key, "setting value", value)
-					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
-					continue
-				}
-				if data != intvalue {
-					diff[key] = intvalue
-				}
-			case string:
-				if data != value {
-					diff[key] = value
-				}
-			case float64:
-				floatvalue, err := strconv.ParseFloat(value, 64)
-				if err != nil {
-					log.Error(err, "failed to check type for", "Setting name", key, "Setting value", value)
-					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %v", key, value, err))
-					continue
-				}
-				if data != floatvalue {
-					diff[key] = floatvalue
-				}
-			}
-		} else {
-			diff[key] = value
-		}
-	}
-
-	if len(errs) > 0 {
-		return diff, fmt.Errorf("failed to find diff for some BMC settings: %v", errs)
-	}
-
-	return diff, nil
+	return computeSettingsDiff(settings.Spec.SettingsMap, currentSettings)
 }
 
 func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {

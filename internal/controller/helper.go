@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
@@ -32,6 +33,17 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
+
+	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
+	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
+	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
+	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
+	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
+	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
+	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
+
+	BMCConditionReset = "BMCResetIssued"
+	BMCReasonReset    = "BMCResetIssued"
 )
 
 type BMCTaskFetchFailedError struct {
@@ -615,4 +627,43 @@ func settingKeys(attrs schemas.SettingsAttributes) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// computeSettingsDiff compares desired settings (string values) against actual settings (typed values from BMC)
+// and returns the attributes that differ, converting string values to the appropriate type.
+func computeSettingsDiff(desired map[string]string, actual schemas.SettingsAttributes) (schemas.SettingsAttributes, error) {
+	diff := schemas.SettingsAttributes{}
+	var errs []error
+	for key, value := range desired {
+		res, ok := actual[key]
+		if !ok {
+			diff[key] = value
+			continue
+		}
+		switch data := res.(type) {
+		case int:
+			intValue, err := strconv.Atoi(value)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to parse int for setting %s with value %s: %w", key, value, err))
+				continue
+			}
+			if data != intValue {
+				diff[key] = intValue
+			}
+		case string:
+			if data != value {
+				diff[key] = value
+			}
+		case float64:
+			floatValue, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to parse float for setting %s with value %s: %w", key, value, err))
+				continue
+			}
+			if data != floatValue {
+				diff[key] = floatValue
+			}
+		}
+	}
+	return diff, errors.Join(errs...)
 }

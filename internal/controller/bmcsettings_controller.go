@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,35 +41,20 @@ type BMCSettingsReconciler struct {
 }
 
 const (
-	BMCSettingFinalizer = "metal.ironcore.dev/bmcsettings"
+	BMCSettingFinalizer               = "metal.ironcore.dev/bmcsettings"
+	BMCResetPostSettingApplyCondition = "ResetPostSettingApply"
+	BMCPoweredOffCondition            = "PoweredOff"
+	BMCPoweredOffReason               = "PoweredOff"
+	BMCVersionUpdatePendingCondition  = "VersionUpdatePending"
+	BMCVersionUpgradePendingReason    = "VersionUpgradePending"
+	BMCVersionMatchingReason          = "VersionMatching"
 
-	ConditionBMCResetPostSettingApply    = "ResetPostSettingApply"
-	ConditionBMCPoweredOff               = "PoweredOff"
-	ConditionBMCSettingsChangesIssued    = "ChangesIssued"
-	ConditionBMCSettingsChangesVerified  = "ChangesVerified"
-	ConditionBMCSettingsValidationFailed = "SettingsValidationFailed"
-
-	ReasonBMCPoweredOff                  = "PoweredOff"
-	ReasonBMCVersionMatching             = "VersionMatching"
-	ReasonBMCSettingsChangesIssued       = "ChangesIssued"
-	ReasonBMCSettingsChangesVerified     = "ChangesVerified"
-	ReasonBMCSettingsVerificationPending = "SettingsVerificationPending"
-	ReasonBMCSettingsValidationFailed    = "SettingsValidationFailed"
+	BMCSettingsChangesIssuedCondition      = "ChangesIssued"
+	BMCSettingsChangesIssuedReason         = "ChangesIssued"
+	BMCSettingsChangesVerifiedCondition    = "ChangesVerified"
+	BMCSettingsChangesVerifiedReason       = "ChangesVerified"
+	BMCSettingsChangesNotYetVerifiedReason = "ChangesNotYetVerified"
 )
-
-// legacyBMCSettingsConditionTypes maps old condition type strings to their new values.
-// TODO: Remove this migration in the next release once all CRs have been reconciled.
-var legacyBMCSettingsConditionTypes = map[string]string{
-	"BMCResetIssued":                       ConditionResetIssued,
-	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
-}
-
-// legacyBMCSettingsConditionReasons maps old condition reason strings to their new values.
-var legacyBMCSettingsConditionReasons = map[string]string{
-	"BMCResetIssued":              ReasonResetIssued,
-	"SettingsProvidedAreNotValid": ReasonBMCSettingsValidationFailed,
-	"ChangesNotYetVerified":       ReasonBMCSettingsVerificationPending,
-}
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings/status,verbs=get;update;patch
@@ -79,7 +63,6 @@ var legacyBMCSettingsConditionReasons = map[string]string{
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 func (r *BMCSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -88,18 +71,6 @@ func (r *BMCSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log := ctrl.LoggerFrom(ctx)
-	// TODO: Remove this migration in the next release once all CRs have been reconciled.
-	settingsBase := settings.DeepCopy()
-	migrated := migrateConditionTypes(settings.Status.Conditions, legacyBMCSettingsConditionTypes)
-	if migrateConditionReasons(settings.Status.Conditions, legacyBMCSettingsConditionReasons) {
-		migrated = true
-	}
-	if migrated {
-		log.Info("Migrated legacy conditions on BMCSettings")
-		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
-		}
-	}
 	log.V(1).Info("Reconciling BMCSettings")
 
 	return r.reconcileExists(ctx, settings)
@@ -306,19 +277,8 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(ctx 
 	defer bmcClient.Logout()
 	switch settings.Status.State {
 	case "", metalv1alpha1.BMCSettingsStatePending:
-		// remove the retry annotation if it's present as we are retrying now
-		if shouldRetryReconciliation(settings) {
-			settingsBase := settings.DeepCopy()
-			annotations := settings.GetAnnotations()
-			delete(annotations, metalv1alpha1.OperationAnnotation)
-			settings.SetAnnotations(annotations)
-			if err := r.Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to patch BMCSettings for removing retrying annotation: %w", err)
-			}
-			return ctrl.Result{}, nil
-		}
 		var state = metalv1alpha1.BMCSettingsStateInProgress
-		versionCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionVersionUpdatePending)
+		versionCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCVersionUpdatePendingCondition)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BMCVersion update state: %w", err)
 		}
@@ -327,7 +287,7 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(ctx 
 			if err := r.Conditions.Update(
 				versionCheckCondition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(ReasonVersionUpgradePending),
+				conditionutils.UpdateReason(BMCVersionUpgradePendingReason),
 				conditionutils.UpdateMessage(fmt.Sprintf("Waiting to update BMCVersion: %v, current BMCVersion: %v", settings.Spec.Version, bmcObj.Status.FirmwareVersion)),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
@@ -337,7 +297,7 @@ func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(ctx 
 			if err := r.Conditions.Update(
 				versionCheckCondition,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(ReasonBMCVersionMatching),
+				conditionutils.UpdateReason(BMCVersionMatchingReason),
 				conditionutils.UpdateMessage(fmt.Sprintf("BMCVersion matches: %v", settings.Spec.Version)),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
@@ -371,7 +331,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
-	condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionServerMaintenanceWaiting)
+	condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionWaiting)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -386,7 +346,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(ctx context.Context
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(ReasonMaintenanceWaiting),
+				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
 				conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", settings.Spec.ServerMaintenanceRefs)),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -399,11 +359,11 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(ctx context.Context
 	}
 
 	// Once in maintenance, clear the waiting condition if present
-	if condition.Reason != ReasonMaintenanceApproved {
+	if condition.Reason != ServerMaintenanceReasonApproved {
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
-			conditionutils.UpdateReason(ReasonMaintenanceApproved),
+			conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
 			conditionutils.UpdateMessage("Server is now in Maintenance mode"),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -415,7 +375,7 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(ctx context.Context
 	}
 
 	// Reset the BMC to ensure it's in a stable state before proceeding
-	if ok, err := r.handleBMCReset(ctx, settings, bmcObj, ConditionResetIssued); !ok || err != nil {
+	if ok, err := r.handleBMCReset(ctx, settings, bmcObj, BMCConditionReset); !ok || err != nil {
 		return ctrl.Result{}, err
 	}
 	return r.updateSettingsAndVerify(ctx, settings, bmcObj, settingsDiff, bmcClient)
@@ -423,15 +383,46 @@ func (r *BMCSettingsReconciler) handleSettingInProgressState(ctx context.Context
 
 func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, settingsDiff schemas.SettingsAttributes, bmcClient bmc.BMC) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	resetBMC, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCResetPostSettingApply)
+	resetBMC, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCResetPostSettingApplyCondition)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get condition for reset of BMC of server: %w", err)
 	}
 
-	if resetBMC.Reason != ReasonResetIssued {
-		// apply the BMC Settings if not done.
-		if ok, err := r.handleBMCPowerState(ctx, bmcObj, settings); err != nil || ok {
-			return ctrl.Result{}, err
+	if resetBMC.Reason != BMCReasonReset {
+		switch bmcObj.Status.PowerState {
+		case metalv1alpha1.OnPowerState:
+			fallthrough
+		case metalv1alpha1.UnknownPowerState:
+			BMCPoweredOffCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCPoweredOffCondition)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state: %w", err)
+			}
+			if BMCPoweredOffCondition.Status == metav1.ConditionTrue {
+				if err := r.Conditions.Update(
+					BMCPoweredOffCondition,
+					conditionutils.UpdateStatus(corev1.ConditionFalse),
+					conditionutils.UpdateReason("BMCPoweredOn"),
+					conditionutils.UpdateMessage(fmt.Sprintf("BMC in Powered On, Power State: %v", bmcObj.Status.PowerState)),
+				); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+				}
+				return ctrl.Result{}, r.updateBMCSettingsStatus(ctx, settings, settings.Status.State, BMCPoweredOffCondition)
+			}
+		default:
+			log.V(1).Info("BMC is not powered on, could not proceed", "PowerState", bmcObj.Status.PowerState)
+			BMCPoweredOffCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCPoweredOffCondition)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to get Condition for powered off BMC state: %w", err)
+			}
+			if err := r.Conditions.Update(
+				BMCPoweredOffCondition,
+				conditionutils.UpdateStatus(corev1.ConditionTrue),
+				conditionutils.UpdateReason(BMCPoweredOffReason),
+				conditionutils.UpdateMessage(fmt.Sprintf("BMC is not powered on, Power State: %v", bmcObj.Status.PowerState)),
+			); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Pending BMCVersion update condition: %w", err)
+			}
+			return ctrl.Result{}, r.updateBMCSettingsStatus(ctx, settings, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCondition)
 		}
 
 		pendingAttr, err := bmcClient.GetBMCPendingAttributeValues(ctx, bmcObj.Spec.BMCUUID)
@@ -442,24 +433,6 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 		if len(pendingAttr) == 0 {
 			resetBMCReq, err := bmcClient.CheckBMCAttributes(ctx, bmcObj.Spec.BMCUUID, settingsDiff)
 			if err != nil {
-				log.Error(err, "could not validate settings and determine if reboot needed")
-				var invalidSettingsErr *bmc.InvalidBMCSettingsError
-				if errors.As(err, &invalidSettingsErr) {
-					inValidSettings, errCond := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsValidationFailed)
-					if errCond != nil {
-						return ctrl.Result{}, fmt.Errorf("failed to get Condition for invalid BMC settings %v", errors.Join(err, errCond))
-					}
-					if errCond := r.Conditions.Update(
-						inValidSettings,
-						conditionutils.UpdateStatus(corev1.ConditionTrue),
-						conditionutils.UpdateReason(ReasonBMCSettingsValidationFailed),
-						conditionutils.UpdateMessage(fmt.Sprintf("Settings provided is invalid. error: %v", err)),
-					); errCond != nil {
-						return ctrl.Result{}, fmt.Errorf("failed to update Invalid Settings condition: %w", errors.Join(err, errCond))
-					}
-					err := r.updateBMCSettingsStatus(ctx, settings, metalv1alpha1.BMCSettingsStateFailed, inValidSettings)
-					return ctrl.Result{}, err
-				}
 				return ctrl.Result{}, fmt.Errorf("failed to check BMC settings provided: %w", err)
 			}
 
@@ -467,16 +440,16 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
 			}
-			log.V(1).Info("BMC settings issued successfully", "SettingKeys", settingKeys(settingsDiff))
+			log.V(1).Info("BMC settings issued successfully", "Settings", settingsDiff)
 
-			BMCSettingsAppliedCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsChangesIssued)
+			BMCSettingsAppliedCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCSettingsChangesIssuedCondition)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Condition for Successful issue of BMC Settings: %w", err)
 			}
 			if err := r.Conditions.Update(
 				BMCSettingsAppliedCondition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(ReasonBMCSettingsChangesIssued),
+				conditionutils.UpdateReason(BMCSettingsChangesIssuedReason),
 				conditionutils.UpdateMessage("BMC settings have been issued on the server's BMC"),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update BMCSettings Applied condition: %w", err)
@@ -485,14 +458,14 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 				return ctrl.Result{}, fmt.Errorf("failed to update Condition for Successful issue of BMC Settings: %w", err)
 			}
 			if resetBMCReq {
-				if ok, err := r.handleBMCReset(ctx, settings, bmcObj, ConditionBMCResetPostSettingApply); !ok || err != nil {
+				if ok, err := r.handleBMCReset(ctx, settings, bmcObj, BMCResetPostSettingApplyCondition); !ok || err != nil {
 					return ctrl.Result{}, err
 				}
 			}
 		}
 	} else {
 		log.V(1).Info("Waiting for BMC reset post applying BMC settings")
-		if ok, err := r.handleBMCReset(ctx, settings, bmcObj, ConditionBMCResetPostSettingApply); !ok || err != nil {
+		if ok, err := r.handleBMCReset(ctx, settings, bmcObj, BMCResetPostSettingApplyCondition); !ok || err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -501,7 +474,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC settings: %w", err)
 	}
-	BMCSettingsVerifiedCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsChangesVerified)
+	BMCSettingsVerifiedCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCSettingsChangesVerifiedCondition)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get Condition for verification BMC settings changes: %w", err)
 	}
@@ -509,7 +482,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 		if err := r.Conditions.Update(
 			BMCSettingsVerifiedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(ReasonBMCSettingsChangesVerified),
+			conditionutils.UpdateReason(BMCSettingsChangesVerifiedReason),
 			conditionutils.UpdateMessage("BMC settings changes have been verified on the server's BMC"),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update BMCSettings verified condition: %w", err)
@@ -517,11 +490,11 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 		return ctrl.Result{}, r.updateBMCSettingsStatus(ctx, settings, metalv1alpha1.BMCSettingsStateApplied, BMCSettingsVerifiedCondition)
 	}
 
-	if BMCSettingsVerifiedCondition.Status == metav1.ConditionFalse && BMCSettingsVerifiedCondition.Reason != ReasonBMCSettingsVerificationPending {
+	if BMCSettingsVerifiedCondition.Status == metav1.ConditionFalse && BMCSettingsVerifiedCondition.Reason != BMCSettingsChangesNotYetVerifiedReason {
 		if err := r.Conditions.Update(
 			BMCSettingsVerifiedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
-			conditionutils.UpdateReason(ReasonBMCSettingsVerificationPending),
+			conditionutils.UpdateReason(BMCSettingsChangesNotYetVerifiedReason),
 			conditionutils.UpdateMessage("BMC Settings changes are not yet verified on the server's BMC"),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update BMCSettings verified condition: %w", err)
@@ -551,67 +524,16 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(ctx context.Context, s
 	return nil
 }
 
-func (r *BMCSettingsReconciler) handleBMCPowerState(
-	ctx context.Context,
-	BMC *metalv1alpha1.BMC,
-	bmcSetting *metalv1alpha1.BMCSettings,
-) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	switch BMC.Status.PowerState {
-	case metalv1alpha1.OnPowerState:
-		fallthrough
-	case metalv1alpha1.UnknownPowerState:
-		BMCPoweredOffCond, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, ConditionBMCPoweredOff)
-		if err != nil {
-			return false, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
-		}
-		if BMCPoweredOffCond.Status == metav1.ConditionTrue {
-			if err := r.Conditions.Update(
-				BMCPoweredOffCond,
-				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason("BMCPoweredBackOn"),
-				conditionutils.UpdateMessage(fmt.Sprintf("BMC in Powered On, Power State: %v", BMC.Status.PowerState)),
-			); err != nil {
-				return false, fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
-			}
-			err = r.updateBMCSettingsStatus(ctx, bmcSetting, bmcSetting.Status.State, BMCPoweredOffCond)
-			return true, err
-		}
-	default:
-		log.V(1).Info("BMC is not Powered On. Can not proceed", "PowerState", BMC.Status.PowerState)
-		BMCPoweredOffCond, err := GetCondition(r.Conditions, bmcSetting.Status.Conditions, ConditionBMCPoweredOff)
-		if err != nil {
-			return false, fmt.Errorf("failed to get Condition for powered off BMC state %v", err)
-		}
-		if err := r.Conditions.Update(
-			BMCPoweredOffCond,
-			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(ReasonBMCPoweredOff),
-			conditionutils.UpdateMessage(fmt.Sprintf("BMC in not Powered On, Power State: %v", BMC.Status.PowerState)),
-		); err != nil {
-			return false, fmt.Errorf("failed to update Pending BMCSetting update condition: %w", err)
-		}
-		err = r.updateBMCSettingsStatus(ctx, bmcSetting, metalv1alpha1.BMCSettingsStateFailed, BMCPoweredOffCond)
-		return true, err
-	}
-	return false, nil
-}
-
-func (r *BMCSettingsReconciler) handleBMCReset(
-	ctx context.Context,
-	settings *metalv1alpha1.BMCSettings,
-	bmcObj *metalv1alpha1.BMC,
-	conditionType string,
-) (bool, error) {
+func (r *BMCSettingsReconciler) handleBMCReset(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, conditionType string) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	resetBMC, err := GetCondition(r.Conditions, settings.Status.Conditions, conditionType)
 	if err != nil {
-		return false, fmt.Errorf("failed to get condition for reset of BMC of server %v", err)
+		return false, fmt.Errorf("failed to get condition for reset of BMC of server: %w", err)
 	}
 
 	if resetBMC.Status != metav1.ConditionTrue {
 		annotations := bmcObj.GetAnnotations()
-		if resetBMC.Reason != ReasonResetIssued {
+		if resetBMC.Reason != BMCReasonReset {
 			if annotations != nil {
 				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
 					if op == metalv1alpha1.GracefulRestartBMC {
@@ -619,7 +541,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 						if err := r.Conditions.Update(
 							resetBMC,
 							conditionutils.UpdateStatus(corev1.ConditionFalse),
-							conditionutils.UpdateReason(ReasonResetIssued),
+							conditionutils.UpdateReason(BMCReasonReset),
 							conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
 						); err != nil {
 							return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
@@ -645,7 +567,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 			if err := r.Conditions.Update(
 				resetBMC,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(ReasonResetIssued),
+				conditionutils.UpdateReason(BMCReasonReset),
 				conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
@@ -666,7 +588,7 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 		if err := r.Conditions.Update(
 			resetBMC,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(ReasonResetIssued),
+			conditionutils.UpdateReason(BMCReasonReset),
 			conditionutils.UpdateMessage("BMC reset of the server is completed"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update power on server condition: %w", err)
@@ -679,80 +601,16 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC) error {
 	log := ctrl.LoggerFrom(ctx)
 	if shouldRetryReconciliation(settings) {
-		log.V(1).Info("Retrying BMCSettings as per annotation")
+		log.V(1).Info("Retrying BMCSettings reconciliation")
 		settingsBase := settings.DeepCopy()
-		settings.Status.FailedAttempts = 0
 		settings.Status.State = metalv1alpha1.BMCSettingsStatePending
-		settings.Status.ObservedGeneration = settings.Generation
-		annotations := settings.GetAnnotations()
-		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
-		if err != nil {
-			return fmt.Errorf("failed to get retry condition for BMCSettings: %w", err)
-		}
-		if retryCondition.Status != metav1.ConditionTrue {
-			err := r.Conditions.Update(retryCondition,
-				conditionutils.UpdateStatus(metav1.ConditionTrue),
-				conditionutils.UpdateReason(ReasonRetryOfFailedResourceIssued),
-				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
-			)
-			if err != nil {
-				return fmt.Errorf("failed to update retry condition for BMCSettings: %w", err)
-			}
-		}
-		settings.Status.Conditions = []metav1.Condition{*retryCondition}
 		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
 			return fmt.Errorf("failed to patch BMCSettings status for retrying: %w", err)
 		}
 		return nil
 	}
-	var maxAttempts int32
-	if settings.Spec.RetryPolicy != nil && settings.Spec.RetryPolicy.MaxAttempts != nil {
-		// if RetryPolicy is given (even if MaxAttempts is 0), do not use the default value.
-		maxAttempts = *settings.Spec.RetryPolicy.MaxAttempts
-	} else if r.DefaultFailedAutoRetryCount > 0 {
-		// set the retry to this, if the optional RetryPolicy is not given and default retry count is set on the reconciler.
-		maxAttempts = r.DefaultFailedAutoRetryCount
-	}
-	if maxAttempts > 0 {
-		if settings.Status.ObservedGeneration != settings.Generation {
-			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
-			settings.Status.FailedAttempts = 0
-		}
-		if settings.Status.FailedAttempts < maxAttempts {
-			log.V(1).Info("Retrying BMCSettings automatically", "FailedAttempts", settings.Status.FailedAttempts)
-			settingsBase := settings.DeepCopy()
-			settings.Status.State = metalv1alpha1.BMCSettingsStatePending
-			settings.Status.ObservedGeneration = settings.Generation
-			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
-			if err != nil {
-				return fmt.Errorf("failed to get Retry condition for BMCSettings: %w", err)
-			}
-			if retryCondition.Status == metav1.ConditionTrue {
-				// keep the condition if it's already true,
-				// otherwise SET resource will patch the retry annotation again.
-				settings.Status.Conditions = []metav1.Condition{*retryCondition}
-			} else {
-				settings.Status.Conditions = nil
-			}
-			settings.Status.FailedAttempts++
-			if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
-				return fmt.Errorf("failed to patch BMCSettings status for auto-retrying: %w", err)
-			}
-			return nil
-		}
-	}
-	// Keep status consistent when retries are disabled or exhausted.
-	if settings.Status.FailedAttempts != 0 &&
-		(maxAttempts == 0 || settings.Status.ObservedGeneration != settings.Generation) {
-		settingsBase := settings.DeepCopy()
-		settings.Status.FailedAttempts = 0
-		settings.Status.ObservedGeneration = settings.Generation
-		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
-			return fmt.Errorf("failed to patch BMCSettings status for disabled auto-retry: %w", err)
-		}
-	}
-	// todo: revisit this logic to either create maintenance if not present, put server in Error state on failed bmc settings maintenance
-	log.V(1).Info("Failed to update BMC setting", "ctx", ctx, "bmcSetting", settings, "BMC", bmcObj)
+	// TODO: Revisit this logic to either create maintenance if not present or put server in Error state on failed BMC settings maintenance
+	log.V(1).Info("Failed to update BMCSettings", "BMC", bmcObj.Name)
 	return nil
 }
 
@@ -772,47 +630,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 
 	log.V(1).Info("Current BMC settings fetched", "SettingKeys", settingKeys(currentSettings))
 
-	diff = schemas.SettingsAttributes{}
-	var errs []error
-	for key, value := range effectiveSettingsMap {
-		res, ok := currentSettings[key]
-		if ok {
-			switch data := res.(type) {
-			case int:
-				intvalue, err := strconv.Atoi(value)
-				if err != nil {
-					log.Error(err, "Failed to check type for", "Setting name", key, "setting value", value)
-					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %w", key, value, err))
-					continue
-				}
-				if data != intvalue {
-					diff[key] = intvalue
-				}
-			case string:
-				if data != value {
-					diff[key] = value
-				}
-			case float64:
-				floatvalue, err := strconv.ParseFloat(value, 64)
-				if err != nil {
-					log.Error(err, "Failed to check type for", "Setting name", key, "Setting value", value)
-					errs = append(errs, fmt.Errorf("failed to check type for name %v; value %v; error: %w", key, value, err))
-					continue
-				}
-				if data != floatvalue {
-					diff[key] = floatvalue
-				}
-			}
-		} else {
-			diff[key] = value
-		}
-	}
-
-	if len(errs) > 0 {
-		return diff, fmt.Errorf("failed to find diff for some BMC settings: %v", errs)
-	}
-
-	return diff, nil
+	return computeSettingsDiff(effectiveSettingsMap, currentSettings)
 }
 
 func (r *BMCSettingsReconciler) checkIfMaintenanceGranted(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (bool, error) {
@@ -913,7 +731,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(ctx context.Context,
 				return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", errors.Join(errs...))
 			}
 		}
-		condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionServerMaintenanceCreated)
+		condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionCreated)
 		if err != nil {
 			return false, err
 		}
@@ -923,7 +741,7 @@ func (r *BMCSettingsReconciler) requestMaintenanceOnServers(ctx context.Context,
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(ReasonMaintenanceCreated),
+			conditionutils.UpdateReason(ServerMaintenanceReasonCreated),
 			conditionutils.UpdateMessage(fmt.Sprintf("Created/present %v at %v", settings.Spec.ServerMaintenanceRefs, time.Now())),
 		); err != nil {
 			return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -1247,102 +1065,6 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(ctx context.Conte
 	return requests
 }
 
-// enqueueBMCSettingsBySecret enqueues every BMCSettings that references the changed
-// Secret via spec.variables[*].valueFrom.secretKeyRef.
-// Selector name fields containing $(VAR) placeholders are expanded using any
-// preceding fieldRef variables (resolved inline, no API calls) so that chained
-// references such as secretKeyRef.name: "$(BmcName)" are matched correctly.
-func (r *BMCSettingsReconciler) enqueueBMCSettingsBySecret(ctx context.Context, obj client.Object) []ctrl.Request {
-	log := ctrl.LoggerFrom(ctx)
-	secretName := obj.GetName()
-	secretNamespace := obj.GetNamespace()
-
-	list := &metalv1alpha1.BMCSettingsList{}
-	if err := r.List(ctx, list); err != nil {
-		log.Error(err, "Failed to list BMCSettings for Secret watch")
-		return nil
-	}
-
-	var requests []ctrl.Request
-	for _, settings := range list.Items {
-		// Pre-resolve fieldRef variables in declaration order — these are
-		// free (no network) and cover the common chaining pattern.
-		partialResolved := make(map[string]string)
-		for _, v := range settings.Spec.Variables {
-			if v.ValueFrom == nil || v.ValueFrom.FieldRef == nil {
-				continue
-			}
-			val, err := resolveFieldRef(&settings, substituteVars(v.ValueFrom.FieldRef.FieldPath, partialResolved))
-			if err != nil {
-				continue
-			}
-			partialResolved[v.Key] = val
-		}
-
-		for _, v := range settings.Spec.Variables {
-			if v.ValueFrom == nil || v.ValueFrom.SecretKeyRef == nil {
-				continue
-			}
-			ref := v.ValueFrom.SecretKeyRef
-			if substituteVars(ref.Name, partialResolved) == secretName && substituteVars(ref.Namespace, partialResolved) == secretNamespace {
-				requests = append(requests, ctrl.Request{
-					NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name},
-				})
-				break
-			}
-		}
-	}
-	return requests
-}
-
-// enqueueBMCSettingsByConfigMap enqueues every BMCSettings that references the changed
-// ConfigMap via spec.variables[*].valueFrom.configMapKeyRef.
-// Selector name fields containing $(VAR) placeholders are expanded using any
-// preceding fieldRef variables (resolved inline, no API calls) so that chained
-// references such as configMapKeyRef.name: "$(BmcName)" are matched correctly.
-func (r *BMCSettingsReconciler) enqueueBMCSettingsByConfigMap(ctx context.Context, obj client.Object) []ctrl.Request {
-	log := ctrl.LoggerFrom(ctx)
-	cmName := obj.GetName()
-	cmNamespace := obj.GetNamespace()
-
-	list := &metalv1alpha1.BMCSettingsList{}
-	if err := r.List(ctx, list); err != nil {
-		log.Error(err, "Failed to list BMCSettings for ConfigMap watch")
-		return nil
-	}
-
-	var requests []ctrl.Request
-	for _, settings := range list.Items {
-		// Pre-resolve fieldRef variables in declaration order — these are
-		// free (no network) and cover the common chaining pattern.
-		partialResolved := make(map[string]string)
-		for _, v := range settings.Spec.Variables {
-			if v.ValueFrom == nil || v.ValueFrom.FieldRef == nil {
-				continue
-			}
-			val, err := resolveFieldRef(&settings, substituteVars(v.ValueFrom.FieldRef.FieldPath, partialResolved))
-			if err != nil {
-				continue
-			}
-			partialResolved[v.Key] = val
-		}
-
-		for _, v := range settings.Spec.Variables {
-			if v.ValueFrom == nil || v.ValueFrom.ConfigMapKeyRef == nil {
-				continue
-			}
-			ref := v.ValueFrom.ConfigMapKeyRef
-			if substituteVars(ref.Name, partialResolved) == cmName && substituteVars(ref.Namespace, partialResolved) == cmNamespace {
-				requests = append(requests, ctrl.Request{
-					NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name},
-				})
-				break
-			}
-		}
-	}
-	return requests
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCSettingsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -1351,7 +1073,5 @@ func (r *BMCSettingsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByServerRefs)).
 		Watches(&metalv1alpha1.BMC{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByBMCRefs)).
 		Watches(&metalv1alpha1.BMCVersion{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByBMCVersion)).
-		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsBySecret)).
-		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByConfigMap)).
 		Complete(r)
 }

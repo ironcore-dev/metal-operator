@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -128,7 +130,7 @@ func (r *BMCUserSetReconciler) delete(
 
 	var errs []error
 	for i := range ownedBMCUsers.Items {
-		if err := r.Delete(ctx, &ownedBMCUsers.Items[i]); err != nil {
+		if err := client.IgnoreNotFound(r.Delete(ctx, &ownedBMCUsers.Items[i])); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -283,10 +285,11 @@ func (r *BMCUserSetReconciler) deleteOrphanedBMCUsers(
 			continue
 		}
 		if _, ok := bmcMap[bmcUser.Spec.BMCRef.Name]; !ok {
-			if err := r.Delete(ctx, bmcUser); err != nil {
+			if err := client.IgnoreNotFound(r.Delete(ctx, bmcUser)); err != nil {
 				errs = append(errs, err)
+			} else {
+				log.V(1).Info("Deleted orphaned BMCUser", "BMCUser", bmcUser.Name)
 			}
-			log.V(1).Info("Deleted orphaned BMCUser", "BMCUser", bmcUser.Name)
 		}
 	}
 
@@ -335,22 +338,48 @@ func (r *BMCUserSetReconciler) patchBMCUsersFromTemplate(
 	return errors.Join(errs...)
 }
 
+func shouldFilterAnnotation(key string) bool {
+	if key == metalv1alpha1.OperationAnnotation {
+		return true
+	}
+	if strings.HasPrefix(key, "kubernetes.io/") ||
+		strings.HasPrefix(key, "k8s.io/") ||
+		strings.HasPrefix(key, "kubectl.kubernetes.io/") {
+		return true
+	}
+	return false
+}
+
 func syncBMCUserAnnotationsFromSet(bmcUser *metalv1alpha1.BMCUser, bmcUserSet *metalv1alpha1.BMCUserSet) {
+	// Get current annotations
 	annotations := bmcUser.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
+
+	// Build desired annotation set from BMCUserSet (filtered)
+	desired := map[string]string{}
 	for key, value := range bmcUserSet.GetAnnotations() {
-		// Filter out system and operator-internal annotations
-		if key == metalv1alpha1.OperationAnnotation {
+		if shouldFilterAnnotation(key) {
 			continue
 		}
-		// Skip kubernetes.io and k8s.io system annotations
-		if len(key) >= 13 && (key[:13] == "kubernetes.io" || key[:6] == "k8s.io") {
-			continue
-		}
-		annotations[key] = value
+		desired[key] = value
 	}
+
+	// Remove annotations that are no longer in the source
+	for key := range annotations {
+		if shouldFilterAnnotation(key) {
+			// Don't touch system annotations
+			continue
+		}
+		if _, exists := desired[key]; !exists {
+			delete(annotations, key)
+		}
+	}
+
+	// Add/update annotations from source
+	maps.Copy(annotations, desired)
+
 	bmcUser.SetAnnotations(annotations)
 }
 

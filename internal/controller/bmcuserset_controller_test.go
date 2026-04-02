@@ -294,4 +294,208 @@ var _ = Describe("BMCUserSet Controller", func() {
 			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
 		}
 	})
+
+	It("Should remove annotations from BMCUsers when removed from BMCUserSet", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "bmc-secret-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a BMC")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-bmc-annotation-removal",
+				Labels: map[string]string{
+					"test": "annotation-removal",
+				},
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
+					MACAddress: "23:11:8A:33:CF:EE",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: MockServerPort,
+				},
+				BMCSecretRef: corev1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		By("Creating a BMCUserSet with annotations")
+		bmcUserSet := &metalv1alpha1.BMCUserSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmcuserset-",
+				Annotations: map[string]string{
+					"example.com/test-annotation": "test-value",
+					"example.com/will-be-removed": "remove-me",
+				},
+			},
+			Spec: metalv1alpha1.BMCUserSetSpec{
+				BMCSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"test": "annotation-removal"},
+				},
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "test-user",
+					RoleID:   "Administrator",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcUserSet)).To(Succeed())
+
+		By("Ensuring BMCUser is created with annotations")
+		bmcUserList := &metalv1alpha1.BMCUserList{}
+		Eventually(ObjectList(bmcUserList)).Should(SatisfyAll(
+			HaveField("Items", HaveLen(1)),
+			HaveField("Items", ContainElement(SatisfyAll(
+				HaveField("Annotations", HaveKeyWithValue("example.com/test-annotation", "test-value")),
+				HaveField("Annotations", HaveKeyWithValue("example.com/will-be-removed", "remove-me")),
+			))),
+		))
+
+		By("Removing one annotation from BMCUserSet")
+		Eventually(Update(bmcUserSet, func() {
+			annotations := bmcUserSet.GetAnnotations()
+			delete(annotations, "example.com/will-be-removed")
+			bmcUserSet.SetAnnotations(annotations)
+		})).Should(Succeed())
+
+		By("Ensuring the annotation is removed from BMCUser")
+		Eventually(ObjectList(bmcUserList)).Should(SatisfyAll(
+			HaveField("Items", HaveLen(1)),
+			HaveField("Items", ContainElement(SatisfyAll(
+				HaveField("Annotations", HaveKeyWithValue("example.com/test-annotation", "test-value")),
+				HaveField("Annotations", Not(HaveKey("example.com/will-be-removed"))),
+			))),
+		))
+
+		Expect(k8sClient.Delete(ctx, bmcUserSet)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+		Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(HaveField("Items", HaveLen(0)))
+
+		Expect(k8sClient.List(ctx, bmcUserList)).To(Succeed())
+		for i := range bmcUserList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &bmcUserList.Items[i]))).To(Succeed())
+		}
+		Eventually(ObjectList(&metalv1alpha1.BMCUserList{})).Should(HaveField("Items", HaveLen(0)))
+
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for i := range secretList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
+		}
+	})
+
+	It("Should filter out system annotations during propagation", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "bmc-secret-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a BMC")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-bmc-annotation-filter",
+				Labels: map[string]string{
+					"test": "annotation-filter",
+				},
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
+					MACAddress: "23:11:8A:33:CF:EF",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: MockServerPort,
+				},
+				BMCSecretRef: corev1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		By("Creating a BMCUserSet with system and user annotations")
+		bmcUserSet := &metalv1alpha1.BMCUserSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmcuserset-",
+				Annotations: map[string]string{
+					"kubernetes.io/should-not-propagate":        "system-value",
+					"k8s.io/also-should-not-propagate":          "k8s-value",
+					"kubectl.kubernetes.io/third-system-prefix": "kubectl-value",
+					"example.com/user-annotation":               "user-value",
+				},
+			},
+			Spec: metalv1alpha1.BMCUserSetSpec{
+				BMCSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"test": "annotation-filter"},
+				},
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "test-user",
+					RoleID:   "Administrator",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcUserSet)).To(Succeed())
+
+		By("Ensuring BMCUser is created with only user annotations")
+		bmcUserList := &metalv1alpha1.BMCUserList{}
+		Eventually(ObjectList(bmcUserList)).Should(SatisfyAll(
+			HaveField("Items", HaveLen(1)),
+			HaveField("Items", ContainElement(SatisfyAll(
+				HaveField("Annotations", HaveKeyWithValue("example.com/user-annotation", "user-value")),
+				HaveField("Annotations", Not(HaveKey("kubernetes.io/should-not-propagate"))),
+				HaveField("Annotations", Not(HaveKey("k8s.io/also-should-not-propagate"))),
+				HaveField("Annotations", Not(HaveKey("kubectl.kubernetes.io/third-system-prefix"))),
+			))),
+		))
+
+		Expect(k8sClient.Delete(ctx, bmcUserSet)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+		Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(HaveField("Items", HaveLen(0)))
+
+		Expect(k8sClient.List(ctx, bmcUserList)).To(Succeed())
+		for i := range bmcUserList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &bmcUserList.Items[i]))).To(Succeed())
+		}
+		Eventually(ObjectList(&metalv1alpha1.BMCUserList{})).Should(HaveField("Items", HaveLen(0)))
+
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for i := range secretList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
+		}
+	})
 })

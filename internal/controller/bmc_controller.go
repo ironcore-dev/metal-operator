@@ -56,8 +56,9 @@ const (
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Insecure bool
+	Scheme             *runtime.Scheme
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
 	// BMCFailureResetDelay defines the duration after which a BMC will be reset upon repeated connection failures.
 	BMCFailureResetDelay time.Duration
 	BMCOptions           bmc.Options
@@ -109,7 +110,7 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 		}
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
 	if err == nil {
 		defer bmcClient.Logout()
 		if err := r.deleteEventSubscription(ctx, bmcClient, bmcObj); err != nil {
@@ -142,7 +143,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 			RequeueAfter: r.BMCClientRetryInterval,
 		}, nil
 	}
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions, bmcutils.BMCConnectivityCheckOption)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, bmcutils.BMCConnectivityCheckOption)
 	if err != nil {
 		if r.shouldResetBMC(bmcObj) {
 			log.V(1).Info("BMC needs reset, resetting", "BMC", bmcObj.Name)

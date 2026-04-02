@@ -663,6 +663,17 @@ func computeSettingsDiff(desired map[string]string, actual schemas.SettingsAttri
 			if data != floatValue {
 				diff[key] = floatValue
 			}
+		case bool:
+			boolValue, err := strconv.ParseBool(value)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to parse bool for setting %s with value %s: %w", key, value, err))
+				continue
+			}
+			if data != boolValue {
+				diff[key] = boolValue
+			}
+		default:
+			errs = append(errs, fmt.Errorf("unsupported attribute type %T for setting %s", res, key))
 		}
 	}
 	return diff, errors.Join(errs...)

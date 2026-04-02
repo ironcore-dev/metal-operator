@@ -6,12 +6,14 @@ package bmc
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"math/big"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
+	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -83,15 +86,28 @@ func (e *InvalidBIOSSettingsError) Error() string {
 
 // newRedfishBaseBMCClient creates a new RedfishBaseBMC with the given connection details (internal use only).
 func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBaseBMC, error) {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+	}
+	if err := http2.ConfigureTransport(transport); err != nil {
+		return nil, fmt.Errorf("failed to configure HTTP/2 transport: %w", err)
+	}
 	clientConfig := gofish.ClientConfig{
-		Endpoint:  options.Endpoint,
-		Username:  options.Username,
-		Password:  options.Password,
-		Insecure:  true,
-		BasicAuth: options.BasicAuth,
+		Endpoint:          options.Endpoint,
+		Username:          options.Username,
+		Password:          options.Password,
+		BasicAuth:         options.BasicAuth,
+		HTTPClient:        &http.Client{Transport: transport},
+		NoModifyTransport: true,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			ctrl.LoggerFrom(ctx).V(1).Info("Could not connect to BMC endpoint", "endpoint", options.Endpoint, "op", urlErr.Op, "errorType", fmt.Sprintf("%T", urlErr.Unwrap()), "error", err)
+		} else {
+			ctrl.LoggerFrom(ctx).V(1).Info("Could not connect to BMC endpoint", "endpoint", options.Endpoint, "errorType", fmt.Sprintf("%T", err), "error", err)
+		}
 		return nil, err
 	}
 	bmc := &RedfishBaseBMC{client: client}

@@ -23,7 +23,7 @@ var _ = Describe("BMC Controller", func() {
 	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {
@@ -343,7 +343,7 @@ var _ = Describe("BMC Controller", func() {
 
 var _ = Describe("BMC Validation", func() {
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
@@ -513,7 +513,7 @@ var _ = Describe("BMC Reset", func() {
 	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should reset the BMC", func(ctx SpecContext) {
@@ -580,7 +580,7 @@ var _ = Describe("BMC Conditions", func() {
 	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should create ready conditions when there are bmc connection errors", func(ctx SpecContext) {

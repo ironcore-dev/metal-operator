@@ -59,7 +59,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("Should force a Server into maintenance from Initial State", func(ctx SpecContext) {

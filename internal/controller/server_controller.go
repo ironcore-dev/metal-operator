@@ -81,6 +81,7 @@ const (
 // ServerReconciler reconciles a Server object
 type ServerReconciler struct {
 	client.Client
+	APIReader               client.Reader
 	Scheme                  *runtime.Scheme
 	Insecure                bool
 	ManagerNamespace        string
@@ -449,6 +450,18 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 	if err := r.ensureIndicatorLED(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
+
+	// Re-fetch directly from the API server before checking ServerClaimRef.
+	// The object passed into this handler may be from the informer cache and
+	// could be stale if a ServerClaim controller just wrote the ref. Without
+	// this, a BMC-triggered reconcile that arrives with a stale cache snapshot
+	// would skip the Reserved transition even though the claim already landed.
+	fresh := &metalv1alpha1.Server{}
+	if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(server), fresh); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+	*server = *fresh
+
 	if server.Spec.ServerClaimRef != nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved); err != nil || modified {
 			return true, err

@@ -13,13 +13,9 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
+
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 
-	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
-	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
-	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
+	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -92,6 +94,9 @@ var _ = BeforeSuite(func() {
 	DeferCleanup(testEnv.Stop)
 
 	Expect(metalv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+
+	err = metalv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
 

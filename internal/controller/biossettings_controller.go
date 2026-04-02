@@ -932,10 +932,21 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 		return fmt.Errorf("BIOS setting issued to BMC not accepted")
 	}
 
+	// Re-fetch the settings diff: attributes that were applied immediately (no reboot)
+	// will no longer appear, so only attributes still outstanding remain.
+	settingsDiff, err = r.getSettingsDiff(ctx, bmcClient, flowItem.Settings, server)
+	if err != nil {
+		return fmt.Errorf("failed to re-fetch BIOS settings difference: %w", err)
+	}
+
 	// Verify pending settings match what we requested
 	pendingSettingsDiff := make(schemas.SettingsAttributes, len(settingsDiff))
 	for name, value := range settingsDiff {
-		if pendingValue, ok := pendingSettings[name]; ok && value != pendingValue {
+		pendingValue, ok := pendingSettings[name]
+		switch {
+		case !ok:
+			pendingSettingsDiff[name] = "<missing>"
+		case value != pendingValue:
 			pendingSettingsDiff[name] = pendingValue
 		}
 	}

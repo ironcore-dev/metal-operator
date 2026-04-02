@@ -31,12 +31,13 @@ import (
 // BMCSettingsReconciler reconciles a BMCSettings object
 type BMCSettingsReconciler struct {
 	client.Client
-	ManagerNamespace string
-	ResyncInterval   time.Duration
-	Insecure         bool
-	Scheme           *runtime.Scheme
-	BMCOptions       bmc.Options
-	Conditions       *conditionutils.Accessor
+	ManagerNamespace   string
+	ResyncInterval     time.Duration
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	Scheme             *runtime.Scheme
+	BMCOptions         bmc.Options
+	Conditions         *conditionutils.Accessor
 }
 
 const (
@@ -265,7 +266,7 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 
 func (r *BMCSettingsReconciler) ensureBMCSettingsMaintenanceStateTransition(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available, skipping", "BMC", bmcObj.Name, "error", err)

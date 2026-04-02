@@ -36,14 +36,11 @@ const (
 	BMCConnectivityCheckOption BMCClientOptions = 1
 )
 
-func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, insecure bool) metalv1alpha1.ProtocolScheme {
+func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, defaultScheme metalv1alpha1.ProtocolScheme) metalv1alpha1.ProtocolScheme {
 	if scheme != "" {
 		return scheme
 	}
-	if insecure {
-		return metalv1alpha1.HTTPProtocolScheme
-	}
-	return metalv1alpha1.HTTPSProtocolScheme
+	return defaultScheme
 }
 
 func GetBMCCredentialsFromSecret(secret *metalv1alpha1.BMCSecret) (string, string, error) {
@@ -110,7 +107,7 @@ func GetBMCAddressForBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 
 const DefaultKubeNamespace = "default"
 
-func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, insecure bool, options bmc.Options) (bmc.BMC, error) {
+func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options) (bmc.BMC, error) {
 	if server.Spec.BMCRef != nil {
 		b := &metalv1alpha1.BMC{}
 		bmcName := server.Spec.BMCRef.Name
@@ -118,7 +115,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			return nil, err
 		}
 
-		return GetBMCClientFromBMC(ctx, c, b, insecure, options)
+		return GetBMCClientFromBMC(ctx, c, b, defaultProtocol, skipCertValidation, options)
 	}
 
 	if server.Spec.BMC != nil {
@@ -127,7 +124,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			return nil, err
 		}
 
-		protocolScheme := GetProtocolScheme(server.Spec.BMC.Protocol.Scheme, insecure)
+		protocolScheme := GetProtocolScheme(server.Spec.BMC.Protocol.Scheme, defaultProtocol)
 
 		return CreateBMCClient(
 			ctx,
@@ -138,13 +135,14 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			server.Spec.BMC.Protocol.Port,
 			bmcSecret,
 			options,
+			skipCertValidation,
 		)
 	}
 
 	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
-func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, insecure bool, options bmc.Options, opts ...BMCClientOptions) (bmc.BMC, error) {
+func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, opts ...BMCClientOptions) (bmc.BMC, error) {
 	var address string
 
 	if !slices.Contains(opts, BMCConnectivityCheckOption) {
@@ -170,8 +168,8 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 	}
 
-	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
-	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
+	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, defaultProtocol)
+	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options, skipCertValidation)
 	return bmcClient, err
 }
 
@@ -184,6 +182,7 @@ func CreateBMCClient(
 	port int32,
 	bmcSecret *metalv1alpha1.BMCSecret,
 	bmcOptions bmc.Options,
+	skipCertValidation bool,
 ) (bmc.BMC, error) {
 	var bmcClient bmc.BMC
 	var err error
@@ -193,6 +192,7 @@ func CreateBMCClient(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
 	}
+	bmcOptions.InsecureTLS = skipCertValidation
 
 	switch bmcProtocol {
 	case metalv1alpha1.ProtocolRedfish:

@@ -102,7 +102,8 @@ type ServerReconciler struct {
 	DiscoveryIgnitionPath   string
 }
 
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servernetworkconfigs,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servernetworkconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;create;update;patch;delete
@@ -415,15 +416,19 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 
 	log.V(1).Info("Extracted Server details")
 
-	log.V(1).Info("Setting Server state to available")
-	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
-		return false, err
-	}
-
 	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
 	}
 	log.V(1).Info("Removed Server from Registry")
+
+	if done, err := r.runNetworkCheck(ctx, server); err != nil || !done {
+		return false, err
+	}
+
+	log.V(1).Info("Setting Server state to available")
+	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
+		return false, err
+	}
 	return false, nil
 }
 
@@ -1093,6 +1098,126 @@ func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *m
 	return r.Status().Patch(ctx, server, client.MergeFrom(original))
 }
 
+// runNetworkCheck looks for a ServerNetworkConfig referencing this server.
+// If none exists, the check is skipped and the server may proceed to Available.
+// If one exists, the expected interfaces are compared against the discovered LLDP data.
+// Returns (true, nil) when the server may proceed, (false, nil) to requeue, or (false, err) on error.
+func (r *ServerReconciler) runNetworkCheck(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	networkConfigList := &metalv1alpha1.ServerNetworkConfigList{}
+	if err := r.List(ctx, networkConfigList); err != nil {
+		return false, fmt.Errorf("failed to list ServerNetworkConfigs: %w", err)
+	}
+
+	var networkConfig *metalv1alpha1.ServerNetworkConfig
+	for i := range networkConfigList.Items {
+		if networkConfigList.Items[i].Spec.ServerRef.Name == server.Name {
+			networkConfig = &networkConfigList.Items[i]
+			break
+		}
+	}
+
+	if networkConfig == nil {
+		log.V(1).Info("No ServerNetworkConfig found, skipping network check")
+		return true, nil
+	}
+
+	log.V(1).Info("Running network check", "serverNetworkConfig", networkConfig.Name)
+
+	// Build a MAC → actual NIC map from discovered LLDP data
+	type actualNIC struct {
+		switchName string
+		portID     string
+	}
+	actual := make(map[string]actualNIC) // keyed by normalised MAC
+	for _, iface := range server.Status.NetworkInterfaces {
+		mac := strings.ToLower(iface.MACAddress)
+		if len(iface.Neighbors) > 0 {
+			actual[mac] = actualNIC{
+				switchName: iface.Neighbors[0].SystemName,
+				portID:     iface.Neighbors[0].PortID,
+			}
+		} else {
+			actual[mac] = actualNIC{}
+		}
+	}
+
+	var mismatches []metalv1alpha1.NetworkInterfaceMismatch
+	for _, expected := range networkConfig.Spec.Interfaces {
+		mac := strings.ToLower(expected.MACAddress)
+		found, ok := actual[mac]
+		if !ok {
+			mismatches = append(mismatches, metalv1alpha1.NetworkInterfaceMismatch{
+				Name:           expected.Name,
+				MACAddress:     expected.MACAddress,
+				ExpectedSwitch: expected.Switch,
+				ExpectedPort:   expected.Port,
+			})
+			continue
+		}
+		if !switchPortMatch(expected.Switch, expected.Port, found.switchName, found.portID) {
+			mismatches = append(mismatches, metalv1alpha1.NetworkInterfaceMismatch{
+				Name:           expected.Name,
+				MACAddress:     expected.MACAddress,
+				ExpectedSwitch: expected.Switch,
+				ExpectedPort:   expected.Port,
+				ActualSwitch:   found.switchName,
+				ActualPort:     found.portID,
+			})
+		}
+	}
+
+	original := networkConfig.DeepCopy()
+	networkConfig.Status.LastCheckTime = &metav1.Time{Time: time.Now()}
+	networkConfig.Status.Mismatches = mismatches
+
+	if len(mismatches) == 0 {
+		networkConfig.Status.Phase = metalv1alpha1.NetworkCheckPhasePassed
+		networkConfig.Status.Message = "Network configuration matches expected"
+	} else {
+		networkConfig.Status.Phase = metalv1alpha1.NetworkCheckPhaseFailed
+		networkConfig.Status.Message = fmt.Sprintf("%d interface(s) did not match expected configuration", len(mismatches))
+	}
+
+	if err := r.Status().Patch(ctx, networkConfig, client.MergeFrom(original)); err != nil {
+		return false, fmt.Errorf("failed to update ServerNetworkConfig status: %w", err)
+	}
+
+	if networkConfig.Status.Phase != metalv1alpha1.NetworkCheckPhasePassed {
+		log.V(1).Info("Network check failed, requeueing", "message", networkConfig.Status.Message)
+		return false, nil
+	}
+	return true, nil
+}
+
+// switchPortMatch compares switch and port identifiers, normalising for common vendor variations.
+func switchPortMatch(expectedSwitch, expectedPort, actualSwitch, actualPort string) bool {
+	normaliseSwitch := func(s string) string {
+		// Strip domain suffix (e.g. "switch.example.com" → "switch")
+		if i := strings.Index(s, "."); i > 0 {
+			s = s[:i]
+		}
+		return strings.ToLower(s)
+	}
+	normalisePort := func(p string) string {
+		p = strings.ToLower(p)
+		// Longest forms first to avoid partial matches.
+		// Cisco IOS full names → standard abbreviations.
+		// NX-OS/ACI already uses "eth" natively; "ethernet→eth" covers that too.
+		p = strings.ReplaceAll(p, "fortygigabitethernet", "fo")
+		p = strings.ReplaceAll(p, "tengigabitethernet", "te")
+		p = strings.ReplaceAll(p, "twentyfivegige", "twe")
+		p = strings.ReplaceAll(p, "hundredgige", "hu")
+		p = strings.ReplaceAll(p, "gigabitethernet", "gi")
+		p = strings.ReplaceAll(p, "fastethernet", "fa")
+		p = strings.ReplaceAll(p, "ethernet", "eth")
+		return p
+	}
+	return normaliseSwitch(expectedSwitch) == normaliseSwitch(actualSwitch) &&
+		normalisePort(expectedPort) == normalisePort(actualPort)
+}
+
 func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, server *metalv1alpha1.Server) error {
 	// TODO: implement
 	return nil
@@ -1260,6 +1385,10 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&metalv1alpha1.ServerBootConfiguration{},
 			r.enqueueServerByServerBootConfiguration(),
 		).
+		Watches(
+			&metalv1alpha1.ServerNetworkConfig{},
+			r.enqueueServerByNetworkConfig(),
+		).
 		Complete(r)
 }
 
@@ -1283,6 +1412,20 @@ func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.Even
 		return []ctrl.Request{
 			{
 				NamespacedName: types.NamespacedName{Name: config.Spec.ServerRef.Name},
+			},
+		}
+	})
+}
+
+func (r *ServerReconciler) enqueueServerByNetworkConfig() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+		networkConfig := obj.(*metalv1alpha1.ServerNetworkConfig)
+		if networkConfig.Spec.ServerRef.Name == "" {
+			return nil
+		}
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{Name: networkConfig.Spec.ServerRef.Name},
 			},
 		}
 	})

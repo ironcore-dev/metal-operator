@@ -18,6 +18,8 @@ resources:
 - bases/metal.ironcore.dev_biossettingssets.yaml
 - bases/metal.ironcore.dev_bmcusers.yaml
 - bases/metal.ironcore.dev_bmcsettingssets.yaml
+# cert-manager CRDs required for BMC certificate management feature
+- cert-manager/cert-manager.crds.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:

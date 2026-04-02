@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
+---
+# Self-signed Issuer for E2E testing
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}

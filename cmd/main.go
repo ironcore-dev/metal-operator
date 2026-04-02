@@ -98,6 +98,8 @@ func main() { // nolint: gocyclo
 		bmcFailureResetDelay               time.Duration
 		bmcResetResyncInterval             time.Duration
 		bmcResetWaitingInterval            time.Duration
+		enableBMCCertificateManagement     bool
+		certificateRetryInterval           time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
@@ -167,6 +169,10 @@ func main() { // nolint: gocyclo
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.DurationVar(&biosSettingsApplyTimeout, "bios-setting-timeout", 2*time.Hour,
 		"Timeout for BIOS Settings Controller")
+	flag.BoolVar(&enableBMCCertificateManagement, "enable-bmc-certificate-management", false,
+		"Enable automatic BMC certificate management via cert-manager integration")
+	flag.DurationVar(&certificateRetryInterval, "certificate-retry-interval", 5*time.Minute,
+		"Interval to retry BMC certificate operations when they fail")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
 
@@ -373,16 +379,18 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
-		Client:                 mgr.GetClient(),
-		Scheme:                 mgr.GetScheme(),
-		Insecure:               insecure,
-		BMCFailureResetDelay:   bmcFailureResetDelay,
-		BMCResetWaitTime:       bmcResetWaitingInterval,
-		BMCClientRetryInterval: bmcResetResyncInterval,
-		ManagerNamespace:       managerNamespace,
-		EventURL:               eventURL,
-		DNSRecordTemplate:      dnsRecordTemplate,
-		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Client:                      mgr.GetClient(),
+		Scheme:                      mgr.GetScheme(),
+		Insecure:                    insecure,
+		BMCFailureResetDelay:        bmcFailureResetDelay,
+		BMCResetWaitTime:            bmcResetWaitingInterval,
+		BMCClientRetryInterval:      bmcResetResyncInterval,
+		ManagerNamespace:            managerNamespace,
+		EventURL:                    eventURL,
+		DNSRecordTemplate:           dnsRecordTemplate,
+		EnableCertificateManagement: enableBMCCertificateManagement,
+		CertificateRetryInterval:    certificateRetryInterval,
+		Conditions:                  conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},

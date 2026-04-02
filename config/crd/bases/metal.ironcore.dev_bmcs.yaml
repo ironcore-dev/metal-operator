@@ -120,6 +120,55 @@ spec:
                 description: BMCUUID is the unique identifier for the BMC as defined
                   in Redfish API.
                 type: string
+              certificate:
+                description: Certificate specifies the certificate configuration for
+                  the BMC.
+                properties:
+                  commonName:
+                    description: CommonName is the common name to be used on the certificate.
+                    type: string
+                  dnsNames:
+                    description: DNSNames is a list of DNS names to be used on the
+                      certificate.
+                    items:
+                      type: string
+                    type: array
+                  duration:
+                    description: Duration is the requested duration for the certificate.
+                    type: string
+                  ipAddresses:
+                    description: IPAddresses is a list of IP addresses to be used
+                      on the certificate.
+                    items:
+                      type: string
+                    type: array
+                  issuerRef:
+                    description: IssuerRef is a reference to the cert-manager Issuer
+                      or ClusterIssuer.
+                    properties:
+                      group:
+                        default: cert-manager.io
+                        description: |-
+                          Group is the API group of the Issuer or ClusterIssuer.
+                          Defaults to cert-manager.io if not specified.
+                          This field allows referencing issuers from external cert-manager implementations.
+                        type: string
+                      kind:
+                        default: Issuer
+                        description: Kind is the type of the issuer (Issuer or ClusterIssuer).
+                        enum:
+                        - Issuer
+                        - ClusterIssuer
+                        type: string
+                      name:
+                        description: Name is the name of the Issuer or ClusterIssuer.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - issuerRef
+                type: object
               consoleProtocol:
                 description: ConsoleProtocol specifies the protocol to be used for
                   console access to the BMC.
@@ -188,6 +237,25 @@ spec:
           status:
             description: BMCStatus defines the observed state of BMC.
             properties:
+              certificateRequestName:
+                description: CertificateRequestName is the name of the cert-manager
+                  CertificateRequest.
+                type: string
+              certificateSecretRef:
+                description: CertificateSecretRef is a reference to the secret containing
+                  the BMC certificate.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               conditions:
                 description: Conditions represents the latest available observations
                   of the BMC's current state.

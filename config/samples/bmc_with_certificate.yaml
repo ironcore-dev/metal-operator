@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
+---
+# Example BMC resource with certificate management enabled
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMC
+metadata:
+  labels:
+    manufacturer: "Dell"
+    app.kubernetes.io/name: bmc
+    app.kubernetes.io/instance: bmc-with-cert
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: bmc-with-cert
+spec:
+  # Network access configuration
+  access:
+    ip: 192.168.1.100
+    macAddress: "00:1A:2B:3C:4D:5E"
+
+  # BMC credentials reference
+  bmcSecretRef:
+    name: bmcsecret-sample
+
+  # Protocol configuration
+  protocol:
+    name: Redfish
+    port: 443
+    scheme: https
+
+  # Optional: BMC hostname (recommended for certificate management)
+  hostname: "bmc-server-01.example.com"
+
+  # Certificate configuration (managed by cert-manager)
+  certificate:
+    # Reference to cert-manager Issuer or ClusterIssuer
+    issuerRef:
+      name: selfsigned-issuer  # Name of your Issuer or ClusterIssuer
+      kind: Issuer             # "Issuer" or "ClusterIssuer"
+
+    # Optional: Certificate validity duration (defaults to issuer's default)
+    duration: 2160h  # 90 days
+
+    # Optional: Common name for the certificate
+    commonName: "bmc-server-01.example.com"
+
+    # Optional: DNS names to include in certificate (for multi-name certificates)
+    dnsNames:
+      - "bmc-server-01.example.com"
+      - "bmc-server-01.internal.example.com"
+
+    # Optional: IP addresses to include in certificate (for IP-based access)
+    ipAddresses:
+      - "192.168.1.100"

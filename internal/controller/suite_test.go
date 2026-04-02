@@ -5,13 +5,20 @@ package controller
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net/netip"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 
@@ -71,7 +78,10 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "config", "crd", "bases"),
+			filepath.Join("..", "..", "config", "crd", "cert-manager"),
+		},
 		ErrorIfCRDPathMissing: true,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
@@ -92,6 +102,7 @@ var _ = BeforeSuite(func() {
 	DeferCleanup(testEnv.Stop)
 
 	Expect(metalv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(certmanagerv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
 
@@ -171,15 +182,16 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect((&BMCReconciler{
-			Client:                 k8sManager.GetClient(),
-			Scheme:                 k8sManager.GetScheme(),
-			Insecure:               true,
-			ManagerNamespace:       ns.Name,
-			BMCResetWaitTime:       400 * time.Millisecond,
-			BMCClientRetryInterval: 25 * time.Millisecond,
-			EventURL:               "http://localhost:8008",
-			DNSRecordTemplate:      dnsTemplate,
-			Conditions:             accessor,
+			Client:                      k8sManager.GetClient(),
+			Scheme:                      k8sManager.GetScheme(),
+			Insecure:                    true,
+			ManagerNamespace:            ns.Name,
+			BMCResetWaitTime:            400 * time.Millisecond,
+			BMCClientRetryInterval:      25 * time.Millisecond,
+			EventURL:                    "http://localhost:8008",
+			DNSRecordTemplate:           dnsTemplate,
+			Conditions:                  accessor,
+			EnableCertificateManagement: true,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
@@ -383,4 +395,35 @@ func EnsureCleanState() {
 	for _, list := range objectLists {
 		Eventually(ObjectList(list)).Should(HaveField("Items", HaveLen(0)))
 	}
+}
+
+// generateTestCertificate creates a test X.509 certificate with specified validity duration.
+// This is a shared helper function used across unit and integration tests.
+func generateTestCertificate(validityDuration time.Duration, commonName string) []byte {
+	GinkgoHelper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).NotTo(HaveOccurred())
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(validityDuration),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	Expect(err).NotTo(HaveOccurred())
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certDER,
+	})
+
+	return certPEM
 }

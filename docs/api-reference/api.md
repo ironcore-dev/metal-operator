@@ -413,6 +413,26 @@ _Appears in:_
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 
 
+#### BMCCertificateSpec
+
+
+
+BMCCertificateSpec defines the desired certificate configuration for a BMC.
+
+
+
+_Appears in:_
+- [BMCSpec](#bmcspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `issuerRef` _[CertificateIssuerRef](#certificateissuerref)_ | IssuerRef is a reference to the cert-manager Issuer or ClusterIssuer. |  |  |
+| `duration` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | Duration is the requested duration for the certificate. |  |  |
+| `commonName` _string_ | CommonName is the common name to be used on the certificate. |  |  |
+| `dnsNames` _string array_ | DNSNames is a list of DNS names to be used on the certificate. |  |  |
+| `ipAddresses` _string array_ | IPAddresses is a list of IP addresses to be used on the certificate. |  |  |
+
+
 #### BMCPowerState
 
 _Underlying type:_ _string_
@@ -628,6 +648,7 @@ _Appears in:_
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
 | `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
+| `certificate` _[BMCCertificateSpec](#bmccertificatespec)_ | Certificate specifies the certificate configuration for the BMC. |  |  |
 
 
 #### BMCState
@@ -673,6 +694,8 @@ _Appears in:_
 | `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  |  |
 | `metricsReportSubscriptionLink` _string_ | MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc. |  |  |
 | `eventsSubscriptionLink` _string_ | EventsSubscriptionLink is the link to the events subscription of the bmc. |  |  |
+| `certificateSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | CertificateSecretRef is a reference to the secret containing the BMC certificate. |  |  |
+| `certificateRequestName` _string_ | CertificateRequestName is the name of the cert-manager CertificateRequest. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  |  |
 
 
@@ -905,6 +928,23 @@ _Appears in:_
 | `name` _string_ | Name is the name of the boot device. |  |  |
 | `priority` _integer_ | Priority is the priority of the boot device. |  |  |
 | `device` _string_ | Device is the device to boot from. |  |  |
+
+
+#### CertificateIssuerRef
+
+
+
+CertificateIssuerRef defines a reference to a cert-manager Issuer or ClusterIssuer.
+
+
+
+_Appears in:_
+- [BMCCertificateSpec](#bmccertificatespec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the name of the Issuer or ClusterIssuer. |  |  |
+| `kind` _string_ | Kind is the type of the issuer (Issuer or ClusterIssuer). | Issuer | Enum: [Issuer ClusterIssuer] <br /> |
 
 
 #### ConsoleProtocol

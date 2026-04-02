@@ -5,15 +5,20 @@ package bmcutils
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"slices"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"golang.org/x/crypto/ssh"
+	v1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -170,9 +175,73 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 		return nil, fmt.Errorf("failed to get BMC secret: %w", err)
 	}
 
+	// Load certificate for secure connection if available
+	if !insecure && bmcObj.Status.CertificateSecretRef != nil {
+		tlsConfig, err := loadTLSConfigFromSecret(ctx, c, bmcObj)
+		if err != nil {
+			// Log warning but continue with insecure connection
+			log := ctrl.LoggerFrom(ctx)
+			log.V(1).Info("Failed to load certificate, using insecure connection", "error", err)
+		} else {
+			options.TLSConfig = tlsConfig
+		}
+	}
+
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, insecure)
 	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options)
 	return bmcClient, err
+}
+
+// loadTLSConfigFromSecret loads TLS configuration from a certificate secret
+func loadTLSConfigFromSecret(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC) (*tls.Config, error) {
+	secret := &v1.Secret{}
+	secretKey := client.ObjectKey{
+		Name:      bmcObj.Status.CertificateSecretRef.Name,
+		Namespace: getManagerNamespace(), // Use manager namespace for cluster-scoped BMC
+	}
+
+	if err := c.Get(ctx, secretKey, secret); err != nil {
+		return nil, fmt.Errorf("failed to get certificate secret: %w", err)
+	}
+
+	// Load CA certificate
+	caCertPEM := secret.Data["ca.crt"]
+	if len(caCertPEM) == 0 {
+		return nil, fmt.Errorf("ca.crt not found in certificate secret")
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCertPEM) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+	}
+
+	// Add client certificate if present (for operator-generated CSR case)
+	if certPEM, hasCert := secret.Data["tls.crt"]; hasCert {
+		if keyPEM, hasKey := secret.Data["tls.key"]; hasKey {
+			cert, err := tls.X509KeyPair(certPEM, keyPEM)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load client certificate: %w", err)
+			}
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+	}
+
+	return tlsConfig, nil
+}
+
+// getManagerNamespace returns the namespace where the metal-operator is running
+func getManagerNamespace() string {
+	// Try to read from environment variable first (set by Kubernetes)
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns
+	}
+	// Default namespace
+	return "metal-operator-system"
 }
 
 func CreateBMCClient(

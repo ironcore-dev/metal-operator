@@ -923,10 +923,10 @@ func (r *ServerReconciler) bootServer(ctx context.Context, bmcClient bmc.BMC, se
 
 	switch config.Spec.BootMethod {
 	case metalv1alpha1.BootMethodVirtualMedia:
-		log.Info("Booting server via virtual media")
+		log.V(1).Info("Booting server via virtual media")
 		return r.virtualMediaBootServer(ctx, bmcClient, server, config)
 	default: // BootMethodPXE or empty
-		log.Info("Booting server via PXE")
+		log.V(1).Info("Booting server via PXE")
 		return r.pxeBootServer(ctx, bmcClient, server)
 	}
 }
@@ -988,6 +988,8 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, bmcClient
 		return fmt.Errorf("failed to get system info for manufacturer detection: %w", err)
 	}
 
+	// Eject any existing virtual media before mounting new ISOs
+	// We log but don't fail on eject errors - the subsequent mount will fail if ejection was truly necessary
 	for _, media := range currentMedia {
 		if media.Inserted != nil && *media.Inserted {
 			normalizedSlotID := normalizeVirtualMediaSlotID(systemInfo.Manufacturer, media.ID)
@@ -1000,8 +1002,8 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, bmcClient
 	}
 
 	// Determine slot IDs based on manufacturer
-	// HPE: Slot 1 = USB, Slot 2 = CD (bootable OS must be on CD)
-	// Dell/Lenovo: Slot 1 = CD, Slot 2 = CD
+	// HPE: Slot 1 = USB (config), Slot 2 = CD (boot) - bootable OS must be on CD
+	// Dell/Lenovo: Slot 1 = CD (boot), Slot 2 = CD (config)
 	bootISOSlot := "1"
 	configISOSlot := "2"
 

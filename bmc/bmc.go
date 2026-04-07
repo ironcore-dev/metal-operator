@@ -152,7 +152,7 @@ type BMC interface {
 	EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error
 
 	// GetVirtualMediaStatus retrieves the status of all virtual media devices.
-	GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error)
+	GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error)
 }
 
 type Entity struct {

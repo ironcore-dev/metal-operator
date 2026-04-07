@@ -1074,18 +1074,19 @@ func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string
 	return nil
 }
 
-func (r *RedfishBMC) SetVirtualMediaBootOnce(ctx context.Context, systemURI string) error {
+// SetVirtualMediaBootOnce configures the system to boot from virtual media (CD) once.
+func (r *RedfishBaseBMC) SetVirtualMediaBootOnce(ctx context.Context, systemURI string) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	system, err := redfish.GetComputerSystem(r.client, systemURI)
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get system: %w", err)
 	}
 
-	setBoot := redfish.Boot{
-		BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled, // One-time only
-		BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,    // UEFI mode
-		BootSourceOverrideTarget:  redfish.CdBootSourceOverrideTarget,    // CD/DVD (virtual media)
+	setBoot := &schemas.Boot{
+		BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled, // One-time only
+		BootSourceOverrideMode:    schemas.UEFIBootSourceOverrideMode,    // UEFI mode
+		BootSourceOverrideTarget:  schemas.CdBootSource,                  // CD/DVD (virtual media)
 	}
 
 	if err := system.SetBoot(setBoot); err != nil {
@@ -1096,45 +1097,20 @@ func (r *RedfishBMC) SetVirtualMediaBootOnce(ctx context.Context, systemURI stri
 	return nil
 }
 
-func (r *RedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
-	manufacturer, err := r.getSystemManufacturer()
-	if err != nil {
-		return fmt.Errorf("failed to get manufacturer: %w", err)
-	}
-
-	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
-	if err != nil {
-		return fmt.Errorf("failed to get OEM interface: %w", err)
-	}
-
-	return oemInterface.MountVirtualMedia(ctx, systemURI, mediaURL, slotID)
+// MountVirtualMedia returns not supported error for base implementation.
+// Vendor-specific types override this method.
+func (r *RedfishBaseBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	return fmt.Errorf("virtual media mounting not supported for this BMC type")
 }
 
-func (r *RedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
-	manufacturer, err := r.getSystemManufacturer()
-	if err != nil {
-		return fmt.Errorf("failed to get manufacturer: %w", err)
-	}
-
-	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
-	if err != nil {
-		return fmt.Errorf("failed to get OEM interface: %w", err)
-	}
-
-	return oemInterface.EjectVirtualMedia(ctx, systemURI, slotID)
+// EjectVirtualMedia returns not supported error for base implementation.
+// Vendor-specific types override this method.
+func (r *RedfishBaseBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	return fmt.Errorf("virtual media ejection not supported for this BMC type")
 }
 
-// GetVirtualMediaStatus retrieves the status of all virtual media devices.
-func (r *RedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*redfish.VirtualMedia, error) {
-	manufacturer, err := r.getSystemManufacturer()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get manufacturer: %w", err)
-	}
-
-	oemInterface, err := NewOEMInterface(manufacturer, r.client.GetService())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OEM interface: %w", err)
-	}
-
-	return oemInterface.GetVirtualMediaStatus(ctx, systemURI)
+// GetVirtualMediaStatus returns not supported error for base implementation.
+// Vendor-specific types override this method.
+func (r *RedfishBaseBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
+	return nil, fmt.Errorf("virtual media status not supported for this BMC type")
 }

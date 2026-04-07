@@ -93,6 +93,7 @@ func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBase
 		Insecure:  options.InsecureTLS,
 		BasicAuth: options.BasicAuth,
 	}
+
 	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
 		return nil, err
@@ -1139,4 +1140,110 @@ func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string
 		return fmt.Errorf("failed to delete event subscription: %w", err)
 	}
 	return nil
+}
+
+// GenerateCSR generates a Certificate Signing Request (CSR) with the provided parameters.
+// The CSR can be submitted to a Certificate Authority for signing.
+func (r *RedfishBaseBMC) GenerateCSR(ctx context.Context, params CSRParameters) ([]byte, error) {
+	service := r.client.GetService()
+	certService, err := service.CertificateService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate service: %w", err)
+	}
+	if certService == nil {
+		return nil, fmt.Errorf("certificate service is not available")
+	}
+
+	// Build the GenerateCSR action payload from params
+	csrParams := &schemas.CertificateServiceGenerateCSRParameters{
+		CommonName:         params.CommonName,
+		AlternativeNames:   params.AlternativeNames,
+		Organization:       params.Organization,
+		OrganizationalUnit: params.OrganizationalUnit,
+		City:               params.City,
+		State:              params.State,
+		Country:            params.Country,
+		KeyPairAlgorithm:   params.KeyPairAlgorithm,
+		KeyBitLength:       params.KeyBitLength,
+	}
+
+	// Call certificateService.GenerateCSR
+	response, err := certService.GenerateCSR(csrParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate CSR: %w", err)
+	}
+
+	if response == nil || response.CSRString == "" {
+		return nil, fmt.Errorf("empty CSR string in response")
+	}
+
+	return []byte(response.CSRString), nil
+}
+
+// ReplaceCertificate replaces the BMC's TLS certificate with the provided certificate and private key.
+// The certificate and privateKey should be PEM-encoded strings.
+func (r *RedfishBaseBMC) ReplaceCertificate(ctx context.Context, certificate, privateKey string) error {
+	service := r.client.GetService()
+	certService, err := service.CertificateService()
+	if err != nil {
+		return fmt.Errorf("failed to get certificate service: %w", err)
+	}
+	if certService == nil {
+		return fmt.Errorf("certificate service is not available")
+	}
+
+	// Build the certificate string, including private key if provided
+	certString := certificate
+	if privateKey != "" {
+		certString = certificate + "\n" + privateKey
+	}
+
+	// Get the certificate locations to find the certificate URI
+	certLocations, err := certService.CertificateLocations()
+	if err != nil {
+		return fmt.Errorf("failed to get certificate locations: %w", err)
+	}
+	if certLocations == nil {
+		return fmt.Errorf("certificate locations not available")
+	}
+
+	// Get the certificates from the location
+	certificates, err := certLocations.Certificates()
+	if err != nil {
+		return fmt.Errorf("failed to get certificates: %w", err)
+	}
+
+	// For now, use the first certificate URI if available
+	// TODO: Make certificate URI selection more configurable
+	if len(certificates) == 0 {
+		return fmt.Errorf("no certificate URI available for replacement")
+	}
+	certURI := certificates[0].ODataID
+
+	// Build ReplaceCertificate action payload
+	replaceParams := &schemas.CertificateServiceReplaceCertificateParameters{
+		CertificateString: certString,
+		CertificateType:   schemas.PEMCertificateType,
+		CertificateURI:    certURI,
+	}
+
+	// Call certificateService.ReplaceCertificate
+	taskInfo, err := certService.ReplaceCertificate(replaceParams)
+	if err != nil {
+		return fmt.Errorf("failed to replace certificate: %w", err)
+	}
+
+	// If a task was created, we could monitor it, but for now just return success
+	if taskInfo != nil {
+		// Task created - certificate replacement is in progress
+		log := ctrl.LoggerFrom(ctx)
+		log.V(2).Info("Certificate replacement task created", "taskMonitor", taskInfo)
+	}
+
+	return nil
+}
+
+// GetCertificateInfo retrieves information about the BMC's current TLS certificate.
+func (r *RedfishBaseBMC) GetCertificateInfo(ctx context.Context) (*CertificateInfo, error) {
+	return nil, fmt.Errorf("GetCertificateInfo not implemented")
 }

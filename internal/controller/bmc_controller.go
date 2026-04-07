@@ -78,6 +78,7 @@ type BMCReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -133,6 +134,17 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
 	}
+
+	// Certificate reconciliation (before BMC operations)
+	if result, err := r.reconcileCertificate(ctx, bmcObj); err != nil || !result.IsZero() {
+		return result, err
+	}
+
+	// Re-fetch BMC after certificate reconciliation to get latest status
+	if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Name}, bmcObj); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
 	if r.waitForBMCReset(bmcObj, r.BMCResetWaitTime) {
 		log.V(1).Info("Skipped BMC reconciliation while waiting for BMC reset to complete")
 		err := r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
@@ -625,6 +637,44 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 	}
 }
 
+// enqueueBMCByTLSSecret maps Secret events to BMC reconciliation requests.
+// It finds all BMCs that reference the changed TLS secret and triggers reconciliation.
+func (r *BMCReconciler) enqueueBMCByTLSSecret(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	secret := obj.(*corev1.Secret)
+
+	// Only process kubernetes.io/tls secrets
+	if secret.Type != corev1.SecretTypeTLS {
+		return nil
+	}
+
+	// Find all BMCs that reference this secret
+	bmcList := &metalv1alpha1.BMCList{}
+	if err := r.List(ctx, bmcList); err != nil {
+		log.Error(err, "Failed to list BMCs for TLS secret watch")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, bmcItem := range bmcList.Items {
+		if bmcItem.Spec.TLSSecretRef != nil &&
+			bmcItem.Spec.TLSSecretRef.Name == secret.Name &&
+			(bmcItem.Spec.TLSSecretRef.Namespace == "" || bmcItem.Spec.TLSSecretRef.Namespace == secret.Namespace) {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: bmcItem.Name},
+			})
+		}
+	}
+
+	if len(requests) > 0 {
+		log.V(1).Info("TLS secret changed, enqueuing BMCs for reconciliation",
+			"secret", secret.Name,
+			"bmcCount", len(requests))
+	}
+
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -632,5 +682,6 @@ func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&metalv1alpha1.Server{}).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
 		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByTLSSecret)).
 		Complete(r)
 }

@@ -268,6 +268,14 @@ func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, t
 	return task, nil
 }
 
+// GenerateCSR generates a Certificate Signing Request (CSR) with failure simulation support.
+func (r *RedfishLocalBMC) GenerateCSR(ctx context.Context, params CSRParameters) ([]byte, error) {
+	if UnitTestMockUps.SimulateCSRGenerationFailure {
+		return nil, fmt.Errorf("simulated CSR generation failure")
+	}
+	return r.RedfishBaseBMC.GenerateCSR(ctx, params)
+}
+
 // CheckBMCPendingComponentUpgrade returns false for local provider.
 // This is the expected behavior for non-real hardware environments; vendor implementations
 // (Dell, HPE, Lenovo) override this to check actual firmware inventory.

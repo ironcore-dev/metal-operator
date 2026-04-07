@@ -339,23 +339,11 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 	}
 	log.V(1).Info("Updated Server status system info")
 
-	if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server); err != nil {
+	config, err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server)
+	if err != nil {
 		return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
 	}
 	log.V(1).Info("Applied Server boot configuration")
-
-	// Get the server boot configuration to determine boot type
-	if server.Spec.BootConfigurationRef == nil {
-		return false, fmt.Errorf("server boot configuration reference is nil")
-	}
-
-	config := &metalv1alpha1.ServerBootConfiguration{}
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: server.Spec.BootConfigurationRef.Namespace,
-		Name:      server.Spec.BootConfigurationRef.Name,
-	}, config); err != nil {
-		return false, fmt.Errorf("failed to get server boot configuration: %w", err)
-	}
 
 	if err := r.bootServer(ctx, bmcClient, server, config); err != nil {
 		return false, fmt.Errorf("failed to boot server: %w", err)
@@ -712,7 +700,7 @@ func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context,
 	return nil
 }
 
-func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) (*metalv1alpha1.ServerBootConfiguration, error) {
 	log := ctrl.LoggerFrom(ctx)
 	bootConfig := &metalv1alpha1.ServerBootConfiguration{}
 	bootConfig.Name = server.Name
@@ -729,15 +717,18 @@ func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx con
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
+		return nil, fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
 	}
 
 	log.V(1).Info("Created or patched", "ServerBootConfiguration", bootConfig.Name, "Namespace", bootConfig.Namespace, "Operation", opResult)
 
 	if err := r.ensureServerBootConfigRef(ctx, server, bootConfig); err != nil {
-		return err
+		return nil, err
 	}
-	return r.applyDefaultIgnitionForServer(ctx, server, bootConfig, r.RegistryURL)
+	if err := r.applyDefaultIgnitionForServer(ctx, server, bootConfig, r.RegistryURL); err != nil {
+		return nil, err
+	}
+	return bootConfig, nil
 }
 
 func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, server *metalv1alpha1.Server, bootConfig *metalv1alpha1.ServerBootConfiguration, registryURL string) error {
@@ -907,7 +898,21 @@ func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, s
 	if err := r.Get(ctx, client.ObjectKey{Namespace: server.Spec.BootConfigurationRef.Namespace, Name: server.Spec.BootConfigurationRef.Name}, config); err != nil {
 		return false, err
 	}
-	return config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady, nil
+
+	// Check basic readiness
+	if config.Status.State != metalv1alpha1.ServerBootConfigurationStateReady {
+		return false, nil
+	}
+
+	// For VirtualMedia boot, also verify that BootISOURL is populated
+	// This prevents error loops if boot-operator sets State=Ready before populating the URL
+	if config.Spec.BootMethod == metalv1alpha1.BootMethodVirtualMedia {
+		if config.Status.BootISOURL == "" {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func (r *ServerReconciler) bootServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {

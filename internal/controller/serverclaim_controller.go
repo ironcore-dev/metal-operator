@@ -459,7 +459,7 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 		var req []reconcile.Request
 		claimList := &metalv1alpha1.ServerClaimList{}
 		if err := r.List(ctx, claimList); err != nil {
-			log.Error(err, "failed to list host claims")
+			log.Error(err, "Failed to list host claims")
 			return nil
 		}
 		for _, claim := range claimList.Items {

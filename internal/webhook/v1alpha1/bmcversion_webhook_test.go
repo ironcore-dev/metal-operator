@@ -37,7 +37,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 				BMCRef: &v1.LocalObjectReference{Name: "foo"},
 			},
 		}
-		By("Creating an BMCVersion")
+		By("Creating a BMCVersion")
 		Expect(k8sClient.Create(ctx, BMCVersionV1)).To(Succeed())
 		SetClient(k8sClient)
 
@@ -49,7 +49,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 	})
 
 	Context("When creating or updating BMCVersion under Validating Webhook", func() {
-		It("Should deny creation if a BMC referred is already referred by another", func(ctx SpecContext) {
+		It("should deny creation if a BMC referred is already referred by another", func(ctx SpecContext) {
 			By("Creating another BMCVersion with reference to existing referred BMC")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
@@ -68,7 +68,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(validator.ValidateCreate(ctx, BMCVersionV2)).Error().To(HaveOccurred())
 		})
 
-		It("Should create if a referenced BMC is NOT duplicate", func() {
+		It("should create if a referenced BMC is NOT duplicate", func() {
 			By("Creating another BMCVersion for different BMCRef")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
@@ -87,7 +87,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
 		})
 
-		It("Should deny Update if a BMC referred is already referred by another", func() {
+		It("should deny Update if a BMC referred is already referred by another", func() {
 			By("Creating another BMCVersion with different BMCRef")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
@@ -111,7 +111,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV2Updated)).Error().To(HaveOccurred())
 		})
 
-		It("Should Update if a BMC referred is NOT referred by another", func() {
+		It("should update if a BMC referred is not referred by another", func() {
 			By("Creating another BMCVersion with different BMCref")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
@@ -135,8 +135,8 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, BMCVersionV2, BMCVersionV2Updated)).Error().NotTo(HaveOccurred())
 		})
 
-		It("Should NOT allow update settings is in progress. but should allow to Force it", func() {
-			By("Patching the biosSettings V1 to Inprogress state")
+		It("should not allow update when settings are in progress, but should allow forcing it", func() {
+			By("Patching the BMCVersion V1 to InProgress state")
 			Eventually(UpdateStatus(BMCVersionV1, func() {
 				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateInProgress
 			})).Should(Succeed())
@@ -157,8 +157,8 @@ var _ = Describe("BMCVersion Webhook", func() {
 			})).Should(Succeed())
 		})
 
-		It("Should refuse to delete if InProgress", func() {
-			By("Patching the BMCVersionV1 to a Inprogress state")
+		It("should refuse to delete if InProgress", func() {
+			By("Patching the BMCVersion V1 to an InProgress state")
 			Eventually(UpdateStatus(BMCVersionV1, func() {
 				BMCVersionV1.Status.State = metalv1alpha1.BMCVersionStateInProgress
 			})).Should(Succeed())

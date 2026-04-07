@@ -33,13 +33,13 @@ var _ = Describe("BMCSecret Webhook", func() {
 				"password": []byte("adminpass"),
 			},
 		}
-		By("Creating an BMCSecret")
+		By("Creating a BMCSecret")
 		Expect(k8sClient.Create(ctx, BMCSecret)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, BMCSecret)
 	})
 
 	Context("When creating or updating BMCSecret under Validating Webhook", func() {
-		It("Should deny Update BMCSecret if Immutable is set to True", func(ctx SpecContext) {
+		It("should deny Update BMCSecret if Immutable is set to True", func(ctx SpecContext) {
 			By("Setting Immutable to True")
 			Eventually(Update(BMCSecret, func() {
 				BMCSecret.Immutable = ptr.To(true)
@@ -51,7 +51,7 @@ var _ = Describe("BMCSecret Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, BMCSecret, BMCSecretUpdated)).Error().To(HaveOccurred())
 		})
 
-		It("Should allow Update BMCSecret if Immutable is set to False", func(ctx SpecContext) {
+		It("should allow Update BMCSecret if Immutable is set to False", func(ctx SpecContext) {
 			By("Updating an BMCSecret with Immutable set to False")
 			BMCSecretMutable := BMCSecret.DeepCopy()
 			BMCSecretMutable.Immutable = ptr.To(false)

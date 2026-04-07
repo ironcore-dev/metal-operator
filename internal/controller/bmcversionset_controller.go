@@ -376,14 +376,14 @@ func (r *BMCVersionSetReconciler) enqueueByBMC(ctx context.Context, obj client.O
 
 	bmcVersionSetList := &metalv1alpha1.BMCVersionSetList{}
 	if err := r.List(ctx, bmcVersionSetList); err != nil {
-		log.Error(err, "failed to list BMCVersionSet")
+		log.Error(err, "Failed to list BMCVersionSet")
 		return nil
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, bmcVersionSet := range bmcVersionSetList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&bmcVersionSet.Spec.BMCSelector)
 		if err != nil {
-			log.Error(err, "failed to convert label selector")
+			log.Error(err, "Failed to convert label selector")
 			return nil
 		}
 		// if the host label matches the selector, enqueue the request
@@ -397,7 +397,7 @@ func (r *BMCVersionSetReconciler) enqueueByBMC(ctx context.Context, obj client.O
 		} else { // if the label has been removed
 			ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, &bmcVersionSet)
 			if err != nil {
-				log.Error(err, "failed to get owned BMCVersion resources")
+				log.Error(err, "Failed to get owned BMCVersion resources")
 				return nil
 			}
 			for _, bmcVersion := range ownedBMCVersions.Items {

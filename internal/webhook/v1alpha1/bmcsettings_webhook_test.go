@@ -35,7 +35,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
-		By("Creating an BMCSettings")
+		By("Creating a BMCSettings")
 		Expect(k8sClient.Create(ctx, BMCSettingsV1)).To(Succeed())
 		validator = BMCSettingsCustomValidator{Client: k8sClient}
 		SetClient(k8sClient)
@@ -49,7 +49,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 
 	Context("When creating or updating BMCSettings under Validating Webhook", func() {
 
-		It("Should deny creation if a BMC referred is already referred by another", func(ctx SpecContext) {
+		It("should deny creation if a BMC referred is already referred by another", func(ctx SpecContext) {
 			By("Creating another BMCSettings with reference to existing referred BMC")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
@@ -67,7 +67,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 			Expect(validator.ValidateCreate(ctx, BMCSettingsV2)).Error().To(HaveOccurred())
 		})
 
-		It("Should create if a referenced BMC is NOT duplicate", func() {
+		It("should create if a referenced BMC is NOT duplicate", func() {
 			By("Creating another BMCSetting for different BMCRef")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
@@ -85,7 +85,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
 		})
 
-		It("Should deny Update if a BMC referred is already referred by another", func() {
+		It("should deny Update if a BMC referred is already referred by another", func() {
 			By("Creating another BMCSetting with different BMCRef")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
@@ -108,7 +108,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().To(HaveOccurred())
 		})
 
-		It("Should Update if a BMC referred is NOT referred by another", func() {
+		It("should update if a BMC referred is not referred by another", func() {
 			By("Creating another BMCSetting with different BMCref")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
@@ -131,8 +131,8 @@ var _ = Describe("BMCSettings Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().NotTo(HaveOccurred())
 		})
 
-		It("Should NOT allow update settings is in progress. but should allow to Force it", func() {
-			By("Patching the bmcSettings V1 to Inprogress state")
+		It("should not allow update when settings are in progress, but should allow forcing it", func() {
+			By("Patching the BMCSettings V1 to InProgress state")
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
 			})).Should(Succeed())
@@ -155,7 +155,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 			})).Should(Succeed())
 		})
 
-		It("Should refuse to delete if InProgress", func() {
+		It("should refuse to delete if InProgress", func() {
 			By("Patching the BMCSettings V1 to a InProgress state")
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress

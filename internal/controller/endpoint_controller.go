@@ -70,7 +70,7 @@ func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1
 
 func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Reconciling endpoint")
+	log.V(1).Info("Reconciling Endpoint")
 	if shouldIgnoreReconciliation(endpoint) {
 		log.V(1).Info("Skipped Endpoint reconciliation")
 		return ctrl.Result{}, nil
@@ -152,12 +152,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
 			default:
-				return ctrl.Result{}, fmt.Errorf("uknown protocol: %s", m.Protocol)
+				return ctrl.Result{}, fmt.Errorf("unknown protocol: %s", m.Protocol)
 			}
 			// TODO: other types like Switches can be handled here later
 		}
 	}
-	log.V(1).Info("Reconciled endpoint")
+	log.V(1).Info("Reconciled Endpoint")
 
 	return ctrl.Result{}, nil
 }

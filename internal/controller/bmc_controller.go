@@ -514,14 +514,14 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 		}
 	}
 	// BMC Unavailable, currently can not perform reset. try to reset with ssh when available
-	log.Error(err, "failed to reset BMC via Redfish, falling back to rest via ssh", "BMC", bmcObj.Name)
+	log.Error(err, "Failed to reset BMC via Redfish, falling back to reset via SSH", "BMC", bmcObj.Name)
 	if httpErr, ok := err.(*schemas.Error); ok {
 		// only handle 5xx errors
 		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-			return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("cannot reset bmc: %w", err))
+			return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("could not reset BMC: %w", err))
 		}
 	} else {
-		return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
+		return fmt.Errorf("could not reset BMC, unknown error: %w", err)
 	}
 	return nil
 }

@@ -77,7 +77,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 	condFound, err := acc.FindSlice(conditions, conditionType, condition)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
+		return nil, fmt.Errorf("failed to find Condition %v. error: %w", conditionType, err)
 	}
 	if !condFound {
 		condition.Type = conditionType
@@ -85,7 +85,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
 		); err != nil {
-			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
+			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %w", conditionType, err)
 		}
 	}
 
@@ -217,7 +217,7 @@ func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv
 		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
 		BMC := &metalv1alpha1.BMC{}
 		if err := kClient.Get(ctx, key, BMC); err != nil {
-			log.Error(err, "failed to get referred server's Manager")
+			log.Error(err, "Failed to get referred server's Manager")
 			return err
 		}
 		annotations := BMC.GetAnnotations()

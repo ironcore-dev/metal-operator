@@ -35,7 +35,7 @@ var _ = Describe("Endpoint Webhook", func() {
 	})
 
 	Context("When creating or updating an Endpoint under Validating Webhook", func() {
-		It("Should deny creation if an Endpoint has a duplicate MAC address", func(ctx SpecContext) {
+		It("should deny creation if an Endpoint has a duplicate MAC address", func(ctx SpecContext) {
 			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
@@ -61,7 +61,7 @@ var _ = Describe("Endpoint Webhook", func() {
 			Expect(validator.ValidateCreate(ctx, existingEndpoint)).Error().To(HaveOccurred())
 		})
 
-		It("Should allow creation if an Endpoint has a unique MAC address", func(ctx SpecContext) {
+		It("should allow creation if an Endpoint has a unique MAC address", func(ctx SpecContext) {
 			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
@@ -87,7 +87,7 @@ var _ = Describe("Endpoint Webhook", func() {
 			Expect(validator.ValidateCreate(ctx, existingEndpoint)).Error().ToNot(HaveOccurred())
 		})
 
-		It("Should deny update of an Endpoint with existing MAC address", func() {
+		It("should deny update of an Endpoint with existing MAC address", func() {
 			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
@@ -118,7 +118,7 @@ var _ = Describe("Endpoint Webhook", func() {
 			Expect(validator.ValidateUpdate(ctx, endpoint, updatedEndpoint)).Error().To(HaveOccurred())
 		})
 
-		It("Should allow update an IP address of the same Endpoint", func() {
+		It("should allow updating an IP address of the same Endpoint", func() {
 			By("Creating an Endpoint")
 			existingEndpoint := &metalv1alpha1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{

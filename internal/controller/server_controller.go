@@ -364,7 +364,7 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+		log.V(1).Info("Server boot configuration is not ready, retrying")
 		return true, err
 	}
 	log.V(1).Info("Server boot configuration is ready")
@@ -399,7 +399,7 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		return true, nil
 	}
 	if err != nil {
-		log.V(1).Info("Could not get server details from registry.")
+		log.V(1).Info("Could not get server details from registry")
 		return false, err
 	}
 
@@ -504,7 +504,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 	}
 
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-		log.V(1).Info("Server boot configuration is not ready. Retrying ...")
+		log.V(1).Info("Server boot configuration is not ready, retrying")
 		return true, err
 	}
 	log.V(1).Info("Server boot configuration is ready")
@@ -812,7 +812,7 @@ func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, bmcClien
 	if server.Status.State == metalv1alpha1.ServerStateInitial &&
 		server.Status.PowerState == metalv1alpha1.ServerOnPowerState &&
 		r.EnforceFirstBoot {
-		log.V(1).Info("Server in initial state is powered on. Ensure that it is powered off.")
+		log.V(1).Info("Server in initial state is powered on, ensuring it is powered off")
 		requeue, err := r.setAndPatchServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff)
 		if err != nil {
 			return false, fmt.Errorf("failed to set server power state: %w", err)
@@ -834,9 +834,9 @@ func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, bmcC
 		return false, fmt.Errorf("failed to patch Server: %w", err)
 	}
 	if op == controllerutil.OperationResultUpdated {
-		log.V(1).Info("Server updated to power off state.")
+		log.V(1).Info("Server updated to power off state")
 		if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
-			log.V(1).Info("ensuring power state failed.")
+			log.V(1).Info("Ensuring power state failed")
 		}
 		return true, nil
 	}

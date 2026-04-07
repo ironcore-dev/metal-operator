@@ -39,7 +39,7 @@ var _ = Describe("Server Webhook", func() {
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 		validator = ServerCustomValidator{Client: k8sClient}
 		SetClient(k8sClient)
-		By("Creating an server")
+		By("Creating a Server")
 	})
 
 	AfterEach(func(ctx context.Context) {
@@ -48,7 +48,7 @@ var _ = Describe("Server Webhook", func() {
 	})
 
 	Context("When deleting Server under Validating Webhook", func() {
-		It("Should refuse to delete if in Maintenance", func() {
+		It("should refuse to delete if in Maintenance", func() {
 			By("Patching the server to a maintenance state and adding finalizer")
 			Eventually(UpdateStatus(server, func() {
 				server.Status.State = metalv1alpha1.ServerStateMaintenance
@@ -67,7 +67,7 @@ var _ = Describe("Server Webhook", func() {
 	})
 
 	Context("When updating ServerClaimRef under CEL validation", func() {
-		It("Should reject changing the name of an existing ServerClaimRef", func() {
+		It("should reject changing the name of an existing ServerClaimRef", func() {
 			By("Setting a ServerClaimRef")
 			Eventually(Update(server, func() {
 				server.Spec.ServerClaimRef = &metalv1alpha1.ImmutableObjectReference{
@@ -83,7 +83,7 @@ var _ = Describe("Server Webhook", func() {
 			})()).To(Not(Succeed()))
 		})
 
-		It("Should reject changing the namespace of an existing ServerClaimRef", func() {
+		It("should reject changing the namespace of an existing ServerClaimRef", func() {
 			By("Setting a ServerClaimRef")
 			Eventually(Update(server, func() {
 				server.Spec.ServerClaimRef = &metalv1alpha1.ImmutableObjectReference{

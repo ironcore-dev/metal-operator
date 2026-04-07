@@ -670,5 +670,155 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, bmcSettings01_02)).To(Succeed())
 			Eventually(Get(bmcSettings01_02)).Should(Satisfy(apierrors.IsNotFound))
 		})
+
+		It("Should merge dynamic settings and override static settings", func(ctx SpecContext) {
+			By("Creating dynamic setting sources")
+			dynamicConfigMap := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "dynamic-settings-cm",
+				},
+				Data: map[string]string{
+					"suffix": "cm",
+				},
+			}
+			Expect(k8sClient.Create(ctx, dynamicConfigMap)).To(Succeed())
+
+			dynamicSecret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "dynamic-settings-secret",
+				},
+				Data: map[string][]byte{
+					"token": []byte("secret"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, dynamicSecret)).To(Succeed())
+
+			By("Creating a BMCSettingsSet with static and dynamic settings")
+			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-bmcsettingsset-dynamic-",
+				},
+				Spec: metalv1alpha1.BMCSettingsSetSpec{
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						SettingsMap: map[string]string{
+							"abc": "static-value",
+						},
+					},
+					DynamicSettings: []metalv1alpha1.DynamicSetting{
+						{
+							Key: "abc",
+							ValueFrom: &metalv1alpha1.DynamicSettingSource{
+								BMCLabel: "metal.ironcore.dev/Model",
+							},
+						},
+						{
+							Key:    "composite",
+							Format: "{{.model}}-{{.token}}-{{.suffix}}",
+							Variables: map[string]metalv1alpha1.DynamicSettingSource{
+								"model": {
+									BMCLabel: "metal.ironcore.dev/Model",
+								},
+								"token": {
+									SecretKeyRef: &metalv1alpha1.NamespacedKeySelector{
+										Namespace: ns.Name,
+										Name:      dynamicSecret.Name,
+										Key:       "token",
+									},
+								},
+								"suffix": {
+									ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
+										Namespace: ns.Name,
+										Name:      dynamicConfigMap.Name,
+										Key:       "suffix",
+									},
+								},
+							},
+						},
+					},
+					BMCSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"metal.ironcore.dev/Manufacturer": "foo",
+							"metal.ironcore.dev/Model":        "bar",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSettingsSet)).To(Succeed())
+
+			By("Verifying dynamic values are resolved and override static values")
+			bmcSettings01 := &metalv1alpha1.BMCSettings{ObjectMeta: metav1.ObjectMeta{Name: bmcSettingsSet.Name + "-" + bmc01.Name}}
+			Eventually(Get(bmcSettings01)).Should(Succeed())
+			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "bar")),
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("composite", "bar-secret-cm")),
+			))
+
+			By("Waiting for BMCSettings to reach Applied state before triggering a ConfigMap update")
+			Eventually(Object(bmcSettings01)).Should(HaveField("Status.State", Equal(metalv1alpha1.BMCSettingsStateApplied)))
+
+			By("Updating ConfigMap to trigger watch-based reconciliation")
+			Eventually(Update(dynamicConfigMap, func() {
+				dynamicConfigMap.Data["suffix"] = "cm2"
+			})).Should(Succeed())
+
+			Eventually(Object(bmcSettings01)).Should(
+				HaveField("Spec.SettingsMap", HaveKeyWithValue("composite", "bar-secret-cm2")),
+			)
+
+			By("Cleaning up")
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSettingsSet))).To(Succeed())
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSettings01))).To(Succeed())
+			Eventually(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, dynamicConfigMap))).To(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, dynamicSecret))).To(Succeed())
+		})
+
+		It("Should fail to create child BMCSettings when dynamic source is missing", func(ctx SpecContext) {
+			By("Creating a BMCSettingsSet with a missing BMC label source")
+			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-bmcsettingsset-missing-dynamic-",
+				},
+				Spec: metalv1alpha1.BMCSettingsSetSpec{
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						SettingsMap: map[string]string{
+							"abc": "static-value",
+						},
+					},
+					DynamicSettings: []metalv1alpha1.DynamicSetting{
+						{
+							Key: "missing",
+							ValueFrom: &metalv1alpha1.DynamicSettingSource{
+								BMCLabel: "metal.ironcore.dev/does-not-exist",
+							},
+						},
+					},
+					BMCSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"metal.ironcore.dev/Manufacturer": "foo",
+							"metal.ironcore.dev/Model":        "bar",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSettingsSet)).To(Succeed())
+
+			By("Verifying child BMCSettings is not created")
+			bmcSettings01 := &metalv1alpha1.BMCSettings{ObjectMeta: metav1.ObjectMeta{Name: bmcSettingsSet.Name + "-" + bmc01.Name}}
+			Consistently(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+
+			By("Cleaning up")
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSettingsSet))).To(Succeed())
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
+		})
 	})
 })

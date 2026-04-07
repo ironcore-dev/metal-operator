@@ -456,17 +456,28 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 		log.V(1).Info("Server state set to power off")
 	}
 
-	if server.Spec.BMCRef != nil && server.Spec.SystemURI != "" {
+	// Clean up virtual media for both BMCRef and inline BMC configurations
+	if (server.Spec.BMCRef != nil || server.Spec.BMC != nil) && server.Spec.SystemURI != "" {
 		currentMedia, err := bmcClient.GetVirtualMediaStatus(ctx, server.Spec.SystemURI)
 		if err != nil {
 			log.V(1).Info("Failed to get virtual media status", "error", err.Error())
 		} else {
+			// Get system info to determine manufacturer for slot ID normalization
+			systemInfo, sysInfoErr := bmcClient.GetSystemInfo(ctx, server.Spec.SystemURI)
+			manufacturer := ""
+			if sysInfoErr == nil {
+				manufacturer = systemInfo.Manufacturer
+			} else {
+				log.V(1).Info("Failed to get system info for slot ID normalization, attempting eject with original IDs", "error", sysInfoErr.Error())
+			}
+
 			for _, media := range currentMedia {
 				if media.Inserted != nil && *media.Inserted {
-					if err := bmcClient.EjectVirtualMedia(ctx, server.Spec.SystemURI, media.ID); err != nil {
-						log.V(1).Info("Failed to eject virtual media", "id", media.ID, "error", err.Error())
+					normalizedSlotID := normalizeVirtualMediaSlotID(manufacturer, media.ID)
+					if err := bmcClient.EjectVirtualMedia(ctx, server.Spec.SystemURI, normalizedSlotID); err != nil {
+						log.V(1).Info("Failed to eject virtual media", "id", media.ID, "normalizedID", normalizedSlotID, "error", err.Error())
 					} else {
-						log.V(1).Info("Ejected virtual media", "id", media.ID)
+						log.V(1).Info("Ejected virtual media", "id", media.ID, "normalizedID", normalizedSlotID)
 					}
 				}
 			}
@@ -540,7 +551,10 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 	log.V(1).Info("Server boot configuration is ready")
 
 	// TODO: handle working Reserved Server that was suddenly powered off but needs to boot from disk
-	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
+	// Only stage boot media when we're actually going to power on the server
+	// This ensures idempotent reconciliation - we don't eject/mount ISOs repeatedly when power is off
+	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState &&
+		server.Spec.Power == metalv1alpha1.PowerOn {
 		if server.Spec.BootConfigurationRef == nil {
 			return false, fmt.Errorf("server boot configuration reference is nil")
 		}
@@ -929,6 +943,17 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 	return nil
 }
 
+// normalizeVirtualMediaSlotID normalizes the slot ID returned by GetVirtualMediaStatus
+// to match what the EjectVirtualMedia implementation expects for each manufacturer.
+// Lenovo returns IDs like "EXT1" but EjectVirtualMedia expects "1" (it adds EXT prefix internally).
+// Dell and HPE return IDs that can be used directly with their EjectVirtualMedia implementations.
+func normalizeVirtualMediaSlotID(manufacturer string, slotID string) string {
+	if manufacturer == "Lenovo" && strings.HasPrefix(slotID, "EXT") {
+		return strings.TrimPrefix(slotID, "EXT")
+	}
+	return slotID
+}
+
 func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
 	log := ctrl.LoggerFrom(ctx)
 	if server == nil || server.Spec.BootConfigurationRef == nil {
@@ -952,12 +977,19 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, bmcClient
 		return fmt.Errorf("failed to get current virtual media status: %w", err)
 	}
 
+	// Get system info early to determine manufacturer for slot ID normalization
+	systemInfo, err := bmcClient.GetSystemInfo(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system info for manufacturer detection: %w", err)
+	}
+
 	for _, media := range currentMedia {
 		if media.Inserted != nil && *media.Inserted {
-			if err := bmcClient.EjectVirtualMedia(ctx, systemURI, media.ID); err != nil {
-				log.V(1).Info("Failed to eject existing virtual media", "id", media.ID, "error", err.Error())
+			normalizedSlotID := normalizeVirtualMediaSlotID(systemInfo.Manufacturer, media.ID)
+			if err := bmcClient.EjectVirtualMedia(ctx, systemURI, normalizedSlotID); err != nil {
+				log.V(1).Info("Failed to eject existing virtual media", "id", media.ID, "normalizedID", normalizedSlotID, "error", err.Error())
 			} else {
-				log.V(1).Info("Ejected existing virtual media", "id", media.ID)
+				log.V(1).Info("Ejected existing virtual media", "id", media.ID, "normalizedID", normalizedSlotID)
 			}
 		}
 	}
@@ -968,14 +1000,13 @@ func (r *ServerReconciler) virtualMediaBootServer(ctx context.Context, bmcClient
 	bootISOSlot := "1"
 	configISOSlot := "2"
 
-	systemInfo, err := bmcClient.GetSystemInfo(ctx, systemURI)
-	if err != nil {
-		log.V(1).Info("Failed to get system info for manufacturer detection, using default slot mapping", "error", err.Error())
-	} else if systemInfo.Manufacturer == "HPE" || systemInfo.Manufacturer == "HP" {
+	if systemInfo.Manufacturer == "HPE" || systemInfo.Manufacturer == "HP" {
 		// HPE requires bootable OS ISO on slot 2 (CD), config drive on slot 1 (USB)
 		bootISOSlot = "2"
 		configISOSlot = "1"
 		log.V(1).Info("Detected HPE system, using HPE-specific slot mapping", "bootSlot", bootISOSlot, "configSlot", configISOSlot)
+	} else {
+		log.V(1).Info("Using default slot mapping", "manufacturer", systemInfo.Manufacturer, "bootSlot", bootISOSlot, "configSlot", configISOSlot)
 	}
 
 	if err := bmcClient.MountVirtualMedia(ctx, systemURI, bootISOURL, bootISOSlot); err != nil {

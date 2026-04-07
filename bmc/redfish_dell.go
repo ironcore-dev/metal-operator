@@ -476,18 +476,14 @@ func (r *DellRedfishBMC) dellCheckPending(fw *schemas.SoftwareInventory) bool {
 
 // MountVirtualMedia mounts a virtual media image to the specified slot.
 func (r *DellRedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
-	systems, err := r.client.Service.Systems()
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
 	if err != nil {
-		return fmt.Errorf("failed to get systems: %w", err)
-	}
-	if len(systems) == 0 {
-		return fmt.Errorf("no systems found")
+		return fmt.Errorf("failed to get system: %w", err)
 	}
 
-	system := systems[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.InsertMedia", system.ODataID, slotID)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"Image":          mediaURL,
 		"Inserted":       true,
 		"WriteProtected": true,
@@ -513,18 +509,14 @@ func (r *DellRedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string
 
 // EjectVirtualMedia ejects virtual media from the specified slot.
 func (r *DellRedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
-	systems, err := r.client.Service.Systems()
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
 	if err != nil {
-		return fmt.Errorf("failed to get systems: %w", err)
-	}
-	if len(systems) == 0 {
-		return fmt.Errorf("no systems found")
+		return fmt.Errorf("failed to get system: %w", err)
 	}
 
-	system := systems[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.EjectMedia", system.ODataID, slotID)
 
-	resp, err := r.client.Service.GetClient().Post(vmURI, map[string]interface{}{})
+	resp, err := r.client.Service.GetClient().Post(vmURI, map[string]any{})
 	if err != nil {
 		return fmt.Errorf("failed to eject virtual media: %w", err)
 	}
@@ -544,14 +536,10 @@ func (r *DellRedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string
 
 // GetVirtualMediaStatus retrieves the status of all virtual media slots.
 func (r *DellRedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
-	systems, err := r.client.Service.Systems()
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get systems: %w", err)
-	}
-	if len(systems) == 0 {
-		return nil, fmt.Errorf("no systems found")
+		return nil, fmt.Errorf("failed to get system: %w", err)
 	}
 
-	system := systems[0]
 	return system.VirtualMedia()
 }

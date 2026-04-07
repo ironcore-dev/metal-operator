@@ -265,21 +265,61 @@ func (r *HPERedfishBMC) hpeCheckPending(fw *schemas.SoftwareInventory) bool {
 
 // --- VirtualMedia methods ---
 
+// getManagerForSystem retrieves the manager responsible for the specified system.
+// For most single-BMC deployments, there is only one manager.
+// For multi-system chassis, this returns the first manager that manages the specified system.
+func (r *HPERedfishBMC) getManagerForSystem(systemURI string) (*schemas.Manager, error) {
+	// Verify the system exists
+	_, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get system: %w", err)
+	}
+
+	// Get all managers
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
+	}
+
+	// For single-manager BMCs (most common), return the only manager
+	if len(managers) == 1 {
+		return managers[0], nil
+	}
+
+	// For multi-manager systems, find the manager that manages this system
+	// In Redfish, managers expose which systems they manage via ManagerForServers links
+	for _, manager := range managers {
+		// Check if this manager manages the specified system
+		systems, err := manager.ManagerForServers()
+		if err != nil {
+			continue
+		}
+		for _, sys := range systems {
+			if sys.ODataID == systemURI {
+				return manager, nil
+			}
+		}
+	}
+
+	// Fallback: return first manager with a warning logged
+	// This handles BMCs where the ManagerForServers link might not be populated
+	return managers[0], nil
+}
+
 // MountVirtualMedia mounts a virtual media image to the specified slot.
 // HPE uses Manager endpoints for VirtualMedia instead of System endpoints.
 func (r *HPERedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
-	managers, err := r.client.Service.Managers()
+	manager, err := r.getManagerForSystem(systemURI)
 	if err != nil {
-		return fmt.Errorf("failed to get managers: %w", err)
-	}
-	if len(managers) == 0 {
-		return fmt.Errorf("no managers found")
+		return fmt.Errorf("failed to get manager for system: %w", err)
 	}
 
-	manager := managers[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.InsertMedia", manager.ODataID, slotID)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"Image":          mediaURL,
 		"Inserted":       true,
 		"WriteProtected": true,
@@ -306,18 +346,14 @@ func (r *HPERedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string,
 // EjectVirtualMedia ejects virtual media from the specified slot.
 // HPE uses Manager endpoints for VirtualMedia instead of System endpoints.
 func (r *HPERedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
-	managers, err := r.client.Service.Managers()
+	manager, err := r.getManagerForSystem(systemURI)
 	if err != nil {
-		return fmt.Errorf("failed to get managers: %w", err)
-	}
-	if len(managers) == 0 {
-		return fmt.Errorf("no managers found")
+		return fmt.Errorf("failed to get manager for system: %w", err)
 	}
 
-	manager := managers[0]
 	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.EjectMedia", manager.ODataID, slotID)
 
-	resp, err := r.client.Service.GetClient().Post(vmURI, map[string]interface{}{})
+	resp, err := r.client.Service.GetClient().Post(vmURI, map[string]any{})
 	if err != nil {
 		return fmt.Errorf("failed to eject virtual media: %w", err)
 	}
@@ -338,14 +374,10 @@ func (r *HPERedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string,
 // GetVirtualMediaStatus retrieves the status of all virtual media slots.
 // HPE uses Manager endpoints for VirtualMedia instead of System endpoints.
 func (r *HPERedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
-	managers, err := r.client.Service.Managers()
+	manager, err := r.getManagerForSystem(systemURI)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get managers: %w", err)
-	}
-	if len(managers) == 0 {
-		return nil, fmt.Errorf("no managers found")
+		return nil, fmt.Errorf("failed to get manager for system: %w", err)
 	}
 
-	manager := managers[0]
 	return manager.VirtualMedia()
 }

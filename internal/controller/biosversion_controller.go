@@ -30,12 +30,13 @@ import (
 // BIOSVersionReconciler reconciles a BIOSVersion object
 type BIOSVersionReconciler struct {
 	client.Client
-	ManagerNamespace string
-	Insecure         bool
-	Scheme           *runtime.Scheme
-	BMCOptions       bmc.Options
-	ResyncInterval   time.Duration
-	Conditions       *conditionutils.Accessor
+	ManagerNamespace   string
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	Scheme             *runtime.Scheme
+	BMCOptions         bmc.Options
+	ResyncInterval     time.Duration
+	Conditions         *conditionutils.Accessor
 }
 
 const (
@@ -159,6 +160,14 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, biosVersion *meta
 		return ctrl.Result{}, nil
 	}
 
+	base := biosVersion.DeepCopy()
+	if biosVersion.Spec.ServerMaintenanceRef != nil && clearDeprecatedObjectRefFields(biosVersion.Spec.ServerMaintenanceRef) {
+		if err := r.Patch(ctx, biosVersion, client.MergeFrom(base)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BIOSVersion: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersion, BIOSVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -186,7 +195,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 		return false, fmt.Errorf("failed to fetch server: %w", err)
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
@@ -203,6 +212,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 		if ok, err := r.handleServerMaintenance(ctx, bmcClient, biosVersion, server); err != nil || !ok {
 			return false, err
 		}
+
 		return r.processInProgressState(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateCompleted:
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
@@ -260,7 +270,7 @@ func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmc
 		return false, nil
 	}
 
-	if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.UID != biosVersion.Spec.ServerMaintenanceRef.UID {
+	if server.Spec.ServerMaintenanceRef == nil || server.Spec.ServerMaintenanceRef.Name != biosVersion.Spec.ServerMaintenanceRef.Name || server.Spec.ServerMaintenanceRef.Namespace != biosVersion.Spec.ServerMaintenanceRef.Namespace {
 		log.V(1).Info("Server is already in maintenance", "Server", server.Name)
 		if condition.Status != metav1.ConditionTrue {
 			if err := r.Conditions.Update(
@@ -600,11 +610,8 @@ func (r *BIOSVersionReconciler) patchServerMaintenanceRef(ctx context.Context, b
 		biosVersion.Spec.ServerMaintenanceRef = nil
 	} else {
 		biosVersion.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
-			APIVersion: serverMaintenance.GroupVersionKind().GroupVersion().String(),
-			Kind:       "ServerMaintenance",
-			Namespace:  serverMaintenance.Namespace,
-			Name:       serverMaintenance.Name,
-			UID:        serverMaintenance.UID,
+			Namespace: serverMaintenance.Namespace,
+			Name:      serverMaintenance.Name,
 		}
 	}
 

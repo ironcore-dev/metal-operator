@@ -238,11 +238,8 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerBootConfiguration",
-				Namespace:  ns.Name,
-				Name:       server.Name,
-				UID:        bootConfig.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: ns.Name,
+				Name:      server.Name,
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.Conditions", ContainElement(
@@ -251,7 +248,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -432,11 +429,8 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerBootConfiguration",
-				Namespace:  ns.Name,
-				Name:       server.Name,
-				UID:        bootConfig.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: ns.Name,
+				Name:      server.Name,
 			}),
 			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.BIOSVersion", "P79 v1.45 (12/06/2017)"),
@@ -450,7 +444,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 50*time.Millisecond, 250*time.Millisecond)
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -1188,7 +1182,8 @@ passwd:
 				RegistryURL:           registryURL,
 				ManagerNamespace:      ns.Name,
 				ProbeImage:            "custom-probe:v1.0.0",
-				Insecure:              true,
+				DefaultProtocol:       metalv1alpha1.HTTPProtocolScheme,
+				SkipCertValidation:    true,
 				DiscoveryIgnitionPath: tmpFile.Name(),
 			}
 

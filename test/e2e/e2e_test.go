@@ -17,6 +17,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/test/utils"
 )
 
+// namespace is the namespace where the controller-manager and related resources will be deployed for testing.
 const namespace = "metal-operator-system"
 
 // serviceAccountName created for the project

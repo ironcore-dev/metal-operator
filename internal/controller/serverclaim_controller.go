@@ -32,6 +32,7 @@ const (
 // ServerClaimReconciler reconciles a ServerClaim object
 type ServerClaimReconciler struct {
 	client.Client
+	APIReader               client.Reader
 	Cache                   cache.Cache
 	Scheme                  *runtime.Scheme
 	MaxConcurrentReconciles int
@@ -189,25 +190,21 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 
 func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
+
 	if server.Spec.ServerClaimRef != nil {
-		log.V(1).Info("Server is already claimed", "Server", server.Name, "Claim", server.Spec.ServerClaimRef.Name)
+		log.V(1).Info("Server already claimed", "Server", server.Name, "Claim", server.Spec.ServerClaimRef.Name)
 		return nil
 	}
 
-	if server.Spec.ServerClaimRef == nil {
-		serverBase := server.DeepCopy()
-		server.Spec.ServerClaimRef = &metalv1alpha1.ObjectReference{
-			APIVersion: "metal.ironcore.dev/v1alpha1",
-			Kind:       "ServerClaim",
-			Namespace:  claim.Namespace,
-			Name:       claim.Name,
-			UID:        claim.UID,
-		}
-		if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
-			return fmt.Errorf("failed to patch claim ref for server: %w", err)
-		}
-		log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
+	serverBase := server.DeepCopy()
+	server.Spec.ServerClaimRef = &metalv1alpha1.ImmutableObjectReference{
+		Namespace: claim.Namespace,
+		Name:      claim.Name,
 	}
+	if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
+		return fmt.Errorf("failed to patch claim ref for server: %w", err)
+	}
+	log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
 	return nil
 }
 
@@ -276,11 +273,8 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, serv
 
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
-		Namespace:  config.Namespace,
-		Name:       config.Name,
-		UID:        config.UID,
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-		Kind:       "ServerBootConfiguration",
+		Namespace: config.Namespace,
+		Name:      config.Name,
 	}
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
@@ -317,8 +311,17 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1a
 	for _, server := range serverList.Items {
 		// find previously claimed server
 		if ref := server.Spec.ServerClaimRef; ref != nil {
-			if ref.UID == claim.UID && ref.Name == claim.Name && ref.Namespace == claim.Namespace {
-				return &server, nil
+			if ref.Name == claim.Name && ref.Namespace == claim.Namespace {
+				// Re-fetch from the API server to confirm this claim still owns it.
+				// The list above is cached and may be stale.
+				fresh := server.DeepCopy()
+				if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(fresh), fresh); err != nil {
+					return nil, client.IgnoreNotFound(err)
+				}
+				if ref := fresh.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
+					return nil, nil
+				}
+				return fresh, nil
 			}
 		}
 	}
@@ -361,12 +364,28 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1a
 		return nil, nil
 	}
 	log.V(1).Info("Matching server found", "Server", selectedServer.Name)
-	// ensureObjectRefForServer() uses a patch with optimistic locking,
-	// so it will not overwrite the claim with a different server,
-	// in case controller-runtimes cached client is not up to date.
+
+	// Re-fetch the selected server directly from the API server before claiming.
+	// The list above used the informer cache; a concurrent reconciler may have
+	// already claimed or changed the server since then. Re-fetching here ensures
+	// isServerClaimable and ensureObjectRefForServer act on consistent state.
+	if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(selectedServer), selectedServer); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	if !r.isServerClaimable(ctx, selectedServer, claim) {
+		return nil, nil
+	}
+
+	// ensureObjectRefForServer uses optimistic locking on the patch, so it will
+	// not overwrite a claim that was set between our re-fetch and the write.
 	err := r.ensureObjectRefForServer(ctx, claim, selectedServer)
 	if err != nil {
 		return nil, err
+	}
+	// If another reconciler won the optimistic-lock race, the ref will point to
+	// their claim. Return an error to requeue with backoff so this claim retries.
+	if ref := selectedServer.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
+		return nil, fmt.Errorf("server %s was claimed concurrently, will retry", selectedServer.Name)
 	}
 	log.V(1).Info("Ensured ObjectRef for Server", "Server", selectedServer.Name)
 	return selectedServer, nil
@@ -396,8 +415,8 @@ func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, ser
 
 func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) bool {
 	log := ctrl.LoggerFrom(ctx)
-	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && claimRef.UID != claim.UID {
-		log.V(1).Info("Server claim ref UID does not match claim", "Server", server.Name, "ClaimUID", claimRef.UID)
+	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && (claimRef.Name != claim.Name || claimRef.Namespace != claim.Namespace) {
+		log.V(1).Info("Server claim ref does not match claim", "Server", server.Name, "ClaimName", claimRef.Name)
 		return false
 	}
 	if server.Status.State != metalv1alpha1.ServerStateAvailable {

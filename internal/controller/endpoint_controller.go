@@ -28,10 +28,11 @@ const (
 // EndpointReconciler reconciles a Endpoints object
 type EndpointReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	MACPrefixes *macdb.MacPrefixes
-	Insecure    bool
-	BMCOptions  bmc.Options
+	Scheme             *runtime.Scheme
+	MACPrefixes        *macdb.MacPrefixes
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	BMCOptions         bmc.Options
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
@@ -84,12 +85,13 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 			}
 
 			bmcOptions := bmc.Options{
-				BasicAuth: true,
-				Username:  m.DefaultCredentials[0].Username,
-				Password:  m.DefaultCredentials[0].Password,
+				BasicAuth:   true,
+				Username:    m.DefaultCredentials[0].Username,
+				Password:    m.DefaultCredentials[0].Password,
+				InsecureTLS: r.SkipCertValidation,
 			}
 
-			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.Insecure)
+			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.DefaultProtocol)
 			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 
 			switch m.Protocol {

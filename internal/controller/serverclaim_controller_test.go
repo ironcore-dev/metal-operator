@@ -138,11 +138,8 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring that the server has a correct boot configuration ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-				Kind:       "ServerBootConfiguration",
-				Namespace:  ns.Name,
-				Name:       config.Name,
-				UID:        config.UID,
+				Namespace: ns.Name,
+				Name:      config.Name,
 			}),
 		))
 		By("Patching the boot configuration to a Ready state")
@@ -270,12 +267,9 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ObjectReference{
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-				Kind:       "ServerClaim",
-				Name:       claim.Name,
-				Namespace:  claim.Namespace,
-				UID:        claim.UID,
+			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ImmutableObjectReference{
+				Name:      claim.Name,
+				Namespace: claim.Namespace,
 			}),
 			HaveField("Spec.Power", metalv1alpha1.PowerOff),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
@@ -368,12 +362,9 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the Server has claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ObjectReference{
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-				Kind:       "ServerClaim",
-				Namespace:  ns.Name,
-				Name:       claim.Name,
-				UID:        claim.UID,
+			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ImmutableObjectReference{
+				Namespace: ns.Name,
+				Name:      claim.Name,
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
@@ -406,12 +397,9 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the Server has claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ObjectReference{
-				APIVersion: "metal.ironcore.dev/v1alpha1",
-				Kind:       "ServerClaim",
-				Namespace:  ns.Name,
-				Name:       claim.Name,
-				UID:        claim.UID,
+			HaveField("Spec.ServerClaimRef", &metalv1alpha1.ImmutableObjectReference{
+				Namespace: ns.Name,
+				Name:      claim.Name,
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))

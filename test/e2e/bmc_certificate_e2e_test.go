@@ -24,13 +24,6 @@ var _ = Describe("BMC Certificate Management", Ordered, func() {
 		reconciliationPolling = 2 * time.Second
 	)
 
-	BeforeAll(func() {
-		By("creating BMC secret")
-		cmd := exec.Command("kubectl", "apply", "-f", bmcSecretFile)
-		_, err := utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to create BMC secret")
-	})
-
 	AfterAll(func() {
 		By("cleaning up BMC resources")
 		cmd := exec.Command("kubectl", "delete", "-f", bmcWithTLSSecretFile, "--ignore-not-found=true")
@@ -43,9 +36,14 @@ var _ = Describe("BMC Certificate Management", Ordered, func() {
 
 	Context("TLS Secret Integration", func() {
 		It("should create a BMC with TLS secret reference", func() {
-			By("creating BMC resource with TLS secret reference")
-			cmd := exec.Command("kubectl", "apply", "-f", bmcWithTLSSecretFile)
+			By("creating BMC secret")
+			cmd := exec.Command("kubectl", "apply", "-f", bmcSecretFile)
 			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create BMC secret")
+
+			By("creating BMC resource with TLS secret reference")
+			cmd = exec.Command("kubectl", "apply", "-f", bmcWithTLSSecretFile)
+			_, err = utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred(), "Failed to create BMC with TLS secret")
 
 			By("verifying BMC resource is created")

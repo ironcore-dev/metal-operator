@@ -145,20 +145,9 @@ func (r *ServerReconciler) reconcileExists(ctx context.Context, server *metalv1a
 func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alpha1.Server) bool {
 	log := ctrl.LoggerFrom(ctx)
 
-	// Special case: If Server doesn't have DeletionTimestamp yet but BMC is gone,
-	// the Server should be deleted (handles cascade deletion via OwnerReference)
+	// If Server doesn't have DeletionTimestamp, it should not be deleted
+	// Kubernetes garbage collection via OwnerReferences handles cascade deletion automatically
 	if server.DeletionTimestamp.IsZero() {
-		if server.Spec.BMCRef != nil {
-			bmcObj := &metalv1alpha1.BMC{}
-			if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmcObj); err != nil {
-				if apierrors.IsNotFound(err) {
-					log.V(1).Info("BMC not found, Server should be deleted", "BMC", server.Spec.BMCRef.Name, "Server", server.Name)
-					return true
-				}
-				// Log other errors but don't force deletion on API errors
-				log.Error(err, "Failed to check BMC existence", "BMC", server.Spec.BMCRef.Name)
-			}
-		}
 		return false
 	}
 
@@ -171,7 +160,7 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 			bmcObj := &metalv1alpha1.BMC{}
 			if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BMCRef.Name}, bmcObj); err != nil {
 				if apierrors.IsNotFound(err) {
-					log.V(1).Info("BMC not found, proceeding with deletion despite Maintenance state", "BMC", server.Spec.BMCRef.Name)
+					log.Info("BMC not found for Server during deletion, skipping reconciliation to allow deletion", "Server", server.Name)
 					return true
 				}
 				// On API errors, log but don't postpone indefinitely

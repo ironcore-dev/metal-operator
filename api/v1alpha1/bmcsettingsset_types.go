@@ -33,7 +33,7 @@ type DynamicSetting struct {
 	// +optional
 	ValueFrom *DynamicSettingSource `json:"valueFrom,omitempty"`
 
-	// Format defines a composite Go template with variable references like {{.name}}.
+	// Format defines a composite Go template with variable references like '{{.name}}'.
 	// +optional
 	Format string `json:"format,omitempty"`
 

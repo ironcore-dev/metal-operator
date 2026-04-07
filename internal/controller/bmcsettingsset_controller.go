@@ -439,10 +439,12 @@ func (r *BMCSettingsSetReconciler) resolveDynamicSettingSource(
 	bmc *metalv1alpha1.BMC,
 	source *metalv1alpha1.DynamicSettingSource,
 ) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if source.BMCLabel != "" {
 		if value, ok := bmc.Labels[source.BMCLabel]; ok {
 			return value, nil
 		}
+		log.Error(fmt.Errorf("bmc label %q not found on BMC %s", source.BMCLabel, bmc.Name), "BMC label not found")
 		return "", fmt.Errorf("bmc label %q not found on BMC %s", source.BMCLabel, bmc.Name)
 	}
 
@@ -450,7 +452,8 @@ func (r *BMCSettingsSetReconciler) resolveDynamicSettingSource(
 		selector := source.ConfigMapKeyRef
 		configMap := &corev1.ConfigMap{}
 		if err := r.Get(ctx, client.ObjectKey{Namespace: selector.Namespace, Name: selector.Name}, configMap); err != nil {
-			return "", fmt.Errorf("failed to get ConfigMap %s/%s: %w", selector.Namespace, selector.Name, err)
+			log.Error(err, "Failed to get ConfigMap", "ConfigMap", fmt.Sprintf("%s/%s", selector.Namespace, selector.Name))
+			return "", err
 		}
 		if value, ok := configMap.Data[selector.Key]; ok {
 			return value, nil
@@ -465,7 +468,8 @@ func (r *BMCSettingsSetReconciler) resolveDynamicSettingSource(
 		selector := source.SecretKeyRef
 		secret := &corev1.Secret{}
 		if err := r.Get(ctx, client.ObjectKey{Namespace: selector.Namespace, Name: selector.Name}, secret); err != nil {
-			return "", fmt.Errorf("failed to get Secret %s/%s: %w", selector.Namespace, selector.Name, err)
+			log.Error(err, "Failed to get Secret", "Secret", fmt.Sprintf("%s/%s", selector.Namespace, selector.Name))
+			return "", err
 		}
 		if value, ok := secret.Data[selector.Key]; ok {
 			return string(value), nil

@@ -957,7 +957,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `key` _string_ | Key is the BMC setting key to set. |  | MinLength: 1 <br /> |
 | `valueFrom` _[DynamicSettingSource](#dynamicsettingsource)_ | ValueFrom defines a simple single source for the setting value. |  |  |
-| `format` _string_ | Format defines a composite Go template with variable references like \{\{.name\}\}. |  |  |
+| `format` _string_ | Format defines a composite Go template with variable references like '\{\{.name\}\}'. |  |  |
 | `variables` _object (keys:string, values:[DynamicSettingSource](#dynamicsettingsource))_ | Variables maps format placeholder names to their sources. |  |  |
 
 

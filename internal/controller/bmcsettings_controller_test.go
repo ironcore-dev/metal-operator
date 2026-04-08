@@ -35,7 +35,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
 			},
 			Data: map[string][]byte{
@@ -49,7 +48,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		bmc = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -104,7 +102,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -136,7 +133,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-nochange",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -180,7 +176,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -267,7 +262,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -366,7 +360,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -464,7 +457,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -521,7 +513,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -580,7 +571,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("creation of new BMCSettings with same spec")
 		bmcSettings2 := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-recreate-",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{

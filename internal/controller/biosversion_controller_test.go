@@ -34,7 +34,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
@@ -47,7 +46,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
@@ -89,7 +87,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
@@ -142,7 +139,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
@@ -263,7 +259,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
@@ -358,7 +353,6 @@ var _ = Describe("BIOSVersion Controller", func() {
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
@@ -411,7 +405,6 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 	BeforeEach(func(ctx SpecContext) {
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
 			},
 			Data: map[string][]byte{
@@ -423,7 +416,6 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 		bmcObj = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -478,7 +470,6 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{

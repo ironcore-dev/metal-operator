@@ -35,7 +35,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
 			},
 			Data: map[string][]byte{
@@ -49,7 +48,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		bmcObj = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -99,7 +97,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -154,7 +151,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -273,7 +269,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -371,7 +366,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -411,7 +405,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion with maintenance upgrade")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -459,7 +452,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion with maintenance upgrade")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -536,7 +528,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion with orphaned state")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -587,7 +578,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion with maintenance upgrade")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{

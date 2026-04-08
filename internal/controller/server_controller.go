@@ -836,7 +836,7 @@ func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, bmcC
 	if op == controllerutil.OperationResultUpdated {
 		log.V(1).Info("Server updated to power off state")
 		if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
-			log.V(1).Info("Ensuring power state failed")
+			log.V(1).Info("Failed to ensure power state")
 		}
 		return true, nil
 	}

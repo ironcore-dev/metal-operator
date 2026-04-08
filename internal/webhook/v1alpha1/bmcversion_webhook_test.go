@@ -87,7 +87,7 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
 		})
 
-		It("should deny Update if a BMC referred is already referred by another", func() {
+		It("should deny update if a BMC referred is already referred by another", func() {
 			By("Creating another BMCVersion with different BMCRef")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{

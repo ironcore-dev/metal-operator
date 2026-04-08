@@ -79,7 +79,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 	sanitizedMACAddress := strings.ReplaceAll(endpoint.Spec.MACAddress, ":", "")
 	for _, m := range r.MACPrefixes.MacPrefixes {
 		if strings.HasPrefix(sanitizedMACAddress, m.MacPrefix) && m.Type == metalv1alpha1.BMCType {
-			log.V(1).Info("Found a BMC adapter for endpoint", "Type", m.Type, "Protocol", m.Protocol)
+			log.V(1).Info("Found a BMC adapter for Endpoint", "Type", m.Type, "Protocol", m.Protocol)
 			if len(m.DefaultCredentials) == 0 {
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
@@ -109,12 +109,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied BMC secret for endpoint")
+				log.V(1).Info("Applied BMC secret for Endpoint")
 
 				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
-				log.V(1).Info("Applied BMC object for endpoint")
+				log.V(1).Info("Applied BMC object for Endpoint")
 			case metalv1alpha1.ProtocolRedfishLocal:
 				log.V(1).Info("Creating client for a local test BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
@@ -127,7 +127,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied local test BMC secret for endpoint")
+				log.V(1).Info("Applied local test BMC secret for Endpoint")
 
 				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
@@ -145,7 +145,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied kube test BMC secret for endpoint")
+				log.V(1).Info("Applied kube test BMC secret for Endpoint")
 
 				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)

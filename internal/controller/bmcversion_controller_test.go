@@ -138,7 +138,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		)
 	})
 
-	It("should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
+	It("should successfully start and monitor upgrade task to completion", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
 		// note: ImageURI need to have the version string.

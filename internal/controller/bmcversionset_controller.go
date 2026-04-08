@@ -58,7 +58,7 @@ func (r *BMCVersionSetReconciler) reconcileExists(
 	log := ctrl.LoggerFrom(ctx)
 	// if object is being deleted - reconcile deletion
 	if !bmcVersionSet.DeletionTimestamp.IsZero() {
-		log.V(1).Info("object is being deleted")
+		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, bmcVersionSet)
 	}
 
@@ -256,7 +256,7 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	for _, bmcVersion := range bmcVersionList.Items {
 		if _, ok := bmcMap[bmcVersion.Spec.BMCRef.Name]; !ok {
 			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-				log.V(1).Info("waiting for BMCVersion to move out of InProgress state", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
+				log.V(1).Info("Waiting for BMCVersion to move out of InProgress state", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
 				warnings = append(warnings, fmt.Sprintf("BMCVersion %s is still in progress, skipping deletion", bmcVersion.Name))
 				continue
 			}

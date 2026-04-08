@@ -218,7 +218,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateFailed:
 		if shouldRetryReconciliation(biosVersion) {
-			log.V(1).Info("Retrying")
+			log.V(1).Info("Retrying BIOSVersion reconciliation", "BIOSVersion", biosVersion.Name, "Server", biosVersion.Spec.ServerRef.Name)
 			biosVersionBase := biosVersion.DeepCopy()
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
 			biosVersion.Status.Conditions = []metav1.Condition{}

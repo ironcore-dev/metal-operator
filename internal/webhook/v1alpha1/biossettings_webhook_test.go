@@ -148,7 +148,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
 	})
 
-	It("should allow update if a ServerRef field is NOT duplicate", func() {
+	It("should allow update if a ServerRef field is not duplicate", func() {
 		By("Creating a BIOSSetting with different ServerRef")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{

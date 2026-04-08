@@ -300,7 +300,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		)
 	})
 
-	It("should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
+	It("should successfully reconcile the resource when BMCs are deleted/created", func(ctx SpecContext) {
 		By("Create resource")
 		bmcVersionSet := &metalv1alpha1.BMCVersionSet{
 			ObjectMeta: metav1.ObjectMeta{

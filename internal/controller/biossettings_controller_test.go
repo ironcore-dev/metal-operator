@@ -12,7 +12,6 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -77,7 +76,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSSettings()
+		defaultMockServer.ResetBIOSSettings()
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
@@ -1046,7 +1045,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSSettings()
+		defaultMockServer.ResetBIOSSettings()
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
@@ -1379,7 +1378,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSSettings()
+		defaultMockServer.ResetBIOSSettings()
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())

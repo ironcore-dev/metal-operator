@@ -5,7 +5,10 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -232,96 +235,93 @@ func (r *RedfishKubeBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, t
 	return task, nil
 }
 
-// ResetManager resets the BMC with a delay for pending settings.
-func (r *RedfishKubeBMC) ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error {
-	go func() {
-		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
-			time.Sleep(150 * time.Millisecond)
-			for key, data := range UnitTestMockUps.PendingBMCSetting {
-				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
-					UnitTestMockUps.BMCSettingAttr[key] = data
-				}
-			}
-			UnitTestMockUps.ResetPendingBMCSetting()
-		}
-	}()
-	return nil
-}
-
-// SetBMCAttributesImmediately sets BMC attributes, applying them immediately or on reset.
-func (r *RedfishKubeBMC) SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) error {
-	for key, value := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
-			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
-				attrData["value"] = value
-			} else {
-				UnitTestMockUps.PendingBMCSetting[key] = map[string]any{
-					"type":   attrData["type"],
-					"reboot": attrData["reboot"],
-					"value":  value,
-				}
-			}
-		}
+// SetBMCAttributesImmediately sets BMC attributes via HTTP PATCH to the BMC Settings endpoint.
+func (r *RedfishKubeBMC) SetBMCAttributesImmediately(_ context.Context, _ string, attributes schemas.SettingsAttributes) error {
+	if len(attributes) == 0 {
+		return nil
+	}
+	payload := map[string]any{"Attributes": attributes}
+	c := r.client.GetService().GetClient()
+	resp, err := c.Patch("/redfish/v1/Managers/BMC/Settings", payload)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("PATCH Managers/BMC/Settings returned status %d", resp.StatusCode)
 	}
 	return nil
 }
 
-// GetBMCAttributeValues retrieves specific BMC attribute values.
+// GetBMCAttributeValues retrieves specific BMC attribute values via HTTP from the BMC manager.
 func (r *RedfishKubeBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
 
-	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
+	filtered, err := r.getFilteredBMCRegistryAttributes(ctx, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get filtered BMC attributes: %w", err)
 	}
 
+	manager, err := r.GetManager(UUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BMC manager: %w", err)
+	}
+
+	var raw struct {
+		Attributes schemas.SettingsAttributes `json:"Attributes"`
+	}
+	if err := json.Unmarshal(manager.RawData, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse manager attributes: %w", err)
+	}
+
 	result := make(schemas.SettingsAttributes, len(attributes))
 	for key := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok && filtered[key].AttributeName != "" {
-			result[key] = attrData["value"]
+		entry, ok := filtered[key]
+		if !ok {
+			continue
 		}
+		val := raw.Attributes[key]
+		if strings.EqualFold(string(entry.Type), "integer") {
+			if f, ok := val.(float64); ok {
+				val = int(f)
+			}
+		}
+		result[key] = val
 	}
 	return result, nil
 }
 
-// GetBMCPendingAttributeValues returns pending BMC attribute values.
-func (r *RedfishKubeBMC) GetBMCPendingAttributeValues(ctx context.Context, systemUUID string) (schemas.SettingsAttributes, error) {
-	pending := UnitTestMockUps.PendingBMCSetting
-	if len(pending) == 0 {
-		return schemas.SettingsAttributes{}, nil
+// GetBMCPendingAttributeValues returns pending BMC attribute values via HTTP GET on the Settings endpoint.
+func (r *RedfishKubeBMC) GetBMCPendingAttributeValues(ctx context.Context, _ string) (schemas.SettingsAttributes, error) {
+	var pending struct {
+		Attributes schemas.SettingsAttributes `json:"Attributes"`
 	}
-
-	result := make(schemas.SettingsAttributes, len(pending))
-	for key, data := range pending {
-		result[key] = data["value"]
+	if err := r.GetEntityFromUri(ctx, "/redfish/v1/Managers/BMC/Settings", r.client.GetService().GetClient(), &pending); err != nil {
+		return nil, fmt.Errorf("failed to get pending BMC attributes: %w", err)
 	}
-	return result, nil
+	return pending.Attributes, nil
 }
 
-// getFilteredBMCRegistryAttributes returns filtered BMC registry attributes.
-func (r *RedfishKubeBMC) getFilteredBMCRegistryAttributes(readOnly, immutable bool) (map[string]schemas.Attributes, error) {
-	if len(UnitTestMockUps.BMCSettingAttr) == 0 {
-		return nil, fmt.Errorf("no BMC setting attributes found")
+// getFilteredBMCRegistryAttributes fetches the BMC attribute registry from the server and filters attributes.
+func (r *RedfishKubeBMC) getFilteredBMCRegistryAttributes(ctx context.Context, readOnly, immutable bool) (map[string]schemas.Attributes, error) {
+	var bmcRegistry schemas.AttributeRegistry
+	if err := r.GetEntityFromUri(ctx, "/redfish/v1/Registries/BMCAttributeRegistry", r.client.GetService().GetClient(), &bmcRegistry); err != nil {
+		return nil, fmt.Errorf("failed to fetch BMC attribute registry: %w", err)
 	}
 
 	filtered := make(map[string]schemas.Attributes)
-	for name, attrData := range UnitTestMockUps.BMCSettingAttr {
-		filtered[name] = schemas.Attributes{
-			AttributeName: name,
-			Immutable:     immutable,
-			ReadOnly:      readOnly,
-			Type:          attrData["type"].(schemas.AttributeType),
-			ResetRequired: attrData["reboot"].(bool),
+	for _, entry := range bmcRegistry.RegistryEntries.Attributes {
+		if entry.Immutable == immutable && entry.ReadOnly == readOnly && !entry.Hidden {
+			filtered[entry.AttributeName] = entry
 		}
 	}
 	return filtered, nil
 }
 
-// CheckBMCAttributes validates BMC attributes.
+// CheckBMCAttributes validates BMC attributes against the server-side registry.
 func (r *RedfishKubeBMC) CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (bool, error) {
-	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
+	filtered, err := r.getFilteredBMCRegistryAttributes(ctx, false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}

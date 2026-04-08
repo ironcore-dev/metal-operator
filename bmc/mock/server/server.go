@@ -40,10 +40,21 @@ const (
 
 	biosSettingsPathSuffix = "Bios/Settings"
 	attributesKey          = "Attributes"
+
+	// Fixed file paths for BMC manager resources.
+	bmcFilePath         = "data/Managers/BMC/index.json"
+	bmcSettingsFilePath = "data/Managers/BMC/Settings/index.json"
+
+	// Fixed file paths for system BIOS resources.
+	biosFilePath        = "data/Systems/437XR1138R2/Bios/index.json"
+	biosSettingFilePath = "data/Systems/437XR1138R2/Bios/Settings/index.json"
 )
 
 // BIOS settings that can be applied without reboot.
 var noRebootSettings = []string{"AdminPhone"}
+
+// BMC settings that can be applied immediately without a BMC reset.
+var noRebootBMCSettings = []string{"abc"}
 
 // Power state categories for system reset actions.
 var (
@@ -238,6 +249,11 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.applyBiosSettings(r.URL.Path, update); err != nil {
+		s.handleError(w, r, err)
+		return
+	}
+
+	if err := s.applyBMCSettings(r.URL.Path, update); err != nil {
 		s.handleError(w, r, err)
 		return
 	}
@@ -441,23 +457,141 @@ func (s *MockServer) doPowerReset(systemPath, basePath string) {
 }
 
 func (s *MockServer) doBMCReset(bmcPath string) {
-	time.Sleep(150 * time.Millisecond)
-	s.mu.Lock()
-	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
-		base["PowerState"] = PowerOffState
-		s.log.Info("Powered off the BMC")
-	}
-	s.mu.Unlock()
-
+	// Simulate the BMC being offline during reset.
+	// The lock set by handleBMCReset prevents new POST operations during this window.
 	time.Sleep(150 * time.Millisecond)
 
 	s.mu.Lock()
 	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
-		base["PowerState"] = PowerOnState
 		s.setLocked(base, false)
-		s.log.Info("Powered on the BMC")
+		s.log.Info("BMC reset complete")
 	}
 	s.mu.Unlock()
+
+	if err := s.applyPendingBMCSettings(); err != nil {
+		s.log.Error(err, "Failed to apply pending BMC settings")
+	}
+}
+
+func (s *MockServer) applyBMCSettings(urlPath string, update map[string]any) error {
+	if !strings.Contains(urlPath, "Managers/BMC/Settings") {
+		return nil
+	}
+
+	attrs, ok := update[attributesKey].(map[string]any)
+	if !ok || len(attrs) == 0 {
+		return nil
+	}
+
+	// Attrs that can be applied immediately without a BMC reset.
+	immediate := make(map[string]any)
+	for key, val := range attrs {
+		if slices.Contains(noRebootBMCSettings, key) {
+			immediate[key] = val
+		}
+	}
+
+	if len(immediate) == 0 {
+		return nil
+	}
+
+	s.log.Info("Applying BMC settings without reset", "settings", immediate)
+
+	// Remove immediate settings from the pending update so they are not
+	// written to the Settings (pending) resource.
+	for key := range immediate {
+		delete(attrs, key)
+	}
+
+	// Apply to the current BMC manager resource.
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	bmcBase, err := s.loadResourceLocked(bmcFilePath)
+	if err != nil {
+		return err
+	}
+
+	if bmcAttrs, ok := bmcBase[attributesKey].(map[string]any); ok {
+		maps.Copy(bmcAttrs, immediate)
+	}
+	s.overrides[bmcFilePath] = bmcBase
+
+	return nil
+}
+
+func (s *MockServer) applyPendingBMCSettings() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pending, err := s.loadResourceLocked(bmcSettingsFilePath)
+	if err != nil {
+		return err
+	}
+
+	pendingAttrs, ok := pending[attributesKey].(map[string]any)
+	if !ok || len(pendingAttrs) == 0 {
+		return nil
+	}
+
+	current, err := s.loadResourceLocked(bmcFilePath)
+	if err != nil {
+		return err
+	}
+
+	currentAttrs, ok := current[attributesKey].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	maps.Copy(currentAttrs, pendingAttrs)
+	pending[attributesKey] = map[string]any{}
+
+	s.overrides[bmcFilePath] = current
+	s.overrides[bmcSettingsFilePath] = pending
+	s.log.Info("Applied pending BMC settings")
+
+	return nil
+}
+
+// ResetBMCSettings resets the BMC attribute state on the server to defaults,
+// clearing both current and pending attributes. Called from test AfterEach.
+func (s *MockServer) ResetBMCSettings() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetAttributesFromEmbeddedLocked(bmcFilePath)
+	s.resetAttributesFromEmbeddedLocked(bmcSettingsFilePath)
+}
+
+// ResetBIOSSettings resets the BIOS attribute state on the server to defaults,
+// clearing both current and pending attributes. Called from test AfterEach.
+func (s *MockServer) ResetBIOSSettings() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetAttributesFromEmbeddedLocked(biosFilePath)
+	s.resetAttributesFromEmbeddedLocked(biosSettingFilePath)
+}
+
+// resetAttributesFromEmbeddedLocked resets the Attributes field of a resource to its
+// embedded-FS defaults. The caller must hold s.mu.
+func (s *MockServer) resetAttributesFromEmbeddedLocked(filePath string) {
+	raw, err := dataFS.ReadFile(filePath)
+	if err != nil {
+		s.log.Error(err, "Failed to read embedded default", "path", filePath)
+		return
+	}
+	var defaults map[string]any
+	if err := json.Unmarshal(raw, &defaults); err != nil {
+		s.log.Error(err, "Failed to parse embedded default", "path", filePath)
+		return
+	}
+	current, err := s.loadResourceLocked(filePath)
+	if err != nil {
+		s.log.Error(err, "Failed to load resource for reset", "path", filePath)
+		return
+	}
+	current[attributesKey] = defaults[attributesKey]
+	s.overrides[filePath] = current
 }
 
 func (s *MockServer) applyBiosSettings(urlPath string, update map[string]any) error {

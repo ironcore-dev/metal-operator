@@ -9,6 +9,9 @@
         },
         {
             "@odata.id": "/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0"
+        },
+        {
+            "@odata.id": "/redfish/v1/Registries/BMCAttributeRegistry"
         }
     ],
     "@odata.id": "/redfish/v1/Registries",

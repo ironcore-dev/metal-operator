@@ -253,7 +253,7 @@ func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmc
 	}
 
 	if server.Status.State != metalv1alpha1.ServerStateMaintenance {
-		log.V(1).Info("Server is not in maintenance, waiting", "server State", server.Status.State, "server", server.Name)
+		log.V(1).Info("Server is not in maintenance, waiting", "ServerState", server.Status.State, "Server", server.Name)
 		if condition.Status != metav1.ConditionTrue {
 			if err := r.Conditions.Update(
 				condition,

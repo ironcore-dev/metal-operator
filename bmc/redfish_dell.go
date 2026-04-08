@@ -94,7 +94,7 @@ func (r *DellRedfishBMC) getObjFromURI(c schemas.Client, uri string, respObj any
 func (r *DellRedfishBMC) getManagerForOEM() (*schemas.Manager, error) {
 	manager, err := r.GetManager("")
 	if err != nil {
-		return nil, fmt.Errorf("not able to get Manager: %v", err)
+		return nil, fmt.Errorf("failed to get Manager: %w", err)
 	}
 	if manager.Manufacturer == "" {
 		manager.Manufacturer = r.manufacturer
@@ -310,7 +310,7 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 				return resp.Header.Get("ETag"), nil
 			}()
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get Etag for %v. error %v", settingPath, err))
+				errs = append(errs, fmt.Errorf("failed to get Etag for %v: %w", settingPath, err))
 				continue
 			}
 
@@ -330,7 +330,7 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 				return nil
 			}()
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to patch settings at %v. error %v", settingPath, err))
+				errs = append(errs, fmt.Errorf("failed to patch settings at %v: %w", settingPath, err))
 				continue
 			}
 		}

@@ -204,7 +204,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		s.log.Info("Shutting down registry server...")
+		s.log.Info("Shutting down registry server")
 		if err := server.Shutdown(ctx); err != nil {
 			return fmt.Errorf("HTTP server Shutdown: %w", err)
 		}

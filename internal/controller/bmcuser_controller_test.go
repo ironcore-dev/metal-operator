@@ -77,7 +77,7 @@ var _ = Describe("BMCUser Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should create a bmc user and secret", func(ctx SpecContext) {
+	It("should create a BMC user and secret", func(ctx SpecContext) {
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
@@ -135,7 +135,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Eventually(Get(effectiveSecret)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should just create additional bmc users", func(ctx SpecContext) {
+	It("should just create additional BMC users", func(ctx SpecContext) {
 		user01 := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "user01",
@@ -241,7 +241,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Delete(ctx, effectiveSecret02)).To(Succeed())
 	})
 
-	It("Should rotate password if rotationPeriod is set", func(ctx SpecContext) {
+	It("should rotate password if rotationPeriod is set", func(ctx SpecContext) {
 		adminUser := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "admin-user",
@@ -293,7 +293,7 @@ var _ = Describe("BMCUser Controller", func() {
 		}
 	})
 
-	It("Should delete bmc user and secret on User deletion", func(ctx SpecContext) {
+	It("should delete BMC user and secret on User deletion", func(ctx SpecContext) {
 		metalBMC.UnitTestMockUps.InitializeDefaults()
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
@@ -339,7 +339,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Delete(ctx, effectiveSecret)).To(Succeed())
 	})
 
-	It("Should rotate password if OperationAnnotationRotateCredentials is set", func(ctx SpecContext) {
+	It("should rotate password if OperationAnnotationRotateCredentials is set", func(ctx SpecContext) {
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{

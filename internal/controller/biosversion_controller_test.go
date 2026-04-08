@@ -81,7 +81,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully mark completed if no BIOS version change", func(ctx SpecContext) {
+	It("should successfully mark completed if no BIOS version change", func(ctx SpecContext) {
 		By("Ensuring that the server has Available state")
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
@@ -128,7 +128,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		)
 	})
 
-	It("Should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
+	It("should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
 		// note: ImageURI need to have the version string.
@@ -224,7 +224,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		)
 	})
 
-	It("Should upgrade servers BIOS when in reserved state", func(ctx SpecContext) {
+	It("should upgrade servers BIOS when in reserved state", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
 		// note: ImageURI need to have the version string.
@@ -354,7 +354,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		))
 	})
 
-	It("Should allow retry using annotation", func(ctx SpecContext) {
+	It("should allow retry using annotation", func(ctx SpecContext) {
 		By("Creating a BIOSVersion")
 		biosVersion := &metalv1alpha1.BIOSVersion{
 			ObjectMeta: metav1.ObjectMeta{

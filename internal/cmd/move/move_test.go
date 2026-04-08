@@ -21,7 +21,7 @@ import (
 var _ = Describe("metalctl move", func() {
 	_ = SetupTest()
 
-	It("Should successfully move metal CRs from a source cluster on a target cluster", func(ctx SpecContext) {
+	It("should successfully move metal CRs from a source cluster on a target cluster", func(ctx SpecContext) {
 		// source cluster setup
 		sourceCommonEndpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-common-"},

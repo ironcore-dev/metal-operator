@@ -66,14 +66,14 @@ func (r *LenovoRedfishBMC) lenovoBuildRequestBody(parameters *schemas.UpdateServ
 func (r *LenovoRedfishBMC) lenovoExtractTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)
+		return "", fmt.Errorf("failed to read the response body %w %v", err, rawBody)
 	}
 
 	var tResp struct {
 		TaskMonitor string `json:"@odata.id,omitempty"`
 	}
 	if err = json.Unmarshal(rawBody, &tResp); err != nil {
-		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
+		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %w", err)
 	}
 
 	if tResp.TaskMonitor == "" {
@@ -107,7 +107,7 @@ func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonit
 					respJobRawBody, err := io.ReadAll(respJob.Body)
 					if err != nil {
 						return nil,
-							fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+							fmt.Errorf("failed to get the upgrade Task details and read the response body: %v, statusCode: %v",
 								err, respJob.StatusCode)
 					}
 					return nil,
@@ -118,7 +118,7 @@ func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonit
 				respJobRawBody, err := io.ReadAll(respJob.Body)
 				if err != nil {
 					return nil,
-						fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+						fmt.Errorf("failed to get the upgrade Task details and read the response body: %v, statusCode: %v",
 							err, respJob.StatusCode)
 				}
 

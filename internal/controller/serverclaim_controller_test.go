@@ -72,7 +72,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully claim a server in available state", func(ctx SpecContext) {
+	It("should successfully claim a server in available state", func(ctx SpecContext) {
 		By("Creating an Ignition secret")
 		ignitionSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -167,7 +167,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		))
 	})
 
-	It("Should successfully claim a server by reference and label selector", func(ctx SpecContext) {
+	It("should successfully claim a server by reference and label selector", func(ctx SpecContext) {
 		By("Patching Server labels")
 		Eventually(Update(server, func() {
 			server.Labels = map[string]string{
@@ -228,7 +228,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		))
 	})
 
-	It("Should successfully claim a server by label selector", func(ctx SpecContext) {
+	It("should successfully claim a server by label selector", func(ctx SpecContext) {
 		By("Patching Server labels")
 		Eventually(Update(server, func() {
 			server.Labels = map[string]string{
@@ -292,7 +292,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		))
 	})
 
-	It("Should not claim a server in a non-available state", func(ctx SpecContext) {
+	It("should not claim a server in a non-available state", func(ctx SpecContext) {
 		By("Patching the Server to Initial state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateInitial
@@ -340,7 +340,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should not claim a server with set claim ref", func(ctx SpecContext) {
+	It("should not claim a server with set claim ref", func(ctx SpecContext) {
 		By("Updating the Server to available state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
@@ -424,7 +424,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 	})
 
-	It("Should not claim a server when labels do not match selector", func(ctx SpecContext) {
+	It("should not claim a server when labels do not match selector", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -470,7 +470,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should allow deletion of ServerClaim without a Server", func(ctx SpecContext) {
+	It("should allow deletion of ServerClaim without a Server", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -539,7 +539,7 @@ var _ = Describe("ServerClaim Validation", func() {
 		EnsureCleanState()
 	})
 
-	It("Should deny if the ServerRef changes", func() {
+	It("should deny if the ServerRef changes", func() {
 		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claim, func() {
 			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "bar"}
@@ -549,7 +549,7 @@ var _ = Describe("ServerClaim Validation", func() {
 		Consistently(Object(claim)).Should(HaveField("Spec.ServerRef.Name", Equal("foo")))
 	})
 
-	It("Should allow a change of ServerClaim by not changing the ServerRef", func() {
+	It("should allow a change of ServerClaim by not changing the ServerRef", func() {
 		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claim, func() {
 			claim.Spec.Power = metalv1alpha1.PowerOn
@@ -563,7 +563,7 @@ var _ = Describe("ServerClaim Validation", func() {
 		))
 	})
 
-	It("Should deny if the ServerSelector changes", func() {
+	It("should deny if the ServerSelector changes", func() {
 		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claimWithSelector, func() {
 			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
@@ -578,7 +578,7 @@ var _ = Describe("ServerClaim Validation", func() {
 			HaveField("Spec.ServerSelector.MatchLabels", Equal(map[string]string{"foo": "bar"})))
 	})
 
-	It("Should allow a change of ServerClaim by not changing the ServerSelector", func() {
+	It("should allow a change of ServerClaim by not changing the ServerSelector", func() {
 		By("Updating the ServerRef to claim a different Server")
 		Eventually(Update(claimWithSelector, func() {
 			claimWithSelector.Spec.Power = metalv1alpha1.PowerOn
@@ -677,7 +677,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		EnsureCleanState()
 	})
 
-	It("Binds four out of ten server for four best effort claims", func(ctx SpecContext) {
+	It("should bind four out of ten servers for four best effort claims", func(ctx SpecContext) {
 		for range 10 {
 			makeServer(ctx)
 		}
@@ -690,7 +690,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
 	})
 
-	It("Binds four out of ten server for four label selector claims", func(ctx SpecContext) {
+	It("should bind four out of ten servers for four label selector claims", func(ctx SpecContext) {
 		for range 10 {
 			makeServer(ctx)
 		}
@@ -703,7 +703,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(4))
 	})
 
-	It("Should not bind the same server to multiple best effort claims", func(ctx SpecContext) {
+	It("should not bind the same server to multiple best effort claims", func(ctx SpecContext) {
 		By("Creating eight ServerClaims")
 		for range 8 {
 			makeClaim(ctx, nil)
@@ -715,7 +715,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		Consistently(countUniqueBoundClaims(ctx)).Should(Equal(1))
 	})
 
-	It("Should not bind the same server to multiple label selector claims", func(ctx SpecContext) {
+	It("should not bind the same server to multiple label selector claims", func(ctx SpecContext) {
 		By("Creating eight ServerClaims")
 		for range 8 {
 			makeClaim(ctx, metav1.SetAsLabelSelector(labels.Set{"foo": "bar"}))

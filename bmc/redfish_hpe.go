@@ -153,14 +153,14 @@ func (r *HPERedfishBMC) hpeBuildRequestBody(parameters *schemas.UpdateServiceSim
 func (r *HPERedfishBMC) hpeExtractTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)
+		return "", fmt.Errorf("failed to read the response body %w %v", err, rawBody)
 	}
 
 	var tResp struct {
 		TaskMonitor string
 	}
 	if err = json.Unmarshal(rawBody, &tResp); err != nil {
-		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
+		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %w", err)
 	}
 
 	if tResp.TaskMonitor != "" {

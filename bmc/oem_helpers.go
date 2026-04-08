@@ -104,18 +104,18 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.U
 	}
 	defer func(Body io.ReadCloser) {
 		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
+			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
 
-	// any error post this point is fatal, as we can not issue multiple upgrade requests.
-	// expectation is to move to failed state, and manually check the status before retrying
+	// Any error past this point is fatal, as we cannot issue multiple upgrade requests.
+	// Expectation is to move to failed state, and manually check the status before retrying.
 	log.V(1).Info("Update has been issued", "ResponseCode", resp.StatusCode)
 	if resp.StatusCode != http.StatusAccepted {
 		rawBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return "", true,
-				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
+				fmt.Errorf("failed to accept the upgrade request and read the response body: %w, statusCode: %v",
 					err, resp.StatusCode)
 		}
 		return "", true,
@@ -125,10 +125,10 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.U
 
 	taskMonitorURI, err := taskMonitorURIFn(resp)
 	if err != nil {
-		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
+		return "", true, fmt.Errorf("failed to read task monitor URI: %w", err)
 	}
 
-	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
+	log.V(1).Info("Update has been accepted", "Response", taskMonitorURI)
 	return taskMonitorURI, false, nil
 }
 
@@ -142,7 +142,7 @@ func getUpgradeTask(ctx context.Context, base *RedfishBaseBMC, taskURI string, p
 	}
 	defer func(Body io.ReadCloser) {
 		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
+			log.Error(err, "Failed to close response body")
 		}
 	}(respTask.Body)
 
@@ -150,7 +150,7 @@ func getUpgradeTask(ctx context.Context, base *RedfishBaseBMC, taskURI string, p
 		respTaskRawBody, err := io.ReadAll(respTask.Body)
 		if err != nil {
 			return nil,
-				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+				fmt.Errorf("failed to get the upgrade Task details and read the response body: %w, statusCode: %v",
 					err, respTask.StatusCode)
 		}
 		return nil,
@@ -177,13 +177,13 @@ func httpBasedGetBMCSettingAttribute(c schemas.Client, attributes map[string]str
 		}
 		resp, err := c.Get(parts[1])
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to GET attribute %s to URL %s: %v", key, parts[1], err))
+			errs = append(errs, fmt.Errorf("failed to GET attribute %s to URL %s: %w", key, parts[1], err))
 			continue
 		}
 		respRawBody, err := io.ReadAll(resp.Body)
 		resp.Body.Close() // nolint: errcheck
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to read response body for url %s: %v", parts[1], err))
+			errs = append(errs, fmt.Errorf("failed to read response body for url %s: %w", parts[1], err))
 			continue
 		}
 		okCodes := []int{http.StatusOK, http.StatusNoContent}
@@ -194,13 +194,13 @@ func httpBasedGetBMCSettingAttribute(c schemas.Client, attributes map[string]str
 		var respData map[string]any
 		err = json.Unmarshal(respRawBody, &respData)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to unmarshal response body for GET url %s: %v\nbody: %v", parts[1], err, string(respRawBody)))
+			errs = append(errs, fmt.Errorf("failed to unmarshal response body for GET url %s: %w\nbody: %v", parts[1], err, string(respRawBody)))
 			continue
 		}
 		var dataMap map[string]any
 		err = json.Unmarshal([]byte(data), &dataMap)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %v\nbody: %v", parts[1], err, data))
+			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %w\nbody: %v", parts[1], err, data))
 			continue
 		}
 		if isSubMap(respData, dataMap) {
@@ -237,21 +237,21 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 			var err error
 			jsonBytes, err = json.Marshal(value)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to marshal spec data for url %s: %v\nbody: %v", parts[1], err, value))
+				errs = append(errs, fmt.Errorf("failed to marshal spec data for url %s: %w\nbody: %v", parts[1], err, value))
 				continue
 			}
 		}
 		valueMap := map[string]any{}
 		err := json.Unmarshal(jsonBytes, &valueMap)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %v\nbody: %v", parts[1], err, value))
+			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %w\nbody: %v", parts[1], err, value))
 			continue
 		}
 		switch parts[0] {
 		case http.MethodPost:
 			resp, err := c.Post(url, valueMap)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to POST attribute %s to URL %s: %v", attr, url, err))
+				errs = append(errs, fmt.Errorf("failed to POST attribute %s to URL %s: %w", attr, url, err))
 				continue
 			}
 			if !slices.Contains(okCodes, resp.StatusCode) {
@@ -261,7 +261,7 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 		case http.MethodPatch:
 			resp, err := c.Patch(url, valueMap)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to PATCH attribute %s to URL %s: %v", attr, url, err))
+				errs = append(errs, fmt.Errorf("failed to PATCH attribute %s to URL %s: %w", attr, url, err))
 				continue
 			}
 			if !slices.Contains(okCodes, resp.StatusCode) {

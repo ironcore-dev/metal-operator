@@ -98,7 +98,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
+	It("should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 
 		By("Creating a BMCSettings")
@@ -130,7 +130,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
 
-	It("Should move to completed if no BMCSettings changes to referred BMC", func(ctx SpecContext) {
+	It("should move to completed if no BMCSettings changes to referred BMC", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 
 		By("Creating a BMCSettings")
@@ -167,7 +167,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 	})
 
-	It("Should update the setting if BMCSettings changes requested in Available State", func(ctx SpecContext) {
+	It("should update the setting if BMCSettings changes requested in Available State", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 		bmcSetting["abc"] = "changed-bmc-setting"
 
@@ -229,7 +229,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		)
 	})
 
-	It("Should create maintenance and wait for its approval before applying settings", func(ctx SpecContext) {
+	It("should create maintenance and wait for its approval before applying settings", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 		bmcSetting["abc"] = "changed-to-req-server-maintenance-through-ownerapproved"
 
@@ -353,7 +353,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 	})
 
-	It("Should wait for upgrade and reconcile BMCSettings version is correct", func(ctx SpecContext) {
+	It("should wait for upgrade and reconcile when BMCSettings version is correct", func(ctx SpecContext) {
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"
 
@@ -450,7 +450,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		)
 	})
 
-	It("Should allow retry using annotation", func(ctx SpecContext) {
+	It("should allow retry using annotation", func(ctx SpecContext) {
 		// Settings that do not require reboot (mocked in bmc/redfish_local.go)
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"
@@ -507,7 +507,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		)
 	})
 
-	It("Should replace missing BMCSettings ref in server", func(ctx SpecContext) {
+	It("should replace missing BMCSettings ref in server", func(ctx SpecContext) {
 		// Settings that do not require reboot (mocked in bmc/redfish_local.go)
 		bmcSetting := make(map[string]string)
 		bmcSetting["fooreboot"] = "145"

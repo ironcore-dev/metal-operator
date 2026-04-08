@@ -133,7 +133,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully reconcile the resource", func(ctx SpecContext) {
+	It("should successfully reconcile the resource", func(ctx SpecContext) {
 		By("Created resource")
 		biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -234,7 +234,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		)
 	})
 
-	It("Should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
+	It("should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
 		By("Create resource")
 		biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 			ObjectMeta: metav1.ObjectMeta{

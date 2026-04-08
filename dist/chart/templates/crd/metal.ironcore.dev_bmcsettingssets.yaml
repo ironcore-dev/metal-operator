@@ -144,7 +144,7 @@ spec:
                   properties:
                     format:
                       description: Format defines a composite Go template with variable
-                        references like '{{.name}}'.
+                        references like `{{.name}}`.
                       type: string
                     key:
                       description: Key is the BMC setting key to set.

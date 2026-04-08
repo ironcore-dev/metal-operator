@@ -364,7 +364,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 		log.V(1).Info("Found duplicate keys", "DuplicatesCount", len(duplicateName), "DuplicatesSettingsCound", len(duplicateSettingsNames))
 		duplicateCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSSettingsConditionDuplicateKey)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BIOSSettings state: %w", err)
+			return ctrl.Result{}, fmt.Errorf("failed to get Condition for duplicate-key BIOSSettings state: %w", err)
 		}
 		if err := r.Conditions.Update(
 			duplicateCheckCondition,
@@ -410,7 +410,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BIOSVersion update state: %w", err)
 		}
 		if versionCheckCondition.Status == metav1.ConditionTrue {
-			log.V(1).Info("Pending BIOS version upgrade", "current bios Version", biosVersion, "required version", settings.Spec.Version)
+			log.V(1).Info("Pending BIOS version upgrade", "currentBiosVersion", biosVersion, "requiredVersion", settings.Spec.Version)
 			return ctrl.Result{}, nil
 		}
 		if err := r.Conditions.Update(

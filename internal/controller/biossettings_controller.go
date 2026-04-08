@@ -663,7 +663,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			if errors.As(err, &invalidSettingsErr) {
 				inValidSettings, errCond := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionWrongSettings)
 				if errCond != nil {
-					return false, fmt.Errorf("failed to get Condition for skip reboot post setting update: %w", errCond)
+					return false, errors.Join(fmt.Errorf("failed to get Condition for skip reboot post setting update: %w", errCond), err)
 				}
 				if errCond := r.Conditions.Update(
 					inValidSettings,

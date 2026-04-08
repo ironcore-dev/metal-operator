@@ -947,7 +947,7 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, ob
 		}
 		return true, nil
 	}); err != nil {
-		log.Error(err, "Failed to list Servers created by this BMC resource", "BMC", bmcObj.Name)
+		log.Error(err, "Failed to list BIOSVersion objects created by this BMC resource", "BMC", bmcObj.Name)
 		return nil
 	}
 

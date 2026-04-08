@@ -193,7 +193,7 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 	log := ctrl.LoggerFrom(ctx)
 	bmcObj, err := r.getBMCFromBMCVersion(ctx, bmcVersion)
 	if err != nil {
-		log.V(1).Info("Referred Server object could not be fetched")
+		log.V(1).Info("Referred BMC object could not be fetched", "BMCVersion", bmcVersion.Name)
 		return ctrl.Result{}, err
 	}
 

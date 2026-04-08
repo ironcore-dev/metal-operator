@@ -226,7 +226,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		)
 	})
 
-	It("should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
+	It("should successfully reconcile the resource when servers are deleted/created", func(ctx SpecContext) {
 		By("Create resource")
 		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{

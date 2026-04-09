@@ -37,7 +37,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		bmcSecret               *metalv1alpha1.BMCSecret
 		upgradeServerBMCVersion string
 	)
-	ns := SetupTest(MockServerIPAddrs)
+	_ = SetupTest(MockServerIPAddrs)
 
 	BeforeEach(func(ctx SpecContext) {
 		upgradeServerBMCVersion = "1.46.455b66-rev4"
@@ -57,7 +57,6 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		bmc01 = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-01-",
-				Namespace:    ns.Name,
 				Labels: map[string]string{
 					"metal.ironcore.dev/Manufacturer": "foo",
 				},
@@ -93,7 +92,6 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		bmc02 = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-02-",
-				Namespace:    ns.Name,
 				Labels: map[string]string{
 					"metal.ironcore.dev/Manufacturer": "bar",
 				},
@@ -129,7 +127,6 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		bmc03 = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-03-",
-				Namespace:    ns.Name,
 				Labels: map[string]string{
 					"metal.ironcore.dev/Manufacturer": "bar",
 				},
@@ -200,7 +197,6 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		bmcVersionSet := &metalv1alpha1.BMCVersionSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmcversion-set-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCVersionSetSpec{
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
@@ -305,7 +301,6 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		bmcVersionSet := &metalv1alpha1.BMCVersionSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmcsversion-set-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCVersionSetSpec{
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{

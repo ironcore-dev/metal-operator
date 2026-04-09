@@ -147,7 +147,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -226,7 +225,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -315,7 +313,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -414,7 +411,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -517,7 +513,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating the BMCSettingsSet resource")
 			bmcSettingsSet1 := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset1-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -555,7 +550,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Createing a duplicate BMCSettingsSet resource")
 			bmcSettingsSet2 := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset2-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{

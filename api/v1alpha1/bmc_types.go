@@ -18,6 +18,16 @@ const (
 	ProtocolRedfishLocal = "RedfishLocal"
 	// ProtocolRedfishKube is the RedfishKube protocol.
 	ProtocolRedfishKube = "RedfishKube"
+
+	// BMCCertificateReadyCondition indicates that the BMC certificate is ready.
+	BMCCertificateReadyCondition = "CertificateReady"
+
+	// BMCCertificateReadyReasonIssued indicates that the certificate was successfully issued.
+	BMCCertificateReadyReasonIssued = "Issued"
+	// BMCCertificateReadyReasonPending indicates that the certificate request is pending.
+	BMCCertificateReadyReasonPending = "Pending"
+	// BMCCertificateReadyReasonFailed indicates that the certificate request failed.
+	BMCCertificateReadyReasonFailed = "Failed"
 )
 
 // BMCSpec defines the desired state of BMC
@@ -61,6 +71,12 @@ type BMCSpec struct {
 	// Hostname is the hostname of the BMC.
 	// +optional
 	Hostname *string `json:"hostname,omitempty"`
+
+	// TLSSecretRef references a Kubernetes secret containing the TLS certificate
+	// to be installed on the BMC. The secret must be of type kubernetes.io/tls
+	// and contain tls.crt and tls.key keys.
+	// +optional
+	TLSSecretRef *v1.SecretReference `json:"tlsSecretRef,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.
@@ -213,6 +229,10 @@ type BMCStatus struct {
 	// EventsSubscriptionLink is the link to the events subscription of the bmc.
 	// +optional
 	EventsSubscriptionLink string `json:"eventsSubscriptionLink,omitempty"`
+
+	// CertificateSecretRef is a reference to the secret containing the BMC certificate.
+	// +optional
+	CertificateSecretRef *v1.LocalObjectReference `json:"certificateSecretRef,omitempty"`
 
 	// Conditions represents the latest available observations of the BMC's current state.
 	// +patchStrategy=merge

@@ -25,8 +25,9 @@ type RedfishMockUps struct {
 	BMCUpgradeTaskIndex  int
 	BMCUpgradeTaskStatus []schemas.Task
 
-	Accounts              map[string]*schemas.ManagerAccount
-	SimulateUnvailableBMC bool
+	Accounts                     map[string]*schemas.ManagerAccount
+	SimulateUnvailableBMC        bool
+	SimulateCSRGenerationFailure bool
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -145,6 +146,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		},
 	}
 	r.SimulateUnvailableBMC = false
+	r.SimulateCSRGenerationFailure = false
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {

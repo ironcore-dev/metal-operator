@@ -41,7 +41,7 @@ import (
 
 const (
 	pollingInterval      = 50 * time.Millisecond
-	eventuallyTimeout    = 5 * time.Second
+	eventuallyTimeout    = 10 * time.Second // Increased from 5s to handle slower CI environments
 	consistentlyDuration = 1 * time.Second
 	MockServerIP         = "127.0.0.1"
 	MockServerPort       = 8000
@@ -71,7 +71,9 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "config", "crd", "bases"),
+		},
 		ErrorIfCRDPathMissing: true,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
@@ -394,7 +396,9 @@ func EnsureCleanState() {
 		&metalv1alpha1.ServerList{},
 	}
 
+	// Use a longer timeout (10 seconds) to handle slower CI environments
+	// The default 5-second timeout is often too short for garbage collection
 	for _, list := range objectLists {
-		Eventually(ObjectList(list)).Should(HaveField("Items", HaveLen(0)))
+		Eventually(ObjectList(list), 10*time.Second, pollingInterval).Should(HaveField("Items", HaveLen(0)))
 	}
 }

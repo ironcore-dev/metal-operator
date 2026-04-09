@@ -628,6 +628,7 @@ _Appears in:_
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
 | `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
+| `tlsSecretRef` _[SecretReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#secretreference-v1-core)_ | TLSSecretRef references a Kubernetes secret containing the TLS certificate<br />to be installed on the BMC. The secret must be of type kubernetes.io/tls<br />and contain tls.crt and tls.key keys. |  |  |
 
 
 #### BMCState
@@ -673,6 +674,7 @@ _Appears in:_
 | `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  |  |
 | `metricsReportSubscriptionLink` _string_ | MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc. |  |  |
 | `eventsSubscriptionLink` _string_ | EventsSubscriptionLink is the link to the events subscription of the bmc. |  |  |
+| `certificateSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | CertificateSecretRef is a reference to the secret containing the BMC certificate. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  |  |
 
 

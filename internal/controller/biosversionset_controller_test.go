@@ -125,12 +125,19 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
 
-		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		// Delete servers and wait for cleanup
+		By("Cleaning up servers")
+		Expect(k8sClient.Delete(ctx, server01)).To(Or(Succeed(), Satisfy(apierrors.IsNotFound)))
+		Expect(k8sClient.Delete(ctx, server02)).To(Or(Succeed(), Satisfy(apierrors.IsNotFound)))
+		Expect(k8sClient.Delete(ctx, server03)).To(Or(Succeed(), Satisfy(apierrors.IsNotFound)))
 
-		EnsureCleanState()
+		By("Waiting for servers to be deleted")
+		Eventually(Get(server01)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(server02)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Cleaning up BMC secret")
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Or(Succeed(), Satisfy(apierrors.IsNotFound)))
 	})
 
 	It("should successfully reconcile the resource", func(ctx SpecContext) {

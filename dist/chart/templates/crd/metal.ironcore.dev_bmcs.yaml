@@ -184,6 +184,22 @@ spec:
                 - name
                 - port
                 type: object
+              tlsSecretRef:
+                description: |-
+                  TLSSecretRef references a Kubernetes secret containing the TLS certificate
+                  to be installed on the BMC. The secret must be of type kubernetes.io/tls
+                  and contain tls.crt and tls.key keys.
+                properties:
+                  name:
+                    description: name is unique within a namespace to reference a
+                      secret resource.
+                    type: string
+                  namespace:
+                    description: namespace defines the space within which the secret
+                      name must be unique.
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
             required:
             - bmcSecretRef
             - protocol
@@ -194,6 +210,21 @@ spec:
           status:
             description: BMCStatus defines the observed state of BMC.
             properties:
+              certificateSecretRef:
+                description: CertificateSecretRef is a reference to the secret containing
+                  the BMC certificate.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               conditions:
                 description: Conditions represents the latest available observations
                   of the BMC's current state.

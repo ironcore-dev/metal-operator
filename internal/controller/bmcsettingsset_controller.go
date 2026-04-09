@@ -4,9 +4,11 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"text/template"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -41,6 +43,8 @@ const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *BMCSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{}
@@ -286,7 +290,11 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 
 			// create/patch new Settings
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCSettings, func() error {
-				newBMCSettings.Spec.BMCSettingsTemplate = *bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
+				effectiveTemplate, err := r.buildEffectiveTemplate(ctx, bmcSettingsSet, &bmc)
+				if err != nil {
+					return fmt.Errorf("failed to build effective settings for BMC %s: %w", bmc.Name, err)
+				}
+				newBMCSettings.Spec.BMCSettingsTemplate = *effectiveTemplate
 				newBMCSettings.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmc.Name}
 				return controllerutil.SetControllerReference(bmcSettingsSet, newBMCSettings, r.Client.Scheme())
 			})
@@ -348,8 +356,21 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 			continue
 		}
 
+		bmc := &metalv1alpha1.BMC{}
+		if err := r.Get(ctx, client.ObjectKey{Name: bmcSettings.Spec.BMCRef.Name}, bmc); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			errs = append(errs, fmt.Errorf("failed to get BMC %s for BMCSettings %s: %w", bmcSettings.Spec.BMCRef.Name, bmcSettings.Name, err))
+			continue
+		}
+
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcSettings, func() error {
-			bmcSettings.Spec.BMCSettingsTemplate = *bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
+			effectiveTemplate, err := r.buildEffectiveTemplate(ctx, bmcSettingsSet, bmc)
+			if err != nil {
+				return fmt.Errorf("failed to build effective settings for BMC %s: %w", bmc.Name, err)
+			}
+			bmcSettings.Spec.BMCSettingsTemplate = *effectiveTemplate
 			return nil
 		})
 		if err != nil {
@@ -360,6 +381,103 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		}
 	}
 	return pendingPatchingSettings, errors.Join(errs...)
+}
+
+func (r *BMCSettingsSetReconciler) buildEffectiveTemplate(
+	ctx context.Context,
+	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
+	bmc *metalv1alpha1.BMC,
+) (*metalv1alpha1.BMCSettingsTemplate, error) {
+	effectiveTemplate := bmcSettingsSet.Spec.BMCSettingsTemplate.DeepCopy()
+	if effectiveTemplate.SettingsMap == nil {
+		effectiveTemplate.SettingsMap = map[string]string{}
+	}
+
+	for _, dynamicSetting := range bmcSettingsSet.Spec.DynamicSettings {
+		value, err := r.resolveDynamicSettingValue(ctx, bmc, &dynamicSetting)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve dynamic setting %q: %w", dynamicSetting.Key, err)
+		}
+		// Dynamic values intentionally override static settings for the same key.
+		effectiveTemplate.SettingsMap[dynamicSetting.Key] = value
+	}
+
+	return effectiveTemplate, nil
+}
+
+func (r *BMCSettingsSetReconciler) resolveDynamicSettingValue(
+	ctx context.Context,
+	bmc *metalv1alpha1.BMC,
+	setting *metalv1alpha1.DynamicSetting,
+) (string, error) {
+	if setting.ValueFrom != nil {
+		return r.resolveDynamicSettingSource(ctx, bmc, setting.ValueFrom)
+	}
+
+	data := make(map[string]string, len(setting.Variables))
+	for name, source := range setting.Variables {
+		value, err := r.resolveDynamicSettingSource(ctx, bmc, &source)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve variable %q: %w", name, err)
+		}
+		data[name] = value
+	}
+
+	tmpl, err := template.New("format").Option("missingkey=error").Parse(setting.Format)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse format template: %w", err)
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute format template: %w", err)
+	}
+	return buf.String(), nil
+}
+
+func (r *BMCSettingsSetReconciler) resolveDynamicSettingSource(
+	ctx context.Context,
+	bmc *metalv1alpha1.BMC,
+	source *metalv1alpha1.DynamicSettingSource,
+) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	if source.BMCLabel != "" {
+		if value, ok := bmc.Labels[source.BMCLabel]; ok {
+			return value, nil
+		}
+		log.Error(fmt.Errorf("bmc label %q not found on BMC %s", source.BMCLabel, bmc.Name), "BMC label not found")
+		return "", fmt.Errorf("bmc label %q not found on BMC %s", source.BMCLabel, bmc.Name)
+	}
+
+	if source.ConfigMapKeyRef != nil {
+		selector := source.ConfigMapKeyRef
+		configMap := &corev1.ConfigMap{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: selector.Namespace, Name: selector.Name}, configMap); err != nil {
+			log.Error(err, "Failed to get ConfigMap", "ConfigMap", fmt.Sprintf("%s/%s", selector.Namespace, selector.Name))
+			return "", err
+		}
+		if value, ok := configMap.Data[selector.Key]; ok {
+			return value, nil
+		}
+		if value, ok := configMap.BinaryData[selector.Key]; ok {
+			return string(value), nil
+		}
+		return "", fmt.Errorf("key %q not found in ConfigMap %s/%s", selector.Key, selector.Namespace, selector.Name)
+	}
+
+	if source.SecretKeyRef != nil {
+		selector := source.SecretKeyRef
+		secret := &corev1.Secret{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: selector.Namespace, Name: selector.Name}, secret); err != nil {
+			log.Error(err, "Failed to get Secret", "Secret", fmt.Sprintf("%s/%s", selector.Namespace, selector.Name))
+			return "", err
+		}
+		if value, ok := secret.Data[selector.Key]; ok {
+			return string(value), nil
+		}
+		return "", fmt.Errorf("key %q not found in Secret %s/%s", selector.Key, selector.Namespace, selector.Name)
+	}
+
+	return "", errors.New("dynamic setting source is empty")
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(
@@ -410,6 +528,75 @@ func (r *BMCSettingsSetReconciler) enqueueByBMC(
 	return reqs
 }
 
+func (r *BMCSettingsSetReconciler) enqueueByConfigMap(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	configMap := obj.(*corev1.ConfigMap)
+	return r.enqueueByDynamicSource(ctx, configMap.Namespace, configMap.Name, true)
+}
+
+func (r *BMCSettingsSetReconciler) enqueueBySecret(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	secret := obj.(*corev1.Secret)
+	return r.enqueueByDynamicSource(ctx, secret.Namespace, secret.Name, false)
+}
+
+func (r *BMCSettingsSetReconciler) enqueueByDynamicSource(
+	ctx context.Context,
+	namespace string,
+	name string,
+	isConfigMap bool,
+) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	bmcSettingsSetList := &metalv1alpha1.BMCSettingsSetList{}
+	if err := r.List(ctx, bmcSettingsSetList); err != nil {
+		log.Error(err, "Failed to list BMCSettingsSet")
+		return nil
+	}
+
+	var reqs []ctrl.Request
+	for _, bmcSettingsSet := range bmcSettingsSetList.Items {
+		if referencesDynamicSource(&bmcSettingsSet, namespace, name, isConfigMap) {
+			reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKey{Name: bmcSettingsSet.Name, Namespace: bmcSettingsSet.Namespace}})
+		}
+	}
+	return reqs
+}
+
+func referencesDynamicSource(
+	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
+	namespace string,
+	name string,
+	isConfigMap bool,
+) bool {
+	for _, setting := range bmcSettingsSet.Spec.DynamicSettings {
+		if setting.ValueFrom != nil && sourceMatchesDynamicRef(setting.ValueFrom, namespace, name, isConfigMap) {
+			return true
+		}
+		for _, source := range setting.Variables {
+			if sourceMatchesDynamicRef(&source, namespace, name, isConfigMap) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func sourceMatchesDynamicRef(
+	source *metalv1alpha1.DynamicSettingSource,
+	namespace string,
+	name string,
+	isConfigMap bool,
+) bool {
+	if isConfigMap {
+		return source.ConfigMapKeyRef != nil && source.ConfigMapKeyRef.Namespace == namespace && source.ConfigMapKeyRef.Name == name
+	}
+	return source.SecretKeyRef != nil && source.SecretKeyRef.Namespace == namespace && source.SecretKeyRef.Name == name
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -426,6 +613,14 @@ func (r *BMCSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return labelChangeOrAnyFieldChangeInObject(e, []any{oldBMC.Spec.BMCSettingRef}, []any{newBMC.Spec.BMCSettingRef})
 				},
 			})).
+		Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueByConfigMap),
+		).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueBySecret),
+		).
 		Named("bmcsettingsset").
 		Complete(r)
 }

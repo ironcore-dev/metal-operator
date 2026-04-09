@@ -36,6 +36,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 	}
 	r.BMCSettingAttr = map[string]map[string]any{
 		"abc":       {"type": schemas.StringAttributeType, "reboot": false, "value": "bar"},
+		"composite": {"type": schemas.StringAttributeType, "reboot": false, "value": ""},
 		"fooreboot": {"type": schemas.IntegerAttributeType, "reboot": true, "value": 123},
 	}
 	r.PendingBIOSSetting = map[string]map[string]any{}
@@ -173,6 +174,7 @@ func (r *RedfishMockUps) ResetPendingBMCSetting() {
 func (r *RedfishMockUps) ResetBMCSettings() {
 	r.BMCSettingAttr = map[string]map[string]any{
 		"abc":       {"type": schemas.StringAttributeType, "reboot": false, "value": "bar"},
+		"composite": {"type": schemas.StringAttributeType, "reboot": false, "value": ""},
 		"fooreboot": {"type": schemas.IntegerAttributeType, "reboot": true, "value": 123},
 	}
 	r.PendingBMCSetting = map[string]map[string]any{}

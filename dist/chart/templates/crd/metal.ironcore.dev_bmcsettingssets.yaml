@@ -143,8 +143,8 @@ spec:
                 items:
                   properties:
                     format:
-                      description: Format defines a composite setting format with
-                        placeholders like $(name).
+                      description: Format defines a composite Go template with variable
+                        references like `{{.name}}`.
                       type: string
                     key:
                       description: Key is the BMC setting key to set.

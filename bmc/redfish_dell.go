@@ -471,3 +471,75 @@ func (r *DellRedfishBMC) dellMatchesComponentFilter(fw *schemas.SoftwareInventor
 func (r *DellRedfishBMC) dellCheckPending(fw *schemas.SoftwareInventory) bool {
 	return fw.Staged
 }
+
+// --- VirtualMedia methods ---
+
+// MountVirtualMedia mounts a virtual media image to the specified slot.
+func (r *DellRedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system: %w", err)
+	}
+
+	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.InsertMedia", system.ODataID, slotID)
+
+	payload := map[string]any{
+		"Image":          mediaURL,
+		"Inserted":       true,
+		"WriteProtected": true,
+	}
+
+	resp, err := r.client.Service.GetClient().Post(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to mount virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to mount virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// EjectVirtualMedia ejects virtual media from the specified slot.
+func (r *DellRedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system: %w", err)
+	}
+
+	vmURI := fmt.Sprintf("%s/VirtualMedia/%s/Actions/VirtualMedia.EjectMedia", system.ODataID, slotID)
+
+	resp, err := r.client.Service.GetClient().Post(vmURI, map[string]any{})
+	if err != nil {
+		return fmt.Errorf("failed to eject virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to eject virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetVirtualMediaStatus retrieves the status of all virtual media slots.
+func (r *DellRedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get system: %w", err)
+	}
+
+	return system.VirtualMedia()
+}

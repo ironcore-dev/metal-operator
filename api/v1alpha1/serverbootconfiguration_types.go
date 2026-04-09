@@ -8,6 +8,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// BootMethod defines the boot method to use for server provisioning.
+type BootMethod string
+
+const (
+	// BootMethodPXE boots the server using PXE network boot.
+	BootMethodPXE BootMethod = "PXE"
+	// BootMethodVirtualMedia boots the server using virtual media (ISO mounted via BMC).
+	BootMethodVirtualMedia BootMethod = "VirtualMedia"
+)
+
 // ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration.
 type ServerBootConfigurationSpec struct {
 	// ServerRef is a reference to the server for which this boot configuration is intended.
@@ -15,6 +25,9 @@ type ServerBootConfigurationSpec struct {
 	ServerRef v1.LocalObjectReference `json:"serverRef"`
 
 	// Image specifies the boot image to be used for the server.
+	// For PXE boot: OCI image reference containing kernel/initrd.
+	// For VirtualMedia boot: OCI image reference containing bootable ISO layer.
+	// This field is optional and can be omitted if not specified.
 	// +optional
 	Image string `json:"image,omitempty"`
 
@@ -22,6 +35,14 @@ type ServerBootConfigurationSpec struct {
 	// the ignition configuration for the server.
 	// +optional
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
+
+	// BootMethod specifies the boot method to use for the server.
+	// Valid values are "PXE" (default) and "VirtualMedia".
+	// If not specified, defaults to PXE for backwards compatibility.
+	// +kubebuilder:validation:Enum=PXE;VirtualMedia
+	// +kubebuilder:default=PXE
+	// +optional
+	BootMethod BootMethod `json:"bootMethod,omitempty"`
 }
 
 // ServerBootConfigurationState defines the possible states of a ServerBootConfiguration.
@@ -47,6 +68,16 @@ type ServerBootConfigurationStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// BootISOURL is the URL to the bootable OS ISO provided by boot-operator.
+	// This field is populated for VirtualMedia boot type.
+	// +optional
+	BootISOURL string `json:"bootISOURL,omitempty"`
+
+	// ConfigISOURL is the URL to the config drive ISO containing ignition configuration.
+	// This field is populated by boot-operator for VirtualMedia boot type.
+	// +optional
+	ConfigISOURL string `json:"configISOURL,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -55,6 +86,7 @@ type ServerBootConfigurationStatus struct {
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
 // +kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.spec.image`
 // +kubebuilder:printcolumn:name="IgnitionRef",type=string,JSONPath=`.spec.ignitionSecretRef.name`
+// +kubebuilder:printcolumn:name="BootMethod",type=string,JSONPath=`.spec.bootMethod`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

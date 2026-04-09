@@ -192,3 +192,127 @@ func (r *LenovoRedfishBMC) lenovoMatchesComponentFilter(fw *schemas.SoftwareInve
 func (r *LenovoRedfishBMC) lenovoCheckPending(fw *schemas.SoftwareInventory) bool {
 	return strings.Contains(strings.ToUpper(fw.ID), "-PENDING")
 }
+
+// --- VirtualMedia methods ---
+
+// getManagerForSystem retrieves the manager responsible for the specified system.
+// For most single-BMC deployments, there is only one manager.
+// For multi-system chassis, this returns the first manager that manages the specified system.
+func (r *LenovoRedfishBMC) getManagerForSystem(systemURI string) (*schemas.Manager, error) {
+	// Verify the system exists
+	_, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get system: %w", err)
+	}
+
+	// Get all managers
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
+	}
+
+	// For single-manager BMCs (most common), return the only manager
+	if len(managers) == 1 {
+		return managers[0], nil
+	}
+
+	// For multi-manager systems, find the manager that manages this system
+	// In Redfish, managers expose which systems they manage via ManagerForServers links
+	for _, manager := range managers {
+		// Check if this manager manages the specified system
+		systems, err := manager.ManagerForServers()
+		if err != nil {
+			continue
+		}
+		for _, sys := range systems {
+			if sys.ODataID == systemURI {
+				return manager, nil
+			}
+		}
+	}
+
+	// Fallback: return first manager with a warning logged
+	// This handles BMCs where the ManagerForServers link might not be populated
+	return managers[0], nil
+}
+
+// MountVirtualMedia mounts a virtual media image to the specified slot.
+// Lenovo uses Manager endpoints and PATCH requests with EXT-prefixed slot IDs.
+func (r *LenovoRedfishBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	manager, err := r.getManagerForSystem(systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get manager for system: %w", err)
+	}
+
+	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
+
+	payload := map[string]any{
+		"Image":          mediaURL,
+		"Inserted":       true,
+		"WriteProtected": true,
+	}
+
+	resp, err := r.client.Service.GetClient().Patch(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to mount virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to mount virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// EjectVirtualMedia ejects virtual media from the specified slot.
+// Lenovo uses Manager endpoints and PATCH requests with EXT-prefixed slot IDs.
+func (r *LenovoRedfishBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	manager, err := r.getManagerForSystem(systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get manager for system: %w", err)
+	}
+
+	vmURI := fmt.Sprintf("%s/VirtualMedia/EXT%s", manager.ODataID, slotID)
+
+	payload := map[string]any{
+		"Image":    "",
+		"Inserted": false,
+	}
+
+	resp, err := r.client.Service.GetClient().Patch(vmURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to eject virtual media: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", cerr)
+		}
+	}()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to eject virtual media, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetVirtualMediaStatus retrieves the status of all virtual media slots.
+// Lenovo uses Manager endpoints for VirtualMedia.
+func (r *LenovoRedfishBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
+	manager, err := r.getManagerForSystem(systemURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for system: %w", err)
+	}
+
+	return manager.VirtualMedia()
+}

@@ -1140,3 +1140,44 @@ func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string
 	}
 	return nil
 }
+
+// SetVirtualMediaBootOnce configures the system to boot from virtual media (CD) once.
+func (r *RedfishBaseBMC) SetVirtualMediaBootOnce(ctx context.Context, systemURI string) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	system, err := schemas.GetObject[schemas.ComputerSystem](r.client, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system: %w", err)
+	}
+
+	setBoot := &schemas.Boot{
+		BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled, // One-time only
+		BootSourceOverrideMode:    schemas.UEFIBootSourceOverrideMode,    // UEFI mode
+		BootSourceOverrideTarget:  schemas.CdBootSource,                  // CD/DVD (virtual media)
+	}
+
+	if err := system.SetBoot(setBoot); err != nil {
+		return fmt.Errorf("failed to set virtual media boot once: %w", err)
+	}
+
+	log.Info("Successfully set virtual media boot once", "systemURI", systemURI)
+	return nil
+}
+
+// MountVirtualMedia returns not supported error for base implementation.
+// Vendor-specific types override this method.
+func (r *RedfishBaseBMC) MountVirtualMedia(ctx context.Context, systemURI string, mediaURL string, slotID string) error {
+	return fmt.Errorf("virtual media mounting not supported for this BMC type")
+}
+
+// EjectVirtualMedia returns not supported error for base implementation.
+// Vendor-specific types override this method.
+func (r *RedfishBaseBMC) EjectVirtualMedia(ctx context.Context, systemURI string, slotID string) error {
+	return fmt.Errorf("virtual media ejection not supported for this BMC type")
+}
+
+// GetVirtualMediaStatus returns not supported error for base implementation.
+// Vendor-specific types override this method.
+func (r *RedfishBaseBMC) GetVirtualMediaStatus(ctx context.Context, systemURI string) ([]*schemas.VirtualMedia, error) {
+	return nil, fmt.Errorf("virtual media status not supported for this BMC type")
+}

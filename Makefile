@@ -27,6 +27,11 @@ CONTAINER_TOOL ?= docker
 REDFISH_CONTAINER_NAME=redfish_mockup_server
 REDFISH_CONTAINER_VERSION=latest
 
+# In-house mock BMC server settings
+MOCKSERVER_BIN      := /tmp/metal-operator-mockserver
+MOCKSERVER_PID_FILE := /tmp/metal-operator-mockserver.pid
+MOCKSERVER_PORT     := 8000
+
 # Use the most portable option for core detection
 NPROCS := $(shell getconf _NPROCESSORS_ONLN)
 # Add a fallback just in case the command fails
@@ -105,21 +110,42 @@ test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated 
 	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: startbmc
-startbmc: ## Start BMC emulator
-	@if [ -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
-		echo "Starting container $(REDFISH_CONTAINER_NAME)..."; \
-		docker run --rm -d -p 8000:8000 --name $(REDFISH_CONTAINER_NAME) dmtf/redfish-mockup-server:$(REDFISH_CONTAINER_VERSION); \
-	else \
-		echo "Container $(REDFISH_CONTAINER_NAME) is already running."; \
-	fi
+startbmc: ## Build and start in-house Redfish mock server; waits until :$(MOCKSERVER_PORT) is ready
+	@if [ -f "$(MOCKSERVER_PID_FILE)" ] && kill -0 "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null; then \
+		echo "In-house Redfish mock server is already running (PID $$(cat $(MOCKSERVER_PID_FILE)))."; \
+		exit 0; \
+	fi; \
+	echo "Compiling in-house Redfish mock server..."; \
+	go build -o $(MOCKSERVER_BIN) ./bmc/mock/main.go || { echo "Compile failed."; exit 1; }; \
+	$(MOCKSERVER_BIN) & \
+	echo $$! > "$(MOCKSERVER_PID_FILE)"; \
+	echo "Waiting for mock server to bind :$(MOCKSERVER_PORT)..."; \
+	for i in {1..30}; do \
+		if nc -z 127.0.0.1 $(MOCKSERVER_PORT) 2>/dev/null; then \
+			echo "Mock server ready on :$(MOCKSERVER_PORT) (PID $$(cat $(MOCKSERVER_PID_FILE)))."; \
+			exit 0; \
+		fi; \
+		if ! kill -0 "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null; then \
+			echo "Mock server process died unexpectedly. Check for startup errors or port collisions."; \
+			rm -f "$(MOCKSERVER_PID_FILE)"; \
+			exit 1; \
+		fi; \
+		sleep 0.5; \
+	done; \
+	echo "Timed out waiting for mock server on :$(MOCKSERVER_PORT)."; \
+	kill "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null || true; \
+	rm -f "$(MOCKSERVER_PID_FILE)"; \
+	exit 1
 
 .PHONY: stopbmc
-stopbmc: ## Stop BMC emulator
-	@if [ ! -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
-		echo "Stopping container $(REDFISH_CONTAINER_NAME)..."; \
-		docker stop $(REDFISH_CONTAINER_NAME); \
+stopbmc: ## Stop in-house Redfish mock server (started by startbmc)
+	@if [ -f "$(MOCKSERVER_PID_FILE)" ] && kill -0 "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null; then \
+		kill "$$(cat $(MOCKSERVER_PID_FILE))"; \
+		rm -f "$(MOCKSERVER_PID_FILE)"; \
+		echo "Stopped in-house Redfish mock server."; \
 	else \
-		echo "Container $(REDFISH_CONTAINER_NAME) is not running."; \
+		rm -f "$(MOCKSERVER_PID_FILE)"; \
+		echo "In-house Redfish mock server is not running."; \
 	fi
 
 

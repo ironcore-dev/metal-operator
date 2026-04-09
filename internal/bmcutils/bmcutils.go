@@ -8,12 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -220,15 +224,48 @@ func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmcObj.Name, "system", index)
 }
 
+// SSHResetBMCFunc is a function variable that defaults to SSHResetBMC.
+// It allows tests to replace the SSH implementation with mocks.
+var SSHResetBMCFunc = SSHResetBMC
+
+// expandPath expands the tilde (~) in a file path to the user's home directory.
+func expandPath(path string) (string, error) {
+	if len(path) > 0 && path[0] == '~' {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(homeDir, path[1:]), nil
+	}
+	return path, nil
+}
+
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
-	// If Redfish reset fails, try SSH-based reset for known manufacturers
+	log := ctrl.LoggerFrom(ctx)
+
+	// Set up secure host key verification with fallback to insecure mode
+	// Following the pattern from cmd/metalctl/app/console.go
+	var hostKeyCallback ssh.HostKeyCallback
+	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+	expandedPath, err := expandPath(knownHostsPath)
+	if err != nil {
+		log.V(1).Info("Failed to expand known_hosts path, falling back to insecure mode", "error", err)
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else {
+		hostKeyCallback, err = knownhosts.New(expandedPath)
+		if err != nil {
+			log.V(1).Info("Failed to load known_hosts file, falling back to insecure mode", "path", expandedPath, "error", err)
+			hostKeyCallback = ssh.InsecureIgnoreHostKey()
+		} else {
+			log.V(1).Info("Using known_hosts for SSH host key verification", "path", expandedPath)
+		}
+	}
+
 	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{ssh.Password(password)},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			return nil
-		},
-		Timeout: timeout,
+		User:            username,
+		Auth:            []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         timeout,
 	}
 	resetCMD := ""
 	switch manufacturer {
@@ -256,7 +293,7 @@ func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password strin
 	defer func() {
 		_ = session.Close()
 	}()
-	// cancel reset cmd after 5 minutes
+	// cancel reset cmd after timeout
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	done := make(chan error, 1)

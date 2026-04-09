@@ -223,7 +223,7 @@ func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv
 		annotations := BMC.GetAnnotations()
 		if annotations != nil {
 			if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
-				if op == metalv1alpha1.GracefulRestartBMC {
+				if op == metalv1alpha1.ForceResetBMC {
 					log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
 					return nil
 				} else {
@@ -237,7 +237,7 @@ func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.GracefulRestartBMC
+		annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
 		BMC.SetAnnotations(annotations)
 		if err := kClient.Patch(ctx, BMC, client.MergeFrom(BMCBase)); err != nil {
 			return err
@@ -252,7 +252,7 @@ func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
 		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
-		err = bmcClient.ResetManager(ctx, bmcManager.ID, schemas.GracefulRestartResetType)
+		err = bmcClient.ResetManager(ctx, bmcManager.ID, schemas.ForceRestartResetType)
 		if err != nil {
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}

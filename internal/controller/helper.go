@@ -35,14 +35,6 @@ const (
 
 	RetryOfFailedResourceConditionIssued = "RetryOfFailedResourceConditionIssued"
 	RetryOfFailedResourceReasonIssued    = "RetryOfFailedResourceReasonIssued"
-
-	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
-	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
-	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
-	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
-	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
-	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
-	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
 
 type BMCTaskFetchFailedError struct {

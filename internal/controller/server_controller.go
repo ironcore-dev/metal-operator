@@ -65,8 +65,6 @@ const (
 	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
 	// InternalAnnotationTypeValue is the value for the internal annotation type
 	InternalAnnotationTypeValue = "Internal"
-	// PoweringOnCondition is the condition type for powering on a server
-	PoweringOnCondition = "PoweringOn"
 )
 
 const (
@@ -1081,7 +1079,7 @@ func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *m
 	original := server.DeepCopy()
 	err := r.Conditions.UpdateSlice(
 		&server.Status.Conditions,
-		PoweringOnCondition,
+		ConditionPoweringOn,
 		conditionutils.UpdateStatus(metav1.ConditionTrue),
 		conditionutils.UpdateReason("ServerPowerOn"),
 		conditionutils.UpdateMessage("Server is powering on"),

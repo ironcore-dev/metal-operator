@@ -27,7 +27,9 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-const biosSettingsSetFinalizer = "metal.ironcore.dev/biossettingsset"
+const (
+	biosSettingsSetFinalizer = "metal.ironcore.dev/biossettingsset"
+)
 
 // BIOSSettingsSetReconciler reconciles a BIOSSettingsSet object
 type BIOSSettingsSetReconciler struct {

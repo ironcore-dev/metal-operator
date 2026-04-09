@@ -22,7 +22,7 @@ var _ = Describe("Endpoints Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully create a BMC secret and BMC object from endpoint", func(ctx SpecContext) {
+	It("should successfully create a BMC secret and BMC object from endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
@@ -55,7 +55,7 @@ var _ = Describe("Endpoints Controller", func() {
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
 			}))))
 
-		By("By ensuring that the BMC object has been created")
+		By("Ensuring that the BMC object has been created")
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: endpoint.Name,

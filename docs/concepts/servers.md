@@ -13,7 +13,7 @@ kind: Server
 metadata:
   name: my-server
 spec:
-  uuid: "123e4567-e89b-12d3-a456-426614174000"
+  systemUUID: "123e4567-e89b-12d3-a456-426614174000"
   power: "Off"
   bmcRef:
     name: my-bmc
@@ -103,7 +103,7 @@ kind: Server
 metadata:
   name: server-with-bmc-ref
 spec:
-  uuid: "123e4567-e89b-12d3-a456-426614174000"
+  systemUUID: "123e4567-e89b-12d3-a456-426614174000"
   power: "On"
   bmcRef:
     name: my-bmc

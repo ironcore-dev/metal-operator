@@ -113,7 +113,7 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 	}
 
 	if server.Spec.ServerMaintenanceRef != nil {
-		if server.Spec.ServerMaintenanceRef.UID != maintenance.UID {
+		if server.Spec.ServerMaintenanceRef.Name != maintenance.Name || server.Spec.ServerMaintenanceRef.Namespace != maintenance.Namespace {
 			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
 			return ctrl.Result{}, nil
 		}
@@ -207,7 +207,7 @@ func (r *ServerMaintenanceReconciler) shouldDeferToHigherPriorityMaintenance(ctx
 
 	for i := range maintenanceList.Items {
 		other := &maintenanceList.Items[i]
-		if other.UID == maintenance.UID {
+		if other.Name == maintenance.Name && other.Namespace == maintenance.Namespace {
 			continue
 		}
 		if !other.DeletionTimestamp.IsZero() {
@@ -305,11 +305,8 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 	log.V(1).Info("Created or patched Config", "Config", config.Name, "Operation", opResult)
 	serverBase := server.DeepCopy()
 	server.Spec.MaintenanceBootConfigurationRef = &metalv1alpha1.ObjectReference{
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-		Kind:       "ServerBootConfiguration",
-		Namespace:  config.Namespace,
-		Name:       config.Name,
-		UID:        config.UID,
+		Namespace: config.Namespace,
+		Name:      config.Name,
 	}
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return config, fmt.Errorf("failed to patch server maintenance boot configuration ref: %w", err)
@@ -330,11 +327,8 @@ func (r *ServerMaintenanceReconciler) updateServerRef(ctx context.Context, maint
 		return nil
 	}
 	server.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
-		APIVersion: "metal.ironcore.dev/v1alpha1",
-		Kind:       "ServerMaintenance",
-		Namespace:  maintenance.Namespace,
-		Name:       maintenance.Name,
-		UID:        maintenance.UID,
+		Namespace: maintenance.Namespace,
+		Name:      maintenance.Name,
 	}
 	// use update to not overwrite ServerMaintenanceRef if another maintenance was quicker
 	if err := r.Update(ctx, server); err != nil {
@@ -384,7 +378,7 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metal
 
 	if server.Spec.ServerMaintenanceRef != nil {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
-			log.Error(err, "failed to remove ServerMaintenance ref from server")
+			log.Error(err, "Failed to remove ServerMaintenance ref from Server")
 		}
 	}
 	if server.Spec.MaintenanceBootConfigurationRef != nil {
@@ -470,7 +464,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 		log := ctrl.LoggerFrom(ctx)
 		server, ok := object.(*metalv1alpha1.Server)
 		if !ok {
-			log.Error(nil, "expected object to be a Server", "object", object)
+			log.Error(nil, "Expected object to be a Server", "object", object)
 			return nil
 		}
 
@@ -487,7 +481,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: server.Name}); err != nil {
-			log.Error(err, "failed to list ServerMaintenances")
+			log.Error(err, "Failed to list ServerMaintenances")
 			return req
 		}
 		for _, maintenance := range maintenanceList.Items {
@@ -504,7 +498,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 		log := ctrl.LoggerFrom(ctx)
 		claim, ok := object.(*metalv1alpha1.ServerClaim)
 		if !ok {
-			log.Error(nil, "expected object to be a ServerClaim", "object", object)
+			log.Error(nil, "Expected object to be a ServerClaim", "object", object)
 			return nil
 		}
 
@@ -519,7 +513,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: claim.Spec.ServerRef.Name}); err != nil {
-			log.Error(err, "failed to list ServerMaintenances")
+			log.Error(err, "Failed to list ServerMaintenances")
 			return nil
 		}
 

@@ -6,13 +6,9 @@ package bmc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
-	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	"k8s.io/apimachinery/pkg/api/resource"
-
-	"github.com/ironcore-dev/metal-operator/bmc/oem"
 )
 
 type Manufacturer string
@@ -22,6 +18,14 @@ const (
 	ManufacturerLenovo     Manufacturer = "Lenovo"
 	ManufacturerHPE        Manufacturer = "HPE"
 	ManufacturerSupermicro Manufacturer = "Supermicro"
+)
+
+// ComponentType represents a firmware component type.
+type ComponentType string
+
+const (
+	ComponentTypeBMC  ComponentType = "BMC"
+	ComponentTypeBIOS ComponentType = "BIOS"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -113,6 +117,12 @@ type BMC interface {
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
+	// CreateEventSubscription creates an event subscription for the manager.
+	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
+
+	// DeleteEventSubscription deletes an event subscription for the manager.
+	DeleteEventSubscription(ctx context.Context, uri string) error
+
 	// CreateOrUpdateAccount creates or updates a BMC user account.
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 
@@ -124,6 +134,10 @@ type BMC interface {
 
 	// GetAccountService retrieves the account service.
 	GetAccountService() (*schemas.AccountService, error)
+
+	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
+	// for the given component type.
+	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
 }
 
 type Entity struct {
@@ -282,48 +296,4 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
-}
-
-func NewOEMManager(manager *schemas.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
-	var OEMManager oem.ManagerInterface
-	switch manager.Manufacturer {
-	case string(ManufacturerDell):
-		OEMManager = &oem.DellIdracManager{
-			BMC:     manager,
-			Service: service,
-		}
-	case string(ManufacturerHPE):
-		OEMManager = &oem.HPEILOManager{
-			BMC:     manager,
-			Service: service,
-		}
-	case string(ManufacturerLenovo):
-		OEMManager = &oem.LenovoXCCManager{
-			BMC:     manager,
-			Service: service,
-		}
-	default:
-		return nil, fmt.Errorf("unsupported manufacturer: %v", manager.Manufacturer)
-	}
-	return OEMManager, nil
-}
-
-func NewOEMInterface(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
-	var oemInterface oem.OEMInterface
-	switch manufacturer {
-	case string(ManufacturerDell):
-		return &oem.Dell{
-			Service: service,
-		}, nil
-	case string(ManufacturerHPE):
-		return &oem.HPE{
-			Service: service,
-		}, nil
-	case string(ManufacturerLenovo):
-		return &oem.Lenovo{
-			Service: service,
-		}, nil
-	default:
-		return oemInterface, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
-	}
 }

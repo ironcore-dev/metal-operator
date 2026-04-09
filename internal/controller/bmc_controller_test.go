@@ -30,7 +30,7 @@ var _ = Describe("BMC Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully reconcile the a BMC resource", func(ctx SpecContext) {
+	It("should successfully reconcile a BMC resource", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
@@ -65,6 +65,8 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),
 			HaveField("Status.FirmwareVersion", "1.45.455b66-rev4"),
+			HaveField("Status.MetricsReportSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/5")),
+			HaveField("Status.EventsSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/6")),
 		))
 
 		By("Ensuring that the Server resource will be created")
@@ -101,7 +103,7 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should successfully reconcile the a BMC resource with inline access information", func(ctx SpecContext) {
+	It("should successfully reconcile a BMC resource with inline access information", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -147,6 +149,8 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),
 			HaveField("Status.FirmwareVersion", "1.45.455b66-rev4"),
+			HaveField("Status.MetricsReportSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/5")),
+			HaveField("Status.EventsSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/6")),
 		))
 
 		By("Ensuring that the Server resource has been created")
@@ -178,7 +182,7 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should successfully reconcile the a BMC resource and patch on BMC label changes", func(ctx SpecContext) {
+	It("should successfully reconcile a BMC resource and patch on BMC label changes", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -267,7 +271,7 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should create a DNSRecord for the bmc if configured", func(ctx SpecContext) {
+	It("should create a DNS record for the BMC if configured", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -346,7 +350,7 @@ var _ = Describe("BMC Validation", func() {
 		EnsureCleanState()
 	})
 
-	It("Should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
+	It("should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-invalid",
@@ -363,7 +367,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should deny if the BMC has no EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
+	It("should deny if the BMC has no EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-empty",
@@ -374,7 +378,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should admit if the BMC has an EndpointRef but no InlineEndpoint spec field", func(ctx SpecContext) {
+	It("should admit if the BMC has an EndpointRef but no InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
@@ -390,7 +394,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should deny if the BMC EndpointRef spec field has been removed", func(ctx SpecContext) {
+	It("should deny if the BMC EndpointRef spec field has been removed", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
@@ -413,7 +417,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should admit if the BMC is changing EndpointRef to InlineEndpoint spec field", func(ctx SpecContext) {
+	It("should admit if the BMC is changing EndpointRef to InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
@@ -437,7 +441,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should admit if the BMC has no EndpointRef but an InlineEndpoint spec field", func(ctx SpecContext) {
+	It("should admit if the BMC has no EndpointRef but an InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
@@ -456,7 +460,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should deny if the BMC InlineEndpoint spec field has been removed", func(ctx SpecContext) {
+	It("should deny if the BMC InlineEndpoint spec field has been removed", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
@@ -484,7 +488,7 @@ var _ = Describe("BMC Validation", func() {
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should admit if the BMC has is changing to an EndpointRef from an InlineEndpoint spec field", func(ctx SpecContext) {
+	It("should admit if the BMC is changing to an EndpointRef from an InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
@@ -516,7 +520,7 @@ var _ = Describe("BMC Reset", func() {
 		EnsureCleanState()
 	})
 
-	It("Should reset the BMC", func(ctx SpecContext) {
+	It("should reset the BMC", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -583,7 +587,7 @@ var _ = Describe("BMC Conditions", func() {
 		EnsureCleanState()
 	})
 
-	It("Should create ready conditions when there are bmc connection errors", func(ctx SpecContext) {
+	It("should create ready conditions when there are BMC connection errors", func(ctx SpecContext) {
 		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{

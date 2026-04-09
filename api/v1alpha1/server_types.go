@@ -77,11 +77,6 @@ type BootOrder struct {
 
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
-	// UUID is the unique identifier for the server.
-	// Deprecated in favor of systemUUID.
-	// +optional
-	UUID string `json:"uuid,omitempty"`
-
 	// SystemUUID is the unique identifier for the server.
 	// +required
 	SystemUUID string `json:"systemUUID"`
@@ -99,9 +94,8 @@ type ServerSpec struct {
 
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
 	// +optional
-	ServerClaimRef *ObjectReference `json:"serverClaimRef,omitempty"`
+	ServerClaimRef *ImmutableObjectReference `json:"serverClaimRef,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
 	// +optional

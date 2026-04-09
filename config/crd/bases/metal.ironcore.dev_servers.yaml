@@ -157,10 +157,12 @@ spec:
                   the boot configuration for this server.
                 properties:
                   apiVersion:
-                    description: APIVersion is the API version of the referenced object.
+                    description: 'Deprecated: APIVersion is no longer used. Retained
+                      for backwards compatibility.'
                     type: string
                   kind:
-                    description: Kind is the kind of the referenced object.
+                    description: 'Deprecated: Kind is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                   name:
                     description: Name is the name of the referenced object.
@@ -169,14 +171,12 @@ spec:
                     description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: UID is the uid of the referenced object.
+                    description: 'Deprecated: UID is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                 required:
-                - apiVersion
-                - kind
                 - name
                 - namespace
-                - uid
                 type: object
               bootOrder:
                 description: BootOrder specifies the boot order of the server.
@@ -208,10 +208,12 @@ spec:
                   the boot configuration for this server during maintenance.
                 properties:
                   apiVersion:
-                    description: APIVersion is the API version of the referenced object.
+                    description: 'Deprecated: APIVersion is no longer used. Retained
+                      for backwards compatibility.'
                     type: string
                   kind:
-                    description: Kind is the kind of the referenced object.
+                    description: 'Deprecated: Kind is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                   name:
                     description: Name is the name of the referenced object.
@@ -220,14 +222,12 @@ spec:
                     description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: UID is the uid of the referenced object.
+                    description: 'Deprecated: UID is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                 required:
-                - apiVersion
-                - kind
                 - name
                 - namespace
-                - uid
                 type: object
               power:
                 description: Power specifies the desired power state of the server.
@@ -237,39 +237,44 @@ spec:
                   that claims this server.
                 properties:
                   apiVersion:
-                    description: APIVersion is the API version of the referenced object.
+                    description: 'Deprecated: APIVersion is no longer used. Retained
+                      for backwards compatibility.'
                     type: string
                   kind:
-                    description: Kind is the kind of the referenced object.
+                    description: 'Deprecated: Kind is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                   name:
                     description: Name is the name of the referenced object.
+                    maxLength: 253
                     type: string
+                    x-kubernetes-validations:
+                    - rule: self == oldSelf
                   namespace:
                     description: Namespace is the namespace of the referenced object.
+                    maxLength: 63
                     type: string
+                    x-kubernetes-validations:
+                    - rule: self == oldSelf
                   uid:
-                    description: UID is the uid of the referenced object.
+                    description: 'Deprecated: UID is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                 required:
-                - apiVersion
-                - kind
                 - name
                 - namespace
-                - uid
                 type: object
-                x-kubernetes-validations:
-                - message: serverClaimRef cannot be switched directly
-                  rule: self == null || oldSelf == null || self == oldSelf
               serverMaintenanceRef:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
                   object that maintains this server.
                 properties:
                   apiVersion:
-                    description: APIVersion is the API version of the referenced object.
+                    description: 'Deprecated: APIVersion is no longer used. Retained
+                      for backwards compatibility.'
                     type: string
                   kind:
-                    description: Kind is the kind of the referenced object.
+                    description: 'Deprecated: Kind is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                   name:
                     description: Name is the name of the referenced object.
@@ -278,14 +283,12 @@ spec:
                     description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: UID is the uid of the referenced object.
+                    description: 'Deprecated: UID is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                 required:
-                - apiVersion
-                - kind
                 - name
                 - namespace
-                - uid
                 type: object
               systemURI:
                 description: SystemURI is the unique URI for the server resource in
@@ -293,11 +296,6 @@ spec:
                 type: string
               systemUUID:
                 description: SystemUUID is the unique identifier for the server.
-                type: string
-              uuid:
-                description: |-
-                  UUID is the unique identifier for the server.
-                  Deprecated in favor of systemUUID.
                 type: string
             required:
             - systemUUID

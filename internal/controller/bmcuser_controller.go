@@ -31,9 +31,10 @@ const (
 // BMCUserReconciler reconciles a BMCUser object
 type BMCUserReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Insecure   bool
-	BMCOptions bmc.Options
+	Scheme             *runtime.Scheme
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	BMCOptions         bmc.Options
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcusers,verbs=get;list;watch;create;update;patch;delete
@@ -293,7 +294,7 @@ func (r *BMCUserReconciler) setEffectiveSecretRef(ctx context.Context, user *met
 }
 
 func (r *BMCUserReconciler) getBMCClient(ctx context.Context, bmcObj *metalv1alpha1.BMC) (bmc.BMC, error) {
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
 	if err != nil {
 		return bmcClient, fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -351,12 +352,12 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, user *met
 }
 
 func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metalv1alpha1.BMCSecret, bmcObj *metalv1alpha1.BMC) (bool, error) {
-	protocolScheme := bmcutils.GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, r.Insecure)
+	protocolScheme := bmcutils.GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, r.DefaultProtocol)
 	address, err := bmcutils.GetBMCAddressForBMC(ctx, r.Client, bmcObj)
 	if err != nil {
 		return false, fmt.Errorf("failed to get BMC address: %w", err)
 	}
-	_, err = bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions)
+	bmcClient, err := bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions, r.SkipCertValidation)
 	if err != nil {
 		var httpErr *schemas.Error
 		if errors.As(err, &httpErr) {
@@ -366,6 +367,7 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 		}
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
+	defer bmcClient.Logout()
 	return false, nil
 }
 

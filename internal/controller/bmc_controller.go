@@ -553,9 +553,8 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
 	}
 
-	// Initialize err with clientErr instead of nil to preserve error context
-	err := clientErr
-
+	// Start with the client error if available
+	var err error
 	if bmcClient != nil {
 		if err = bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.ForceRestartResetType); err == nil {
 			log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)
@@ -581,7 +580,8 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 
 	// Try SSH reset for 5xx server errors (BMC is having issues)
 	// For 4xx client errors (auth/permission), SSH won't help
-	if httpErr, ok := err.(*schemas.Error); ok {
+	var httpErr *schemas.Error
+	if errors.As(err, &httpErr) {
 		if httpErr.HTTPReturnedStatusCode >= 500 && httpErr.HTTPReturnedStatusCode < 600 {
 			// 5xx server error - enqueue SSH reset work
 			// The bmcResetConditionType condition (set to True above) acts as idempotency guard:

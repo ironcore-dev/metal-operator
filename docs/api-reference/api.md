@@ -27,6 +27,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
 - [ServerMaintenance](#servermaintenance)
+- [ServerNetworkConfig](#servernetworkconfig)
 
 
 
@@ -1028,6 +1029,26 @@ _Appears in:_
 
 
 
+#### ExpectedNetworkInterface
+
+
+
+ExpectedNetworkInterface defines the expected configuration of a single network interface,
+derived from an external source such as NetBox.
+
+
+
+_Appears in:_
+- [ServerNetworkConfigSpec](#servernetworkconfigspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the interface name as defined in the external source. |  |  |
+| `macAddress` _string_ | MACAddress is the expected MAC address of the interface. |  |  |
+| `switch` _string_ | Switch is the expected LLDP neighbor system name (i.e. the connected switch). |  |  |
+| `port` _string_ | Port is the expected LLDP neighbor port ID on the connected switch. |  |  |
+
+
 #### IP
 
 
@@ -1165,6 +1186,24 @@ _Appears in:_
 | `key` _string_ | Key is the key within the referenced object. |  |  |
 
 
+#### NetworkCheckPhase
+
+_Underlying type:_ _string_
+
+NetworkCheckPhase indicates the result of the network check.
+
+
+
+_Appears in:_
+- [ServerNetworkConfigStatus](#servernetworkconfigstatus)
+
+| Field | Description |
+| --- | --- |
+| `Passed` | NetworkCheckPhasePassed indicates all interfaces matched the expected configuration.<br /> |
+| `Failed` | NetworkCheckPhaseFailed indicates one or more interfaces did not match.<br /> |
+| `Pending` | NetworkCheckPhasePending indicates the check has not yet run.<br /> |
+
+
 #### NetworkInterface
 
 
@@ -1184,6 +1223,27 @@ _Appears in:_
 | `macAddress` _string_ | MACAddress is the MAC address of the network interface. |  |  |
 | `carrierStatus` _string_ | CarrierStatus is the operational carrier status of the network interface. |  |  |
 | `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
+
+
+#### NetworkInterfaceMismatch
+
+
+
+NetworkInterfaceMismatch describes a single interface that did not match expectations.
+
+
+
+_Appears in:_
+- [ServerNetworkConfigStatus](#servernetworkconfigstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the interface name. |  |  |
+| `macAddress` _string_ | MACAddress is the MAC address used to identify the interface. |  |  |
+| `expectedSwitch` _string_ | ExpectedSwitch is the switch name expected from the external source. |  |  |
+| `expectedPort` _string_ | ExpectedPort is the port ID expected from the external source. |  |  |
+| `actualSwitch` _string_ | ActualSwitch is the switch name observed via LLDP. Empty if the interface was not found. |  |  |
+| `actualPort` _string_ | ActualPort is the port ID observed via LLDP. Empty if the interface was not found. |  |  |
 
 
 #### ObjectReference
@@ -1600,6 +1660,65 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `state` _[ServerMaintenanceState](#servermaintenancestate)_ | State specifies the current state of the server maintenance. |  |  |
+
+
+#### ServerNetworkConfig
+
+
+
+ServerNetworkConfig holds the expected network configuration for a server (written by
+an external source such as argora) and the result of the network check performed by
+metal-operator at the Discovery→Available transition.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `ServerNetworkConfig` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[ServerNetworkConfigSpec](#servernetworkconfigspec)_ |  |  |  |
+| `status` _[ServerNetworkConfigStatus](#servernetworkconfigstatus)_ |  |  |  |
+
+
+#### ServerNetworkConfigSpec
+
+
+
+ServerNetworkConfigSpec defines the expected network configuration for a server,
+populated by an external source (e.g. argora from NetBox).
+
+
+
+_Appears in:_
+- [ServerNetworkConfig](#servernetworkconfig)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef references the Server this config applies to. |  |  |
+| `interfaces` _[ExpectedNetworkInterface](#expectednetworkinterface) array_ | Interfaces lists the expected network interfaces. |  |  |
+
+
+#### ServerNetworkConfigStatus
+
+
+
+ServerNetworkConfigStatus defines the observed state of ServerNetworkConfig,
+written by metal-operator after running the comparison at the Discovery→Available transition.
+
+
+
+_Appears in:_
+- [ServerNetworkConfig](#servernetworkconfig)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `phase` _[NetworkCheckPhase](#networkcheckphase)_ | Phase is the result of the network check. |  |  |
+| `message` _string_ | Message provides a human-readable summary of the check result. |  |  |
+| `lastCheckTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastCheckTime is the timestamp of the last check. |  |  |
+| `mismatches` _[NetworkInterfaceMismatch](#networkinterfacemismatch) array_ | Mismatches lists interfaces that did not match the expected configuration. |  |  |
 
 
 #### ServerPowerState

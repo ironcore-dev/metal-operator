@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/metautils"
@@ -76,7 +77,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		defaultMockServer.ResetBIOSSettings()
+		defaultMockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
@@ -1045,7 +1046,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		defaultMockServer.ResetBIOSSettings()
+		defaultMockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
@@ -1378,7 +1379,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		defaultMockServer.ResetBIOSSettings()
+		defaultMockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())

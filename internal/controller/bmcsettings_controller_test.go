@@ -85,7 +85,7 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		defaultMockServer.ResetBMCSettings()
+		defaultMockServer.ResetBMCSettings("BMC")
 
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Eventually(UpdateStatus(server, func() {

@@ -44,17 +44,46 @@ const (
 	// Fixed file paths for BMC manager resources.
 	bmcFilePath         = "data/Managers/BMC/index.json"
 	bmcSettingsFilePath = "data/Managers/BMC/Settings/index.json"
-
-	// Fixed file paths for system BIOS resources.
-	biosFilePath        = "data/Systems/437XR1138R2/Bios/index.json"
-	biosSettingFilePath = "data/Systems/437XR1138R2/Bios/Settings/index.json"
 )
 
-// BIOS settings that can be applied without reboot.
-var noRebootSettings = []string{"AdminPhone"}
+// noRebootSettings and noRebootBMCSettings are populated at init time by
+// scanning the embedded attribute registries for entries where ResetRequired == false.
+var (
+	noRebootSettings    []string
+	noRebootBMCSettings []string
+)
 
-// BMC settings that can be applied immediately without a BMC reset.
-var noRebootBMCSettings = []string{"abc"}
+func init() {
+	noRebootSettings = loadNoRebootAttrs("data/Registries/BiosAttributeRegistry.v1_0_0.json")
+	noRebootBMCSettings = loadNoRebootAttrs("data/Registries/BMCAttributeRegistry/index.json")
+}
+
+// loadNoRebootAttrs reads an attribute registry JSON from the embedded FS and
+// returns the names of all attributes whose ResetRequired field is false.
+func loadNoRebootAttrs(registryPath string) []string {
+	data, err := dataFS.ReadFile(registryPath)
+	if err != nil {
+		return nil
+	}
+	var registry struct {
+		RegistryEntries struct {
+			Attributes []struct {
+				AttributeName string `json:"AttributeName"`
+				ResetRequired bool   `json:"ResetRequired"`
+			} `json:"Attributes"`
+		} `json:"RegistryEntries"`
+	}
+	if err := json.Unmarshal(data, &registry); err != nil {
+		return nil
+	}
+	var result []string
+	for _, attr := range registry.RegistryEntries.Attributes {
+		if !attr.ResetRequired {
+			result = append(result, attr.AttributeName)
+		}
+	}
+	return result
+}
 
 // Power state categories for system reset actions.
 var (
@@ -495,14 +524,6 @@ func (s *MockServer) applyBMCSettings(urlPath string, update map[string]any) err
 		return nil
 	}
 
-	s.log.Info("Applying BMC settings without reset", "settings", immediate)
-
-	// Remove immediate settings from the pending update so they are not
-	// written to the Settings (pending) resource.
-	for key := range immediate {
-		delete(attrs, key)
-	}
-
 	// Apply to the current BMC manager resource.
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -510,6 +531,21 @@ func (s *MockServer) applyBMCSettings(urlPath string, update map[string]any) err
 	bmcBase, err := s.loadResourceLocked(bmcFilePath)
 	if err != nil {
 		return err
+	}
+
+	// If the BMC is mid-reset (locked), leave the immediate settings in attrs
+	// so they are written to the pending Settings resource and picked up by
+	// applyPendingBMCSettings once the reset completes.
+	if s.isLocked(bmcBase) {
+		return nil
+	}
+
+	s.log.Info("Applying BMC settings without reset", "settings", immediate)
+
+	// Remove immediate settings from the pending update so they are not
+	// written to the Settings (pending) resource.
+	for key := range immediate {
+		delete(attrs, key)
 	}
 
 	if bmcAttrs, ok := bmcBase[attributesKey].(map[string]any); ok {
@@ -555,21 +591,33 @@ func (s *MockServer) applyPendingBMCSettings() error {
 }
 
 // ResetBMCSettings resets the BMC attribute state on the server to defaults,
-// clearing both current and pending attributes. Called from test AfterEach.
-func (s *MockServer) ResetBMCSettings() {
+// clearing both current and pending attributes. managerID is the folder name under data/Managers/ (e.g. "BMC").
+func (s *MockServer) ResetBMCSettings(managerID string) {
+	filePath := fmt.Sprintf("data/Managers/%s/index.json", managerID)
+	settingsFilePath := fmt.Sprintf("data/Managers/%s/Settings/index.json", managerID)
+	if _, err := dataFS.Open(filePath); err != nil {
+		s.log.Error(err, "ResetBMCSettings: path not found", "path", filePath)
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.resetAttributesFromEmbeddedLocked(bmcFilePath)
-	s.resetAttributesFromEmbeddedLocked(bmcSettingsFilePath)
+	s.resetAttributesFromEmbeddedLocked(filePath)
+	s.resetAttributesFromEmbeddedLocked(settingsFilePath)
 }
 
 // ResetBIOSSettings resets the BIOS attribute state on the server to defaults,
-// clearing both current and pending attributes. Called from test AfterEach.
-func (s *MockServer) ResetBIOSSettings() {
+// clearing both current and pending attributes. systemID is the folder name under data/Systems/ (e.g. "437XR1138R2").
+func (s *MockServer) ResetBIOSSettings(systemID string) {
+	filePath := fmt.Sprintf("data/Systems/%s/Bios/index.json", systemID)
+	settingsFilePath := fmt.Sprintf("data/Systems/%s/Bios/Settings/index.json", systemID)
+	if _, err := dataFS.Open(filePath); err != nil {
+		s.log.Error(err, "ResetBIOSSettings: path not found", "path", filePath)
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.resetAttributesFromEmbeddedLocked(biosFilePath)
-	s.resetAttributesFromEmbeddedLocked(biosSettingFilePath)
+	s.resetAttributesFromEmbeddedLocked(filePath)
+	s.resetAttributesFromEmbeddedLocked(settingsFilePath)
 }
 
 // resetAttributesFromEmbeddedLocked resets the Attributes field of a resource to its

@@ -14,6 +14,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"golang.org/x/crypto/ssh"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -35,6 +36,22 @@ type BMCClientOptions int
 const (
 	BMCConnectivityCheckOption BMCClientOptions = 1
 )
+
+// CreateBMCClientOption is a functional option for CreateBMCClient and GetBMCClientForServer.
+type CreateBMCClientOption func(*createBMCClientConfig)
+
+type createBMCClientConfig struct {
+	registryURL string
+}
+
+// WithRegistryURL configures the BMC client to POST dummy registration data to
+// the given base URL after SetPXEBootOnce. Used with ProtocolRedfishWithRegistryPatch to
+// simulate probe boot registration without a real K8s Job.
+func WithRegistryURL(url string) CreateBMCClientOption {
+	return func(c *createBMCClientConfig) {
+		c.registryURL = url
+	}
+}
 
 func GetProtocolScheme(scheme metalv1alpha1.ProtocolScheme, defaultScheme metalv1alpha1.ProtocolScheme) metalv1alpha1.ProtocolScheme {
 	if scheme != "" {
@@ -107,7 +124,7 @@ func GetBMCAddressForBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 
 const DefaultKubeNamespace = "default"
 
-func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options) (bmc.BMC, error) {
+func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, opts ...CreateBMCClientOption) (bmc.BMC, error) {
 	if server.Spec.BMCRef != nil {
 		b := &metalv1alpha1.BMC{}
 		bmcName := server.Spec.BMCRef.Name
@@ -115,7 +132,11 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			return nil, err
 		}
 
-		return GetBMCClientFromBMC(ctx, c, b, defaultProtocol, skipCertValidation, options)
+		anyOpts := make([]any, len(opts))
+		for i, o := range opts {
+			anyOpts[i] = o
+		}
+		return GetBMCClientFromBMC(ctx, c, b, defaultProtocol, skipCertValidation, options, anyOpts...)
 	}
 
 	if server.Spec.BMC != nil {
@@ -136,16 +157,27 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			bmcSecret,
 			options,
 			skipCertValidation,
+			opts...,
 		)
 	}
 
 	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
-func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, opts ...BMCClientOptions) (bmc.BMC, error) {
+func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, opts ...any) (bmc.BMC, error) {
 	var address string
+	var bmcClientOpts []BMCClientOptions
+	var createOpts []CreateBMCClientOption
+	for _, o := range opts {
+		switch v := o.(type) {
+		case BMCClientOptions:
+			bmcClientOpts = append(bmcClientOpts, v)
+		case CreateBMCClientOption:
+			createOpts = append(createOpts, v)
+		}
+	}
 
-	if !slices.Contains(opts, BMCConnectivityCheckOption) {
+	if !slices.Contains(bmcClientOpts, BMCConnectivityCheckOption) {
 		if bmcObj.Status.State != metalv1alpha1.BMCStateEnabled && bmcObj.Status.State != "" {
 			return nil, BMCUnAvailableError{Message: fmt.Sprintf("BMC %s is not in enabled state: current state: %s", bmcObj.Name, bmcObj.Status.State)}
 		}
@@ -169,7 +201,7 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 	}
 
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, defaultProtocol)
-	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options, skipCertValidation)
+	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options, skipCertValidation, createOpts...)
 	return bmcClient, err
 }
 
@@ -183,9 +215,15 @@ func CreateBMCClient(
 	bmcSecret *metalv1alpha1.BMCSecret,
 	bmcOptions bmc.Options,
 	skipCertValidation bool,
+	opts ...CreateBMCClientOption,
 ) (bmc.BMC, error) {
 	var bmcClient bmc.BMC
 	var err error
+
+	cfg := &createBMCClientConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
 
 	bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
 	bmcOptions.Username, bmcOptions.Password, err = GetBMCCredentialsFromSecret(bmcSecret)
@@ -193,6 +231,9 @@ func CreateBMCClient(
 		return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
 	}
 	bmcOptions.InsecureTLS = skipCertValidation
+
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Creating BMC client", "Protocol", bmcProtocol, "Address", bmcOptions.Endpoint, "Username", bmcOptions.Username, "cfg", cfg)
 
 	switch bmcProtocol {
 	case metalv1alpha1.ProtocolRedfish:
@@ -205,8 +246,8 @@ func CreateBMCClient(
 		if err != nil {
 			return nil, err
 		}
-	case metalv1alpha1.ProtocolRedfishKube:
-		bmcClient, err = bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, c, DefaultKubeNamespace)
+	case metalv1alpha1.ProtocolRedfishWithRegistryPatch:
+		bmcClient, err = bmc.NewRedfishLocalBMCClientWithRegistry(ctx, bmcOptions, cfg.registryURL)
 		if err != nil {
 			return nil, err
 		}

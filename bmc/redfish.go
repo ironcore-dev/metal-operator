@@ -50,6 +50,11 @@ type Options struct {
 	// TLS configuration
 	InsecureTLS bool // Skip TLS certificate verification
 
+	// RegistryURL is an optional base URL (e.g. http://host:port) for the metal-registry.
+	// When set on a RedfishLocalBMC with ProtocolRedfishKube, SetPXEBootOnce posts dummy
+	// registration data to simulate a probe boot in dev/tilt environments.
+	RegistryURL string
+
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration

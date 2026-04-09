@@ -105,22 +105,17 @@ test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated 
 	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: startbmc
-startbmc: ## Start BMC emulator
-	@if [ -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
-		echo "Starting container $(REDFISH_CONTAINER_NAME)..."; \
-		docker run --rm -d -p 8000:8000 --name $(REDFISH_CONTAINER_NAME) dmtf/redfish-mockup-server:$(REDFISH_CONTAINER_VERSION); \
+startbmc: ## Start in-house Redfish mock server
+	@if ! pgrep -f 'go.*bmc/mock' > /dev/null; then \
+		echo "Starting in-house Redfish mock server on :8000..."; \
+		go run ./bmc/mock/main.go & \
 	else \
-		echo "Container $(REDFISH_CONTAINER_NAME) is already running."; \
+		echo "In-house Redfish mock server is already running."; \
 	fi
 
 .PHONY: stopbmc
-stopbmc: ## Stop BMC emulator
-	@if [ ! -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
-		echo "Stopping container $(REDFISH_CONTAINER_NAME)..."; \
-		docker stop $(REDFISH_CONTAINER_NAME); \
-	else \
-		echo "Container $(REDFISH_CONTAINER_NAME) is not running."; \
-	fi
+stopbmc: ## Stop in-house Redfish mock server
+	@pkill -f 'go.*bmc/mock' && echo "Stopped in-house Redfish mock server." || echo "In-house Redfish mock server is not running."
 
 
 .PHONY: lint

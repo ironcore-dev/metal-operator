@@ -18,3 +18,4 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**BMCSettingsSet**](/concepts/bmcsettingsset): Handles creation of multiple `BMCSettings` by selecting BMCs through labels.
 - [**BMCVersion**](/concepts/bmcversion): Handles upgrading the BMC Version on the physical server's Manager.
 - [**BMCVersionSet**](/concepts/bmcversionset): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.
+- [**Server Enrichment**](/concepts/server-enrichment): Allows external systems to cache additional metadata (location, asset, network topology) on `ServerMetadata` resources.

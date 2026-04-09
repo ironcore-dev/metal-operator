@@ -53,6 +53,34 @@ const (
 	OperationAnnotationRotateCredentials = "rotate-credentials"
 )
 
+// Well-known enrichment keys for ServerMetadata.Enrichment.
+// External controllers SHOULD use these standardized keys for interoperability
+// with visualizers and other tools that consume enrichment data.
+// Keys follow a hierarchical naming convention: "domain.category/attribute"
+const (
+	// Datacenter location hierarchy
+	EnrichmentLocationSite     = "datacenter.location/site"
+	EnrichmentLocationBuilding = "datacenter.location/building"
+	EnrichmentLocationRoom     = "datacenter.location/room"
+	EnrichmentLocationRack     = "datacenter.location/rack"
+	EnrichmentLocationPosition = "datacenter.location/position"
+
+	// Network topology (upstream connectivity)
+	EnrichmentNetworkUpstreamSwitch = "network.topology/upstream-switch"
+	EnrichmentNetworkUpstreamPort   = "network.topology/upstream-port"
+
+	// Asset management
+	EnrichmentAssetTag          = "asset.management/asset-tag"
+	EnrichmentAssetPurchaseDate = "asset.management/purchase-date"
+	EnrichmentAssetOwner        = "asset.management/owner"
+
+	// External system metadata (for linking back to source system)
+	EnrichmentExternalSystemID     = "external.system/id"      // Device ID in external system
+	EnrichmentExternalSystemName   = "external.system/name"    // System name (e.g., "netbox", "servicenow")
+	EnrichmentExternalSystemURL    = "external.system/url"     // Link to external system record
+	EnrichmentExternalSystemSyncAt = "external.system/sync-at" // Last sync timestamp (RFC3339)
+)
+
 const (
 	// GracefulShutdownServerPower indicates to gracefully restart the baremetal server power.
 	GracefulRestartServerPower = "graceful-restart-server"

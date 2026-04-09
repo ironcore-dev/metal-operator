@@ -32,6 +32,39 @@
 <body>
 <div id="header">Server Visualizer</div>
 <div id="tooltip"></div>
+
+<!-- Location navigation panel -->
+<div id="location-nav" style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; min-width: 200px;">
+    <h3 style="margin-top: 0; color: #fff;">Location Filter</h3>
+    <div style="margin-bottom: 10px;">
+        <label style="color: #ccc; display: block; margin-bottom: 3px;">Site:</label>
+        <select id="site-select" onchange="filterBySite(this.value)" style="width: 100%; padding: 4px;">
+            <option value="">All Sites</option>
+        </select>
+    </div>
+    <div style="margin-bottom: 10px;">
+        <label style="color: #ccc; display: block; margin-bottom: 3px;">Building:</label>
+        <select id="building-select" onchange="filterByBuilding(this.value)" style="width: 100%; padding: 4px;">
+            <option value="">All Buildings</option>
+        </select>
+    </div>
+    <div style="margin-bottom: 10px;">
+        <label style="color: #ccc; display: block; margin-bottom: 3px;">Room:</label>
+        <select id="room-select" onchange="filterByRoom(this.value)" style="width: 100%; padding: 4px;">
+            <option value="">All Rooms</option>
+        </select>
+    </div>
+    <button onclick="resetFilters()" style="width: 100%; padding: 6px; margin-top: 5px;">Reset Filters</button>
+</div>
+
+<!-- Hardware specs panel (toggle-able) -->
+<div id="hardware-panel" style="position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; max-width: 300px; display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 style="margin: 0; color: #fff;">Server Details</h3>
+        <button onclick="closeHardwarePanel()" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 18px;">&times;</button>
+    </div>
+    <div id="hardware-content" style="color: #ccc; font-size: 12px; line-height: 1.6;"></div>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
@@ -44,6 +77,11 @@
         const serverObjects = [];
         const tooltip = document.getElementById('tooltip');
         const rackGroup = new THREE.Group(); // Group to hold all rack and server objects
+
+        // Location filtering state
+        let currentLocation = { site: null, building: null, room: null };
+        let allServers = [];  // Store all servers for filtering
+        let selectedServer = null;  // Currently selected server for hardware panel
 
         // --- Constants for Visualization ---
         const RACK_WIDTH = 10;
@@ -105,6 +143,7 @@
             // --- Event Listeners ---
             window.addEventListener('resize', onWindowResize, false);
             document.addEventListener('mousemove', onMouseMove, false);
+            renderer.domElement.addEventListener('click', onMouseClick, false);
 
             // --- Data Fetching ---
             fetchServers(); // Initial fetch
@@ -141,9 +180,11 @@
                     return response.json();
                 })
                 .then(data => {
-                    clearScene();
                     if (data) {
-                        visualizeServers(data);
+                        allServers = data;
+                        updateLocationFilters(data);
+                        clearScene();
+                        visualizeServers(filterServersByLocation(data));
                     }
                 })
                 .catch(error => {
@@ -159,6 +200,195 @@
                     errorDiv.textContent = 'Could not fetch server data. Is kubectl proxy running and are servers available?';
                     document.body.appendChild(errorDiv);
                 });
+        }
+
+        // Update location dropdown options from enrichment data
+        function updateLocationFilters(servers) {
+            const sites = new Set();
+            const buildings = new Set();
+            const rooms = new Set();
+
+            servers.forEach(server => {
+                if (server.location) {
+                    if (server.location.site) sites.add(server.location.site);
+                    if (server.location.building) buildings.add(server.location.building);
+                    if (server.location.room) rooms.add(server.location.room);
+                }
+            });
+
+            populateSelect('site-select', Array.from(sites));
+            populateSelect('building-select', Array.from(buildings));
+            populateSelect('room-select', Array.from(rooms));
+        }
+
+        function populateSelect(id, options) {
+            const select = document.getElementById(id);
+            // Keep first option (All...)
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+            options.sort().forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                select.appendChild(option);
+            });
+        }
+
+        // Filter servers by selected location
+        function filterServersByLocation(servers) {
+            return servers.filter(server => {
+                // Always show servers without location data
+                if (!server.location) return true;
+
+                if (currentLocation.site && server.location.site !== currentLocation.site) return false;
+                if (currentLocation.building && server.location.building !== currentLocation.building) return false;
+                if (currentLocation.room && server.location.room !== currentLocation.room) return false;
+
+                return true;
+            });
+        }
+
+        function filterBySite(site) {
+            currentLocation.site = site || null;
+            clearScene();
+            visualizeServers(filterServersByLocation(allServers));
+        }
+
+        function filterByBuilding(building) {
+            currentLocation.building = building || null;
+            clearScene();
+            visualizeServers(filterServersByLocation(allServers));
+        }
+
+        function filterByRoom(room) {
+            currentLocation.room = room || null;
+            clearScene();
+            visualizeServers(filterServersByLocation(allServers));
+        }
+
+        function resetFilters() {
+            currentLocation = { site: null, building: null, room: null };
+            document.getElementById('site-select').value = '';
+            document.getElementById('building-select').value = '';
+            document.getElementById('room-select').value = '';
+            clearScene();
+            visualizeServers(filterServersByLocation(allServers));
+        }
+
+        // Expose filter and panel functions to global scope for HTML onclick handlers
+        window.filterBySite = filterBySite;
+        window.filterByBuilding = filterByBuilding;
+        window.filterByRoom = filterByRoom;
+        window.resetFilters = resetFilters;
+
+        // Show hardware details panel when server is clicked
+        function showHardwarePanel(server) {
+            selectedServer = server;
+            const panel = document.getElementById('hardware-panel');
+            const content = document.getElementById('hardware-content');
+
+            let html = `<strong>${server.name}</strong><br><br>`;
+
+            // Hardware specifications
+            if (server.hardware) {
+                html += '<strong>System:</strong><br>';
+                if (server.hardware.manufacturer) {
+                    html += `${server.hardware.manufacturer} ${server.hardware.model || ''}<br>`;
+                }
+                if (server.hardware.serialNumber) {
+                    html += `S/N: ${server.hardware.serialNumber}<br>`;
+                }
+
+                if (server.hardware.biosVendor) {
+                    html += `<br><strong>BIOS:</strong><br>`;
+                    html += `${server.hardware.biosVendor} ${server.hardware.biosVersion || ''}<br>`;
+                }
+
+                if (server.hardware.totalCpus > 0) {
+                    html += `<br><strong>CPU:</strong><br>`;
+                    html += `${server.hardware.totalCpus}x ${server.hardware.cpuModel || 'Unknown'}<br>`;
+                    html += `${server.hardware.totalCores} cores, ${server.hardware.totalThreads} threads<br>`;
+                }
+
+                if (server.hardware.totalMemoryGb > 0) {
+                    html += `<br><strong>Memory:</strong><br>`;
+                    html += `${server.hardware.totalMemoryGb} GB (${server.hardware.memoryModules} modules)<br>`;
+                }
+
+                if (server.hardware.totalStorageGb > 0) {
+                    html += `<br><strong>Storage:</strong><br>`;
+                    html += `${server.hardware.totalStorageGb} GB (${server.hardware.storageDevices} devices)<br>`;
+                }
+
+                if (server.hardware.networkInterfaces > 0) {
+                    html += `<br><strong>Network:</strong><br>`;
+                    html += `${server.hardware.networkInterfaces} interfaces<br>`;
+                }
+            } else {
+                html += '<em>No hardware data available</em><br>';
+            }
+
+            // Location info
+            if (server.location) {
+                html += '<br><strong>Location:</strong><br>';
+                if (server.location.hierarchyPath && server.location.hierarchyPath.length > 0) {
+                    html += server.location.hierarchyPath.join(' &gt; ') + '<br>';
+                }
+                if (server.location.position) {
+                    html += `Position: ${server.location.position}U<br>`;
+                }
+            }
+
+            // Enrichment data (network, asset, etc.)
+            if (server.enrichment) {
+                const upstreamSwitch = server.enrichment['network.topology/upstream-switch'];
+                const upstreamPort = server.enrichment['network.topology/upstream-port'];
+
+                if (upstreamSwitch) {
+                    html += '<br><strong>Network:</strong><br>';
+                    html += `Switch: ${upstreamSwitch}<br>`;
+                    if (upstreamPort) {
+                        html += `Port: ${upstreamPort}<br>`;
+                    }
+                }
+
+                const assetTag = server.enrichment['asset.management/asset-tag'];
+                if (assetTag) {
+                    html += '<br><strong>Asset:</strong><br>';
+                    html += `Tag: ${assetTag}<br>`;
+                }
+            }
+
+            // Power and state
+            html += `<br><strong>Status:</strong><br>`;
+            html += `Power: ${server.power}<br>`;
+            html += `State: ${server.state}<br>`;
+
+            content.innerHTML = html;
+            panel.style.display = 'block';
+        }
+
+        function closeHardwarePanel() {
+            document.getElementById('hardware-panel').style.display = 'none';
+            selectedServer = null;
+        }
+
+        // Expose panel function to global scope for HTML onclick handler
+        window.closeHardwarePanel = closeHardwarePanel;
+
+        // Click handler for hardware panel
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(serverObjects);
+
+            if (intersects.length > 0) {
+                const server = intersects[0].object.userData;
+                showHardwarePanel(server);
+            }
         }
 
         function visualizeServers(servers) {
@@ -278,7 +508,9 @@
             // Blinking effect for servers with indicatorLED
             const time = Date.now() * 0.005;
             serverObjects.forEach(obj => {
-                if (obj.userData.indicatorLED && obj.userData.indicatorLED.toLowerCase() === 'blinking') {
+                if (selectedServer && obj.userData.name === selectedServer.name) {
+                    obj.material.emissive.setHex(0x0066ff);  // Blue highlight for selected
+                } else if (obj.userData.indicatorLED && obj.userData.indicatorLED.toLowerCase() === 'blinking') {
                     obj.material.emissive.setHex( (time * 5) % 2 > 1 ? 0x0000ff : 0x000000 );
                 }
             });
@@ -296,12 +528,50 @@
 
                     tooltip.style.display = 'block';
                     const server = INTERSECTED.userData;
-                    tooltip.innerHTML = `Name: ${server.name}
+
+                    // Build tooltip with enrichment data
+                    let tooltipText = `<strong>${server.name}</strong>
 Rack: ${server.rack}
 Height Unit: ${server.heightUnit}
 Power: ${server.power}
-Indicator LED: ${server.indicatorLED || 'N/A'}
+LED: ${server.indicatorLED || 'N/A'}
 State: ${server.state || 'N/A'}`;
+
+                    // Add hardware summary if available
+                    if (server.hardware) {
+                        tooltipText += `\n\n<strong>Hardware:</strong>`;
+                        if (server.hardware.manufacturer) {
+                            tooltipText += `\n${server.hardware.manufacturer} ${server.hardware.model || ''}`;
+                        }
+                        if (server.hardware.totalMemoryGb) {
+                            tooltipText += `\n${server.hardware.totalMemoryGb}GB RAM, ${server.hardware.totalCores || 0} cores`;
+                        }
+                    }
+
+                    // Add location hierarchy if available
+                    if (server.location && server.location.hierarchyPath && server.location.hierarchyPath.length > 0) {
+                        tooltipText += `\n\n<strong>Location:</strong>\n${server.location.hierarchyPath.join(' > ')}`;
+                    }
+
+                    // Add network info if available
+                    if (server.enrichment) {
+                        const upstreamSwitch = server.enrichment['network.topology/upstream-switch'];
+                        if (upstreamSwitch) {
+                            const upstreamPort = server.enrichment['network.topology/upstream-port'];
+                            tooltipText += `\n\n<strong>Network:</strong>\nSwitch: ${upstreamSwitch}`;
+                            if (upstreamPort) {
+                                tooltipText += `\nPort: ${upstreamPort}`;
+                            }
+                        }
+
+                        const assetTag = server.enrichment['asset.management/asset-tag'];
+                        if (assetTag) {
+                            tooltipText += `\nAsset: ${assetTag}`;
+                        }
+                    }
+
+                    tooltipText += `\n\n<em>Click for details</em>`;
+                    tooltip.innerHTML = tooltipText;
                 }
             } else {
                 if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.currentHex);

@@ -625,7 +625,7 @@ var _ = Describe("BMC Conditions", func() {
 		Eventually(Object(bmc)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", bmcReadyConditionType),
+					HaveField("Type", ConditionReady),
 					HaveField("Status", metav1.ConditionFalse),
 				),
 			)),
@@ -640,7 +640,7 @@ var _ = Describe("BMC Conditions", func() {
 		Eventually(Object(bmc)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", bmcReadyConditionType),
+					HaveField("Type", ConditionReady),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -659,9 +659,9 @@ var _ = Describe("BMC Conditions", func() {
 			HaveField("Status.Conditions", HaveLen(2)),
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", bmcResetConditionType),
+					HaveField("Type", ConditionReset),
 					HaveField("Status", metav1.ConditionTrue),
-					HaveField("Reason", bmcUserResetReason),
+					HaveField("Reason", ReasonUserReset),
 				),
 			)),
 		))
@@ -673,7 +673,7 @@ var _ = Describe("BMC Conditions", func() {
 		Eventually(Object(bmc)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", bmcResetConditionType),
+					HaveField("Type", ConditionReset),
 					HaveField("Status", metav1.ConditionFalse),
 					HaveField("Reason", "ResetComplete"),
 				),

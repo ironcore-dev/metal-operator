@@ -558,7 +558,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeIssued, condIssue)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionVersionUpgradeIssued, condIssue)).To(BeTrue())
 			return condIssue.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -579,7 +579,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted, condComplete)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionVersionUpgradeCompleted, condComplete)).To(BeTrue())
 			return condComplete.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -600,7 +600,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	Eventually(
 		func(g Gomega) bool {
 			g.Expect(Get(biosVersion)()).To(Succeed())
-			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted, rebootStart)).To(BeTrue())
+			g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionVersionUpgradeCompleted, rebootStart)).To(BeTrue())
 			return rebootStart.Status == metav1.ConditionTrue
 		}).Should(BeTrue())
 
@@ -619,7 +619,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	}).Should(BeNumerically(">=", 4))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(biosVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted, rebootComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionVersionUpgradeCompleted, rebootComplete)).To(BeTrue())
 		return rebootComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
@@ -631,7 +631,7 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 	}).Should(BeNumerically(">=", 5))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(biosVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionBIOSUpgradeVerification, verificationComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionVersionUpgradeVerification, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 }

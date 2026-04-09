@@ -108,7 +108,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
 			HaveField("Spec.ServerRef", Not(BeNil())),
 			HaveField("Spec.ServerRef.Name", server.Name),
@@ -207,7 +207,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
 			HaveField("Spec.ServerRef", Not(BeNil())),
 			HaveField("Spec.ServerRef.Name", server.Name),
@@ -260,7 +260,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Spec.ServerRef", Equal(&v1.LocalObjectReference{Name: server.Name})),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
 		))
@@ -320,7 +320,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseUnbound),
 		))
 
@@ -371,7 +371,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerClaim is bound")
 		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
 		))
 
@@ -391,7 +391,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerClaim is Unbound")
 		Eventually(Object(claim2)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseUnbound),
 		))
 
@@ -459,7 +459,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerClaim is unbound")
 		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerClaimFinalizer)),
+			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", metalv1alpha1.PhaseUnbound),
 		))
 

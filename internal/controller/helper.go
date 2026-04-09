@@ -29,14 +29,6 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
-
-	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
-	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
-	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
-	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
-	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
-	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
-	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
 
 type BMCTaskFetchFailedError struct {

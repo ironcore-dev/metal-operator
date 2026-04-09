@@ -18,8 +18,6 @@ import (
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-
-	bmcPkg "github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BMCSettings Controller", func() {
@@ -85,7 +83,7 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmcPkg.UnitTestMockUps.ResetBMCSettings()
+		defaultMockServer.ResetBMCSettings("BMC")
 
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Eventually(UpdateStatus(server, func() {

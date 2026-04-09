@@ -252,7 +252,7 @@ func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
 		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
-		err = bmcClient.ResetManager(ctx, bmcManager.ID, schemas.GracefulRestartResetType)
+		err = bmcClient.ResetManager(ctx, bmcManager.UUID, schemas.GracefulRestartResetType)
 		if err != nil {
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}

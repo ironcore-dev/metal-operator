@@ -56,6 +56,7 @@ rules:
   - serverclaims
   - serverconfigurations
   - servermaintenances
+  - servermetadata
   - servers
   verbs:
   - create

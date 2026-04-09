@@ -76,7 +76,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully mark completed if no BIOS version change", func(ctx SpecContext) {
@@ -454,7 +454,7 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 	It("should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
 		// mocked at

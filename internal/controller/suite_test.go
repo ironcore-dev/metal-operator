@@ -375,8 +375,12 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 }
 
 // EnsureCleanState ensures that all ServerClaims and cluster scoped objects are removed from the API server.
-func EnsureCleanState() {
+func EnsureCleanState(ctx context.Context) {
 	GinkgoHelper()
+
+	// Delete ServerMetadata explicitly since envtest has no garbage collector
+	// to cascade-delete them when the owning Server is deleted.
+	Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerMetadata{})).To(Succeed())
 
 	objectLists := []client.ObjectList{
 		&metalv1alpha1.EndpointList{},
@@ -391,6 +395,7 @@ func EnsureCleanState() {
 		&metalv1alpha1.BIOSSettingsSetList{},
 		&metalv1alpha1.BIOSSettingsList{},
 		&metalv1alpha1.ServerMaintenanceList{},
+		&metalv1alpha1.ServerMetadataList{},
 		&metalv1alpha1.ServerList{},
 	}
 

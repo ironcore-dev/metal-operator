@@ -90,7 +90,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully mark completed if no BMC version change", func(ctx SpecContext) {

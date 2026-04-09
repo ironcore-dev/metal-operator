@@ -4,6 +4,7 @@ resources:
 - metal_v1alpha1_bmcsecret.yaml
 - metal_v1alpha1_bmc.yaml
 - metal_v1alpha1_server.yaml
+- metal_v1alpha1_servermetadata.yaml
 - metal_v1alpha1_serverbootconfiguration.yaml
 - metal_v1alpha1_serverclaim.yaml
 - metal_v1alpha1_servermaintenance.yaml

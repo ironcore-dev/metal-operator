@@ -19,7 +19,7 @@ var _ = Describe("Endpoints Controller", func() {
 	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully create a BMC secret and BMC object from endpoint", func(ctx SpecContext) {

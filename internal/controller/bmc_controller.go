@@ -274,6 +274,14 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, bmcClient bm
 	if err != nil {
 		return fmt.Errorf("failed to get manager details for BMC %s: %w", bmcObj.Name, err)
 	}
+
+	// CRITICAL: Check for nil BEFORE accessing fields
+	if bmcManager == nil {
+		log.V(1).Info("Manager details not available for BMC", "BMC", bmcObj.Name)
+		return nil
+	}
+
+	// NOW safe to access bmcManager fields
 	// parse time to metav1.Time: ISO 8601 format
 	lastResetTime := &metav1.Time{}
 	if bmcManager.LastResetTime != "" {
@@ -282,27 +290,24 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, bmcClient bm
 			lastResetTime = &metav1.Time{Time: t}
 		}
 	}
-	if bmcManager != nil {
-		bmcBase := bmcObj.DeepCopy()
-		bmcObj.Status.Manufacturer = bmcManager.Manufacturer
-		bmcObj.Status.State = metalv1alpha1.BMCState(string(bmcManager.Status.State))
-		// Set power state, or unknown if not available from BMC
-		if bmcManager.PowerState != "" {
-			bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(string(bmcManager.PowerState))
-		} else {
-			bmcObj.Status.PowerState = metalv1alpha1.UnknownPowerState
-			log.V(1).Info("Power state not reported by BMC, setting to unknown", "BMC", bmcObj.Name)
-		}
-		bmcObj.Status.FirmwareVersion = bmcManager.FirmwareVersion
-		bmcObj.Status.SerialNumber = bmcManager.SerialNumber
-		bmcObj.Status.SKU = bmcManager.PartNumber
-		bmcObj.Status.Model = bmcManager.Model
-		bmcObj.Status.LastResetTime = lastResetTime
-		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return fmt.Errorf("failed to patch manager details for BMC %s: %w", bmcObj.Name, err)
-		}
+
+	bmcBase = bmcObj.DeepCopy()
+	bmcObj.Status.Manufacturer = bmcManager.Manufacturer
+	bmcObj.Status.State = metalv1alpha1.BMCState(string(bmcManager.Status.State))
+	// Set power state, or unknown if not available from BMC
+	if bmcManager.PowerState != "" {
+		bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(string(bmcManager.PowerState))
 	} else {
-		log.V(1).Info("Manager details not available for BMC", "BMC", bmcObj.Name)
+		bmcObj.Status.PowerState = metalv1alpha1.UnknownPowerState
+		log.V(1).Info("Power state not reported by BMC, setting to unknown", "BMC", bmcObj.Name)
+	}
+	bmcObj.Status.FirmwareVersion = bmcManager.FirmwareVersion
+	bmcObj.Status.SerialNumber = bmcManager.SerialNumber
+	bmcObj.Status.SKU = bmcManager.PartNumber
+	bmcObj.Status.Model = bmcManager.Model
+	bmcObj.Status.LastResetTime = lastResetTime
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return fmt.Errorf("failed to patch manager details for BMC %s: %w", bmcObj.Name, err)
 	}
 	return nil
 }
@@ -547,7 +552,10 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 	if err := r.updateConditions(ctx, bmcObj, true, bmcResetConditionType, corev1.ConditionTrue, reason, message); err != nil {
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
 	}
-	var err error
+
+	// Initialize err with clientErr instead of nil to preserve error context
+	err := clientErr
+
 	if bmcClient != nil {
 		if err = bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.ForceRestartResetType); err == nil {
 			log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)
@@ -560,8 +568,15 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 		err = clientErr
 		log.Error(err, "Could not create BMC client, checking if SSH reset is possible", "BMC", bmcObj.Name)
 	} else {
-		// bmcClient is nil - cannot perform any reset
+		// bmcClient is nil and no clientErr - cannot perform any reset
+		_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, "BMC reset did not start")
 		return errors.Join(r.updateBMCStateToPending(ctx, bmcObj), fmt.Errorf("cannot reset bmc: client unavailable"))
+	}
+
+	// Check if err is nil (should not happen, but guard against it)
+	if err == nil {
+		_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, "BMC reset did not start")
+		return fmt.Errorf("cannot reset bmc: missing error context")
 	}
 
 	// Try SSH reset for 5xx server errors (BMC is having issues)
@@ -593,9 +608,13 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 				return fmt.Errorf("failed to enqueue SSH reset for BMC %s: queue full", bmcObj.Name)
 			}
 		}
-		// 4xx or other status code - don't try SSH
+		// 4xx or other status code - don't try SSH, clear condition
+		_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, "Cannot reset BMC via SSH for client errors")
 		return errors.Join(r.updateBMCStateToPending(ctx, bmcObj), fmt.Errorf("cannot reset bmc: %w", err))
 	}
+
+	// Unknown error type - clear condition
+	_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, "Cannot classify error for SSH reset")
 	return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
 }
 

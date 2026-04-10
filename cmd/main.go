@@ -602,6 +602,7 @@ func main() { // nolint: gocyclo
 		Scheme:             mgr.GetScheme(),
 		DefaultProtocol:    effectiveProtocol,
 		SkipCertValidation: effectiveSkipCert,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -612,6 +613,14 @@ func main() { // nolint: gocyclo
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCUser")
 		os.Exit(1)
+	}
+
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupBMCUserWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCUser")
+			os.Exit(1)
+		}
 	}
 
 	// nolint:goconst

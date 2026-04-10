@@ -12,6 +12,15 @@ Metal-operator is a project built using Kubebuilder and controller-runtime to fa
 of bare metal servers. It provides a robust and scalable solution for managing bare metal infrastructure, ensuring 
 seamless integration and automation within Kubernetes environments.
 
+## Features
+
+- **Automated Server Discovery**: Discover and manage bare metal servers through BMC interfaces
+- **Server Provisioning**: Automated server boot configuration and provisioning
+- **BIOS and BMC Management**: Configure and update BIOS/BMC settings and firmware
+- **Temporary Users with TTL**: Automatic expiration and cleanup of temporary BMC users for debugging and maintenance
+- **Server Claims**: Reserve and claim servers for specific workloads
+- **Server Maintenance**: Coordinate maintenance operations across server fleets
+
 ## Getting Started
 
 ### Prerequisites

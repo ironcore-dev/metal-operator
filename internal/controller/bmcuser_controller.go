@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
+	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
@@ -35,6 +36,7 @@ type BMCUserReconciler struct {
 	DefaultProtocol    metalv1alpha1.ProtocolScheme
 	SkipCertValidation bool
 	BMCOptions         bmc.Options
+	Conditions         *conditionutils.Accessor
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcusers,verbs=get;list;watch;create;update;patch;delete
@@ -74,6 +76,30 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.B
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
+
+	// Calculate expiration time if needed (ONCE at creation)
+	isTemporary, err := r.calculateExpirationTime(ctx, user)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Check if user has expired -> trigger deletion
+	expired, err := r.checkExpiration(ctx, user)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if expired {
+		// Deletion triggered, no requeue needed
+		return ctrl.Result{}, nil
+	}
+
+	// Update expiration warning condition
+	if isTemporary {
+		if err := r.checkAndUpdateExpirationWarning(ctx, user); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	bmcClient, err := r.getBMCClient(ctx, bmcObj)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
@@ -113,7 +139,15 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.B
 			return ctrl.Result{}, fmt.Errorf("failed to handle updated BMCSecret reference: %w", err)
 		}
 	}
-	return r.handleRotatingPassword(ctx, user, bmcObj, bmcClient)
+
+	// Handle password rotation and coordinate requeue
+	rotationResult, err := r.handleRotatingPassword(ctx, user, bmcObj, bmcClient)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Coordinate requeue between rotation and expiration
+	return r.coordinateRequeue(user, rotationResult), nil
 }
 
 func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, user *metalv1alpha1.BMCUser, bmcClient bmc.BMC) error {
@@ -413,6 +447,211 @@ func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCU
 	}
 	log.Info("Successfully deleted BMC account and removed finalizer for User")
 	return ctrl.Result{}, nil
+}
+
+// calculateExpirationTime sets status.ExpiresAt based on spec.TTL or spec.ExpiresAt.
+// Only called once - when user is first created (status.ExpiresAt is nil).
+// Returns whether expiration was set and any error.
+func (r *BMCUserReconciler) calculateExpirationTime(ctx context.Context, user *metalv1alpha1.BMCUser) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Already calculated - don't recalculate
+	if user.Status.ExpiresAt != nil {
+		return true, nil
+	}
+
+	// No TTL or ExpiresAt - permanent user
+	if user.Spec.TTL == nil && user.Spec.ExpiresAt == nil {
+		return false, nil
+	}
+
+	userBase := user.DeepCopy()
+
+	if user.Spec.TTL != nil {
+		// Calculate from creation time + TTL
+		expiresAt := user.CreationTimestamp.Add(user.Spec.TTL.Duration)
+		user.Status.ExpiresAt = &metav1.Time{Time: expiresAt}
+		log.Info("Calculated expiration time from TTL",
+			"TTL", user.Spec.TTL.Duration,
+			"ExpiresAt", expiresAt)
+	} else if user.Spec.ExpiresAt != nil {
+		// Use absolute expiration time
+		user.Status.ExpiresAt = user.Spec.ExpiresAt
+		log.Info("Using absolute expiration time",
+			"ExpiresAt", user.Spec.ExpiresAt.Time)
+	}
+
+	if err := r.Status().Patch(ctx, user, client.MergeFrom(userBase)); err != nil {
+		return false, fmt.Errorf("failed to update status with expiration time: %w", err)
+	}
+
+	return true, nil
+}
+
+// checkExpiration checks if the user has expired and triggers deletion if needed.
+// Returns true if expired (deletion triggered), false otherwise.
+func (r *BMCUserReconciler) checkExpiration(ctx context.Context, user *metalv1alpha1.BMCUser) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Not a temporary user
+	if user.Status.ExpiresAt == nil {
+		return false, nil
+	}
+
+	now := metav1.Now()
+	if now.After(user.Status.ExpiresAt.Time) {
+		log.Info("BMCUser has expired, triggering deletion",
+			"ExpiresAt", user.Status.ExpiresAt.Time,
+			"Now", now.Time)
+
+		// Update condition before deletion
+		if err := r.updateActiveCondition(ctx, user, false,
+			metalv1alpha1.BMCUserReasonExpired,
+			fmt.Sprintf("User expired at %s", user.Status.ExpiresAt.Format(time.RFC3339))); err != nil {
+			return false, err
+		}
+
+		// Delete the user
+		if err := r.Delete(ctx, user); err != nil {
+			return false, fmt.Errorf("failed to delete expired user: %w", err)
+		}
+
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// updateActiveCondition updates the Active condition based on expiration status.
+func (r *BMCUserReconciler) updateActiveCondition(ctx context.Context, user *metalv1alpha1.BMCUser,
+	active bool, reason, message string) error {
+
+	log := ctrl.LoggerFrom(ctx)
+
+	status := metav1.ConditionTrue
+	if !active {
+		status = metav1.ConditionFalse
+	}
+
+	condition := &metav1.Condition{}
+	found, err := r.Conditions.FindSlice(user.Status.Conditions,
+		metalv1alpha1.BMCUserConditionTypeActive, condition)
+	if err != nil {
+		return fmt.Errorf("failed to find Active condition: %w", err)
+	}
+
+	// Check if condition needs updating
+	needsUpdate := !found ||
+		condition.Status != status ||
+		condition.Reason != reason ||
+		condition.Message != message
+
+	if !needsUpdate {
+		return nil
+	}
+
+	userBase := user.DeepCopy()
+
+	if err := r.Conditions.UpdateSlice(
+		&user.Status.Conditions,
+		metalv1alpha1.BMCUserConditionTypeActive,
+		conditionutils.UpdateStatus(status),
+		conditionutils.UpdateReason(reason),
+		conditionutils.UpdateMessage(message),
+	); err != nil {
+		return fmt.Errorf("failed to update Active condition: %w", err)
+	}
+
+	if err := r.Status().Patch(ctx, user, client.MergeFrom(userBase)); err != nil {
+		return fmt.Errorf("failed to patch BMCUser status with condition: %w", err)
+	}
+
+	log.V(1).Info("Updated Active condition",
+		"Status", status, "Reason", reason)
+
+	return nil
+}
+
+// checkAndUpdateExpirationWarning checks if user is in warning period and updates condition.
+// Warning period is the smaller of: 10% of TTL or 1 hour before expiration.
+func (r *BMCUserReconciler) checkAndUpdateExpirationWarning(ctx context.Context, user *metalv1alpha1.BMCUser) error {
+	// Not a temporary user
+	if user.Status.ExpiresAt == nil {
+		// Ensure Active=True for permanent users
+		return r.updateActiveCondition(ctx, user, true,
+			metalv1alpha1.BMCUserReasonActive,
+			"User is active")
+	}
+
+	now := metav1.Now()
+	timeUntilExpiration := user.Status.ExpiresAt.Sub(now.Time)
+
+	// Calculate warning threshold
+	var warningThreshold time.Duration
+	if user.Spec.TTL != nil {
+		// 10% of TTL, capped at 1 hour
+		warningThreshold = min(time.Duration(float64(user.Spec.TTL.Duration)*0.1), time.Hour)
+	} else {
+		// For absolute ExpiresAt, use 1 hour
+		warningThreshold = time.Hour
+	}
+
+	if timeUntilExpiration <= warningThreshold && timeUntilExpiration > 0 {
+		return r.updateActiveCondition(ctx, user, true,
+			metalv1alpha1.BMCUserReasonExpiringSoon,
+			fmt.Sprintf("User will expire in %s at %s",
+				timeUntilExpiration.Round(time.Minute),
+				user.Status.ExpiresAt.Format(time.RFC3339)))
+	}
+
+	// Normal active state
+	return r.updateActiveCondition(ctx, user, true,
+		metalv1alpha1.BMCUserReasonActive,
+		fmt.Sprintf("User is active, expires at %s",
+			user.Status.ExpiresAt.Format(time.RFC3339)))
+}
+
+// coordinateRequeue determines the next requeue time considering both
+// password rotation and expiration checking.
+func (r *BMCUserReconciler) coordinateRequeue(user *metalv1alpha1.BMCUser, rotationResult ctrl.Result) ctrl.Result {
+	// Not a temporary user - use rotation result as-is
+	if user.Status.ExpiresAt == nil {
+		return rotationResult
+	}
+
+	now := metav1.Now()
+	timeUntilExpiration := user.Status.ExpiresAt.Sub(now.Time)
+
+	// Already expired - no requeue
+	if timeUntilExpiration <= 0 {
+		return ctrl.Result{}
+	}
+
+	// Calculate when we need to check next for expiration/warning
+	var expirationRequeue time.Duration
+
+	// Calculate warning threshold
+	var warningThreshold time.Duration
+	if user.Spec.TTL != nil {
+		warningThreshold = min(time.Duration(float64(user.Spec.TTL.Duration)*0.1), time.Hour)
+	} else {
+		warningThreshold = time.Hour
+	}
+
+	if timeUntilExpiration > warningThreshold {
+		// Not in warning period yet - requeue when warning starts
+		expirationRequeue = timeUntilExpiration - warningThreshold
+	} else {
+		// In warning period - check every 5 minutes for expiration
+		expirationRequeue = 5 * time.Minute
+	}
+
+	// Choose the earlier of rotation or expiration requeue
+	if rotationResult.RequeueAfter > 0 && rotationResult.RequeueAfter < expirationRequeue {
+		return rotationResult
+	}
+
+	return ctrl.Result{RequeueAfter: expirationRequeue}
 }
 
 // SetupWithManager sets up the controller with the Manager.

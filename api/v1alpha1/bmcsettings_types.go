@@ -8,15 +8,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BMCSettings refer's to Out-Of-Band_management like IDrac for Dell, iLo for HPE etc Settings
+// BMCSettingsTemplate defines the template for BMC settings to be applied.
 
 type BMCSettingsTemplate struct {
-
-	// Version defines the BMC firmware for which the settings should be applied.
+	// Version specifies the BMC firmware version for which the settings should be applied.
 	// +required
 	Version string `json:"version"`
 
-	// SettingsMap contains bmc settings as map
+	// SettingsMap contains BMC settings as a map.
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
@@ -26,7 +25,6 @@ type BMCSettingsTemplate struct {
 }
 
 // BMCSettingsSpec defines the desired state of BMCSettings.
-
 type BMCSettingsSpec struct {
 	BMCSettingsTemplate `json:",inline"`
 
@@ -35,7 +33,7 @@ type BMCSettingsSpec struct {
 	// +optional
 	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
 
-	// BMCRef is a reference to a specific BMC to apply setting to.
+	// BMCRef is a reference to a specific BMC to apply settings to.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BMCRef is immutable"
 	// +required
 	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
@@ -52,13 +50,13 @@ type ServerMaintenanceRefItem struct {
 type BMCSettingsState string
 
 const (
-	// BMCSettingsStatePending specifies that the BMC maintenance is waiting
+	// BMCSettingsStatePending specifies that the BMC settings update is waiting.
 	BMCSettingsStatePending BMCSettingsState = "Pending"
-	// BMCSettingsStateInProgress specifies that the BMC setting changes are in progress
+	// BMCSettingsStateInProgress specifies that the BMC settings changes are in progress.
 	BMCSettingsStateInProgress BMCSettingsState = "InProgress"
-	// BMCSettingsStateApplied specifies that the BMC maintenance has been completed.
+	// BMCSettingsStateApplied specifies that the BMC settings have been applied.
 	BMCSettingsStateApplied BMCSettingsState = "Applied"
-	// BMCSettingsStateFailed specifies that the BMC maintenance has failed.
+	// BMCSettingsStateFailed specifies that the BMC settings update has failed.
 	BMCSettingsStateFailed BMCSettingsState = "Failed"
 )
 

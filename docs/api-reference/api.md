@@ -63,10 +63,10 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `Pending` | BIOSSettingsFlowStatePending specifies that the BIOSSetting Controller is updating the settings for current Priority<br /> |
-| `InProgress` | BIOSSettingsFlowStateInProgress specifies that the BIOSSetting Controller is updating the settings for current Priority<br /> |
-| `Applied` | BIOSSettingsFlowStateApplied specifies that the bios setting has been completed for current Priority<br /> |
-| `Failed` | BIOSSettingsFlowStateFailed specifies that the bios setting update has failed.<br /> |
+| `Pending` | BIOSSettingsFlowStatePending specifies that the BIOS settings update for the current priority is pending.<br /> |
+| `InProgress` | BIOSSettingsFlowStateInProgress specifies that the BIOS settings update for the current priority is in progress.<br /> |
+| `Applied` | BIOSSettingsFlowStateApplied specifies that the BIOS settings for the current priority have been applied.<br /> |
+| `Failed` | BIOSSettingsFlowStateFailed specifies that the BIOS settings update has failed.<br /> |
 
 
 #### BIOSSettingsFlowStatus
@@ -82,9 +82,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `flowState` _[BIOSSettingsFlowState](#biossettingsflowstate)_ | State represents the current state of the bios configuration task for current priority. |  |  |
-| `name` _string_ | Name identifies current priority settings from the Spec |  |  |
-| `priority` _integer_ | Priority identifies the settings priority from the Spec |  |  |
+| `flowState` _[BIOSSettingsFlowState](#biossettingsflowstate)_ | State represents the current state of the BIOS settings update for the current priority. |  |  |
+| `name` _string_ | Name identifies the current priority settings from the spec. |  |  |
+| `priority` _integer_ | Priority identifies the settings priority from the spec. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOSSettings's current Flowstate. |  |  |
 | `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
 
@@ -121,7 +121,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `biosSettingsTemplate` _[BIOSSettingsTemplate](#biossettingstemplate)_ | BiosSettingsTemplate defines the template for the BIOSSettings Resource to be applied to the servers. |  |  |
+| `biosSettingsTemplate` _[BIOSSettingsTemplate](#biossettingstemplate)_ | BIOSSettingsTemplate defines the template for the BIOSSettings resource to be applied to the servers. |  |  |
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the servers that are to be selected. |  |  |
 
 
@@ -138,12 +138,12 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fullyLabeledServers` _integer_ | FullyLabeledServers is the number of server in the set. |  |  |
-| `availableBIOSSettings` _integer_ | AvailableBIOSVersion is the number of Settings current created by the set. |  |  |
-| `pendingBIOSSettings` _integer_ | PendingBIOSSettings is the total number of pending server in the set. |  |  |
-| `inProgressBIOSSettings` _integer_ | InProgressBIOSSettings is the total number of server in the set that are currently in InProgress. |  |  |
-| `completedBIOSSettings` _integer_ | CompletedBIOSSettings is the total number of completed server in the set. |  |  |
-| `failedBIOSSettings` _integer_ | FailedBIOSSettings is the total number of failed server in the set. |  |  |
+| `fullyLabeledServers` _integer_ | FullyLabeledServers is the number of servers in the set. |  |  |
+| `availableBIOSSettings` _integer_ | AvailableBIOSSettings is the number of BIOSSettings currently created by the set. |  |  |
+| `pendingBIOSSettings` _integer_ | PendingBIOSSettings is the total number of pending BIOSSettings in the set. |  |  |
+| `inProgressBIOSSettings` _integer_ | InProgressBIOSSettings is the total number of BIOSSettings in the set that are currently in progress. |  |  |
+| `completedBIOSSettings` _integer_ | CompletedBIOSSettings is the total number of completed BIOSSettings in the set. |  |  |
+| `failedBIOSSettings` _integer_ | FailedBIOSSettings is the total number of failed BIOSSettings in the set. |  |  |
 
 
 #### BIOSSettingsSpec
@@ -159,11 +159,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version contains software (eg: BIOS, BMC) version this settings applies to |  |  |
-| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order |  |  |
+| `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BiosSetting has requested for the referred server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply bios setting on. |  |  |
+| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server. |  |  |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS settings on. |  |  |
 
 
 #### BIOSSettingsState
@@ -179,10 +179,10 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `Pending` | BIOSSettingsStatePending specifies that the bios setting update is waiting<br /> |
-| `InProgress` | BIOSSettingsStateInProgress specifies that the BIOSSetting Controller is updating the settings<br /> |
-| `Applied` | BIOSSettingsStateApplied specifies that the bios setting update has been completed.<br /> |
-| `Failed` | BIOSSettingsStateFailed specifies that the bios setting update has failed.<br /> |
+| `Pending` | BIOSSettingsStatePending specifies that the BIOS settings update is waiting.<br /> |
+| `InProgress` | BIOSSettingsStateInProgress specifies that the BIOS settings update is in progress.<br /> |
+| `Applied` | BIOSSettingsStateApplied specifies that the BIOS settings have been applied.<br /> |
+| `Failed` | BIOSSettingsStateFailed specifies that the BIOS settings update has failed.<br /> |
 
 
 #### BIOSSettingsStatus
@@ -198,7 +198,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `state` _[BIOSSettingsState](#biossettingsstate)_ | State represents the current state of the bios configuration task. |  |  |
+| `state` _[BIOSSettingsState](#biossettingsstate)_ | State represents the current state of the BIOS settings update. |  |  |
 | `flowState` _[BIOSSettingsFlowStatus](#biossettingsflowstatus) array_ | FlowState is a list of individual BIOSSettings operation flows. |  |  |
 | `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOSSettings's current state. |  |  |
@@ -218,8 +218,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version contains software (eg: BIOS, BMC) version this settings applies to |  |  |
-| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains BIOS settings sequence to apply on the BIOS in given order |  |  |
+| `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 
 
@@ -275,7 +275,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the servers that are to be selected. |  |  |
-| `biosVersionTemplate` _[BIOSVersionTemplate](#biosversiontemplate)_ | BIOSVersionTemplate defines the template for the BIOSversion Resource to be applied to the servers. |  |  |
+| `biosVersionTemplate` _[BIOSVersionTemplate](#biosversiontemplate)_ | BIOSVersionTemplate defines the template for the BIOSVersion resource to be applied to the servers. |  |  |
 
 
 #### BIOSVersionSetStatus
@@ -294,7 +294,7 @@ _Appears in:_
 | `fullyLabeledServers` _integer_ | FullyLabeledServers is the number of servers in the set. |  |  |
 | `availableBIOSVersion` _integer_ | AvailableBIOSVersion is the number of BIOSVersion created by the set. |  |  |
 | `pendingBIOSVersion` _integer_ | PendingBIOSVersion is the total number of pending BIOSVersion in the set. |  |  |
-| `inProgressBIOSVersion` _integer_ | InProgressBIOSVersion is the total number of BIOSVersion in the set that are currently in InProgress. |  |  |
+| `inProgressBIOSVersion` _integer_ | InProgressBIOSVersion is the total number of BIOSVersion resources in the set that are currently in progress. |  |  |
 | `completedBIOSVersion` _integer_ | CompletedBIOSVersion is the total number of completed BIOSVersion in the set. |  |  |
 | `failedBIOSVersion` _integer_ | FailedBIOSVersion is the total number of failed BIOSVersion in the set. |  |  |
 
@@ -312,12 +312,12 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version contains a BIOS version to upgrade to |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy An indication of whether the server's upgrade service should bypass vendor update policies |  |  |
-| `image` _[ImageSpec](#imagespec)_ | details regarding the image to use to upgrade to given BIOS version |  |  |
+| `version` _string_ | Version specifies the BIOS version to upgrade to. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that that Controller has requested for the referred server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply bios upgrade on. |  |  |
+| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server. |  |  |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS upgrade on. |  |  |
 
 
 #### BIOSVersionState
@@ -333,10 +333,10 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `Pending` | BIOSVersionStatePending specifies that the bios upgrade maintenance is waiting<br /> |
-| `InProgress` | BIOSVersionStateInProgress specifies that upgrading bios is in progress.<br /> |
-| `Completed` | BIOSVersionStateCompleted specifies that the bios upgrade maintenance has been completed.<br /> |
-| `Failed` | BIOSVersionStateFailed specifies that the bios upgrade maintenance has failed.<br /> |
+| `Pending` | BIOSVersionStatePending specifies that the BIOS upgrade is waiting.<br /> |
+| `InProgress` | BIOSVersionStateInProgress specifies that upgrading BIOS is in progress.<br /> |
+| `Completed` | BIOSVersionStateCompleted specifies that the BIOS upgrade has been completed.<br /> |
+| `Failed` | BIOSVersionStateFailed specifies that the BIOS upgrade has failed.<br /> |
 
 
 #### BIOSVersionStatus
@@ -352,9 +352,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `state` _[BIOSVersionState](#biosversionstate)_ | State represents the current state of the bios configuration task. |  |  |
+| `state` _[BIOSVersionState](#biosversionstate)_ | State represents the current state of the BIOS upgrade task. |  |  |
 | `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the Upgrade Task created by the BMC |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the Bios version upgrade state. |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOS version upgrade state. |  |  |
 
 
 #### BIOSVersionTemplate
@@ -371,9 +371,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version contains a BIOS version to upgrade to |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy An indication of whether the server's upgrade service should bypass vendor update policies |  |  |
-| `image` _[ImageSpec](#imagespec)_ | details regarding the image to use to upgrade to given BIOS version |  |  |
+| `version` _string_ | Version specifies the BIOS version to upgrade to. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 
 
@@ -411,7 +411,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
 | `address` _string_ | Address is the address of the BMC. |  |  |
-| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials<br />required to access the BMC. This secret includes sensitive information such as usernames and passwords. |  |  |
+| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 
 
 #### BMCPowerState
@@ -507,8 +507,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings Resource to be applied to the BMCs. |  |  |
-| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ |  BMCSelector specifies a label selector to identify the BMCs that are to be selected. |  |  |
+| `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
+| `dynamicSettings` _[DynamicSetting](#dynamicsetting) array_ | DynamicSettings defines dynamic settings to resolve per BMC when creating BMCSettings resources. |  |  |
+| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
 
 
 #### BMCSettingsSetStatus
@@ -524,19 +525,19 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of BMC in the set. |  |  |
+| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of BMCs in the set. |  |  |
 | `availableBMCSettings` _integer_ | AvailableBMCSettings is the number of BMCSettings currently created by the set. |  |  |
-| `pendingBMCSettings` _integer_ | PendingBMCSettings is the total number of pending BMC in the set. |  |  |
-| `inProgressBMCSettings` _integer_ | InProgressBMCSettings is the total number of BMC in the set that are currently in progress. |  |  |
-| `completedBMCSettings` _integer_ | CompletedBMCSettings is the total number of completed BMC in the set. |  |  |
-| `failedBMCSettings` _integer_ | FailedBMCSettings is the total number of failed BMC in the set. |  |  |
+| `pendingBMCSettings` _integer_ | PendingBMCSettings is the total number of pending BMCSettings in the set. |  |  |
+| `inProgressBMCSettings` _integer_ | InProgressBMCSettings is the total number of BMCSettings in the set that are currently in progress. |  |  |
+| `completedBMCSettings` _integer_ | CompletedBMCSettings is the total number of completed BMCSettings in the set. |  |  |
+| `failedBMCSettings` _integer_ | FailedBMCSettings is the total number of failed BMCSettings in the set. |  |  |
 
 
 #### BMCSettingsSpec
 
 
 
-
+BMCSettingsSpec defines the desired state of BMCSettings.
 
 
 
@@ -545,11 +546,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version defines the BMC firmware for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains bmc settings as map |  |  |
+| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
+| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
-| `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply setting to. |  |  |
+| `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply settings to. |  |  |
 
 
 #### BMCSettingsState
@@ -565,10 +566,10 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `Pending` | BMCSettingsStatePending specifies that the BMC maintenance is waiting<br /> |
-| `InProgress` | BMCSettingsStateInProgress specifies that the BMC setting changes are in progress<br /> |
-| `Applied` | BMCSettingsStateApplied specifies that the BMC maintenance has been completed.<br /> |
-| `Failed` | BMCSettingsStateFailed specifies that the BMC maintenance has failed.<br /> |
+| `Pending` | BMCSettingsStatePending specifies that the BMC settings update is waiting.<br /> |
+| `InProgress` | BMCSettingsStateInProgress specifies that the BMC settings changes are in progress.<br /> |
+| `Applied` | BMCSettingsStateApplied specifies that the BMC settings have been applied.<br /> |
+| `Failed` | BMCSettingsStateFailed specifies that the BMC settings update has failed.<br /> |
 
 
 #### BMCSettingsStatus
@@ -602,8 +603,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version defines the BMC firmware for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains bmc settings as map |  |  |
+| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
+| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 
 
@@ -621,11 +622,11 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcUUID` _string_ | BMCUUID is the unique identifier for the BMC as defined in Redfish API. |  | Optional: \{\} <br /> |
-| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Kubernetes object that contains the endpoint information for the BMC.<br />This reference is typically used to locate the BMC endpoint within the cluster. |  | Optional: \{\} <br /> |
-| `access` _[InlineEndpoint](#inlineendpoint)_ | Endpoint allows inline configuration of network access details for the BMC.<br />Use this field if access settings like address are to be configured directly within the BMC resource. |  | Optional: \{\} <br /> |
-| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the Kubernetes Secret object that contains the credentials<br />required to access the BMC. This secret includes sensitive information such as usernames and passwords. |  |  |
-| `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC.<br />It could be a standard protocol such as IPMI or Redfish. |  |  |
-| `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC.<br />This field is optional and can be omitted if console access is not required. |  |  |
+| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC. |  | Optional: \{\} <br /> |
+| `access` _[InlineEndpoint](#inlineendpoint)_ | Endpoint specifies inline network access details for the BMC. |  | Optional: \{\} <br /> |
+| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
+| `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
+| `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
 | `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 
@@ -661,8 +662,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `macAddress` _string_ | MACAddress is the MAC address of the BMC.<br />The format is validated using a regular expression pattern. |  | Pattern: `^([0-9A-Fa-f]\{2\}[:-])\{5\}([0-9A-Fa-f]\{2\})$` <br /> |
-| `ip` _[IP](#ip)_ | IP is the IP address of the BMC.<br />The type is specified as string and is schemaless. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
+| `macAddress` _string_ | MACAddress is the MAC address of the BMC. |  | Pattern: `^([0-9A-Fa-f]\{2\}[:-])\{5\}([0-9A-Fa-f]\{2\})$` <br /> |
+| `ip` _[IP](#ip)_ | IP is the IP address of the BMC. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
 | `manufacturer` _string_ | Manufacturer is the name of the BMC manufacturer. |  |  |
 | `model` _string_ | Model is the model number or name of the BMC. |  |  |
 | `sku` _string_ | SKU is the stock keeping unit identifier for the BMC. |  |  |
@@ -671,6 +672,8 @@ _Appears in:_
 | `state` _[BMCState](#bmcstate)_ | State represents the current state of the BMC.<br />kubebuilder:validation:Enum=Enabled;Error;Pending | Pending |  |
 | `powerState` _[BMCPowerState](#bmcpowerstate)_ | PowerState represents the current power state of the BMC. |  |  |
 | `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  |  |
+| `metricsReportSubscriptionLink` _string_ | MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc. |  |  |
+| `eventsSubscriptionLink` _string_ | EventsSubscriptionLink is the link to the events subscription of the bmc. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  |  |
 
 
@@ -759,10 +762,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `userName` _string_ | Username of the BMC user. |  |  |
-| `roleID` _string_ | RoleID is the ID of the role to assign to the user.<br />The available roles depend on the BMC implementation.<br />For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly". |  |  |
-| `description` _string_ | Description is an optional description for the BMC user. |  |  |
-| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />if not set, the password will not be rotated. |  |  |
+| `userName` _string_ | UserName is the username of the BMC user. |  |  |
+| `roleID` _string_ | RoleID is the ID of the role to assign to the user. |  |  |
+| `description` _string_ | Description is a description for the BMC user. |  |  |
+| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />If not set, the password will not be rotated. |  |  |
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef references the BMCSecret containing the credentials for this user.<br />If not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef references the BMC this user should be created on. |  |  |
 
@@ -783,7 +786,7 @@ _Appears in:_
 | `effectiveBMCSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | EffectiveBMCSecretRef references the BMCSecret currently used for this user.<br />This may differ from Spec.BMCSecretRef if the operator generated a password. |  |  |
 | `lastRotation` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastRotation is the timestamp of the last password rotation. |  |  |
 | `passwordExpiration` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | PasswordExpiration is the timestamp when the password will expire. |  |  |
-| `id` _string_ | ID of the user in the BMC system |  |  |
+| `id` _string_ | ID is the identifier of the user in the BMC system. |  |  |
 
 
 #### BMCUserTemplate
@@ -858,8 +861,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMC that are to be selected. |  |  |
-| `bmcVersionTemplate` _[BMCVersionTemplate](#bmcversiontemplate)_ | BMCVersionTemplate defines the template for the BMCversion Resource to be applied to the servers. |  |  |
+| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
+| `bmcVersionTemplate` _[BMCVersionTemplate](#bmcversiontemplate)_ | BMCVersionTemplate defines the template for the BMCVersion resource to be applied to the BMCs. |  |  |
 
 
 #### BMCVersionSetStatus
@@ -875,12 +878,12 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of server in the set. |  |  |
-| `availableBMCVersion` _integer_ | AvailableBMCVersion is the number of BMCVersion current created by the set. |  |  |
-| `pendingBMCVersion` _integer_ | PendingBMCVersion is the total number of pending BMCVersion in the set. |  |  |
-| `inProgressBMCVersion` _integer_ | InProgressBMCVersion is the total number of BMCVersion in the set that are currently in InProgress. |  |  |
-| `completedBMCVersion` _integer_ | CompletedBMCVersion is the total number of completed BMCVersion in the set. |  |  |
-| `failedBMCVersion` _integer_ | FailedBMCVersion is the total number of failed BMCVersion in the set. |  |  |
+| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of BMCs in the set. |  |  |
+| `availableBMCVersion` _integer_ | AvailableBMCVersion is the number of BMCVersion resources currently created by the set. |  |  |
+| `pendingBMCVersion` _integer_ | PendingBMCVersion is the total number of pending BMCVersion resources in the set. |  |  |
+| `inProgressBMCVersion` _integer_ | InProgressBMCVersion is the total number of BMCVersion resources in the set that are currently in progress. |  |  |
+| `completedBMCVersion` _integer_ | CompletedBMCVersion is the total number of completed BMCVersion resources in the set. |  |  |
+| `failedBMCVersion` _integer_ | FailedBMCVersion is the total number of failed BMCVersion resources in the set. |  |  |
 
 
 #### BMCVersionSpec
@@ -896,11 +899,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version contains a BMC version to upgrade to |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy is an indication of whether the server's upgrade service should bypass vendor update policies |  |  |
-| `image` _[ImageSpec](#imagespec)_ | details regarding the image to use to upgrade to given BMC version |  |  |
+| `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
-| `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to a ServerMaintenance objects that Controller has requested for the each of the related server. |  |  |
+| `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply BMC upgrade on. |  |  |
 
 
@@ -917,7 +920,7 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `Pending` | BMCVersionStatePending specifies that the BMC upgrade maintenance is waiting<br /> |
+| `Pending` | BMCVersionStatePending specifies that the BMC upgrade is waiting.<br /> |
 | `InProgress` | BMCVersionStateInProgress specifies that upgrading BMC is in progress.<br /> |
 | `Completed` | BMCVersionStateCompleted specifies that the BMC upgrade maintenance has been completed.<br /> |
 | `Failed` | BMCVersionStateFailed specifies that the BMC upgrade maintenance has failed.<br /> |
@@ -937,7 +940,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `state` _[BMCVersionState](#bmcversionstate)_ | State represents the current state of the BMC configuration task. |  |  |
-| `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the Upgrade Task created by the BMC |  |  |
+| `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the upgrade task created by the BMC. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC version upgrade state. |  |  |
 
 
@@ -955,9 +958,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version contains a BMC version to upgrade to |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy is an indication of whether the server's upgrade service should bypass vendor update policies |  |  |
-| `image` _[ImageSpec](#imagespec)_ | details regarding the image to use to upgrade to given BMC version |  |  |
+| `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
 
 
@@ -992,8 +995,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _[ConsoleProtocolName](#consoleprotocolname)_ | Name specifies the name of the console protocol.<br />This could be a protocol such as "SSH", "Telnet", etc. |  | Enum: [IPMI SSH SSHLenovo] <br /> |
-| `port` _integer_ | Port specifies the port number used for console access.<br />This port is used by the specified console protocol to establish connections. |  |  |
+| `name` _[ConsoleProtocolName](#consoleprotocolname)_ | Name specifies the name of the console protocol. |  | Enum: [IPMI SSH SSHLenovo] <br /> |
+| `port` _integer_ | Port specifies the port number used for console access. |  |  |
 
 
 #### ConsoleProtocolName
@@ -1012,6 +1015,43 @@ _Appears in:_
 | `IPMI` | ConsoleProtocolNameIPMI represents the IPMI console protocol.<br /> |
 | `SSH` | ConsoleProtocolNameSSH represents the SSH console protocol.<br /> |
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
+
+
+#### DynamicSetting
+
+
+
+
+
+
+
+_Appears in:_
+- [BMCSettingsSetSpec](#bmcsettingssetspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the BMC setting key to set. |  | MinLength: 1 <br /> |
+| `valueFrom` _[DynamicSettingSource](#dynamicsettingsource)_ | ValueFrom defines a simple single source for the setting value. |  |  |
+| `format` _string_ | Format defines a composite setting format with placeholders like $(name). |  |  |
+| `variables` _object (keys:string, values:[DynamicSettingSource](#dynamicsettingsource))_ | Variables maps format placeholder names to their sources. |  |  |
+
+
+#### DynamicSettingSource
+
+
+
+
+
+
+
+_Appears in:_
+- [DynamicSetting](#dynamicsetting)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `bmcLabel` _string_ | BMCLabel is sourced from a label on the selected BMC. |  |  |
+| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
+| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
 
 
 #### Endpoint
@@ -1099,9 +1139,30 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `secretRef` _[SecretReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#secretreference-v1-core)_ | ImageSecretRef is a reference to the Kubernetes Secret (of type SecretTypeBasicAuth) object that contains the credentials<br />to access the ImageURI. This secret includes sensitive information such as usernames and passwords. |  |  |
-| `transferProtocol` _string_ | The network protocol that the server's update service uses to retrieve 'ImageURI' |  |  |
-| `URI` _string_ | The URI of the software image to update/install." |  |  |
+| `secretRef` _[SecretReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#secretreference-v1-core)_ | SecretRef is a reference to the Secret containing the credentials to access the image URI. |  |  |
+| `transferProtocol` _string_ | TransferProtocol is the network protocol used to retrieve the image URI. |  |  |
+| `URI` _string_ | URI is the URI of the software image to install. |  |  |
+
+
+#### ImmutableObjectReference
+
+
+
+ImmutableObjectReference is a namespaced name reference whose name and namespace
+cannot be changed once set (the entire reference can still be set or cleared).
+
+
+
+_Appears in:_
+- [ServerSpec](#serverspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
+| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
+| `namespace` _string_ | Namespace is the namespace of the referenced object. |  | MaxLength: 63 <br /> |
+| `name` _string_ | Name is the name of the referenced object. |  | MaxLength: 253 <br /> |
+| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
 
 
 #### IndicatorLED
@@ -1161,6 +1222,24 @@ _Appears in:_
 | `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
 
 
+#### NamespacedKeySelector
+
+
+
+
+
+
+
+_Appears in:_
+- [DynamicSettingSource](#dynamicsettingsource)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the referenced object name. |  |  |
+| `namespace` _string_ | Namespace is the referenced object namespace. |  |  |
+| `key` _string_ | Key is the key within the referenced object. |  |  |
+
+
 #### NetworkInterface
 
 
@@ -1199,11 +1278,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `apiVersion` _string_ | APIVersion is the API version of the referenced object. |  |  |
-| `kind` _string_ | Kind is the kind of the referenced object. |  |  |
+| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
+| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  |  |
 | `name` _string_ | Name is the name of the referenced object. |  |  |
-| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | UID is the uid of the referenced object. |  |  |
+| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
 
 
 #### Phase
@@ -1280,8 +1359,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _[ProtocolName](#protocolname)_ | Name specifies the name of the protocol.<br />This could be a protocol such as "IPMI", "Redfish", etc. |  |  |
-| `port` _integer_ | Port specifies the port number used for communication.<br />This port is used by the specified protocol to establish connections. |  |  |
+| `name` _[ProtocolName](#protocolname)_ | Name specifies the name of the protocol. |  |  |
+| `port` _integer_ | Port specifies the port number used for communication. |  |  |
 | `scheme` _[ProtocolScheme](#protocolscheme)_ | Scheme specifies the scheme used for communication. |  |  |
 
 
@@ -1373,8 +1452,8 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to the server for which this boot configuration is intended. |  |  |
-| `image` _string_ | Image specifies the boot image to be used for the server.<br />This field is optional and can be omitted if not specified. |  |  |
-| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Kubernetes Secret object that contains<br />the ignition configuration for the server. This field is optional and can be omitted if not specified. |  |  |
+| `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
+| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
 
 
 #### ServerBootConfigurationState
@@ -1426,7 +1505,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `name` _string_ | Name specifies the name of the boot configuration. |  |  |
-| `spec` _[ServerBootConfigurationSpec](#serverbootconfigurationspec)_ | Parameters specify the parameters to be used for rendering the boot configuration. |  |  |
+| `spec` _[ServerBootConfigurationSpec](#serverbootconfigurationspec)_ | Spec specifies the boot configuration to be rendered. |  |  |
 
 
 #### ServerClaim
@@ -1462,9 +1541,9 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to be claimed.<br />This field is optional and can be omitted if the server is to be selected using ServerSelector. |  | Optional: \{\} <br /> |
-| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed.<br />This field is optional and can be omitted if a specific server is referenced using ServerRef. |  | Optional: \{\} <br /> |
-| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Kubernetes Secret object that contains<br />the ignition configuration for the server. This field is optional and can be omitted if not specified. |  |  |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to be claimed. |  | Optional: \{\} <br /> |
+| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br /> |
+| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
 
 
@@ -1560,6 +1639,7 @@ _Appears in:_
 | `policy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | Policy specifies the maintenance policy to be enforced on the server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to the server that is to be maintained. |  |  |
 | `serverPower` _[Power](#power)_ | ServerPower specifies the power state of the server during maintenance. |  |  |
+| `priority` _integer_ | Priority determines ordering when multiple ServerMaintenance resources target the same server.<br />Higher values are processed first. If priorities are equal, older resources are processed first.<br />If omitted, priority is treated as 0. | 0 |  |
 | `serverBootConfigurationTemplate` _[ServerBootConfigurationTemplate](#serverbootconfigurationtemplate)_ | ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance. |  |  |
 
 
@@ -1630,17 +1710,16 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `uuid` _string_ | UUID is the unique identifier for the server.<br />Deprecated in favor of systemUUID. |  |  |
 | `systemUUID` _string_ | SystemUUID is the unique identifier for the server. |  |  |
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
 | `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |
-| `serverClaimRef` _[ObjectReference](#objectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server.<br />This field is optional and can be omitted if no claim is associated with this server. |  | Optional: \{\} <br /> |
+| `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server. |  |  |
-| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server.<br />This field is optional and can be omitted if no BMC is associated with this server. |  |  |
-| `bmc` _[BMCAccess](#bmcaccess)_ | BMC contains the access details for the BMC.<br />This field is optional and can be omitted if no BMC access is specified. |  |  |
-| `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. This field is optional and can be omitted<br />if no boot configuration is specified. |  |  |
-| `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. This field is optional and can be omitted |  |  |
+| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server. |  |  |
+| `bmc` _[BMCAccess](#bmcaccess)_ | BMC contains the access details for the BMC. |  |  |
+| `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. |  |  |
+| `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
 
@@ -1708,16 +1787,16 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the flow item |  | MaxLength: 1000 <br />MinLength: 1 <br /> |
-| `settings` _object (keys:string, values:string)_ | Settings contains software (eg: BIOS, BMC) settings as map |  |  |
-| `priority` _integer_ | Priority defines the order of applying the settings<br />any int greater than 0. lower number have higher Priority (ie; lower number is applied first) |  | Maximum: 2.147483645e+09 <br />Minimum: 1 <br /> |
+| `name` _string_ | Name is the name of the flow item. |  | MaxLength: 1000 <br />MinLength: 1 <br /> |
+| `settings` _object (keys:string, values:string)_ | Settings contains software (e.g. BIOS, BMC) settings as a map. |  |  |
+| `priority` _integer_ | Priority defines the order of applying the settings. Lower numbers have higher priority (i.e. lower numbers are applied first). |  | Maximum: 2.147483645e+09 <br />Minimum: 1 <br /> |
 
 
 #### Storage
 
 
 
-Storage defines the details of one storage device
+Storage defines the details of one storage device.
 
 
 
@@ -1726,7 +1805,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the storage interface. |  |  |
+| `name` _string_ | Name is the name of the storage device. |  |  |
 | `state` _[StorageState](#storagestate)_ | State specifies the state of the storage device. |  |  |
 | `volumes` _[StorageVolume](#storagevolume) array_ | Volumes is a collection of volumes associated with this storage. |  |  |
 | `drives` _[StorageDrive](#storagedrive) array_ | Drives is a collection of drives associated with this storage. |  |  |
@@ -1736,7 +1815,7 @@ _Appears in:_
 
 
 
-StorageDrive defines the details of one storage drive
+StorageDrive defines the details of one storage drive.
 
 
 
@@ -1745,7 +1824,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the storage interface. |  |  |
+| `name` _string_ | Name is the name of the storage drive. |  |  |
 | `mediaType` _string_ | MediaType specifies the media type of the storage device. |  |  |
 | `type` _string_ | Type specifies the type of the storage device. |  |  |
 | `capacity` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#quantity-resource-api)_ | Capacity specifies the size of the storage device in bytes. |  |  |
@@ -1778,7 +1857,7 @@ _Appears in:_
 
 
 
-StorageVolume defines the details of one storage volume
+StorageVolume defines the details of one storage volume.
 
 
 
@@ -1787,7 +1866,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the storage interface. |  |  |
+| `name` _string_ | Name is the name of the storage volume. |  |  |
 | `capacity` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#quantity-resource-api)_ | Capacity specifies the size of the storage device in bytes. |  |  |
 | `state` _[StorageState](#storagestate)_ | Status specifies the status of the volume. |  |  |
 | `raidType` _string_ | RAIDType specifies the RAID type of the associated Volume. |  |  |

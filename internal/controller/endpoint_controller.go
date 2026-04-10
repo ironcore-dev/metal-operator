@@ -9,7 +9,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
@@ -29,10 +28,11 @@ const (
 // EndpointReconciler reconciles a Endpoints object
 type EndpointReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	MACPrefixes *macdb.MacPrefixes
-	Insecure    bool
-	BMCOptions  bmc.Options
+	Scheme             *runtime.Scheme
+	MACPrefixes        *macdb.MacPrefixes
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	BMCOptions         bmc.Options
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
@@ -42,23 +42,23 @@ type EndpointReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints/finalizers,verbs=update
 
 func (r *EndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	endpoint := &metalv1alpha1.Endpoint{}
 	if err := r.Get(ctx, req.NamespacedName, endpoint); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, log, endpoint)
+	return r.reconcileExists(ctx, endpoint)
 }
 
-func (r *EndpointReconciler) reconcileExists(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+func (r *EndpointReconciler) reconcileExists(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
 	if !endpoint.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, endpoint)
+		return r.delete(ctx, endpoint)
 	}
-	return r.reconcile(ctx, log, endpoint)
+	return r.reconcile(ctx, endpoint)
 }
 
-func (r *EndpointReconciler) delete(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting Endpoint")
 	// TODO: cleanup endpoint
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, EndpointFinalizer); err != nil || modified {
@@ -68,8 +68,9 @@ func (r *EndpointReconciler) delete(ctx context.Context, log logr.Logger, endpoi
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
-	log.V(1).Info("Reconciling endpoint")
+func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Reconciling Endpoint")
 	if shouldIgnoreReconciliation(endpoint) {
 		log.V(1).Info("Skipped Endpoint reconciliation")
 		return ctrl.Result{}, nil
@@ -78,18 +79,19 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 	sanitizedMACAddress := strings.ReplaceAll(endpoint.Spec.MACAddress, ":", "")
 	for _, m := range r.MACPrefixes.MacPrefixes {
 		if strings.HasPrefix(sanitizedMACAddress, m.MacPrefix) && m.Type == metalv1alpha1.BMCType {
-			log.V(1).Info("Found a BMC adapter for endpoint", "Type", m.Type, "Protocol", m.Protocol)
+			log.V(1).Info("Found a BMC adapter for Endpoint", "Type", m.Type, "Protocol", m.Protocol)
 			if len(m.DefaultCredentials) == 0 {
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
 
 			bmcOptions := bmc.Options{
-				BasicAuth: true,
-				Username:  m.DefaultCredentials[0].Username,
-				Password:  m.DefaultCredentials[0].Password,
+				BasicAuth:   true,
+				Username:    m.DefaultCredentials[0].Username,
+				Password:    m.DefaultCredentials[0].Password,
+				InsecureTLS: r.SkipCertValidation,
 			}
 
-			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.Insecure)
+			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.DefaultProtocol)
 			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 
 			switch m.Protocol {
@@ -104,15 +106,15 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				// TODO: ensure that BMC has the correct MACAddress
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied BMC secret for endpoint")
+				log.V(1).Info("Applied BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
-				log.V(1).Info("Applied BMC object for endpoint")
+				log.V(1).Info("Applied BMC object for Endpoint")
 			case metalv1alpha1.ProtocolRedfishLocal:
 				log.V(1).Info("Creating client for a local test BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
@@ -122,12 +124,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				defer bmcClient.Logout()
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied local test BMC secret for endpoint")
+				log.V(1).Info("Applied local test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -140,27 +142,28 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, log logr.Logger, end
 				defer bmcClient.Logout()
 
 				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, log, endpoint, m); err != nil {
+				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied kube test BMC secret for endpoint")
+				log.V(1).Info("Applied kube test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, log, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
 			default:
-				return ctrl.Result{}, fmt.Errorf("uknown protocol: %s", m.Protocol)
+				return ctrl.Result{}, fmt.Errorf("unknown protocol: %s", m.Protocol)
 			}
 			// TODO: other types like Switches can be handled here later
 		}
 	}
-	log.V(1).Info("Reconciled endpoint")
+	log.V(1).Info("Reconciled Endpoint")
 
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcObj := &metalv1alpha1.BMC{}
 	bmcObj.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, func() error {
@@ -186,7 +189,8 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, log logr.Logger, endp
 	return nil
 }
 
-func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, log logr.Logger, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {
+func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metalv1alpha1.Endpoint, m macdb.MacPrefix) (*metalv1alpha1.BMCSecret, error) {
+	log := ctrl.LoggerFrom(ctx)
 	bmcSecret := &metalv1alpha1.BMCSecret{}
 	bmcSecret.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcSecret, func() error {

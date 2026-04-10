@@ -26,6 +26,14 @@ var (
 	dataFS embed.FS
 )
 
+type Collection struct {
+	Members []Member `json:"Members"`
+}
+
+type Member struct {
+	OdataID string `json:"@odata.id"`
+}
+
 const (
 	PowerOffState = "Off"
 	PowerOnState  = "On"
@@ -99,10 +107,14 @@ func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	cached, hasOverride := s.overrides[filePath]
+	var copied any
+	if hasOverride {
+		copied = deepCopyAny(cached)
+	}
 	s.mu.RUnlock()
 
 	if hasOverride {
-		s.writeJSON(w, http.StatusOK, cached)
+		s.writeJSON(w, http.StatusOK, copied)
 		return
 	}
 
@@ -135,6 +147,66 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 	case strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
 		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
 	default:
+		//
+		urlPath := resolvePath(r.URL.Path)
+		var update map[string]any
+		if err := json.Unmarshal(body, &update); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		// Handle resource creation in collections
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		cached, hasOverride := s.overrides[urlPath]
+		var base Collection
+		if hasOverride {
+			s.log.Info("Using overridden data for POST", "path", urlPath)
+			var ok bool
+			base, ok = cached.(Collection)
+			if !ok {
+				http.Error(w, "Corrupt overridden JSON", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			s.log.Info("Using embedded data for POST", "path", urlPath)
+			data, err := dataFS.ReadFile(urlPath)
+			if err != nil {
+				s.log.Error(err, "Failed to read embedded data for POST", "path", urlPath)
+				http.NotFound(w, r)
+				return
+			}
+			if err := json.Unmarshal(data, &base); err != nil {
+				http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+				return
+			}
+		}
+		// If resource collection (has "Members"), add a new member
+		if len(base.Members) > 0 {
+			newID := fmt.Sprintf("%d", len(base.Members)+1)
+			location := path.Join(r.URL.Path, newID)
+			newMemberPath := resolvePath(location)
+			base.Members = append(base.Members, Member{
+				OdataID: location,
+			})
+			s.log.Info("Adding new member", "id", newID, "location", location, "memberPath", newMemberPath)
+			if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
+				w.Header().Set("Location", location)
+			}
+			s.overrides[urlPath] = base
+			s.overrides[newMemberPath] = update
+		} else {
+			base.Members = make([]Member, 0)
+			location := r.URL.JoinPath("1").String()
+			base.Members = []Member{
+				{
+					OdataID: r.URL.JoinPath("1").String(),
+				},
+			}
+			s.overrides[urlPath] = base
+			if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
+				w.Header().Set("Location", location)
+			}
+		}
 		s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
 	}
 }
@@ -178,22 +250,56 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 
 func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	filePath := resolvePath(r.URL.Path)
-
 	base, err := s.loadResource(filePath)
 	if err != nil {
 		s.handleError(w, r, err)
 		return
 	}
-
 	if _, isCollection := base["Members"]; isCollection {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
+	// Hold a single lock for the entire delete + collection update to avoid
+	// unsynchronised reads of s.overrides between the two operations.
 	s.mu.Lock()
 	delete(s.overrides, filePath)
-	s.mu.Unlock()
 
+	// get collection of the resource
+	collectionPath := path.Dir(filePath)
+	cached, hasOverride := s.overrides[collectionPath]
+	var collection Collection
+	if hasOverride {
+		var ok bool
+		collection, ok = cached.(Collection)
+		if !ok {
+			s.mu.Unlock()
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		data, err := dataFS.ReadFile(collectionPath + "/index.json")
+		if err != nil {
+			s.mu.Unlock()
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.Unmarshal(data, &collection); err != nil {
+			s.mu.Unlock()
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
+	}
+	// remove member from collection
+	newMembers := make([]Member, 0)
+	for _, member := range collection.Members {
+		if member.OdataID != r.URL.Path {
+			newMembers = append(newMembers, member)
+		}
+	}
+	s.log.Info("Removing member from collection", "members", newMembers, "collection", collectionPath)
+	collection.Members = newMembers
+	s.overrides[collectionPath] = collection
+	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -459,12 +565,12 @@ func (s *MockServer) loadResourceLocked(filePath string) (map[string]any, error)
 
 	data, err := dataFS.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errNotFound, err)
+		return nil, fmt.Errorf("%w: %w", errNotFound, err)
 	}
 
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("%w: %v", errCorruptJSON, err)
+		return nil, fmt.Errorf("%w: %w", errCorruptJSON, err)
 	}
 
 	return result, nil
@@ -560,13 +666,28 @@ func resolvePath(urlPath string) string {
 func deepCopy(m map[string]any) map[string]any {
 	c := make(map[string]any)
 	for k, v := range m {
-		if vMap, ok := v.(map[string]any); ok {
-			c[k] = deepCopy(vMap)
-		} else {
-			c[k] = v
-		}
+		c[k] = deepCopyAny(v)
 	}
 	return c
+}
+
+func deepCopyAny(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopy(val)
+	case []any:
+		c := make([]any, len(val))
+		for i, elem := range val {
+			c[i] = deepCopyAny(elem)
+		}
+		return c
+	case Collection:
+		members := make([]Member, len(val.Members))
+		copy(members, val.Members)
+		return Collection{Members: members}
+	default:
+		return v
+	}
 }
 
 func mergeJSON(base, update map[string]any) {

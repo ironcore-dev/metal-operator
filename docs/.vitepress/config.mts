@@ -23,7 +23,7 @@ export default withMermaid({
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Concepts', link: '/concepts' },
+      { text: 'Documentation', link: '/architecture' },
       { text: 'Quickstart', link: '/quickstart' },
       { text: 'IronCore Documentation', link: 'https://ironcore-dev.github.io' },
     ],
@@ -60,12 +60,13 @@ export default withMermaid({
       },
       {
         text: 'Concepts',
-        collapsed: false,
+        collapsed: true,
         items: [
           { text: 'Endpoints', link: '/concepts/endpoints' },
           { text: 'BMCs', link: '/concepts/bmcs' },
           { text: 'BMCSecrets', link: '/concepts/bmcsecrets' },
           { text: 'BMCSettings', link: '/concepts/bmcsettings' },
+          { text: 'BMCSettingsSet', link: '/concepts/bmcsettingsset' },
           { text: 'BMCVersion', link: '/concepts/bmcversion' },
           { text: 'BMCVersionSet', link: '/concepts/bmcversionset' },
           { text: 'Servers', link: '/concepts/servers' },
@@ -86,11 +87,27 @@ export default withMermaid({
         ]
       },
       {
-        text: 'Developer Guide',
+        text: 'Observability',
+        collapsed: false,
+        items: [
+          { text: 'Metrics', link: '/observability/metrics' },
+        ]
+      },
+      {
+        text: 'Development',
         collapsed: false,
         items: [
           { text: 'Local Dev Setup', link: '/development/dev_setup' },
           { text: 'Documentation', link: '/development/dev_docs' },
+          { text: 'CRD and Controller Docs Checklist', link: '/development/crd_controller_docs' },
+        ]
+      },
+      {
+        text: 'Contributing',
+        collapsed: false,
+        items: [
+          { text: 'Contributing Guide', link: 'https://ironcore.dev/community/contributing.html' },
+          { text: 'Cherry-Picking', link: '/contributing/cherry_pick' },
         ]
       }
     ],

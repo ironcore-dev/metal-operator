@@ -6,7 +6,6 @@ package controller
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -26,30 +25,31 @@ type ServerBootConfigurationReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *ServerBootConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	bootConfig := &metalv1alpha1.ServerBootConfiguration{}
 	if err := r.Get(ctx, req.NamespacedName, bootConfig); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	return r.reconcileExists(ctx, log, bootConfig)
+	return r.reconcileExists(ctx, bootConfig)
 }
 
-func (r *ServerBootConfigurationReconciler) reconcileExists(ctx context.Context, log logr.Logger, config *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
+func (r *ServerBootConfigurationReconciler) reconcileExists(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
 	if !config.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, config)
+		return r.delete(ctx, config)
 	}
-	return r.reconcile(ctx, log, config)
+	return r.reconcile(ctx, config)
 }
 
-func (r *ServerBootConfigurationReconciler) delete(ctx context.Context, log logr.Logger, config *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
+func (r *ServerBootConfigurationReconciler) delete(ctx context.Context, _ *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting ServerBootConfiguration")
 
 	log.V(1).Info("Deleted ServerBootConfiguration")
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerBootConfigurationReconciler) reconcile(ctx context.Context, log logr.Logger, config *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
+func (r *ServerBootConfigurationReconciler) reconcile(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling ServerBootConfiguration")
 	if config.Status.State == "" {
 		if modified, err := r.patchState(ctx, config, metalv1alpha1.ServerBootConfigurationStatePending); err != nil || modified {

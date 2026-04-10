@@ -8,20 +8,20 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"reflect"
 	"slices"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -29,7 +29,34 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
+
+	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
+	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
+	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
+	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
+	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
+	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
+	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
+
+type BMCTaskFetchFailedError struct {
+	TaskURI  string
+	Resource string
+	Err      error
+}
+
+func (e BMCTaskFetchFailedError) Error() string {
+	return e.Err.Error()
+}
+
+type MultiErrorTracker struct {
+	Identifier string
+	Err        error
+}
+
+func (e MultiErrorTracker) Error() string {
+	return e.Err.Error()
+}
 
 // GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
 func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client, ref *metalv1alpha1.ObjectReference) (*metalv1alpha1.ServerMaintenance, error) {
@@ -50,7 +77,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 	condFound, err := acc.FindSlice(conditions, conditionType, condition)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
+		return nil, fmt.Errorf("failed to find Condition %v. error: %w", conditionType, err)
 	}
 	if !condFound {
 		condition.Type = conditionType
@@ -58,7 +85,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
 		); err != nil {
-			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
+			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %w", conditionType, err)
 		}
 	}
 
@@ -69,10 +96,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}
 	if err := c.Get(ctx, client.ObjectKey{Name: serverName}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("server not found")
+		return nil, err
 	}
 	return server, nil
 }
@@ -187,18 +211,13 @@ func enqueueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 	return true
 }
 
-func resetBMCOfServer(
-	ctx context.Context,
-	log logr.Logger,
-	kClient client.Client,
-	server *metalv1alpha1.Server,
-	bmcClient bmc.BMC,
-) error {
+func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.BMCRef != nil {
 		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
 		BMC := &metalv1alpha1.BMC{}
 		if err := kClient.Get(ctx, key, BMC); err != nil {
-			log.V(1).Error(err, "failed to get referred server's Manager")
+			log.Error(err, "Failed to get referred server's Manager")
 			return err
 		}
 		annotations := BMC.GetAnnotations()
@@ -233,7 +252,7 @@ func resetBMCOfServer(
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
 		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
-		err = bmcClient.ResetManager(ctx, bmcManager.ID, redfish.GracefulRestartResetType)
+		err = bmcClient.ResetManager(ctx, bmcManager.ID, schemas.GracefulRestartResetType)
 		if err != nil {
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
@@ -242,7 +261,8 @@ func resetBMCOfServer(
 	return fmt.Errorf("no BMC reference or inline BMC details found in server spec to reset BMC")
 }
 
-func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+func handleIgnoreAnnotationPropagation(ctx context.Context, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -284,7 +304,8 @@ func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c c
 	return errors.Join(errs...)
 }
 
-func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -347,4 +368,64 @@ func GetImageCredentialsForSecretRef(ctx context.Context, c client.Client, secre
 	}
 
 	return string(username), string(password), nil
+}
+
+func clearDeprecatedObjectRefFields(ref *metalv1alpha1.ObjectReference) bool {
+	if ref == nil {
+		return false
+	}
+	changed := ref.APIVersion != "" || ref.Kind != "" || ref.UID != "" //nolint:staticcheck // clearing deprecated fields
+	ref.APIVersion = ""                                                //nolint:staticcheck // clearing deprecated fields
+	ref.Kind = ""                                                      //nolint:staticcheck // clearing deprecated fields
+	ref.UID = ""                                                       //nolint:staticcheck // clearing deprecated fields
+	return changed
+}
+
+func clearDeprecatedImmutableObjectRefFields(ref *metalv1alpha1.ImmutableObjectReference) bool {
+	if ref == nil {
+		return false
+	}
+	changed := ref.APIVersion != "" || ref.Kind != "" || ref.UID != "" //nolint:staticcheck // clearing deprecated fields
+	ref.APIVersion = ""                                                //nolint:staticcheck // clearing deprecated fields
+	ref.Kind = ""                                                      //nolint:staticcheck // clearing deprecated fields
+	ref.UID = ""                                                       //nolint:staticcheck // clearing deprecated fields
+	return changed
+}
+
+func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFields []any) bool {
+	isNil := func(arg any) bool {
+		if v := reflect.ValueOf(arg); !v.IsValid() || ((v.Kind() == reflect.Ptr ||
+			v.Kind() == reflect.Interface ||
+			v.Kind() == reflect.Slice ||
+			v.Kind() == reflect.Map ||
+			v.Kind() == reflect.Chan ||
+			v.Kind() == reflect.Func) && v.IsNil()) {
+			return true
+		}
+		return false
+	}
+	if isNil(e.ObjectOld) {
+		return false
+	}
+	if isNil(e.ObjectNew) {
+		return false
+	}
+
+	labelChange := !maps.Equal(e.ObjectNew.GetLabels(), e.ObjectOld.GetLabels())
+	if labelChange {
+		return true
+	}
+
+	if len(oldFields) != len(newFields) {
+		// This indicates a programming error, but we can handle it defensively.
+		return true
+	}
+
+	for i := range oldFields {
+		if !reflect.DeepEqual(oldFields[i], newFields[i]) {
+			return true
+		}
+	}
+
+	return false
 }

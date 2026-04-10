@@ -17,12 +17,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-	"github.com/stmcginnis/gofish/common"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 const (
@@ -32,9 +31,10 @@ const (
 // BMCUserReconciler reconciles a BMCUser object
 type BMCUserReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Insecure   bool
-	BMCOptions bmc.Options
+	Scheme             *runtime.Scheme
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	BMCOptions         bmc.Options
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcusers,verbs=get;list;watch;create;update;patch;delete
@@ -44,22 +44,22 @@ type BMCUserReconciler struct {
 
 // Reconcile reconciles a BMCUser object
 func (r *BMCUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	user := &metalv1alpha1.BMCUser{}
 	if err := r.Get(ctx, req.NamespacedName, user); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	return r.reconcileExists(ctx, log, user)
+	return r.reconcileExists(ctx, user)
 }
 
-func (r *BMCUserReconciler) reconcileExists(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
+func (r *BMCUserReconciler) reconcileExists(ctx context.Context, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
 	if !user.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, user)
+		return r.delete(ctx, user)
 	}
-	return r.reconcile(ctx, log, user)
+	return r.reconcile(ctx, user)
 }
 
-func (r *BMCUserReconciler) reconcile(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
+func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if user.Spec.BMCRef == nil {
 		log.Info("No BMC reference set for User, skipping reconciliation")
 		return ctrl.Result{}, nil
@@ -68,7 +68,7 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, log logr.Logger, user
 	if err := r.Get(ctx, client.ObjectKey{Name: user.Spec.BMCRef.Name}, bmcObj); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.updateEffectiveSecret(ctx, log, user, bmcObj); err != nil {
+	if err := r.updateEffectiveSecret(ctx, user, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update effective BMCSecret: %w", err)
 	}
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
@@ -79,13 +79,13 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, log logr.Logger, user
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
-	if err = r.patchUserStatus(ctx, log, user, bmcClient); err != nil {
+	if err = r.patchUserStatus(ctx, user, bmcClient); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update User status: %w", err)
 	}
 
 	if user.Spec.BMCSecretRef == nil {
 		log.Info("No BMCSecret reference set for User, creating a new one")
-		if err := r.ensureBMCSecretForUser(ctx, log, bmcClient, user, bmcObj); err != nil {
+		if err := r.ensureBMCSecretForUser(ctx, bmcClient, user, bmcObj); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to handle missing BMCSecret reference: %w", err)
 		}
 	}
@@ -103,20 +103,21 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, log logr.Logger, user
 		if err = bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, password, true); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create or update BMC account with new password: %w", err)
 		}
-		if err = r.patchUserStatus(ctx, log, user, bmcClient); err != nil {
+		if err = r.patchUserStatus(ctx, user, bmcClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update User status after creating BMC account: %w", err)
 		}
 	}
 	if user.Status.EffectiveBMCSecretRef != nil && user.Spec.BMCSecretRef.Name != user.Status.EffectiveBMCSecretRef.Name {
 		log.Info("BMCSecret reference has changed, updating BMC account")
-		if err := r.handleUpdatedSecretRef(ctx, log, user, bmcSecret, bmcClient); err != nil {
+		if err := r.handleUpdatedSecretRef(ctx, user, bmcSecret, bmcClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to handle updated BMCSecret reference: %w", err)
 		}
 	}
-	return r.handleRotatingPassword(ctx, log, user, bmcObj, bmcClient)
+	return r.handleRotatingPassword(ctx, user, bmcObj, bmcClient)
 }
 
-func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, bmcClient bmc.BMC) error {
+func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, user *metalv1alpha1.BMCUser, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	accounts, err := bmcClient.GetAccounts()
 	if err != nil {
 		return fmt.Errorf("failed to get BMC accounts: %w", err)
@@ -144,7 +145,8 @@ func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, log logr.Logger
 	return nil
 }
 
-func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (ctrl.Result, error) {
+func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, user *metalv1alpha1.BMCUser, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	forceRotation := false
 	if user.GetAnnotations() != nil && user.GetAnnotations()[metalv1alpha1.OperationAnnotation] == metalv1alpha1.OperationAnnotationRotateCredentials {
 		log.Info("User has rotation annotation set, triggering password rotation")
@@ -178,15 +180,15 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get account service: %w", err)
 	}
-	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), accountService.MaxPasswordLength)
+	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), int(accountService.MaxPasswordLength))
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to generate new password for BMC user %s: %w", user.Name, err)
 	}
-	secret, err := r.createBMCSecretForUser(ctx, log, user, newPassword)
+	secret, err := r.createBMCSecretForUser(ctx, user, newPassword)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create BMCSecret: %w", err)
 	}
-	if err := r.setBMCUserSecretRef(ctx, log, user, secret); err != nil {
+	if err := r.setBMCUserSecretRef(ctx, user, secret); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to set BMCSecret reference for User: %w", err)
 	}
 	if err := bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, newPassword, true); err != nil {
@@ -202,21 +204,22 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, log logr
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCUserReconciler) ensureBMCSecretForUser(ctx context.Context, log logr.Logger, bmcClient bmc.BMC, user *metalv1alpha1.BMCUser, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCUserReconciler) ensureBMCSecretForUser(ctx context.Context, bmcClient bmc.BMC, user *metalv1alpha1.BMCUser, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	log.Info("No BMCSecret reference set for User, creating a new one")
 	accountService, err := bmcClient.GetAccountService()
 	if err != nil {
 		return fmt.Errorf("failed to get account service: %w", err)
 	}
-	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), accountService.MaxPasswordLength)
+	newPassword, err := bmc.GenerateSecurePassword(bmc.Manufacturer(bmcObj.Status.Manufacturer), int(accountService.MaxPasswordLength))
 	if err != nil {
 		return fmt.Errorf("failed to generate new password for BMC account %s: %w", user.Name, err)
 	}
-	secret, err := r.createBMCSecretForUser(ctx, log, user, newPassword)
+	secret, err := r.createBMCSecretForUser(ctx, user, newPassword)
 	if err != nil {
 		return fmt.Errorf("failed to create BMCSecret: %w", err)
 	}
-	if err := r.setBMCUserSecretRef(ctx, log, user, secret); err != nil {
+	if err := r.setBMCUserSecretRef(ctx, user, secret); err != nil {
 		return fmt.Errorf("failed to set BMCSecret reference for User: %w", err)
 	}
 	log.Info("Creating BMC account with new password", "Account", user.Name)
@@ -227,7 +230,8 @@ func (r *BMCUserReconciler) ensureBMCSecretForUser(ctx context.Context, log logr
 	return nil
 }
 
-func (r *BMCUserReconciler) handleUpdatedSecretRef(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, bmcSecret *metalv1alpha1.BMCSecret, bmcClient bmc.BMC) error {
+func (r *BMCUserReconciler) handleUpdatedSecretRef(ctx context.Context, user *metalv1alpha1.BMCUser, bmcSecret *metalv1alpha1.BMCSecret, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	log.Info("BMCSecret credentials have changed, updating BMC user")
 	_, password, err := bmcutils.GetBMCCredentialsFromSecret(bmcSecret)
 	if err != nil {
@@ -240,7 +244,8 @@ func (r *BMCUserReconciler) handleUpdatedSecretRef(ctx context.Context, log logr
 	return nil
 }
 
-func (r *BMCUserReconciler) createBMCSecretForUser(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, password string) (*metalv1alpha1.BMCSecret, error) {
+func (r *BMCUserReconciler) createBMCSecretForUser(ctx context.Context, user *metalv1alpha1.BMCUser, password string) (*metalv1alpha1.BMCSecret, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.Info("Creating BMCSecret for User")
 	secret := &metalv1alpha1.BMCSecret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -265,7 +270,8 @@ func (r *BMCUserReconciler) createBMCSecretForUser(ctx context.Context, log logr
 	return secret, nil
 }
 
-func (r *BMCUserReconciler) setBMCUserSecretRef(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, secret *metalv1alpha1.BMCSecret) error {
+func (r *BMCUserReconciler) setBMCUserSecretRef(ctx context.Context, user *metalv1alpha1.BMCUser, secret *metalv1alpha1.BMCSecret) error {
+	log := ctrl.LoggerFrom(ctx)
 	log.Info("Setting BMCSecret reference for User", "User", user.Name)
 	userBase := user.DeepCopy()
 	user.Spec.BMCSecretRef = &v1.LocalObjectReference{Name: secret.Name}
@@ -275,7 +281,8 @@ func (r *BMCUserReconciler) setBMCUserSecretRef(ctx context.Context, log logr.Lo
 	return nil
 }
 
-func (r *BMCUserReconciler) setEffectiveSecretRef(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, secret *metalv1alpha1.BMCSecret) error {
+func (r *BMCUserReconciler) setEffectiveSecretRef(ctx context.Context, user *metalv1alpha1.BMCUser, secret *metalv1alpha1.BMCSecret) error {
+	log := ctrl.LoggerFrom(ctx)
 	log.Info("Setting effective BMCSecret")
 	userBase := user.DeepCopy()
 	if user.Status.EffectiveBMCSecretRef == nil {
@@ -289,7 +296,7 @@ func (r *BMCUserReconciler) setEffectiveSecretRef(ctx context.Context, log logr.
 }
 
 func (r *BMCUserReconciler) getBMCClient(ctx context.Context, bmcObj *metalv1alpha1.BMC) (bmc.BMC, error) {
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
 	if err != nil {
 		return bmcClient, fmt.Errorf("failed to create BMC client: %w", err)
 	}
@@ -297,7 +304,8 @@ func (r *BMCUserReconciler) getBMCClient(ctx context.Context, bmcObj *metalv1alp
 	return bmcClient, nil
 }
 
-func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, user *metalv1alpha1.BMCUser, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	if user.Spec.BMCSecretRef == nil || user.Status.ID == "" {
 		return nil
 	}
@@ -317,7 +325,7 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.
 		return nil
 	}
 	if user.Status.EffectiveBMCSecretRef == nil {
-		if err := r.setEffectiveSecretRef(ctx, log, user, secret); err != nil {
+		if err := r.setEffectiveSecretRef(ctx, user, secret); err != nil {
 			return fmt.Errorf("failed to update effective BMCSecret: %w", err)
 		}
 		log.Info("Set effective BMCSecret for User")
@@ -337,7 +345,7 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.
 	}
 	if invalidCredentials {
 		log.Info("Effective BMCSecret is invalid", "EffectiveBMCSecret", effSecret.Name, "NewBMCSecret", secret.Name)
-		if err := r.setEffectiveSecretRef(ctx, log, user, secret); err != nil {
+		if err := r.setEffectiveSecretRef(ctx, user, secret); err != nil {
 			return fmt.Errorf("failed to update effective BMCSecret: %w", err)
 		}
 		log.Info("Updated effective BMCSecret for User")
@@ -346,14 +354,14 @@ func (r *BMCUserReconciler) updateEffectiveSecret(ctx context.Context, log logr.
 }
 
 func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metalv1alpha1.BMCSecret, bmcObj *metalv1alpha1.BMC) (bool, error) {
-	protocolScheme := bmcutils.GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, r.Insecure)
+	protocolScheme := bmcutils.GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, r.DefaultProtocol)
 	address, err := bmcutils.GetBMCAddressForBMC(ctx, r.Client, bmcObj)
 	if err != nil {
 		return false, fmt.Errorf("failed to get BMC address: %w", err)
 	}
-	_, err = bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions)
+	bmcClient, err := bmcutils.CreateBMCClient(ctx, r.Client, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, secret, r.BMCOptions, r.SkipCertValidation)
 	if err != nil {
-		var httpErr *common.Error
+		var httpErr *schemas.Error
 		if errors.As(err, &httpErr) {
 			if httpErr.HTTPReturnedStatusCode == 401 || httpErr.HTTPReturnedStatusCode == 403 {
 				return true, nil
@@ -361,10 +369,12 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 		}
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
+	defer bmcClient.Logout()
 	return false, nil
 }
 
-func (r *BMCUserReconciler) delete(ctx context.Context, log logr.Logger, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
+func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCUser) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if user.Spec.BMCRef == nil {
 		log.Info("No BMC reference set for User, removing finalizer")
 		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
@@ -393,7 +403,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, log logr.Logger, user *m
 
 	log.Info("Deleting BMC account for User")
 	if err := bmcClient.DeleteAccount(ctx, user.Spec.UserName, user.Status.ID); err != nil {
-		var httpErr *common.Error
+		var httpErr *schemas.Error
 		if errors.As(err, &httpErr) && httpErr.HTTPReturnedStatusCode == 404 {
 			log.Info("BMC account not found, continuing finalizer removal")
 		} else {

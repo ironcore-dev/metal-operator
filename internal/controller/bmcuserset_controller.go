@@ -10,7 +10,6 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,27 +45,27 @@ func (r *BMCUserSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log.V(1).Info("Reconciling BMCUserSet")
-	return r.reconcileExists(ctx, log, bmcUserSet)
+	return r.reconcileExists(ctx, bmcUserSet)
 }
 
 func (r *BMCUserSetReconciler) reconcileExists(
 	ctx context.Context,
-	log logr.Logger,
 	bmcUserSet *metalv1alpha1.BMCUserSet,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if !bmcUserSet.DeletionTimestamp.IsZero() {
 		log.V(1).Info("Object is being deleted")
-		return r.delete(ctx, log, bmcUserSet)
+		return r.delete(ctx, bmcUserSet)
 	}
 	log.V(1).Info("Object exists and is not being deleted")
-	return r.reconcile(ctx, log, bmcUserSet)
+	return r.reconcile(ctx, bmcUserSet)
 }
 
 func (r *BMCUserSetReconciler) reconcile(
 	ctx context.Context,
-	log logr.Logger,
 	bmcUserSet *metalv1alpha1.BMCUserSet,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if shouldIgnoreReconciliation(bmcUserSet) {
 		log.V(1).Info("Skipped BMCUserSet reconciliation")
 		return ctrl.Result{}, nil
@@ -85,11 +84,11 @@ func (r *BMCUserSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to list owned BMCUsers: %w", err)
 	}
 
-	if err := r.createMissingBMCUsers(ctx, log, bmcList, ownedBMCUsers, bmcUserSet); err != nil {
+	if err := r.createMissingBMCUsers(ctx, bmcList, ownedBMCUsers, bmcUserSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create missing BMCUsers: %w", err)
 	}
 
-	if err := r.deleteOrphanedBMCUsers(ctx, log, bmcList, ownedBMCUsers); err != nil {
+	if err := r.deleteOrphanedBMCUsers(ctx, bmcList, ownedBMCUsers); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCUsers: %w", err)
 	}
 
@@ -99,14 +98,14 @@ func (r *BMCUserSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to re-fetch owned BMCUsers: %w", err)
 	}
 
-	if err := r.patchBMCUsersFromTemplate(ctx, log, bmcUserSet, ownedBMCUsers); err != nil {
+	if err := r.patchBMCUsersFromTemplate(ctx, bmcUserSet, ownedBMCUsers); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCUsers from template: %w", err)
 	}
 
 	log.V(1).Info("Updating BMCUserSet status")
 	currentStatus := r.getOwnedBMCUserSetStatus(ownedBMCUsers)
 	currentStatus.FullyLabeledBMCs = int32(len(bmcList.Items))
-	if err := r.updateStatus(ctx, log, currentStatus, bmcUserSet); err != nil {
+	if err := r.updateStatus(ctx, currentStatus, bmcUserSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCUserSet status: %w", err)
 	}
 
@@ -115,9 +114,9 @@ func (r *BMCUserSetReconciler) reconcile(
 
 func (r *BMCUserSetReconciler) delete(
 	ctx context.Context,
-	log logr.Logger,
 	bmcUserSet *metalv1alpha1.BMCUserSet,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if !controllerutil.ContainsFinalizer(bmcUserSet, BMCUserSetFinalizer) {
 		return ctrl.Result{}, nil
 	}
@@ -137,7 +136,7 @@ func (r *BMCUserSetReconciler) delete(
 
 	if len(ownedBMCUsers.Items) > 0 {
 		currentStatus := r.getOwnedBMCUserSetStatus(ownedBMCUsers)
-		if err := r.updateStatus(ctx, log, currentStatus, bmcUserSet); err != nil {
+		if err := r.updateStatus(ctx, currentStatus, bmcUserSet); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCUserSet status: %w", err)
 		}
 		log.V(1).Info("Waiting on the created BMCUsers to be deleted")
@@ -174,10 +173,10 @@ func (r *BMCUserSetReconciler) getOwnedBMCUserSetStatus(
 
 func (r *BMCUserSetReconciler) updateStatus(
 	ctx context.Context,
-	log logr.Logger,
 	currentStatus *metalv1alpha1.BMCUserSetStatus,
 	bmcUserSet *metalv1alpha1.BMCUserSet,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcUserSetBase := bmcUserSet.DeepCopy()
 	bmcUserSet.Status = *currentStatus
 	if err := r.Status().Patch(ctx, bmcUserSet, client.MergeFrom(bmcUserSetBase)); err != nil {
@@ -205,11 +204,11 @@ func (r *BMCUserSetReconciler) getBMCsBySelector(
 
 func (r *BMCUserSetReconciler) createMissingBMCUsers(
 	ctx context.Context,
-	log logr.Logger,
 	bmcList *metalv1alpha1.BMCList,
 	bmcUserList *metalv1alpha1.BMCUserList,
 	bmcUserSet *metalv1alpha1.BMCUserSet,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcWithUser := make(map[string]struct{})
 	for _, bmcUser := range bmcUserList.Items {
 		if bmcUser.Spec.BMCRef == nil {
@@ -269,10 +268,10 @@ func (r *BMCUserSetReconciler) createMissingBMCUsers(
 
 func (r *BMCUserSetReconciler) deleteOrphanedBMCUsers(
 	ctx context.Context,
-	log logr.Logger,
 	bmcList *metalv1alpha1.BMCList,
 	bmcUserList *metalv1alpha1.BMCUserList,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcMap := make(map[string]struct{})
 	for _, bmc := range bmcList.Items {
 		bmcMap[bmc.Name] = struct{}{}
@@ -298,10 +297,10 @@ func (r *BMCUserSetReconciler) deleteOrphanedBMCUsers(
 
 func (r *BMCUserSetReconciler) patchBMCUsersFromTemplate(
 	ctx context.Context,
-	log logr.Logger,
 	bmcUserSet *metalv1alpha1.BMCUserSet,
 	bmcUserList *metalv1alpha1.BMCUserList,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	if len(bmcUserList.Items) == 0 {
 		log.V(1).Info("No BMCUsers found, skipping spec template update")
 		return nil
@@ -338,6 +337,9 @@ func (r *BMCUserSetReconciler) patchBMCUsersFromTemplate(
 	return errors.Join(errs...)
 }
 
+// shouldFilterAnnotation returns true if the annotation key should be filtered out
+// when syncing from BMCUserSet to BMCUser. System annotations (kubernetes.io/,
+// k8s.io/, kubectl.kubernetes.io/) and the operation annotation are filtered.
 func shouldFilterAnnotation(key string) bool {
 	if key == metalv1alpha1.OperationAnnotation {
 		return true
@@ -350,6 +352,9 @@ func shouldFilterAnnotation(key string) bool {
 	return false
 }
 
+// syncBMCUserAnnotationsFromSet synchronizes annotations from BMCUserSet to BMCUser.
+// It implements bidirectional sync: adds/updates annotations from the source, and
+// removes annotations that are no longer present in the source (excluding system annotations).
 func syncBMCUserAnnotationsFromSet(bmcUser *metalv1alpha1.BMCUser, bmcUserSet *metalv1alpha1.BMCUserSet) {
 	// Get current annotations
 	annotations := bmcUser.GetAnnotations()
@@ -383,6 +388,8 @@ func syncBMCUserAnnotationsFromSet(bmcUser *metalv1alpha1.BMCUser, bmcUserSet *m
 	bmcUser.SetAnnotations(annotations)
 }
 
+// enqueueByBMC returns reconcile requests for all BMCUserSets that select the given BMC.
+// This function is used as a watch handler to trigger reconciliation when BMCs change.
 func (r *BMCUserSetReconciler) enqueueByBMC(
 	ctx context.Context,
 	obj client.Object,

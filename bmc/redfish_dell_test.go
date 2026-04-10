@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-package oem
+package bmc
 
 import (
 	"io"
@@ -11,7 +11,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 func TestDellOEM(t *testing.T) {
@@ -20,30 +20,30 @@ func TestDellOEM(t *testing.T) {
 }
 
 var _ = Describe("Dell OEM", func() {
-	var dell *Dell
+	var dell *DellRedfishBMC
 
 	BeforeEach(func() {
-		dell = &Dell{}
+		dell = &DellRedfishBMC{}
 	})
 
 	Describe("GetUpdateRequestBody", func() {
 		It("should create request body with correct parameters", func() {
-			params := &redfish.SimpleUpdateParameters{
+			params := &schemas.UpdateServiceSimpleUpdateParameters{
 				ImageURI:    "http://example.com/firmware.bin",
 				Username:    "admin",
-				Passord:     "password",
+				Password:    "password",
 				ForceUpdate: true,
 				Targets:     []string{"/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate"},
 			}
 
-			body := dell.GetUpdateRequestBody(params)
+			body := dell.dellBuildRequestBody(params)
 
 			Expect(body.ImageURI).To(Equal(params.ImageURI))
 			Expect(body.Username).To(Equal(params.Username))
-			Expect(body.Passord).To(Equal(params.Passord))
+			Expect(body.Password).To(Equal(params.Password))
 			Expect(body.ForceUpdate).To(Equal(params.ForceUpdate))
 			Expect(body.Targets).To(Equal(params.Targets))
-			Expect(body.RedfishOperationApplyTime).To(Equal(redfish.ImmediateOperationApplyTime))
+			Expect(body.RedfishOperationApplyTime).To(Equal(schemas.ImmediateOperationApplyTime))
 		})
 	})
 
@@ -55,7 +55,7 @@ var _ = Describe("Dell OEM", func() {
 			}
 			resp.Header.Set("Location", "/redfish/v1/TaskService/Tasks/1")
 
-			uri, err := dell.GetUpdateTaskMonitorURI(resp)
+			uri, err := dell.dellExtractTaskMonitorURI(resp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(uri).To(Equal("/redfish/v1/TaskService/Tasks/1"))
 		})
@@ -66,7 +66,7 @@ var _ = Describe("Dell OEM", func() {
 				Body:   io.NopCloser(strings.NewReader(`{"@odata.id": "/redfish/v1/TaskService/Tasks/2"}`)),
 			}
 
-			uri, err := dell.GetUpdateTaskMonitorURI(resp)
+			uri, err := dell.dellExtractTaskMonitorURI(resp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(uri).To(Equal("/redfish/v1/TaskService/Tasks/2"))
 		})
@@ -77,7 +77,7 @@ var _ = Describe("Dell OEM", func() {
 				Body:   io.NopCloser(strings.NewReader("{}")),
 			}
 
-			_, err := dell.GetUpdateTaskMonitorURI(resp)
+			_, err := dell.dellExtractTaskMonitorURI(resp)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unable to extract task monitor URI"))
 		})

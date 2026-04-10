@@ -38,8 +38,8 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully add the boot configuration ref to server", func(ctx SpecContext) {
-		By("By creating a server boot configuration")
+	It("should successfully add the boot configuration ref to server", func(ctx SpecContext) {
+		By("Creating a server boot configuration")
 		config := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,

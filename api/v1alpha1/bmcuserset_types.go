@@ -12,11 +12,13 @@ import (
 type BMCUserTemplate struct {
 	// Username of the BMC user.
 	// +required
+	// +kubebuilder:validation:MinLength=1
 	UserName string `json:"userName"`
 	// RoleID is the ID of the role to assign to the user.
 	// The available roles depend on the BMC implementation.
 	// For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly".
 	// +required
+	// +kubebuilder:validation:MinLength=1
 	RoleID string `json:"roleID"`
 	// Description is an optional description for the BMC user.
 	Description string `json:"description,omitempty"`

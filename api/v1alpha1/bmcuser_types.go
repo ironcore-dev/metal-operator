@@ -21,17 +21,26 @@ type BMCUserStatus struct {
 	// EffectiveBMCSecretRef references the BMCSecret currently used for this user.
 	// This may differ from Spec.BMCSecretRef if the operator generated a password.
 	EffectiveBMCSecretRef *v1.LocalObjectReference `json:"effectiveBMCSecretRef,omitempty"`
+
 	// LastRotation is the timestamp of the last password rotation.
 	LastRotation *metav1.Time `json:"lastRotation,omitempty"`
+
 	// PasswordExpiration is the timestamp when the password will expire.
 	PasswordExpiration *metav1.Time `json:"passwordExpiration,omitempty"`
-	// ID of the user in the BMC system
+
+	// ID is the identifier of the user in the BMC system.
 	ID string `json:"id,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=bmcu
+// +kubebuilder:printcolumn:name="ID",type=string,JSONPath=`.status.id`
+// +kubebuilder:printcolumn:name="UserName",type=string,JSONPath=`.spec.userName`
+// +kubebuilder:printcolumn:name="RoleID",type=string,JSONPath=`.spec.roleID`
+// +kubebuilder:printcolumn:name="LastRotation",type=date,JSONPath=`.status.lastRotation`
+// +kubebuilder:printcolumn:name="PasswordExpiration",type=date,JSONPath=`.status.passwordExpiration`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BMCUser is the Schema for the bmcusers API.
 type BMCUser struct {

@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	// ServerMaintenanceFinalizer is the finalizer for the ServerMaintenance resource.
-	ServerMaintenanceFinalizer = "metal.ironcore.dev/servermaintenance"
+	// serverMaintenanceFinalizer is the finalizer for the ServerMaintenance resource.
+	serverMaintenanceFinalizer = "metal.ironcore.dev/servermaintenance"
 
 	// trueValue represents the string value "true" used for labels and annotations
 	trueValue = "true"
@@ -77,7 +77,7 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, maintenance
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get Server: %w", err)
 	}
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, maintenance, ServerMaintenanceFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, maintenance, serverMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -361,7 +361,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, maintenance *m
 	log.V(1).Info("Removed dependencies")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, maintenance, ServerMaintenanceFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, maintenance, serverMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer is removed")

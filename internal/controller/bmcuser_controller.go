@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	BMCUserFinalizer = "metal.ironcore.dev/bmcuser"
+	bmcUserFinalizer = "metal.ironcore.dev/bmcuser"
 )
 
 // BMCUserReconciler reconciles a BMCUser object
@@ -71,7 +71,7 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.B
 	if err := r.updateEffectiveSecret(ctx, user, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update effective BMCSecret: %w", err)
 	}
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	bmcClient, err := r.getBMCClient(ctx, bmcObj)
@@ -375,7 +375,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCU
 	log := ctrl.LoggerFrom(ctx)
 	if user.Spec.BMCRef == nil {
 		log.Info("No BMC reference set for User, removing finalizer")
-		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -385,7 +385,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCU
 	if err := r.Get(ctx, client.ObjectKey{Name: user.Spec.BMCRef.Name}, bmcObj); err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			log.Info("BMC not found, removing finalizer")
-			if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+			if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
@@ -408,7 +408,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCU
 			return ctrl.Result{}, fmt.Errorf("failed to delete BMC account: %w", err)
 		}
 	}
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.Info("Successfully deleted BMC account and removed finalizer for User")

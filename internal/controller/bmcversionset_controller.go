@@ -25,14 +25,16 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
+const (
+	BMCVersionSetFinalizer = "metal.ironcore.dev/bmcversionset"
+)
+
 // BMCVersionSetReconciler reconciles a BMCVersionSet object
 type BMCVersionSetReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
 	ResyncInterval time.Duration
 }
-
-const BMCVersionSetFinalizer = "metal.ironcore.dev/bmcversionset"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/status,verbs=get;update;patch

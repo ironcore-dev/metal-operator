@@ -29,14 +29,6 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
-
-	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
-	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
-	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
-	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
-	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
-	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
-	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
 
 type BMCTaskFetchFailedError struct {
@@ -72,6 +64,7 @@ func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client
 }
 
 // GetCondition finds a condition in a condition slice.
+// If the condition is not found, a new one with Status=False is returned.
 func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
 	condition := &metav1.Condition{}
 	condFound, err := acc.FindSlice(conditions, conditionType, condition)
@@ -90,6 +83,20 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 	}
 
 	return condition, nil
+}
+
+// migrateConditionTypes renames legacy condition type strings in-place.
+// Returns true if any conditions were migrated.
+// TODO: Remove this function in the next release once all CRs have been reconciled.
+func migrateConditionTypes(conditions []metav1.Condition, migrations map[string]string) bool {
+	migrated := false
+	for i := range conditions {
+		if newType, ok := migrations[conditions[i].Type]; ok {
+			conditions[i].Type = newType
+			migrated = true
+		}
+	}
+	return migrated
 }
 
 // GetServerByName returns a Server object by its name or an error in case the object can not be found.

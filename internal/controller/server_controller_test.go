@@ -243,7 +243,7 @@ var _ = Describe("Server Controller", func() {
 			}),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.Conditions", ContainElement(
-				HaveField("Type", PoweringOnCondition),
+				HaveField("Type", ConditionPoweringOn),
 			)),
 		))
 
@@ -439,7 +439,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
 			HaveField("Status.Conditions", ContainElement(
-				HaveField("Type", PoweringOnCondition),
+				HaveField("Type", ConditionPoweringOn),
 			)),
 		))
 

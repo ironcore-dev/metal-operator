@@ -26,13 +26,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const (
+	BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
+)
+
 type BMCSettingsSetReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
 	ResyncInterval time.Duration
 }
-
-const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettingssets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettingssets/status,verbs=get;update;patch

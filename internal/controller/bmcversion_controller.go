@@ -31,6 +31,12 @@ const (
 	bmcVersionFinalizer = "metal.ironcore.dev/bmcversion"
 )
 
+// legacyBMCVersionConditionTypes maps old condition type strings to their new values.
+// TODO: Remove this migration in the next release once all CRs have been reconciled.
+var legacyBMCVersionConditionTypes = map[string]string{
+	"BMCResetIssued": ConditionResetIssued,
+}
+
 // BMCVersionReconciler reconciles a BMCVersion object
 type BMCVersionReconciler struct {
 	client.Client
@@ -62,6 +68,14 @@ func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log := ctrl.LoggerFrom(ctx)
+	// TODO: Remove this migration in the next release once all CRs have been reconciled.
+	bmcVersionBase := bmcVersion.DeepCopy()
+	if migrateConditionTypes(bmcVersion.Status.Conditions, legacyBMCVersionConditionTypes) {
+		log.Info("Migrated legacy condition types on BMCVersion")
+		if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
+		}
+	}
 	log.V(1).Info("Reconciling BMCVersion")
 
 	return r.reconcileExists(ctx, bmcVersion)

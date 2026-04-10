@@ -58,6 +58,12 @@ const (
 	ReasonBMCSettingsWrongSettings         = "SettingsProvidedAreNotValid"
 )
 
+// legacyBMCSettingsConditionTypes maps old condition type strings to their new values.
+// TODO: Remove this migration in the next release once all CRs have been reconciled.
+var legacyBMCSettingsConditionTypes = map[string]string{
+	"BMCResetIssued": ConditionResetIssued,
+}
+
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings/finalizers,verbs=update
@@ -74,6 +80,14 @@ func (r *BMCSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log := ctrl.LoggerFrom(ctx)
+	// TODO: Remove this migration in the next release once all CRs have been reconciled.
+	settingsBase := settings.DeepCopy()
+	if migrateConditionTypes(settings.Status.Conditions, legacyBMCSettingsConditionTypes) {
+		log.Info("Migrated legacy condition types on BMCSettings")
+		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
+		}
+	}
 	log.V(1).Info("Reconciling BMCSettings")
 
 	return r.reconcileExists(ctx, settings)

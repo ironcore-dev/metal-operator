@@ -92,18 +92,23 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               description:
-                description: Description is a description for the BMC user.
+                description: Description is an optional description for the BMC user.
                 type: string
               roleID:
-                description: RoleID is the ID of the role to assign to the user.
+                description: |-
+                  RoleID is the ID of the role to assign to the user.
+                  The available roles depend on the BMC implementation.
+                  For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly".
+                minLength: 1
                 type: string
               rotationPeriod:
                 description: |-
                   RotationPeriod defines how often the password should be rotated.
-                  If not set, the password will not be rotated.
+                  if not set, the password will not be rotated.
                 type: string
               userName:
-                description: UserName is the username of the BMC user.
+                description: Username of the BMC user.
+                minLength: 1
                 type: string
             required:
             - roleID

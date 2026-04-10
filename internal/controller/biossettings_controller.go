@@ -63,6 +63,19 @@ const (
 	ReasonSettingsInvalid               = "SettingsProvidedAreNotValid"
 )
 
+// legacyBIOSSettingsConditionTypes maps old condition type strings to their new values.
+// This ensures backward compatibility with existing CRs created before the rename.
+var legacyBIOSSettingsConditionTypes = map[string]string{
+	"BIOSSettingsCheckPendingSettings":    ConditionPendingSettingsCheck,
+	"BIOSSettingsDuplicateKeys":           ConditionSettingsDuplicateKeys,
+	"BIOSSettingUpdateStartTime":          ConditionSettingsUpdateStartTime,
+	"BIOSSettingsTimedOut":                ConditionSettingsTimedOut,
+	"ServerPowerOnCondition":              ConditionSettingsServerPowerOn,
+	"ServerRebootPostUpdateHasBeenIssued": ConditionSettingsRebootPostUpdate,
+	"BMCResetIssued":                      ConditionResetIssued,
+	"BIOSVersionUpdatePending":            ConditionVersionUpdatePending,
+}
+
 // BIOSSettingsReconciler reconciles a BIOSSettings object
 type BIOSSettingsReconciler struct {
 	client.Client
@@ -93,7 +106,28 @@ func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, biosSettings); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	if err := r.migrateLegacyConditions(ctx, biosSettings); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
+	}
 	return r.reconcileExists(ctx, biosSettings)
+}
+
+// migrateLegacyConditions renames legacy condition type strings on existing CRs.
+// TODO: Remove this migration in the next release once all CRs have been reconciled.
+func (r *BIOSSettingsReconciler) migrateLegacyConditions(ctx context.Context, settings *metalv1alpha1.BIOSSettings) error {
+	settingsBase := settings.DeepCopy()
+	migrated := migrateConditionTypes(settings.Status.Conditions, legacyBIOSSettingsConditionTypes)
+	for i := range settings.Status.FlowState {
+		if migrateConditionTypes(settings.Status.FlowState[i].Conditions, legacyBIOSSettingsConditionTypes) {
+			migrated = true
+		}
+	}
+	if !migrated {
+		return nil
+	}
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("Migrated legacy condition types on BIOSSettings")
+	return r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase))
 }
 
 func (r *BIOSSettingsReconciler) reconcileExists(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {

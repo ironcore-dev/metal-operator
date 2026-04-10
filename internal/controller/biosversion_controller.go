@@ -38,6 +38,18 @@ const (
 	ReasonRebootPowerOn  = "RebootPowerOn"
 )
 
+// legacyBIOSVersionConditionTypes maps old condition type strings to their new values.
+// TODO: Remove this migration in the next release once all CRs have been reconciled.
+var legacyBIOSVersionConditionTypes = map[string]string{
+	"BIOSUpgradeIssued":        ConditionVersionUpgradeIssued,
+	"BIOSUpgradeCompleted":     ConditionVersionUpgradeCompleted,
+	"BIOSUpgradePowerOn":       ConditionUpgradePowerOn,
+	"BIOSUpgradePowerOff":      ConditionUpgradePowerOff,
+	"BIOSUpgradeVerification":  ConditionVersionUpgradeVerification,
+	"BIOSVersionUpdatePending": ConditionVersionUpdatePending,
+	"BMCResetIssued":           ConditionResetIssued,
+}
+
 type BIOSVersionReconciler struct {
 	client.Client
 	ManagerNamespace   string
@@ -63,6 +75,14 @@ func (r *BIOSVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	biosVersion := &metalv1alpha1.BIOSVersion{}
 	if err := r.Get(ctx, req.NamespacedName, biosVersion); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	// TODO: Remove this migration in the next release once all CRs have been reconciled.
+	biosVersionBase := biosVersion.DeepCopy()
+	if migrateConditionTypes(biosVersion.Status.Conditions, legacyBIOSVersionConditionTypes) {
+		log.Info("Migrated legacy condition types on BIOSVersion")
+		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
+		}
 	}
 	log.V(1).Info("Reconciling BIOSVersion")
 

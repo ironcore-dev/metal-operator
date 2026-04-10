@@ -324,6 +324,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme:             k8sManager.GetScheme(),
 			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
 			SkipCertValidation: true,
+			Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

@@ -406,4 +406,115 @@ var _ = Describe("BMCUser Controller", func() {
 		})).To(Succeed())
 	})
 
+	It("should set status.ExpiresAt based on TTL", func(ctx SpecContext) {
+		By("Creating a temporary BMCUser with TTL")
+		user := &metalv1alpha1.BMCUser{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "temp-user-",
+			},
+			Spec: metalv1alpha1.BMCUserSpec{
+				UserName: "tempuser",
+				RoleID:   "ReadOnly",
+				TTL:      &metav1.Duration{Duration: 1 * time.Hour},
+				BMCRef:   &v1.LocalObjectReference{Name: bmc.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, user)).To(Succeed())
+
+		By("Ensuring that the status.ExpiresAt is set")
+		Eventually(Object(user)).Should(SatisfyAll(
+			HaveField("Status.ExpiresAt", Not(BeNil())),
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", Equal(metalv1alpha1.BMCUserConditionTypeActive)),
+				HaveField("Status", Equal(metav1.ConditionTrue)),
+				HaveField("Reason", Equal(metalv1alpha1.BMCUserReasonActive)),
+			))),
+		))
+
+		By("Verifying expiration time is approximately creationTime + TTL")
+		expectedExpiry := user.CreationTimestamp.Add(1 * time.Hour)
+		Expect(user.Status.ExpiresAt.Time).To(BeTemporally("~", expectedExpiry, 5*time.Second))
+
+		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+	})
+
+	It("should use absolute expiration time from ExpiresAt", func(ctx SpecContext) {
+		By("Creating a temporary BMCUser with ExpiresAt")
+		expiryTime := metav1.NewTime(time.Now().Add(2 * time.Hour))
+		user := &metalv1alpha1.BMCUser{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "abs-expiry-user-",
+			},
+			Spec: metalv1alpha1.BMCUserSpec{
+				UserName:  "absuser",
+				RoleID:    "ReadOnly",
+				ExpiresAt: &expiryTime,
+				BMCRef:    &v1.LocalObjectReference{Name: bmc.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, user)).To(Succeed())
+
+		By("Ensuring that the status.ExpiresAt matches spec.ExpiresAt")
+		Eventually(Object(user)).Should(
+			HaveField("Status.ExpiresAt.Time", BeTemporally("~", expiryTime.Time, 1*time.Second)),
+		)
+
+		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+	})
+
+	It("should ignore TTL changes after expiration is calculated", func(ctx SpecContext) {
+		By("Creating a temporary BMCUser with TTL")
+		user := &metalv1alpha1.BMCUser{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "temp-user-immutable-",
+			},
+			Spec: metalv1alpha1.BMCUserSpec{
+				UserName: "tempuser2",
+				RoleID:   "ReadOnly",
+				TTL:      &metav1.Duration{Duration: 1 * time.Hour},
+				BMCRef:   &v1.LocalObjectReference{Name: bmc.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, user)).To(Succeed())
+
+		By("Waiting for expiration to be calculated")
+		Eventually(Object(user)).Should(HaveField("Status.ExpiresAt", Not(BeNil())))
+		originalExpiry := user.Status.ExpiresAt.DeepCopy()
+
+		By("Changing TTL in spec")
+		userBase := user.DeepCopy()
+		user.Spec.TTL = &metav1.Duration{Duration: 2 * time.Hour}
+		Expect(k8sClient.Patch(ctx, user, client.MergeFrom(userBase))).To(Succeed())
+
+		By("Ensuring that expiration did not change")
+		Consistently(Object(user), "3s").Should(
+			HaveField("Status.ExpiresAt.Time", BeTemporally("~", originalExpiry.Time, 1*time.Second)),
+		)
+
+		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+	})
+
+	It("should not set expiration for users without TTL or ExpiresAt", func(ctx SpecContext) {
+		By("Creating a permanent BMCUser without TTL")
+		user := &metalv1alpha1.BMCUser{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "permanent-user-",
+			},
+			Spec: metalv1alpha1.BMCUserSpec{
+				UserName: "permuser",
+				RoleID:   "Administrator",
+				BMCRef:   &v1.LocalObjectReference{Name: bmc.Name},
+				// No TTL or ExpiresAt
+			},
+		}
+		Expect(k8sClient.Create(ctx, user)).To(Succeed())
+
+		By("Ensuring that expiration is not set")
+		Consistently(Object(user), "3s").Should(
+			HaveField("Status.ExpiresAt", BeNil()),
+		)
+
+		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+	})
+
 })

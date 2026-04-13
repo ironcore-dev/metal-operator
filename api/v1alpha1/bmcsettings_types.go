@@ -20,6 +20,7 @@ type BMCSettingsTemplate struct {
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
 	// Variables is a list of variables that can be used in the settings for templating.
+	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Variables []DynamicVariable `json:"variables,omitempty"`
 
@@ -31,6 +32,7 @@ type BMCSettingsTemplate struct {
 type DynamicVariable struct {
 	// Key is the name of the variable to be used in the BMCSettingsTemplate format.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	// +required
 	Key string `json:"key"`
 
@@ -57,6 +59,7 @@ type DynamicVariableSourceValueFrom struct {
 type FieldRefSelector struct {
 	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.bmcRef.name).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
 	// +required
 	FieldPath string `json:"fieldPath"`
 }
@@ -64,16 +67,19 @@ type FieldRefSelector struct {
 type NamespacedKeySelector struct {
 	// Name is the referenced object name.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name"`
 
 	// Namespace is the referenced object namespace.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	// +required
 	Namespace string `json:"namespace"`
 
 	// Key is the key within the referenced object.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Key string `json:"key"`
 }

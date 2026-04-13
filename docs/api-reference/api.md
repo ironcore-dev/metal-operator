@@ -546,7 +546,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[DynamicVariable](#dynamicvariable) array_ | Variables is a list of variables that can be used in the settings for templating. |  |  |
+| `variables` _[DynamicVariable](#dynamicvariable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
 | `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply settings to. |  |  |
@@ -604,7 +604,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[DynamicVariable](#dynamicvariable) array_ | Variables is a list of variables that can be used in the settings for templating. |  |  |
+| `variables` _[DynamicVariable](#dynamicvariable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 
 
@@ -957,7 +957,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `key` _string_ | Key is the name of the variable to be used in the BMCSettingsTemplate format. |  | MinLength: 1 <br /> |
+| `key` _string_ | Key is the name of the variable to be used in the BMCSettingsTemplate format. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
 | `valueFrom` _[DynamicVariableSourceValueFrom](#dynamicvariablesourcevaluefrom)_ | ValueFrom defines a simple single source for the variable value. |  |  |
 
 
@@ -1041,7 +1041,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.bmcRef.name). |  | MinLength: 1 <br /> |
+| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.bmcRef.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
 
 
 #### IP
@@ -1176,9 +1176,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the referenced object name. |  | MinLength: 1 <br /> |
-| `namespace` _string_ | Namespace is the referenced object namespace. |  | MinLength: 1 <br /> |
-| `key` _string_ | Key is the key within the referenced object. |  | MinLength: 1 <br /> |
+| `name` _string_ | Name is the referenced object name. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
+| `namespace` _string_ | Namespace is the referenced object namespace. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
+| `key` _string_ | Key is the key within the referenced object. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
 
 
 #### NetworkInterface

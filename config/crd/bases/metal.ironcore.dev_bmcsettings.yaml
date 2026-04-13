@@ -122,6 +122,7 @@ spec:
                     key:
                       description: Key is the name of the variable to be used in the
                         BMCSettingsTemplate format.
+                      maxLength: 63
                       minLength: 1
                       type: string
                     valueFrom:
@@ -134,14 +135,17 @@ spec:
                           properties:
                             key:
                               description: Key is the key within the referenced object.
+                              maxLength: 253
                               minLength: 1
                               type: string
                             name:
                               description: Name is the referenced object name.
+                              maxLength: 253
                               minLength: 1
                               type: string
                             namespace:
                               description: Namespace is the referenced object namespace.
+                              maxLength: 63
                               minLength: 1
                               type: string
                           required:
@@ -156,6 +160,7 @@ spec:
                             fieldPath:
                               description: FieldPath is the path of the field on the
                                 BMCSettings object to select (e.g. spec.bmcRef.name).
+                              maxLength: 256
                               minLength: 1
                               type: string
                           required:
@@ -167,14 +172,17 @@ spec:
                           properties:
                             key:
                               description: Key is the key within the referenced object.
+                              maxLength: 253
                               minLength: 1
                               type: string
                             name:
                               description: Name is the referenced object name.
+                              maxLength: 253
                               minLength: 1
                               type: string
                             namespace:
                               description: Namespace is the referenced object namespace.
+                              maxLength: 63
                               minLength: 1
                               type: string
                           required:
@@ -192,6 +200,7 @@ spec:
                   - key
                   - valueFrom
                   type: object
+                maxItems: 64
                 type: array
               version:
                 description: Version specifies the BMC firmware version for which

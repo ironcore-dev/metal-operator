@@ -1,6 +1,9 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 categories:
+  - title: '🌟 Highlights'
+    labels:
+      - 'highlight'
   - title: '⚠️ Breaking'
     labels:
       - 'breaking'
@@ -14,6 +17,9 @@ categories:
       - 'fix'
       - 'bugfix'
       - 'bug'
+  - title: '⚠️ Deprecations'
+    labels:
+      - 'deprecation'
   - title: '🧰 Maintenance'
     labels:
       - 'chore'

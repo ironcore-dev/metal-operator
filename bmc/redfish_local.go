@@ -5,7 +5,12 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/stmcginnis/gofish/schemas"
@@ -15,7 +20,7 @@ import (
 var _ BMC = (*RedfishLocalBMC)(nil)
 
 const (
-	DummyMockTaskForUpgrade = "dummyTask"
+	DummyMockTaskForUpgrade = "/redfish/v1/TaskService/Tasks/upgrade"
 )
 
 // RedfishLocalBMC implements the BMC interface for Redfish.
@@ -92,43 +97,22 @@ func (r *RedfishLocalBMC) DeleteAccount(ctx context.Context, userName, id string
 	return fmt.Errorf("account %s not found", userName)
 }
 
-// GetBiosVersion retrieves the BIOS version.
-func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
-	if UnitTestMockUps.BIOSVersion == "" {
-		var err error
-		UnitTestMockUps.BIOSVersion, err = r.RedfishBaseBMC.GetBiosVersion(ctx, systemUUID)
-		if err != nil {
-			return "", fmt.Errorf("failed to get BIOS version: %w", err)
-		}
-	}
-	return UnitTestMockUps.BIOSVersion, nil
-}
-
-// UpgradeBiosVersion initiates a BIOS upgrade.
+// UpgradeBiosVersion initiates a BIOS upgrade via HTTP to the mock Redfish server.
 func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
-	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
-	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BIOSUpgradeTaskIndex++
+	p := *params
+	if !strings.HasPrefix(params.ImageURI, "bios://") {
+		systems, err := r.GetSystems(ctx)
+		if err != nil || len(systems) == 0 {
+			return "", true, fmt.Errorf("failed to resolve system URI for BIOS upgrade: %w", err)
 		}
-	}()
-	return DummyMockTaskForUpgrade, false, nil
+		p.ImageURI = "bios://" + systems[0].URI + "/" + url.PathEscape(params.ImageURI)
+	}
+	return upgradeVersion(ctx, r.RedfishBaseBMC, &p, localBuildRequestBody, localExtractTaskURI)
 }
 
-// GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
+// GetBiosUpgradeTask retrieves the status of a BIOS upgrade task via HTTP.
 func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
-	index := UnitTestMockUps.BIOSUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BIOSUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
-	}
-	task := &UnitTestMockUps.BIOSUpgradeTaskStatus[index]
-	if task.TaskState == schemas.CompletedTaskState {
-		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
-	}
-	return task, nil
+	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, localParseTask)
 }
 
 // ResetManager resets the BMC with a delay for pending settings.
@@ -229,41 +213,48 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, a
 	return checkAttributes(attrs, filtered)
 }
 
-// GetBMCVersion retrieves the BMC version.
-func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
-	if UnitTestMockUps.BMCVersion == "" {
-		var err error
-		UnitTestMockUps.BMCVersion, err = r.RedfishBaseBMC.GetBMCVersion(ctx, systemUUID)
-		if err != nil {
-			return "", fmt.Errorf("failed to get BMC version: %w", err)
-		}
-	}
-	return UnitTestMockUps.BMCVersion, nil
-}
-
-// UpgradeBMCVersion initiates a BMC upgrade.
+// UpgradeBMCVersion initiates a BMC upgrade via HTTP to the mock Redfish server.
 func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
-	UnitTestMockUps.BMCUpgradeTaskIndex = 0
-	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
-			time.Sleep(5 * time.Millisecond)
-			UnitTestMockUps.BMCUpgradeTaskIndex++
-		}
-	}()
-	return DummyMockTaskForUpgrade, false, nil
+	p := *params
+	if !strings.HasPrefix(params.ImageURI, "bmc://") {
+		p.ImageURI = "bmc://" + params.ImageURI
+	}
+	return upgradeVersion(ctx, r.RedfishBaseBMC, &p, localBuildRequestBody, localExtractTaskURI)
 }
 
-// GetBMCUpgradeTask retrieves the status of a BMC upgrade task.
+// GetBMCUpgradeTask retrieves the status of a BMC upgrade task via HTTP.
 func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
-	index := UnitTestMockUps.BMCUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BMCUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, localParseTask)
+}
+
+func localBuildRequestBody(params *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody {
+	return &SimpleUpdateRequestBody{
+		UpdateServiceSimpleUpdateParameters: *params,
 	}
-	task := &UnitTestMockUps.BMCUpgradeTaskStatus[index]
-	if task.TaskState == schemas.CompletedTaskState {
-		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
+}
+
+func localExtractTaskURI(resp *http.Response) (string, error) {
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	var taskResp struct {
+		OdataID string `json:"@odata.id"`
+	}
+	if err := json.Unmarshal(rawBody, &taskResp); err != nil {
+		return "", fmt.Errorf("failed to unmarshal task URI: %w", err)
+	}
+	return taskResp.OdataID, nil
+}
+
+func localParseTask(_ context.Context, resp *http.Response) (*schemas.Task, error) {
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	task := &schemas.Task{}
+	if err := json.Unmarshal(rawBody, task); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal task: %w", err)
 	}
 	return task, nil
 }

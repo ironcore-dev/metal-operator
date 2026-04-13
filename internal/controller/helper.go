@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"reflect"
 	"slices"
+	"strconv"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -37,6 +38,9 @@ const (
 	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
 	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
 	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
+
+	BMCConditionReset = "BMCResetIssued"
+	BMCReasonReset    = "BMCResetIssued"
 )
 
 type BMCTaskFetchFailedError struct {
@@ -428,4 +432,54 @@ func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFiel
 	}
 
 	return false
+}
+
+// computeSettingsDiff compares desired settings (string values) against actual settings (typed values from BMC)
+// and returns the attributes that differ, converting string values to the appropriate type.
+func computeSettingsDiff(desired map[string]string, actual schemas.SettingsAttributes) (schemas.SettingsAttributes, error) {
+	diff := schemas.SettingsAttributes{}
+	var errs []error
+	for key, value := range desired {
+		res, ok := actual[key]
+		if !ok {
+			diff[key] = value
+			continue
+		}
+		switch data := res.(type) {
+		case int:
+			intValue, err := strconv.Atoi(value)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to parse int for setting %s with value %s: %w", key, value, err))
+				continue
+			}
+			if data != intValue {
+				diff[key] = intValue
+			}
+		case string:
+			if data != value {
+				diff[key] = value
+			}
+		case float64:
+			floatValue, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to parse float for setting %s with value %s: %w", key, value, err))
+				continue
+			}
+			if data != floatValue {
+				diff[key] = floatValue
+			}
+		case bool:
+			boolValue, err := strconv.ParseBool(value)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to parse bool for setting %s with value %s: %w", key, value, err))
+				continue
+			}
+			if data != boolValue {
+				diff[key] = boolValue
+			}
+		default:
+			errs = append(errs, fmt.Errorf("unsupported attribute type %T for setting %s", res, key))
+		}
+	}
+	return diff, errors.Join(errs...)
 }

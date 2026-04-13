@@ -120,6 +120,85 @@ spec:
                   type: string
                 description: SettingsMap contains BMC settings as a map.
                 type: object
+              variables:
+                description: Variables is a list of variables that can be used in
+                  the settings for templating.
+                items:
+                  properties:
+                    key:
+                      description: Key is the name of the variable to be used in the
+                        BMCSettingsTemplate format.
+                      minLength: 1
+                      type: string
+                    valueFrom:
+                      description: ValueFrom defines a simple single source for the
+                        variable value.
+                      properties:
+                        configMapKeyRef:
+                          description: ConfigMapKeyRef points to a namespaced ConfigMap
+                            key.
+                          properties:
+                            key:
+                              description: Key is the key within the referenced object.
+                              minLength: 1
+                              type: string
+                            name:
+                              description: Name is the referenced object name.
+                              minLength: 1
+                              type: string
+                            namespace:
+                              description: Namespace is the referenced object namespace.
+                              minLength: 1
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                        fieldRef:
+                          description: FieldRef sources the value from a field of
+                            the BMCSettings object (e.g. spec.bmcRef.name).
+                          properties:
+                            fieldPath:
+                              description: FieldPath is the path of the field on the
+                                BMCSettings object to select (e.g. spec.bmcRef.name).
+                              minLength: 1
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                        secretKeyRef:
+                          description: SecretKeyRef points to a namespaced Secret
+                            key.
+                          properties:
+                            key:
+                              description: Key is the key within the referenced object.
+                              minLength: 1
+                              type: string
+                            name:
+                              description: Name is the referenced object name.
+                              minLength: 1
+                              type: string
+                            namespace:
+                              description: Namespace is the referenced object namespace.
+                              minLength: 1
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                      type: object
+                      x-kubernetes-validations:
+                      - message: exactly one of fieldRef, configMapKeyRef, or secretKeyRef
+                          must be provided
+                        rule: '(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef)
+                          ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
+                  required:
+                  - key
+                  - valueFrom
+                  type: object
+                type: array
               version:
                 description: Version specifies the BMC firmware version for which
                   the settings should be applied.
@@ -128,6 +207,10 @@ spec:
             - BMCRef
             - version
             type: object
+            x-kubernetes-validations:
+            - message: variable keys must be unique
+              rule: '!has(self.variables) || self.variables.all(v, self.variables.filter(w,
+                w.key == v.key).size() == 1)'
           status:
             description: BMCSettingsStatus defines the observed state of BMCSettings.
             properties:

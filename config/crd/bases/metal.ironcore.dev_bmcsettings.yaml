@@ -155,11 +155,11 @@ spec:
                           type: object
                         fieldRef:
                           description: FieldRef sources the value from a field of
-                            the BMCSettings object (e.g. spec.bmcRef.name).
+                            the BMCSettings object (e.g. spec.BMCRef.name).
                           properties:
                             fieldPath:
                               description: FieldPath is the path of the field on the
-                                BMCSettings object to select (e.g. spec.bmcRef.name).
+                                BMCSettings object to select (e.g. spec.BMCRef.name).
                               maxLength: 256
                               minLength: 1
                               type: string

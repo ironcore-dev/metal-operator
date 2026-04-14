@@ -22,14 +22,14 @@ type BMCSettingsTemplate struct {
 	// Variables is a list of variables that can be used in the settings for templating.
 	// +kubebuilder:validation:MaxItems=64
 	// +optional
-	Variables []DynamicVariable `json:"variables,omitempty"`
+	Variables []Variable `json:"variables,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 }
 
-type DynamicVariable struct {
+type Variable struct {
 	// Key is the name of the variable to be used in the BMCSettingsTemplate format.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
@@ -38,12 +38,12 @@ type DynamicVariable struct {
 
 	// ValueFrom defines a simple single source for the variable value.
 	// +required
-	ValueFrom *DynamicVariableSourceValueFrom `json:"valueFrom"`
+	ValueFrom *VariableSourceValueFrom `json:"valueFrom"`
 }
 
 // +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of fieldRef, configMapKeyRef, or secretKeyRef must be provided"
-type DynamicVariableSourceValueFrom struct {
-	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.bmcRef.name).
+type VariableSourceValueFrom struct {
+	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
 	// +optional
 	FieldRef *FieldRefSelector `json:"fieldRef,omitempty"`
 
@@ -57,7 +57,7 @@ type DynamicVariableSourceValueFrom struct {
 }
 
 type FieldRefSelector struct {
-	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.bmcRef.name).
+	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
 	// +required

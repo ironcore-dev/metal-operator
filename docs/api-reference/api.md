@@ -546,7 +546,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[DynamicVariable](#dynamicvariable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
 | `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply settings to. |  |  |
@@ -604,7 +604,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[DynamicVariable](#dynamicvariable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 
 
@@ -943,42 +943,6 @@ _Appears in:_
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
 
 
-#### DynamicVariable
-
-
-
-
-
-
-
-_Appears in:_
-- [BMCSettingsSpec](#bmcsettingsspec)
-- [BMCSettingsTemplate](#bmcsettingstemplate)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `key` _string_ | Key is the name of the variable to be used in the BMCSettingsTemplate format. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
-| `valueFrom` _[DynamicVariableSourceValueFrom](#dynamicvariablesourcevaluefrom)_ | ValueFrom defines a simple single source for the variable value. |  |  |
-
-
-#### DynamicVariableSourceValueFrom
-
-
-
-
-
-
-
-_Appears in:_
-- [DynamicVariable](#dynamicvariable)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.bmcRef.name). |  |  |
-| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
-| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
-
-
 #### Endpoint
 
 
@@ -1037,11 +1001,11 @@ _Appears in:_
 
 
 _Appears in:_
-- [DynamicVariableSourceValueFrom](#dynamicvariablesourcevaluefrom)
+- [VariableSourceValueFrom](#variablesourcevaluefrom)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.bmcRef.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
 
 
 #### IP
@@ -1172,7 +1136,7 @@ _Appears in:_
 
 
 _Appears in:_
-- [DynamicVariableSourceValueFrom](#dynamicvariablesourcevaluefrom)
+- [VariableSourceValueFrom](#variablesourcevaluefrom)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -1851,5 +1815,41 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `Force` |  |
+
+
+#### Variable
+
+
+
+
+
+
+
+_Appears in:_
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the name of the variable to be used in the BMCSettingsTemplate format. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
+| `valueFrom` _[VariableSourceValueFrom](#variablesourcevaluefrom)_ | ValueFrom defines a simple single source for the variable value. |  |  |
+
+
+#### VariableSourceValueFrom
+
+
+
+
+
+
+
+_Appears in:_
+- [Variable](#variable)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name). |  |  |
+| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
+| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
 
 

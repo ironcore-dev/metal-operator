@@ -11,15 +11,15 @@ spec:
   version: 1.45.455b66-rev4
   serverMaintenancePolicy: Enforced
   settings:
-    BootMode: "UEFI"
-    HyperThreading: "Enabled"
-    LicenseKey: "$(LicenseKey)"
-    FQDN: "$(BmcName).$(SearchDomain)"
+    bootMode: "UEFI"
+    hyperThreading: "Enabled"
+    licenseKey: "$(LicenseKey)"
+    fqdn: "$(BmcName).$(SearchDomain)"
   variables:
     - key: BmcName
       valueFrom:
         fieldRef:
-          fieldPath: spec.bmcRef.name
+          fieldPath: spec.BMCRef.name
     - key: SearchDomain
       valueFrom:
         configMapKeyRef:

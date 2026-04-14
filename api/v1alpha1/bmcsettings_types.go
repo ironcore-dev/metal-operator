@@ -9,7 +9,7 @@ import (
 )
 
 // BMCSettingsTemplate defines the template for BMC settings to be applied.
-
+// +kubebuilder:validation:XValidation:rule="!has(self.variables) || self.variables.all(v, self.variables.filter(w, w.key == v.key).size() == 1)",message="variable keys must be unique"
 type BMCSettingsTemplate struct {
 	// Version specifies the BMC firmware version for which the settings should be applied.
 	// +required
@@ -19,9 +19,69 @@ type BMCSettingsTemplate struct {
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
 
+	// Variables is a list of variables that can be used in the settings for templating.
+	// +kubebuilder:validation:MaxItems=64
+	// +optional
+	Variables []Variable `json:"variables,omitempty"`
+
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+}
+
+type Variable struct {
+	// Key is the name of the variable to be used in the BMCSettingsTemplate format.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	Key string `json:"key"`
+
+	// ValueFrom defines a simple single source for the variable value.
+	// +required
+	ValueFrom *VariableSourceValueFrom `json:"valueFrom"`
+}
+
+// +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of fieldRef, configMapKeyRef, or secretKeyRef must be provided"
+type VariableSourceValueFrom struct {
+	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+	// +optional
+	FieldRef *FieldRefSelector `json:"fieldRef,omitempty"`
+
+	// ConfigMapKeyRef points to a namespaced ConfigMap key.
+	// +optional
+	ConfigMapKeyRef *NamespacedKeySelector `json:"configMapKeyRef,omitempty"`
+
+	// SecretKeyRef points to a namespaced Secret key.
+	// +optional
+	SecretKeyRef *NamespacedKeySelector `json:"secretKeyRef,omitempty"`
+}
+
+type FieldRefSelector struct {
+	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +required
+	FieldPath string `json:"fieldPath"`
+}
+
+type NamespacedKeySelector struct {
+	// Name is the referenced object name.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Name string `json:"name"`
+
+	// Namespace is the referenced object namespace.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	Namespace string `json:"namespace"`
+
+	// Key is the key within the referenced object.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Key string `json:"key"`
 }
 
 // BMCSettingsSpec defines the desired state of BMCSettings.

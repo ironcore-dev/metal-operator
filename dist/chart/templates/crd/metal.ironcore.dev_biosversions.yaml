@@ -119,10 +119,12 @@ spec:
                   object that the controller has requested for the referred server.
                 properties:
                   apiVersion:
-                    description: APIVersion is the API version of the referenced object.
+                    description: 'Deprecated: APIVersion is no longer used. Retained
+                      for backwards compatibility.'
                     type: string
                   kind:
-                    description: Kind is the kind of the referenced object.
+                    description: 'Deprecated: Kind is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                   name:
                     description: Name is the name of the referenced object.
@@ -131,14 +133,12 @@ spec:
                     description: Namespace is the namespace of the referenced object.
                     type: string
                   uid:
-                    description: UID is the uid of the referenced object.
+                    description: 'Deprecated: UID is no longer used. Retained for
+                      backwards compatibility.'
                     type: string
                 required:
-                - apiVersion
-                - kind
                 - name
                 - namespace
-                - uid
                 type: object
               serverRef:
                 description: ServerRef is a reference to a specific server to apply

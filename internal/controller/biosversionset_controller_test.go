@@ -33,7 +33,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		bmcSecret                *metalv1alpha1.BMCSecret
 		upgradeServerBiosVersion string
 	)
-	ns := SetupTest(MockServerIPAddrs)
+	_ = SetupTest(MockServerIPAddrs)
 
 	BeforeEach(func(ctx SpecContext) {
 		upgradeServerBiosVersion = "P80 v1.45 (12/06/2017)"
@@ -133,12 +133,11 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully reconcile the resource", func(ctx SpecContext) {
+	It("should successfully reconcile the resource", func(ctx SpecContext) {
 		By("Created resource")
 		biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biosversion-set-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
@@ -234,12 +233,11 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		)
 	})
 
-	It("Should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
+	It("should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
 		By("Create resource")
 		biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biosversion-set-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
@@ -412,7 +410,6 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biosversion-set-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{

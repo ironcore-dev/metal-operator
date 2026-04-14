@@ -14,16 +14,45 @@ import (
 
 // ObjectReference is the namespaced name reference to an object.
 type ObjectReference struct {
-	// APIVersion is the API version of the referenced object.
-	APIVersion string `json:"apiVersion"`
-	// Kind is the kind of the referenced object.
-	Kind string `json:"kind"`
+	// Deprecated: APIVersion is no longer used. Retained for backwards compatibility.
+	// +optional
+	APIVersion string `json:"apiVersion,omitempty"`
+	// Deprecated: Kind is no longer used. Retained for backwards compatibility.
+	// +optional
+	Kind string `json:"kind,omitempty"`
 	// Namespace is the namespace of the referenced object.
+	// +required
 	Namespace string `json:"namespace"`
 	// Name is the name of the referenced object.
+	// +required
 	Name string `json:"name"`
-	// UID is the uid of the referenced object.
-	UID types.UID `json:"uid"`
+	// Deprecated: UID is no longer used. Retained for backwards compatibility.
+	// +optional
+	UID types.UID `json:"uid,omitempty"`
+}
+
+// ImmutableObjectReference is a namespaced name reference whose name and namespace
+// cannot be changed once set (the entire reference can still be set or cleared).
+type ImmutableObjectReference struct {
+	// Deprecated: APIVersion is no longer used. Retained for backwards compatibility.
+	// +optional
+	APIVersion string `json:"apiVersion,omitempty"`
+	// Deprecated: Kind is no longer used. Retained for backwards compatibility.
+	// +optional
+	Kind string `json:"kind,omitempty"`
+	// Namespace is the namespace of the referenced object.
+	// +required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf"
+	Namespace string `json:"namespace"`
+	// Name is the name of the referenced object.
+	// +required
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf"
+	Name string `json:"name"`
+	// Deprecated: UID is no longer used. Retained for backwards compatibility.
+	// +optional
+	UID types.UID `json:"uid,omitempty"`
 }
 
 // IP is an IP address.

@@ -36,7 +36,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
 			},
 			Data: map[string][]byte{
@@ -50,7 +49,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		bmcObj = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -96,11 +94,10 @@ var _ = Describe("BMCVersion Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully mark completed if no BMC version change", func(ctx SpecContext) {
+	It("should successfully mark completed if no BMC version change", func(ctx SpecContext) {
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -139,7 +136,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		)
 	})
 
-	It("Should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
+	It("should successfully start and monitor upgrade task to completion", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
 		// note: ImageURI need to have the version string.
@@ -155,7 +152,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -191,11 +187,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ObjectReference{
 					{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: metalv1alpha1.GroupVersion.String(),
+						Namespace: serverMaintenance.Namespace,
+						Name:      serverMaintenance.Name,
 					},
 				},
 			),
@@ -205,11 +198,8 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		))
 
@@ -241,7 +231,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		)
 	})
 
-	It("Should upgrade servers BMC when server in reserved state", func(ctx SpecContext) {
+	It("should upgrade servers BMC when server in reserved state", func(ctx SpecContext) {
 		// mocked at
 		// metal-operator/bmc/redfish_local.go mockedBIOS*
 		// note: ImageURI need to have the version string.
@@ -280,7 +270,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -316,11 +305,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			HaveField("Spec.ServerMaintenanceRefs",
 				[]metalv1alpha1.ObjectReference{
 					{
-						Kind:       "ServerMaintenance",
-						Name:       serverMaintenance.Name,
-						Namespace:  serverMaintenance.Namespace,
-						UID:        serverMaintenance.UID,
-						APIVersion: metalv1alpha1.GroupVersion.String(),
+						Namespace: serverMaintenance.Namespace,
+						Name:      serverMaintenance.Name,
 					},
 				},
 			))
@@ -340,11 +326,8 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateMaintenance),
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: "metal.ironcore.dev/v1alpha1",
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		))
 
@@ -380,12 +363,11 @@ var _ = Describe("BMCVersion Controller", func() {
 		))
 	})
 
-	It("Should allow retry using annotation", func(ctx SpecContext) {
+	It("should allow retry using annotation", func(ctx SpecContext) {
 		failedAutoRetryCount := 2
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 				Annotations: map[string]string{
 					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
@@ -439,11 +421,10 @@ var _ = Describe("BMCVersion Controller", func() {
 		})).Should(Succeed())
 	})
 
-	It("Should cleanup ServerMaintenance when references are cleared", func(ctx SpecContext) {
+	It("should cleanup ServerMaintenance when references are cleared", func(ctx SpecContext) {
 		By("Creating a BMCVersion with maintenance upgrade")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -487,11 +468,10 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 	})
 
-	It("Should maintain cleanup functionality with populated spec.serverMaintenanceRefs", func(ctx SpecContext) {
+	It("should maintain cleanup functionality with populated spec.serverMaintenanceRefs", func(ctx SpecContext) {
 		By("Creating a BMCVersion with maintenance upgrade")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -551,7 +531,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 	})
 
-	It("Should not delete ServerMaintenance objects not owned by BMCVersion", func(ctx SpecContext) {
+	It("should not delete ServerMaintenance objects not owned by BMCVersion", func(ctx SpecContext) {
 		By("Creating a standalone ServerMaintenance without owner reference")
 		orphanMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
@@ -568,7 +548,6 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Creating a BMCVersion with orphaned state")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
@@ -615,11 +594,10 @@ var _ = Describe("BMCVersion Controller", func() {
 		Eventually(ObjectList(&serverMaintenanceList)).Should(HaveField("Items", BeEmpty()))
 	})
 
-	It("Should be idempotent when cleaning up orphaned ServerMaintenance", func(ctx SpecContext) {
+	It("should be idempotent when cleaning up orphaned ServerMaintenance", func(ctx SpecContext) {
 		By("Creating a BMCVersion with maintenance upgrade")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{

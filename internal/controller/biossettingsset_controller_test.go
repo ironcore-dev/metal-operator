@@ -33,7 +33,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		server03  *metalv1alpha1.Server
 		bmcSecret *metalv1alpha1.BMCSecret
 	)
-	ns := SetupTest(MockServerIPAddrs)
+	_ = SetupTest(MockServerIPAddrs)
 
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")
@@ -130,12 +130,11 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should successfully reconcile the resource", func(ctx SpecContext) {
+	It("should successfully reconcile the resource", func(ctx SpecContext) {
 		By("Reconciling the created resource")
 		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
@@ -227,12 +226,11 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		)
 	})
 
-	It("Should successfully reconcile the resource when server are deleted/created", func(ctx SpecContext) {
+	It("should successfully reconcile the resource when servers are deleted/created", func(ctx SpecContext) {
 		By("Create resource")
 		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
@@ -407,12 +405,11 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		)
 	})
 
-	It("Should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
+	It("should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
 		By("Create BIOSSettingsSet resource")
 		biosSettingsSet1 := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set1-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
@@ -462,7 +459,6 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		biosSettingsSet2 := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set2-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
@@ -624,7 +620,6 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json

@@ -142,14 +142,13 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			EnsureCleanState()
 		})
 
-		It("Should successfully reconcile when BMCSettingsSet was generated, labels match and bmcsettings were generated", func(ctx SpecContext) {
+		It("should successfully reconcile when BMCSettingsSet was generated, labels match and BMCSettings were generated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -221,14 +220,13 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		})
 
-		It("Should successfully reconcile when bmc resource was deleted", func(ctx SpecContext) {
+		It("should successfully reconcile when BMC resource was deleted", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -310,14 +308,13 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		})
 
-		It("Should successfully reconcile when label of bmc02 was changed", func(ctx SpecContext) {
+		It("should successfully reconcile when label of BMC02 was changed", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -407,7 +404,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Consistently(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
 
 		})
-		It("Should successfully reconcile when bmcsettingset was updated", func(ctx SpecContext) {
+		It("should successfully reconcile when BMCSettingsSet was updated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 			bmcSettingNew := make(map[string]string)
@@ -416,7 +413,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -510,7 +506,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.List(ctx, &maintList)).To(Succeed())
 		})
 
-		It("Should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
+		It("should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 			bmcSettingNew := make(map[string]string)
@@ -519,7 +515,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating the BMCSettingsSet resource")
 			bmcSettingsSet1 := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset1-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -557,7 +552,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Createing a duplicate BMCSettingsSet resource")
 			bmcSettingsSet2 := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset2-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{

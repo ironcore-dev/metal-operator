@@ -266,7 +266,7 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 						log.V(1).Info("BMCSettings referenced by BMC not found, will create a new one", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
 						// proceed to create a new BMCSettings; the ref will be updated when it is created
 					} else {
-						log.Error(err, "error when trying to get BMCSettings referenced by Server", "Server", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+						log.Error(err, "Failed to get BMCSettings referenced by BMC", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
 						// we will try this again in next reconciliation loop
 						continue
 					}

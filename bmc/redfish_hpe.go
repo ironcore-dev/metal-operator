@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/stmcginnis/gofish"
@@ -44,6 +45,98 @@ func (r *HPERedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ schema
 	return false, nil
 }
 
+// CreateEventSubscription overrides the base implementation to omit DeliveryRetryPolicy.
+// HPE iLO firmware does not support the DeliveryRetryPolicy property in EventDestination
+// POST requests and returns: "PropertyNotWritableOrUnknown: DeliveryRetryPolicy is not writable or unknown"
+// Even when the EventService advertises retry capabilities, iLO rejects this field.
+func (r *HPERedfishBMC) CreateEventSubscription(
+	ctx context.Context,
+	destination string,
+	eventFormatType schemas.EventFormatType,
+	retry schemas.DeliveryRetryPolicy,
+) (string, error) {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return "", fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return "", fmt.Errorf("event service is not enabled")
+	}
+
+	payload := &subscriptionPayload{
+		Destination:     destination,
+		EventFormatType: eventFormatType,
+		Protocol:        schemas.RedfishEventDestinationProtocol,
+		Context:         "metal-operator",
+		// NOTE: DeliveryRetryPolicy is intentionally omitted for HPE iLO compatibility
+	}
+
+	client := ev.GetClient()
+	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
+	if len(ev.ResourceTypes) == 0 {
+		payload.EventTypes = []schemas.EventType{}
+	}
+	// Omit RegistryPrefixes and ResourceTypes to allow all events.
+	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
+
+	resp, err := client.Post(ev.SubscriptionsLink, payload)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Read error response body
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+		}
+
+		// Parse Redfish error response
+		var redfishError struct {
+			Error struct {
+				MessageExtendedInfo []struct {
+					MessageID string `json:"MessageId"`
+					Message   string `json:"Message"`
+				} `json:"@Message.ExtendedInfo"`
+			} `json:"error"`
+		}
+
+		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
+			// Check if it's a "resource already exists" error
+			for _, info := range redfishError.Error.MessageExtendedInfo {
+				if strings.Contains(info.MessageID, "ResourceAlreadyExists") ||
+					strings.Contains(info.MessageID, "PropertyValueModified") {
+					// Handle duplicate subscription - try to find existing one
+					if existingLink, findErr := r.findExistingSubscription(destination, eventFormatType); findErr == nil {
+						// Successfully found existing subscription
+						return existingLink, nil
+					}
+					// Failed to find existing subscription - fall through to return original error
+					// This preserves the detailed Redfish error message for troubleshooting
+					break
+				}
+			}
+		}
+
+		// Not a duplicate error - return original error with details
+		return "", fmt.Errorf("failed to create event subscription status code: %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	// return subscription link from returned location
+	subscriptionLink := resp.Header.Get("Location")
+	if subscriptionLink == "" {
+		return "", fmt.Errorf("failed to get subscription link from response header")
+	}
+	urlParser, err := url.ParseRequestURI(subscriptionLink)
+	if err == nil {
+		subscriptionLink = urlParser.RequestURI()
+	}
+	return subscriptionLink, nil
+}
+
 // --- Firmware upgrade overrides ---
 
 func (r *HPERedfishBMC) hpeBuildRequestBody(parameters *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody {
@@ -60,14 +153,14 @@ func (r *HPERedfishBMC) hpeBuildRequestBody(parameters *schemas.UpdateServiceSim
 func (r *HPERedfishBMC) hpeExtractTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)
+		return "", fmt.Errorf("failed to read the response body %w %v", err, rawBody)
 	}
 
 	var tResp struct {
 		TaskMonitor string
 	}
 	if err = json.Unmarshal(rawBody, &tResp); err != nil {
-		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
+		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %w", err)
 	}
 
 	if tResp.TaskMonitor != "" {

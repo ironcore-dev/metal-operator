@@ -227,10 +227,10 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(ctx context.Contex
 			if server.Spec.BIOSSettingsRef != nil {
 				if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, &metalv1alpha1.BIOSSettings{}); err != nil {
 					if apierrors.IsNotFound(err) {
-						log.Error(err, "failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+						log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
 						// we will go ahead and create a new BIOSSettings for this server. the ref will be updated when the new BIOSSettings is created
 					} else {
-						log.Error(err, "error when trying to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+						log.Error(err, "Error when trying to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
 						// we will try this again in next reconciliation loop
 						continue
 					}
@@ -393,7 +393,7 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 	if server.Spec.BIOSSettingsRef != nil {
 		settings := &metalv1alpha1.BIOSSettings{}
 		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, settings); err != nil {
-			log.Error(err, "failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+			log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
 			return nil
 		}
 		owner := metav1.GetControllerOf(settings)

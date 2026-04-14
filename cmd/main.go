@@ -72,6 +72,8 @@ func main() { // nolint: gocyclo
 		enableHTTP2                        bool
 		macPrefixesFile                    string
 		insecure                           bool
+		protocol                           string
+		skipCertValidation                 bool
 		managerNamespace                   string
 		probeImage                         string
 		probeOSImage                       string
@@ -81,6 +83,8 @@ func main() { // nolint: gocyclo
 		eventPort                          int
 		eventURL                           string
 		eventProtocol                      string
+		registryClientTimeout              time.Duration
+		registryDataMaxAge                 time.Duration
 		registryResyncInterval             time.Duration
 		webhookPort                        int
 		enforceFirstBoot                   bool
@@ -116,6 +120,10 @@ func main() { // nolint: gocyclo
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
 	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
 		"Defines the interval at which the registry is polled for new server information.")
+	flag.DurationVar(&registryClientTimeout, "registry-client-timeout", 5*time.Second,
+		"Timeout for HTTP requests to the registry.")
+	flag.DurationVar(&registryDataMaxAge, "registry-data-max-age", 2*time.Minute,
+		"Maximum age of registry data to accept for discovery completion.")
 	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 2*time.Minute,
 		"Defines the interval at which the server is polled.")
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
@@ -138,7 +146,11 @@ func main() { // nolint: gocyclo
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
-	flag.BoolVar(&insecure, "insecure", true, "If true, use http instead of https for connecting to a BMC.")
+	flag.BoolVar(&insecure, "insecure", true, "Deprecated: Use --protocol and --skip-cert-validation instead")
+	flag.StringVar(&protocol, "protocol", "",
+		"Protocol to use for BMC connections: 'http' or 'https'. "+
+			"If not set, defaults based on --insecure flag for compatibility")
+	flag.BoolVar(&skipCertValidation, "skip-cert-validation", false, "Skip TLS certificate validation when using HTTPS")
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -175,6 +187,41 @@ func main() { // nolint: gocyclo
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Handle protocol and TLS certificate validation flags with backward compatibility
+	var effectiveProtocol metalv1alpha1.ProtocolScheme
+	var effectiveSkipCert bool
+
+	if protocol != "" {
+		// New flag takes precedence
+		switch protocol {
+		case "http":
+			effectiveProtocol = metalv1alpha1.HTTPProtocolScheme
+		case "https":
+			effectiveProtocol = metalv1alpha1.HTTPSProtocolScheme
+		default:
+			setupLog.Error(nil, "Invalid protocol value. Must be 'http' or 'https'", "protocol", protocol)
+			os.Exit(1)
+		}
+		effectiveSkipCert = skipCertValidation
+	} else {
+		// Backward compatibility: use insecure flag
+		if insecure {
+			effectiveProtocol = metalv1alpha1.HTTPProtocolScheme
+			effectiveSkipCert = true // HTTP doesn't use TLS anyway
+			setupLog.Info("Using deprecated --insecure flag. Please migrate to --protocol=http")
+		} else {
+			effectiveProtocol = metalv1alpha1.HTTPSProtocolScheme
+			// Legacy behavior: insecure=false still skipped cert validation
+			effectiveSkipCert = true
+			setupLog.Info("Using deprecated --insecure=false flag. " +
+				"Please migrate to --protocol=https --skip-cert-validation=false for secure connections")
+		}
+	}
+
+	if effectiveSkipCert && effectiveProtocol == metalv1alpha1.HTTPSProtocolScheme {
+		setupLog.Info("WARNING: TLS certificate verification is disabled. This is not recommended for production")
+	}
 
 	if probeOSImage == "" {
 		setupLog.Error(nil, "probe OS image must be set")
@@ -360,10 +407,11 @@ func main() { // nolint: gocyclo
 	setupLog.Info("Registered custom server metrics collector")
 
 	if err = (&controller.EndpointReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		MACPrefixes: macPRefixes,
-		Insecure:    insecure,
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		MACPrefixes:        macPRefixes,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "Endpoint")
 		os.Exit(1)
@@ -378,7 +426,8 @@ func main() { // nolint: gocyclo
 	if err = (&controller.BMCReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
-		Insecure:               insecure,
+		DefaultProtocol:        effectiveProtocol,
+		SkipCertValidation:     effectiveSkipCert,
 		BMCFailureResetDelay:   bmcFailureResetDelay,
 		BMCResetWaitTime:       bmcResetWaitingInterval,
 		BMCClientRetryInterval: bmcResetResyncInterval,
@@ -395,12 +444,16 @@ func main() { // nolint: gocyclo
 	}
 	if err = (&controller.ServerReconciler{
 		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
 		Scheme:                  mgr.GetScheme(),
-		Insecure:                insecure,
+		DefaultProtocol:         effectiveProtocol,
+		SkipCertValidation:      effectiveSkipCert,
 		ManagerNamespace:        managerNamespace,
 		ProbeImage:              probeImage,
 		ProbeOSImage:            probeOSImage,
 		RegistryURL:             registryURL,
+		RegistryClientTimeout:   registryClientTimeout,
+		RegistryDataMaxAge:      registryDataMaxAge,
 		RegistryResyncInterval:  registryResyncInterval,
 		ResyncInterval:          serverResyncInterval,
 		EnforceFirstBoot:        enforceFirstBoot,
@@ -429,6 +482,7 @@ func main() { // nolint: gocyclo
 	}
 	if err = (&controller.ServerClaimReconciler{
 		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
 		Cache:                   mgr.GetCache(),
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,
@@ -444,12 +498,13 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSSettingsReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		Insecure:         insecure,
-		ResyncInterval:   maintenanceResyncInterval,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		ResyncInterval:     maintenanceResyncInterval,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -464,12 +519,13 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSVersionReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		Insecure:         insecure,
-		ResyncInterval:   maintenanceResyncInterval,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		ResyncInterval:     maintenanceResyncInterval,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -483,12 +539,13 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCSettingsReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		ResyncInterval:   maintenanceResyncInterval,
-		Insecure:         insecure,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		ResyncInterval:     maintenanceResyncInterval,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -502,12 +559,13 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCVersionReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		Insecure:         insecure,
-		ResyncInterval:   maintenanceResyncInterval,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		ResyncInterval:     maintenanceResyncInterval,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -553,9 +611,10 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCUserReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Insecure: insecure,
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,

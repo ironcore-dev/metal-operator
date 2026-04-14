@@ -58,7 +58,7 @@ func (r *BMCVersionSetReconciler) reconcileExists(
 	log := ctrl.LoggerFrom(ctx)
 	// if object is being deleted - reconcile deletion
 	if !bmcVersionSet.DeletionTimestamp.IsZero() {
-		log.V(1).Info("object is being deleted")
+		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, bmcVersionSet)
 	}
 
@@ -256,7 +256,7 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	for _, bmcVersion := range bmcVersionList.Items {
 		if _, ok := bmcMap[bmcVersion.Spec.BMCRef.Name]; !ok {
 			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-				log.V(1).Info("waiting for BMCVersion to move out of InProgress state", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
+				log.V(1).Info("Waiting for BMCVersion to move out of InProgress state", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
 				warnings = append(warnings, fmt.Sprintf("BMCVersion %s is still in progress, skipping deletion", bmcVersion.Name))
 				continue
 			}
@@ -381,14 +381,14 @@ func (r *BMCVersionSetReconciler) enqueueByBMC(ctx context.Context, obj client.O
 
 	bmcVersionSetList := &metalv1alpha1.BMCVersionSetList{}
 	if err := r.List(ctx, bmcVersionSetList); err != nil {
-		log.Error(err, "failed to list BMCVersionSet")
+		log.Error(err, "Failed to list BMCVersionSet")
 		return nil
 	}
 	reqs := make([]ctrl.Request, 0)
 	for _, bmcVersionSet := range bmcVersionSetList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&bmcVersionSet.Spec.BMCSelector)
 		if err != nil {
-			log.Error(err, "failed to convert label selector")
+			log.Error(err, "Failed to convert label selector")
 			return nil
 		}
 		// if the host label matches the selector, enqueue the request
@@ -402,7 +402,7 @@ func (r *BMCVersionSetReconciler) enqueueByBMC(ctx context.Context, obj client.O
 		} else { // if the label has been removed
 			ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, &bmcVersionSet)
 			if err != nil {
-				log.Error(err, "failed to get owned BMCVersion resources")
+				log.Error(err, "Failed to get owned BMCVersion resources")
 				return nil
 			}
 			for _, bmcVersion := range ownedBMCVersions.Items {

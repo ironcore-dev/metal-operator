@@ -98,11 +98,12 @@ spec:
                         server.
                       properties:
                         apiVersion:
-                          description: APIVersion is the API version of the referenced
-                            object.
+                          description: 'Deprecated: APIVersion is no longer used.
+                            Retained for backwards compatibility.'
                           type: string
                         kind:
-                          description: Kind is the kind of the referenced object.
+                          description: 'Deprecated: Kind is no longer used. Retained
+                            for backwards compatibility.'
                           type: string
                         name:
                           description: Name is the name of the referenced object.
@@ -112,14 +113,12 @@ spec:
                             object.
                           type: string
                         uid:
-                          description: UID is the uid of the referenced object.
+                          description: 'Deprecated: UID is no longer used. Retained
+                            for backwards compatibility.'
                           type: string
                       required:
-                      - apiVersion
-                      - kind
                       - name
                       - namespace
-                      - uid
                       type: object
                   type: object
                 type: array

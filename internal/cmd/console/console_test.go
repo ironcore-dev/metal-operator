@@ -23,7 +23,7 @@ var _ = Describe("Console Access", func() {
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSecret{})).To(Succeed())
 	})
 
-	It("Should successfully construct console config for Server with inline configuration", func(ctx SpecContext) {
+	It("should successfully construct console config for Server with inline configuration", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -63,7 +63,7 @@ var _ = Describe("Console Access", func() {
 		}))
 	})
 
-	It("Should successfully construct console config for Server with a BMC ref", func(ctx SpecContext) {
+	It("should successfully construct console config for Server with a BMC ref", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{

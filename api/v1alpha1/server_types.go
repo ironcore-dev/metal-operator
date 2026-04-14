@@ -94,9 +94,8 @@ type ServerSpec struct {
 
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:XValidation:rule="self == null || oldSelf == null || self == oldSelf",message="serverClaimRef cannot be switched directly"
 	// +optional
-	ServerClaimRef *ObjectReference `json:"serverClaimRef,omitempty"`
+	ServerClaimRef *ImmutableObjectReference `json:"serverClaimRef,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
 	// +optional

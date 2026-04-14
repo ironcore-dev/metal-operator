@@ -12,28 +12,31 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type Agent struct {
-	SystemUUID       string
-	RegistryURL      string
-	Duration         time.Duration
-	Server           *registry.Server // Pointer to Server for late initialization.
-	log              logr.Logger
-	LLDPSyncInterval time.Duration
-	LLDPSyncDuration time.Duration
+	SystemUUID            string
+	RegistryURL           string
+	Duration              time.Duration
+	RegistryClientTimeout time.Duration
+	Server                *registry.Server // Pointer to Server for late initialization.
+	log                   logr.Logger
+	LLDPSyncInterval      time.Duration
+	LLDPSyncDuration      time.Duration
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
+func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
 	return &Agent{
-		log:              log,
-		SystemUUID:       systemUUID,
-		RegistryURL:      registryURL,
-		Duration:         duration,
-		LLDPSyncInterval: LLDPSyncInterval,
-		LLDPSyncDuration: LLDPSyncDuration,
+		log:                   log,
+		SystemUUID:            systemUUID,
+		RegistryURL:           registryURL,
+		Duration:              duration,
+		RegistryClientTimeout: registryClientTimeout,
+		LLDPSyncInterval:      LLDPSyncInterval,
+		LLDPSyncDuration:      LLDPSyncDuration,
 	}
 }
 
@@ -94,7 +97,9 @@ func (a *Agent) Init(ctx context.Context) error {
 		pciDevices = []registry.PCIDevice{}
 	}
 
+	now := metav1.Now()
 	a.Server = &registry.Server{
+		Timestamp:         &now,
 		SystemInfo:        systeminfo,
 		CPU:               cpuInfos,
 		NetworkInterfaces: interfaces,
@@ -114,17 +119,17 @@ func (a *Agent) Start(ctx context.Context) error {
 
 	// Ensure the Agent is initialized.
 	if a.Server == nil {
-		a.log.Info("Initializing probe agent...")
+		a.log.Info("Initializing probe agent")
 		if err := a.Init(ctx); err != nil {
-			a.log.Error(err, "failed to initialize agent")
+			a.log.Error(err, "Failed to initialize agent")
 			return err
 		}
 	}
 
 	// Run the registration immediately before starting the ticker loop.
-	a.log.Info("Registering server ...")
+	a.log.Info("Registering server")
 	if err := a.registerServer(ctx); err != nil {
-		a.log.Error(err, "failed to initially register server")
+		a.log.Error(err, "Failed to initially register server")
 		return err
 	}
 	a.log.Info("Server registered", "uuid", a.SystemUUID)
@@ -132,26 +137,26 @@ func (a *Agent) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			a.log.Info("Probe agent stopped.")
+			a.log.Info("Probe agent stopped")
 			return nil
 		case <-ticker.C:
 			// Only refresh LLDP info on subsequent runs, rest is static
 			if a.Server == nil {
-				a.log.Info("Server uninitialized; initializing probe agent...")
+				a.log.Info("Server uninitialized, initializing probe agent")
 				if err := a.Init(ctx); err != nil {
-					a.log.Error(err, "failed to initialize agent on tick")
+					a.log.Error(err, "Failed to initialize agent on tick")
 					// don't stop the agent on transient errors; continue to next tick
 					continue
 				}
 			} else {
-				a.log.Info("Refreshing LLDP info...")
+				a.log.Info("Refreshing LLDP info")
 				if err := a.RefreshLLDP(ctx); err != nil {
-					a.log.Error(err, "failed to refresh LLDP info; continuing with previous data")
+					a.log.Error(err, "Failed to refresh LLDP info, continuing with previous data")
 				}
 			}
-			a.log.Info("Re-registering Server...")
+			a.log.Info("Re-registering Server")
 			if err := a.registerServer(ctx); err != nil {
-				a.log.Error(err, "failed to re-register server")
+				a.log.Error(err, "Failed to re-register server")
 			}
 			a.log.Info("Server registered", "uuid", a.SystemUUID)
 		}
@@ -166,10 +171,12 @@ func (a *Agent) RefreshLLDP(ctx context.Context) error {
 	}
 	lldp, err := collectLLDPInfo(ctx, a.LLDPSyncInterval, a.LLDPSyncDuration)
 	if err != nil {
-		a.log.Error(err, "collectLLDPInfo failed")
+		a.log.Error(err, "Failed to collect LLDP info")
 		return err
 	}
 	a.Server.LLDP = lldp.Interfaces
+	now := metav1.Now()
+	a.Server.Timestamp = &now
 	a.log.Info("Refreshed LLDP info", "interfaces", len(a.Server.LLDP))
 	return nil
 }
@@ -195,20 +202,26 @@ func (a *Agent) registerServer(ctx context.Context) error {
 				return false, err
 			}
 
-			resp, err := http.Post(a.RegistryURL+"/register", "application/json", bytes.NewBuffer(jsonData))
+			c := &http.Client{Timeout: a.RegistryClientTimeout}
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.RegistryURL+"/register", bytes.NewBuffer(jsonData))
 			if err != nil {
-				a.log.Error(err, "failed to post registration data", "url", a.RegistryURL)
+				return false, err
+			}
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := c.Do(req)
+			if err != nil {
+				a.log.Error(err, "Failed to post registration data", "url", a.RegistryURL)
 				return false, nil
 			}
 			defer func() {
 				err := resp.Body.Close()
 				if err != nil {
-					a.log.Error(err, "failed to close response body")
+					a.log.Error(err, "Failed to close response body")
 				}
 			}()
 
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				a.log.Error(err, "failed to register server", "url", a.RegistryURL)
+				a.log.Error(err, "Failed to register server", "url", a.RegistryURL)
 				return false, nil
 			}
 

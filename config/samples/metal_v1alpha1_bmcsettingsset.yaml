@@ -6,38 +6,33 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: bmcsettingsset-sample
 spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: "dell"
+      model: "poweredge-r840"
   bmcSettingsTemplate:
     version: "1.45.455b66-rev4"
     serverMaintenancePolicy: Enforced
     settings:
       BootMode: "UEFI"
       HyperThreading: "Enabled"
-  bmcSelector:
-    matchLabels:
-      manufacturer: "dell"
-      model: "poweredge-r840"
-  dynamicSettings:
-    - key: "AssetTag"
-      valueFrom:
-        bmcLabel: "metal.ironcore.dev/asset-tag"
-    - key: "FQDN"
-      format: "$(hostname).$(domain)"
-      variables:
-        hostname:
-          bmcLabel: "metal.ironcore.dev/hostname"
-        domain:
+      LicenseKey: "$(LicenseKey)"
+      FQDN: "$(BmcName).$(SearchDomain)"
+    variables:
+      - key: BmcName
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.bmcRef.name
+      - key: SearchDomain
+        valueFrom:
           configMapKeyRef:
-            name: "network-config"
+            name: "bmc-network-config"
             namespace: "metal-system"
-            key: "domain-suffix"
-    - key: "LicenseKey"
-      format: "$(region)-$(key)"
-      variables:
-        region:
-          bmcLabel: "metal.ironcore.dev/region"
-        key:
+            key: "search-domain"
+      - key: LicenseKey
+        valueFrom:
           secretKeyRef:
             name: "bmc-licenses"
             namespace: "metal-system"
-            key: "{{ .bmcName }}"
+            key: "$(BmcName)"
 

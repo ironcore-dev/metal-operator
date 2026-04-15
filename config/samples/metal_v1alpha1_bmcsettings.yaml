@@ -9,6 +9,26 @@ spec:
   BMCRef:
     name: endpoint-sample
   version: 1.45.455b66-rev4
-  settings:
-      abc: "3"
   serverMaintenancePolicy: Enforced
+  settings:
+    bootMode: "UEFI"
+    hyperThreading: "Enabled"
+    licenseKey: "$(LicenseKey)"
+    fqdn: "$(BmcName).$(SearchDomain)"
+  variables:
+    - key: BmcName
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.BMCRef.name
+    - key: SearchDomain
+      valueFrom:
+        configMapKeyRef:
+          name: "bmc-network-config"
+          namespace: "metal-system"
+          key: "search-domain"
+    - key: LicenseKey
+      valueFrom:
+        secretKeyRef:
+          name: "bmc-licenses"
+          namespace: "metal-system"
+          key: "$(BmcName)"

@@ -515,7 +515,6 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
-| `dynamicSettings` _[DynamicSetting](#dynamicsetting) array_ | DynamicSettings defines dynamic settings to resolve per BMC when creating BMCSettings resources. |  |  |
 | `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
 
 
@@ -555,6 +554,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
@@ -603,7 +603,7 @@ _Appears in:_
 
 
 
-
+BMCSettingsTemplate defines the template for BMC settings to be applied.
 
 
 
@@ -615,6 +615,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 
@@ -958,43 +959,6 @@ _Appears in:_
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
 
 
-#### DynamicSetting
-
-
-
-
-
-
-
-_Appears in:_
-- [BMCSettingsSetSpec](#bmcsettingssetspec)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `key` _string_ | Key is the BMC setting key to set. |  | MinLength: 1 <br /> |
-| `valueFrom` _[DynamicSettingSource](#dynamicsettingsource)_ | ValueFrom defines a simple single source for the setting value. |  |  |
-| `format` _string_ | Format defines a composite setting format with placeholders like $(name). |  |  |
-| `variables` _object (keys:string, values:[DynamicSettingSource](#dynamicsettingsource))_ | Variables maps format placeholder names to their sources. |  |  |
-
-
-#### DynamicSettingSource
-
-
-
-
-
-
-
-_Appears in:_
-- [DynamicSetting](#dynamicsetting)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `bmcLabel` _string_ | BMCLabel is sourced from a label on the selected BMC. |  |  |
-| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
-| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
-
-
 #### Endpoint
 
 
@@ -1042,6 +1006,22 @@ EndpointStatus defines the observed state of Endpoint
 _Appears in:_
 - [Endpoint](#endpoint)
 
+
+
+#### FieldRefSelector
+
+
+
+
+
+
+
+_Appears in:_
+- [VariableSourceValueFrom](#variablesourcevaluefrom)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
 
 
 #### IP
@@ -1172,13 +1152,13 @@ _Appears in:_
 
 
 _Appears in:_
-- [DynamicSettingSource](#dynamicsettingsource)
+- [VariableSourceValueFrom](#variablesourcevaluefrom)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the referenced object name. |  |  |
-| `namespace` _string_ | Namespace is the referenced object namespace. |  |  |
-| `key` _string_ | Key is the key within the referenced object. |  |  |
+| `name` _string_ | Name is the referenced object name. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
+| `namespace` _string_ | Namespace is the referenced object namespace. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
+| `key` _string_ | Key is the key within the referenced object. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
 
 
 #### NetworkInterface
@@ -1874,5 +1854,41 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `Force` |  |
+
+
+#### Variable
+
+
+
+
+
+
+
+_Appears in:_
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the name of the variable to be used in the BMCSettingsTemplate format. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
+| `valueFrom` _[VariableSourceValueFrom](#variablesourcevaluefrom)_ | ValueFrom defines a simple single source for the variable value. |  |  |
+
+
+#### VariableSourceValueFrom
+
+
+
+
+
+
+
+_Appears in:_
+- [Variable](#variable)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name). |  |  |
+| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
+| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
 
 

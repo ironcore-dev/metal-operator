@@ -138,6 +138,98 @@ spec:
                       type: string
                     description: SettingsMap contains BMC settings as a map.
                     type: object
+                  variables:
+                    description: Variables is a list of variables that can be used
+                      in the settings for templating.
+                    items:
+                      properties:
+                        key:
+                          description: Key is the name of the variable to be used
+                            in the BMCSettingsTemplate format.
+                          maxLength: 63
+                          minLength: 1
+                          type: string
+                        valueFrom:
+                          description: ValueFrom defines a simple single source for
+                            the variable value.
+                          properties:
+                            configMapKeyRef:
+                              description: ConfigMapKeyRef points to a namespaced
+                                ConfigMap key.
+                              properties:
+                                key:
+                                  description: Key is the key within the referenced
+                                    object.
+                                  maxLength: 253
+                                  minLength: 1
+                                  type: string
+                                name:
+                                  description: Name is the referenced object name.
+                                  maxLength: 253
+                                  minLength: 1
+                                  type: string
+                                namespace:
+                                  description: Namespace is the referenced object
+                                    namespace.
+                                  maxLength: 63
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              - namespace
+                              type: object
+                            fieldRef:
+                              description: FieldRef sources the value from a field
+                                of the BMCSettings object (e.g. spec.BMCRef.name).
+                              properties:
+                                fieldPath:
+                                  description: FieldPath is the path of the field
+                                    on the BMCSettings object to select (e.g. spec.BMCRef.name).
+                                  maxLength: 256
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - fieldPath
+                              type: object
+                            secretKeyRef:
+                              description: SecretKeyRef points to a namespaced Secret
+                                key.
+                              properties:
+                                key:
+                                  description: Key is the key within the referenced
+                                    object.
+                                  maxLength: 253
+                                  minLength: 1
+                                  type: string
+                                name:
+                                  description: Name is the referenced object name.
+                                  maxLength: 253
+                                  minLength: 1
+                                  type: string
+                                namespace:
+                                  description: Namespace is the referenced object
+                                    namespace.
+                                  maxLength: 63
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              - namespace
+                              type: object
+                          type: object
+                          x-kubernetes-validations:
+                          - message: exactly one of fieldRef, configMapKeyRef, or
+                              secretKeyRef must be provided
+                            rule: '(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef)
+                              ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
+                      required:
+                      - key
+                      - valueFrom
+                      type: object
+                    maxItems: 64
+                    type: array
                   version:
                     description: Version specifies the BMC firmware version for which
                       the settings should be applied.
@@ -145,138 +237,10 @@ spec:
                 required:
                 - version
                 type: object
-              dynamicSettings:
-                description: DynamicSettings defines dynamic settings to resolve per
-                  BMC when creating BMCSettings resources.
-                items:
-                  properties:
-                    format:
-                      description: Format defines a composite setting format with
-                        placeholders like $(name).
-                      type: string
-                    key:
-                      description: Key is the BMC setting key to set.
-                      minLength: 1
-                      type: string
-                    valueFrom:
-                      description: ValueFrom defines a simple single source for the
-                        setting value.
-                      properties:
-                        bmcLabel:
-                          description: BMCLabel is sourced from a label on the selected
-                            BMC.
-                          type: string
-                        configMapKeyRef:
-                          description: ConfigMapKeyRef points to a namespaced ConfigMap
-                            key.
-                          properties:
-                            key:
-                              description: Key is the key within the referenced object.
-                              type: string
-                            name:
-                              description: Name is the referenced object name.
-                              type: string
-                            namespace:
-                              description: Namespace is the referenced object namespace.
-                              type: string
-                          required:
-                          - key
-                          - name
-                          - namespace
-                          type: object
-                        secretKeyRef:
-                          description: SecretKeyRef points to a namespaced Secret
-                            key.
-                          properties:
-                            key:
-                              description: Key is the key within the referenced object.
-                              type: string
-                            name:
-                              description: Name is the referenced object name.
-                              type: string
-                            namespace:
-                              description: Namespace is the referenced object namespace.
-                              type: string
-                          required:
-                          - key
-                          - name
-                          - namespace
-                          type: object
-                      type: object
-                      x-kubernetes-validations:
-                      - message: exactly one of bmcLabel, configMapKeyRef, or secretKeyRef
-                          must be provided
-                        rule: '(has(self.bmcLabel) ? 1 : 0) + (has(self.configMapKeyRef)
-                          ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
-                    variables:
-                      additionalProperties:
-                        properties:
-                          bmcLabel:
-                            description: BMCLabel is sourced from a label on the selected
-                              BMC.
-                            type: string
-                          configMapKeyRef:
-                            description: ConfigMapKeyRef points to a namespaced ConfigMap
-                              key.
-                            properties:
-                              key:
-                                description: Key is the key within the referenced
-                                  object.
-                                type: string
-                              name:
-                                description: Name is the referenced object name.
-                                type: string
-                              namespace:
-                                description: Namespace is the referenced object namespace.
-                                type: string
-                            required:
-                            - key
-                            - name
-                            - namespace
-                            type: object
-                          secretKeyRef:
-                            description: SecretKeyRef points to a namespaced Secret
-                              key.
-                            properties:
-                              key:
-                                description: Key is the key within the referenced
-                                  object.
-                                type: string
-                              name:
-                                description: Name is the referenced object name.
-                                type: string
-                              namespace:
-                                description: Namespace is the referenced object namespace.
-                                type: string
-                            required:
-                            - key
-                            - name
-                            - namespace
-                            type: object
-                        type: object
-                        x-kubernetes-validations:
-                        - message: exactly one of bmcLabel, configMapKeyRef, or secretKeyRef
-                            must be provided
-                          rule: '(has(self.bmcLabel) ? 1 : 0) + (has(self.configMapKeyRef)
-                            ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
-                      description: Variables maps format placeholder names to their
-                        sources.
-                      type: object
-                  required:
-                  - key
-                  type: object
-                  x-kubernetes-validations:
-                  - message: exactly one of valueFrom or non-empty format must be
-                      provided
-                    rule: '(has(self.valueFrom) ? 1 : 0) + (has(self.format) && size(self.format)
-                      > 0 ? 1 : 0) == 1'
-                  - message: variables must be provided when format is set
-                    rule: '!has(self.format) || size(self.format) == 0 || (has(self.variables)
-                      && size(self.variables) > 0)'
-                  - message: variables can only be provided when format is set
-                    rule: '!has(self.variables) || (has(self.format) && size(self.format)
-                      > 0)'
-                type: array
+                x-kubernetes-validations:
+                - message: variable keys must be unique
+                  rule: '!has(self.variables) || self.variables.all(v, self.variables.filter(w,
+                    w.key == v.key).size() == 1)'
             required:
             - bmcSelector
             - bmcSettingsTemplate

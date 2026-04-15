@@ -6,8 +6,7 @@
 
 - Selects BMCs by `spec.bmcSelector`.
 - Creates one child `BMCSettings` per selected BMC.
-- Copies `spec.bmcSettingsTemplate` into children.
-- Supports per-BMC value materialization using `spec.dynamicSettings`.
+- Copies `spec.bmcSettingsTemplate` (including `settings` and `variables`) into each child.
 - Deletes orphan children and aggregates rollout counters.
 
 ## Spec Reference
@@ -16,32 +15,41 @@
 |---|---|---|
 | `spec.bmcSelector` | Yes | Label selector for target BMCs. |
 | `spec.bmcSettingsTemplate.version` | Yes | Required BMC firmware version gate for children. |
-| `spec.bmcSettingsTemplate.settings` | No | Base settings map copied into each child. |
+| `spec.bmcSettingsTemplate.settings` | No | Base settings map copied into each child. Values may reference variables using `$(VarName)` syntax. |
+| `spec.bmcSettingsTemplate.variables[]` | No | Variables resolved at apply time in each child. Max 64 items. |
 | `spec.bmcSettingsTemplate.serverMaintenancePolicy` | No | Maintenance policy copied into children. |
-| `spec.dynamicSettings[]` | No | Per-BMC computed settings merged into child spec. |
 
-### Dynamic Settings
+### Variables
 
-`dynamicSettings` provides per-target value resolution.
+`spec.bmcSettingsTemplate.variables` defines named variables that are copied verbatim into each child `BMCSettings`.
+Resolution happens in the child controller at apply time, against the specific child object — not against the set.
 
-Each item defines:
+Each variable has a `key` (used as `$(key)` in settings values) and exactly one source via `valueFrom`.
+Variables are resolved in list order.
 
-- `key`: destination settings key.
-- Exactly one of:
-  - `valueFrom` (single source)
-  - `format` plus `variables` (templated composition)
+#### `valueFrom.fieldRef`
 
-Allowed variable/source kinds:
+Reads a field from the child `BMCSettings` object. This is the idiomatic way to reference per-BMC identity (e.g. the BMC name).
 
-- `bmcLabel`
-- `configMapKeyRef` (`name`, `namespace`, `key`)
-- `secretKeyRef` (`name`, `namespace`, `key`)
+| Field | Required | Description |
+|---|---|---|
+| `fieldPath` | Yes | Field path on the child BMCSettings object, e.g. `spec.BMCRef.name`. Min 1, max 256 chars. |
+
+#### `valueFrom.configMapKeyRef` / `valueFrom.secretKeyRef`
+
+Reads a key from a cluster-scoped ConfigMap or Secret.
+The `key` field supports `$(VarName)` substitution using variables resolved earlier in the list.
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | Yes | Object name. Max 253 chars. |
+| `namespace` | Yes | Object namespace. Max 63 chars. |
+| `key` | Yes | Key within the object. May contain `$(VarName)` substitutions. Max 253 chars. |
 
 Validation guarantees:
-
-- Exactly one source per variable.
-- `format` requires non-empty `variables`.
-- `variables` can only be used with `format`.
+- Exactly one of `fieldRef`, `configMapKeyRef`, or `secretKeyRef` per variable.
+- Variable `key` values must be unique within the list.
+- Variable `key` is 1–63 characters.
 
 ## Status Fields In Detail
 
@@ -72,7 +80,7 @@ flowchart TD
   I --> J
   J --> K{Child InProgress?}
   K -- yes --> L[Skip patch]
-  K -- no --> M[Patch from template and dynamicSettings]
+  K -- no --> M[Patch from template]
   L --> N[Aggregate status]
   M --> N
   N --> O{Counts converged?}
@@ -86,25 +94,24 @@ flowchart TD
   - Build desired BMC target set from selector labels.
 2. Child creation:
   - Create missing `BMCSettings` child per selected BMC.
-  - Skip creation if BMC already references a valid child.
-3. Dynamic settings materialization:
-  - Resolve `dynamicSettings` values from labels, ConfigMaps, and Secrets.
-  - Merge resolved values into child settings payload.
-4. Orphan cleanup:
+  - Copy `bmcSettingsTemplate` (settings + variables) verbatim into the child.
+3. Orphan cleanup:
   - Delete children whose BMC is no longer selected.
   - Protect in-progress children from deletion until safe.
-5. Template propagation:
+4. Template propagation:
   - Patch only non-in-progress children.
   - Requeue until desired topology and child specs converge.
-6. Rollout visibility:
+5. Rollout visibility:
   - Aggregate counters from child states each reconcile loop.
+
+Note: Variable resolution is **not** done by the set controller. The variables list is copied into the child `BMCSettings` and resolved there at apply time against the specific child object.
 
 ## Troubleshooting Guide
 
 | Symptom | Where to check | Likely cause | Action |
 |---|---|---|---|
 | Child count below target count | `fullyLabeledBMCs` vs `availableBMCSettings` | Create failures or ownership conflicts | Check create errors, RBAC, and ownerRef validity. |
-| `failedBMCSettings` rises after dynamic settings use | failed child conditions + source objects | Missing/invalid ConfigMap/Secret keys or label source | Validate source object namespace/name/key and label presence. |
+| `failedBMCSettings` rises after variable use | failed child conditions + source objects | Missing/invalid ConfigMap/Secret keys or wrong fieldPath | Validate source object namespace/name/key and that `fieldPath` resolves on the child object. |
 | Many children stuck `Pending` | child conditions | Prerequisites not met in child workflow | Inspect one pending child and fix shared dependency. |
 | Orphans not deleted | child state | Child in-progress safety guard | Wait for terminal state, then reconcile. |
 
@@ -116,26 +123,33 @@ kind: BMCSettingsSet
 metadata:
   name: bmcsettingsset-sample
 spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: dell
+      model: poweredge-r840
   bmcSettingsTemplate:
     version: 1.45.455b66-rev4
     serverMaintenancePolicy: Enforced
     settings:
       BootMode: UEFI
-  bmcSelector:
-    matchLabels:
-      manufacturer: dell
-  dynamicSettings:
-    - key: AssetTag
-      valueFrom:
-        bmcLabel: metal.ironcore.dev/asset-tag
-    - key: FQDN
-      format: $(hostname).$(domain)
-      variables:
-        hostname:
-          bmcLabel: metal.ironcore.dev/hostname
-        domain:
+      HyperThreading: Enabled
+      LicenseKey: $(LicenseKey)
+      FQDN: $(BmcName).$(SearchDomain)
+    variables:
+      - key: BmcName
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.BMCRef.name
+      - key: SearchDomain
+        valueFrom:
           configMapKeyRef:
-            name: network-config
+            name: bmc-network-config
             namespace: metal-system
-            key: domain-suffix
+            key: search-domain
+      - key: LicenseKey
+        valueFrom:
+          secretKeyRef:
+            name: bmc-licenses
+            namespace: metal-system
+            key: $(BmcName)
 ```

@@ -59,7 +59,23 @@ fi
 echo -e "${GREEN}✓ License headers valid${NC}"
 echo ""
 
-# 4. Kustomize validation (fast)
+# 4. REUSE compliance (fast)
+echo -e "${BLUE}→ Checking REUSE compliance...${NC}"
+if command -v reuse &> /dev/null; then
+  if ! reuse lint; then
+    echo -e "${RED}❌ REUSE compliance check failed.${NC}"
+    echo "   Fix by adding SPDX headers to files missing them."
+    echo "   See: https://reuse.software/ for guidance."
+    exit 1
+  fi
+  echo -e "${GREEN}✓ REUSE compliance passed${NC}"
+else
+  echo -e "${YELLOW}⚠️  REUSE tool not found, skipping check${NC}"
+  echo "   Install with: pip install reuse"
+fi
+echo ""
+
+# 5. Kustomize validation (fast)
 echo -e "${BLUE}→ Validating kustomize files...${NC}"
 if ! ./hack/validate-kustomize.sh; then
   echo -e "${RED}❌ Kustomize validation failed.${NC}"
@@ -69,7 +85,7 @@ fi
 echo -e "${GREEN}✓ Kustomize validation passed${NC}"
 echo ""
 
-# 5. Unit tests (slowest, but critical)
+# 6. Unit tests (slowest, but critical)
 echo -e "${BLUE}→ Running unit tests...${NC}"
 if ! make test; then
   echo -e "${RED}❌ Tests failed.${NC}"

@@ -37,8 +37,9 @@ When using Claude Code, automatic pre-push validation is configured to ensure co
 1. **Code Generation** (`make check-gen`) - Ensures generated code/manifests are up-to-date
 2. **Linting** (`make lint`) - Runs golangci-lint
 3. **License Headers** (`make check-license`) - Verifies SPDX headers
-4. **Kustomize Validation** - Validates all kustomization.yaml files
-5. **Unit Tests** (`make test`) - Runs the test suite
+4. **REUSE Compliance** (`reuse lint`) - Verifies REUSE specification compliance
+5. **Kustomize Validation** - Validates all kustomization.yaml files
+6. **Unit Tests** (`make test`) - Runs the test suite
 
 ### Manual Validation
 

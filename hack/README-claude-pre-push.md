@@ -24,11 +24,16 @@ The script runs the following checks in sequence:
    - Verifies all Go files have proper SPDX license headers
    - Ensures compliance with project licensing
 
-4. **Kustomize Validation** (`./hack/validate-kustomize.sh`)
+4. **REUSE Compliance** (`reuse lint`)
+   - Verifies compliance with REUSE specification
+   - Ensures all files have proper copyright and license information
+   - Skipped if `reuse` tool is not installed
+
+5. **Kustomize Validation** (`./hack/validate-kustomize.sh`)
    - Validates all kustomization.yaml files
    - Ensures Kustomize configuration is correct
 
-5. **Unit Tests** (`make test`)
+6. **Unit Tests** (`make test`)
    - Runs the full test suite
    - Ensures no regressions
 

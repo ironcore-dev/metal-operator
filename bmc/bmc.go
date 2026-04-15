@@ -138,6 +138,9 @@ type BMC interface {
 	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
 	// for the given component type.
 	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
+
+	// GetSensors retrieves sensor information for the chassis.
+	GetSensors(ctx context.Context, chassisURI string) ([]Sensor, error)
 }
 
 type Entity struct {
@@ -296,4 +299,20 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
+}
+
+// Sensor represents a sensor reading from a chassis.
+type Sensor struct {
+	// ID uniquely identifies the sensor.
+	ID string
+	// Name is the name of the sensor.
+	Name string
+	// Reading is the current sensor reading value.
+	Reading float64
+	// Units specifies the units of the sensor reading.
+	Units string
+	// State specifies the operational state of the sensor.
+	State string
+	// PhysicalContext specifies the physical location context of the sensor.
+	PhysicalContext string
 }

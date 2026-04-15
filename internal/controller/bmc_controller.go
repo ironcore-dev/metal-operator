@@ -70,7 +70,17 @@ type BMCReconciler struct {
 	BMCClientRetryInterval time.Duration
 	// DNSRecordTemplatePath is the path to the file containing the DNSRecord template.
 	DNSRecordTemplate string
-	Conditions        *conditionutils.Accessor
+	// MetricsPollingInterval defines the interval for polling metrics from BMC when event subscriptions fail.
+	MetricsPollingInterval time.Duration
+	// MetricsPollingTimeout defines the timeout for each metrics polling request to BMC.
+	MetricsPollingTimeout time.Duration
+	// MetricsStalenessThreshold defines the time after which metrics are considered stale if not updated.
+	MetricsStalenessThreshold time.Duration
+	// EnableMetricsPolling enables polling fallback for BMC metrics when event subscriptions are unavailable.
+	EnableMetricsPolling bool
+	// MetricsCollector is the Redfish event collector for tracking metrics.
+	MetricsCollector *serverevents.RedfishEventCollector
+	Conditions       *conditionutils.Accessor
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -197,6 +207,14 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 
 	if modified, err := r.handleEventSubscriptions(ctx, bmcClient, bmcObj); err != nil || modified {
 		return ctrl.Result{}, err
+	}
+
+	// Poll metrics if needed (fallback for Lenovo BMCs with subscription issues)
+	if err := r.pollMetricsIfNeeded(ctx, bmcClient, bmcObj); err != nil {
+		log.V(1).Info("Metrics polling failed", "error", err)
+		// Don't fail reconciliation - polling is a best-effort fallback
+		// Requeue after polling interval to retry
+		return ctrl.Result{RequeueAfter: r.MetricsPollingInterval}, nil
 	}
 
 	log.V(1).Info("Reconciled BMC")
@@ -587,6 +605,99 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 		log.Info("Event subscription established", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "type", "events", "link", link)
 	}
 	return modified, nil
+}
+
+// pollMetricsIfNeeded polls sensor metrics from the BMC when event subscriptions are unavailable
+// or when metrics become stale. This provides a fallback mechanism for Lenovo BMCs that may
+// have issues with event subscriptions.
+func (r *BMCReconciler) pollMetricsIfNeeded(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Skip if polling is disabled
+	if !r.EnableMetricsPolling {
+		return nil
+	}
+
+	// Skip if metrics collector is not available
+	if r.MetricsCollector == nil {
+		return nil
+	}
+
+	// Get systems to check manufacturer
+	systems, err := bmcClient.GetSystems(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if len(systems) == 0 {
+		return nil
+	}
+
+	// Only poll for Lenovo BMCs (known to have event subscription issues)
+	manufacturer := systems[0].Manufacturer
+	if !strings.Contains(strings.ToLower(manufacturer), "lenovo") {
+		return nil
+	}
+
+	hostname := bmcObj.Name
+
+	// Check if metrics are stale or if event subscription failed
+	shouldPoll := false
+	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
+		// No event subscription exists - definitely need to poll
+		shouldPoll = true
+		log.V(1).Info("No metrics subscription exists, polling will be used", "hostname", hostname)
+	} else {
+		// Check if metrics are stale
+		lastUpdate := r.MetricsCollector.GetLastUpdateTime(hostname)
+		if lastUpdate.IsZero() || time.Since(lastUpdate) > r.MetricsStalenessThreshold {
+			shouldPoll = true
+			log.V(1).Info("Metrics are stale, polling for updates",
+				"hostname", hostname,
+				"lastUpdate", lastUpdate,
+				"staleness", time.Since(lastUpdate))
+		}
+	}
+
+	if !shouldPoll {
+		return nil
+	}
+
+	// Poll sensors with timeout
+	pollCtx, cancel := context.WithTimeout(ctx, r.MetricsPollingTimeout)
+	defer cancel()
+
+	// Try common chassis URIs - most BMCs use /redfish/v1/Chassis/{id}
+	// For Lenovo, it's typically /redfish/v1/Chassis/1
+	chassisURIs := []string{
+		"/redfish/v1/Chassis/1",
+		"/redfish/v1/Chassis/Self",
+	}
+
+	var allSensors []bmc.Sensor
+	for _, chassisURI := range chassisURIs {
+		sensors, err := bmcClient.GetSensors(pollCtx, chassisURI)
+		if err != nil {
+			log.V(1).Info("Failed to get sensors from chassis",
+				"chassisURI", chassisURI,
+				"error", err)
+			continue
+		}
+		allSensors = append(allSensors, sensors...)
+	}
+
+	if len(allSensors) == 0 {
+		log.V(1).Info("No sensors found for BMC", "hostname", hostname)
+		r.MetricsCollector.RecordPollError(hostname)
+		return nil
+	}
+
+	// Update metrics collector with polled sensor data
+	r.MetricsCollector.UpdateFromSensorPoll(hostname, allSensors)
+	log.Info("Successfully polled metrics from BMC",
+		"hostname", hostname,
+		"sensorCount", len(allSensors))
+
+	return nil
 }
 
 func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {

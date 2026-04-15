@@ -177,6 +177,11 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Collector returns the RedfishEventCollector for this server.
+func (s *Server) Collector() *RedfishEventCollector {
+	return s.collector
+}
+
 // Start starts the server on the specified address and adds logging for key events.
 func (s *Server) Start(ctx context.Context) error {
 	s.log.Info("Starting event server", "address", s.addr)

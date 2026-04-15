@@ -100,6 +100,10 @@ func main() { // nolint: gocyclo
 		bmcFailureResetDelay               time.Duration
 		bmcResetResyncInterval             time.Duration
 		bmcResetWaitingInterval            time.Duration
+		metricsPollingInterval             time.Duration
+		metricsPollingTimeout              time.Duration
+		metricsStalenessThreshold          time.Duration
+		enableMetricsPolling               bool
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
@@ -130,6 +134,14 @@ func main() { // nolint: gocyclo
 		"Defines the interval at which the bmc is polled when bmc reset is in-progress.")
 	flag.DurationVar(&bmcResetWaitingInterval, "bmc-reset-waiting-interval", 2*time.Minute,
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
+	flag.DurationVar(&metricsPollingInterval, "metrics-polling-interval", 60*time.Second,
+		"Interval for polling metrics from BMC when event subscriptions fail.")
+	flag.DurationVar(&metricsPollingTimeout, "metrics-polling-timeout", 30*time.Second,
+		"Timeout for each metrics polling request to BMC.")
+	flag.DurationVar(&metricsStalenessThreshold, "metrics-staleness-threshold", 5*time.Minute,
+		"Time after which metrics are considered stale if not updated.")
+	flag.BoolVar(&enableMetricsPolling, "enable-metrics-polling", true,
+		"Enable polling fallback for BMC metrics when event subscriptions are unavailable.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
 	flag.StringVar(&discoveryIgnitionPath, "discovery-ignition-path", "/etc/metal-operator/ignition-template.yaml",
@@ -414,18 +426,43 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCSecret")
 		os.Exit(1)
 	}
+
+	// Create event server early so we can access its collector
+	var metricsCollector *serverevents.RedfishEventCollector
+	if eventURL != "" {
+		eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
+		metricsCollector = eventServer.Collector()
+		// Add the event server as a runnable
+		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			setupLog.Info("Starting event server for alerts and metrics", "EventURL", eventURL)
+			if err := eventServer.Start(ctx); err != nil {
+				return fmt.Errorf("unable to start event server: %w", err)
+			}
+			<-ctx.Done()
+			return nil
+		})); err != nil {
+			setupLog.Error(err, "Unable to add event runnable to manager")
+			os.Exit(1)
+		}
+	}
+
 	if err = (&controller.BMCReconciler{
-		Client:                 mgr.GetClient(),
-		Scheme:                 mgr.GetScheme(),
-		DefaultProtocol:        effectiveProtocol,
-		SkipCertValidation:     effectiveSkipCert,
-		BMCFailureResetDelay:   bmcFailureResetDelay,
-		BMCResetWaitTime:       bmcResetWaitingInterval,
-		BMCClientRetryInterval: bmcResetResyncInterval,
-		ManagerNamespace:       managerNamespace,
-		EventURL:               eventURL,
-		DNSRecordTemplate:      dnsRecordTemplate,
-		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Client:                    mgr.GetClient(),
+		Scheme:                    mgr.GetScheme(),
+		DefaultProtocol:           effectiveProtocol,
+		SkipCertValidation:        effectiveSkipCert,
+		BMCFailureResetDelay:      bmcFailureResetDelay,
+		BMCResetWaitTime:          bmcResetWaitingInterval,
+		BMCClientRetryInterval:    bmcResetResyncInterval,
+		ManagerNamespace:          managerNamespace,
+		EventURL:                  eventURL,
+		DNSRecordTemplate:         dnsRecordTemplate,
+		MetricsPollingInterval:    metricsPollingInterval,
+		MetricsPollingTimeout:     metricsPollingTimeout,
+		MetricsStalenessThreshold: metricsStalenessThreshold,
+		EnableMetricsPolling:      enableMetricsPolling,
+		MetricsCollector:          metricsCollector,
+		Conditions:                conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},
@@ -692,21 +729,6 @@ func main() { // nolint: gocyclo
 	})); err != nil {
 		setupLog.Error(err, "unable to add registry runnable to manager")
 		os.Exit(1)
-	}
-
-	if eventURL != "" {
-		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
-			eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
-			if err := eventServer.Start(ctx); err != nil {
-				return fmt.Errorf("unable to start event server: %w", err)
-			}
-			<-ctx.Done()
-			return nil
-		})); err != nil {
-			setupLog.Error(err, "unable to add event runnable to manager")
-			os.Exit(1)
-		}
 	}
 
 	setupLog.Info("Starting manager")

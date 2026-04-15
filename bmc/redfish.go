@@ -344,6 +344,32 @@ func (r *RedfishBaseBMC) GetProcessors(ctx context.Context, systemURI string) ([
 	return processors, nil
 }
 
+func (r *RedfishBaseBMC) GetSensors(ctx context.Context, chassisURI string) ([]Sensor, error) {
+	chassis, err := r.getChassisFromUri(ctx, chassisURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chassis: %w", err)
+	}
+	chassisSensors, err := chassis.Sensors()
+	if err != nil {
+		// If sensors endpoint is not supported (404), return empty slice
+		log := ctrl.LoggerFrom(ctx)
+		log.V(1).Info("Sensors not available for chassis", "chassisURI", chassisURI, "error", err)
+		return []Sensor{}, nil
+	}
+	sensors := make([]Sensor, 0, len(chassisSensors))
+	for _, s := range chassisSensors {
+		sensors = append(sensors, Sensor{
+			ID:              s.ID,
+			Name:            s.Name,
+			Reading:         gofish.Deref(s.Reading),
+			Units:           s.ReadingUnits,
+			State:           string(s.Status.State),
+			PhysicalContext: string(s.PhysicalContext),
+		})
+	}
+	return sensors, nil
+}
+
 func (r *RedfishBaseBMC) GetBootOrder(ctx context.Context, systemURI string) ([]string, error) {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
@@ -839,6 +865,29 @@ func (r *RedfishBaseBMC) getSystemFromUri(ctx context.Context, systemURI string)
 		return system, nil
 	}
 	return nil, fmt.Errorf("no system found for %v", systemURI)
+}
+
+func (r *RedfishBaseBMC) getChassisFromUri(ctx context.Context, chassisURI string) (*schemas.Chassis, error) {
+	if len(chassisURI) == 0 {
+		return nil, fmt.Errorf("cannot process empty URI")
+	}
+	var chassis *schemas.Chassis
+	if err := wait.PollUntilContextTimeout(
+		ctx,
+		r.options.ResourcePollingInterval,
+		r.options.ResourcePollingTimeout,
+		true,
+		func(ctx context.Context) (bool, error) {
+			var err error
+			chassis, err = schemas.GetObject[schemas.Chassis](r.client, chassisURI)
+			return err == nil, nil
+		}); err != nil {
+		return nil, fmt.Errorf("failed to wait for chassis to be ready: %w", err)
+	}
+	if chassis.ID != "" {
+		return chassis, nil
+	}
+	return nil, fmt.Errorf("no chassis found for %v", chassisURI)
 }
 
 func (r *RedfishBaseBMC) WaitForServerPowerState(ctx context.Context, systemURI string, powerState schemas.PowerState) error {

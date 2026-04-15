@@ -30,6 +30,58 @@ make test
 This `Makefile` directive will start under the hood the Redfish mock server, instantiate the `envtest` environment
 and run `go test ./...` on the whole project.
 
+## Pre-Push Validation
+
+When using Claude Code, automatic pre-push validation is configured to ensure code quality before pushing to GitHub. The validation runs these checks:
+
+1. **Code Generation** (`make check-gen`) - Ensures generated code/manifests are up-to-date
+2. **Linting** (`make lint`) - Runs golangci-lint
+3. **License Headers** (`make check-license`) - Verifies SPDX headers
+4. **Kustomize Validation** - Validates all kustomization.yaml files
+5. **Unit Tests** (`make test`) - Runs the test suite
+
+### Manual Validation
+
+To run the same checks manually before pushing:
+
+```shell
+./hack/claude-pre-push-check.sh
+```
+
+Or run individual checks:
+
+```shell
+make check-gen          # Verify generated code is current
+make lint               # Run linter
+make check-license      # Verify license headers
+./hack/validate-kustomize.sh  # Validate kustomize files
+make test               # Run tests
+```
+
+Or use the comprehensive check target:
+
+```shell
+make check              # Runs all checks
+```
+
+### Emergency Bypass
+
+In rare cases where you need to push without validation (not recommended):
+
+```shell
+CLAUDE_SKIP_PREPUSH=1 git push
+```
+
+**Warning:** Only use this for emergency hotfixes. CI will still run these checks and may fail.
+
+### Disabling Pre-Push Hooks
+
+If you prefer manual validation, you can disable the hook:
+
+1. Edit `.claude/settings.local.json`
+2. Remove or comment out the `PreToolUse` hook for git push
+3. Remember to run `make check` before pushing manually
+
 ### Start/Stop Redfish Mock Server
 
 The Redfish mock server can be started and stopped with the following command

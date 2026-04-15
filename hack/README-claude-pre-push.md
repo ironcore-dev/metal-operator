@@ -3,9 +3,11 @@ SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore con
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# Claude Code Pre-Push Validation
+# Claude Code Pre-Push Validation (Opt-In)
 
-This script (`claude-pre-push-check.sh`) provides pre-push validation for Claude Code to ensure code quality before pushing to GitHub.
+This script (`claude-pre-push-check.sh`) provides **opt-in** pre-push validation for Claude Code to ensure code quality before pushing to GitHub.
+
+**Note:** This is opt-in by default. You must manually enable the hook if you want automatic validation.
 
 ## What It Does
 
@@ -37,9 +39,12 @@ The script runs the following checks in sequence:
    - Runs the full test suite
    - Ensures no regressions
 
-## How It Works
+## How to Enable
 
-The script is automatically triggered by Claude Code when it attempts to run `git push` commands. This is configured via a hook in `.claude/settings.json`:
+The validation hook is **opt-in**. To enable automatic pre-push validation:
+
+1. Create or edit `.claude/settings.local.json` in the repository root
+2. Add the following configuration:
 
 ```json
 {
@@ -59,6 +64,14 @@ The script is automatically triggered by Claude Code when it attempts to run `gi
   }
 }
 ```
+
+3. Save the file - the hook will now run automatically when Claude Code attempts to push
+
+**Note:** Use `.claude/settings.local.json` for personal configuration (not checked into git).
+
+## How It Works
+
+Once enabled, the script is automatically triggered by Claude Code when it attempts to run `git push` commands.
 
 ## Manual Usage
 
@@ -99,12 +112,13 @@ Expected runtime:
 
 **Total: ~60-120 seconds**
 
-## Disabling for Manual Work
+## Disabling
 
-If you prefer to run validation manually:
+If you enabled the hook and want to disable it:
 
-1. Edit `.claude/settings.json` (project-level) or `.claude/settings.local.json` (personal)
+1. Edit `.claude/settings.local.json`
 2. Remove the entire `PreToolUse` hook entry that contains `claude-pre-push-check.sh`
+3. Save the file
 3. Remember to run `make check` before pushing
 
 ## Benefits

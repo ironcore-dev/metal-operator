@@ -30,9 +30,41 @@ make test
 This `Makefile` directive will start under the hood the Redfish mock server, instantiate the `envtest` environment
 and run `go test ./...` on the whole project.
 
-## Pre-Push Validation
+## Pre-Push Validation (Opt-In)
 
-When using Claude Code, automatic pre-push validation is configured to ensure code quality before pushing to GitHub. The validation runs these checks:
+A pre-push validation script is available to catch issues locally before pushing to GitHub. This is **opt-in** - you need to enable it manually if you want automatic validation.
+
+### Enabling Pre-Push Validation
+
+To enable automatic validation when Claude Code pushes to GitHub:
+
+1. Create or edit `.claude/settings.local.json` in the repository root
+2. Add the following hook configuration:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hack/claude-pre-push-check.sh",
+            "if": "Bash(git push*)",
+            "statusMessage": "Running pre-push validation checks..."
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+3. The hook will now run automatically before Claude Code pushes
+
+### What Gets Validated
+
+When enabled, the validation runs these checks:
 
 1. **Code Generation** (`make check-gen`) - Ensures generated code/manifests are up-to-date
 2. **Linting** (`make lint`) - Runs golangci-lint
@@ -55,6 +87,7 @@ Or run individual checks:
 make check-gen          # Verify generated code is current
 make lint               # Run linter
 make check-license      # Verify license headers
+reuse lint              # Check REUSE compliance
 ./hack/validate-kustomize.sh  # Validate kustomize files
 make test               # Run tests
 ```
@@ -67,7 +100,7 @@ make check              # Runs all checks
 
 ### Emergency Bypass
 
-In rare cases where you need to push without validation (not recommended):
+If you enabled the hook and need to push without validation (not recommended):
 
 ```shell
 CLAUDE_SKIP_PREPUSH=1 git push
@@ -75,11 +108,11 @@ CLAUDE_SKIP_PREPUSH=1 git push
 
 **Warning:** Only use this for emergency hotfixes. CI will still run these checks and may fail.
 
-### Disabling Pre-Push Hooks
+### Disabling Pre-Push Validation
 
-If you prefer manual validation, you can disable the hook by removing it from the settings file:
+If you enabled the hook and want to disable it:
 
-1. Edit `.claude/settings.local.json` (for personal changes) or `.claude/settings.json` (project-wide)
+1. Edit `.claude/settings.local.json`
 2. Remove the entire `PreToolUse` hook entry that contains `claude-pre-push-check.sh`
 3. Remember to run `make check` before pushing manually
 

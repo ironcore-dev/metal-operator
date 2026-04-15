@@ -835,22 +835,22 @@ var _ = Describe("BIOSSettings Controller", func() {
 						Name:     "one",
 					}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
-		By("Ensuring that the BIOS setting has started retry and AutoRetryCountRemaining is set")
+		By("Ensuring that the BIOS setting has started retry and FailedAttempts is set")
 		Eventually(func(g Gomega) bool {
 			g.Expect(Get(biosSettings)()).To(Succeed())
-			return biosSettings.Status.AutoRetryCountRemaining != nil && *biosSettings.Status.AutoRetryCountRemaining > int32(0)
+			return biosSettings.Status.FailedAttempts > int32(0)
 		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		Eventually(Object(biosSettings)).Should(
@@ -860,7 +860,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the BIOS setting has not been changed")
 		Consistently(Object(biosSettings), "250ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())

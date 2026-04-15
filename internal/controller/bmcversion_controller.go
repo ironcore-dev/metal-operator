@@ -430,7 +430,7 @@ func (r *BMCVersionReconciler) handleFailedState(
 	if shouldRetryReconciliation(bmcVersion) {
 		log.V(1).Info("Retrying BMCVersion as per annotation")
 		bmcVersionBase := bmcVersion.DeepCopy()
-		bmcVersion.Status.AutoRetryCountRemaining = nil
+		bmcVersion.Status.FailedAttempts = 0
 		bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
 		bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
 		annotations := bmcVersion.GetAnnotations()
@@ -455,25 +455,21 @@ func (r *BMCVersionReconciler) handleFailedState(
 		}
 		return nil
 	}
-	var retryCount int32
-	if bmcVersion.Spec.FailedAutoRetryCount != nil {
-		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
-		retryCount = *bmcVersion.Spec.FailedAutoRetryCount
+	var maxAttempts int32
+	if bmcVersion.Spec.RetryPolicy != nil && bmcVersion.Spec.RetryPolicy.MaxAttempts != nil {
+		// if RetryPolicy is given (even if MaxAttempts is 0), do not use the default value.
+		maxAttempts = *bmcVersion.Spec.RetryPolicy.MaxAttempts
 	} else if r.DefaultFailedAutoRetryCount > 0 {
-		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
-		retryCount = r.DefaultFailedAutoRetryCount
-	} else {
-		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
-		retryCount = 0
+		// set the retry to this, if the optional RetryPolicy is not given and default retry count is set on the reconciler.
+		maxAttempts = r.DefaultFailedAutoRetryCount
 	}
-	if retryCount > 0 {
-		remaining := bmcVersion.Status.AutoRetryCountRemaining
+	if maxAttempts > 0 {
 		if bmcVersion.Status.ObservedGeneration != bmcVersion.Generation {
 			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
-			remaining = nil
+			bmcVersion.Status.FailedAttempts = 0
 		}
-		if remaining == nil || *remaining > 0 {
-			log.V(1).Info("Retrying BMCVersion automatically", "RetryCount", remaining)
+		if bmcVersion.Status.FailedAttempts < maxAttempts {
+			log.V(1).Info("Retrying BMCVersion automatically", "FailedAttempts", bmcVersion.Status.FailedAttempts)
 			bmcVersionBase := bmcVersion.DeepCopy()
 			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
 			bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
@@ -488,27 +484,18 @@ func (r *BMCVersionReconciler) handleFailedState(
 			} else {
 				bmcVersion.Status.Conditions = nil
 			}
-
-			if remaining == nil {
-				newRemaining := retryCount - 1
-				bmcVersion.Status.AutoRetryCountRemaining = &newRemaining
-			} else {
-				*bmcVersion.Status.AutoRetryCountRemaining--
-			}
-
+			bmcVersion.Status.FailedAttempts++
 			if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 				return fmt.Errorf("failed to patch BMCVersion status for auto-retrying: %w", err)
 			}
 			return nil
 		}
 	}
-	// Keep status consistent when retries are disabled.
-	if bmcVersion.Status.AutoRetryCountRemaining != nil &&
-		(*bmcVersion.Status.AutoRetryCountRemaining != 0 ||
-			bmcVersion.Status.ObservedGeneration != bmcVersion.Generation) {
+	// Keep status consistent when retries are disabled or exhausted.
+	if bmcVersion.Status.FailedAttempts != 0 &&
+		(maxAttempts == 0 || bmcVersion.Status.ObservedGeneration != bmcVersion.Generation) {
 		bmcVersionBase := bmcVersion.DeepCopy()
-		zero := int32(0)
-		bmcVersion.Status.AutoRetryCountRemaining = &zero
+		bmcVersion.Status.FailedAttempts = 0
 		bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
 		if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 			return fmt.Errorf("failed to patch BMCVersion status for disabled auto-retry: %w", err)

@@ -69,13 +69,6 @@ spec:
           spec:
             description: BIOSVersionSpec defines the desired state of BIOSVersion.
             properties:
-              failedAutoRetryCount:
-                description: FailedAutoRetryCount is the number of times the controller
-                  should automatically retry applying BIOSVersion in case of failure
-                  before giving up.
-                format: int32
-                minimum: 0
-                type: integer
               image:
                 description: Image specifies the image to use to upgrade to the given
                   BIOS version.
@@ -103,6 +96,20 @@ spec:
                     type: string
                 required:
                 - URI
+                type: object
+              retryPolicy:
+                description: RetryPolicy defines the retry behavior for automatic
+                  retries on transient failures.
+                properties:
+                  maxAttempts:
+                    description: |-
+                      MaxAttempts is the maximum number of automatic retry attempts after failure.
+                      0 means no automatic retries. Must be between 0 and 10 inclusive.
+                      If not set, the operator-level default is used.
+                    format: int32
+                    maximum: 10
+                    minimum: 0
+                    type: integer
                 type: object
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
@@ -166,12 +173,6 @@ spec:
           status:
             description: BIOSVersionStatus defines the observed state of BIOSVersion.
             properties:
-              autoRetryCountRemaining:
-                description: AutoRetryCountRemaining is the number of remaining times
-                  the controller will automatically retry applying BIOSVersion in
-                  case of failure before giving up.
-                format: int32
-                type: integer
               conditions:
                 description: Conditions represents the latest available observations
                   of the BIOS version upgrade state.
@@ -230,6 +231,11 @@ spec:
                   - type
                   type: object
                 type: array
+              failedAttempts:
+                description: FailedAttempts is the number of automatic retry attempts
+                  made after failure.
+                format: int32
+                type: integer
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
                   by the controller.

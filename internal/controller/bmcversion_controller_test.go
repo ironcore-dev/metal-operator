@@ -379,21 +379,21 @@ var _ = Describe("BMCVersion Controller", func() {
 					Version:                 upgradeServerBMCVersion + " fail",
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
 
-		By("Ensuring that the BIOS Version has started retry and AutoRetryCountRemaining is set")
+		By("Ensuring that the BMC Version has started retry and FailedAttempts is set")
 		Eventually(func(g Gomega) bool {
 			g.Expect(Get(bmcVersion)()).To(Succeed())
-			return bmcVersion.Status.AutoRetryCountRemaining != nil && *bmcVersion.Status.AutoRetryCountRemaining > int32(0)
+			return bmcVersion.Status.FailedAttempts > int32(0)
 		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
 
 		Eventually(Object(bmcVersion)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		Eventually(Object(bmcVersion)).Should(
@@ -403,7 +403,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Ensuring that the BIOS setting has not been changed")
 		Consistently(Object(bmcVersion), "250ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		// cleanup

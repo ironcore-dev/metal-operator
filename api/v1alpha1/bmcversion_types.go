@@ -34,10 +34,9 @@ type BMCVersionTemplate struct {
 	// +required
 	Image ImageSpec `json:"image"`
 
-	// FailedAutoRetryCount is the number of times the controller should automatically retry applying BMCVersion in case of failure before giving up.
-	// +kubebuilder:validation:Minimum=0
+	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
 	// +optional
-	FailedAutoRetryCount *int32 `json:"failedAutoRetryCount,omitempty"`
+	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.
 	// +optional
@@ -66,9 +65,9 @@ type BMCVersionStatus struct {
 	// UpgradeTask contains the state of the upgrade task created by the BMC.
 	UpgradeTask *Task `json:"upgradeTask,omitempty"`
 
-	// AutoRetryCountRemaining is the number of remaining times the controller will automatically retry applying BMCVersion in case of failure before giving up.
+	// FailedAttempts is the number of automatic retry attempts made after failure.
 	// +optional
-	AutoRetryCountRemaining *int32 `json:"autoRetryCountRemaining,omitempty"`
+	FailedAttempts int32 `json:"failedAttempts,omitempty"`
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	// +optional

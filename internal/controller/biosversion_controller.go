@@ -467,7 +467,7 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 	if shouldRetryReconciliation(biosVersion) {
 		log.V(1).Info("Retrying BIOSVersion as per annotation")
 		biosVersionBase := biosVersion.DeepCopy()
-		biosVersion.Status.AutoRetryCountRemaining = nil
+		biosVersion.Status.FailedAttempts = 0
 		biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
 		biosVersion.Status.ObservedGeneration = biosVersion.Generation
 		annotations := biosVersion.GetAnnotations()
@@ -492,25 +492,21 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 		}
 		return true, nil
 	}
-	var retryCount int32
-	if biosVersion.Spec.FailedAutoRetryCount != nil {
-		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
-		retryCount = *biosVersion.Spec.FailedAutoRetryCount
+	var maxAttempts int32
+	if biosVersion.Spec.RetryPolicy != nil && biosVersion.Spec.RetryPolicy.MaxAttempts != nil {
+		// if RetryPolicy is given (even if MaxAttempts is 0), do not use the default value.
+		maxAttempts = *biosVersion.Spec.RetryPolicy.MaxAttempts
 	} else if r.DefaultFailedAutoRetryCount > 0 {
-		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
-		retryCount = r.DefaultFailedAutoRetryCount
-	} else {
-		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
-		retryCount = 0
+		// set the retry to this, if the optional RetryPolicy is not given and default retry count is set on the reconciler.
+		maxAttempts = r.DefaultFailedAutoRetryCount
 	}
-	if retryCount > 0 {
-		remaining := biosVersion.Status.AutoRetryCountRemaining
+	if maxAttempts > 0 {
 		if biosVersion.Status.ObservedGeneration != biosVersion.Generation {
 			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
-			remaining = nil
+			biosVersion.Status.FailedAttempts = 0
 		}
-		if remaining == nil || *remaining > 0 {
-			log.V(1).Info("Retrying BIOSVersion automatically", "RetryCount", remaining)
+		if biosVersion.Status.FailedAttempts < maxAttempts {
+			log.V(1).Info("Retrying BIOSVersion automatically", "FailedAttempts", biosVersion.Status.FailedAttempts)
 			biosVersionBase := biosVersion.DeepCopy()
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
 			biosVersion.Status.ObservedGeneration = biosVersion.Generation
@@ -525,14 +521,7 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 			} else {
 				biosVersion.Status.Conditions = nil
 			}
-
-			if remaining == nil {
-				newRemaining := retryCount - 1
-				biosVersion.Status.AutoRetryCountRemaining = &newRemaining
-			} else {
-				*biosVersion.Status.AutoRetryCountRemaining--
-			}
-
+			biosVersion.Status.FailedAttempts++
 			if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 				return true, fmt.Errorf("failed to patch BIOSVersion status for auto-retrying: %w", err)
 			}
@@ -540,13 +529,11 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 		}
 	}
 
-	// Keep status consistent when retries are disabled.
-	if biosVersion.Status.AutoRetryCountRemaining != nil &&
-		(*biosVersion.Status.AutoRetryCountRemaining != 0 ||
-			biosVersion.Status.ObservedGeneration != biosVersion.Generation) {
+	// Keep status consistent when retries are disabled or exhausted.
+	if biosVersion.Status.FailedAttempts != 0 &&
+		(maxAttempts == 0 || biosVersion.Status.ObservedGeneration != biosVersion.Generation) {
 		biosVersionBase := biosVersion.DeepCopy()
-		zero := int32(0)
-		biosVersion.Status.AutoRetryCountRemaining = &zero
+		biosVersion.Status.FailedAttempts = 0
 		biosVersion.Status.ObservedGeneration = biosVersion.Generation
 		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 			return true, fmt.Errorf("failed to patch BIOSVersion status for disabled auto-retry: %w", err)

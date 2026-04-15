@@ -416,7 +416,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 					Version:                 upgradeServerBiosVersion + " fail",
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 				},
 				ServerSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -453,13 +453,13 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		By("Ensuring that the BIOSVersion 02 has failed")
 		Eventually(Object(biosVersion02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Ensuring that the BIOSVersion 03 has failed")
 		Eventually(Object(biosVersion03)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Checking if the status has been updated to failed")
@@ -472,13 +472,13 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		By("Ensuring that the BIOSVersion 02 has not been changed")
 		Consistently(Object(biosVersion02), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Ensuring that the BIOSVersion 03 has not been changed")
 		Consistently(Object(biosVersion03), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Updating the BIOSVersionSet with retry annotation")
@@ -491,37 +491,37 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		By("Ensuring that the BIOSVersion 02 has been retried ")
 		Eventually(Object(biosVersion02)).Should(SatisfyAll(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSVersionStateFailed))),
-			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
+			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
 		))
 
 		By("Ensuring that the BIOSVersion 03 has been retried")
 		Eventually(Object(biosVersion03)).Should(SatisfyAll(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSVersionStateFailed))),
-			HaveField("Status.AutoRetryCountRemaining", Not(Equal(GetPtr(int32(0))))),
+			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
 		))
 
 		By("Ensuring that the BIOSVersion 02 has failed again")
 		Eventually(Object(biosVersion02)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Ensuring that the BIOSVersion 03 has failed again")
 		Eventually(Object(biosVersion03)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Ensuring that the BIOSVersion 02 has not been changed")
 		Consistently(Object(biosVersion02), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Ensuring that the BIOSVersion 03 has not been changed")
 		Consistently(Object(biosVersion03), "50ms").Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSVersionStateFailed),
-			HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
 		By("Checking if the status has been updated to failed again")

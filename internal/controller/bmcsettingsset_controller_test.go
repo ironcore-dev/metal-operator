@@ -682,7 +682,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 						Version:                 "1.45.455b66-rev4",
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 						SettingsMap:             bmcSetting,
-						FailedAutoRetryCount:    GetPtr(int32(failedAutoRetryCount)),
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -711,7 +711,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Ensuring that the BMCSetting01 has failed")
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
-				HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 			))
 
 			By("Checking if the status has been updated to failed")
@@ -724,7 +724,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Ensuring that the BMCSetting01 has not been changed")
 			Consistently(Object(bmcSettings01), "50ms").Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
-				HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 			))
 
 			By("Updating the BMCSettingsSet with retry annotation")
@@ -737,19 +737,19 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Ensuring that the BMCSetting01 has been retried ")
 			Eventually(Object(bmcSettings01)).WithPolling(1 * time.Microsecond).Should(SatisfyAll(
 				HaveField("Status.State", Not(Equal(metalv1alpha1.BMCSettingsStateFailed))),
-				HaveField("Status.AutoRetryCountRemaining", BeNil()),
+				HaveField("Status.FailedAttempts", Equal(int32(0))),
 			))
 
 			By("Ensuring that the BMCSetting01 has failed again")
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
-				HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 			))
 
 			By("Ensuring that the BMCSetting01 has not been changed")
 			Consistently(Object(bmcSettings01), "50ms").Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
-				HaveField("Status.AutoRetryCountRemaining", Equal(GetPtr(int32(0)))),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 			))
 
 			By("Checking if the status has been updated to failed again")

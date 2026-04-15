@@ -117,13 +117,6 @@ spec:
                 description: BMCVersionTemplate defines the template for the BMCVersion
                   resource to be applied to the BMCs.
                 properties:
-                  failedAutoRetryCount:
-                    description: FailedAutoRetryCount is the number of times the controller
-                      should automatically retry applying BMCVersion in case of failure
-                      before giving up.
-                    format: int32
-                    minimum: 0
-                    type: integer
                   image:
                     description: Image specifies the image to use to upgrade to the
                       given BMC version.
@@ -151,6 +144,20 @@ spec:
                         type: string
                     required:
                     - URI
+                    type: object
+                  retryPolicy:
+                    description: RetryPolicy defines the retry behavior for automatic
+                      retries on transient failures.
+                    properties:
+                      maxAttempts:
+                        description: |-
+                          MaxAttempts is the maximum number of automatic retry attempts after failure.
+                          0 means no automatic retries. Must be between 0 and 10 inclusive.
+                          If not set, the operator-level default is used.
+                        format: int32
+                        maximum: 10
+                        minimum: 0
+                        type: integer
                     type: object
                   serverMaintenancePolicy:
                     description: ServerMaintenancePolicy is a maintenance policy to

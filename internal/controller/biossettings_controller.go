@@ -1044,7 +1044,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 	if shouldRetryReconciliation(settings) {
 		log.V(1).Info("Retrying reconciliation")
 		biosSettingsBase := settings.DeepCopy()
-		settings.Status.AutoRetryCountRemaining = nil
+		settings.Status.FailedAttempts = 0
 		settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
 		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 		settings.Status.ObservedGeneration = settings.Generation
@@ -1072,26 +1072,22 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		return ctrl.Result{}, nil
 	}
 
-	var retryCount int32
-	if settings.Spec.FailedAutoRetryCount != nil {
-		// if FailedAutoRetryCount is given (even if its 0), do not use the default value.
-		retryCount = *settings.Spec.FailedAutoRetryCount
+	var maxAttempts int32
+	if settings.Spec.RetryPolicy != nil && settings.Spec.RetryPolicy.MaxAttempts != nil {
+		// if RetryPolicy is given (even if MaxAttempts is 0), do not use the default value.
+		maxAttempts = *settings.Spec.RetryPolicy.MaxAttempts
 	} else if r.DefaultFailedAutoRetryCount > 0 {
-		// set the retry to this, if the optional FailedAutoRetryCount is not given and default retry count is set on the reconciler.
-		retryCount = r.DefaultFailedAutoRetryCount
-	} else {
-		// if neither the FailedAutoRetryCount is given nor the default retry count is set, do not retry and set the retry count to 0.
-		retryCount = 0
+		// set the retry to this, if the optional RetryPolicy is not given and default retry count is set on the reconciler.
+		maxAttempts = r.DefaultFailedAutoRetryCount
 	}
 
-	if retryCount > 0 {
-		remaining := settings.Status.AutoRetryCountRemaining
+	if maxAttempts > 0 {
 		if settings.Status.ObservedGeneration != settings.Generation {
 			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
-			remaining = nil
+			settings.Status.FailedAttempts = 0
 		}
-		if remaining == nil || *remaining > 0 {
-			log.V(1).Info("Retrying BIOSSettings automatically", "RetryCount", remaining)
+		if settings.Status.FailedAttempts < maxAttempts {
+			log.V(1).Info("Retrying BIOSSettings automatically", "FailedAttempts", settings.Status.FailedAttempts)
 			biosSettingsBase := settings.DeepCopy()
 			settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
 			settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
@@ -1107,14 +1103,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 			} else {
 				settings.Status.Conditions = nil
 			}
-
-			if remaining == nil {
-				newRemaining := retryCount - 1
-				settings.Status.AutoRetryCountRemaining = &newRemaining
-			} else {
-				*settings.Status.AutoRetryCountRemaining--
-			}
-
+			settings.Status.FailedAttempts++
 			if err := r.Status().Patch(ctx, settings, client.MergeFrom(biosSettingsBase)); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for auto-retrying: %w", err)
 			}
@@ -1122,13 +1111,11 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		}
 	}
 
-	// Keep status consistent when retries are disabled.
-	if settings.Status.AutoRetryCountRemaining != nil &&
-		(*settings.Status.AutoRetryCountRemaining != 0 ||
-			settings.Status.ObservedGeneration != settings.Generation) {
+	// Keep status consistent when retries are disabled or exhausted.
+	if settings.Status.FailedAttempts != 0 &&
+		(maxAttempts == 0 || settings.Status.ObservedGeneration != settings.Generation) {
 		settingsBase := settings.DeepCopy()
-		zero := int32(0)
-		settings.Status.AutoRetryCountRemaining = &zero
+		settings.Status.FailedAttempts = 0
 		settings.Status.ObservedGeneration = settings.Generation
 		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings status for disabled auto-retry: %w", err)

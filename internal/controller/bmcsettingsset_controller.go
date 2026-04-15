@@ -369,11 +369,6 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		}
 		if opResult != controllerutil.OperationResultNone {
 			log.V(1).Info("Patched BMCSettings with updated spec", "BMCSettings", bmcSettings.Name, "Operation", opResult)
-			settingsBase := bmcSettings.DeepCopy()
-			bmcSettings.Status.AutoRetryCountRemaining = bmcSettings.Spec.FailedAutoRetryCount
-			if err = r.Status().Patch(ctx, &bmcSettings, client.MergeFrom(settingsBase)); err != nil {
-				errs = append(errs, err)
-			}
 		}
 	}
 	return pendingPatchingSettings, errors.Join(errs...)

@@ -23,8 +23,11 @@ var _ = Describe("RedfishEventCollector", func() {
 
 	BeforeEach(func() {
 		collector = &RedfishEventCollector{
-			lastReadings: make(map[string]MetricEntry),
-			alertCounts:  make(map[EventKey]uint64),
+			lastReadings:      make(map[string]MetricEntry),
+			alertCounts:       make(map[EventKey]uint64),
+			metricsSourceType: make(map[string]float64),
+			sensorPollCount:   make(map[string]uint64),
+			sensorPollErrors:  make(map[string]uint64),
 		}
 	})
 

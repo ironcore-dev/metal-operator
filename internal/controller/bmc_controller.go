@@ -209,13 +209,8 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 		return ctrl.Result{}, err
 	}
 
-	// Poll metrics if needed (fallback for Lenovo BMCs with subscription issues)
-	if err := r.pollMetricsIfNeeded(ctx, bmcClient, bmcObj); err != nil {
-		log.V(1).Info("Metrics polling failed", "error", err)
-		// Don't fail reconciliation - polling is a best-effort fallback
-		// Requeue after polling interval to retry
-		return ctrl.Result{RequeueAfter: r.MetricsPollingInterval}, nil
-	}
+	// Note: Metrics polling for Lenovo BMCs is handled by a background goroutine
+	// started in SetupWithManager to avoid blocking the reconcile loop.
 
 	log.V(1).Info("Reconciled BMC")
 	return ctrl.Result{}, nil
@@ -738,10 +733,78 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Start background metrics polling worker if enabled
+	if r.EnableMetricsPolling && r.MetricsCollector != nil {
+		go r.runMetricsPollingWorker(mgr.GetClient())
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
 		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
 		Complete(r)
+}
+
+// runMetricsPollingWorker runs a background goroutine that periodically polls metrics
+// from BMCs that need polling fallback (e.g., Lenovo BMCs with event subscription issues).
+// This runs independently of the reconcile loop to avoid blocking reconciliation.
+func (r *BMCReconciler) runMetricsPollingWorker(c client.Client) {
+	ticker := time.NewTicker(r.MetricsPollingInterval)
+	defer ticker.Stop()
+
+	log := ctrl.Log.WithName("metrics-poller")
+	log.Info("Started background metrics polling worker", "interval", r.MetricsPollingInterval)
+
+	for range ticker.C {
+		// List all BMCs
+		bmcList := &metalv1alpha1.BMCList{}
+		if err := c.List(context.Background(), bmcList); err != nil {
+			log.Error(err, "Failed to list BMCs for metrics polling")
+			continue
+		}
+
+		// Poll each BMC that needs it
+		for i := range bmcList.Items {
+			bmcObj := &bmcList.Items[i]
+
+			// Skip BMCs that don't need polling
+			if !r.shouldPollBMC(bmcObj) {
+				continue
+			}
+
+			// Poll in a separate goroutine to allow concurrent polling
+			go func(bmc *metalv1alpha1.BMC) {
+				ctx, cancel := context.WithTimeout(context.Background(), r.MetricsPollingTimeout)
+				defer cancel()
+
+				bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, c, bmc, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
+				if err != nil {
+					log.V(1).Info("Failed to get BMC client for polling", "bmcName", bmc.Name, "error", err)
+					return
+				}
+				defer bmcClient.Logout()
+
+				if err := r.pollMetricsIfNeeded(ctx, bmcClient, bmc); err != nil {
+					log.V(1).Info("Metrics polling failed", "bmcName", bmc.Name, "error", err)
+				}
+			}(bmcObj)
+		}
+	}
+}
+
+// shouldPollBMC determines if a BMC needs metrics polling based on manufacturer and metric staleness.
+func (r *BMCReconciler) shouldPollBMC(bmcObj *metalv1alpha1.BMC) bool {
+	// Check if metrics are stale or subscription is missing
+	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
+		return true // No subscription - definitely need to poll
+	}
+
+	// Check if metrics are stale
+	lastUpdate := r.MetricsCollector.GetLastUpdateTime(bmcObj.Name)
+	if lastUpdate.IsZero() || time.Since(lastUpdate) > r.MetricsStalenessThreshold {
+		return true // Metrics are stale - need to poll
+	}
+
+	return false // Metrics are fresh - no polling needed
 }

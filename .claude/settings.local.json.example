@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hack/claude-pre-push-check.sh",
+            "if": "Bash(git push*)",
+            "statusMessage": "Running pre-push validation checks..."
+          }
+        ]
+      }
+    ]
+  }
+}

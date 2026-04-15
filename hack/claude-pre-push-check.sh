@@ -26,9 +26,6 @@ fi
 echo -e "${BLUE}🔍 Running pre-push validation...${NC}"
 echo ""
 
-# Track overall status
-FAILED=0
-
 # 1. Code generation check (fast, catches common issue)
 echo -e "${BLUE}→ Checking generated code is up-to-date...${NC}"
 if ! make check-gen; then

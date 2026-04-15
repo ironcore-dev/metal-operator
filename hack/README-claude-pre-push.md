@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Claude Code Pre-Push Validation
 
 This script (`claude-pre-push-check.sh`) provides pre-push validation for Claude Code to ensure code quality before pushing to GitHub.
@@ -94,7 +99,7 @@ Expected runtime:
 If you prefer to run validation manually:
 
 1. Edit `.claude/settings.json` (project-level) or `.claude/settings.local.json` (personal)
-2. Remove or comment out the `PreToolUse` hook
+2. Remove the entire `PreToolUse` hook entry that contains `claude-pre-push-check.sh`
 3. Remember to run `make check` before pushing
 
 ## Benefits

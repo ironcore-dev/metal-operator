@@ -76,10 +76,10 @@ CLAUDE_SKIP_PREPUSH=1 git push
 
 ### Disabling Pre-Push Hooks
 
-If you prefer manual validation, you can disable the hook:
+If you prefer manual validation, you can disable the hook by removing it from the settings file:
 
-1. Edit `.claude/settings.local.json`
-2. Remove or comment out the `PreToolUse` hook for git push
+1. Edit `.claude/settings.local.json` (for personal changes) or `.claude/settings.json` (project-wide)
+2. Remove the entire `PreToolUse` hook entry that contains `claude-pre-push-check.sh`
 3. Remember to run `make check` before pushing manually
 
 ### Start/Stop Redfish Mock Server

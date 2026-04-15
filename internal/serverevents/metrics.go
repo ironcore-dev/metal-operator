@@ -289,4 +289,3 @@ func (c *RedfishEventCollector) SetMetricsSourceType(hostname string, sourceType
 
 	c.metricsSourceType[hostname] = sourceType
 }
-

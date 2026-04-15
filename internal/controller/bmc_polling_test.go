@@ -373,18 +373,18 @@ var _ = Describe("BMC Polling", func() {
 
 			sensors := []metalBmc.Sensor{
 				{
-					ID:               "sensor1",
-					Name:             "Fan1",
-					Reading:          5000,
-					Units:            "RPM",
-					PhysicalContext:  "Fans",
+					ID:              "sensor1",
+					Name:            "Fan1",
+					Reading:         5000,
+					Units:           "RPM",
+					PhysicalContext: "Fans",
 				},
 				{
-					ID:               "sensor2",
-					Name:             "Temp1",
-					Reading:          45.5,
-					Units:            "Celsius",
-					PhysicalContext:  "CPU",
+					ID:              "sensor2",
+					Name:            "Temp1",
+					Reading:         45.5,
+					Units:           "Celsius",
+					PhysicalContext: "CPU",
 				},
 			}
 

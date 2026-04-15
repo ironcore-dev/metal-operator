@@ -20,6 +20,7 @@ func TestServerEvents(t *testing.T) {
 
 var _ = Describe("RedfishEventCollector", func() {
 	var collector *RedfishEventCollector
+	const testHostname = "test-server.example.com"
 
 	BeforeEach(func() {
 		collector = &RedfishEventCollector{
@@ -34,7 +35,7 @@ var _ = Describe("RedfishEventCollector", func() {
 	Describe("UpdateFromSensorPoll", func() {
 		Context("when processing sensor data", func() {
 			It("should convert sensor data to metric entries", func() {
-				hostname := "test-server.example.com"
+				hostname := testHostname
 				sensors := []bmc.Sensor{
 					{
 						ID:              "CPU1Temp",
@@ -144,7 +145,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			})
 
 			It("should update existing sensor readings", func() {
-				hostname := "test-server.example.com"
+				hostname := testHostname
 				initialSensors := []bmc.Sensor{
 					{
 						ID:      "TempSensor",
@@ -177,7 +178,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			})
 
 			It("should handle empty sensor list", func() {
-				hostname := "test-server.example.com"
+				hostname := testHostname
 				collector.UpdateFromSensorPoll(hostname, []bmc.Sensor{})
 
 				Expect(collector.lastReadings).To(BeEmpty())
@@ -188,7 +189,7 @@ var _ = Describe("RedfishEventCollector", func() {
 	Describe("GetLastUpdateTime", func() {
 		Context("when metrics exist for hostname", func() {
 			It("should return the most recent timestamp", func() {
-				hostname := "test-server.example.com"
+				hostname := testHostname
 
 				// Add metrics at different times
 				now := time.Now()
@@ -228,7 +229,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			})
 
 			It("should match hostname by key prefix", func() {
-				hostname := "test-server.example.com"
+				hostname := testHostname
 				now := time.Now()
 
 				// Simulate metrics with hostname-prefixed keys
@@ -257,7 +258,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			})
 
 			It("should return zero time when collector is empty", func() {
-				hostname := "test-server.example.com"
+				hostname := testHostname
 				lastUpdate := collector.GetLastUpdateTime(hostname)
 
 				Expect(lastUpdate.IsZero()).To(BeTrue())
@@ -270,7 +271,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			done := make(chan bool)
 
 			// Spawn multiple goroutines updating metrics
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				go func(id int) {
 					sensors := []bmc.Sensor{
 						{
@@ -286,7 +287,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			}
 
 			// Wait for all goroutines to complete
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				Eventually(done).Should(Receive())
 			}
 
@@ -305,7 +306,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			done := make(chan bool)
 
 			// Spawn multiple goroutines reading the timestamp
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				go func() {
 					lastUpdate := collector.GetLastUpdateTime(hostname)
 					Expect(lastUpdate.IsZero()).To(BeFalse())
@@ -314,7 +315,7 @@ var _ = Describe("RedfishEventCollector", func() {
 			}
 
 			// Wait for all goroutines to complete
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				Eventually(done).Should(Receive())
 			}
 		}, SpecTimeout(5*time.Second))

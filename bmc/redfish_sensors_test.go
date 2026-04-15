@@ -30,7 +30,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/1U", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Chassis.v1_25_1.Chassis",
 				"Id": "1U",
 				"Name": "Computer System Chassis",
@@ -44,7 +44,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/1U/Sensors", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#SensorCollection.SensorCollection",
 				"Name": "Chassis sensors",
 				"Members@odata.count": 3,
@@ -60,7 +60,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/1U/Sensors/AmbientTemp", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Sensor.v1_8_1.Sensor",
 				"Id": "AmbientTemp",
 				"Name": "Ambient Temperature",
@@ -77,7 +77,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/1U/Sensors/CPUFan1", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Sensor.v1_8_1.Sensor",
 				"Id": "CPUFan1",
 				"Name": "CPU #1 Fan Speed",
@@ -94,7 +94,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/1U/Sensors/TotalPower", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Sensor.v1_8_1.Sensor",
 				"Id": "TotalPower",
 				"Name": "Total Power",
@@ -112,7 +112,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/NoSensors", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Chassis.v1_25_1.Chassis",
 				"Id": "NoSensors",
 				"Name": "Chassis without sensors"
@@ -123,7 +123,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/EmptySensors/Sensors", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#SensorCollection.SensorCollection",
 				"Name": "Empty sensors",
 				"Members@odata.count": 0,
@@ -134,7 +134,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/EmptySensors", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Chassis.v1_25_1.Chassis",
 				"Id": "EmptySensors",
 				"Name": "Chassis with empty sensors",
@@ -148,7 +148,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/NilReading/Sensors", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#SensorCollection.SensorCollection",
 				"Name": "Sensors with nil reading",
 				"Members@odata.count": 1,
@@ -161,7 +161,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/NilReading/Sensors/BrokenSensor", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Sensor.v1_8_1.Sensor",
 				"Id": "BrokenSensor",
 				"Name": "Broken Sensor",
@@ -177,7 +177,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/Chassis/NilReading", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#Chassis.v1_25_1.Chassis",
 				"Id": "NilReading",
 				"Name": "Chassis with nil reading sensor",
@@ -191,7 +191,7 @@ var _ = Describe("GetSensors", func() {
 		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{
+			_, _ = fmt.Fprintf(w, `{
 				"@odata.type": "#ServiceRoot.v1_18_0.ServiceRoot",
 				"Id": "RootService",
 				"Name": "Root Service"
@@ -203,9 +203,9 @@ var _ = Describe("GetSensors", func() {
 		// Create RedfishBMC using NewRedfishBMCClient
 		var err error
 		redfishBMC, err = NewRedfishBMCClient(ctx, Options{
-			Endpoint:   server.URL,
-			Username:   "admin",
-			Password:   "admin",
+			Endpoint:    server.URL,
+			Username:    "admin",
+			Password:    "admin",
 			InsecureTLS: true,
 			BasicAuth:   true,
 		})

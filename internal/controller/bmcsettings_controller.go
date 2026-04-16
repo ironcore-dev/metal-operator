@@ -1259,7 +1259,7 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsBySecret(ctx context.Context, 
 				continue
 			}
 			ref := v.ValueFrom.SecretKeyRef
-			if substituteVars(ref.Name, partialResolved) == secretName && ref.Namespace == secretNamespace {
+			if substituteVars(ref.Name, partialResolved) == secretName && substituteVars(ref.Namespace, partialResolved) == secretNamespace {
 				requests = append(requests, ctrl.Request{
 					NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name},
 				})
@@ -1307,7 +1307,7 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByConfigMap(ctx context.Contex
 				continue
 			}
 			ref := v.ValueFrom.ConfigMapKeyRef
-			if substituteVars(ref.Name, partialResolved) == cmName && ref.Namespace == cmNamespace {
+			if substituteVars(ref.Name, partialResolved) == cmName && substituteVars(ref.Namespace, partialResolved) == cmNamespace {
 				requests = append(requests, ctrl.Request{
 					NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name},
 				})

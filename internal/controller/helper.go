@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -20,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -428,4 +430,124 @@ func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFiel
 	}
 
 	return false
+}
+
+// ResolveVariables resolves the Variables list into a flat key→value map.
+// Returns an error if any variable cannot be resolved.
+func ResolveVariables(
+	ctx context.Context,
+	c client.Client,
+	owner client.Object,
+	variables []metalv1alpha1.Variable,
+) (map[string]string, error) {
+	resolved := make(map[string]string, len(variables))
+	for _, v := range variables {
+		value, err := resolveVariable(ctx, c, owner, v, resolved)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve variable %q: %w", v.Key, err)
+		}
+		// Apply already-resolved variables to the fetched value so later variables
+		// can reference earlier ones (e.g. a raw secret value containing $(BmcName)).
+		resolved[v.Key] = substituteVars(value, resolved)
+	}
+	return resolved, nil
+}
+
+// ApplyVariables substitutes $(KEY) placeholders in each settingsMap value using the
+// resolved variable map. Returns the original map unchanged if resolved is empty.
+func ApplyVariables(settingsMap map[string]string, resolved map[string]string) map[string]string {
+	if len(resolved) == 0 {
+		return settingsMap
+	}
+	out := make(map[string]string, len(settingsMap))
+	for k, v := range settingsMap {
+		out[k] = substituteVars(v, resolved)
+	}
+	return out
+}
+
+// substituteVars replaces $(KEY) with the resolved value.
+// The escape sequence $$(KEY) produces a literal $(KEY) in the output.
+func substituteVars(s string, resolved map[string]string) string {
+	// Sentinel marks escaped $$(KEY) sequences during substitution so they are
+	// not expanded. The value is chosen to be effectively impossible to appear
+	// in any real BMC setting value or JSON payload.
+	const sentinel = "\x00\x01METAL_OPERATOR_ESC\x01\x00"
+	result := s
+	for key := range resolved {
+		result = strings.ReplaceAll(result, "$$("+key+")", sentinel+"("+key+")")
+	}
+	for key, val := range resolved {
+		result = strings.ReplaceAll(result, "$("+key+")", val)
+	}
+	for key := range resolved {
+		result = strings.ReplaceAll(result, sentinel+"("+key+")", "$("+key+")")
+	}
+	return result
+}
+
+func resolveVariable(
+	ctx context.Context,
+	c client.Client,
+	owner client.Object,
+	v metalv1alpha1.Variable,
+	resolved map[string]string,
+) (string, error) {
+	if v.ValueFrom == nil {
+		return "", fmt.Errorf("valueFrom is required")
+	}
+	switch {
+	case v.ValueFrom.FieldRef != nil:
+		return resolveFieldRef(owner, v.ValueFrom.FieldRef.FieldPath)
+	case v.ValueFrom.SecretKeyRef != nil:
+		ref := v.ValueFrom.SecretKeyRef
+		// Expand variable references in the selector fields before use.
+		name := substituteVars(ref.Name, resolved)
+		namespace := substituteVars(ref.Namespace, resolved)
+		key := substituteVars(ref.Key, resolved)
+		secret := &corev1.Secret{}
+		if err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, secret); err != nil {
+			return "", fmt.Errorf("failed to get secret %s/%s: %w", namespace, name, err)
+		}
+		val, ok := secret.Data[key]
+		if !ok {
+			return "", fmt.Errorf("key %q not found in secret %s/%s", key, namespace, name)
+		}
+		return string(val), nil
+	case v.ValueFrom.ConfigMapKeyRef != nil:
+		ref := v.ValueFrom.ConfigMapKeyRef
+		// Expand variable references in the selector fields before use.
+		name := substituteVars(ref.Name, resolved)
+		namespace := substituteVars(ref.Namespace, resolved)
+		key := substituteVars(ref.Key, resolved)
+		cm := &corev1.ConfigMap{}
+		if err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, cm); err != nil {
+			return "", fmt.Errorf("failed to get configmap %s/%s: %w", namespace, name, err)
+		}
+		val, ok := cm.Data[key]
+		if !ok {
+			return "", fmt.Errorf("key %q not found in configmap %s/%s", key, namespace, name)
+		}
+		return val, nil
+	default:
+		return "", fmt.Errorf("no source specified in valueFrom")
+	}
+}
+
+// resolveFieldRef navigates a dotted fieldPath on the given object using the
+// unstructured accessor (e.g. "spec.BMCRef.name").
+func resolveFieldRef(obj client.Object, fieldPath string) (string, error) {
+	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert object for fieldRef: %w", err)
+	}
+	parts := strings.Split(fieldPath, ".")
+	val, found, err := unstructured.NestedString(raw, parts...)
+	if err != nil {
+		return "", fmt.Errorf("failed to navigate fieldPath %q: %w", fieldPath, err)
+	}
+	if !found {
+		return "", fmt.Errorf("fieldPath %q not found on object %s", fieldPath, obj.GetName())
+	}
+	return val, nil
 }

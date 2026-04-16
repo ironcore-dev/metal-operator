@@ -616,7 +616,14 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 
 func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (diff schemas.SettingsAttributes, err error) {
 	log := ctrl.LoggerFrom(ctx)
-	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, bmcObj.Spec.BMCUUID, settings.Spec.SettingsMap)
+
+	resolvedVars, err := ResolveVariables(ctx, r.Client, settings, settings.Spec.Variables)
+	if err != nil {
+		return diff, fmt.Errorf("failed to resolve BMCSettings variables: %w", err)
+	}
+	effectiveSettingsMap := ApplyVariables(settings.Spec.SettingsMap, resolvedVars)
+
+	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, bmcObj.Spec.BMCUUID, effectiveSettingsMap)
 	if err != nil {
 		return diff, fmt.Errorf("failed to get BMC settings: %w", err)
 	}
@@ -625,7 +632,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 
 	diff = schemas.SettingsAttributes{}
 	var errs []error
-	for key, value := range settings.Spec.SettingsMap {
+	for key, value := range effectiveSettingsMap {
 		res, ok := currentSettings[key]
 		if ok {
 			switch data := res.(type) {

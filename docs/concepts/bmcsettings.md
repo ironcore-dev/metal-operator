@@ -31,12 +31,16 @@ Note: The API field is `BMCRef` (capitalized) in this CRD schema.
 `spec.variables` allows setting values to be resolved dynamically at apply time.
 Each variable has a `key` (referenced as `$(key)` in settings values) and exactly one source via `valueFrom`.
 
-Variables are resolved in list order — a variable may use `$(PreviousVarKey)` in its `configMapKeyRef.key` or `secretKeyRef.key` if the referenced variable is defined earlier in the list.
+Variables are resolved in list order. A variable defined later in the list can reference any earlier-resolved variable by embedding `$(PreviousVarKey)` in its `configMapKeyRef.key`, `configMapKeyRef.name`, `secretKeyRef.key`, or `secretKeyRef.name` fields — the substitution is performed *before* the lookup.
 
-Resolution order within a single variable:
-1. `fieldRef` — reads a field from the BMCSettings object itself.
-2. `configMapKeyRef` — reads a key from a ConfigMap (key name may contain `$(VarName)` substitutions).
-3. `secretKeyRef` — reads a key from a Secret (key name may contain `$(VarName)` substitutions).
+**Escape sequence**: use `$$(KEY)` to produce a literal `$(KEY)` in the output without triggering variable substitution.
+
+Each variable uses exactly one source type (enforced by validation):
+- `fieldRef` — reads a field from the BMCSettings object itself.
+- `configMapKeyRef` — reads a key from a ConfigMap. The `key`, `name`, and `namespace` fields may contain `$(VarName)` substitutions.
+- `secretKeyRef` — reads a key from a Secret. The `key`, `name`, and `namespace` fields may contain `$(VarName)` substitutions.
+
+After fetching the raw value from its source, already-resolved variables are also substituted into that value before it is stored. This means a ConfigMap value of `http://$(HOST)/api` will be fully expanded if `HOST` was resolved earlier in the list.
 
 #### `valueFrom.fieldRef`
 
@@ -71,59 +75,71 @@ stateDiagram-v2
     [*] --> Pending
 
     state Pending {
-      [*] --> CheckDiff
-      CheckDiff --> NoDiff: settings already match
-      CheckDiff --> CheckVersion: settings differ
+      [*] --> CheckVersion
       CheckVersion --> WaitVersion: firmware mismatch
-      CheckVersion --> RequestMaintenance: firmware matches
-      RequestMaintenance --> WaitMaintenance
-      WaitMaintenance --> ReadyToApply: approved
+      CheckVersion --> Advancing: firmware matches
     }
 
-    Pending --> Applied: NoDiff
-    Pending --> InProgress: ReadyToApply
+    Pending --> InProgress: Advancing
 
     state InProgress {
-      [*] --> ResolveVariables
-      ResolveVariables --> ResetPreApply
+      [*] --> ResolveAndDiff
+      ResolveAndDiff --> NoDiff: settings already match
+      ResolveAndDiff --> RequestMaintenance: settings differ
+      RequestMaintenance --> WaitMaintenance
+      WaitMaintenance --> ResetPreApply: approved
       ResetPreApply --> IssueSettingsUpdate
-      IssueSettingsUpdate --> WaitApplyComplete
-      WaitApplyComplete --> RebootIfNeeded
+      IssueSettingsUpdate --> RebootIfNeeded: vendor reset required
+      IssueSettingsUpdate --> VerifySettings: no reset needed
       RebootIfNeeded --> VerifySettings
       VerifySettings --> Success: desired settings observed
-      VerifySettings --> FailedVerify: mismatch/timeout
+      VerifySettings --> StillInProgress: mismatch/not yet converged
       IssueSettingsUpdate --> FailedIssue: request failed
-      ResolveVariables --> FailedResolve: missing source
+      ResolveAndDiff --> FailedResolve: missing source
     }
 
-    InProgress --> Applied: Success
-    InProgress --> Failed: FailedIssue or FailedVerify or FailedResolve
+    InProgress --> Applied: NoDiff or Success
+    InProgress --> Failed: FailedIssue or FailedResolve
+
+    state Applied {
+      [*] --> DriftCheck
+      DriftCheck --> Drifted: settings differ from desired
+      DriftCheck --> Stable: no change detected
+    }
+
+    Applied --> Pending: Drifted
     Failed --> Pending: retry annotation/manual recovery
 ```
 
 ## Detailed Workflow (All Main Cases)
 
-1. Intake and ownership:
-  - Resolve `BMCRef` and bind BMC-side reference.
-  - Ensure finalizer and ownership links are in place.
-2. Diff and version gate:
-  - If no settings diff exists, transition to `Applied`.
-  - If diff exists and version mismatches, remain `Pending`.
-3. Maintenance orchestration:
-  - Discover all servers associated with the BMC.
-  - Request maintenance per server (policy driven) and wait for approval.
-4. Variable resolution:
-  - Resolve each variable in list order: `fieldRef` first, then `configMapKeyRef`/`secretKeyRef` with substitution.
-  - Substitute `$(VarName)` placeholders into settings values.
-5. Apply path:
-  - Optional BMC reset to establish stable state.
-  - Issue settings update and track progress via conditions.
-6. Reboot/verification path:
-  - Perform reset/reboot when required by vendor behavior.
-  - Verify settings from BMC readback.
-7. Terminalization and cleanup:
-  - On success set `Applied`, on failure set `Failed`.
-  - Remove self-managed maintenance references where applicable.
+1. **Intake and ownership** (`Pending`):
+   - Resolve `BMCRef` and bind BMC-side reference.
+   - Ensure finalizer and ownership links are in place.
+2. **Version gate** (`Pending`):
+   - If BMC firmware version mismatches `spec.version`, remain `Pending`.
+   - Once version matches, transition unconditionally to `InProgress`.
+3. **Diff and variable resolution** (`InProgress`):
+   - Resolve `spec.variables` in list order, substituting already-resolved variables into each source selector before lookup.
+   - Substitute `$(VarName)` placeholders into `spec.settings` values to build the effective settings map.
+   - Compare effective settings against current BMC values. If no diff, transition to `Applied`.
+   - If variable resolution fails (missing ConfigMap/Secret/field), transition to `Failed`.
+4. **Maintenance orchestration** (`InProgress`):
+   - Discover all servers associated with the BMC.
+   - Request `ServerMaintenance` per server (policy-driven) and wait for approval.
+5. **Apply path** (`InProgress`):
+   - Pre-apply BMC reset to establish a stable state.
+   - Issue settings update and track progress via conditions.
+6. **Reboot/verification path** (`InProgress`):
+   - Post-apply BMC reset/reboot when required by vendor behavior.
+   - Re-run variable resolution and diff check to verify convergence.
+   - Transition to `Applied` when diff is empty, otherwise stay `InProgress` and retry.
+7. **Drift detection** (`Applied`):
+   - On each reconcile, re-resolve variables and re-check diff against the BMC.
+   - If drift is detected, transition back to `Pending` for a new apply cycle.
+8. **Terminalisation and cleanup** (`Applied`):
+   - Remove self-managed maintenance references.
+   - On failure, set `Failed`; on retry annotation, reset to `Pending`.
 
 ## Troubleshooting Guide
 

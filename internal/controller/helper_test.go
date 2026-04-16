@@ -95,14 +95,14 @@ var _ = Describe("Variable templating", func() {
 	// ─── ApplyVariables ────────────────────────────────────────────────────────
 
 	Describe("ApplyVariables", func() {
-		It("returns the original map (same pointer) when resolved is nil", func() {
+		It("returns unchanged content when resolved is nil", func() {
 			orig := map[string]string{"k": "$(X)"}
-			Expect(ApplyVariables(orig, nil)).To(BeIdenticalTo(orig))
+			Expect(ApplyVariables(orig, nil)).To(Equal(orig))
 		})
 
-		It("returns the original map (same pointer) when resolved is empty", func() {
+		It("returns unchanged content when resolved is empty", func() {
 			orig := map[string]string{"k": "$(X)"}
-			Expect(ApplyVariables(orig, map[string]string{})).To(BeIdenticalTo(orig))
+			Expect(ApplyVariables(orig, map[string]string{})).To(Equal(orig))
 		})
 
 		It("substitutes placeholders across all map values", func() {

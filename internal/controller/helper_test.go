@@ -14,8 +14,6 @@ import (
 
 var _ = Describe("Variable templating", func() {
 
-	// ─── substituteVars ────────────────────────────────────────────────────────
-
 	Describe("substituteVars", func() {
 		It("replaces a single placeholder", func() {
 			Expect(substituteVars("hello $(NAME)", map[string]string{"NAME": "world"})).
@@ -50,8 +48,6 @@ var _ = Describe("Variable templating", func() {
 				To(Equal("plain-value"))
 		})
 
-		// ── escape sequences ──────────────────────────────────────────────────
-
 		It("$$(KEY) produces a literal $(KEY) — not expanded", func() {
 			Expect(substituteVars("$$(NAME)", map[string]string{"NAME": "world"})).
 				To(Equal("$(NAME)"))
@@ -67,8 +63,6 @@ var _ = Describe("Variable templating", func() {
 			Expect(substituteVars("$$(X) $$(Y)", map[string]string{"X": "1", "Y": "2"})).
 				To(Equal("$(X) $(Y)"))
 		})
-
-		// ── special characters in values ──────────────────────────────────────
 
 		It("works when the resolved value contains JSON-like characters", func() {
 			// Simulates: key: "$(FOO)" where FOO = `{"a":1}`
@@ -91,8 +85,6 @@ var _ = Describe("Variable templating", func() {
 				To(Equal("price: $100 and apple"))
 		})
 	})
-
-	// ─── ApplyVariables ────────────────────────────────────────────────────────
 
 	Describe("ApplyVariables", func() {
 		It("returns unchanged content when resolved is nil", func() {
@@ -144,8 +136,6 @@ var _ = Describe("Variable templating", func() {
 		})
 	})
 
-	// ─── resolveFieldRef ───────────────────────────────────────────────────────
-
 	Describe("resolveFieldRef", func() {
 		It("resolves a deeply nested string field (spec.BMCRef.name)", func() {
 			obj := &metalv1alpha1.BMCSettings{
@@ -189,8 +179,6 @@ var _ = Describe("Variable templating", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
-
-	// ─── ResolveVariables (integration — requires k8s API) ────────────────────
 
 	Describe("ResolveVariables", func() {
 		ns := SetupTest(nil)

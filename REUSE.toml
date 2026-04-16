@@ -55,3 +55,10 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2014 The Kubernetes Authors"
 SPDX-License-Identifier = "Apache-2.0"
 Comment = "Forked from https://github.com/kubernetes/kubernetes/blob/master/third_party/forked/golang/expansion/expand.go"
+
+[[annotations]]
+path = "third_party/expansion/expand_test.go"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2014 The Kubernetes Authors"
+SPDX-License-Identifier = "Apache-2.0"
+Comment = "Forked from https://github.com/kubernetes/kubernetes/blob/master/third_party/forked/golang/expansion/expand_test.go"

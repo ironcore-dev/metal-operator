@@ -578,3 +578,14 @@ func resolveFieldRef(obj client.Object, fieldPath string) (string, error) {
 	}
 	return val, nil
 }
+
+// settingKeys returns only the map keys of a SettingsAttributes map for
+// safe logging. Values are omitted because they may contain secrets resolved
+// from SecretKeyRef variables.
+func settingKeys(attrs schemas.SettingsAttributes) []string {
+	keys := make([]string, 0, len(attrs))
+	for k := range attrs {
+		keys = append(keys, k)
+	}
+	return keys
+}

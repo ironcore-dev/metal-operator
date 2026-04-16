@@ -604,8 +604,8 @@ func (s *MockServer) ResetBMCSettings(managerID string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.resetAttributesFromEmbeddedLocked(filePath)
-	s.resetAttributesFromEmbeddedLocked(settingsFilePath)
+	s.resetResourceFromEmbeddedLocked(filePath)
+	s.resetResourceFromEmbeddedLocked(settingsFilePath)
 }
 
 // ResetBIOSSettings resets the BIOS attribute state on the server to defaults,
@@ -619,13 +619,15 @@ func (s *MockServer) ResetBIOSSettings(systemID string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.resetAttributesFromEmbeddedLocked(filePath)
-	s.resetAttributesFromEmbeddedLocked(settingsFilePath)
+	s.resetResourceFromEmbeddedLocked(filePath)
+	s.resetResourceFromEmbeddedLocked(settingsFilePath)
 }
 
-// resetAttributesFromEmbeddedLocked resets the Attributes field of a resource to its
-// embedded-FS defaults. The caller must hold s.mu.
-func (s *MockServer) resetAttributesFromEmbeddedLocked(filePath string) {
+// resetResourceFromEmbeddedLocked replaces the override for filePath with the
+// full contents of the embedded file, clearing all mutated fields including
+// resourceLock, Attributes, and any other state accumulated during a test.
+// The caller must hold s.mu.
+func (s *MockServer) resetResourceFromEmbeddedLocked(filePath string) {
 	raw, err := dataFS.ReadFile(filePath)
 	if err != nil {
 		s.log.Error(err, "Failed to read embedded default", "path", filePath)
@@ -636,13 +638,7 @@ func (s *MockServer) resetAttributesFromEmbeddedLocked(filePath string) {
 		s.log.Error(err, "Failed to parse embedded default", "path", filePath)
 		return
 	}
-	current, err := s.loadResourceLocked(filePath)
-	if err != nil {
-		s.log.Error(err, "Failed to load resource for reset", "path", filePath)
-		return
-	}
-	current[attributesKey] = defaults[attributesKey]
-	s.overrides[filePath] = current
+	s.overrides[filePath] = defaults
 }
 
 func (s *MockServer) applyBiosSettings(urlPath string, update map[string]any) error {

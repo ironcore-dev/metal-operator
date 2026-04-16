@@ -24,6 +24,10 @@ type BMCSettingsTemplate struct {
 	// +optional
 	Variables []Variable `json:"variables,omitempty"`
 
+	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
+	// +optional
+	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
+
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
@@ -125,6 +129,14 @@ type BMCSettingsStatus struct {
 	// State represents the current state of the BMC configuration task.
 	// +optional
 	State BMCSettingsState `json:"state,omitempty"`
+
+	// FailedAttempts is the number of automatic retry attempts made after failure.
+	// +optional
+	FailedAttempts int32 `json:"failedAttempts,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions represents the latest available observations of the BMC Settings Resource state.
 	// +patchStrategy=merge

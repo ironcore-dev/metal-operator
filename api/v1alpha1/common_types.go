@@ -55,6 +55,17 @@ type ImmutableObjectReference struct {
 	UID types.UID `json:"uid,omitempty"`
 }
 
+// RetryPolicy defines the retry behavior on transient failures.
+type RetryPolicy struct {
+	// MaxAttempts is the maximum number of automatic retry attempts after failure.
+	// 0 means no automatic retries. Must be between 0 and 10 inclusive.
+	// If not set, the operator-level default is used.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
+	// +optional
+	MaxAttempts *int32 `json:"maxAttempts,omitempty"`
+}
+
 // IP is an IP address.
 // +kubebuilder:validation:Type=string
 // +kubebuilder:validation:Format=ip

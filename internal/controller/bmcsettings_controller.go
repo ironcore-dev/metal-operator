@@ -66,6 +66,7 @@ const (
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 func (r *BMCSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -1221,6 +1222,102 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(ctx context.Conte
 	return requests
 }
 
+// enqueueBMCSettingsBySecret enqueues every BMCSettings that references the changed
+// Secret via spec.variables[*].valueFrom.secretKeyRef.
+// Selector name fields containing $(VAR) placeholders are expanded using any
+// preceding fieldRef variables (resolved inline, no API calls) so that chained
+// references such as secretKeyRef.name: "$(BmcName)" are matched correctly.
+func (r *BMCSettingsReconciler) enqueueBMCSettingsBySecret(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	secretName := obj.GetName()
+	secretNamespace := obj.GetNamespace()
+
+	list := &metalv1alpha1.BMCSettingsList{}
+	if err := r.List(ctx, list); err != nil {
+		log.Error(err, "Failed to list BMCSettings for Secret watch")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, settings := range list.Items {
+		// Pre-resolve fieldRef variables in declaration order — these are
+		// free (no network) and cover the common chaining pattern.
+		partialResolved := make(map[string]string)
+		for _, v := range settings.Spec.Variables {
+			if v.ValueFrom == nil || v.ValueFrom.FieldRef == nil {
+				continue
+			}
+			val, err := resolveFieldRef(&settings, substituteVars(v.ValueFrom.FieldRef.FieldPath, partialResolved))
+			if err != nil {
+				continue
+			}
+			partialResolved[v.Key] = val
+		}
+
+		for _, v := range settings.Spec.Variables {
+			if v.ValueFrom == nil || v.ValueFrom.SecretKeyRef == nil {
+				continue
+			}
+			ref := v.ValueFrom.SecretKeyRef
+			if substituteVars(ref.Name, partialResolved) == secretName && ref.Namespace == secretNamespace {
+				requests = append(requests, ctrl.Request{
+					NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name},
+				})
+				break
+			}
+		}
+	}
+	return requests
+}
+
+// enqueueBMCSettingsByConfigMap enqueues every BMCSettings that references the changed
+// ConfigMap via spec.variables[*].valueFrom.configMapKeyRef.
+// Selector name fields containing $(VAR) placeholders are expanded using any
+// preceding fieldRef variables (resolved inline, no API calls) so that chained
+// references such as configMapKeyRef.name: "$(BmcName)" are matched correctly.
+func (r *BMCSettingsReconciler) enqueueBMCSettingsByConfigMap(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+	cmName := obj.GetName()
+	cmNamespace := obj.GetNamespace()
+
+	list := &metalv1alpha1.BMCSettingsList{}
+	if err := r.List(ctx, list); err != nil {
+		log.Error(err, "Failed to list BMCSettings for ConfigMap watch")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, settings := range list.Items {
+		// Pre-resolve fieldRef variables in declaration order — these are
+		// free (no network) and cover the common chaining pattern.
+		partialResolved := make(map[string]string)
+		for _, v := range settings.Spec.Variables {
+			if v.ValueFrom == nil || v.ValueFrom.FieldRef == nil {
+				continue
+			}
+			val, err := resolveFieldRef(&settings, substituteVars(v.ValueFrom.FieldRef.FieldPath, partialResolved))
+			if err != nil {
+				continue
+			}
+			partialResolved[v.Key] = val
+		}
+
+		for _, v := range settings.Spec.Variables {
+			if v.ValueFrom == nil || v.ValueFrom.ConfigMapKeyRef == nil {
+				continue
+			}
+			ref := v.ValueFrom.ConfigMapKeyRef
+			if substituteVars(ref.Name, partialResolved) == cmName && ref.Namespace == cmNamespace {
+				requests = append(requests, ctrl.Request{
+					NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name},
+				})
+				break
+			}
+		}
+	}
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCSettingsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -1229,5 +1326,7 @@ func (r *BMCSettingsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByServerRefs)).
 		Watches(&metalv1alpha1.BMC{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByBMCRefs)).
 		Watches(&metalv1alpha1.BMCVersion{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByBMCVersion)).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsBySecret)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCSettingsByConfigMap)).
 		Complete(r)
 }

@@ -95,11 +95,12 @@ stateDiagram-v2
       VerifySettings --> Success: desired settings observed
       VerifySettings --> StillInProgress: mismatch/not yet converged
       IssueSettingsUpdate --> FailedIssue: request failed
-      ResolveAndDiff --> FailedResolve: missing source
+      ResolveAndDiff --> ResolveAndDiff: missing source (requeue)
     }
 
     InProgress --> Applied: NoDiff or Success
-    InProgress --> Failed: FailedIssue or FailedResolve
+    InProgress --> Failed: FailedIssue
+    InProgress --> InProgress: ResolveError (requeue)
 
     state Applied {
       [*] --> DriftCheck
@@ -123,7 +124,7 @@ stateDiagram-v2
    - Resolve `spec.variables` in list order, substituting already-resolved variables into each source selector before lookup.
    - Substitute `$(VarName)` placeholders into `spec.settings` values to build the effective settings map.
    - Compare effective settings against current BMC values. If no diff, transition to `Applied`.
-   - If variable resolution fails (missing ConfigMap/Secret/field), transition to `Failed`.
+   - If variable resolution fails (missing ConfigMap/Secret/field), the reconcile returns an error and controller-runtime requeues with exponential backoff; the state machine does **not** move to `Failed`.
 4. **Maintenance orchestration** (`InProgress`):
    - Discover all servers associated with the BMC.
    - Request `ServerMaintenance` per server (policy-driven) and wait for approval.
@@ -137,7 +138,7 @@ stateDiagram-v2
 7. **Drift detection** (`Applied`):
    - On each reconcile, re-resolve variables and re-check diff against the BMC.
    - If drift is detected, transition back to `Pending` for a new apply cycle.
-8. **Terminalisation and cleanup** (`Applied`):
+8. **Termination and cleanup** (`Applied`):
    - Remove self-managed maintenance references.
    - On failure, set `Failed`; on retry annotation, reset to `Pending`.
 
@@ -149,7 +150,7 @@ stateDiagram-v2
 | Stuck waiting for maintenance | `spec.serverMaintenanceRefs[]`, conditions | One or more server maintenances not approved | Approve each pending server maintenance resource. |
 | `InProgress` too long | conditions + BMC health | BMC reset/apply did not converge | Check BMC reachability and vendor-specific settings endpoint health. |
 | `Failed` after apply | verify condition message | Unsupported key/value or readback mismatch | Validate exact vendor key names and normalized values. |
-| `Failed` on variable resolution | conditions | Missing ConfigMap/Secret or wrong key | Check that all referenced objects and keys exist in the correct namespace. |
+| Stuck in `InProgress`, repeated reconcile errors in logs | controller logs (`failed to resolve BMCSettings variables`) | Missing ConfigMap/Secret or wrong key | Check that all referenced objects and keys exist in the correct namespace; the controller requeues automatically once they appear. |
 | Deletion blocked | finalizer + in-progress state | Active reconciliation and pending cleanup refs | Resolve active operation first, then retry deletion. |
 
 ## Example

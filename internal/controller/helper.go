@@ -17,6 +17,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/third_party/expansion"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -498,24 +499,11 @@ func ApplyVariables(settingsMap map[string]string, resolved map[string]string) m
 	return out
 }
 
-// substituteVars replaces $(KEY) with the resolved value.
-// The escape sequence $$(KEY) produces a literal $(KEY) in the output.
+// substituteVars replaces $(KEY) placeholders using the resolved variable map.
+// $$(KEY) produces a literal $(KEY) in the output (escape semantics identical
+// to Kubernetes environment variable expansion).
 func substituteVars(s string, resolved map[string]string) string {
-	// Sentinel marks escaped $$(KEY) sequences during substitution so they are
-	// not expanded. The value is chosen to be effectively impossible to appear
-	// in any real BMC setting value or JSON payload.
-	const sentinel = "\x00\x01METAL_OPERATOR_ESC\x01\x00"
-	result := s
-	for key := range resolved {
-		result = strings.ReplaceAll(result, "$$("+key+")", sentinel+"("+key+")")
-	}
-	for key, val := range resolved {
-		result = strings.ReplaceAll(result, "$("+key+")", val)
-	}
-	for key := range resolved {
-		result = strings.ReplaceAll(result, sentinel+"("+key+")", "$("+key+")")
-	}
-	return result
+	return expansion.Expand(s, expansion.MappingFuncFor(resolved))
 }
 
 func resolveVariable(
@@ -568,6 +556,13 @@ func resolveVariable(
 
 // resolveFieldRef navigates a dotted fieldPath on the given object using the
 // unstructured accessor (e.g. "spec.BMCRef.name").
+// resolveFieldRef extracts the value at fieldPath from obj using dot-separated
+// path navigation (e.g. "spec.BMCRef.name"). Only string-typed fields are
+// supported; integer, bool, or map fields will be reported as an error.
+// If broader type coercion is needed in the future, prefer
+// k8s.io/apimachinery/pkg/fieldpath.ExtractFieldPathAsString, which handles
+// the same paths as the Kubernetes downward API and stringifies non-string
+// scalar types automatically.
 func resolveFieldRef(obj client.Object, fieldPath string) (string, error) {
 	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {

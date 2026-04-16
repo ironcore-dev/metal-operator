@@ -731,6 +731,9 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
+		By("Ensuring the resolved secret value was written to the BMC (not the raw placeholder)")
+		Expect(bmcPkg.UnitTestMockUps.BMCSettingAttr["abc"]).To(HaveKeyWithValue("value", "changed-via-secret"))
+
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
 
@@ -786,6 +789,9 @@ var _ = Describe("BMCSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
 
+		By("Ensuring the resolved ConfigMap value was written to the BMC (not the raw placeholder)")
+		Expect(bmcPkg.UnitTestMockUps.BMCSettingAttr["abc"]).To(HaveKeyWithValue("value", "changed-via-configmap"))
+
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
 
@@ -825,6 +831,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(settings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
+
+		By("Ensuring the resolved field value (BMC object name) was written to the BMC")
+		Expect(bmcPkg.UnitTestMockUps.BMCSettingAttr["abc"]).To(HaveKeyWithValue("value", bmc.Name))
 
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
@@ -889,6 +898,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(settings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
+
+		By("Ensuring both resolved variable values were concatenated and written to the BMC")
+		Expect(bmcPkg.UnitTestMockUps.BMCSettingAttr["abc"]).To(HaveKeyWithValue("value", bmc.Name+".example.com"))
 
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
@@ -963,6 +975,9 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(settings)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
 		))
+
+		By("Ensuring the chained variable (LicenseKey looked up via BmcName) was written to the BMC")
+		Expect(bmcPkg.UnitTestMockUps.BMCSettingAttr["abc"]).To(HaveKeyWithValue("value", "license-key-for-"+bmc.Name))
 
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})

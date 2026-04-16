@@ -54,16 +54,19 @@ var (
 )
 
 func init() {
-	noRebootSettings = loadNoRebootAttrs("data/Registries/BiosAttributeRegistry.v1_0_0.json")
-	noRebootBMCSettings = loadNoRebootAttrs("data/Registries/BMCAttributeRegistry/index.json")
+	noRebootSettings = mustLoadNoRebootAttrs("data/Registries/BiosAttributeRegistry.v1_0_0.json")
+	noRebootBMCSettings = mustLoadNoRebootAttrs("data/Registries/BMCAttributeRegistry/index.json")
 }
 
-// loadNoRebootAttrs reads an attribute registry JSON from the embedded FS and
+// mustLoadNoRebootAttrs reads an attribute registry JSON from the embedded FS and
 // returns the names of all attributes whose ResetRequired field is false.
-func loadNoRebootAttrs(registryPath string) []string {
+// It panics if the file cannot be read or parsed so that a renamed or malformed
+// embedded registry is caught immediately at startup rather than silently
+// flipping all settings onto the slow (reboot-required) path.
+func mustLoadNoRebootAttrs(registryPath string) []string {
 	data, err := dataFS.ReadFile(registryPath)
 	if err != nil {
-		return nil
+		panic(fmt.Sprintf("read %s: %v", registryPath, err))
 	}
 	var registry struct {
 		RegistryEntries struct {
@@ -74,7 +77,7 @@ func loadNoRebootAttrs(registryPath string) []string {
 		} `json:"RegistryEntries"`
 	}
 	if err := json.Unmarshal(data, &registry); err != nil {
-		return nil
+		panic(fmt.Sprintf("parse %s: %v", registryPath, err))
 	}
 	var result []string
 	for _, attr := range registry.RegistryEntries.Attributes {

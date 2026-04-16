@@ -431,8 +431,8 @@ func (r *RedfishBaseBMC) GetBiosPendingAttributeValues(ctx context.Context, syst
 		return nil, err
 	}
 
-	// unfortunately, some vendors fill the pending attribute with copy of actual bios attribute
-	// remove if there are the same
+	// Unfortunately, some vendors fill the pending attribute with a copy of actual BIOS attributes.
+	// Remove if they are the same.
 	if len(tBios.Attributes) == len(tBiosPendingSetting.Attributes) {
 		pendingAttr := schemas.SettingsAttributes{}
 		for key, attr := range tBiosPendingSetting.Attributes {
@@ -455,7 +455,7 @@ func (r *RedfishBaseBMC) GetEntityFromUri(ctx context.Context, uri string, clien
 	}
 	defer func(Body io.ReadCloser) {
 		if err = Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
+			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
 
@@ -542,7 +542,7 @@ func (r *RedfishBaseBMC) CheckBiosAttributes(attrs schemas.SettingsAttributes) (
 func (r *RedfishBaseBMC) checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
-	// TODO: add more types like maps and Enumerations
+	// TODO: add support for Map/Object attribute types
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
@@ -790,7 +790,7 @@ func (r *RedfishBaseBMC) DeleteAccount(ctx context.Context, userName, id string)
 				return err
 			}
 			if err = resp.Body.Close(); err != nil {
-				log.Error(err, "failed to close response body")
+				log.Error(err, "Failed to close response body")
 			}
 			return nil
 		}

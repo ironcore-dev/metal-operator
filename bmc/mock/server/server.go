@@ -746,12 +746,12 @@ func (s *MockServer) loadResourceLocked(filePath string) (map[string]any, error)
 
 	data, err := dataFS.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errNotFound, err)
+		return nil, fmt.Errorf("%w: %w", errNotFound, err)
 	}
 
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("%w: %v", errCorruptJSON, err)
+		return nil, fmt.Errorf("%w: %w", errCorruptJSON, err)
 	}
 
 	return result, nil

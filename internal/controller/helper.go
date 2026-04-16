@@ -30,6 +30,9 @@ import (
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
 
+	RetryOfFailedResourceConditionIssued = "RetryOfFailedResourceConditionIssued"
+	RetryOfFailedResourceReasonIssued    = "RetryOfFailedResourceReasonIssued"
+
 	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
 	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
 	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
@@ -77,7 +80,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 	condFound, err := acc.FindSlice(conditions, conditionType, condition)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
+		return nil, fmt.Errorf("failed to find Condition %v. error: %w", conditionType, err)
 	}
 	if !condFound {
 		condition.Type = conditionType
@@ -85,7 +88,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
 		); err != nil {
-			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
+			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %w", conditionType, err)
 		}
 	}
 
@@ -217,7 +220,7 @@ func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv
 		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
 		BMC := &metalv1alpha1.BMC{}
 		if err := kClient.Get(ctx, key, BMC); err != nil {
-			log.Error(err, "failed to get referred server's Manager")
+			log.Error(err, "Failed to get referred server's Manager")
 			return err
 		}
 		annotations := BMC.GetAnnotations()
@@ -308,9 +311,16 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
-		childObj, ok := obj.(client.Object)
+		cObj, ok := obj.(client.Object)
 		if !ok {
 			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
+			return nil
+		}
+		// Always fetch the latest version from the API server
+		childObj := cObj.DeepCopyObject().(client.Object)
+		err := c.Get(ctx, client.ObjectKeyFromObject(cObj), childObj)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to fetch latest child %s: %w", cObj.GetName(), err))
 			return nil
 		}
 		// if the child is being deleted, we don't need to propagate
@@ -325,6 +335,28 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 			if !shouldChildRetryReconciliation(parentObj) && isChildRetryThroughSets(childObj) && annotations != nil {
 				delete(annotations, metalv1alpha1.OperationAnnotation)
 				childObj.SetAnnotations(annotations)
+			}
+			// Use reflection to access the Status.Conditions field, assuming given child objects have it.
+			v := reflect.ValueOf(childObj).Elem()
+			statusField := v.FieldByName("Status")
+			if statusField.IsValid() {
+				// If there's no Status field, we can't check conditions we continue.
+				conditionsField := statusField.FieldByName("Conditions")
+				if conditionsField.IsValid() {
+					// Same as above, if there's no Conditions field, we can't check this.
+					conditions, ok := conditionsField.Interface().([]metav1.Condition)
+					if ok {
+						acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+						retriedCondition, err := GetCondition(acc, conditions, RetryOfFailedResourceConditionIssued)
+
+						if err == nil && retriedCondition != nil &&
+							retriedCondition.Status == metav1.ConditionTrue &&
+							retriedCondition.Message == metalv1alpha1.OperationAnnotationRetryFailedPropagated {
+							// retry was already propagated to child, we can skip re-propagation to avoid infinite loop
+							return nil
+						}
+					}
+				}
 			}
 			// should not overwrite the already present retry annotation on child
 			// should not overwrite if the annotation already present on the child

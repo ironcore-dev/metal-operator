@@ -378,7 +378,7 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metal
 
 	if server.Spec.ServerMaintenanceRef != nil {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
-			log.Error(err, "failed to remove ServerMaintenance ref from server")
+			log.Error(err, "Failed to remove ServerMaintenance ref from Server")
 		}
 	}
 	if server.Spec.MaintenanceBootConfigurationRef != nil {
@@ -464,7 +464,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 		log := ctrl.LoggerFrom(ctx)
 		server, ok := object.(*metalv1alpha1.Server)
 		if !ok {
-			log.Error(nil, "expected object to be a Server", "object", object)
+			log.Error(nil, "Expected object to be a Server", "object", object)
 			return nil
 		}
 
@@ -481,7 +481,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: server.Name}); err != nil {
-			log.Error(err, "failed to list ServerMaintenances")
+			log.Error(err, "Failed to list ServerMaintenances")
 			return req
 		}
 		for _, maintenance := range maintenanceList.Items {
@@ -498,7 +498,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 		log := ctrl.LoggerFrom(ctx)
 		claim, ok := object.(*metalv1alpha1.ServerClaim)
 		if !ok {
-			log.Error(nil, "expected object to be a ServerClaim", "object", object)
+			log.Error(nil, "Expected object to be a ServerClaim", "object", object)
 			return nil
 		}
 
@@ -513,7 +513,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: claim.Spec.ServerRef.Name}); err != nil {
-			log.Error(err, "failed to list ServerMaintenances")
+			log.Error(err, "Failed to list ServerMaintenances")
 			return nil
 		}
 

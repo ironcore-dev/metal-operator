@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/netip"
 
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -149,14 +151,13 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			EnsureCleanState()
 		})
 
-		It("Should successfully reconcile when BMCSettingsSet was generated, labels match and bmcsettings were generated", func(ctx SpecContext) {
+		It("should successfully reconcile when BMCSettingsSet was generated, labels match and BMCSettings were generated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -228,14 +229,13 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		})
 
-		It("Should successfully reconcile when bmc resource was deleted", func(ctx SpecContext) {
+		It("should successfully reconcile when BMC resource was deleted", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -317,14 +317,13 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 		})
 
-		It("Should successfully reconcile when label of bmc02 was changed", func(ctx SpecContext) {
+		It("should successfully reconcile when label of BMC02 was changed", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -414,7 +413,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Consistently(Get(bmcSettings02)).Should(Satisfy(apierrors.IsNotFound))
 
 		})
-		It("Should successfully reconcile when bmcsettingset was updated", func(ctx SpecContext) {
+		It("should successfully reconcile when BMCSettingsSet was updated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 			bmcSettingNew := make(map[string]string)
@@ -423,7 +422,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating a BMCSettingsSet")
 			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -517,7 +515,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.List(ctx, &maintList)).To(Succeed())
 		})
 
-		It("Should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
+		It("should successfully wait and reconcile until all resources are updated", func(ctx SpecContext) {
 			bmcSetting := make(map[string]string)
 			bmcSetting["abc"] = changedBMCSetting
 			bmcSettingNew := make(map[string]string)
@@ -526,7 +524,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Creating the BMCSettingsSet resource")
 			bmcSettingsSet1 := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset1-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -564,7 +561,6 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Createing a duplicate BMCSettingsSet resource")
 			bmcSettingsSet2 := &metalv1alpha1.BMCSettingsSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    ns.Name,
 					GenerateName: "test-bmcsettingsset2-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
@@ -679,5 +675,132 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, bmcSettings01_02)).To(Succeed())
 			Eventually(Get(bmcSettings01_02)).Should(Satisfy(apierrors.IsNotFound))
 		})
+		It("Should successfully retry failed state child resources", func(ctx SpecContext) {
+
+			failedAutoRetryCount := 2
+			bmcSetting := make(map[string]string)
+			bmcSetting["UnknownSettings"] = changedBMCSetting
+
+			By("Creating a BMCSettingsSet")
+			bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    ns.Name,
+					GenerateName: "test-bmcsettingsset"},
+				Spec: metalv1alpha1.BMCSettingsSetSpec{
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						SettingsMap:             bmcSetting,
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					},
+					BMCSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"metal.ironcore.dev/Manufacturer": "foo",
+							"metal.ironcore.dev/Model":        "bar",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSettingsSet)).To(Succeed())
+
+			By("Checking if the bmcSettings was generated")
+			bmcSettings01 := &metalv1alpha1.BMCSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: bmcSettingsSet.Name + "-" + bmc01.Name,
+				},
+			}
+			Eventually(Get(bmcSettings01)).Should(Succeed())
+
+			By("Checking if the status has been updated")
+			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+			))
+
+			By("Ensuring that the BMCSetting01 has failed")
+			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+			))
+
+			By("Checking if the status has been updated to failed")
+			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 1)),
+			))
+
+			By("Ensuring that the BMCSetting01 has not been changed")
+			Consistently(Object(bmcSettings01), "50ms").Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+			))
+
+			By("Updating the BMCSettingsSet with retry annotation")
+			Eventually(Update(bmcSettingsSet, func() {
+				bmcSettingsSet.Annotations = map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryChildAndSelf,
+				}
+			})).Should(Succeed())
+
+			By("Ensuring that the BMCSetting01 has been retried ")
+			Eventually(Object(bmcSettings01)).WithPolling(1 * time.Microsecond).Should(SatisfyAll(
+				HaveField("Status.State", Not(Equal(metalv1alpha1.BMCSettingsStateFailed))),
+				HaveField("Status.FailedAttempts", Equal(int32(0))),
+			))
+
+			By("Ensuring that the BMCSetting01 has failed again")
+			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+			))
+
+			By("Ensuring that the BMCSetting01 has not been changed")
+			Consistently(Object(bmcSettings01), "50ms").Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+				HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+			))
+
+			By("Checking if the status has been updated to failed again")
+			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 1)),
+			))
+
+			By("Ensuring that the BMCSetting01 has not been retried again")
+			Consistently(Object(bmcSettings01), "50ms").Should(
+				HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			)
+
+			By("Updating the BMCSettingsSet with NO retry annotation")
+			Eventually(Update(bmcSettingsSet, func() {
+				delete(bmcSettingsSet.GetAnnotations(), metalv1alpha1.OperationAnnotation)
+				delete(bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsMap, "UnknownSettings")
+				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsMap["abc"] = changedBMCSetting
+			})).Should(Succeed())
+
+			By("Checking if the status has been updated to completed (retried automatically)")
+			Eventually(Object(bmcSettingsSet)).Should(SatisfyAll(
+				HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+				HaveField("Status.AvailableBMCSettings", BeNumerically("==", 1)),
+				HaveField("Status.FailedBMCSettings", BeNumerically("==", 0)),
+				HaveField("Status.CompletedBMCSettings", BeNumerically("==", 1)),
+			))
+
+			// cleanup
+			Expect(k8sClient.Delete(ctx, bmcSettingsSet)).To(Succeed())
+			Eventually(Get(bmcSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
+			Expect(k8sClient.Delete(ctx, bmcSettings01)).To(Succeed())
+			Eventually(Get(bmcSettings01)).Should(Satisfy(apierrors.IsNotFound))
+
+			Eventually(Object(server01)).Should(
+				HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			)
+			Eventually(Object(server02)).Should(
+				HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			)
+		})
+
 	})
 })

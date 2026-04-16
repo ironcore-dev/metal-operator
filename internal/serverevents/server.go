@@ -190,7 +190,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}()
 	select {
 	case <-ctx.Done():
-		s.log.Info("Shutting down event server...")
+		s.log.Info("Shutting down event server")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {

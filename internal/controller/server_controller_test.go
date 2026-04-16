@@ -38,7 +38,7 @@ var _ = Describe("Server Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should initialize a Server from Endpoint", func(ctx SpecContext) {
+	It("should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
 		endpoint := &metalv1alpha1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
@@ -286,7 +286,7 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should initialize a Server with inline BMC configuration", func(ctx SpecContext) {
+	It("should initialize a Server with inline BMC configuration", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -510,7 +510,7 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
-	It("Should reset a Server into initial state on discovery failure", func(ctx SpecContext) {
+	It("should reset a Server into initial state on discovery failure", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -593,7 +593,7 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
-	It("Should reset a Server into initial state after maintenance is removed", func(ctx SpecContext) {
+	It("should reset a Server into initial state after maintenance is removed", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -656,7 +656,7 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
-	It("Should reset a claimed Server into Reserved state after maintenance is removed", func(ctx SpecContext) {
+	It("should reset a claimed Server into Reserved state after maintenance is removed", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -740,7 +740,7 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
-	It("Should updated the BootStateReceived condition when the bootstate endpoint is called", func(ctx SpecContext) {
+	It("should update the BootStateReceived condition when the bootstate endpoint is called", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -799,7 +799,7 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should move Server out of reserved state on missing serverClaim and BootConfig", func(ctx SpecContext) {
+	It("should move Server out of reserved state on missing serverClaim and BootConfig", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -972,7 +972,7 @@ var _ = Describe("Server Controller", func() {
 			}
 		})
 
-		It("Should use custom file template when available", func(ctx SpecContext) {
+		It("should use custom file template when available", func(ctx SpecContext) {
 			By("Creating a custom ignition template file")
 			customTemplate := `variant: fcos
 version: "1.4.0"
@@ -1033,7 +1033,7 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("RestartSec=30"))
 		})
 
-		It("Should fallback with error when file is missing", func(ctx SpecContext) {
+		It("should fallback with error when file is missing", func(ctx SpecContext) {
 			By("Creating a ServerReconciler with non-existent file path")
 			reconciler := &ServerReconciler{
 				Client:                k8sClient,
@@ -1054,7 +1054,7 @@ passwd:
 			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
 		})
 
-		It("Should fail when file template is invalid", func(ctx SpecContext) {
+		It("should fail when file template is invalid", func(ctx SpecContext) {
 			By("Creating a file with invalid template")
 			invalidTemplate := `variant: fcos
 systemd:
@@ -1090,7 +1090,7 @@ systemd:
 			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
 		})
 
-		It("Should use default ignition template from file", func(ctx SpecContext) {
+		It("should use default ignition template from file", func(ctx SpecContext) {
 			By("Creating a default ignition template file")
 			defaultTemplate := `variant: fcos
 version: "1.3.0"
@@ -1145,7 +1145,7 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("name: metal"))
 		})
 
-		It("Should create server with custom ignition template file end-to-end", func(ctx SpecContext) {
+		It("should create server with custom ignition template file end-to-end", func(ctx SpecContext) {
 			By("Creating a custom ignition template file")
 			customTemplate := `variant: fcos
 version: "1.5.0"

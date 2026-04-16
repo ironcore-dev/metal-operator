@@ -731,17 +731,6 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 	return nil
 }
 
-// settingKeys returns only the map keys of a SettingsAttributes map for
-// safe logging. Values are omitted because they may contain secrets resolved
-// from SecretKeyRef variables.
-func settingKeys(attrs schemas.SettingsAttributes) []string {
-	keys := make([]string, 0, len(attrs))
-	for k := range attrs {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (diff schemas.SettingsAttributes, err error) {
 	log := ctrl.LoggerFrom(ctx)
 

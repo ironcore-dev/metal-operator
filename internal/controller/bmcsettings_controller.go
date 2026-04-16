@@ -442,7 +442,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to set BMC settings: %w", err)
 			}
-			log.V(1).Info("BMC settings issued successfully", "Settings", settingsDiff)
+			log.V(1).Info("BMC settings issued successfully", "SettingKeys", settingKeys(settingsDiff))
 
 			BMCSettingsAppliedCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCSettingsChangesIssuedCondition)
 			if err != nil {
@@ -731,6 +731,17 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 	return nil
 }
 
+// settingKeys returns only the map keys of a SettingsAttributes map for
+// safe logging. Values are omitted because they may contain secrets resolved
+// from SecretKeyRef variables.
+func settingKeys(attrs schemas.SettingsAttributes) []string {
+	keys := make([]string, 0, len(attrs))
+	for k := range attrs {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (diff schemas.SettingsAttributes, err error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -745,7 +756,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 		return diff, fmt.Errorf("failed to get BMC settings: %w", err)
 	}
 
-	log.V(1).Info("Current BMC settings fetched", "Settings", currentSettings)
+	log.V(1).Info("Current BMC settings fetched", "SettingKeys", settingKeys(currentSettings))
 
 	diff = schemas.SettingsAttributes{}
 	var errs []error

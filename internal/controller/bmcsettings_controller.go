@@ -61,7 +61,8 @@ const (
 // legacyBMCSettingsConditionTypes maps old condition type strings to their new values.
 // TODO: Remove this migration in the next release once all CRs have been reconciled.
 var legacyBMCSettingsConditionTypes = map[string]string{
-	"BMCResetIssued": ConditionResetIssued,
+	"BMCResetIssued":                       ConditionResetIssued,
+	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete
@@ -673,14 +674,14 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 		settings.Status.State = metalv1alpha1.BMCSettingsStatePending
 		settings.Status.ObservedGeneration = settings.Generation
 		annotations := settings.GetAnnotations()
-		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 		if err != nil {
 			return fmt.Errorf("failed to get retry condition for BMCSettings: %w", err)
 		}
 		if retryCondition.Status != metav1.ConditionTrue {
 			err := r.Conditions.Update(retryCondition,
 				conditionutils.UpdateStatus(metav1.ConditionTrue),
-				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateReason(ReasonRetryOfFailedResourceIssued),
 				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
 			)
 			if err != nil {
@@ -711,7 +712,7 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 			settingsBase := settings.DeepCopy()
 			settings.Status.State = metalv1alpha1.BMCSettingsStatePending
 			settings.Status.ObservedGeneration = settings.Generation
-			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 			if err != nil {
 				return fmt.Errorf("failed to get Retry condition for BMCSettings: %w", err)
 			}

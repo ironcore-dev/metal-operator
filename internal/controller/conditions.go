@@ -29,6 +29,8 @@ const (
 	ConditionReset = "Reset"
 	// ConditionReady indicates readiness.
 	ConditionReady = "Ready"
+	// ConditionRetryOfFailedResourceIssued indicates a retry of a failed resource has been issued.
+	ConditionRetryOfFailedResourceIssued = "RetryOfFailedResourceIssued"
 )
 
 // Shared reason strings used across multiple controllers.
@@ -71,4 +73,6 @@ const (
 	ReasonMaintenanceWaiting = "ServerMaintenanceWaitingOnApproval"
 	// ReasonMaintenanceApproved indicates ServerMaintenance has been approved.
 	ReasonMaintenanceApproved = "ServerMaintenanceApproval"
+	// ReasonRetryOfFailedResourceIssued indicates a retry of a failed resource has been issued.
+	ReasonRetryOfFailedResourceIssued = "RetryOfFailedResourceIssued"
 )

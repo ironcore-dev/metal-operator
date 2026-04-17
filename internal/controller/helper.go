@@ -32,9 +32,6 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
-
-	RetryOfFailedResourceConditionIssued = "RetryOfFailedResourceConditionIssued"
-	RetryOfFailedResourceReasonIssued    = "RetryOfFailedResourceReasonIssued"
 )
 
 type BMCTaskFetchFailedError struct {
@@ -357,7 +354,7 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 					conditions, ok := conditionsField.Interface().([]metav1.Condition)
 					if ok {
 						acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-						retriedCondition, err := GetCondition(acc, conditions, RetryOfFailedResourceConditionIssued)
+						retriedCondition, err := GetCondition(acc, conditions, ConditionRetryOfFailedResourceIssued)
 
 						if err == nil && retriedCondition != nil &&
 							retriedCondition.Status == metav1.ConditionTrue &&

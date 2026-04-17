@@ -41,13 +41,14 @@ const (
 // legacyBIOSVersionConditionTypes maps old condition type strings to their new values.
 // TODO: Remove this migration in the next release once all CRs have been reconciled.
 var legacyBIOSVersionConditionTypes = map[string]string{
-	"BIOSUpgradeIssued":        ConditionVersionUpgradeIssued,
-	"BIOSUpgradeCompleted":     ConditionVersionUpgradeCompleted,
-	"BIOSUpgradePowerOn":       ConditionUpgradePowerOn,
-	"BIOSUpgradePowerOff":      ConditionUpgradePowerOff,
-	"BIOSUpgradeVerification":  ConditionVersionUpgradeVerification,
-	"BIOSVersionUpdatePending": ConditionVersionUpdatePending,
-	"BMCResetIssued":           ConditionResetIssued,
+	"BIOSUpgradeIssued":                    ConditionVersionUpgradeIssued,
+	"BIOSUpgradeCompleted":                 ConditionVersionUpgradeCompleted,
+	"BIOSUpgradePowerOn":                   ConditionUpgradePowerOn,
+	"BIOSUpgradePowerOff":                  ConditionUpgradePowerOff,
+	"BIOSUpgradeVerification":              ConditionVersionUpgradeVerification,
+	"BIOSVersionUpdatePending":             ConditionVersionUpdatePending,
+	"BMCResetIssued":                       ConditionResetIssued,
+	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
 }
 
 type BIOSVersionReconciler struct {
@@ -482,7 +483,7 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 		biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
 		biosVersion.Status.ObservedGeneration = biosVersion.Generation
 		annotations := biosVersion.GetAnnotations()
-		retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 		if err != nil {
 			return true, fmt.Errorf("failed to get retry condition for BIOSVersion: %w", err)
 		}
@@ -490,7 +491,7 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 		if retryCondition.Status != metav1.ConditionTrue {
 			err := r.Conditions.Update(retryCondition,
 				conditionutils.UpdateStatus(metav1.ConditionTrue),
-				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateReason(ReasonRetryOfFailedResourceIssued),
 				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
 			)
 			if err != nil {
@@ -521,7 +522,7 @@ func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVers
 			biosVersionBase := biosVersion.DeepCopy()
 			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
 			biosVersion.Status.ObservedGeneration = biosVersion.Generation
-			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 			if err != nil {
 				return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
 			}
@@ -640,7 +641,7 @@ func (r *BIOSVersionReconciler) cleanup(ctx context.Context, bmcClient bmc.BMC, 
 		log.V(1).Info("Upgraded BIOS version", "Version", currentBiosVersion, "Server", server.Name)
 		return r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateCompleted, nil, nil)
 	}
-	retryFailedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
+	retryFailedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 	if err != nil {
 		return fmt.Errorf("failed to get retry condition for BIOSVersion: %w", err)
 	}

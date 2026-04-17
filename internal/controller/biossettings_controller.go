@@ -66,14 +66,15 @@ const (
 // legacyBIOSSettingsConditionTypes maps old condition type strings to their new values.
 // This ensures backward compatibility with existing CRs created before the rename.
 var legacyBIOSSettingsConditionTypes = map[string]string{
-	"BIOSSettingsCheckPendingSettings":    ConditionPendingSettingsCheck,
-	"BIOSSettingsDuplicateKeys":           ConditionSettingsDuplicateKeys,
-	"BIOSSettingUpdateStartTime":          ConditionSettingsUpdateStartTime,
-	"BIOSSettingsTimedOut":                ConditionSettingsTimedOut,
-	"ServerPowerOnCondition":              ConditionSettingsServerPowerOn,
-	"ServerRebootPostUpdateHasBeenIssued": ConditionSettingsRebootPostUpdate,
-	"BMCResetIssued":                      ConditionResetIssued,
-	"BIOSVersionUpdatePending":            ConditionVersionUpdatePending,
+	"BIOSSettingsCheckPendingSettings":     ConditionPendingSettingsCheck,
+	"BIOSSettingsDuplicateKeys":            ConditionSettingsDuplicateKeys,
+	"BIOSSettingUpdateStartTime":           ConditionSettingsUpdateStartTime,
+	"BIOSSettingsTimedOut":                 ConditionSettingsTimedOut,
+	"ServerPowerOnCondition":               ConditionSettingsServerPowerOn,
+	"ServerRebootPostUpdateHasBeenIssued":  ConditionSettingsRebootPostUpdate,
+	"BMCResetIssued":                       ConditionResetIssued,
+	"BIOSVersionUpdatePending":             ConditionVersionUpdatePending,
+	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
 }
 
 // BIOSSettingsReconciler reconciles a BIOSSettings object
@@ -1080,7 +1081,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 		settings.Status.ObservedGeneration = settings.Generation
 		annotations := settings.GetAnnotations()
-		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get retry condition for BIOSSettings: %w", err)
 		}
@@ -1088,7 +1089,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		if retryCondition.Status != metav1.ConditionTrue {
 			err := r.Conditions.Update(retryCondition,
 				conditionutils.UpdateStatus(metav1.ConditionTrue),
-				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateReason(ReasonRetryOfFailedResourceIssued),
 				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
 			)
 			if err != nil {
@@ -1123,7 +1124,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 			settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
 			settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 			settings.Status.ObservedGeneration = settings.Generation
-			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Retry condition for BIOSSettings: %w", err)
 			}

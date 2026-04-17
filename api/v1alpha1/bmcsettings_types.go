@@ -48,6 +48,7 @@ type Variable struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of fieldRef, configMapKeyRef, or secretKeyRef must be provided"
 type VariableSourceValueFrom struct {
 	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+	// Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
 	// +optional
 	FieldRef *FieldRefSelector `json:"fieldRef,omitempty"`
 
@@ -62,6 +63,7 @@ type VariableSourceValueFrom struct {
 
 type FieldRefSelector struct {
 	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
+	// Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
 	// +required

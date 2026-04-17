@@ -115,6 +115,13 @@ func (r *BMCSettingsSetReconciler) delete(
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
 		}
+		log.V(1).Info("Updated BMCSettingsSet state", "Status", currentStatus)
+
+		// Handle propagation of retry annotation to child when parent is being deleted.
+		// That way the deleted annotations can be passed to children before parent is deleted.
+		if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+			return ctrl.Result{}, err
+		}
 		log.Info("Waiting on the created BMCSettings to reach terminal status")
 		return ctrl.Result{}, nil
 
@@ -225,6 +232,11 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
 	}
 
+	// handle retry annotation - remove the annotation after retrying reconciliation
+	if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if currentStatus.FullyLabeledBMCs != currentStatus.AvailableBMCSettings || pendingPatchingSettings {
 		log.V(1).Info("Waiting for all BMCSettings to be created/Patched for the labeled BMCs", "Status", currentStatus)
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
@@ -254,7 +266,7 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 						log.V(1).Info("BMCSettings referenced by BMC not found, will create a new one", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
 						// proceed to create a new BMCSettings; the ref will be updated when it is created
 					} else {
-						log.Error(err, "error when trying to get BMCSettings referenced by Server", "Server", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+						log.Error(err, "Failed to get BMCSettings referenced by BMC", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
 						// we will try this again in next reconciliation loop
 						continue
 					}
@@ -360,6 +372,22 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		}
 	}
 	return pendingPatchingSettings, errors.Join(errs...)
+}
+
+func (r *BMCSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, set *metalv1alpha1.BMCSettingsSet) error {
+	log := ctrl.LoggerFrom(ctx)
+	ownedBMCSettings, err := r.getOwnedBMCSettings(ctx, set)
+	if err != nil {
+		return err
+	}
+
+	if len(ownedBMCSettings.Items) == 0 {
+		log.V(1).Info("No BMCSettings found, skipping retry annotation propagation")
+		return nil
+	}
+
+	log.V(1).Info("Propagating retry annotation to owned BMCSettings resources")
+	return handleRetryAnnotationPropagation(ctx, r.Client, set, ownedBMCSettings)
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(

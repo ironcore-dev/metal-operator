@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.26.1 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.2 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -17,6 +17,7 @@ COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
+COPY third_party/ third_party/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command

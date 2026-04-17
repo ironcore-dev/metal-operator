@@ -118,6 +118,20 @@ spec:
                 required:
                 - URI
                 type: object
+              retryPolicy:
+                description: RetryPolicy defines the retry behavior for automatic
+                  retries on transient failures.
+                properties:
+                  maxAttempts:
+                    description: |-
+                      MaxAttempts is the maximum number of automatic retry attempts after failure.
+                      0 means no automatic retries. Must be between 0 and 10 inclusive.
+                      If not set, the operator-level default is used.
+                    format: int32
+                    maximum: 10
+                    minimum: 0
+                    type: integer
+                type: object
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
                   enforced on the server managed by referred BMC.
@@ -130,11 +144,12 @@ spec:
                     an object.
                   properties:
                     apiVersion:
-                      description: APIVersion is the API version of the referenced
-                        object.
+                      description: 'Deprecated: APIVersion is no longer used. Retained
+                        for backwards compatibility.'
                       type: string
                     kind:
-                      description: Kind is the kind of the referenced object.
+                      description: 'Deprecated: Kind is no longer used. Retained for
+                        backwards compatibility.'
                       type: string
                     name:
                       description: Name is the name of the referenced object.
@@ -143,14 +158,12 @@ spec:
                       description: Namespace is the namespace of the referenced object.
                       type: string
                     uid:
-                      description: UID is the uid of the referenced object.
+                      description: 'Deprecated: UID is no longer used. Retained for
+                        backwards compatibility.'
                       type: string
                   required:
-                  - apiVersion
-                  - kind
                   - name
                   - namespace
-                  - uid
                   type: object
                 type: array
               updatePolicy:
@@ -225,6 +238,16 @@ spec:
                   - type
                   type: object
                 type: array
+              failedAttempts:
+                description: FailedAttempts is the number of automatic retry attempts
+                  made after failure.
+                format: int32
+                type: integer
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               state:
                 description: State represents the current state of the BMC configuration
                   task.

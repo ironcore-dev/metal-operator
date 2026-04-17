@@ -66,14 +66,14 @@ func (r *LenovoRedfishBMC) lenovoBuildRequestBody(parameters *schemas.UpdateServ
 func (r *LenovoRedfishBMC) lenovoExtractTaskMonitorURI(response *http.Response) (string, error) {
 	rawBody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read the response body %v %v", err, rawBody)
+		return "", fmt.Errorf("failed to read the response body %w %v", err, rawBody)
 	}
 
 	var tResp struct {
 		TaskMonitor string `json:"@odata.id,omitempty"`
 	}
 	if err = json.Unmarshal(rawBody, &tResp); err != nil {
-		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %v", err)
+		return "", fmt.Errorf("failed to Unmarshal taskMonitor URI %w", err)
 	}
 
 	if tResp.TaskMonitor == "" {
@@ -107,7 +107,7 @@ func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonit
 					respJobRawBody, err := io.ReadAll(respJob.Body)
 					if err != nil {
 						return nil,
-							fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+							fmt.Errorf("failed to get the upgrade Task details and read the response body: %v, statusCode: %v",
 								err, respJob.StatusCode)
 					}
 					return nil,
@@ -118,7 +118,7 @@ func (r *LenovoRedfishBMC) lenovoParseTaskDetails(ctx context.Context, taskMonit
 				respJobRawBody, err := io.ReadAll(respJob.Body)
 				if err != nil {
 					return nil,
-						fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+						fmt.Errorf("failed to get the upgrade Task details and read the response body: %v, statusCode: %v",
 							err, respJob.StatusCode)
 				}
 
@@ -158,4 +158,37 @@ func (r *LenovoRedfishBMC) UpgradeBMCVersion(ctx context.Context, _ string, para
 
 func (r *LenovoRedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.lenovoParseTaskDetails)
+}
+
+// CheckBMCPendingComponentUpgrade checks for pending component upgrades (Lenovo: "-Pending" suffix).
+func (r *LenovoRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
+	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.lenovoGetComponentFilters, r.lenovoMatchesComponentFilter, r.lenovoCheckPending)
+}
+
+func (r *LenovoRedfishBMC) lenovoGetComponentFilters(componentType ComponentType) []string {
+	switch componentType {
+	case ComponentTypeBMC:
+		return []string{"Firmware:BMC"}
+	case ComponentTypeBIOS:
+		return []string{"Firmware:UEFI", "BIOS"}
+	default:
+		return []string{}
+	}
+}
+
+func (r *LenovoRedfishBMC) lenovoMatchesComponentFilter(fw *schemas.SoftwareInventory, filters []string) bool {
+	idUpper := strings.ToUpper(fw.ID)
+	for _, filter := range filters {
+		if strings.Contains(idUpper, strings.ToUpper(filter)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *LenovoRedfishBMC) lenovoCheckPending(fw *schemas.SoftwareInventory) bool {
+	return strings.Contains(strings.ToUpper(fw.ID), "-PENDING")
 }

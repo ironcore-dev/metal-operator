@@ -73,6 +73,20 @@ spec:
                 x-kubernetes-validations:
                 - message: BMCRef is immutable
                   rule: self == oldSelf
+              retryPolicy:
+                description: RetryPolicy defines the retry behavior for automatic
+                  retries on transient failures.
+                properties:
+                  maxAttempts:
+                    description: |-
+                      MaxAttempts is the maximum number of automatic retry attempts after failure.
+                      0 means no automatic retries. Must be between 0 and 10 inclusive.
+                      If not set, the operator-level default is used.
+                    format: int32
+                    maximum: 10
+                    minimum: 0
+                    type: integer
+                type: object
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
                   applied on the server.
@@ -91,11 +105,12 @@ spec:
                         server.
                       properties:
                         apiVersion:
-                          description: APIVersion is the API version of the referenced
-                            object.
+                          description: 'Deprecated: APIVersion is no longer used.
+                            Retained for backwards compatibility.'
                           type: string
                         kind:
-                          description: Kind is the kind of the referenced object.
+                          description: 'Deprecated: Kind is no longer used. Retained
+                            for backwards compatibility.'
                           type: string
                         name:
                           description: Name is the name of the referenced object.
@@ -105,14 +120,12 @@ spec:
                             object.
                           type: string
                         uid:
-                          description: UID is the uid of the referenced object.
+                          description: 'Deprecated: UID is no longer used. Retained
+                            for backwards compatibility.'
                           type: string
                       required:
-                      - apiVersion
-                      - kind
                       - name
                       - namespace
-                      - uid
                       type: object
                   type: object
                 type: array
@@ -121,6 +134,96 @@ spec:
                   type: string
                 description: SettingsMap contains BMC settings as a map.
                 type: object
+              variables:
+                description: Variables is a list of variables that can be used in
+                  the settings for templating.
+                items:
+                  properties:
+                    key:
+                      description: Key is the name of the variable to be used in the
+                        BMCSettingsTemplate format.
+                      maxLength: 63
+                      minLength: 1
+                      type: string
+                    valueFrom:
+                      description: ValueFrom defines a simple single source for the
+                        variable value.
+                      properties:
+                        configMapKeyRef:
+                          description: ConfigMapKeyRef points to a namespaced ConfigMap
+                            key.
+                          properties:
+                            key:
+                              description: Key is the key within the referenced object.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            name:
+                              description: Name is the referenced object name.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            namespace:
+                              description: Namespace is the referenced object namespace.
+                              maxLength: 63
+                              minLength: 1
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                        fieldRef:
+                          description: |-
+                            FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+                            Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
+                          properties:
+                            fieldPath:
+                              description: |-
+                                FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
+                                Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
+                              maxLength: 256
+                              minLength: 1
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                        secretKeyRef:
+                          description: SecretKeyRef points to a namespaced Secret
+                            key.
+                          properties:
+                            key:
+                              description: Key is the key within the referenced object.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            name:
+                              description: Name is the referenced object name.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            namespace:
+                              description: Namespace is the referenced object namespace.
+                              maxLength: 63
+                              minLength: 1
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                      type: object
+                      x-kubernetes-validations:
+                      - message: exactly one of fieldRef, configMapKeyRef, or secretKeyRef
+                          must be provided
+                        rule: '(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef)
+                          ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
+                  required:
+                  - key
+                  - valueFrom
+                  type: object
+                maxItems: 64
+                type: array
               version:
                 description: Version specifies the BMC firmware version for which
                   the settings should be applied.
@@ -129,6 +232,10 @@ spec:
             - BMCRef
             - version
             type: object
+            x-kubernetes-validations:
+            - message: variable keys must be unique
+              rule: '!has(self.variables) || self.variables.all(v, self.variables.filter(w,
+                w.key == v.key).size() == 1)'
           status:
             description: BMCSettingsStatus defines the observed state of BMCSettings.
             properties:
@@ -190,6 +297,16 @@ spec:
                   - type
                   type: object
                 type: array
+              failedAttempts:
+                description: FailedAttempts is the number of automatic retry attempts
+                  made after failure.
+                format: int32
+                type: integer
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               state:
                 description: State represents the current state of the BMC configuration
                   task.

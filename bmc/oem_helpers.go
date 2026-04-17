@@ -33,6 +33,16 @@ type upgradeTaskMonitorURIFn func(response *http.Response) (string, error)
 // taskMonitorDetailsFn parses vendor-specific task monitor details.
 type taskMonitorDetailsFn func(ctx context.Context, response *http.Response) (*schemas.Task, error)
 
+type InvalidBMCSettingsError struct {
+	SettingName  string
+	SettingValue any
+	Message      string
+}
+
+func (e *InvalidBMCSettingsError) Error() string {
+	return fmt.Sprintf("invalid BMC setting %s=%v: %s", e.SettingName, e.SettingValue, e.Message)
+}
+
 // upgradeVersion is the common firmware upgrade flow shared by all vendors.
 // Vendor-specific parts are injected via callbacks.
 func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.UpdateServiceSimpleUpdateParameters, requestBodyFn upgradeRequestBodyFn, taskMonitorURIFn upgradeTaskMonitorURIFn) (string, bool, error) {
@@ -68,18 +78,18 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.U
 	}
 	defer func(Body io.ReadCloser) {
 		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
+			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
 
-	// any error post this point is fatal, as we can not issue multiple upgrade requests.
-	// expectation is to move to failed state, and manually check the status before retrying
+	// Any error past this point is fatal, as we cannot issue multiple upgrade requests.
+	// Expectation is to move to failed state, and manually check the status before retrying.
 	log.V(1).Info("Update has been issued", "ResponseCode", resp.StatusCode)
 	if resp.StatusCode != http.StatusAccepted {
 		rawBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return "", true,
-				fmt.Errorf("failed to accept the upgrade request. and read the response body %v, statusCode %v",
+				fmt.Errorf("failed to accept the upgrade request and read the response body: %w, statusCode: %v",
 					err, resp.StatusCode)
 		}
 		return "", true,
@@ -89,10 +99,10 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.U
 
 	taskMonitorURI, err := taskMonitorURIFn(resp)
 	if err != nil {
-		return "", true, fmt.Errorf("failed to read task monitor URI. %v", err)
+		return "", true, fmt.Errorf("failed to read task monitor URI: %w", err)
 	}
 
-	log.V(1).Info("update has been accepted.", "Response", taskMonitorURI)
+	log.V(1).Info("Update has been accepted", "Response", taskMonitorURI)
 	return taskMonitorURI, false, nil
 }
 
@@ -106,7 +116,7 @@ func getUpgradeTask(ctx context.Context, base *RedfishBaseBMC, taskURI string, p
 	}
 	defer func(Body io.ReadCloser) {
 		if err := Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
+			log.Error(err, "Failed to close response body")
 		}
 	}(respTask.Body)
 
@@ -114,7 +124,7 @@ func getUpgradeTask(ctx context.Context, base *RedfishBaseBMC, taskURI string, p
 		respTaskRawBody, err := io.ReadAll(respTask.Body)
 		if err != nil {
 			return nil,
-				fmt.Errorf("failed to get the upgrade Task details. and read the response body %v, statusCode %v",
+				fmt.Errorf("failed to get the upgrade Task details and read the response body: %w, statusCode: %v",
 					err, respTask.StatusCode)
 		}
 		return nil,
@@ -141,13 +151,13 @@ func httpBasedGetBMCSettingAttribute(c schemas.Client, attributes map[string]str
 		}
 		resp, err := c.Get(parts[1])
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to GET attribute %s to URL %s: %v", key, parts[1], err))
+			errs = append(errs, fmt.Errorf("failed to GET attribute %s to URL %s: %w", key, parts[1], err))
 			continue
 		}
 		respRawBody, err := io.ReadAll(resp.Body)
 		resp.Body.Close() // nolint: errcheck
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to read response body for url %s: %v", parts[1], err))
+			errs = append(errs, fmt.Errorf("failed to read response body for url %s: %w", parts[1], err))
 			continue
 		}
 		okCodes := []int{http.StatusOK, http.StatusNoContent}
@@ -158,13 +168,13 @@ func httpBasedGetBMCSettingAttribute(c schemas.Client, attributes map[string]str
 		var respData map[string]any
 		err = json.Unmarshal(respRawBody, &respData)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to unmarshal response body for GET url %s: %v\nbody: %v", parts[1], err, string(respRawBody)))
+			errs = append(errs, fmt.Errorf("failed to unmarshal response body for GET url %s: %w\nbody: %v", parts[1], err, string(respRawBody)))
 			continue
 		}
 		var dataMap map[string]any
 		err = json.Unmarshal([]byte(data), &dataMap)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %v\nbody: %v", parts[1], err, data))
+			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %w\nbody: %v", parts[1], err, data))
 			continue
 		}
 		if isSubMap(respData, dataMap) {
@@ -201,21 +211,21 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 			var err error
 			jsonBytes, err = json.Marshal(value)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to marshal spec data for url %s: %v\nbody: %v", parts[1], err, value))
+				errs = append(errs, fmt.Errorf("failed to marshal spec data for url %s: %w\nbody: %v", parts[1], err, value))
 				continue
 			}
 		}
 		valueMap := map[string]any{}
 		err := json.Unmarshal(jsonBytes, &valueMap)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %v\nbody: %v", parts[1], err, value))
+			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %w\nbody: %v", parts[1], err, value))
 			continue
 		}
 		switch parts[0] {
 		case http.MethodPost:
 			resp, err := c.Post(url, valueMap)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to POST attribute %s to URL %s: %v", attr, url, err))
+				errs = append(errs, fmt.Errorf("failed to POST attribute %s to URL %s: %w", attr, url, err))
 				continue
 			}
 			if !slices.Contains(okCodes, resp.StatusCode) {
@@ -225,7 +235,7 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 		case http.MethodPatch:
 			resp, err := c.Patch(url, valueMap)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to PATCH attribute %s to URL %s: %v", attr, url, err))
+				errs = append(errs, fmt.Errorf("failed to PATCH attribute %s to URL %s: %w", attr, url, err))
 				continue
 			}
 			if !slices.Contains(okCodes, resp.StatusCode) {
@@ -263,13 +273,22 @@ func isSubMap(main, sub map[string]any) bool {
 
 // checkAttributes validates attributes against a filtered registry, returning
 // whether a reset is required and any validation errors.
-func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schemas.Attributes) (reset bool, err error) {
+func checkAttributes(
+	attrs schemas.SettingsAttributes,
+	filtered map[string]schemas.Attributes,
+) (reset bool, err error) {
 	reset = false
 	var errs []error
+	// TODO: add support for Map/Object attribute types
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
-			errs = append(errs, fmt.Errorf("attribute %s not found or immutable/hidden", name))
+			err := &InvalidBMCSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message:      "attribute not found or is immutable/hidden",
+			}
+			errs = append(errs, err)
 			continue
 		}
 		if entryAttribute.ResetRequired {
@@ -278,21 +297,36 @@ func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schem
 		switch entryAttribute.Type {
 		case schemas.IntegerAttributeType:
 			if _, ok := value.(int); !ok {
-				errs = append(errs,
-					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name, value, entryAttribute.Type, entryAttribute))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		case schemas.StringAttributeType:
 			if _, ok := value.(string); !ok {
-				errs = append(errs,
-					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name, value, entryAttribute.Type, entryAttribute))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		case schemas.EnumerationAttributeType:
 			if _, ok := value.(string); !ok {
-				errs = append(errs,
-					fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-						name, value, entryAttribute.Type, entryAttribute))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 				break
 			}
 			var validEnum bool
@@ -303,13 +337,76 @@ func checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]schem
 				}
 			}
 			if !validEnum {
-				errs = append(errs, fmt.Errorf("attribute %s value is unknown. needed %v", name, entryAttribute.Value))
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message:      fmt.Sprintf("attributes value is unknown. Valid Attributes %v", entryAttribute.Value),
+				}
+				errs = append(errs, err)
+			}
+		case schemas.BooleanAttributeType:
+			if _, ok := value.(bool); !ok {
+				err := &InvalidBMCSettingsError{
+					SettingName:  name,
+					SettingValue: value,
+					Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+						entryAttribute.Type,
+					),
+				}
+				errs = append(errs, err)
 			}
 		default:
-			errs = append(errs,
-				fmt.Errorf("attribute '%s's' value '%v' has wrong type. needed '%s' for '%v'",
-					name, value, entryAttribute.Type, entryAttribute))
+			err := &InvalidBMCSettingsError{
+				SettingName:  name,
+				SettingValue: value,
+				Message: fmt.Sprintf("attribute value has wrong type. needed '%s'",
+					entryAttribute.Type,
+				),
+			}
+			errs = append(errs, err)
 		}
 	}
 	return reset, errors.Join(errs...)
+}
+
+// pendingCheckFn checks if a single firmware inventory item is pending/staged.
+type pendingCheckFn func(*schemas.SoftwareInventory) bool
+
+// getComponentFiltersFn returns vendor-specific component filters for a component type.
+type getComponentFiltersFn func(ComponentType) []string
+
+// matchComponentFilterFn checks if a component matches any filter.
+type matchComponentFilterFn func(*schemas.SoftwareInventory, []string) bool
+
+// checkPendingComponentUpgrade is the shared logic for checking pending component upgrades.
+// Vendor-specific behavior is injected via callbacks.
+func checkPendingComponentUpgrade(ctx context.Context, base *RedfishBaseBMC, componentType ComponentType, getFilters getComponentFiltersFn, matchFilter matchComponentFilterFn, checkPending pendingCheckFn,
+) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	service := base.client.GetService()
+	updateService, err := service.UpdateService()
+	if err != nil {
+		return false, fmt.Errorf("failed to get UpdateService: %w", err)
+	}
+
+	firmwareInventory, err := updateService.FirmwareInventory()
+	if err != nil {
+		return false, fmt.Errorf("failed to get FirmwareInventory: %w", err)
+	}
+
+	filters := getFilters(componentType)
+	for _, fw := range firmwareInventory {
+		if !matchFilter(fw, filters) {
+			continue
+		}
+		if checkPending(fw) {
+			log.V(1).Info("Found pending component upgrade",
+				"id", fw.ID,
+				"version", fw.Version)
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

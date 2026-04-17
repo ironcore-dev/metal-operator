@@ -1,32 +1,113 @@
 # BIOSVersion
 
-`BIOSVersion` represents a BIOS Version upgrade operation for a physical server (compute system). It updates the bios Version on physical server's BIOS. 
+`BIOSVersion` upgrades BIOS firmware for one `Server`.
 
-## Key Points
+It models a task-oriented firmware lifecycle (issue upgrade task, monitor completion, reboot/power-cycle flow, verify final version).
 
-- `BIOSVersion` maps a BIOS version required for a given server's BIOS.
-    - `BIOSVersion` Spec contains the required details to upgrade the BIOS to required version.
-- Only one `BIOSVersion` can be active per `Server` at a time. 
-- `BIOSVersion` starts the version upgrade of the BIOS using redfish `SimpleUpgrade` API.
-- `BIOSVersion` handles reboots of server using `ServerMaintenance` resource.
-- Once`BIOSVersion` moves to `Failed` state, It stays in this state unless Manually moved out of this state. 
+## What It Does
 
-## Workflow
+- Targets one server via `spec.serverRef`.
+- Initiates Redfish-based BIOS upgrade using image metadata in `spec.image`.
+- Tracks vendor task progress in `status.upgradeTask`.
+- Uses `ServerMaintenance` gates before disruptive operations.
+- Verifies final BIOS version before completing.
 
-1. A separate operator (e.g., `biosVersionSet`) or user creates a `BIOSVersion` resource referencing a 
-   specific `Server`.
-2. Provided BIOS Version is checked against the current BIOS version.
-3. If version is same as on the server's BIOS, the state is moved to `Completed`.
-4. If `ServerMaintenance` is not provided already. it requests for one and waits for the `server` to enter `Maintenance` state.
-    - `policy` used by `ServerMaintenance` is to be provided through Spec `ServerMaintenancePolicy` in `BIOSVersion`
-5. `BIOSVersion` issues the bios upgrade using redfish `SimpleUpgrade` API. and monitors the `upgrade task` created by the API.
-6. the `BIOSVersion` moves to `Failed` state:
-    - If `SimpleUpgade` is issued but unable to get the task to monitor the progress of bios upgrade
-    - If the `upgrade task` created by SimpleUpgade fails and does not reach completed state.
-    - If the bios version requested is lower than that of the current bios version
-7. `BIOSVersion` moves to reboot the server once the `upgrade task` has been completed. 
-8. `BIOSVersion` verfiy the bios version post reboot, removes the `ServerMaintenance` resource if created by self. and transistion to `Completed` state
-9. Any further update to the `BIOSVersion` Spec will restart the process. 
+## Spec Reference
+
+| Field | Required | Description |
+|---|---|---|
+| `spec.serverRef.name` | No | Target server. Immutable after creation. Required for the resource to function. |
+| `spec.version` | Yes | Desired BIOS firmware version string. |
+| `spec.image.URI` | Yes | Upgrade image URI. |
+| `spec.image.transferProtocol` | No | Protocol to fetch image (for example `HTTPS`). |
+| `spec.image.secretRef` | No | Secret reference for protected image source. |
+| `spec.updatePolicy` | No | Vendor policy override. Current enum support is `Force`. |
+| `spec.serverMaintenancePolicy` | No | Maintenance behavior for upgrade operations. |
+| `spec.serverMaintenanceRef` | No | Optional pre-existing maintenance object. |
+
+## Status Fields In Detail
+
+| Field | What it means | How to use it for debugging |
+|---|---|---|
+| `status.state` | Lifecycle state (`Pending`, `InProgress`, `Completed`, `Failed`). | Tells whether issue is precheck, execution, or terminal failure. |
+| `status.upgradeTask.URI` | Vendor task endpoint for firmware update. | Missing URI after issue attempt indicates upgrade issue path failed early. |
+| `status.upgradeTask.state` | Task runtime state from BMC. | Detect running vs suspended vs terminal failure behavior. |
+| `status.upgradeTask.status` | Health/status of task. | Correlate with failure reason when task does not complete. |
+| `status.upgradeTask.percentageComplete` | Progress percent. | Flat progress over long duration indicates stalled vendor task. |
+| `status.conditions[]` | Step checkpoints (maintenance, issue, completion, reboot, verify). | Most precise source of failure reason and next remediation step. |
+
+## Detailed State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending
+
+    state Pending {
+      [*] --> CheckTargetVersion
+      CheckTargetVersion --> AlreadyUpToDate: current == desired
+      CheckTargetVersion --> RequestMaintenance: current != desired
+      RequestMaintenance --> WaitMaintenanceApproval
+      WaitMaintenanceApproval --> ReadyToIssue: approved
+    }
+
+    Pending --> Completed: AlreadyUpToDate
+    Pending --> InProgress: ReadyToIssue
+
+    state InProgress {
+      [*] --> IssueUpgrade
+      IssueUpgrade --> MonitorTask: task URI obtained
+      IssueUpgrade --> FailedIssue: failed to issue task
+      MonitorTask --> MonitorTask: task still running
+      MonitorTask --> ValidateFallback: task not found, verify version fallback
+      MonitorTask --> TaskDone: task completed
+      MonitorTask --> FailedTask: task failed
+      TaskDone --> RebootPowerOff
+      RebootPowerOff --> RebootPowerOn
+      RebootPowerOn --> VerifyVersion
+      ValidateFallback --> VerifyVersion
+      VerifyVersion --> Success: desired version observed
+      VerifyVersion --> FailedVerify: desired version not observed
+    }
+
+    InProgress --> Completed: Success
+    InProgress --> Failed: FailedIssue or FailedTask or FailedVerify
+    Failed --> Pending: retry annotation/manual recovery
+```
+
+## Detailed Workflow (All Main Cases)
+
+1. Prechecks:
+  - Validate `serverRef` and reach BMC through the server.
+  - If server/BMC is temporarily unavailable, reconcile requeues.
+2. Version short-circuit:
+  - If current BIOS version already equals desired, mark `Completed`.
+3. Maintenance path:
+  - Ensure `ServerMaintenance` exists (reuse provided ref or create one).
+  - Wait for server maintenance approval and maintenance state.
+4. Upgrade issue path:
+  - Call firmware update endpoint with `spec.image` and policy.
+  - Persist task metadata to `status.upgradeTask`.
+5. Task monitor path:
+  - Poll task status until completed/failed.
+  - If task object disappears, perform fallback version verification.
+6. Reboot path:
+  - Enforce power off then power on when required.
+  - Wait for power-state convergence before verification.
+7. Verification path:
+  - Re-read BIOS version from BMC.
+  - On match -> `Completed`, else -> `Failed`.
+8. Cleanup path:
+  - Remove self-managed maintenance references after terminal completion.
+
+## Troubleshooting Guide
+
+| Symptom | Where to check | Likely cause | Action |
+|---|---|---|---|
+| Stuck in `Pending` | `status.conditions[]` | Maintenance not approved or BMC unavailable | Approve maintenance; validate BMC connectivity and credentials. |
+| `InProgress` with empty or missing `upgradeTask` | `status.conditions[]` | Firmware issue request failed | Verify image URI/protocol/secret and vendor update capability. |
+| `upgradeTask` not progressing | `status.upgradeTask.*` | Vendor task stalled | Inspect BMC task endpoint and event logs; retry if safe. |
+| Task missing but still not `Completed` | `status.conditions[]` + current BIOS version | Vendor deleted task before version reflected | Wait for BMC stabilization, then re-verify version. |
+| `Failed` after reboot | `status.conditions[]` | Final version mismatch or interrupted power sequence | Validate supported upgrade path and power-state transitions. |
 
 ## Example
 
@@ -36,11 +117,12 @@ kind: BIOSVersion
 metadata:
   name: biosversion-sample
 spec:
-  version: "U59 v2.34 (10/04/2024)"
-  image:
-    URI: "https://foo-2.34_10_04_2024.signed.flash"
-    transferProtocol: "HTTPS"
   serverRef:
     name: endpoint-sample-system-0
+  version: P80 v1.45 (12/06/2017)
+  image:
+    URI: https://fw.example.com/contoso/bios/P80-v1.45.fwpkg
+    transferProtocol: HTTPS
+  updatePolicy: Force
   serverMaintenancePolicy: OwnerApproval
 ```

@@ -28,10 +28,11 @@ const (
 // EndpointReconciler reconciles a Endpoints object
 type EndpointReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	MACPrefixes *macdb.MacPrefixes
-	Insecure    bool
-	BMCOptions  bmc.Options
+	Scheme             *runtime.Scheme
+	MACPrefixes        *macdb.MacPrefixes
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	BMCOptions         bmc.Options
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
@@ -69,7 +70,7 @@ func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1
 
 func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Reconciling endpoint")
+	log.V(1).Info("Reconciling Endpoint")
 	if shouldIgnoreReconciliation(endpoint) {
 		log.V(1).Info("Skipped Endpoint reconciliation")
 		return ctrl.Result{}, nil
@@ -78,18 +79,19 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 	sanitizedMACAddress := strings.ReplaceAll(endpoint.Spec.MACAddress, ":", "")
 	for _, m := range r.MACPrefixes.MacPrefixes {
 		if strings.HasPrefix(sanitizedMACAddress, m.MacPrefix) && m.Type == metalv1alpha1.BMCType {
-			log.V(1).Info("Found a BMC adapter for endpoint", "Type", m.Type, "Protocol", m.Protocol)
+			log.V(1).Info("Found a BMC adapter for Endpoint", "Type", m.Type, "Protocol", m.Protocol)
 			if len(m.DefaultCredentials) == 0 {
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
 
 			bmcOptions := bmc.Options{
-				BasicAuth: true,
-				Username:  m.DefaultCredentials[0].Username,
-				Password:  m.DefaultCredentials[0].Password,
+				BasicAuth:   true,
+				Username:    m.DefaultCredentials[0].Username,
+				Password:    m.DefaultCredentials[0].Password,
+				InsecureTLS: r.SkipCertValidation,
 			}
 
-			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.Insecure)
+			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.DefaultProtocol)
 			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
 
 			switch m.Protocol {
@@ -107,12 +109,12 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied BMC secret for endpoint")
+				log.V(1).Info("Applied BMC secret for Endpoint")
 
 				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
-				log.V(1).Info("Applied BMC object for endpoint")
+				log.V(1).Info("Applied BMC object for Endpoint")
 			case metalv1alpha1.ProtocolRedfishLocal:
 				log.V(1).Info("Creating client for a local test BMC", "Address", bmcOptions.Endpoint)
 				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
@@ -125,7 +127,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied local test BMC secret for endpoint")
+				log.V(1).Info("Applied local test BMC secret for Endpoint")
 
 				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
@@ -143,19 +145,19 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
 				}
-				log.V(1).Info("Applied kube test BMC secret for endpoint")
+				log.V(1).Info("Applied kube test BMC secret for Endpoint")
 
 				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
 			default:
-				return ctrl.Result{}, fmt.Errorf("uknown protocol: %s", m.Protocol)
+				return ctrl.Result{}, fmt.Errorf("unknown protocol: %s", m.Protocol)
 			}
 			// TODO: other types like Switches can be handled here later
 		}
 	}
-	log.V(1).Info("Reconciled endpoint")
+	log.V(1).Info("Reconciled Endpoint")
 
 	return ctrl.Result{}, nil
 }

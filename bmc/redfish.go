@@ -47,6 +47,9 @@ type Options struct {
 	Password  string
 	BasicAuth bool
 
+	// TLS configuration
+	InsecureTLS bool // Skip TLS certificate verification
+
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
@@ -87,7 +90,7 @@ func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBase
 		Endpoint:  options.Endpoint,
 		Username:  options.Username,
 		Password:  options.Password,
-		Insecure:  true,
+		Insecure:  options.InsecureTLS,
 		BasicAuth: options.BasicAuth,
 	}
 	client, err := gofish.ConnectContext(ctx, clientConfig)
@@ -428,8 +431,8 @@ func (r *RedfishBaseBMC) GetBiosPendingAttributeValues(ctx context.Context, syst
 		return nil, err
 	}
 
-	// unfortunately, some vendors fill the pending attribute with copy of actual bios attribute
-	// remove if there are the same
+	// Unfortunately, some vendors fill the pending attribute with a copy of actual BIOS attributes.
+	// Remove if they are the same.
 	if len(tBios.Attributes) == len(tBiosPendingSetting.Attributes) {
 		pendingAttr := schemas.SettingsAttributes{}
 		for key, attr := range tBiosPendingSetting.Attributes {
@@ -452,7 +455,7 @@ func (r *RedfishBaseBMC) GetEntityFromUri(ctx context.Context, uri string, clien
 	}
 	defer func(Body io.ReadCloser) {
 		if err = Body.Close(); err != nil {
-			log.Error(err, "failed to close response body")
+			log.Error(err, "Failed to close response body")
 		}
 	}(resp.Body)
 
@@ -539,7 +542,7 @@ func (r *RedfishBaseBMC) CheckBiosAttributes(attrs schemas.SettingsAttributes) (
 func (r *RedfishBaseBMC) checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
-	// TODO: add more types like maps and Enumerations
+	// TODO: add support for Map/Object attribute types
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
@@ -787,7 +790,7 @@ func (r *RedfishBaseBMC) DeleteAccount(ctx context.Context, userName, id string)
 				return err
 			}
 			if err = resp.Body.Close(); err != nil {
-				log.Error(err, "failed to close response body")
+				log.Error(err, "Failed to close response body")
 			}
 			return nil
 		}
@@ -868,6 +871,17 @@ func (r *RedfishBaseBMC) GetBiosUpgradeTask(_ context.Context, _ string, _ strin
 // UpgradeBMCVersion is a fallback for unknown vendors. Vendor-specific structs override this.
 func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)
+}
+
+// CheckBMCPendingComponentUpgrade is a fallback for unknown vendors.
+// Returns an error indicating the feature is not supported.
+// Vendor-specific implementations (Dell, HPE, Lenovo) override this to check actual firmware inventory
+// and return whether a pending component upgrade exists for the specified component type.
+func (r *RedfishBaseBMC) CheckBMCPendingComponentUpgrade(_ context.Context, componentType ComponentType) (bool, error) {
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
+		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	}
+	return false, fmt.Errorf("check pending component upgrade is not supported for manufacturer %q", r.manufacturer)
 }
 
 func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
@@ -1008,17 +1022,16 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		Destination:         destination,
 		EventFormatType:     eventFormatType, // event or metricreport
 		Protocol:            schemas.RedfishEventDestinationProtocol,
-		DeliveryRetryPolicy: retry,
+		DeliveryRetryPolicy: retry, // Note: HPE iLO doesn't support this field; HPERedfishBMC overrides this method to omit it
 		Context:             "metal-operator",
 	}
 	client := ev.GetClient()
 	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
 	if len(ev.ResourceTypes) == 0 {
 		payload.EventTypes = []schemas.EventType{}
-	} else {
-		payload.RegistryPrefixes = []string{""} // Filters by the prefix of the event's MessageId, which points to a Message Registry: [Base, ResourceEvent, iLOEvents]
-		payload.ResourceTypes = []string{""}    // Filters by the schema name (Resource Type) of the event's OriginOfCondition:	[Chassis, ComputerSystem, Power]
 	}
+	// Omit RegistryPrefixes and ResourceTypes to allow all events.
+	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
 	resp, err := client.Post(ev.SubscriptionsLink, payload)
 	if err != nil {
 		return "", err
@@ -1027,7 +1040,41 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+		// Read error response body
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
+		}
+
+		// Parse Redfish error response
+		var redfishError struct {
+			Error struct {
+				MessageExtendedInfo []struct {
+					MessageId string `json:"MessageId"`
+					Message   string `json:"Message"`
+				} `json:"@Message.ExtendedInfo"`
+			} `json:"error"`
+		}
+
+		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
+			// Check if it's a "resource already exists" error
+			for _, info := range redfishError.Error.MessageExtendedInfo {
+				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
+					strings.Contains(info.MessageId, "PropertyValueModified") {
+					// Handle duplicate subscription - try to find existing one
+					if existingLink, findErr := r.findExistingSubscription(destination, eventFormatType); findErr == nil {
+						// Successfully found existing subscription
+						return existingLink, nil
+					}
+					// Failed to find existing subscription - fall through to return original error
+					// This preserves the detailed Redfish error message for troubleshooting
+					break
+				}
+			}
+		}
+
+		// Not a duplicate error - return original error with details
+		return "", fmt.Errorf("failed to create event subscription status code: %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 	// return subscription link from returned location
 	subscriptionLink := resp.Header.Get("Location")
@@ -1039,6 +1086,37 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 		subscriptionLink = urlParser.RequestURI()
 	}
 	return subscriptionLink, nil
+}
+
+// findExistingSubscription queries the BMC for an existing subscription with the given destination.
+// Returns the subscription URI if found, error otherwise.
+func (r *RedfishBaseBMC) findExistingSubscription(
+	destination string,
+	eventFormatType schemas.EventFormatType,
+) (string, error) {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return "", fmt.Errorf("failed to get event service: %w", err)
+	}
+
+	// Get all subscriptions
+	subscriptions, err := ev.Subscriptions()
+	if err != nil {
+		return "", fmt.Errorf("failed to list subscriptions: %w", err)
+	}
+
+	// Find subscription matching our destination and event format
+	for _, sub := range subscriptions {
+		if sub.Destination == destination && sub.EventFormatType == eventFormatType {
+			// Extract URI from OData ID
+			if sub.ODataID != "" {
+				return sub.ODataID, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("existing subscription not found for destination: %s", destination)
 }
 
 func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string) error {

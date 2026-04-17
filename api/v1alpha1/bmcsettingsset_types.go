@@ -11,8 +11,7 @@ import (
 type BMCSettingsSetSpec struct {
 	// BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs.
 	// +required
-	BMCSettingsTemplate BMCSettingsTemplate `json:"bmcSettingsTemplate,omitempty"`
-
+	BMCSettingsTemplate BMCSettingsTemplate `json:"bmcSettingsTemplate"`
 	// BMCSelector specifies a label selector to identify the BMCs to be selected.
 	// +required
 	BMCSelector metav1.LabelSelector `json:"bmcSelector"`

@@ -56,8 +56,9 @@ const (
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Insecure bool
+	Scheme             *runtime.Scheme
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
 	// BMCFailureResetDelay defines the duration after which a BMC will be reset upon repeated connection failures.
 	BMCFailureResetDelay time.Duration
 	BMCOptions           bmc.Options
@@ -109,7 +110,7 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 		}
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
 	if err == nil {
 		defer bmcClient.Logout()
 		if err := r.deleteEventSubscription(ctx, bmcClient, bmcObj); err != nil {
@@ -142,7 +143,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 			RequeueAfter: r.BMCClientRetryInterval,
 		}, nil
 	}
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.Insecure, r.BMCOptions, bmcutils.BMCConnectivityCheckOption)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, bmcutils.BMCConnectivityCheckOption)
 	if err != nil {
 		if r.shouldResetBMC(bmcObj) {
 			log.V(1).Info("BMC needs reset, resetting", "BMC", bmcObj.Name)
@@ -291,7 +292,14 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 			errs = append(errs, fmt.Errorf("failed to create or patch server %s: %w", server.Name, err))
 			continue
 		}
-		log.V(1).Info("Created or patched Server", "Server", server.Name, "Operation", opResult)
+		switch opResult {
+		case controllerutil.OperationResultCreated:
+			log.V(1).Info("Created Server", "Server", server.Name)
+		case controllerutil.OperationResultUpdated:
+			log.V(1).Info("Updated Server", "Server", server.Name)
+		default:
+			log.V(1).Info("Server already up to date", "Server", server.Name)
+		}
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("errors occurred during server discovery: %v", errs)
@@ -506,14 +514,14 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 		}
 	}
 	// BMC Unavailable, currently can not perform reset. try to reset with ssh when available
-	log.Error(err, "failed to reset BMC via Redfish, falling back to rest via ssh", "BMC", bmcObj.Name)
+	log.Error(err, "Failed to reset BMC via Redfish, falling back to reset via SSH", "BMC", bmcObj.Name)
 	if httpErr, ok := err.(*schemas.Error); ok {
 		// only handle 5xx errors
 		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-			return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("cannot reset bmc: %w", err))
+			return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("could not reset BMC: %w", err))
 		}
 	} else {
-		return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
+		return fmt.Errorf("could not reset BMC, unknown error: %w", err)
 	}
 	return nil
 }
@@ -549,13 +557,13 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 	if r.EventURL == "" {
 		return false, nil
 	}
-	log.V(1).Info("Handling event subscriptions for BMC")
+	log.V(1).Info("Handling event subscriptions for BMC", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP)
 	modified := false
 
 	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
 		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
-			return false, fmt.Errorf("failed to subscribe to server metrics report: %w", err)
+			return false, fmt.Errorf("failed to subscribe to server metrics report for BMC %s (%s): %w", bmcObj.Name, bmcObj.Status.IP, err)
 		}
 		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.MetricsReportSubscriptionLink = link
@@ -563,11 +571,12 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
 		}
+		log.Info("Event subscription established", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "type", "metrics", "link", link)
 	}
 	if bmcObj.Status.EventsSubscriptionLink == "" {
 		link, err := serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
-			return false, fmt.Errorf("failed to subscribe to server alerts: %w", err)
+			return false, fmt.Errorf("failed to subscribe to server alerts for BMC %s (%s): %w", bmcObj.Name, bmcObj.Status.IP, err)
 		}
 		bmcBase := bmcObj.DeepCopy()
 		bmcObj.Status.EventsSubscriptionLink = link
@@ -575,6 +584,7 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
 		}
+		log.Info("Event subscription established", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "type", "events", "link", link)
 	}
 	return modified, nil
 }

@@ -62,13 +62,13 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should force a Server into maintenance from Initial State", func(ctx SpecContext) {
+	It("should force a Server into maintenance from Initial State", func(ctx SpecContext) {
 		By("Patching server to Initial State")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateInitial
 		})).Should(Succeed())
 
-		By("Creating an ServerMaintenance object")
+		By("Creating a ServerMaintenance object")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-server-maintenance",
@@ -111,7 +111,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		))
 	})
 
-	It("Should wait to put a Server into maintenance until approval", func(ctx SpecContext) {
+	It("should wait to put a Server into maintenance until approval", func(ctx SpecContext) {
 		By("Patching server to Available state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
@@ -151,7 +151,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
 		))
 
-		By("Creating an ServerMaintenance object")
+		By("Creating a ServerMaintenance object")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-server-maintenance",
@@ -259,8 +259,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
-	It("Should wait for other maintenance to complete before starting a new one", func(ctx SpecContext) {
-		By("Creating an ServerMaintenance objects")
+	It("should wait for other maintenance to complete before starting a new one", func(ctx SpecContext) {
+		By("Creating ServerMaintenance objects")
 		serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-server-maintenance01",
@@ -359,7 +359,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery)))
 	})
 
-	It("Should prioritize higher-priority maintenance for the same server", func(ctx SpecContext) {
+	It("should prioritize higher-priority maintenance for the same server", func(ctx SpecContext) {
 		By("Patching server to Available state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
@@ -459,7 +459,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
-	It("Should treat unset priority as zero", func(ctx SpecContext) {
+	It("should treat unset priority as zero", func(ctx SpecContext) {
 		By("Patching server to Available state")
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable

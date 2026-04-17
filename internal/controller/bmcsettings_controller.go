@@ -44,18 +44,18 @@ type BMCSettingsReconciler struct {
 const (
 	BMCSettingFinalizer = "metal.ironcore.dev/bmcsettings"
 
-	ConditionBMCResetPostSettingApply   = "ResetPostSettingApply"
-	ConditionBMCPoweredOff              = "PoweredOff"
-	ConditionBMCSettingsChangesIssued   = "ChangesIssued"
-	ConditionBMCSettingsChangesVerified = "ChangesVerified"
-	ConditionBMCSettingsWrongSettings   = "SettingsProvidedNotValid"
+	ConditionBMCResetPostSettingApply    = "ResetPostSettingApply"
+	ConditionBMCPoweredOff               = "PoweredOff"
+	ConditionBMCSettingsChangesIssued    = "ChangesIssued"
+	ConditionBMCSettingsChangesVerified  = "ChangesVerified"
+	ConditionBMCSettingsValidationFailed = "SettingsValidationFailed"
 
-	ReasonBMCPoweredOff                    = "PoweredOff"
-	ReasonBMCVersionMatching               = "VersionMatching"
-	ReasonBMCSettingsChangesIssued         = "ChangesIssued"
-	ReasonBMCSettingsChangesVerified       = "ChangesVerified"
-	ReasonBMCSettingsChangesNotYetVerified = "ChangesNotYetVerified"
-	ReasonBMCSettingsWrongSettings         = "SettingsProvidedAreNotValid"
+	ReasonBMCPoweredOff                  = "PoweredOff"
+	ReasonBMCVersionMatching             = "VersionMatching"
+	ReasonBMCSettingsChangesIssued       = "ChangesIssued"
+	ReasonBMCSettingsChangesVerified     = "ChangesVerified"
+	ReasonBMCSettingsVerificationPending = "SettingsVerificationPending"
+	ReasonBMCSettingsValidationFailed    = "SettingsValidationFailed"
 )
 
 // legacyBMCSettingsConditionTypes maps old condition type strings to their new values.
@@ -434,14 +434,14 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 				log.Error(err, "could not validate settings and determine if reboot needed")
 				var invalidSettingsErr *bmc.InvalidBMCSettingsError
 				if errors.As(err, &invalidSettingsErr) {
-					inValidSettings, errCond := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsWrongSettings)
+					inValidSettings, errCond := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsValidationFailed)
 					if errCond != nil {
 						return ctrl.Result{}, fmt.Errorf("failed to get Condition for invalid BMC settings %v", errors.Join(err, errCond))
 					}
 					if errCond := r.Conditions.Update(
 						inValidSettings,
 						conditionutils.UpdateStatus(corev1.ConditionTrue),
-						conditionutils.UpdateReason(ReasonBMCSettingsWrongSettings),
+						conditionutils.UpdateReason(ReasonBMCSettingsValidationFailed),
 						conditionutils.UpdateMessage(fmt.Sprintf("Settings provided is invalid. error: %v", err)),
 					); errCond != nil {
 						return ctrl.Result{}, fmt.Errorf("failed to update Invalid Settings condition: %w", errors.Join(err, errCond))
@@ -506,11 +506,11 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 		return ctrl.Result{}, r.updateBMCSettingsStatus(ctx, settings, metalv1alpha1.BMCSettingsStateApplied, BMCSettingsVerifiedCondition)
 	}
 
-	if BMCSettingsVerifiedCondition.Status == metav1.ConditionFalse && BMCSettingsVerifiedCondition.Reason != ReasonBMCSettingsChangesNotYetVerified {
+	if BMCSettingsVerifiedCondition.Status == metav1.ConditionFalse && BMCSettingsVerifiedCondition.Reason != ReasonBMCSettingsVerificationPending {
 		if err := r.Conditions.Update(
 			BMCSettingsVerifiedCondition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
-			conditionutils.UpdateReason(ReasonBMCSettingsChangesNotYetVerified),
+			conditionutils.UpdateReason(ReasonBMCSettingsVerificationPending),
 			conditionutils.UpdateMessage("BMC Settings changes are not yet verified on the server's BMC"),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update BMCSettings verified condition: %w", err)

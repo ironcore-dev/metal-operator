@@ -45,7 +45,7 @@ const (
 	ConditionSettingsRebootPowerOff   = "RebootPowerOff"
 	ConditionSettingsRebootPowerOn    = "RebootPowerOn"
 	ConditionSettingsVerify           = "VerifySettingsPostUpdate"
-	ConditionSettingsInvalid          = "SettingsProvidedNotValid"
+	ConditionSettingsValidationFailed = "SettingsValidationFailed"
 
 	ReasonPendingSettingsFound          = "PendingSettingsFound"
 	ReasonSettingsDuplicateKeysFound    = "SettingsDuplicateKeysFound"
@@ -60,7 +60,7 @@ const (
 	ReasonSettingsRebootPowerOn         = "PowerOnCompletedDuringReboot"
 	ReasonSettingsVerificationCompleted = "VerificationCompleted"
 	ReasonSettingsVerificationNotDone   = "VerificationNotCompleted"
-	ReasonSettingsInvalid               = "SettingsProvidedAreNotValid"
+	ReasonSettingsValidationFailed      = "SettingsValidationFailed"
 )
 
 // legacyBIOSSettingsConditionTypes maps old condition type strings to their new values.
@@ -75,6 +75,7 @@ var legacyBIOSSettingsConditionTypes = map[string]string{
 	"BMCResetIssued":                       ConditionResetIssued,
 	"BIOSVersionUpdatePending":             ConditionVersionUpdatePending,
 	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
+	"SettingsProvidedNotValid":             ConditionSettingsValidationFailed,
 }
 
 // BIOSSettingsReconciler reconciles a BIOSSettings object
@@ -705,14 +706,14 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			log.Error(err, "Could not validate settings and determine if reboot needed")
 			var invalidSettingsErr *bmc.InvalidBIOSSettingsError
 			if errors.As(err, &invalidSettingsErr) {
-				inValidSettings, errCond := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsInvalid)
+				inValidSettings, errCond := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsValidationFailed)
 				if errCond != nil {
 					return false, errors.Join(fmt.Errorf("failed to get Condition for skip reboot post setting update: %w", errCond), err)
 				}
 				if errCond := r.Conditions.Update(
 					inValidSettings,
 					conditionutils.UpdateStatus(corev1.ConditionTrue),
-					conditionutils.UpdateReason(ReasonSettingsInvalid),
+					conditionutils.UpdateReason(ReasonSettingsValidationFailed),
 					conditionutils.UpdateMessage(fmt.Sprintf("Settings provided is invalid. error: %v", err)),
 				); errCond != nil {
 					return false, fmt.Errorf("failed to update Invalid Settings condition: %w", errors.Join(err, errCond))

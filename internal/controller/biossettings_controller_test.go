@@ -1474,8 +1474,8 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 					SatisfyAll(
 						HaveField("Conditions", ContainElement(
 							SatisfyAll(
-								HaveField("Type", ConditionSettingsInvalid),
-								HaveField("Reason", ReasonSettingsInvalid),
+								HaveField("Type", ConditionSettingsValidationFailed),
+								HaveField("Reason", ReasonSettingsValidationFailed),
 							),
 						)),
 						HaveField("Name", "100"),

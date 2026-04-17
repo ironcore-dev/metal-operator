@@ -180,12 +180,14 @@ spec:
                               - namespace
                               type: object
                             fieldRef:
-                              description: FieldRef sources the value from a field
-                                of the BMCSettings object (e.g. spec.BMCRef.name).
+                              description: |-
+                                FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+                                Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
                               properties:
                                 fieldPath:
-                                  description: FieldPath is the path of the field
-                                    on the BMCSettings object to select (e.g. spec.BMCRef.name).
+                                  description: |-
+                                    FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
+                                    Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
                                   maxLength: 256
                                   minLength: 1
                                   type: string

@@ -1021,7 +1021,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).<br />Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error. |  | MaxLength: 256 <br />MinLength: 1 <br /> |
 
 
 #### IP
@@ -1887,7 +1887,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name). |  |  |
+| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).<br />Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error. |  |  |
 | `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
 | `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
 

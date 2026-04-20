@@ -11,8 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
@@ -434,35 +436,13 @@ var _ = Describe("Server Controller", func() {
 		Expect(ok).To(BeTrue())
 		Expect(user).To(HaveKeyWithValue("name", "metal"))
 
+		// Verify password hash exists and matches (check once outside Eventually)
 		passwordHash, ok := user["password_hash"].(string)
 		Expect(ok).To(BeTrue(), "password_hash should be a string")
-
 		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
 
-		// Extract the discovery token from the actual ignition secret
-		// The controller generates the token and includes it in the probe flags
-		contents := string(ignitionSecret.Data[DefaultIgnitionSecretKeyName])
-		Expect(contents).To(ContainSubstring("--discovery-token="))
-
-		// Extract token using regex
-		tokenRegex := regexp.MustCompile(`--discovery-token=([A-Za-z0-9._-]+)`)
-		matches := tokenRegex.FindStringSubmatch(contents)
-		Expect(matches).To(HaveLen(2), "Should find discovery token in ignition config")
-		actualToken := matches[1]
-		Expect(actualToken).ToNot(BeEmpty())
-
-		// Generate expected ignition data using the same template file the controller uses
-		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
-			ignition.Config{
-				Image:        "foo:latest",
-				Flags:        fmt.Sprintf("--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834 --discovery-token=%s", actualToken),
-				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-				PasswordHash: passwordHash,
-			},
-		)
-		Expect(err).NotTo(HaveOccurred())
-
+		// Eventually assertion with token and hash extraction inside the closure
+		// This prevents race conditions with reconciler re-applying the secret with fresh bcrypt hashes
 		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
@@ -473,7 +453,64 @@ var _ = Describe("Server Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
+			WithTransform(func(secret *v1.Secret) error {
+				// Re-extract password hash and token inside Eventually to handle reconciler updates
+				contents := string(secret.Data[DefaultIgnitionSecretKeyName])
+				if !strings.Contains(contents, "--discovery-token=") {
+					return fmt.Errorf("ignition data does not contain discovery token")
+				}
+
+				// Extract token using regex
+				tokenRegex := regexp.MustCompile(`--discovery-token=([A-Za-z0-9._-]+)`)
+				matches := tokenRegex.FindStringSubmatch(contents)
+				if len(matches) != 2 {
+					return fmt.Errorf("failed to extract discovery token from ignition config")
+				}
+				actualToken := matches[1]
+				if actualToken == "" {
+					return fmt.Errorf("extracted discovery token is empty")
+				}
+
+				// Re-extract current password hash (may have changed due to reconciliation)
+				var ignitionConfig map[string]any
+				if err := yaml.Unmarshal(secret.Data[DefaultIgnitionSecretKeyName], &ignitionConfig); err != nil {
+					return fmt.Errorf("failed to unmarshal ignition config: %w", err)
+				}
+				passwd, _ := ignitionConfig["passwd"].(map[string]any)
+				users, _ := passwd["users"].([]any)
+				if len(users) == 0 {
+					return fmt.Errorf("no users found in ignition config")
+				}
+				user, ok := users[0].(map[string]any)
+				if !ok {
+					return fmt.Errorf("user is not a map")
+				}
+				currentPasswordHash, ok := user["password_hash"].(string)
+				if !ok {
+					return fmt.Errorf("password_hash is not a string")
+				}
+
+				// Generate expected ignition data using the CURRENT password hash and token
+				ignitionData, err := ignition.GenerateIgnitionDataFromFile(
+					filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
+					ignition.Config{
+						Image:        "foo:latest",
+						Flags:        fmt.Sprintf("--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834 --discovery-token=%s", actualToken),
+						SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
+						PasswordHash: currentPasswordHash,
+					},
+				)
+				if err != nil {
+					return fmt.Errorf("failed to generate expected ignition data: %w", err)
+				}
+
+				// Compare actual vs expected
+				if diff := cmp.Diff(string(ignitionData), string(secret.Data[DefaultIgnitionSecretKeyName])); diff != "" {
+					return fmt.Errorf("ignition data mismatch (-want +got):\n%s", diff)
+				}
+
+				return nil
+			}, BeNil()),
 		))
 
 		By("Patching the boot configuration to a Ready state")

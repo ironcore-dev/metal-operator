@@ -234,7 +234,7 @@ func (a *Agent) registerServer(ctx context.Context) error {
 			}
 
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				a.log.Error(err, "Failed to register server", "url", a.RegistryURL, "statusCode", resp.StatusCode)
+				a.log.Info("Failed to register server", "url", a.RegistryURL, "statusCode", resp.StatusCode)
 				return false, nil
 			}
 

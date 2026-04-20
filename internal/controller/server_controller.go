@@ -773,12 +773,23 @@ func (r *ServerReconciler) getOrCreateSigningSecret(ctx context.Context) ([]byte
 	}, secret)
 
 	if err == nil {
-		// Secret exists, return the signing key
+		// Secret exists, check if it's valid
 		if signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]; ok && len(signingKey) == 32 {
 			return signingKey, nil
 		}
-		// Secret exists but is invalid, regenerate
-		return nil, fmt.Errorf("existing signing secret is invalid")
+		// Secret exists but is invalid, regenerate and update it
+		ctrl.LoggerFrom(ctx).Info("Existing signing secret is invalid, regenerating", "name", secretName)
+		newSigningKey, err := metaltoken.GenerateSigningSecret()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate signing secret: %w", err)
+		}
+		secret.Data = map[string][]byte{
+			metaltoken.DiscoveryTokenSigningSecretKey: newSigningKey,
+		}
+		if err := r.Update(ctx, secret); err != nil {
+			return nil, fmt.Errorf("failed to update signing secret: %w", err)
+		}
+		return newSigningKey, nil
 	}
 
 	if !apierrors.IsNotFound(err) {

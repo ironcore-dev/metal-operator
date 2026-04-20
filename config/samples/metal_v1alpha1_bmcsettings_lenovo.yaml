@@ -8,8 +8,16 @@ metadata:
   name: bmcsettings-lenovo-sample
 spec:
   BMCRef:
-    name: ndpoint-lenovo-sample
+    name: endpoint-lenovo-sample
   version: TEI3E4A 4.11 2024-04-25
-  settings:
-      "PATCH /redfish/v1/Managers/1/NetworkProtocol": '{ "NTP": {"ProtocolEnabled": false, "NTPServers": ["timehost1", "timehost2", "timehost3"] } }'
+  priority: 10
   serverMaintenancePolicy: Enforced
+  settingsFlow:
+    - name: ntp
+      priority: 0
+      settings:
+        "PATCH /redfish/v1/Managers/1/NetworkProtocol": '{"NTP": {"ProtocolEnabled": true, "NTPServers": ["timehost1", "timehost2", "timehost3"]}}'
+    - name: snmp
+      priority: 10
+      settings:
+        "PATCH /redfish/v1/Managers/1/NetworkProtocol": '{"SNMP": {"ProtocolEnabled": true, "Port": 161}}'

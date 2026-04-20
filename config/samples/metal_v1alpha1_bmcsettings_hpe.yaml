@@ -10,6 +10,14 @@ spec:
   BMCRef:
     name: endpoint-hpe-sample
   version: iLO 6 v1.70
-  settings:
-      "PATCH /redfish/v1/managers/1/networkprotocol": '{"IPMI": {"ProtocolEnabled": true } }'
+  priority: 10
   serverMaintenancePolicy: Enforced
+  settingsFlow:
+    - name: network-protocol
+      priority: 0
+      settings:
+        "PATCH /redfish/v1/managers/1/networkprotocol": '{"IPMI": {"ProtocolEnabled": true}}'
+    - name: syslog
+      priority: 10
+      settings:
+        "PATCH /redfish/v1/managers/1/networkprotocol": '{"Syslog": {"ProtocolEnabled": true, "SyslogServers": [{"Address": "10.0.0.5", "Port": 514}]}}'

@@ -31,7 +31,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 				BMCRef: &v1.LocalObjectReference{Name: "foo"},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "P70 v1.45 (12/06/2017)",
-					SettingsMap:             map[string]string{},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -60,7 +59,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 					BMCRef: &v1.LocalObjectReference{Name: "foo"},
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						Version:                 "1.45.455b66-rev4",
-						SettingsMap:             map[string]string{},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					}},
 			}
@@ -78,7 +76,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 					BMCRef: &v1.LocalObjectReference{Name: "bar"},
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						Version:                 "P70 v1.45 (12/06/2017)",
-						SettingsMap:             map[string]string{},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					}},
 			}
@@ -96,7 +93,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 					BMCRef: &v1.LocalObjectReference{Name: "bar"},
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						Version:                 "P70 v1.45 (12/06/2017)",
-						SettingsMap:             map[string]string{},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					}},
 			}
@@ -119,7 +115,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 					BMCRef: &v1.LocalObjectReference{Name: "bar"},
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						Version:                 "P70 v1.45 (12/06/2017)",
-						SettingsMap:             map[string]string{},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					}},
 			}
@@ -144,7 +139,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 			})).Should(Succeed())
 			By("Updating an bmcSettings V1 spec, should fail to update when inProgress")
 			bmcSettingsV1Updated := BMCSettingsV1.DeepCopy()
-			bmcSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}
+			bmcSettingsV1Updated.Spec.SettingsFlow = []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: map[string]string{"test": "value"}}}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().To(HaveOccurred())
 			By("Updating an bmcSettings V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
 			bmcSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}

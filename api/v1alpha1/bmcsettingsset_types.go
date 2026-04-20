@@ -7,6 +7,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// VersionSelector limits BMCSettings stamping to BMCs whose firmware version matches.
+type VersionSelector struct {
+	// Versions is the list of exact firmware version strings to match.
+	// If empty or omitted, all firmware versions are included.
+	// +optional
+	Versions []string `json:"versions,omitempty"`
+}
+
 // BMCSettingsSetSpec defines the desired state of BMCSettingsSet.
 type BMCSettingsSetSpec struct {
 	// BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs.
@@ -15,6 +23,12 @@ type BMCSettingsSetSpec struct {
 	// BMCSelector specifies a label selector to identify the BMCs to be selected.
 	// +required
 	BMCSelector metav1.LabelSelector `json:"bmcSelector"`
+	// VersionSelector is an additional filter applied on top of BMCSelector.
+	// Only BMCs whose status.firmwareVersion exactly matches one of the listed strings
+	// will receive a stamped BMCSettings child. When omitted, all BMCs matched by
+	// BMCSelector are included regardless of firmware version.
+	// +optional
+	VersionSelector *VersionSelector `json:"versionSelector,omitempty"`
 }
 
 // BMCSettingsSetStatus defines the observed state of BMCSettingsSet.
@@ -36,7 +50,6 @@ type BMCSettingsSetStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.bmcSettingsTemplate.version`
 // +kubebuilder:printcolumn:name="TotalBMCs",type="integer",JSONPath=`.status.fullyLabeledBMCs`
 // +kubebuilder:printcolumn:name="AvailableBMCSettings",type="integer",JSONPath=`.status.availableBMCSettings`
 // +kubebuilder:printcolumn:name="Pending",type="integer",JSONPath=`.status.pendingBMCSettings`

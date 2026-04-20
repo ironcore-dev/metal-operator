@@ -10,6 +10,11 @@ spec:
   BMCRef:
     name: endpoint-dell-sample
   version: 1.45.4
-  settings:
-      abc: "3"
+  priority: 10
   serverMaintenancePolicy: Enforced
+  settingsFlow:
+    - name: baseline
+      priority: 0
+      settings:
+        BootMode: "UEFI"
+        HyperThreading: "Enabled"

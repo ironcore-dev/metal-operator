@@ -21,9 +21,6 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.bmcSettingsTemplate.version
-      name: BMCVersion
-      type: string
     - jsonPath: .status.fullyLabeledBMCs
       name: TotalBMCs
       type: integer
@@ -121,6 +118,111 @@ spec:
                 description: BMCSettingsTemplate defines the template for the BMCSettings
                   resource to be applied to the BMCs.
                 properties:
+                  priority:
+                    default: 0
+                    description: |-
+                      Priority controls ordering when multiple BMCSettings target the same BMC.
+                      Higher value runs first. Mirrors ServerMaintenance.spec.priority.
+                    format: int32
+                    type: integer
+                  readinessGates:
+                    description: ReadinessGates blocks this BMCSettings in Pending
+                      until all gates are satisfied.
+                    items:
+                      description: |-
+                        ReadinessGate blocks a resource in Pending until the referenced object
+                        satisfies the specified check.
+
+                        Exactly one of Name or OwnedBy must be set (object resolution):
+                          - Name: direct lookup — checks the exact named object.
+                          - OwnedBy: set-child lookup — finds the child of Kind that is owned by
+                            the named Set and associated with this BMC/Server via ownerReferences.
+
+                        Exactly one of ConditionType or FieldMatch must be set (match criterion):
+                          - ConditionType: checks that the named condition is set to True.
+                          - FieldMatch: checks that a specific field equals the given value.
+                      properties:
+                        apiVersion:
+                          description: APIVersion of the object whose condition is
+                            checked, e.g. "metal.ironcore.dev/v1alpha1".
+                          type: string
+                        conditionType:
+                          description: |-
+                            ConditionType checks that the named condition on the referenced object is set to True.
+                            Mutually exclusive with FieldMatch.
+                          type: string
+                        fieldMatch:
+                          description: |-
+                            FieldMatch checks that a specific field on the referenced object equals the given value.
+                            Mutually exclusive with ConditionType.
+                          properties:
+                            fieldPath:
+                              description: |-
+                                FieldPath is the dot-notation path to the field on the referenced object,
+                                e.g. ".status.state".
+                              type: string
+                            value:
+                              description: Value is the expected string value of the
+                                field.
+                              type: string
+                          required:
+                          - fieldPath
+                          - value
+                          type: object
+                        kind:
+                          description: Kind of the object whose condition is checked,
+                            e.g. "BMCSettings".
+                          type: string
+                        name:
+                          description: |-
+                            Name is the exact name of the object to look up.
+                            Mutually exclusive with OwnedBy.
+                          type: string
+                        ownedBy:
+                          description: |-
+                            OwnedBy resolves the target by finding the child of Kind that is owned
+                            by the named Set and associated with this BMC/Server via ownerReferences.
+                            Mutually exclusive with Name.
+                          properties:
+                            kind:
+                              description: Kind is the kind of the owning Set CRD,
+                                e.g. "BMCSettingsSet".
+                              type: string
+                            localFieldPath:
+                              description: |-
+                                LocalFieldPath is the dot-notation path on the *current* resource whose
+                                value is used as the match key, e.g. ".metadata.name" or ".spec.serverRef.name".
+                                Must be set together with RemoteFieldPath.
+                                When both are omitted the controller falls back to ownerReferences.
+                              type: string
+                            name:
+                              description: Name is the name of the owning Set CRD.
+                              type: string
+                            remoteFieldPath:
+                              description: |-
+                                RemoteFieldPath is the dot-notation path on the *child* object to compare
+                                against LocalFieldPath, e.g. ".spec.serverRef.name" or ".spec.bmcRef.name".
+                                Must be set together with LocalFieldPath.
+                              type: string
+                          required:
+                          - kind
+                          - name
+                          type: object
+                          x-kubernetes-validations:
+                          - message: localFieldPath and remoteFieldPath must both
+                              be set or both be omitted
+                            rule: has(self.localFieldPath) == has(self.remoteFieldPath)
+                      required:
+                      - apiVersion
+                      - kind
+                      type: object
+                      x-kubernetes-validations:
+                      - message: exactly one of name or ownedBy must be set
+                        rule: has(self.name) != has(self.ownedBy)
+                      - message: exactly one of conditionType or fieldMatch must be
+                          set
+                        rule: has(self.conditionType) != has(self.fieldMatch)
+                    type: array
                   retryPolicy:
                     description: RetryPolicy defines the retry behavior for automatic
                       retries on transient failures.
@@ -139,11 +241,35 @@ spec:
                     description: ServerMaintenancePolicy is a maintenance policy to
                       be applied on the server.
                     type: string
-                  settings:
-                    additionalProperties:
-                      type: string
-                    description: SettingsMap contains BMC settings as a map.
-                    type: object
+                  settingsFlow:
+                    description: |-
+                      SettingsFlow is the ordered list of setting groups to apply.
+                      Items are applied in ascending Priority order.
+                    items:
+                      description: BMCSettingsFlowItem represents a named, prioritized
+                        group of BMC settings to be applied as a unit.
+                      properties:
+                        name:
+                          description: Name uniquely identifies this flow step within
+                            the BMCSettings.
+                          type: string
+                        priority:
+                          description: |-
+                            Priority controls application order within the flow.
+                            Lower numbers are applied first. Must be unique within the flow.
+                          format: int32
+                          type: integer
+                        settings:
+                          additionalProperties:
+                            type: string
+                          description: Settings is the map of BMC manager key=value
+                            settings for this step.
+                          type: object
+                      required:
+                      - name
+                      - priority
+                      type: object
+                    type: array
                   variables:
                     description: Variables is a list of variables that can be used
                       in the settings for templating.
@@ -237,16 +363,31 @@ spec:
                     maxItems: 64
                     type: array
                   version:
-                    description: Version specifies the BMC firmware version for which
-                      the settings should be applied.
+                    description: |-
+                      Version is the firmware version these settings are applicable for.
+                      Empty means version-agnostic. When created from a BMCSettingsSet with a versionSelector,
+                      the controller sets this to the matched version for traceability.
                     type: string
-                required:
-                - version
                 type: object
                 x-kubernetes-validations:
                 - message: variable keys must be unique
                   rule: '!has(self.variables) || self.variables.all(v, self.variables.filter(w,
                     w.key == v.key).size() == 1)'
+              versionSelector:
+                description: |-
+                  VersionSelector is an additional filter applied on top of BMCSelector.
+                  Only BMCs whose status.firmwareVersion exactly matches one of the listed strings
+                  will receive a stamped BMCSettings child. When omitted, all BMCs matched by
+                  BMCSelector are included regardless of firmware version.
+                properties:
+                  versions:
+                    description: |-
+                      Versions is the list of exact firmware version strings to match.
+                      If empty or omitted, all firmware versions are included.
+                    items:
+                      type: string
+                    type: array
+                type: object
             required:
             - bmcSelector
             - bmcSettingsTemplate

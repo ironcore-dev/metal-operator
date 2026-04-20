@@ -70,6 +70,104 @@ spec:
                 description: BIOSSettingsTemplate defines the template for the BIOSSettings
                   resource to be applied to the servers.
                 properties:
+                  readinessGates:
+                    description: ReadinessGates blocks this BIOSSettings in Pending
+                      until all gates are satisfied.
+                    items:
+                      description: |-
+                        ReadinessGate blocks a resource in Pending until the referenced object
+                        satisfies the specified check.
+
+                        Exactly one of Name or OwnedBy must be set (object resolution):
+                          - Name: direct lookup — checks the exact named object.
+                          - OwnedBy: set-child lookup — finds the child of Kind that is owned by
+                            the named Set and associated with this BMC/Server via ownerReferences.
+
+                        Exactly one of ConditionType or FieldMatch must be set (match criterion):
+                          - ConditionType: checks that the named condition is set to True.
+                          - FieldMatch: checks that a specific field equals the given value.
+                      properties:
+                        apiVersion:
+                          description: APIVersion of the object whose condition is
+                            checked, e.g. "metal.ironcore.dev/v1alpha1".
+                          type: string
+                        conditionType:
+                          description: |-
+                            ConditionType checks that the named condition on the referenced object is set to True.
+                            Mutually exclusive with FieldMatch.
+                          type: string
+                        fieldMatch:
+                          description: |-
+                            FieldMatch checks that a specific field on the referenced object equals the given value.
+                            Mutually exclusive with ConditionType.
+                          properties:
+                            fieldPath:
+                              description: |-
+                                FieldPath is the dot-notation path to the field on the referenced object,
+                                e.g. ".status.state".
+                              type: string
+                            value:
+                              description: Value is the expected string value of the
+                                field.
+                              type: string
+                          required:
+                          - fieldPath
+                          - value
+                          type: object
+                        kind:
+                          description: Kind of the object whose condition is checked,
+                            e.g. "BMCSettings".
+                          type: string
+                        name:
+                          description: |-
+                            Name is the exact name of the object to look up.
+                            Mutually exclusive with OwnedBy.
+                          type: string
+                        ownedBy:
+                          description: |-
+                            OwnedBy resolves the target by finding the child of Kind that is owned
+                            by the named Set and associated with this BMC/Server via ownerReferences.
+                            Mutually exclusive with Name.
+                          properties:
+                            kind:
+                              description: Kind is the kind of the owning Set CRD,
+                                e.g. "BMCSettingsSet".
+                              type: string
+                            localFieldPath:
+                              description: |-
+                                LocalFieldPath is the dot-notation path on the *current* resource whose
+                                value is used as the match key, e.g. ".metadata.name" or ".spec.serverRef.name".
+                                Must be set together with RemoteFieldPath.
+                                When both are omitted the controller falls back to ownerReferences.
+                              type: string
+                            name:
+                              description: Name is the name of the owning Set CRD.
+                              type: string
+                            remoteFieldPath:
+                              description: |-
+                                RemoteFieldPath is the dot-notation path on the *child* object to compare
+                                against LocalFieldPath, e.g. ".spec.serverRef.name" or ".spec.bmcRef.name".
+                                Must be set together with LocalFieldPath.
+                              type: string
+                          required:
+                          - kind
+                          - name
+                          type: object
+                          x-kubernetes-validations:
+                          - message: localFieldPath and remoteFieldPath must both
+                              be set or both be omitted
+                            rule: has(self.localFieldPath) == has(self.remoteFieldPath)
+                      required:
+                      - apiVersion
+                      - kind
+                      type: object
+                      x-kubernetes-validations:
+                      - message: exactly one of name or ownedBy must be set
+                        rule: has(self.name) != has(self.ownedBy)
+                      - message: exactly one of conditionType or fieldMatch must be
+                          set
+                        rule: has(self.conditionType) != has(self.fieldMatch)
+                    type: array
                   retryPolicy:
                     description: RetryPolicy defines the retry behavior for automatic
                       retries on transient failures.

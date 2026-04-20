@@ -1,0 +1,72 @@
+# Example: sequenced BMCSettings — version-baseline waits for both the default
+# settings AND a firmware upgrade to complete first.
+#
+# Scenario: Some tuning settings are only valid on the new firmware (7.x) and
+# assume the NTP/syslog baseline is already in place. We encode both
+# dependencies explicitly via readinessGates.
+#
+# Ordering per BMC:
+#   1. dell-idrac-default-settings (priority 100)  → Applied
+#   2. dell-idrac-upgrade-to-v7                    → Completed
+#   3. dell-idrac-v7-baseline      (priority 10)   → Applied  (this file)
+#
+# dell-idrac-default-settings and dell-idrac-upgrade-to-v7 are defined in
+# metal_v1alpha1_bmcversion_after_settings.yaml.
+
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCSettingsSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dell-idrac-v7-baseline
+spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: dell
+      model: poweredge-r840
+  # Only stamp BMCs that are already running the target firmware.
+  versionSelector:
+    versions:
+      - "7.00.00.00"
+  bmcSettingsTemplate:
+    priority: 10           # lower than default-settings (100), runs after
+    serverMaintenancePolicy: Enforced
+    readinessGates:
+      # Gate 1: default settings must be Applied first.
+      # localFieldPath picks spec.bmcRef.name on this BMCSettings child;
+      # remoteFieldPath matches it against spec.bmcRef.name on the sibling.
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMCSettings
+        conditionType: Applied
+        ownedBy:
+          kind: BMCSettingsSet
+          name: dell-idrac-default-settings
+          localFieldPath: .spec.bmcRef.name   # field on this BMCSettings
+          remoteFieldPath: .spec.bmcRef.name  # matching field on the sibling BMCSettings child
+      # Gate 2: firmware must be on v7 before applying v7-specific tuning.
+      # Alternatively use fieldMatch instead of conditionType:
+      #   fieldMatch:
+      #     fieldPath: .status.state
+      #     value: Completed
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMCVersion
+        conditionType: Completed
+        ownedBy:
+          kind: BMCVersionSet
+          name: dell-idrac-upgrade-to-v7
+          localFieldPath: .spec.bmcRef.name   # field on this BMCSettings
+          remoteFieldPath: .spec.bmcRef.name  # matching field on the BMCVersion child
+    settingsFlow:
+      - name: v7-performance
+        priority: 0
+        settings:
+          PowerProfile: "MaxPerformance"
+          TurboBoost: "Enabled"
+          HyperThreading: "Enabled"
+      - name: v7-security
+        priority: 10
+        settings:
+          SecureBoot: "Enabled"
+          TPMSecurity: "OnWithPrebootMeasurements"
+          SMM: "Enabled"

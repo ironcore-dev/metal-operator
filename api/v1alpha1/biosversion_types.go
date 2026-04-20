@@ -48,6 +48,10 @@ type BIOSVersionTemplate struct {
 	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
 	// +optional
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
+
+	// ReadinessGates blocks this BIOSVersion in Pending until all gates are satisfied.
+	// +optional
+	ReadinessGates []ReadinessGate `json:"readinessGates,omitempty"`
 }
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.

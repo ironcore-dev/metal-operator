@@ -260,22 +260,27 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 	var errs []error
 	for _, bmc := range bmcList.Items {
 		if _, ok := bmcWithSettings[bmc.Name]; !ok {
-			if bmc.Spec.BMCSettingRef != nil {
-				if err := r.Get(ctx, client.ObjectKey{Name: bmc.Spec.BMCSettingRef.Name}, &metalv1alpha1.BMCSettings{}); err != nil {
+			skipBMC := false
+			for _, ref := range bmc.Spec.BMCSettingRefs {
+				if err := r.Get(ctx, client.ObjectKey{Name: ref.Name}, &metalv1alpha1.BMCSettings{}); err != nil {
 					if apierrors.IsNotFound(err) {
-						log.V(1).Info("BMCSettings referenced by BMC not found, will create a new one", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-						// proceed to create a new BMCSettings; the ref will be updated when it is created
+						log.V(1).Info("BMCSettings referenced by BMC not found", "BMC", bmc.Name, "BMCSettings", ref.Name)
 					} else {
-						log.Error(err, "Failed to get BMCSettings referenced by BMC", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-						// we will try this again in next reconciliation loop
-						continue
+						log.Error(err, "Failed to get BMCSettings referenced by BMC", "BMC", bmc.Name, "BMCSettings", ref.Name)
+						skipBMC = true
+						break
 					}
 				} else {
 					// the referenced BMCSettings exists, so we skip creating a new one
-					log.V(1).Info("BMC already has a BMCSettings ref", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-					continue
+					log.V(1).Info("BMC already has a BMCSettings ref", "BMC", bmc.Name, "BMCSettings", ref.Name)
+					skipBMC = true
+					break
 				}
 			}
+			if skipBMC {
+				continue
+			}
+			log.V(1).Info("No existing BMCSettings found for BMC, will create a new one", "BMC", bmc.Name)
 
 			// generate k8s conform name for bmcsettings
 			newBMCSettingsName := fmt.Sprintf("%s-%s", bmcSettingsSet.Name, bmc.Name)
@@ -451,7 +456,7 @@ func (r *BMCSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					oldBMC := e.ObjectOld.(*metalv1alpha1.BMC)
 					newBMC := e.ObjectNew.(*metalv1alpha1.BMC)
-					return labelChangeOrAnyFieldChangeInObject(e, []any{oldBMC.Spec.BMCSettingRef}, []any{newBMC.Spec.BMCSettingRef})
+					return labelChangeOrAnyFieldChangeInObject(e, []any{oldBMC.Spec.BMCSettingRefs}, []any{newBMC.Spec.BMCSettingRefs})
 				},
 			})).
 		Named("bmcsettingsset").

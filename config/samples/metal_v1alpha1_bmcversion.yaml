@@ -14,3 +14,19 @@ spec:
   bmcRef:
     name: endpoint-sample
   serverMaintenancePolicy: OwnerApproval
+  # readinessGates blocks this BMCVersion in Pending until the named
+  # BMCSettings object has its Applied condition set to True.
+  # Two equivalent ways to express this:
+  readinessGates:
+    # Option A: conditionType — checks status.conditions[type=Applied].status == True
+    - apiVersion: metal.ironcore.dev/v1alpha1
+      kind: BMCSettings
+      name: bmcsettings-sample
+      conditionType: Applied
+    # Option B: fieldMatch — generic field equality check
+    # - apiVersion: metal.ironcore.dev/v1alpha1
+    #   kind: BMCSettings
+    #   name: bmcsettings-sample
+    #   fieldMatch:
+    #     fieldPath: .status.state
+    #     value: Applied

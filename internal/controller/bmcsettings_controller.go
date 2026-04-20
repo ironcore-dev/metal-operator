@@ -193,8 +193,21 @@ func (r *BMCSettingsReconciler) cleanupReferences(ctx context.Context, settings 
 		return err
 	}
 
-	if bmcObj.Spec.BMCSettingRef != nil && bmcObj.Spec.BMCSettingRef.Name == settings.Name {
-		return r.patchBMCSettingsRefOnBMC(ctx, bmcObj, nil)
+	bmcObjBase := bmcObj.DeepCopy()
+	refs := make([]corev1.LocalObjectReference, 0, len(bmcObj.Spec.BMCSettingRefs))
+	found := false
+	for _, ref := range bmcObj.Spec.BMCSettingRefs {
+		if ref.Name == settings.Name {
+			found = true
+		} else {
+			refs = append(refs, ref)
+		}
+	}
+	if found {
+		bmcObj.Spec.BMCSettingRefs = refs
+		if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcObjBase)); err != nil {
+			return fmt.Errorf("failed to remove BMCSettings ref from BMC: %w", err)
+		}
 	}
 	return nil
 }
@@ -228,36 +241,18 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 		log.V(1).Info("Failed to fetch referred BMC object")
 		return ctrl.Result{}, err
 	}
-	if bmcObj.Spec.BMCSettingRef == nil {
+	// Ensure this BMCSettings is registered in the BMC's refs list.
+	alreadyReferenced := false
+	for _, ref := range bmcObj.Spec.BMCSettingRefs {
+		if ref.Name == settings.Name {
+			alreadyReferenced = true
+			break
+		}
+	}
+	if !alreadyReferenced {
 		if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
 			return ctrl.Result{}, err
 		}
-	} else if bmcObj.Spec.BMCSettingRef.Name != settings.Name {
-		referredBMCSettings, err := r.getReferredBMCSettings(ctx, bmcObj.Spec.BMCSettingRef)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				log.V(1).Info("Referred BMC contains reference to non-existing BMCSettings, updating reference")
-				if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
-					return ctrl.Result{}, err
-				}
-				// Requeue since updating the BMC object does not trigger reconciliation here
-				return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
-			}
-			log.V(1).Info("Referred BMC contains reference to different BMCSettings, unable to fetch the referenced BMCSettings")
-			return ctrl.Result{}, err
-		}
-		// TODO: Handle version checks correctly
-		if referredBMCSettings.Spec.Version < settings.Spec.Version {
-			log.V(1).Info("Updating BMCSettings reference to the latest BMC version")
-			if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
-				return ctrl.Result{}, err
-			}
-			// Requeue to reconcile with the updated BMC reference
-			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
-		}
-		// This BMCSettings does not own the BMC — stop reconciliation
-		log.V(1).Info("BMC is owned by a newer or equal version BMCSettings, skipping reconciliation")
-		return ctrl.Result{}, nil
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, settings, BMCSettingFinalizer); err != nil || modified {
@@ -732,7 +727,16 @@ func (r *BMCSettingsReconciler) handleFailedState(ctx context.Context, settings 
 
 func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) (diff schemas.SettingsAttributes, err error) {
 	log := ctrl.LoggerFrom(ctx)
-	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, bmcObj.Spec.BMCUUID, settings.Spec.SettingsMap)
+	// Flatten all flow items into a single merged settings map (later items override earlier).
+	// TODO: this is just a temporary solution (for API changes) until we support flow item based settings management in the controller,
+	// currently we just want to have the diff check working for the whole settings.
+	allSettings := make(map[string]string)
+	for _, flowItem := range settings.Spec.SettingsFlow {
+		for k, v := range flowItem.Settings {
+			allSettings[k] = v
+		}
+	}
+	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, bmcObj.Spec.BMCUUID, allSettings)
 	if err != nil {
 		return diff, fmt.Errorf("failed to get BMC settings: %w", err)
 	}
@@ -741,7 +745,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 
 	diff = schemas.SettingsAttributes{}
 	var errs []error
-	for key, value := range settings.Spec.SettingsMap {
+	for key, value := range allSettings {
 		res, ok := currentSettings[key]
 		if ok {
 			switch data := res.(type) {
@@ -1072,14 +1076,16 @@ func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenan
 }
 
 func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, BMCSettingsReference *corev1.LocalObjectReference) error {
-	if (bmcObj.Spec.BMCSettingRef == nil && BMCSettingsReference == nil) ||
-		(bmcObj.Spec.BMCSettingRef != nil && BMCSettingsReference != nil &&
-			bmcObj.Spec.BMCSettingRef.Name == BMCSettingsReference.Name) {
+	if BMCSettingsReference == nil {
 		return nil
 	}
-
+	for _, ref := range bmcObj.Spec.BMCSettingRefs {
+		if ref.Name == BMCSettingsReference.Name {
+			return nil // already present
+		}
+	}
 	bmcObjBase := bmcObj.DeepCopy()
-	bmcObj.Spec.BMCSettingRef = BMCSettingsReference
+	bmcObj.Spec.BMCSettingRefs = append(bmcObj.Spec.BMCSettingRefs, *BMCSettingsReference)
 	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcObjBase)); err != nil {
 		return fmt.Errorf("failed to patch BMC settings ref: %w", err)
 	}

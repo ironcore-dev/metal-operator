@@ -289,3 +289,95 @@ func PtrToIPPrefix(prefix IPPrefix) *IPPrefix {
 func EqualIPPrefixes(a, b IPPrefix) bool {
 	return a == b
 }
+
+// ReadinessGateOwner identifies the Set CRD that owns the child object to check.
+//
+// The controller finds the child of Kind whose owner is the named Set, then
+// confirms it is associated with the current resource. Two association modes:
+//   - Field-based (LocalFieldPath + RemoteFieldPath): the value of LocalFieldPath
+//     on the current object must equal the value of RemoteFieldPath on the child.
+//     e.g. current ".spec.serverRef.name" == child ".spec.serverRef.name"
+//     e.g. current ".metadata.name"       == child ".spec.bmcRef.name"
+//   - OwnerReference-based (both paths omitted): the child must carry an
+//     ownerReference pointing at the current object.
+//
+// +kubebuilder:validation:XValidation:rule="has(self.localFieldPath) == has(self.remoteFieldPath)",message="localFieldPath and remoteFieldPath must both be set or both be omitted"
+type ReadinessGateOwner struct {
+	// Kind is the kind of the owning Set CRD, e.g. "BMCSettingsSet".
+	// +required
+	Kind string `json:"kind"`
+
+	// Name is the name of the owning Set CRD.
+	// +required
+	Name string `json:"name"`
+
+	// LocalFieldPath is the dot-notation path on the *current* resource whose
+	// value is used as the match key, e.g. ".metadata.name" or ".spec.serverRef.name".
+	// Must be set together with RemoteFieldPath.
+	// When both are omitted the controller falls back to ownerReferences.
+	// +optional
+	LocalFieldPath string `json:"localFieldPath,omitempty"`
+
+	// RemoteFieldPath is the dot-notation path on the *child* object to compare
+	// against LocalFieldPath, e.g. ".spec.serverRef.name" or ".spec.bmcRef.name".
+	// Must be set together with LocalFieldPath.
+	// +optional
+	RemoteFieldPath string `json:"remoteFieldPath,omitempty"`
+}
+
+// FieldMatch defines a generic field equality check on the referenced object.
+type FieldMatch struct {
+	// FieldPath is the dot-notation path to the field on the referenced object,
+	// e.g. ".status.state".
+	// +required
+	FieldPath string `json:"fieldPath"`
+
+	// Value is the expected string value of the field.
+	// +required
+	Value string `json:"value"`
+}
+
+// ReadinessGate blocks a resource in Pending until the referenced object
+// satisfies the specified check.
+//
+// Exactly one of Name or OwnedBy must be set (object resolution):
+//   - Name: direct lookup — checks the exact named object.
+//   - OwnedBy: set-child lookup — finds the child of Kind that is owned by
+//     the named Set and associated with this BMC/Server via ownerReferences.
+//
+// Exactly one of ConditionType or FieldMatch must be set (match criterion):
+//   - ConditionType: checks that the named condition is set to True.
+//   - FieldMatch: checks that a specific field equals the given value.
+//
+// +kubebuilder:validation:XValidation:rule="has(self.name) != has(self.ownedBy)",message="exactly one of name or ownedBy must be set"
+// +kubebuilder:validation:XValidation:rule="has(self.conditionType) != has(self.fieldMatch)",message="exactly one of conditionType or fieldMatch must be set"
+type ReadinessGate struct {
+	// APIVersion of the object whose condition is checked, e.g. "metal.ironcore.dev/v1alpha1".
+	// +required
+	APIVersion string `json:"apiVersion"`
+
+	// Kind of the object whose condition is checked, e.g. "BMCSettings".
+	// +required
+	Kind string `json:"kind"`
+
+	// Name is the exact name of the object to look up.
+	// Mutually exclusive with OwnedBy.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// OwnedBy resolves the target by finding the child of Kind that is owned
+	// by the named Set and associated with this BMC/Server via ownerReferences.
+	// Mutually exclusive with Name.
+	// +optional
+	OwnedBy *ReadinessGateOwner `json:"ownedBy,omitempty"`
+
+	// ConditionType checks that the named condition on the referenced object is set to True.
+	// Mutually exclusive with FieldMatch.
+	// +optional
+	ConditionType string `json:"conditionType,omitempty"`
+
+	// FieldMatch checks that a specific field on the referenced object equals the given value.
+	// Mutually exclusive with ConditionType.
+	// +optional
+	FieldMatch *FieldMatch `json:"fieldMatch,omitempty"`
+}

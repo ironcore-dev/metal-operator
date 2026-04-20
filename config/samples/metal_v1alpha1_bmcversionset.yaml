@@ -13,6 +13,19 @@ spec:
       transferProtocol: "HTTPS"
     updatePolicy: Normal
     serverMaintenancePolicy: OwnerApproval
+    # readinessGates with ownedBy resolves the sibling BMCSettings stamped for
+    # the same BMC. localFieldPath picks the identifying field on this BMCVersion
+    # (spec.bmcRef.name) and remoteFieldPath picks the matching field on the
+    # BMCSettings child — the controller finds the child where both values equal.
+    readinessGates:
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMCSettings
+        conditionType: Applied
+        ownedBy:
+          kind: BMCSettingsSet
+          name: bmcsettingsset-sample
+          localFieldPath: .spec.bmcRef.name   # field on this BMCVersion
+          remoteFieldPath: .spec.bmcRef.name  # field on the BMCSettings child
   bmcSelector:
     matchLabels: 
       manufacturer: "Contoso"

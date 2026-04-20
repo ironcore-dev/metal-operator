@@ -1,0 +1,69 @@
+# Example: BMCVersion waiting for default BMCSettings to be Applied first.
+#
+# Scenario: Before upgrading the BMC firmware we want to ensure that
+# baseline settings (NTP, syslog, IPMI config) are already Applied on
+# every BMC. The BMCVersionSet's readinessGate (ownedBy) points at the
+# BMCSettingsSet name; the controller resolves the specific child
+# BMCSettings stamped for each BMC at runtime via ownerReferences.
+#
+#   BMC
+#   ├── BMCSettings [dell-idrac-default-settings-xxxxx]  → Pending → Applied ──┐
+#   └── BMCVersion  [dell-idrac-upgrade-to-v7-yyyyy]     → Pending (gate?) ─────┘→ InProgress → Completed
+
+# ── Step 1: apply default settings to all matching BMCs ──────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCSettingsSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dell-idrac-default-settings
+spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: dell
+      model: poweredge-r840
+  bmcSettingsTemplate:
+    priority: 100          # high priority — wins any slot contention
+    serverMaintenancePolicy: Enforced
+    settingsFlow:
+      - name: ntp-syslog
+        priority: 0
+        settings:
+          NTPServer1: "10.0.0.1"
+          NTPServer2: "10.0.0.2"
+          SyslogServer: "10.0.0.5"
+      - name: ipmi
+        priority: 10
+        settings:
+          IPMIOverLAN: "Enabled"
+          IPMIPort: "623"
+---
+# ── Step 2: upgrade firmware only after default settings are Applied ──────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCVersionSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dell-idrac-upgrade-to-v7
+spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: dell
+      model: poweredge-r840
+  bmcVersionTemplate:
+    version: "7.00.00.00"
+    image:
+      URI: "https://downloads.example.com/dell/idrac-7.00.00.00.exe"
+      transferProtocol: HTTPS
+    serverMaintenancePolicy: Enforced
+    readinessGates:
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMCSettings
+        conditionType: Applied
+        ownedBy:
+          kind: BMCSettingsSet
+          name: dell-idrac-default-settings
+          localFieldPath: .spec.bmcRef.name   # field on this BMCVersion
+          remoteFieldPath: .spec.bmcRef.name  # matching field on the BMCSettings child

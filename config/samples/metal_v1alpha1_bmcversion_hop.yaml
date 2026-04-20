@@ -1,0 +1,88 @@
+# Example: multi-hop BMC firmware upgrade  4.x → 5.x → 6.x → 7.x
+#
+# All three Sets are applied immediately. Each BMC receives three BMCVersion
+# children. Hop 2 and 3 stay in Pending until the previous hop's child (stamped
+# by the named Set for that specific BMC) reaches state Completed. The
+# controller resolves the generated child name at runtime via ownerReferences
+# (ownedBy) — no need to know the GenerateName result up front.
+#
+# If a BMC is already on 5.x, its hop-1 child skips straight to Completed,
+# unblocking hop-2 automatically.
+
+# ── Hop 1: current version → 5.x (no gate, starts immediately) ──────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCVersionSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dell-idrac-upgrade-to-v5
+spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: dell
+      model: poweredge-r840
+  bmcVersionTemplate:
+    version: "5.00.00.00"
+    image:
+      URI: "https://downloads.example.com/dell/idrac-5.00.00.00.exe"
+      transferProtocol: HTTPS
+    serverMaintenancePolicy: Enforced
+---
+# ── Hop 2: 5.x → 6.x (blocked until hop-1 child is Completed) ───────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCVersionSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dell-idrac-upgrade-to-v6
+spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: dell
+      model: poweredge-r840
+  bmcVersionTemplate:
+    version: "6.00.00.00"
+    image:
+      URI: "https://downloads.example.com/dell/idrac-6.00.00.00.exe"
+      transferProtocol: HTTPS
+    serverMaintenancePolicy: Enforced
+    readinessGates:
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMCVersion
+        conditionType: Completed
+        ownedBy:
+          kind: BMCVersionSet
+          name: dell-idrac-upgrade-to-v5
+          localFieldPath: .spec.bmcRef.name   # field on this BMCVersion
+          remoteFieldPath: .spec.bmcRef.name  # matching field on the hop-1 BMCVersion child
+---
+# ── Hop 3: 6.x → 7.x (blocked until hop-2 child is Completed) ───────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCVersionSet
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dell-idrac-upgrade-to-v7
+spec:
+  bmcSelector:
+    matchLabels:
+      manufacturer: dell
+      model: poweredge-r840
+  bmcVersionTemplate:
+    version: "7.00.00.00"
+    image:
+      URI: "https://downloads.example.com/dell/idrac-7.00.00.00.exe"
+      transferProtocol: HTTPS
+    serverMaintenancePolicy: Enforced
+    readinessGates:
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMCVersion
+        conditionType: Completed
+        ownedBy:
+          kind: BMCVersionSet
+          name: dell-idrac-upgrade-to-v6
+          localFieldPath: .spec.bmcRef.name   # field on this BMCVersion
+          remoteFieldPath: .spec.bmcRef.name  # matching field on the hop-2 BMCVersion child

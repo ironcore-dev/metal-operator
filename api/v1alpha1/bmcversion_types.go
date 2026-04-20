@@ -41,6 +41,10 @@ type BMCVersionTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+
+	// ReadinessGates blocks this BMCVersion in Pending until all gates are satisfied.
+	// +optional
+	ReadinessGates []ReadinessGate `json:"readinessGates,omitempty"`
 }
 
 // BMCVersionSpec defines the desired state of BMCVersion.

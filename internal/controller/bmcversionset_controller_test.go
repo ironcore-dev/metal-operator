@@ -404,7 +404,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 
 		By("creating the deleted BMC")
 		BMCToDelete.ResourceVersion = ""
-		BMCToDelete.Spec.BMCSettingRef = nil
+		BMCToDelete.Spec.BMCSettingRefs = nil
 		BMCToDelete.Spec.Endpoint = bmc02.Spec.Endpoint
 		Expect(k8sClient.Create(ctx, BMCToDelete)).Should(Succeed())
 

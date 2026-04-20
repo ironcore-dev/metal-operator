@@ -10,19 +10,34 @@ spec:
     matchLabels:
       manufacturer: "dell"
       model: "poweredge-r840"
+  # versionSelector narrows the above BMCSelector to only BMCs whose
+  # status.firmwareVersion exactly matches one of the listed strings.
+  versionSelector:
+    versions:
+      - "5.00.00.00"
+      - "5.10.00.00"
   bmcSettingsTemplate:
-    version: "1.45.455b66-rev4"
+    priority: 10
     serverMaintenancePolicy: Enforced
-    settings:
-      BootMode: "UEFI"
-      HyperThreading: "Enabled"
-      LicenseKey: "$(LicenseKey)"
-      FQDN: "$(BmcName).$(SearchDomain)"
+    readinessGates: []
+    settingsFlow:
+      - name: baseline
+        priority: 0
+        settings:
+          BootMode: "UEFI"
+          HyperThreading: "Enabled"
+          LicenseKey: "$(LicenseKey)"
+          FQDN: "$(BmcName).$(SearchDomain)"
+      - name: advanced-tuning
+        priority: 10
+        settings:
+          PowerProfile: "MaxPerformance"
+          TurboBoost: "Enabled"
     variables:
       - key: BmcName
         valueFrom:
           fieldRef:
-            fieldPath: spec.bmcRef.name
+            fieldPath: spec.BMCRef.name
       - key: SearchDomain
         valueFrom:
           configMapKeyRef:

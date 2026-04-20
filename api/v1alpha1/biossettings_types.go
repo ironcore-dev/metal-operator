@@ -24,6 +24,10 @@ type BIOSSettingsTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+
+	// ReadinessGates blocks this BIOSSettings in Pending until all gates are satisfied.
+	// +optional
+	ReadinessGates []ReadinessGate `json:"readinessGates,omitempty"`
 }
 
 type SettingsFlowItem struct {

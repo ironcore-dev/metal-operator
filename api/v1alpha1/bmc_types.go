@@ -53,10 +53,10 @@ type BMCSpec struct {
 	// +optional
 	ConsoleProtocol *ConsoleProtocol `json:"consoleProtocol,omitempty"`
 
-	// BMCSettingRef is a reference to a BMCSettings object that specifies
+	// BMCSettingRefs are references to BMCSettings objects that specify
 	// the BMC configuration for this BMC.
 	// +optional
-	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
+	BMCSettingRefs []v1.LocalObjectReference `json:"bmcSettingRefs,omitempty"`
 
 	// Hostname is the hostname of the BMC.
 	// +optional

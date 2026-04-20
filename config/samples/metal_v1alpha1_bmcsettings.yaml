@@ -9,12 +9,21 @@ spec:
   BMCRef:
     name: endpoint-sample
   version: 1.45.455b66-rev4
+  priority: 10
   serverMaintenancePolicy: Enforced
-  settings:
-    bootMode: "UEFI"
-    hyperThreading: "Enabled"
-    licenseKey: "$(LicenseKey)"
-    fqdn: "$(BmcName).$(SearchDomain)"
+  settingsFlow:
+    - name: baseline
+      priority: 0
+      settings:
+        BootMode: "UEFI"
+        HyperThreading: "Enabled"
+        LicenseKey: "$(LicenseKey)"
+        FQDN: "$(BmcName).$(SearchDomain)"
+    - name: advanced-tuning
+      priority: 10
+      settings:
+        PowerProfile: "MaxPerformance"
+        TurboBoost: "Enabled"
   variables:
     - key: BmcName
       valueFrom:

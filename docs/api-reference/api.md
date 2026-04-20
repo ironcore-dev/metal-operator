@@ -162,6 +162,7 @@ _Appears in:_
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BIOSSettings in Pending until all gates are satisfied. |  |  |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS settings on. |  |  |
 
@@ -224,6 +225,7 @@ _Appears in:_
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BIOSSettings in Pending until all gates are satisfied. |  |  |
 
 
 #### BIOSVersion
@@ -320,6 +322,7 @@ _Appears in:_
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BIOSVersion in Pending until all gates are satisfied. |  |  |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS upgrade on. |  |  |
 
@@ -382,6 +385,7 @@ _Appears in:_
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BIOSVersion in Pending until all gates are satisfied. |  |  |
 
 
 #### BMC
@@ -482,6 +486,42 @@ BMCSettings is the Schema for the BMCSettings API.
 | `status` _[BMCSettingsStatus](#bmcsettingsstatus)_ |  |  |  |
 
 
+#### BMCSettingsFlowItem
+
+
+
+BMCSettingsFlowItem represents a named, prioritized group of BMC settings to be applied as a unit.
+
+
+
+_Appears in:_
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name uniquely identifies this flow step within the BMCSettings. |  |  |
+| `priority` _integer_ | Priority controls application order within the flow.<br />Lower numbers are applied first. Must be unique within the flow. |  |  |
+| `settings` _object (keys:string, values:string)_ | Settings is the map of BMC manager key=value settings for this step. |  |  |
+
+
+#### BMCSettingsFlowStatus
+
+
+
+BMCSettingsFlowStatus tracks the per-step state within settingsFlow.
+
+
+
+_Appears in:_
+- [BMCSettingsStatus](#bmcsettingsstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the name of the flow step. |  |  |
+| `state` _[BMCSettingsState](#bmcsettingsstate)_ | State is the current state of this flow step. |  |  |
+
+
 #### BMCSettingsSet
 
 
@@ -516,6 +556,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
 | `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
+| `versionSelector` _[VersionSelector](#versionselector)_ | VersionSelector is an additional filter applied on top of BMCSelector.<br />Only BMCs whose status.firmwareVersion exactly matches one of the listed strings<br />will receive a stamped BMCSettings child. When omitted, all BMCs matched by<br />BMCSelector are included regardless of firmware version. |  |  |
 
 
 #### BMCSettingsSetStatus
@@ -552,8 +593,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
+| `version` _string_ | Version is the firmware version these settings are applicable for.<br />Empty means version-agnostic. When created from a BMCSettingsSet with a versionSelector,<br />the controller sets this to the matched version for traceability. |  |  |
+| `settingsFlow` _[BMCSettingsFlowItem](#bmcsettingsflowitem) array_ | SettingsFlow is the ordered list of setting groups to apply.<br />Items are applied in ascending Priority order. |  |  |
+| `priority` _integer_ | Priority controls ordering when multiple BMCSettings target the same BMC.<br />Higher value runs first. Mirrors ServerMaintenance.spec.priority. | 0 |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BMCSettings in Pending until all gates are satisfied. |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
@@ -570,6 +613,7 @@ BMCSettingsState specifies the current state of the server maintenance.
 
 
 _Appears in:_
+- [BMCSettingsFlowStatus](#bmcsettingsflowstatus)
 - [BMCSettingsStatus](#bmcsettingsstatus)
 
 | Field | Description |
@@ -594,6 +638,8 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `state` _[BMCSettingsState](#bmcsettingsstate)_ | State represents the current state of the BMC configuration task. |  |  |
+| `flowState` _[BMCSettingsFlowStatus](#bmcsettingsflowstatus) array_ | FlowState tracks per-step state within settingsFlow. |  |  |
+| `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastAppliedTime is when the BMCSettings last transitioned to Applied. |  |  |
 | `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
 | `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC Settings Resource state. |  |  |
@@ -613,8 +659,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
+| `version` _string_ | Version is the firmware version these settings are applicable for.<br />Empty means version-agnostic. When created from a BMCSettingsSet with a versionSelector,<br />the controller sets this to the matched version for traceability. |  |  |
+| `settingsFlow` _[BMCSettingsFlowItem](#bmcsettingsflowitem) array_ | SettingsFlow is the ordered list of setting groups to apply.<br />Items are applied in ascending Priority order. |  |  |
+| `priority` _integer_ | Priority controls ordering when multiple BMCSettings target the same BMC.<br />Higher value runs first. Mirrors ServerMaintenance.spec.priority. | 0 |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BMCSettings in Pending until all gates are satisfied. |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
@@ -639,7 +687,7 @@ _Appears in:_
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
-| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
+| `bmcSettingRefs` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core) array_ | BMCSettingRefs are references to BMCSettings objects that specify<br />the BMC configuration for this BMC. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 
 
@@ -842,6 +890,7 @@ _Appears in:_
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BMCVersion in Pending until all gates are satisfied. |  |  |
 | `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply BMC upgrade on. |  |  |
 
@@ -904,6 +953,7 @@ _Appears in:_
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
+| `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BMCVersion in Pending until all gates are satisfied. |  |  |
 
 
 #### BootOrder
@@ -1006,6 +1056,23 @@ EndpointStatus defines the observed state of Endpoint
 _Appears in:_
 - [Endpoint](#endpoint)
 
+
+
+#### FieldMatch
+
+
+
+FieldMatch defines a generic field equality check on the referenced object.
+
+
+
+_Appears in:_
+- [ReadinessGate](#readinessgate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `fieldPath` _string_ | FieldPath is the dot-notation path to the field on the referenced object,<br />e.g. ".status.state". |  |  |
+| `value` _string_ | Value is the expected string value of the field. |  |  |
 
 
 #### FieldRefSelector
@@ -1318,6 +1385,72 @@ _Appears in:_
 | --- | --- |
 | `http` | HTTPProtocolScheme is the http protocol scheme<br /> |
 | `https` | HTTPSProtocolScheme is the https protocol scheme<br /> |
+
+
+#### ReadinessGate
+
+
+
+ReadinessGate blocks a resource in Pending until the referenced object
+satisfies the specified check.
+
+Exactly one of Name or OwnedBy must be set (object resolution):
+  - Name: direct lookup — checks the exact named object.
+  - OwnedBy: set-child lookup — finds the child of Kind that is owned by
+    the named Set and associated with this BMC/Server via ownerReferences.
+
+Exactly one of ConditionType or FieldMatch must be set (match criterion):
+  - ConditionType: checks that the named condition is set to True.
+  - FieldMatch: checks that a specific field equals the given value.
+
+
+
+_Appears in:_
+- [BIOSSettingsSpec](#biossettingsspec)
+- [BIOSSettingsTemplate](#biossettingstemplate)
+- [BIOSVersionSpec](#biosversionspec)
+- [BIOSVersionTemplate](#biosversiontemplate)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+- [BMCVersionSpec](#bmcversionspec)
+- [BMCVersionTemplate](#bmcversiontemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | APIVersion of the object whose condition is checked, e.g. "metal.ironcore.dev/v1alpha1". |  |  |
+| `kind` _string_ | Kind of the object whose condition is checked, e.g. "BMCSettings". |  |  |
+| `name` _string_ | Name is the exact name of the object to look up.<br />Mutually exclusive with OwnedBy. |  |  |
+| `ownedBy` _[ReadinessGateOwner](#readinessgateowner)_ | OwnedBy resolves the target by finding the child of Kind that is owned<br />by the named Set and associated with this BMC/Server via ownerReferences.<br />Mutually exclusive with Name. |  |  |
+| `conditionType` _string_ | ConditionType checks that the named condition on the referenced object is set to True.<br />Mutually exclusive with FieldMatch. |  |  |
+| `fieldMatch` _[FieldMatch](#fieldmatch)_ | FieldMatch checks that a specific field on the referenced object equals the given value.<br />Mutually exclusive with ConditionType. |  |  |
+
+
+#### ReadinessGateOwner
+
+
+
+ReadinessGateOwner identifies the Set CRD that owns the child object to check.
+
+The controller finds the child of Kind whose owner is the named Set, then
+confirms it is associated with the current resource. Two association modes:
+  - Field-based (LocalFieldPath + RemoteFieldPath): the value of LocalFieldPath
+    on the current object must equal the value of RemoteFieldPath on the child.
+    e.g. current ".spec.serverRef.name" == child ".spec.serverRef.name"
+    e.g. current ".metadata.name"       == child ".spec.bmcRef.name"
+  - OwnerReference-based (both paths omitted): the child must carry an
+    ownerReference pointing at the current object.
+
+
+
+_Appears in:_
+- [ReadinessGate](#readinessgate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `kind` _string_ | Kind is the kind of the owning Set CRD, e.g. "BMCSettingsSet". |  |  |
+| `name` _string_ | Name is the name of the owning Set CRD. |  |  |
+| `localFieldPath` _string_ | LocalFieldPath is the dot-notation path on the *current* resource whose<br />value is used as the match key, e.g. ".metadata.name" or ".spec.serverRef.name".<br />Must be set together with RemoteFieldPath.<br />When both are omitted the controller falls back to ownerReferences. |  |  |
+| `remoteFieldPath` _string_ | RemoteFieldPath is the dot-notation path on the *child* object to compare<br />against LocalFieldPath, e.g. ".spec.serverRef.name" or ".spec.bmcRef.name".<br />Must be set together with LocalFieldPath. |  |  |
 
 
 #### RetryPolicy
@@ -1890,5 +2023,21 @@ _Appears in:_
 | `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name). |  |  |
 | `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
 | `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
+
+
+#### VersionSelector
+
+
+
+VersionSelector limits BMCSettings stamping to BMCs whose firmware version matches.
+
+
+
+_Appears in:_
+- [BMCSettingsSetSpec](#bmcsettingssetspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `versions` _string array_ | Versions is the list of exact firmware version strings to match.<br />If empty or omitted, all firmware versions are included. |  |  |
 
 

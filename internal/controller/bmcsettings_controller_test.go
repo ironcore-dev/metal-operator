@@ -109,7 +109,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -117,7 +117,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		Eventually(Object(settings)).Should(SatisfyAny(
@@ -140,7 +140,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -148,7 +148,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		Eventually(Object(settings)).Should(SatisfyAll(
@@ -160,7 +160,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingRefs", BeEmpty()),
 		))
 	})
 
@@ -183,7 +183,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -191,7 +191,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings has reached next state")
@@ -216,7 +216,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingRefs", BeEmpty()),
 		))
 
 		// cleanup
@@ -269,7 +269,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 				}},
 		}
@@ -303,7 +303,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		Eventually(Object(settings)).Should(SatisfyAny(
@@ -337,7 +337,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingRefs", BeEmpty()),
 		))
 
 		// cleanup
@@ -367,7 +367,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "2.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -375,8 +375,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the correct BMC settings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", settings.Name),
+			HaveField("Spec.BMCSettingRefs", ContainElement(HaveField("Name", Equal(settings.Name)))),
 		))
 
 		By("Ensuring that the BMCSettings resource state is Pending while waiting for version upgrade")
@@ -436,7 +435,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the Server BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingRefs", BeEmpty()),
 		))
 
 		Eventually(Object(server)).Should(
@@ -464,7 +463,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -520,7 +519,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -528,8 +527,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Wait for the BMCSettings to be ref on the BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", settings.Name),
+			HaveField("Spec.BMCSettingRefs", ContainElement(HaveField("Name", Equal(settings.Name)))),
 		))
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 		By("Forcing deletion of the object by removing finalizers")
@@ -578,7 +576,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -586,8 +584,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Wait for the BMCSettings2 to be ref on the BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", bmcSettings2.Name),
+			HaveField("Spec.BMCSettingRefs", ContainElement(HaveField("Name", Equal(bmcSettings2.Name)))),
 		))
 
 		Eventually(Object(bmcSettings2)).Should(SatisfyAny(
@@ -636,7 +633,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 				}},

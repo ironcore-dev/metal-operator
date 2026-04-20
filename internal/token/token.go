@@ -6,10 +6,14 @@ package token
 import (
 	"crypto/rand"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+// uuidRegex matches RFC 4122 UUID format (8-4-4-4-12 hex digits)
+var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // GenerateSigningSecret generates a cryptographically secure signing secret
 // for HMAC token generation. Returns a 32-byte (256-bit) secret.
@@ -28,11 +32,16 @@ func GenerateSigningSecret() ([]byte, error) {
 // for a specific systemUUID without storing any state.
 //
 // signingSecret: 32-byte shared secret between controller and registry
-// systemUUID: The server's system UUID
+// systemUUID: The server's system UUID (must be RFC 4122 format)
 // Returns: signed JWT token
 func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string) (string, error) {
 	if len(signingSecret) != 32 {
 		return "", fmt.Errorf("signing secret must be exactly 32 bytes")
+	}
+
+	// Validate UUID format to prevent delimiter injection
+	if !uuidRegex.MatchString(systemUUID) {
+		return "", fmt.Errorf("systemUUID must be a valid RFC 4122 UUID format (got: %s)", systemUUID)
 	}
 
 	// Create JWT claims

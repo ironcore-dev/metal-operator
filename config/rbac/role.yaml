@@ -112,8 +112,20 @@ rules:
   - serverbootconfigurations/status
   - serverclaims/status
   - servermaintenances/status
+  - servernetworkconfigs/status
   - servers/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - servernetworkconfigs
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch

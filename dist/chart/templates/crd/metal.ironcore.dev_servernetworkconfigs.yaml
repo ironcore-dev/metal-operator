@@ -1,0 +1,206 @@
+{{- if .Values.crd.enable }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: servernetworkconfigs.metal.ironcore.dev
+spec:
+  group: metal.ironcore.dev
+  names:
+    kind: ServerNetworkConfig
+    listKind: ServerNetworkConfigList
+    plural: servernetworkconfigs
+    shortNames:
+    - snc
+    singular: servernetworkconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.serverRef.name
+      name: ServerRef
+      type: string
+    - jsonPath: .status.lastUpdateTime
+      name: Updated
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ServerNetworkConfig holds the expected network configuration for a server (written by
+          an external source such as argora) and the discovered network state populated by
+          metal-operator after each discovery run.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              ServerNetworkConfigSpec defines the expected network topology for a server,
+              written by an external source such as argora/NetBox.
+            properties:
+              interfaces:
+                description: Interfaces lists the expected network interfaces.
+                items:
+                  description: SpecNetworkInterface defines the expected configuration
+                    of a single network interface.
+                  properties:
+                    expected:
+                      description: Expected holds the expected switch connectivity
+                        for this interface.
+                      properties:
+                        port:
+                          description: Port is the expected LLDP neighbor port ID
+                            on the connected switch.
+                          type: string
+                        switch:
+                          description: Switch is the expected LLDP neighbor system
+                            name (i.e. the connected switch).
+                          type: string
+                      required:
+                      - port
+                      - switch
+                      type: object
+                    macAddress:
+                      description: MACAddress is the expected MAC address of the interface.
+                      type: string
+                    name:
+                      description: Name is the interface name as defined in the external
+                        source.
+                      type: string
+                  required:
+                  - macAddress
+                  - name
+                  type: object
+                type: array
+              serverRef:
+                description: ServerRef references the Server this config applies to.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - serverRef
+            type: object
+          status:
+            description: ServerNetworkConfigStatus holds the discovered network state
+              populated by metal-operator after discovery.
+            properties:
+              interfaces:
+                description: Interfaces lists the network interfaces observed during
+                  discovery.
+                items:
+                  description: StatusNetworkInterface holds the observed state of
+                    a network interface populated by metal-operator after discovery.
+                  properties:
+                    discovered:
+                      description: Discovered holds the observed interface details
+                        collected during discovery.
+                      properties:
+                        carrierStatus:
+                          description: CarrierStatus is the operational carrier status
+                            of the interface.
+                          type: string
+                        ipAddresses:
+                          description: IPAddresses is the list of IP addresses assigned
+                            to the interface.
+                          items:
+                            type: string
+                          type: array
+                        linkModes:
+                          description: LinkModes lists the supported link modes of
+                            the interface.
+                          items:
+                            type: string
+                          type: array
+                        neighbors:
+                          description: Neighbors holds LLDP neighbor data discovered
+                            on this interface.
+                          items:
+                            description: DiscoveredNeighbor holds LLDP neighbor data
+                              observed on a network interface during discovery.
+                            properties:
+                              chassisID:
+                                description: ChassisID is the chassis identifier of
+                                  the LLDP neighbor.
+                                type: string
+                              mgmtIP:
+                                description: MgmtIP is the management IP of the LLDP
+                                  neighbor.
+                                type: string
+                              portDescription:
+                                description: PortDescription is the description of
+                                  the port on the connected switch.
+                                type: string
+                              portID:
+                                description: PortID is the port identifier on the
+                                  connected switch.
+                                type: string
+                              systemName:
+                                description: SystemName is the system name of the
+                                  LLDP neighbor.
+                                type: string
+                              vlanID:
+                                description: VlanID is the VLAN ID reported by the
+                                  LLDP neighbor.
+                                type: string
+                            type: object
+                          type: array
+                        speed:
+                          description: Speed is the link speed of the interface (e.g.
+                            "25000").
+                          type: string
+                      type: object
+                    macAddress:
+                      description: MACAddress is the MAC address of the interface.
+                      type: string
+                    name:
+                      description: Name is the interface name.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              lastUpdateTime:
+                description: LastUpdateTime is the timestamp of the last discovery
+                  run that updated this status.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end -}}

@@ -102,7 +102,8 @@ type ServerReconciler struct {
 	DiscoveryIgnitionPath   string
 }
 
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servernetworkconfigs,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servernetworkconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;create;update;patch;delete
@@ -363,6 +364,11 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 
 func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
+
+	if err := r.ensureServerNetworkConfig(ctx, server); err != nil {
+		return false, fmt.Errorf("failed to ensure ServerNetworkConfig: %w", err)
+	}
+
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
 		log.V(1).Info("Server boot configuration is not ready, retrying")
 		return true, err
@@ -415,15 +421,19 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 
 	log.V(1).Info("Extracted Server details")
 
-	log.V(1).Info("Setting Server state to available")
-	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
-		return false, err
-	}
-
 	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
 	}
 	log.V(1).Info("Removed Server from Registry")
+
+	if done, err := r.runNetworkCheck(ctx, server); err != nil || !done {
+		return false, err
+	}
+
+	log.V(1).Info("Setting Server state to available")
+	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
+		return false, err
+	}
 	return false, nil
 }
 
@@ -908,9 +918,12 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	}
 
 	serverBase := server.DeepCopy()
-	// update network interfaces
+	// update network interfaces — only active (up) interfaces, no LLDP data
 	nics := make([]metalv1alpha1.NetworkInterface, 0, len(serverDetails.NetworkInterfaces))
 	for _, s := range serverDetails.NetworkInterfaces {
+		if s.CarrierStatus != "up" {
+			continue
+		}
 		nic := metalv1alpha1.NetworkInterface{
 			Name:          s.Name,
 			MACAddress:    s.MACAddress,
@@ -942,31 +955,13 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 		nics = append(nics, nic)
 	}
 
-	// Merge LLDP neighbors into corresponding network interfaces
-	for _, lldpIface := range serverDetails.LLDP {
-		// Find the matching network interface by name
-		for i := range nics {
-			if nics[i].Name == lldpIface.Name {
-				// Convert LLDP neighbors to the CRD format
-				neighbors := make([]metalv1alpha1.LLDPNeighbor, 0, len(lldpIface.Neighbors))
-				for _, neighbor := range lldpIface.Neighbors {
-					neighbors = append(neighbors, metalv1alpha1.LLDPNeighbor{
-						MACAddress:        neighbor.ChassisID,
-						PortID:            neighbor.PortID,
-						PortDescription:   neighbor.PortDescription,
-						SystemName:        neighbor.SystemName,
-						SystemDescription: neighbor.SystemDescription,
-					})
-				}
-				nics[i].Neighbors = neighbors
-				break
-			}
-		}
-	}
-
 	server.Status.NetworkInterfaces = nics
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return false, fmt.Errorf("failed to patch server status: %w", err)
+	}
+
+	if err := r.populateCurrentStatus(ctx, server, serverDetails); err != nil {
+		return false, fmt.Errorf("failed to populate ServerNetworkConfig current status: %w", err)
 	}
 
 	return true, nil
@@ -1091,6 +1086,297 @@ func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *m
 		return fmt.Errorf("failed to update powering on condition: %w", err)
 	}
 	return r.Status().Patch(ctx, server, client.MergeFrom(original))
+}
+
+// runNetworkCheck looks for a ServerNetworkConfig referencing this server.
+// If none exists, the check is skipped and the server may proceed to Available.
+// If one exists, spec.interfaces are compared against the discovered LLDP data
+// and the result is written as a NetworkCheck condition on the Server.
+// Returns (true, nil) when the server may proceed, (false, nil) to requeue, or (false, err) on error.
+func (r *ServerReconciler) runNetworkCheck(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	networkConfigList := &metalv1alpha1.ServerNetworkConfigList{}
+	if err := r.List(ctx, networkConfigList); err != nil {
+		return false, fmt.Errorf("failed to list ServerNetworkConfigs: %w", err)
+	}
+
+	var networkConfig *metalv1alpha1.ServerNetworkConfig
+	for i := range networkConfigList.Items {
+		if networkConfigList.Items[i].Spec.ServerRef.Name == server.Name {
+			networkConfig = &networkConfigList.Items[i]
+			break
+		}
+	}
+
+	if networkConfig == nil {
+		return false, fmt.Errorf("ServerNetworkConfig not found for server %s — should have been created at Discovery start", server.Name)
+	}
+
+	if len(networkConfig.Spec.Interfaces) == 0 {
+		log.V(1).Info("ServerNetworkConfig has no expected interfaces, gate is disabled")
+		serverBase := server.DeepCopy()
+		if err := r.Conditions.UpdateSlice(
+			&server.Status.Conditions,
+			metalv1alpha1.ServerConditionTypeNetworkCheck,
+			conditionutils.UpdateStatus(metav1.ConditionUnknown),
+			conditionutils.UpdateReason("NoConstraint"),
+			conditionutils.UpdateMessage("ServerNetworkConfig exists but no expected interfaces are defined — gate is disabled"),
+			conditionutils.UpdateObserved(server),
+		); err != nil {
+			return false, fmt.Errorf("failed to update NetworkCheck condition: %w", err)
+		}
+		if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server conditions: %w", err)
+		}
+		return true, nil
+	}
+
+	if len(networkConfig.Status.Interfaces) == 0 {
+		log.V(1).Info("ServerNetworkConfig has no discovered interfaces yet, requeueing")
+		serverBase := server.DeepCopy()
+		if err := r.Conditions.UpdateSlice(
+			&server.Status.Conditions,
+			metalv1alpha1.ServerConditionTypeNetworkCheck,
+			conditionutils.UpdateStatus(metav1.ConditionUnknown),
+			conditionutils.UpdateReason("Pending"),
+			conditionutils.UpdateMessage("Expected interfaces are defined but discovery has not yet populated current state"),
+			conditionutils.UpdateObserved(server),
+		); err != nil {
+			return false, fmt.Errorf("failed to update NetworkCheck condition: %w", err)
+		}
+		if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server conditions: %w", err)
+		}
+		return false, nil
+	}
+
+	log.V(1).Info("Running network check", "serverNetworkConfig", networkConfig.Name)
+
+	// Build a MAC → actual NIC map from discovered LLDP data in snc.Status.Interfaces
+	type actualNIC struct {
+		switchName string
+		portID     string
+	}
+	actual := make(map[string]actualNIC) // keyed by normalised MAC
+	for _, iface := range networkConfig.Status.Interfaces {
+		mac := strings.ToLower(iface.MACAddress)
+		if iface.Discovered != nil && len(iface.Discovered.Neighbors) > 0 {
+			actual[mac] = actualNIC{
+				switchName: iface.Discovered.Neighbors[0].SystemName,
+				portID:     iface.Discovered.Neighbors[0].PortID,
+			}
+		} else {
+			actual[mac] = actualNIC{}
+		}
+	}
+
+	type mismatch struct {
+		name           string
+		mac            string
+		expectedSwitch string
+		expectedPort   string
+		actualSwitch   string
+		actualPort     string
+	}
+	var mismatches []mismatch
+	for _, target := range networkConfig.Spec.Interfaces {
+		mac := strings.ToLower(target.MACAddress)
+		found, ok := actual[mac]
+		if !ok {
+			mismatches = append(mismatches, mismatch{
+				name: target.Name, mac: target.MACAddress,
+				expectedSwitch: target.Expected.Switch, expectedPort: target.Expected.Port,
+			})
+			continue
+		}
+		if !switchPortMatch(target.Expected.Switch, target.Expected.Port, found.switchName, found.portID) {
+			mismatches = append(mismatches, mismatch{
+				name: target.Name, mac: target.MACAddress,
+				expectedSwitch: target.Expected.Switch, expectedPort: target.Expected.Port,
+				actualSwitch: found.switchName, actualPort: found.portID,
+			})
+		}
+	}
+
+	serverBase := server.DeepCopy()
+	var condStatus metav1.ConditionStatus
+	var condReason, condMessage string
+	if len(mismatches) == 0 {
+		condStatus = metav1.ConditionTrue
+		condReason = "Passed"
+		condMessage = "Network configuration matches expected"
+	} else {
+		msgs := make([]string, 0, len(mismatches))
+		for _, m := range mismatches {
+			if m.actualSwitch == "" {
+				msgs = append(msgs, fmt.Sprintf("%s(%s): not found", m.name, m.mac))
+			} else {
+				msgs = append(msgs, fmt.Sprintf("%s(%s): want %s/%s got %s/%s",
+					m.name, m.mac, m.expectedSwitch, m.expectedPort, m.actualSwitch, m.actualPort))
+			}
+		}
+		condStatus = metav1.ConditionFalse
+		condReason = "Failed"
+		condMessage = strings.Join(msgs, "; ")
+	}
+
+	if err := r.Conditions.UpdateSlice(
+		&server.Status.Conditions,
+		metalv1alpha1.ServerConditionTypeNetworkCheck,
+		conditionutils.UpdateStatus(condStatus),
+		conditionutils.UpdateReason(condReason),
+		conditionutils.UpdateMessage(condMessage),
+		conditionutils.UpdateObserved(server),
+	); err != nil {
+		return false, fmt.Errorf("failed to update NetworkCheck condition: %w", err)
+	}
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch server conditions: %w", err)
+	}
+
+	if condStatus != metav1.ConditionTrue {
+		log.V(1).Info("Network check failed, requeueing", "message", condMessage)
+		return false, nil
+	}
+	return true, nil
+}
+
+// ensureServerNetworkConfig creates a ServerNetworkConfig for the server if one does not already exist.
+func (r *ServerReconciler) ensureServerNetworkConfig(ctx context.Context, server *metalv1alpha1.Server) error {
+	snc := &metalv1alpha1.ServerNetworkConfig{}
+	err := r.Get(ctx, client.ObjectKey{Name: server.Name}, snc)
+	if err == nil {
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to get ServerNetworkConfig: %w", err)
+	}
+
+	snc = &metalv1alpha1.ServerNetworkConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: server.Name,
+		},
+		Spec: metalv1alpha1.ServerNetworkConfigSpec{
+			ServerRef: v1.LocalObjectReference{Name: server.Name},
+		},
+	}
+	if err := ctrl.SetControllerReference(server, snc, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference on ServerNetworkConfig: %w", err)
+	}
+	if err := r.Create(ctx, snc); err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create ServerNetworkConfig: %w", err)
+	}
+	return nil
+}
+
+// populateCurrentStatus builds status.current on the ServerNetworkConfig from registry discovery data.
+// It joins registry.NetworkInterface + registry.NIC (by name) + registry.LLDPInterface neighbors.
+func (r *ServerReconciler) populateCurrentStatus(ctx context.Context, server *metalv1alpha1.Server, serverDetails *registry.Server) error {
+	networkConfigList := &metalv1alpha1.ServerNetworkConfigList{}
+	if err := r.List(ctx, networkConfigList); err != nil {
+		return fmt.Errorf("failed to list ServerNetworkConfigs: %w", err)
+	}
+
+	var networkConfig *metalv1alpha1.ServerNetworkConfig
+	for i := range networkConfigList.Items {
+		if networkConfigList.Items[i].Spec.ServerRef.Name == server.Name {
+			networkConfig = &networkConfigList.Items[i]
+			break
+		}
+	}
+	if networkConfig == nil {
+		return nil
+	}
+
+	// Build lookup maps for NIC and LLDP data keyed by interface name
+	nicByName := make(map[string]registry.NIC, len(serverDetails.NICs))
+	for _, n := range serverDetails.NICs {
+		nicByName[n.Name] = n
+	}
+	lldpByName := make(map[string][]registry.Neighbor, len(serverDetails.LLDP))
+	for _, l := range serverDetails.LLDP {
+		lldpByName[l.Name] = l.Neighbors
+	}
+
+	discovered := make([]metalv1alpha1.StatusNetworkInterface, 0, len(serverDetails.NetworkInterfaces))
+	for _, iface := range serverDetails.NetworkInterfaces {
+		details := &metalv1alpha1.DiscoveredNetworkDetails{
+			CarrierStatus: iface.CarrierStatus,
+		}
+
+		// Collect IP addresses
+		ipAddrs := iface.IPAddresses
+		if len(ipAddrs) == 0 && iface.IPAddress != "" {
+			ipAddrs = []string{iface.IPAddress}
+		}
+		for _, ip := range ipAddrs {
+			if ip != "" {
+				details.IPAddresses = append(details.IPAddresses, ip)
+			}
+		}
+
+		// Merge NIC speed/link modes if available
+		if nic, ok := nicByName[iface.Name]; ok {
+			details.Speed = nic.Speed
+			details.LinkModes = nic.LinkModes
+		}
+
+		// Merge LLDP neighbors
+		for _, neighbor := range lldpByName[iface.Name] {
+			details.Neighbors = append(details.Neighbors, metalv1alpha1.DiscoveredNeighbor{
+				ChassisID:       neighbor.ChassisID,
+				SystemName:      neighbor.SystemName,
+				PortID:          neighbor.PortID,
+				PortDescription: neighbor.PortDescription,
+				MgmtIP:          neighbor.MgmtIP,
+				VlanID:          neighbor.VlanID,
+			})
+		}
+
+		discovered = append(discovered, metalv1alpha1.StatusNetworkInterface{
+			Name:       iface.Name,
+			MACAddress: iface.MACAddress,
+			Discovered: details,
+		})
+	}
+
+	original := networkConfig.DeepCopy()
+	now := metav1.NewTime(time.Now())
+	networkConfig.Status.LastUpdateTime = &now
+	networkConfig.Status.Interfaces = discovered
+
+	if err := r.Status().Patch(ctx, networkConfig, client.MergeFrom(original)); err != nil {
+		return fmt.Errorf("failed to patch ServerNetworkConfig current status: %w", err)
+	}
+	return nil
+}
+
+// switchPortMatch compares switch and port identifiers, normalising for common vendor variations.
+func switchPortMatch(expectedSwitch, expectedPort, actualSwitch, actualPort string) bool {
+	normaliseSwitch := func(s string) string {
+		// Strip domain suffix (e.g. "switch.example.com" → "switch")
+		if i := strings.Index(s, "."); i > 0 {
+			s = s[:i]
+		}
+		return strings.ToLower(s)
+	}
+	normalisePort := func(p string) string {
+		p = strings.ToLower(p)
+		// Longest forms first to avoid partial matches.
+		// Cisco IOS full names → standard abbreviations.
+		// NX-OS/ACI already uses "eth" natively; "ethernet→eth" covers that too.
+		p = strings.ReplaceAll(p, "fortygigabitethernet", "fo")
+		p = strings.ReplaceAll(p, "tengigabitethernet", "te")
+		p = strings.ReplaceAll(p, "twentyfivegige", "twe")
+		p = strings.ReplaceAll(p, "hundredgige", "hu")
+		p = strings.ReplaceAll(p, "gigabitethernet", "gi")
+		p = strings.ReplaceAll(p, "fastethernet", "fa")
+		p = strings.ReplaceAll(p, "ethernet", "eth")
+		return p
+	}
+	return normaliseSwitch(expectedSwitch) == normaliseSwitch(actualSwitch) &&
+		normalisePort(expectedPort) == normalisePort(actualPort)
 }
 
 func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, server *metalv1alpha1.Server) error {
@@ -1260,6 +1546,10 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&metalv1alpha1.ServerBootConfiguration{},
 			r.enqueueServerByServerBootConfiguration(),
 		).
+		Watches(
+			&metalv1alpha1.ServerNetworkConfig{},
+			r.enqueueServerByNetworkConfig(),
+		).
 		Complete(r)
 }
 
@@ -1283,6 +1573,20 @@ func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.Even
 		return []ctrl.Request{
 			{
 				NamespacedName: types.NamespacedName{Name: config.Spec.ServerRef.Name},
+			},
+		}
+	})
+}
+
+func (r *ServerReconciler) enqueueServerByNetworkConfig() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+		networkConfig := obj.(*metalv1alpha1.ServerNetworkConfig)
+		if networkConfig.Spec.ServerRef.Name == "" {
+			return nil
+		}
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{Name: networkConfig.Spec.ServerRef.Name},
 			},
 		}
 	})

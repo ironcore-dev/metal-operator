@@ -27,6 +27,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
 - [ServerMaintenance](#servermaintenance)
+- [ServerNetworkConfig](#servernetworkconfig)
 
 
 
@@ -959,6 +960,47 @@ _Appears in:_
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
 
 
+#### DiscoveredNeighbor
+
+
+
+DiscoveredNeighbor holds LLDP neighbor data observed on a network interface during discovery.
+
+
+
+_Appears in:_
+- [DiscoveredNetworkDetails](#discoverednetworkdetails)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `chassisID` _string_ | ChassisID is the chassis identifier of the LLDP neighbor. |  |  |
+| `systemName` _string_ | SystemName is the system name of the LLDP neighbor. |  |  |
+| `portID` _string_ | PortID is the port identifier on the connected switch. |  |  |
+| `portDescription` _string_ | PortDescription is the description of the port on the connected switch. |  |  |
+| `mgmtIP` _string_ | MgmtIP is the management IP of the LLDP neighbor. |  |  |
+| `vlanID` _string_ | VlanID is the VLAN ID reported by the LLDP neighbor. |  |  |
+
+
+#### DiscoveredNetworkDetails
+
+
+
+DiscoveredNetworkDetails holds the observed state of a network interface as collected during discovery.
+
+
+
+_Appears in:_
+- [StatusNetworkInterface](#statusnetworkinterface)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `ipAddresses` _string array_ | IPAddresses is the list of IP addresses assigned to the interface. |  |  |
+| `carrierStatus` _string_ | CarrierStatus is the operational carrier status of the interface. |  |  |
+| `speed` _string_ | Speed is the link speed of the interface (e.g. "25000"). |  |  |
+| `linkModes` _string array_ | LinkModes lists the supported link modes of the interface. |  |  |
+| `neighbors` _[DiscoveredNeighbor](#discoveredneighbor) array_ | Neighbors holds LLDP neighbor data discovered on this interface. |  |  |
+
+
 #### Endpoint
 
 
@@ -1006,6 +1048,23 @@ EndpointStatus defines the observed state of Endpoint
 _Appears in:_
 - [Endpoint](#endpoint)
 
+
+
+#### ExpectedNetworkDetails
+
+
+
+ExpectedNetworkDetails holds the expected switch connectivity for a network interface.
+
+
+
+_Appears in:_
+- [SpecNetworkInterface](#specnetworkinterface)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `switch` _string_ | Switch is the expected LLDP neighbor system name (i.e. the connected switch). |  |  |
+| `port` _string_ | Port is the expected LLDP neighbor port ID on the connected switch. |  |  |
 
 
 #### FieldRefSelector
@@ -1123,26 +1182,6 @@ _Appears in:_
 | `ip` _[IP](#ip)_ | IP is the IP address of the BMC. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
 
 
-#### LLDPNeighbor
-
-
-
-LLDPNeighbor defines the details of an LLDP neighbor.
-
-
-
-_Appears in:_
-- [NetworkInterface](#networkinterface)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `macAddress` _string_ | MACAddress is the MAC address of the LLDP neighbor. |  |  |
-| `portID` _string_ | PortID is the port identifier of the LLDP neighbor. |  |  |
-| `portDescription` _string_ | PortDescription is the port description of the LLDP neighbor. |  |  |
-| `systemName` _string_ | SystemName is the system name of the LLDP neighbor. |  |  |
-| `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
-
-
 #### NamespacedKeySelector
 
 
@@ -1175,11 +1214,9 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `name` _string_ | Name is the name of the network interface. |  |  |
-| `ip` _[IP](#ip)_ | IP is the IP address assigned to the network interface.<br />Deprecated: Use IPs instead. Kept for backward compatibility, always nil. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
 | `ips` _[IP](#ip) array_ | IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface. |  | Format: ip <br />Type: string <br /> |
 | `macAddress` _string_ | MACAddress is the MAC address of the network interface. |  |  |
 | `carrierStatus` _string_ | CarrierStatus is the operational carrier status of the network interface. |  |  |
-| `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
 
 
 #### ObjectReference
@@ -1621,6 +1658,62 @@ _Appears in:_
 | `state` _[ServerMaintenanceState](#servermaintenancestate)_ | State specifies the current state of the server maintenance. |  |  |
 
 
+#### ServerNetworkConfig
+
+
+
+ServerNetworkConfig holds the expected network configuration for a server (written by
+an external source such as argora) and the discovered network state populated by
+metal-operator after each discovery run.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `ServerNetworkConfig` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[ServerNetworkConfigSpec](#servernetworkconfigspec)_ |  |  |  |
+| `status` _[ServerNetworkConfigStatus](#servernetworkconfigstatus)_ |  |  |  |
+
+
+#### ServerNetworkConfigSpec
+
+
+
+ServerNetworkConfigSpec defines the expected network topology for a server,
+written by an external source such as argora/NetBox.
+
+
+
+_Appears in:_
+- [ServerNetworkConfig](#servernetworkconfig)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef references the Server this config applies to. |  |  |
+| `interfaces` _[SpecNetworkInterface](#specnetworkinterface) array_ | Interfaces lists the expected network interfaces. |  |  |
+
+
+#### ServerNetworkConfigStatus
+
+
+
+ServerNetworkConfigStatus holds the discovered network state populated by metal-operator after discovery.
+
+
+
+_Appears in:_
+- [ServerNetworkConfig](#servernetworkconfig)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `lastUpdateTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastUpdateTime is the timestamp of the last discovery run that updated this status. |  |  |
+| `interfaces` _[StatusNetworkInterface](#statusnetworkinterface) array_ | Interfaces lists the network interfaces observed during discovery. |  |  |
+
+
 #### ServerPowerState
 
 _Underlying type:_ _string_
@@ -1734,6 +1827,42 @@ _Appears in:_
 | `name` _string_ | Name is the name of the flow item. |  | MaxLength: 1000 <br />MinLength: 1 <br /> |
 | `settings` _object (keys:string, values:string)_ | Settings contains software (e.g. BIOS, BMC) settings as a map. |  |  |
 | `priority` _integer_ | Priority defines the order of applying the settings. Lower numbers have higher priority (i.e. lower numbers are applied first). |  | Maximum: 2.147483645e+09 <br />Minimum: 1 <br /> |
+
+
+#### SpecNetworkInterface
+
+
+
+SpecNetworkInterface defines the expected configuration of a single network interface.
+
+
+
+_Appears in:_
+- [ServerNetworkConfigSpec](#servernetworkconfigspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the interface name as defined in the external source. |  |  |
+| `macAddress` _string_ | MACAddress is the expected MAC address of the interface. |  |  |
+| `expected` _[ExpectedNetworkDetails](#expectednetworkdetails)_ | Expected holds the expected switch connectivity for this interface. |  |  |
+
+
+#### StatusNetworkInterface
+
+
+
+StatusNetworkInterface holds the observed state of a network interface populated by metal-operator after discovery.
+
+
+
+_Appears in:_
+- [ServerNetworkConfigStatus](#servernetworkconfigstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the interface name. |  |  |
+| `macAddress` _string_ | MACAddress is the MAC address of the interface. |  |  |
+| `discovered` _[DiscoveredNetworkDetails](#discoverednetworkdetails)_ | Discovered holds the observed interface details collected during discovery. |  |  |
 
 
 #### Storage

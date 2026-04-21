@@ -1204,6 +1204,222 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("custom-probe:v1.0.0"), "Should include custom probe image")
 		})
 	})
+
+	Describe("ServerNetworkConfig network check", func() {
+		const (
+			testSystemUUID = "38947555-7742-3448-3784-823347823834"
+			testMAC1       = "aa:bb:cc:11:22:33"
+			testMAC2       = "aa:bb:cc:44:55:66"
+			testSwitch1    = "spine1"
+			testPort1      = "Ethernet1/1"
+			testSwitch2    = "spine2"
+			testPort2      = "Ethernet1/2"
+		)
+
+		// registerFakeDiscovery posts fabricated discovery data to the registry so tests
+		// control exactly what MAC/LLDP values the controller will see.
+		registerFakeDiscovery := func(systemUUID string, switchName1, portID1 string) { //nolint:unparam
+			now := metav1.Now()
+			payload := registry.RegistrationPayload{
+				SystemUUID: systemUUID,
+				Data: registry.Server{
+					Timestamp: &now,
+					NetworkInterfaces: []registry.NetworkInterface{
+						{Name: "eth0", MACAddress: testMAC1, CarrierStatus: "up"},
+						{Name: "eth1", MACAddress: testMAC2, CarrierStatus: "up"},
+					},
+					LLDP: []registry.LLDPInterface{
+						{
+							Name: "eth0",
+							Neighbors: []registry.Neighbor{
+								{SystemName: switchName1, PortID: portID1, ChassisID: "de:ad:be:ef:00:01"},
+							},
+						},
+						{
+							Name: "eth1",
+							Neighbors: []registry.Neighbor{
+								{SystemName: testSwitch2, PortID: testPort2, ChassisID: "de:ad:be:ef:00:02"},
+							},
+						},
+					},
+				},
+			}
+			body, err := json.Marshal(payload)
+			Expect(err).NotTo(HaveOccurred())
+			resp, err := http.Post(registryURL+"/register", "application/json", bytes.NewBuffer(body))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.Body.Close()).To(Succeed())
+			Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+		}
+
+		// setupServerInDiscovery creates a BMCSecret + Server and waits until the server
+		// has a boot configuration in Pending state. Returns server, bootConfig and bmcSecret.
+		setupServerInDiscovery := func(ctx SpecContext) (*metalv1alpha1.Server, *metalv1alpha1.ServerBootConfiguration, *metalv1alpha1.BMCSecret) {
+			bmcSecret := &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "snc-test-"},
+				Data: map[string][]byte{
+					"username": []byte("foo"),
+					"password": []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+			server := &metalv1alpha1.Server{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "snc-test-"},
+				Spec: metalv1alpha1.ServerSpec{
+					SystemUUID: testSystemUUID,
+					BMC: &metalv1alpha1.BMCAccess{
+						Protocol: metalv1alpha1.Protocol{
+							Name: metalv1alpha1.ProtocolRedfishLocal,
+							Port: MockServerPort,
+						},
+						Address:      MockServerIP,
+						BMCSecretRef: v1.LocalObjectReference{Name: bmcSecret.Name},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+			bootConfig := &metalv1alpha1.ServerBootConfiguration{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns.Name, Name: server.Name},
+			}
+			Eventually(Object(bootConfig)).Should(
+				HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
+			)
+			Eventually(UpdateStatus(bootConfig, func() {
+				bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+			})).Should(Succeed())
+
+			Eventually(Object(server)).Should(
+				HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			)
+			return server, bootConfig, bmcSecret
+		}
+
+		AfterEach(func() {
+			deleteRegistrySystemIfExists(testSystemUUID)
+		})
+
+		It("should set NetworkCheck condition to Unknown/NoConstraint when SNC has no expected interfaces", func(ctx SpecContext) {
+			server, _, bmcSecret := setupServerInDiscovery(ctx)
+
+			By("Waiting for controller to auto-create SNC")
+			snc := &metalv1alpha1.ServerNetworkConfig{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: server.Name}, snc)).To(Succeed())
+			}).Should(Succeed())
+
+			By("Posting fake discovery data")
+			registerFakeDiscovery(testSystemUUID, testSwitch1, testPort1)
+
+			By("Expecting server to reach Available with NetworkCheck=Unknown/NoConstraint")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Status.Conditions", ContainElement(SatisfyAll(
+					HaveField("Type", metalv1alpha1.ServerConditionTypeNetworkCheck),
+					HaveField("Status", metav1.ConditionUnknown),
+					HaveField("Reason", "NoConstraint"),
+				))),
+			))
+
+			Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+
+		It("should set NetworkCheck condition to True/Passed when target matches discovered topology", func(ctx SpecContext) {
+			server, _, bmcSecret := setupServerInDiscovery(ctx)
+
+			By("Waiting for controller to auto-create SNC then setting matching expected interfaces")
+			snc := &metalv1alpha1.ServerNetworkConfig{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: server.Name}, snc)).To(Succeed())
+				snc.Spec.Interfaces = []metalv1alpha1.SpecNetworkInterface{
+					{Name: "eth0", MACAddress: testMAC1, Expected: metalv1alpha1.ExpectedNetworkDetails{Switch: testSwitch1, Port: testPort1}},
+					{Name: "eth1", MACAddress: testMAC2, Expected: metalv1alpha1.ExpectedNetworkDetails{Switch: testSwitch2, Port: testPort2}},
+				}
+				g.Expect(k8sClient.Update(ctx, snc)).To(Succeed())
+			}).Should(Succeed())
+
+			By("Posting matching fake discovery data")
+			registerFakeDiscovery(testSystemUUID, testSwitch1, testPort1)
+
+			By("Expecting server to reach Available with NetworkCheck=True/Passed")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Status.Conditions", ContainElement(SatisfyAll(
+					HaveField("Type", metalv1alpha1.ServerConditionTypeNetworkCheck),
+					HaveField("Status", metav1.ConditionTrue),
+					HaveField("Reason", "Passed"),
+				))),
+			))
+
+			By("Expecting SNC status.interfaces to be populated")
+			Eventually(Object(snc)).Should(SatisfyAll(
+				HaveField("Status.LastUpdateTime", Not(BeNil())),
+				HaveField("Status.Interfaces", ContainElement(
+					HaveField("MACAddress", testMAC1),
+				)),
+			))
+
+			Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+
+		It("should stay in Discovery when target mismatches, then reach Available after target is corrected", func(ctx SpecContext) {
+			server, _, bmcSecret := setupServerInDiscovery(ctx)
+
+			By("Waiting for controller to auto-create SNC then setting wrong switch/port for eth0")
+			snc := &metalv1alpha1.ServerNetworkConfig{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: server.Name}, snc)).To(Succeed())
+				snc.Spec.Interfaces = []metalv1alpha1.SpecNetworkInterface{
+					{Name: "eth0", MACAddress: testMAC1, Expected: metalv1alpha1.ExpectedNetworkDetails{Switch: "wrong-switch", Port: "Ethernet99/99"}},
+				}
+				g.Expect(k8sClient.Update(ctx, snc)).To(Succeed())
+			}).Should(Succeed())
+
+			By("Posting fake discovery data")
+			registerFakeDiscovery(testSystemUUID, testSwitch1, testPort1)
+
+			By("Expecting server to stay in Discovery with NetworkCheck=False/Failed")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+				HaveField("Status.Conditions", ContainElement(SatisfyAll(
+					HaveField("Type", metalv1alpha1.ServerConditionTypeNetworkCheck),
+					HaveField("Status", metav1.ConditionFalse),
+					HaveField("Reason", "Failed"),
+				))),
+			))
+			Consistently(Object(server), "2s", "200ms").Should(
+				HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			)
+
+			By("Correcting the SNC spec to match real data")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: server.Name}, snc)).To(Succeed())
+				snc.Spec.Interfaces = []metalv1alpha1.SpecNetworkInterface{
+					{Name: "eth0", MACAddress: testMAC1, Expected: metalv1alpha1.ExpectedNetworkDetails{Switch: testSwitch1, Port: testPort1}},
+				}
+				g.Expect(k8sClient.Update(ctx, snc)).To(Succeed())
+			}).Should(Succeed())
+
+			By("Re-posting discovery data to trigger another reconcile")
+			registerFakeDiscovery(testSystemUUID, testSwitch1, testPort1)
+
+			By("Expecting server to now reach Available with NetworkCheck=True/Passed")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Status.Conditions", ContainElement(SatisfyAll(
+					HaveField("Type", metalv1alpha1.ServerConditionTypeNetworkCheck),
+					HaveField("Status", metav1.ConditionTrue),
+					HaveField("Reason", "Passed"),
+				))),
+			))
+
+			Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+	})
 })
 
 func deleteRegistrySystemIfExists(systemUUID string) {

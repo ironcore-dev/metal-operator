@@ -593,6 +593,18 @@ func (s *MockServer) applyPendingBMCSettings() error {
 	return nil
 }
 
+// GetBMCSettingAttr returns the current BMC Attributes map for the given managerID
+// (e.g. "BMC"). Returns nil if the resource cannot be loaded.
+func (s *MockServer) GetBMCSettingAttr(managerID string) map[string]any {
+	filePath := fmt.Sprintf("data/Managers/%s/index.json", managerID)
+	resource, err := s.loadResource(filePath)
+	if err != nil {
+		return nil
+	}
+	attrs, _ := resource[attributesKey].(map[string]any)
+	return attrs
+}
+
 // ResetBMCSettings resets the BMC attribute state on the server to defaults,
 // clearing both current and pending attributes. managerID is the folder name under data/Managers/ (e.g. "BMC").
 func (s *MockServer) ResetBMCSettings(managerID string) {

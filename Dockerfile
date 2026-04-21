@@ -17,6 +17,7 @@ COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
+COPY third_party/ third_party/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command

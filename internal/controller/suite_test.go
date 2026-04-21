@@ -48,13 +48,13 @@ const (
 )
 
 var (
-	cfg                            *rest.Config
-	k8sClient                      client.Client
-	testEnv                        *envtest.Environment
-	registryURL                    = "http://localhost:30000"
-	defaultMockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
-	defaultMockUpServerBMCVersion  = "1.45.455b66-rev4"
-	defaultMockServer              *server.MockServer
+	cfg                     *rest.Config
+	k8sClient               client.Client
+	testEnv                 *envtest.Environment
+	registryURL             = "http://localhost:30000"
+	mockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
+	mockUpServerBMCVersion  = "1.45.455b66-rev4"
+	mockServer              *server.MockServer
 )
 
 func TestControllers(t *testing.T) {
@@ -356,9 +356,9 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			}
 		} else {
 			By("Starting the default mock Redfish server")
-			defaultMockServer = server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort))
+			mockServer = server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort))
 			Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-				if err := defaultMockServer.Start(ctx); err != nil {
+				if err := mockServer.Start(ctx); err != nil {
 					return fmt.Errorf("failed to start mock Redfish server: %w", err)
 				}
 				<-ctx.Done()

@@ -76,7 +76,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		defaultMockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
+		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
@@ -103,7 +103,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -149,7 +149,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion + "2",
+					Version: mockUpServerBiosVersion + "2",
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -201,7 +201,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -264,7 +264,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -358,7 +358,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -506,7 +506,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -614,7 +614,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -764,7 +764,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Simulate the server biosSettings version update by matching the spec version")
 		Eventually(Update(biosSettings, func() {
-			biosSettings.Spec.Version = defaultMockUpServerBiosVersion
+			biosSettings.Spec.Version = mockUpServerBiosVersion
 		})).Should(Succeed())
 
 		By("Ensuring that the biosSettings resource has setting updated, and moved the state")
@@ -828,7 +828,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -901,7 +901,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -964,7 +964,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -1056,7 +1056,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		defaultMockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
+		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
@@ -1112,7 +1112,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -1275,7 +1275,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -1385,7 +1385,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		defaultMockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
+		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
@@ -1402,7 +1402,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1447,7 +1447,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1510,7 +1510,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1558,7 +1558,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1617,7 +1617,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1686,7 +1686,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,

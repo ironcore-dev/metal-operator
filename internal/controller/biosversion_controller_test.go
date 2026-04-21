@@ -94,8 +94,8 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 defaultMockUpServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBiosVersion},
+					Version:                 mockUpServerBiosVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBiosVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},

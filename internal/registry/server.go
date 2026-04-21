@@ -92,7 +92,8 @@ func NewServer(logger logr.Logger, addr string, k8sClient client.Client, signing
 // getSigningSecret returns the signing secret, loading it from Kubernetes if not cached.
 // This method is thread-safe and only memoizes successful loads, allowing recovery from transient failures.
 // It uses a fast-path read lock check and upgrades to write lock only when loading is needed.
-func (s *Server) getSigningSecret() ([]byte, error) {
+// It respects the provided context for cancellation and timeouts.
+func (s *Server) getSigningSecret(ctx context.Context) ([]byte, error) {
 	// Fast path: check if we already have a valid cached secret (read lock)
 	s.signingSecretMu.RLock()
 	if len(s.signingSecret) == 32 {
@@ -108,7 +109,6 @@ func (s *Server) getSigningSecret() ([]byte, error) {
 	}
 
 	// Attempt to load the secret from Kubernetes
-	ctx := context.Background()
 	secret := &corev1.Secret{}
 	err := s.k8sClient.Get(ctx, client.ObjectKey{
 		Name:      s.signingSecretName,
@@ -136,7 +136,8 @@ func (s *Server) getSigningSecret() ([]byte, error) {
 // validateDiscoveryToken verifies a JWT-signed discovery token.
 // Returns (systemUUID, valid) where systemUUID is extracted from the token.
 // If k8sClient is nil (unit test mode), validation is skipped.
-func (s *Server) validateDiscoveryToken(receivedToken string) (string, bool) {
+// Implements single-retry refresh on validation failure to handle secret rotation.
+func (s *Server) validateDiscoveryToken(ctx context.Context, receivedToken string) (string, bool) {
 	// Skip validation in test mode (no k8s client)
 	if s.k8sClient == nil {
 		s.log.V(1).Info("Running in TEST MODE without K8s client - skipping secret loading")
@@ -152,7 +153,7 @@ func (s *Server) validateDiscoveryToken(receivedToken string) (string, bool) {
 	}
 
 	// Get signing secret (thread-safe, loads on first call)
-	secret, err := s.getSigningSecret()
+	secret, err := s.getSigningSecret(ctx)
 	if err != nil {
 		s.log.Error(err, "Signing secret not available")
 		return "", false
@@ -160,14 +161,32 @@ func (s *Server) validateDiscoveryToken(receivedToken string) (string, bool) {
 
 	// Verify the signed token
 	systemUUID, timestamp, valid, err := metaltoken.VerifySignedDiscoveryToken(secret, receivedToken)
-	if err != nil {
-		s.log.Error(err, "Error verifying discovery token")
-		return "", false
-	}
+	if err != nil || !valid {
+		// Token validation failed - could be due to secret rotation
+		// Clear cache and retry once with fresh secret
+		s.log.V(1).Info("Token validation failed, clearing cache and retrying", "error", err)
 
-	if !valid {
-		s.log.Info("Rejected request with invalid discovery token", "tokenLength", len(receivedToken))
-		return "", false
+		s.signingSecretMu.Lock()
+		s.signingSecret = nil
+		s.signingSecretMu.Unlock()
+
+		// Retry with fresh secret
+		secret, err = s.getSigningSecret(ctx)
+		if err != nil {
+			s.log.Error(err, "Failed to reload signing secret for retry")
+			return "", false
+		}
+
+		systemUUID, timestamp, valid, err = metaltoken.VerifySignedDiscoveryToken(secret, receivedToken)
+		if err != nil {
+			s.log.Error(err, "Error verifying discovery token after retry")
+			return "", false
+		}
+
+		if !valid {
+			s.log.Info("Rejected request with invalid discovery token after retry", "tokenLength", len(receivedToken))
+			return "", false
+		}
 	}
 
 	// Token is valid
@@ -198,7 +217,7 @@ func (s *Server) registerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate discovery token and extract systemUUID
-	systemUUID, valid := s.validateDiscoveryToken(reg.DiscoveryToken)
+	systemUUID, valid := s.validateDiscoveryToken(r.Context(), reg.DiscoveryToken)
 	if !valid {
 		http.Error(w, "Unauthorized: invalid or missing discovery token", http.StatusUnauthorized)
 		s.log.Info("Rejected registration attempt with invalid token")
@@ -286,7 +305,7 @@ func (s *Server) bootstateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate discovery token and extract systemUUID
-	systemUUID, valid := s.validateDiscoveryToken(payload.DiscoveryToken)
+	systemUUID, valid := s.validateDiscoveryToken(r.Context(), payload.DiscoveryToken)
 	if !valid {
 		http.Error(w, "Unauthorized: invalid or missing token", http.StatusUnauthorized)
 		s.log.Info("Rejected bootstate attempt with invalid token")

@@ -837,6 +837,9 @@ func (r *ServerReconciler) getOrCreateSigningSecret(ctx context.Context) ([]byte
 				return nil, fmt.Errorf("failed to generate replacement signing secret: %w", err)
 			}
 
+			if secret.Data == nil {
+				secret.Data = make(map[string][]byte)
+			}
 			secret.Data[metaltoken.DiscoveryTokenSigningSecretKey] = signingKey
 			if err := r.Update(ctx, secret); err != nil {
 				return nil, fmt.Errorf("failed to update invalid signing secret: %w", err)

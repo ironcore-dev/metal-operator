@@ -144,7 +144,7 @@ spec:
 
 #### 2. Create a BMCSecret with credentials
 
-Apply a `BMCSecret` with base64-encoded credentials for the BMC:
+Create a `BMCSecret` file with credentials for the BMC:
 
 ```yaml
 apiVersion: metal.ironcore.dev/v1alpha1
@@ -156,16 +156,23 @@ data:
   password: <base64-encoded-password>
 ```
 
+> **Note:** The `username` and `password` values must be base64-encoded. You can encode them with `echo -n '<value>' | base64`.
+
+Save this as `bmcsecret-<node-name>.yaml`, but do not apply it yet.
+
 #### 3. Enable HTTPS for the BMC connection
 
-The manager defaults to `--insecure=true`, which uses plain HTTP. This is fine for the default mock server but may not work for real servers. Make sure to adapt this to the target if necessary. E.g. for a real BMC that uses HTTPS on port 443, set `--insecure=false` in the `Tiltfile`:
+The `--insecure` flag is deprecated. Use `--protocol` and `--skip-cert-validation` instead.
+
+For a real BMC that uses HTTPS on port 443, configure the manager to use secure HTTPS with certificate validation enabled in the `Tiltfile`:
 
 ```python
 settings = {
     "new_args": {
         "metal": [
             # ...
-            "--insecure=false",
+      "--protocol=https",
+      "--skip-cert-validation=false",
         ],
     }
 }
@@ -180,20 +187,6 @@ make tilt-up
 ```
 
 Once the manager is running, apply the `BMCSecret` to the local Kind cluster (it is not part of the kustomize config and must be applied manually):
-
-A `BMCSecret` looks like:
-
-```yaml
-apiVersion: metal.ironcore.dev/v1alpha1
-kind: BMCSecret
-metadata:
-  name: <node-name>
-data:
-  username: <base64-encoded-username>
-  password: <base64-encoded-password>
-```
-
-> **Note:** The `username` and `password` values must be base64-encoded. You can encode them with `echo -n '<value>' | base64`.
 
 ```shell
 # Run against the local Kind cluster

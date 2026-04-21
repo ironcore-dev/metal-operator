@@ -46,11 +46,62 @@ Both templates gain `readinessGates: []ReadinessGate`. A gate specifies an exter
 
 **Why:** Enables declarative prerequisite ordering across resource types (e.g., "apply these settings before updating firmware") without coupling controllers.
 
-### 5. `priority` field for `BMCSettings` ordering
+### 4a. `BMCVersion` drift detection and `Completed` re-evaluation
 
-`BMCSettingsTemplate` gains a `priority int32` field (default `0`). The `shouldBMCSettingsRunBefore(a, b)` function uses `priority → creationTimestamp → name` ordering, mirroring the existing `ServerMaintenance` controller's `shouldRunBefore`. The broken `<` string comparison on versions is removed.
+`BMCVersion` targets firmware at a specific version. Unlike software deployments, BMC firmware can regress (factory reset, emergency rollback). The controller must handle this gracefully.
 
-**Why:** The old version-string ordering is semantically wrong (opaque strings) and fragile. An explicit integer priority is unambiguous.
+**Terminal-state semantics for `Completed`:**
+
+`Completed` is *conditionally* terminal. On every reconcile of a `Completed` `BMCVersion` the controller re-checks two conditions:
+
+1. **Gates still blocked** (`any gate unsatisfied`) → stay `Completed`. The BMC is either already ahead of this hop or behind the point where this hop's self-parking gate triggers. No action.
+2. **All gates satisfied AND `bmc.status.firmwareVersion != spec.version`** → reset to `Pending`. The BMC has regressed to this hop's exact activation point; re-run the upgrade.
+
+No version string comparison is involved — the **self-parking gate** (a `fieldMatch` on `bmc.status.firmwareVersion == <source-version>`) acts as the "should this hop activate" predicate. Because firmware version strings are opaque vendor strings, ordering comparisons (`>=`, `<`) are not safe; only exact equality is used.
+
+**Why this is safe:**
+
+Each hop's self-parking gate checks for exactly the source version of that hop. When a BMC regresses to version X, only the one hop whose self-parking gate matches X will see all gates satisfied. Every other hop sees its self-parking gate as unsatisfied, so it stays `Completed` undisturbed. The result is that only the correct hop re-activates — all neighbours in the chain remain frozen.
+
+**Example — full chain 4.x → 5.x → 6.x → 7.x, BMC factory-reset to 5.x:**
+
+| Hop | Target | Self-parking gate | Gate satisfied? | BMC fw ≠ target? | Action |
+|-----|--------|-------------------|-----------------|-----------------|--------|
+| 1 (→5.x) | 5.x | `fw == 4.x` | ✗ (fw is 5.x) | — | stay `Completed` |
+| 2 (→6.x) | 6.x | `fw == 5.x` | ✓ | 5.x ≠ 6.x → ✓ | reset → `Pending` → upgrades |
+| 3 (→7.x) | 7.x | `fw == 6.x` | ✗ (fw is 5.x) | — | stay `Completed` |
+
+After hop-2 upgrades BMC to 6.x, hop-3's self-parking gate becomes satisfied → it resets and runs, completing the cascade back to 7.x.
+
+**Why not `bmc.firmwareVersion >= spec.version` to short-circuit?**
+
+Firmware version strings are opaque (`"iLO 6 v1.70"`, `"5.00.00.00"`, `"TEI392M-2.50"`). Semantic version parsing is not guaranteed. The self-parking gate's exact-match predicate is the only safe comparator; the controller should not attempt its own version ordering.
+
+
+
+When multiple `BMCSettings` target the same BMC, the controller serializes them using two layers — mirroring how `ServerMaintenance` works, but without a priority field:
+
+1. **Active-slot lock** — if any peer `BMCSettings` for the same BMC is already `InProgress`, all others stay `Pending` unconditionally. An incumbent is never evicted.
+2. **FIFO tiebreak among gate-clear candidates** — when the slot is free, the controller lists all `Pending` peers whose `readinessGates` are all satisfied, and picks the winner by `creationTimestamp → name`. Oldest creation timestamp wins; name is a stable alphabetical tiebreaker for objects created in the same second.
+
+```go
+func shouldBMCSettingsRunBefore(a, b *metalv1alpha1.BMCSettings) bool {
+    if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
+        return a.CreationTimestamp.Before(&b.CreationTimestamp)
+    }
+    return a.Name < b.Name
+}
+```
+
+**Why no `priority` field?**
+
+`priority` would only add value when two independently-authored Sets both have their gates satisfied at the same instant and you want non-FIFO ordering. In practice:
+
+- If B *must* run after A, set a `readinessGate` on B → A. The gate enforces the order exactly; priority adds nothing.
+- If there is *no dependency* between A and B (truly independent Sets), FIFO is deterministic and fair — the Set deployed earlier runs first. This matches user expectation and requires no coordination between Set authors.
+- The only case priority would help is "I want to change the relative order without re-creating objects" — that is an exotic operational edge case that does not justify the API surface and implementation complexity.
+
+`ServerMaintenance` has priority because there is no gate mechanism to express "this maintenance must wait for that one". `BMCSettings` already has `readinessGates` for exactly that purpose, making priority redundant.
 
 ---
 
@@ -214,7 +265,6 @@ spec:
       labels:
         app.kubernetes.io/managed-by: ilo6-v170-baseline
     spec:
-      priority: 10
       readinessGates: []
       settingsFlow:
         - name: safe-defaults
@@ -345,21 +395,24 @@ stateDiagram-v2
 | RC1 | Two Sets stamp same BMC simultaneously | `bmcSettingRefs` list — both append their own entry; no conflict |
 | RC2 | v1.0 settings stamped before prereqs Applied | `readinessGates scope=SetChild` blocks in Pending; sibling watch re-triggers reactively |
 | RC3 | BMCVersion starts before prerequisite settings Applied | Same gate mechanism blocks BMCVersion in Pending |
-| RC4 | Two BMCSettings request maintenance simultaneously | `shouldBMCSettingsRunBefore` (priority→creationTimestamp→name) serialises; incumbent `InProgress` is never evicted |
+| RC4 | Two BMCSettings request maintenance simultaneously | Active-slot lock (any peer `InProgress`?) + FIFO tiebreak (`shouldBMCSettingsRunBefore`) serialises; incumbent `InProgress` is never evicted |
 | RC5 | BMCVersionSet uses `GenerateName` — child name unknown at gate authoring time | Gates reference the Set name; `scope=SetChild` resolves child at runtime via ownerRef scan |
 | RC6 | `versionSelector` stamps before firmware upgrade completes | `bmc_controller` writes `status.firmwareVersion` only after Redfish confirms; no gap |
 
 ---
 
-## Priority Ordering (`shouldBMCSettingsRunBefore`)
+## Serialization: how multiple BMCSettings on the same BMC are ordered
 
-Mirrors `shouldRunBefore` in `servermaintenance_controller.go`:
+The controller uses the same two-layer pattern as `ServerMaintenance`:
+
+**Layer 1 — active-slot lock.** Before doing anything else in `Pending` state, the controller lists all peers in `bmc.spec.bmcSettingRefs` and checks if any is `InProgress`. If one is, stay `Pending` and return. An incumbent is never evicted.
+
+**Layer 2 — FIFO among gate-clear candidates.** When the slot is free, scan all `Pending` peers whose `readinessGates` are all satisfied. If any such peer would run before the current object by `shouldBMCSettingsRunBefore`, stay `Pending`. Otherwise claim the slot → transition to `InProgress`.
 
 ```go
+// shouldBMCSettingsRunBefore returns true if a should claim the active slot
+// before b. Uses creation time then name as a stable tiebreaker.
 func shouldBMCSettingsRunBefore(a, b *metalv1alpha1.BMCSettings) bool {
-    if a.Spec.Priority != b.Spec.Priority {
-        return a.Spec.Priority > b.Spec.Priority // higher value runs first
-    }
     if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
         return a.CreationTimestamp.Before(&b.CreationTimestamp)
     }
@@ -367,18 +420,21 @@ func shouldBMCSettingsRunBefore(a, b *metalv1alpha1.BMCSettings) bool {
 }
 ```
 
-An incumbent in `InProgress` is **never** evicted regardless of the challenger's priority.
+### Why no `priority` field?
 
-## Priority vs ReadinessGates
+`ServerMaintenance` has a `priority` field because there is no mechanism to express "this maintenance must wait for that one" — the only ordering tool available is the integer rank. `BMCSettings` already has `readinessGates` for exactly that purpose:
 
-| | `priority` | `readinessGates` |
+| Ordering need | Without gates | With gates |
 |---|---|---|
-| **Question answered** | *Which one goes first?* | *Can I start at all?* |
-| **Mechanism** | Relative integer ordering between competing `BMCSettings` on the same BMC | Block in Pending until an external object reaches a condition |
-| **Coupling** | Fully decoupled — each object sets its own value independently | Explicit cross-reference — the blocked object must name the dependency |
-| **Use case** | "Security settings should always win the active slot over performance tuning" | "Don't start firmware upgrade until settings are Applied" |
+| B must run after A | Set `priority` on A higher than B | Set a gate on B → A's `Applied` condition |
+| A and B are independent | `priority` determines order | FIFO (creationTimestamp) determines order — equally predictable |
+| B high-priority but must wait for A | `priority: 100` on B causes confusion — high rank but blocked | Gate on B → A makes the dependency explicit and unambiguous |
 
-You could simulate priority using gates — put a gate on B pointing at A's `Applied` condition. But that only works when A and B are known to each other at authoring time, and it doesn't handle the general case where two independently-created Sets both target the same BMC and you want one to naturally outrank the other without them knowing about each other. **Both fields are needed.**
+The gate approach is strictly clearer: the dependency is declared on the object that has it, visible in its spec, and enforced as a hard prerequisite. `priority` would be an implicit, easily-misunderstood second ordering mechanism sitting alongside the explicit one.
+
+### Gate cycle detection (future work)
+
+A gates on B **and** B gates on A → both stay `Pending` forever. The controller should detect this and emit a `GateCycle` condition. Priority cannot cause cycles.
 
 ---
 
@@ -388,7 +444,7 @@ You could simulate priority using gates — put a gate on B pointing at A's `App
 
 1. Add `ReadinessGate` / `ReadinessGateScope` to a new `api/v1alpha1/readinessgate_types.go`
 2. `bmc_types.go`: rename `BMCSettingRef` → `BMCSettingRefs []`
-3. `bmcsettings_types.go`: add `BMCSettingsFlowItem`, `BMCSettingsFlowStatus`; replace `Version`+`SettingsMap` with `SettingsFlow`, `Priority`, `ReadinessGates`; add `FlowState`+`LastAppliedTime` to status
+3. `bmcsettings_types.go`: add `BMCSettingsFlowItem`, `BMCSettingsFlowStatus`; replace `Version`+`SettingsMap` with `SettingsFlow`, `ReadinessGates`; add `FlowState`+`LastAppliedTime` to status
 4. `bmcsettingsset_types.go`: add `VersionSelector`
 5. `bmcversion_types.go`: add `ReadinessGates` to `BMCVersionTemplate`
 6. `make generate` — regenerate deepcopy + CRD manifests
@@ -396,10 +452,11 @@ You could simulate priority using gates — put a gate on B pointing at A's `App
 ### Phase 2 — BMCSettings controller
 
 7. Add `addBMCSettingRef` / `removeBMCSettingRef` list-aware helpers (idempotent)
-8. Remove broken `<` version string comparison; add `shouldBMCSettingsRunBefore`
-9. Add `checkReadinessGates()` — `scope=Global` does a direct Get; `scope=SetChild` scans `bmcSettingRefs` and filters by ownerRef
-10. Thread flow-item iteration through `handleSettingInProgressState`: apply per-item, persist `flowState`, loop back to Pending for next item
-11. Add sibling Watch on `BMCSettings` → re-enqueue all `BMCSettings` sharing the same `bmcSettingRefs` entry
+8. Remove broken `<` version string comparison; add `shouldBMCSettingsRunBefore` (FIFO: creationTimestamp → name)
+9. In `Pending` state: check active-slot lock (any peer `InProgress`?); check gates; call `shouldBMCSettingsRunBefore` against gate-clear peers
+10. Add `checkReadinessGates()` — `Name` mode does a direct Get; `OwnedBy` mode scans `bmcSettingRefs` and filters by ownerRef/field match
+11. Thread flow-item iteration through `handleSettingInProgressState`: apply per-item, persist `flowState`, loop back to Pending for next item
+12. Add sibling Watch on `BMCSettings` → re-enqueue all `BMCSettings` sharing the same `bmcSettingRefs` entry
 
 ### Phase 3 — BMCSettingsSet controller
 
@@ -412,6 +469,8 @@ You could simulate priority using gates — put a gate on B pointing at A's `App
 15. In Pending case: call `checkReadinessGates()` before `removeServerMaintenanceRefAndResetConditions`
 16. Add `ReadinessGatesSatisfied` condition (`True`/`False`)
 17. Add Watch on `BMCSettings` → enqueue `BMCVersions` whose gates reference that `BMCSettings`
+18. In Completed case: re-evaluate gates; if **all gates satisfied AND `bmc.status.firmwareVersion != spec.version`** → reset state to Pending (drift recovery). Otherwise return early without changes.
+19. Add Watch on `BMC` for `status.firmwareVersion` changes → re-enqueue owned `BMCVersion` resources for drift detection
 
 ### Phase 5 — BMCVersionSet controller
 

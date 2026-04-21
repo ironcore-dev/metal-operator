@@ -8,22 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BMCSettingsFlowItem represents a named, prioritized group of BMC settings to be applied as a unit.
-type BMCSettingsFlowItem struct {
-	// Name uniquely identifies this flow step within the BMCSettings.
-	// +required
-	Name string `json:"name"`
-
-	// Priority controls application order within the flow.
-	// Lower numbers are applied first. Must be unique within the flow.
-	// +required
-	Priority int32 `json:"priority"`
-
-	// Settings is the map of BMC manager key=value settings for this step.
-	// +optional
-	Settings map[string]string `json:"settings,omitempty"`
-}
-
 // BMCSettingsFlowStatus tracks the per-step state within settingsFlow.
 type BMCSettingsFlowStatus struct {
 	// Name is the name of the flow step.
@@ -45,13 +29,7 @@ type BMCSettingsTemplate struct {
 	// SettingsFlow is the ordered list of setting groups to apply.
 	// Items are applied in ascending Priority order.
 	// +optional
-	SettingsFlow []BMCSettingsFlowItem `json:"settingsFlow,omitempty"`
-
-	// Priority controls ordering when multiple BMCSettings target the same BMC.
-	// Higher value runs first. Mirrors ServerMaintenance.spec.priority.
-	// +optional
-	// +kubebuilder:default=0
-	Priority int32 `json:"priority,omitempty"`
+	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
 	// ReadinessGates blocks this BMCSettings in Pending until all gates are satisfied.
 	// +optional
@@ -69,61 +47,6 @@ type BMCSettingsTemplate struct {
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-}
-
-type Variable struct {
-	// Key is the name of the variable to be used in the BMCSettingsTemplate format.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=63
-	// +required
-	Key string `json:"key"`
-
-	// ValueFrom defines a simple single source for the variable value.
-	// +required
-	ValueFrom *VariableSourceValueFrom `json:"valueFrom"`
-}
-
-// +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of fieldRef, configMapKeyRef, or secretKeyRef must be provided"
-type VariableSourceValueFrom struct {
-	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
-	// +optional
-	FieldRef *FieldRefSelector `json:"fieldRef,omitempty"`
-
-	// ConfigMapKeyRef points to a namespaced ConfigMap key.
-	// +optional
-	ConfigMapKeyRef *NamespacedKeySelector `json:"configMapKeyRef,omitempty"`
-
-	// SecretKeyRef points to a namespaced Secret key.
-	// +optional
-	SecretKeyRef *NamespacedKeySelector `json:"secretKeyRef,omitempty"`
-}
-
-type FieldRefSelector struct {
-	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=256
-	// +required
-	FieldPath string `json:"fieldPath"`
-}
-
-type NamespacedKeySelector struct {
-	// Name is the referenced object name.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=253
-	// +required
-	Name string `json:"name"`
-
-	// Namespace is the referenced object namespace.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=63
-	// +required
-	Namespace string `json:"namespace"`
-
-	// Key is the key within the referenced object.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=253
-	// +required
-	Key string `json:"key"`
 }
 
 // BMCSettingsSpec defines the desired state of BMCSettings.
@@ -195,7 +118,6 @@ type BMCSettingsStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.spec.version`
-// +kubebuilder:printcolumn:name="Priority",type=integer,JSONPath=`.spec.priority`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="BMCRef",type=string,JSONPath=`.spec.BMCRef.name`
 // +kubebuilder:printcolumn:name="LastAppliedTime",type=date,JSONPath=`.status.lastAppliedTime`

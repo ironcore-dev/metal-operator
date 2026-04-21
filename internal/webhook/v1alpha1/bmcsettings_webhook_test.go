@@ -139,7 +139,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 			})).Should(Succeed())
 			By("Updating an bmcSettings V1 spec, should fail to update when inProgress")
 			bmcSettingsV1Updated := BMCSettingsV1.DeepCopy()
-			bmcSettingsV1Updated.Spec.SettingsFlow = []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: map[string]string{"test": "value"}}}
+			bmcSettingsV1Updated.Spec.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: map[string]string{"test": "value"}}}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().To(HaveOccurred())
 			By("Updating an bmcSettings V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
 			bmcSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}

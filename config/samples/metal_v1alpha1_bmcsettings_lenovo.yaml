@@ -10,7 +10,6 @@ spec:
   BMCRef:
     name: endpoint-lenovo-sample
   version: TEI3E4A 4.11 2024-04-25
-  priority: 10
   serverMaintenancePolicy: Enforced
   settingsFlow:
     - name: ntp

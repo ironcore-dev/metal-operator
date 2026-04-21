@@ -290,39 +290,24 @@ func EqualIPPrefixes(a, b IPPrefix) bool {
 	return a == b
 }
 
-// ReadinessGateOwner identifies the Set CRD that owns the child object to check.
-//
-// The controller finds the child of Kind whose owner is the named Set, then
-// confirms it is associated with the current resource. Two association modes:
-//   - Field-based (LocalFieldPath + RemoteFieldPath): the value of LocalFieldPath
-//     on the current object must equal the value of RemoteFieldPath on the child.
-//     e.g. current ".spec.serverRef.name" == child ".spec.serverRef.name"
-//     e.g. current ".metadata.name"       == child ".spec.bmcRef.name"
-//   - OwnerReference-based (both paths omitted): the child must carry an
-//     ownerReference pointing at the current object.
-//
-// +kubebuilder:validation:XValidation:rule="has(self.localFieldPath) == has(self.remoteFieldPath)",message="localFieldPath and remoteFieldPath must both be set or both be omitted"
-type ReadinessGateOwner struct {
-	// Kind is the kind of the owning Set CRD, e.g. "BMCSettingsSet".
+// SettingsFlowItem represents a named, prioritized group of settings to be applied as a unit.
+// Used by both BMCSettingsTemplate and BIOSSettingsTemplate.
+type SettingsFlowItem struct {
+	// Name is the name of the flow item.
 	// +required
-	Kind string `json:"kind"`
-
-	// Name is the name of the owning Set CRD.
-	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1000
 	Name string `json:"name"`
 
-	// LocalFieldPath is the dot-notation path on the *current* resource whose
-	// value is used as the match key, e.g. ".metadata.name" or ".spec.serverRef.name".
-	// Must be set together with RemoteFieldPath.
-	// When both are omitted the controller falls back to ownerReferences.
-	// +optional
-	LocalFieldPath string `json:"localFieldPath,omitempty"`
+	// Priority defines the order of applying the settings. Lower numbers are applied first.
+	// +required
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=2147483645
+	Priority int32 `json:"priority"`
 
-	// RemoteFieldPath is the dot-notation path on the *child* object to compare
-	// against LocalFieldPath, e.g. ".spec.serverRef.name" or ".spec.bmcRef.name".
-	// Must be set together with LocalFieldPath.
+	// Settings contains the key=value settings for this step.
 	// +optional
-	RemoteFieldPath string `json:"remoteFieldPath,omitempty"`
+	Settings map[string]string `json:"settings,omitempty"`
 }
 
 // FieldMatch defines a generic field equality check on the referenced object.
@@ -337,19 +322,118 @@ type FieldMatch struct {
 	Value string `json:"value"`
 }
 
+// Variable defines a single named variable used in $(VAR_NAME) substitution
+// within BMCSettingsTemplate settings values and ReadinessGate Name fields.
+// Variables are resolved by the Set controller at stamp time.
+type Variable struct {
+	// Key is the variable name, referenced as $(KEY) in template strings.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	Key string `json:"key"`
+
+	// ValueFrom defines a single source for the variable value.
+	// +required
+	ValueFrom *VariableSourceValueFrom `json:"valueFrom"`
+}
+
+// VariableSourceValueFrom defines how to resolve a variable value.
+// Exactly one field must be set.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) + (has(self.ownedByRef) ? 1 : 0) == 1",message="exactly one of fieldRef, configMapKeyRef, secretKeyRef, or ownedByRef must be provided"
+type VariableSourceValueFrom struct {
+	// FieldRef sources the value from a field of the subject object (e.g. metadata.name).
+	// +optional
+	FieldRef *FieldRefSelector `json:"fieldRef,omitempty"`
+
+	// ConfigMapKeyRef points to a namespaced ConfigMap key.
+	// +optional
+	ConfigMapKeyRef *NamespacedKeySelector `json:"configMapKeyRef,omitempty"`
+
+	// SecretKeyRef points to a namespaced Secret key.
+	// +optional
+	SecretKeyRef *NamespacedKeySelector `json:"secretKeyRef,omitempty"`
+
+	// OwnedByRef finds the sibling child of the named Set that matches the
+	// given field filter, and resolves to that child's name.
+	// +optional
+	OwnedByRef *OwnedByRefSelector `json:"ownedByRef,omitempty"`
+}
+
+// FieldRefSelector selects a field on the subject object by dot-notation path.
+type FieldRefSelector struct {
+	// FieldPath is the path of the field on the subject object to select (e.g. metadata.name).
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +required
+	FieldPath string `json:"fieldPath"`
+}
+
+// NamespacedKeySelector references a key within a namespaced ConfigMap or Secret.
+type NamespacedKeySelector struct {
+	// Name is the referenced object name.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Name string `json:"name"`
+
+	// Namespace is the referenced object namespace.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	Namespace string `json:"namespace"`
+
+	// Key is the key within the referenced object.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Key string `json:"key"`
+}
+
+// OwnedByRefSelector identifies a sibling child of a Set by finding the child
+// owned by the named Set whose matchField equals the resolved match value.
+type OwnedByRefSelector struct {
+	// Kind of the owning Set CRD, e.g. "BMCSettingsSet" or "BMCVersionSet".
+	// +required
+	Kind string `json:"kind"`
+
+	// Name of the owning Set CRD.
+	// +required
+	Name string `json:"name"`
+
+	// MatchField filters among all children owned by Kind/Name.
+	// The Set controller picks the child where MatchField.FieldPath
+	// equals MatchField.Value ($(VAR) substitution applied to Value).
+	// +required
+	MatchField OwnedByMatchField `json:"matchField"`
+}
+
+// OwnedByMatchField specifies the field filter used to identify one sibling child.
+type OwnedByMatchField struct {
+	// FieldPath is the dot-notation path on the sibling child object to filter by,
+	// e.g. ".spec.bmcRef.name".
+	// +required
+	FieldPath string `json:"fieldPath"`
+
+	// Value is the expected value of FieldPath. Supports $(VAR_NAME) substitution
+	// using variables defined earlier in the same gate's variables list.
+	// +required
+	Value string `json:"value"`
+}
+
 // ReadinessGate blocks a resource in Pending until the referenced object
 // satisfies the specified check.
 //
-// Exactly one of Name or OwnedBy must be set (object resolution):
-//   - Name: direct lookup — checks the exact named object.
-//   - OwnedBy: set-child lookup — finds the child of Kind that is owned by
-//     the named Set and associated with this BMC/Server via ownerReferences.
+// Object resolution — Name must resolve to a literal object name.
+// On concrete child objects (BMCVersion, BMCSettings) Name is always a
+// literal string. In Set templates, Name may contain $(VAR_NAME) references
+// that are resolved from the gate's own Variables list by the Set controller
+// at stamp time; the stamped child always receives a literal name.
 //
 // Exactly one of ConditionType or FieldMatch must be set (match criterion):
 //   - ConditionType: checks that the named condition is set to True.
 //   - FieldMatch: checks that a specific field equals the given value.
 //
-// +kubebuilder:validation:XValidation:rule="has(self.name) != has(self.ownedBy)",message="exactly one of name or ownedBy must be set"
 // +kubebuilder:validation:XValidation:rule="has(self.conditionType) != has(self.fieldMatch)",message="exactly one of conditionType or fieldMatch must be set"
 type ReadinessGate struct {
 	// APIVersion of the object whose condition is checked, e.g. "metal.ironcore.dev/v1alpha1".
@@ -360,16 +444,11 @@ type ReadinessGate struct {
 	// +required
 	Kind string `json:"kind"`
 
-	// Name is the exact name of the object to look up.
-	// Mutually exclusive with OwnedBy.
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// OwnedBy resolves the target by finding the child of Kind that is owned
-	// by the named Set and associated with this BMC/Server via ownerReferences.
-	// Mutually exclusive with Name.
-	// +optional
-	OwnedBy *ReadinessGateOwner `json:"ownedBy,omitempty"`
+	// Name of the object to look up. On concrete child objects this is always a
+	// literal name. It may contain $(VAR_NAME) references
+	// resolved from Variables at stamp time.
+	// +required
+	Name string `json:"name"`
 
 	// ConditionType checks that the named condition on the referenced object is set to True.
 	// Mutually exclusive with FieldMatch.
@@ -380,4 +459,11 @@ type ReadinessGate struct {
 	// Mutually exclusive with ConditionType.
 	// +optional
 	FieldMatch *FieldMatch `json:"fieldMatch,omitempty"`
+
+	// Variables defines $(VAR_NAME) substitutions used in the Name field of this gate.
+	// Resolved by the Set controller at stamp time; always empty on concrete child objects.
+	// fieldRef variables are resolved first; ownedByRef variables are resolved second
+	// and may reference $(VAR_NAME) values from fieldRef variables in their matchField.value.
+	// +optional
+	Variables []Variable `json:"variables,omitempty"`
 }

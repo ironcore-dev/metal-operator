@@ -10,7 +10,6 @@ spec:
   BMCRef:
     name: endpoint-hpe-sample
   version: iLO 6 v1.70
-  priority: 10
   serverMaintenancePolicy: Enforced
   settingsFlow:
     - name: network-protocol

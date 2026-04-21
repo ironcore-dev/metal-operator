@@ -17,7 +17,6 @@ spec:
       - "5.00.00.00"
       - "5.10.00.00"
   bmcSettingsTemplate:
-    priority: 10
     serverMaintenancePolicy: Enforced
     readinessGates: []
     settingsFlow:

@@ -153,10 +153,11 @@ spec:
                         ReadinessGate blocks a resource in Pending until the referenced object
                         satisfies the specified check.
 
-                        Exactly one of Name or OwnedBy must be set (object resolution):
-                          - Name: direct lookup — checks the exact named object.
-                          - OwnedBy: set-child lookup — finds the child of Kind that is owned by
-                            the named Set and associated with this BMC/Server via ownerReferences.
+                        Object resolution — Name must resolve to a literal object name.
+                        On concrete child objects (BMCVersion, BMCSettings) Name is always a
+                        literal string. In Set templates, Name may contain $(VAR_NAME) references
+                        that are resolved from the gate's own Variables list by the Set controller
+                        at stamp time; the stamped child always receives a literal name.
 
                         Exactly one of ConditionType or FieldMatch must be set (match criterion):
                           - ConditionType: checks that the named condition is set to True.
@@ -195,50 +196,155 @@ spec:
                           type: string
                         name:
                           description: |-
-                            Name is the exact name of the object to look up.
-                            Mutually exclusive with OwnedBy.
+                            Name of the object to look up. On concrete child objects this is always a
+                            literal name. It may contain $(VAR_NAME) references
+                            resolved from Variables at stamp time.
                           type: string
-                        ownedBy:
+                        variables:
                           description: |-
-                            OwnedBy resolves the target by finding the child of Kind that is owned
-                            by the named Set and associated with this BMC/Server via ownerReferences.
-                            Mutually exclusive with Name.
-                          properties:
-                            kind:
-                              description: Kind is the kind of the owning Set CRD,
-                                e.g. "BMCSettingsSet".
-                              type: string
-                            localFieldPath:
-                              description: |-
-                                LocalFieldPath is the dot-notation path on the *current* resource whose
-                                value is used as the match key, e.g. ".metadata.name" or ".spec.serverRef.name".
-                                Must be set together with RemoteFieldPath.
-                                When both are omitted the controller falls back to ownerReferences.
-                              type: string
-                            name:
-                              description: Name is the name of the owning Set CRD.
-                              type: string
-                            remoteFieldPath:
-                              description: |-
-                                RemoteFieldPath is the dot-notation path on the *child* object to compare
-                                against LocalFieldPath, e.g. ".spec.serverRef.name" or ".spec.bmcRef.name".
-                                Must be set together with LocalFieldPath.
-                              type: string
-                          required:
-                          - kind
-                          - name
-                          type: object
-                          x-kubernetes-validations:
-                          - message: localFieldPath and remoteFieldPath must both
-                              be set or both be omitted
-                            rule: has(self.localFieldPath) == has(self.remoteFieldPath)
+                            Variables defines $(VAR_NAME) substitutions used in the Name field of this gate.
+                            Resolved by the Set controller at stamp time; always empty on concrete child objects.
+                            fieldRef variables are resolved first; ownedByRef variables are resolved second
+                            and may reference $(VAR_NAME) values from fieldRef variables in their matchField.value.
+                          items:
+                            description: |-
+                              Variable defines a single named variable used in $(VAR_NAME) substitution
+                              within BMCSettingsTemplate settings values and ReadinessGate Name fields.
+                              Variables are resolved by the Set controller at stamp time.
+                            properties:
+                              key:
+                                description: Key is the variable name, referenced
+                                  as $(KEY) in template strings.
+                                maxLength: 63
+                                minLength: 1
+                                type: string
+                              valueFrom:
+                                description: ValueFrom defines a single source for
+                                  the variable value.
+                                properties:
+                                  configMapKeyRef:
+                                    description: ConfigMapKeyRef points to a namespaced
+                                      ConfigMap key.
+                                    properties:
+                                      key:
+                                        description: Key is the key within the referenced
+                                          object.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      name:
+                                        description: Name is the referenced object
+                                          name.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      namespace:
+                                        description: Namespace is the referenced object
+                                          namespace.
+                                        maxLength: 63
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - key
+                                    - name
+                                    - namespace
+                                    type: object
+                                  fieldRef:
+                                    description: FieldRef sources the value from a
+                                      field of the subject object (e.g. metadata.name).
+                                    properties:
+                                      fieldPath:
+                                        description: FieldPath is the path of the
+                                          field on the subject object to select (e.g.
+                                          metadata.name).
+                                        maxLength: 256
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - fieldPath
+                                    type: object
+                                  ownedByRef:
+                                    description: |-
+                                      OwnedByRef finds the sibling child of the named Set that matches the
+                                      given field filter, and resolves to that child's name.
+                                    properties:
+                                      kind:
+                                        description: Kind of the owning Set CRD, e.g.
+                                          "BMCSettingsSet" or "BMCVersionSet".
+                                        type: string
+                                      matchField:
+                                        description: |-
+                                          MatchField filters among all children owned by Kind/Name.
+                                          The Set controller picks the child where MatchField.FieldPath
+                                          equals MatchField.Value ($(VAR) substitution applied to Value).
+                                        properties:
+                                          fieldPath:
+                                            description: |-
+                                              FieldPath is the dot-notation path on the sibling child object to filter by,
+                                              e.g. ".spec.bmcRef.name".
+                                            type: string
+                                          value:
+                                            description: |-
+                                              Value is the expected value of FieldPath. Supports $(VAR_NAME) substitution
+                                              using variables defined earlier in the same gate's variables list.
+                                            type: string
+                                        required:
+                                        - fieldPath
+                                        - value
+                                        type: object
+                                      name:
+                                        description: Name of the owning Set CRD.
+                                        type: string
+                                    required:
+                                    - kind
+                                    - matchField
+                                    - name
+                                    type: object
+                                  secretKeyRef:
+                                    description: SecretKeyRef points to a namespaced
+                                      Secret key.
+                                    properties:
+                                      key:
+                                        description: Key is the key within the referenced
+                                          object.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      name:
+                                        description: Name is the referenced object
+                                          name.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      namespace:
+                                        description: Namespace is the referenced object
+                                          namespace.
+                                        maxLength: 63
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - key
+                                    - name
+                                    - namespace
+                                    type: object
+                                type: object
+                                x-kubernetes-validations:
+                                - message: exactly one of fieldRef, configMapKeyRef,
+                                    secretKeyRef, or ownedByRef must be provided
+                                  rule: '(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef)
+                                    ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) +
+                                    (has(self.ownedByRef) ? 1 : 0) == 1'
+                            required:
+                            - key
+                            - valueFrom
+                            type: object
+                          type: array
                       required:
                       - apiVersion
                       - kind
+                      - name
                       type: object
                       x-kubernetes-validations:
-                      - message: exactly one of name or ownedBy must be set
-                        rule: has(self.name) != has(self.ownedBy)
                       - message: exactly one of conditionType or fieldMatch must be
                           set
                         rule: has(self.conditionType) != has(self.fieldMatch)

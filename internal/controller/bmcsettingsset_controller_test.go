@@ -153,7 +153,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+						SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -230,7 +230,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+						SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -317,7 +317,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+						SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -414,7 +414,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+						SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -467,7 +467,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Updating the BMCSettingsSet template")
 			Eventually(Update(bmcSettingsSet, func() {
-				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsFlow = []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSettingNew}}
+				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSettingNew}}
 			})).Should(Succeed())
 
 			By("Checking if the bmcSettings was updated")
@@ -515,7 +515,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+						SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -551,7 +551,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+						SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -674,7 +674,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+						SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 					},
 					BMCSelector: metav1.LabelSelector{
@@ -760,7 +760,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Updating the BMCSettingsSet with NO retry annotation")
 			Eventually(Update(bmcSettingsSet, func() {
 				delete(bmcSettingsSet.GetAnnotations(), metalv1alpha1.OperationAnnotation)
-				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsFlow = []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: map[string]string{"abc": changedBMCSetting}}}
+				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: map[string]string{"abc": changedBMCSetting}}}
 			})).Should(Succeed())
 
 			By("Checking if the status has been updated to completed (retried automatically)")

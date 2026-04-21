@@ -1,15 +1,48 @@
 # Example: multi-hop BMC firmware upgrade  4.x → 5.x → 6.x → 7.x
 #
 # All three Sets are applied immediately. Each BMC receives three BMCVersion
-# children. Hop 2 and 3 stay in Pending until the previous hop's child (stamped
-# by the named Set for that specific BMC) reaches state Completed. The
-# controller resolves the generated child name at runtime via ownerReferences
-# (ownedBy) — no need to know the GenerateName result up front.
+# children (one per Set). Each child starts in Pending and progresses to
+# Completed once its gates are satisfied and the upgrade is done.
 #
-# If a BMC is already on 5.x, its hop-1 child skips straight to Completed,
-# unblocking hop-2 automatically.
+# ── Name resolution ──────────────────────────────────────────────────────────
+# Gate name fields use $(VAR_NAME) references. The Set controller resolves
+# variables at stamp time, so concrete BMCVersion children always carry
+# literal names. Variables are evaluated left-to-right: fieldRef first,
+# then ownedByRef (which may reference already-resolved $(VAR) values).
+#
+# ── Self-parking gate ────────────────────────────────────────────────────────
+# Each hop carries a gate that checks bmc.status.firmwareVersion == <source>.
+# This gate serves two purposes:
+#
+#   1. Initial activation: a hop only starts when the BMC is at the expected
+#      source version. If a BMC is already on 5.x when the Sets are applied,
+#      hop-1's self-parking gate is unsatisfied, so hop-1 stays Pending and
+#      never runs. Hop-2's self-parking gate IS satisfied, so hop-2 activates
+#      directly (after its sibling gate on hop-1 is also satisfied).
+#
+#   2. Drift recovery: if a BMC is factory-reset back to an earlier version,
+#      the controller re-evaluates Completed resources. A Completed BMCVersion
+#      is reset to Pending ONLY when ALL its readiness gates are satisfied AND
+#      bmc.firmwareVersion != spec.version (the upgrade did not hold). Because
+#      the self-parking gate checks for the exact source version, only the one
+#      hop that corresponds to the current firmware activates — all others see
+#      their self-parking gate as unsatisfied and stay Completed.
+#
+#      Example — factory reset to 2.x after reaching 7.x:
+#        hop 1 (→v5): self-parking requires fw==4.x  → NOT satisfied → stays Completed
+#        hop 2 (→v6): self-parking requires fw==5.x  → NOT satisfied → stays Completed
+#        hop 3 (→v7): self-parking requires fw==6.x  → NOT satisfied → stays Completed
+#        ... none of the hops defined here target 2.x, so they all stay still.
+#        A separate Set targeting the 1.x→2.x or 2.x→N.x path would handle it.
+#
+# ── Sibling gate ─────────────────────────────────────────────────────────────
+# Hops 2+ also carry a gate on the previous hop's BMCVersion child reaching
+# Completed. This serialises execution and ensures the cascade proceeds in
+# order even when multiple hops are simultaneously unblocked by drift recovery.
 
-# ── Hop 1: current version → 5.x (no gate, starts immediately) ──────────────
+# ── Hop 1: 4.x → 5.x ────────────────────────────────────────────────────────
+# No sibling gate (starts immediately). Self-parking gate ensures it only
+# progresses when the BMC is actually at 4.x.
 apiVersion: metal.ironcore.dev/v1alpha1
 kind: BMCVersionSet
 metadata:
@@ -28,8 +61,22 @@ spec:
       URI: "https://downloads.example.com/dell/idrac-5.00.00.00.exe"
       transferProtocol: HTTPS
     serverMaintenancePolicy: Enforced
+    readinessGates:
+      # Self-parking: only activate when BMC is at 4.x (enables drift recovery;
+      # prevents spurious re-runs when BMC is already ahead).
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMC
+        name: "$(BMC)"
+        fieldMatch:
+          fieldPath: .status.firmwareVersion
+          value: "4.00.00.00"
+        variables:
+          - key: BMC
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.BMCRef.name
 ---
-# ── Hop 2: 5.x → 6.x (blocked until hop-1 child is Completed) ───────────────
+# ── Hop 2: 5.x → 6.x (blocked until hop-1 child reaches Completed) ──────────
 apiVersion: metal.ironcore.dev/v1alpha1
 kind: BMCVersionSet
 metadata:
@@ -49,16 +96,42 @@ spec:
       transferProtocol: HTTPS
     serverMaintenancePolicy: Enforced
     readinessGates:
+      # Self-parking: only activate when BMC is at 5.x (enables drift recovery;
+      # all other hops see this gate as unsatisfied and stay Completed).
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMC
+        name: "$(BMC)"
+        fieldMatch:
+          fieldPath: .status.firmwareVersion
+          value: "5.00.00.00"
+        variables:
+          - key: BMC
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.BMCRef.name
+      # Sibling gate: wait for this BMC's hop-1 BMCVersion child to complete.
+      # $(BMC) is resolved first (fieldRef), then $(HOP1_CHILD) via ownedByRef.
       - apiVersion: metal.ironcore.dev/v1alpha1
         kind: BMCVersion
-        conditionType: Completed
-        ownedBy:
-          kind: BMCVersionSet
-          name: dell-idrac-upgrade-to-v5
-          localFieldPath: .spec.bmcRef.name   # field on this BMCVersion
-          remoteFieldPath: .spec.bmcRef.name  # matching field on the hop-1 BMCVersion child
+        name: "$(HOP1_CHILD)"
+        fieldMatch:
+          fieldPath: .status.state
+          value: Completed
+        variables:
+          - key: BMC
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.BMCRef.name
+          - key: HOP1_CHILD
+            valueFrom:
+              ownedByRef:
+                kind: BMCVersionSet
+                name: dell-idrac-upgrade-to-v5
+                matchField:
+                  fieldPath: .spec.bmcRef.name
+                  value: "$(BMC)"
 ---
-# ── Hop 3: 6.x → 7.x (blocked until hop-2 child is Completed) ───────────────
+# ── Hop 3: 6.x → 7.x (blocked until hop-2 child reaches Completed) ──────────
 apiVersion: metal.ironcore.dev/v1alpha1
 kind: BMCVersionSet
 metadata:
@@ -78,11 +151,36 @@ spec:
       transferProtocol: HTTPS
     serverMaintenancePolicy: Enforced
     readinessGates:
+      # Self-parking: only activate when BMC is at 6.x (enables drift recovery;
+      # all other hops see this gate as unsatisfied and stay Completed).
+      - apiVersion: metal.ironcore.dev/v1alpha1
+        kind: BMC
+        name: "$(BMC)"
+        fieldMatch:
+          fieldPath: .status.firmwareVersion
+          value: "6.00.00.00"
+        variables:
+          - key: BMC
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.BMCRef.name
+      # Sibling gate: wait for this BMC's hop-2 BMCVersion child to complete.
       - apiVersion: metal.ironcore.dev/v1alpha1
         kind: BMCVersion
-        conditionType: Completed
-        ownedBy:
-          kind: BMCVersionSet
-          name: dell-idrac-upgrade-to-v6
-          localFieldPath: .spec.bmcRef.name   # field on this BMCVersion
-          remoteFieldPath: .spec.bmcRef.name  # matching field on the hop-2 BMCVersion child
+        name: "$(HOP2_CHILD)"
+        fieldMatch:
+          fieldPath: .status.state
+          value: Completed
+        variables:
+          - key: BMC
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.BMCRef.name
+          - key: HOP2_CHILD
+            valueFrom:
+              ownedByRef:
+                kind: BMCVersionSet
+                name: dell-idrac-upgrade-to-v6
+                matchField:
+                  fieldPath: .spec.bmcRef.name
+                  value: "$(BMC)"

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
@@ -732,9 +733,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 	// currently we just want to have the diff check working for the whole settings.
 	allSettings := make(map[string]string)
 	for _, flowItem := range settings.Spec.SettingsFlow {
-		for k, v := range flowItem.Settings {
-			allSettings[k] = v
-		}
+		maps.Copy(allSettings, flowItem.Settings)
 	}
 	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, bmcObj.Spec.BMCUUID, allSettings)
 	if err != nil {
@@ -1055,15 +1054,6 @@ func (r *BMCSettingsReconciler) getReferredServerMaintenances(ctx context.Contex
 	}
 
 	return serverMaintenances, nil
-}
-
-func (r *BMCSettingsReconciler) getReferredBMCSettings(ctx context.Context, referredBMCSettingsRef *corev1.LocalObjectReference) (*metalv1alpha1.BMCSettings, error) {
-	key := client.ObjectKey{Name: referredBMCSettingsRef.Name, Namespace: metav1.NamespaceNone}
-	settings := &metalv1alpha1.BMCSettings{}
-	if err := r.Get(ctx, key, settings); err != nil {
-		return nil, err
-	}
-	return settings, nil
 }
 
 func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem, name, namespace string) *metalv1alpha1.ObjectReference {

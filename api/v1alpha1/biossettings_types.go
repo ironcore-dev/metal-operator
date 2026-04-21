@@ -30,24 +30,6 @@ type BIOSSettingsTemplate struct {
 	ReadinessGates []ReadinessGate `json:"readinessGates,omitempty"`
 }
 
-type SettingsFlowItem struct {
-	// Name is the name of the flow item.
-	// +required
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=1000
-	Name string `json:"name"`
-
-	// Settings contains software (e.g. BIOS, BMC) settings as a map.
-	// +optional
-	Settings map[string]string `json:"settings,omitempty"`
-
-	// Priority defines the order of applying the settings. Lower numbers have higher priority (i.e. lower numbers are applied first).
-	// +required
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=2147483645
-	Priority int32 `json:"priority"`
-}
-
 // BIOSSettingsSpec defines the desired state of BIOSSettings.
 type BIOSSettingsSpec struct {
 	// BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.

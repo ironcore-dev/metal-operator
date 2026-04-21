@@ -9,7 +9,6 @@ spec:
   BMCRef:
     name: endpoint-sample
   version: 1.45.455b66-rev4
-  priority: 10
   serverMaintenancePolicy: Enforced
   settingsFlow:
     - name: baseline

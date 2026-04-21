@@ -486,25 +486,6 @@ BMCSettings is the Schema for the BMCSettings API.
 | `status` _[BMCSettingsStatus](#bmcsettingsstatus)_ |  |  |  |
 
 
-#### BMCSettingsFlowItem
-
-
-
-BMCSettingsFlowItem represents a named, prioritized group of BMC settings to be applied as a unit.
-
-
-
-_Appears in:_
-- [BMCSettingsSpec](#bmcsettingsspec)
-- [BMCSettingsTemplate](#bmcsettingstemplate)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `name` _string_ | Name uniquely identifies this flow step within the BMCSettings. |  |  |
-| `priority` _integer_ | Priority controls application order within the flow.<br />Lower numbers are applied first. Must be unique within the flow. |  |  |
-| `settings` _object (keys:string, values:string)_ | Settings is the map of BMC manager key=value settings for this step. |  |  |
-
-
 #### BMCSettingsFlowStatus
 
 
@@ -594,8 +575,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `version` _string_ | Version is the firmware version these settings are applicable for.<br />Empty means version-agnostic. When created from a BMCSettingsSet with a versionSelector,<br />the controller sets this to the matched version for traceability. |  |  |
-| `settingsFlow` _[BMCSettingsFlowItem](#bmcsettingsflowitem) array_ | SettingsFlow is the ordered list of setting groups to apply.<br />Items are applied in ascending Priority order. |  |  |
-| `priority` _integer_ | Priority controls ordering when multiple BMCSettings target the same BMC.<br />Higher value runs first. Mirrors ServerMaintenance.spec.priority. | 0 |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow is the ordered list of setting groups to apply.<br />Items are applied in ascending Priority order. |  |  |
 | `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BMCSettings in Pending until all gates are satisfied. |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
@@ -660,8 +640,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `version` _string_ | Version is the firmware version these settings are applicable for.<br />Empty means version-agnostic. When created from a BMCSettingsSet with a versionSelector,<br />the controller sets this to the matched version for traceability. |  |  |
-| `settingsFlow` _[BMCSettingsFlowItem](#bmcsettingsflowitem) array_ | SettingsFlow is the ordered list of setting groups to apply.<br />Items are applied in ascending Priority order. |  |  |
-| `priority` _integer_ | Priority controls ordering when multiple BMCSettings target the same BMC.<br />Higher value runs first. Mirrors ServerMaintenance.spec.priority. | 0 |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow is the ordered list of setting groups to apply.<br />Items are applied in ascending Priority order. |  |  |
 | `readinessGates` _[ReadinessGate](#readinessgate) array_ | ReadinessGates blocks this BMCSettings in Pending until all gates are satisfied. |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
@@ -1079,7 +1058,7 @@ _Appears in:_
 
 
 
-
+FieldRefSelector selects a field on the subject object by dot-notation path.
 
 
 
@@ -1088,7 +1067,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+| `fieldPath` _string_ | FieldPath is the path of the field on the subject object to select (e.g. metadata.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
 
 
 #### IP
@@ -1214,7 +1193,7 @@ _Appears in:_
 
 
 
-
+NamespacedKeySelector references a key within a namespaced ConfigMap or Secret.
 
 
 
@@ -1271,6 +1250,42 @@ _Appears in:_
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  |  |
 | `name` _string_ | Name is the name of the referenced object. |  |  |
 | `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
+
+
+#### OwnedByMatchField
+
+
+
+OwnedByMatchField specifies the field filter used to identify one sibling child.
+
+
+
+_Appears in:_
+- [OwnedByRefSelector](#ownedbyrefselector)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `fieldPath` _string_ | FieldPath is the dot-notation path on the sibling child object to filter by,<br />e.g. ".spec.bmcRef.name". |  |  |
+| `value` _string_ | Value is the expected value of FieldPath. Supports $(VAR_NAME) substitution<br />using variables defined earlier in the same gate's variables list. |  |  |
+
+
+#### OwnedByRefSelector
+
+
+
+OwnedByRefSelector identifies a sibling child of a Set by finding the child
+owned by the named Set whose matchField equals the resolved match value.
+
+
+
+_Appears in:_
+- [VariableSourceValueFrom](#variablesourcevaluefrom)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `kind` _string_ | Kind of the owning Set CRD, e.g. "BMCSettingsSet" or "BMCVersionSet". |  |  |
+| `name` _string_ | Name of the owning Set CRD. |  |  |
+| `matchField` _[OwnedByMatchField](#ownedbymatchfield)_ | MatchField filters among all children owned by Kind/Name.<br />The Set controller picks the child where MatchField.FieldPath<br />equals MatchField.Value ($(VAR) substitution applied to Value). |  |  |
 
 
 #### Phase
@@ -1394,10 +1409,11 @@ _Appears in:_
 ReadinessGate blocks a resource in Pending until the referenced object
 satisfies the specified check.
 
-Exactly one of Name or OwnedBy must be set (object resolution):
-  - Name: direct lookup — checks the exact named object.
-  - OwnedBy: set-child lookup — finds the child of Kind that is owned by
-    the named Set and associated with this BMC/Server via ownerReferences.
+Object resolution — Name must resolve to a literal object name.
+On concrete child objects (BMCVersion, BMCSettings) Name is always a
+literal string. In Set templates, Name may contain $(VAR_NAME) references
+that are resolved from the gate's own Variables list by the Set controller
+at stamp time; the stamped child always receives a literal name.
 
 Exactly one of ConditionType or FieldMatch must be set (match criterion):
   - ConditionType: checks that the named condition is set to True.
@@ -1419,38 +1435,10 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `apiVersion` _string_ | APIVersion of the object whose condition is checked, e.g. "metal.ironcore.dev/v1alpha1". |  |  |
 | `kind` _string_ | Kind of the object whose condition is checked, e.g. "BMCSettings". |  |  |
-| `name` _string_ | Name is the exact name of the object to look up.<br />Mutually exclusive with OwnedBy. |  |  |
-| `ownedBy` _[ReadinessGateOwner](#readinessgateowner)_ | OwnedBy resolves the target by finding the child of Kind that is owned<br />by the named Set and associated with this BMC/Server via ownerReferences.<br />Mutually exclusive with Name. |  |  |
+| `name` _string_ | Name of the object to look up. On concrete child objects this is always a<br />literal name. It may contain $(VAR_NAME) references<br />resolved from Variables at stamp time. |  |  |
 | `conditionType` _string_ | ConditionType checks that the named condition on the referenced object is set to True.<br />Mutually exclusive with FieldMatch. |  |  |
 | `fieldMatch` _[FieldMatch](#fieldmatch)_ | FieldMatch checks that a specific field on the referenced object equals the given value.<br />Mutually exclusive with ConditionType. |  |  |
-
-
-#### ReadinessGateOwner
-
-
-
-ReadinessGateOwner identifies the Set CRD that owns the child object to check.
-
-The controller finds the child of Kind whose owner is the named Set, then
-confirms it is associated with the current resource. Two association modes:
-  - Field-based (LocalFieldPath + RemoteFieldPath): the value of LocalFieldPath
-    on the current object must equal the value of RemoteFieldPath on the child.
-    e.g. current ".spec.serverRef.name" == child ".spec.serverRef.name"
-    e.g. current ".metadata.name"       == child ".spec.bmcRef.name"
-  - OwnerReference-based (both paths omitted): the child must carry an
-    ownerReference pointing at the current object.
-
-
-
-_Appears in:_
-- [ReadinessGate](#readinessgate)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `kind` _string_ | Kind is the kind of the owning Set CRD, e.g. "BMCSettingsSet". |  |  |
-| `name` _string_ | Name is the name of the owning Set CRD. |  |  |
-| `localFieldPath` _string_ | LocalFieldPath is the dot-notation path on the *current* resource whose<br />value is used as the match key, e.g. ".metadata.name" or ".spec.serverRef.name".<br />Must be set together with RemoteFieldPath.<br />When both are omitted the controller falls back to ownerReferences. |  |  |
-| `remoteFieldPath` _string_ | RemoteFieldPath is the dot-notation path on the *child* object to compare<br />against LocalFieldPath, e.g. ".spec.serverRef.name" or ".spec.bmcRef.name".<br />Must be set together with LocalFieldPath. |  |  |
+| `variables` _[Variable](#variable) array_ | Variables defines $(VAR_NAME) substitutions used in the Name field of this gate.<br />Resolved by the Set controller at stamp time; always empty on concrete child objects.<br />fieldRef variables are resolved first; ownedByRef variables are resolved second<br />and may reference $(VAR_NAME) values from fieldRef variables in their matchField.value. |  |  |
 
 
 #### RetryPolicy
@@ -1854,19 +1842,22 @@ _Appears in:_
 
 
 
-
+SettingsFlowItem represents a named, prioritized group of settings to be applied as a unit.
+Used by both BMCSettingsTemplate and BIOSSettingsTemplate.
 
 
 
 _Appears in:_
 - [BIOSSettingsSpec](#biossettingsspec)
 - [BIOSSettingsTemplate](#biossettingstemplate)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `name` _string_ | Name is the name of the flow item. |  | MaxLength: 1000 <br />MinLength: 1 <br /> |
-| `settings` _object (keys:string, values:string)_ | Settings contains software (e.g. BIOS, BMC) settings as a map. |  |  |
-| `priority` _integer_ | Priority defines the order of applying the settings. Lower numbers have higher priority (i.e. lower numbers are applied first). |  | Maximum: 2.147483645e+09 <br />Minimum: 1 <br /> |
+| `priority` _integer_ | Priority defines the order of applying the settings. Lower numbers are applied first. |  | Maximum: 2.147483645e+09 <br />Minimum: 1 <br /> |
+| `settings` _object (keys:string, values:string)_ | Settings contains the key=value settings for this step. |  |  |
 
 
 #### Storage
@@ -1993,25 +1984,29 @@ _Appears in:_
 
 
 
-
+Variable defines a single named variable used in $(VAR_NAME) substitution
+within BMCSettingsTemplate settings values and ReadinessGate Name fields.
+Variables are resolved by the Set controller at stamp time.
 
 
 
 _Appears in:_
 - [BMCSettingsSpec](#bmcsettingsspec)
 - [BMCSettingsTemplate](#bmcsettingstemplate)
+- [ReadinessGate](#readinessgate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `key` _string_ | Key is the name of the variable to be used in the BMCSettingsTemplate format. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
-| `valueFrom` _[VariableSourceValueFrom](#variablesourcevaluefrom)_ | ValueFrom defines a simple single source for the variable value. |  |  |
+| `key` _string_ | Key is the variable name, referenced as $(KEY) in template strings. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
+| `valueFrom` _[VariableSourceValueFrom](#variablesourcevaluefrom)_ | ValueFrom defines a single source for the variable value. |  |  |
 
 
 #### VariableSourceValueFrom
 
 
 
-
+VariableSourceValueFrom defines how to resolve a variable value.
+Exactly one field must be set.
 
 
 
@@ -2020,9 +2015,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name). |  |  |
+| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the subject object (e.g. metadata.name). |  |  |
 | `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
 | `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
+| `ownedByRef` _[OwnedByRefSelector](#ownedbyrefselector)_ | OwnedByRef finds the sibling child of the named Set that matches the<br />given field filter, and resolves to that child's name. |  |  |
 
 
 #### VersionSelector

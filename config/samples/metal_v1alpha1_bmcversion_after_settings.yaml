@@ -2,9 +2,8 @@
 #
 # Scenario: Before upgrading the BMC firmware we want to ensure that
 # baseline settings (NTP, syslog, IPMI config) are already Applied on
-# every BMC. The BMCVersionSet's readinessGate (ownedBy) points at the
-# BMCSettingsSet name; the controller resolves the specific child
-# BMCSettings stamped for each BMC at runtime via ownerReferences.
+# every BMC. The BMCVersionSet's readinessGate resolves the specific child
+# BMCSettings stamped for each BMC via ownedByRef with a matchField filter.
 #
 #   BMC
 #   ├── BMCSettings [dell-idrac-default-settings-xxxxx]  → Pending → Applied ──┐
@@ -59,11 +58,23 @@ spec:
       transferProtocol: HTTPS
     serverMaintenancePolicy: Enforced
     readinessGates:
+      # Wait for the BMCSettings child stamped by dell-idrac-default-settings
+      # for this same BMC to reach Applied.
+      # $(BMC) is resolved first (fieldRef), then $(SETTINGS_CHILD) via ownedByRef.
       - apiVersion: metal.ironcore.dev/v1alpha1
         kind: BMCSettings
+        name: "$(SETTINGS_CHILD)"
         conditionType: Applied
-        ownedBy:
-          kind: BMCSettingsSet
-          name: dell-idrac-default-settings
-          localFieldPath: .spec.bmcRef.name   # field on this BMCVersion
-          remoteFieldPath: .spec.bmcRef.name  # matching field on the BMCSettings child
+        variables:
+          - key: BMC
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.BMCRef.name
+          - key: SETTINGS_CHILD
+            valueFrom:
+              ownedByRef:
+                kind: BMCSettingsSet
+                name: dell-idrac-default-settings
+                matchField:
+                  fieldPath: .spec.bmcRef.name
+                  value: "$(BMC)"

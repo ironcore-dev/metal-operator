@@ -109,7 +109,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -140,7 +140,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -183,7 +183,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -269,7 +269,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 				}},
 		}
@@ -367,7 +367,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "2.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -463,7 +463,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -519,7 +519,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -576,7 +576,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -633,7 +633,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsFlow:            []metalv1alpha1.BMCSettingsFlowItem{{Name: "main", Settings: bmcSetting}},
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "main", Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 				}},

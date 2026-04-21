@@ -435,7 +435,18 @@ var _ = Describe("BMCUser Controller", func() {
 		expectedExpiry := user.CreationTimestamp.Add(1 * time.Hour)
 		Expect(user.Status.ExpiresAt.Time).To(BeTemporally("~", expectedExpiry, 5*time.Second))
 
+		By("Cleaning up resources")
 		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+		// Clean up all secrets owned by this user since envtest has no garbage collector
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for _, s := range secretList.Items {
+			for _, ref := range s.OwnerReferences {
+				if ref.UID == user.UID {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &s))).To(Succeed())
+				}
+			}
+		}
 	})
 
 	It("should use absolute expiration time from ExpiresAt", func(ctx SpecContext) {
@@ -459,7 +470,18 @@ var _ = Describe("BMCUser Controller", func() {
 			HaveField("Status.ExpiresAt.Time", BeTemporally("~", expiryTime.Time, 1*time.Second)),
 		)
 
+		By("Cleaning up resources")
 		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+		// Clean up all secrets owned by this user since envtest has no garbage collector
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for _, s := range secretList.Items {
+			for _, ref := range s.OwnerReferences {
+				if ref.UID == user.UID {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &s))).To(Succeed())
+				}
+			}
+		}
 	})
 
 	It("should ignore TTL changes after expiration is calculated", func(ctx SpecContext) {
@@ -491,7 +513,18 @@ var _ = Describe("BMCUser Controller", func() {
 			HaveField("Status.ExpiresAt.Time", BeTemporally("~", originalExpiry.Time, 1*time.Second)),
 		)
 
+		By("Cleaning up resources")
 		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+		// Clean up all secrets owned by this user since envtest has no garbage collector
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for _, s := range secretList.Items {
+			for _, ref := range s.OwnerReferences {
+				if ref.UID == user.UID {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &s))).To(Succeed())
+				}
+			}
+		}
 	})
 
 	It("should not set expiration for users without TTL or ExpiresAt", func(ctx SpecContext) {
@@ -514,7 +547,18 @@ var _ = Describe("BMCUser Controller", func() {
 			HaveField("Status.ExpiresAt", BeNil()),
 		)
 
+		By("Cleaning up resources")
 		Expect(k8sClient.Delete(ctx, user)).To(Succeed())
+		// Clean up all secrets owned by this user since envtest has no garbage collector
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for _, s := range secretList.Items {
+			for _, ref := range s.OwnerReferences {
+				if ref.UID == user.UID {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &s))).To(Succeed())
+				}
+			}
+		}
 	})
 
 })

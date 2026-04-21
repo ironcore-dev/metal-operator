@@ -2,9 +2,6 @@ name: Lint
 
 on:
   pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
 
 jobs:
   lint:

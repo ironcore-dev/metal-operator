@@ -598,10 +598,6 @@ func (s *MockServer) applyPendingBMCSettings() error {
 func (s *MockServer) ResetBMCSettings(managerID string) {
 	filePath := fmt.Sprintf("data/Managers/%s/index.json", managerID)
 	settingsFilePath := fmt.Sprintf("data/Managers/%s/Settings/index.json", managerID)
-	if _, err := dataFS.Open(filePath); err != nil {
-		s.log.Error(err, "ResetBMCSettings: path not found", "path", filePath)
-		return
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.resetResourceFromEmbeddedLocked(filePath)
@@ -613,10 +609,6 @@ func (s *MockServer) ResetBMCSettings(managerID string) {
 func (s *MockServer) ResetBIOSSettings(systemID string) {
 	filePath := fmt.Sprintf("data/Systems/%s/Bios/index.json", systemID)
 	settingsFilePath := fmt.Sprintf("data/Systems/%s/Bios/Settings/index.json", systemID)
-	if _, err := dataFS.Open(filePath); err != nil {
-		s.log.Error(err, "ResetBIOSSettings: path not found", "path", filePath)
-		return
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.resetResourceFromEmbeddedLocked(filePath)

@@ -642,8 +642,8 @@ func (r *BMCUserReconciler) coordinateRequeue(user *metalv1alpha1.BMCUser, rotat
 		// Not in warning period yet - requeue when warning starts
 		expirationRequeue = timeUntilExpiration - warningThreshold
 	} else {
-		// In warning period - check every 5 minutes for expiration
-		expirationRequeue = 5 * time.Minute
+		// In warning period - check frequently, but not past expiration
+		expirationRequeue = min(5*time.Minute, timeUntilExpiration)
 	}
 
 	// Choose the earlier of rotation or expiration requeue

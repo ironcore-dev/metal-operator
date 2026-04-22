@@ -35,33 +35,60 @@ type BMCUserCustomValidator struct {
 	Client client.Client
 }
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCUser.
-func (v *BMCUserCustomValidator) ValidateCreate(_ context.Context, obj *metalv1alpha1.BMCUser) (admission.Warnings, error) {
-	bmcuserlog.Info("Validation for BMCUser upon creation", "name", obj.GetName())
-
+// validateBMCUserExpirationSpec validates TTL and ExpiresAt fields.
+// Returns error if validation fails.
+func validateBMCUserExpirationSpec(spec *metalv1alpha1.BMCUserSpec) error {
 	// Validate TTL and ExpiresAt are mutually exclusive
-	if obj.Spec.TTL != nil && obj.Spec.ExpiresAt != nil {
-		return nil, fmt.Errorf("spec.ttl and spec.expiresAt are mutually exclusive")
+	if spec.TTL != nil && spec.ExpiresAt != nil {
+		return fmt.Errorf("spec.ttl and spec.expiresAt are mutually exclusive")
 	}
 
 	// Validate ExpiresAt is in the future
-	if obj.Spec.ExpiresAt != nil {
-		if obj.Spec.ExpiresAt.Before(&metav1.Time{Time: time.Now()}) {
-			return nil, fmt.Errorf("spec.expiresAt must be in the future")
+	if spec.ExpiresAt != nil {
+		if spec.ExpiresAt.Before(&metav1.Time{Time: time.Now()}) {
+			return fmt.Errorf("spec.expiresAt must be in the future")
 		}
 	}
 
-	// Validate TTL is reasonable (> 0, < 10 years)
-	if obj.Spec.TTL != nil {
-		if obj.Spec.TTL.Duration <= 0 {
-			return nil, fmt.Errorf("spec.ttl must be positive")
+	// Validate TTL is reasonable (> 0, <= 1 week)
+	if spec.TTL != nil {
+		if spec.TTL.Duration <= 0 {
+			return fmt.Errorf("spec.ttl must be positive")
 		}
-		if obj.Spec.TTL.Duration > 87600*time.Hour { // 10 years
-			return nil, fmt.Errorf("spec.ttl exceeds maximum of 10 years")
+		if spec.TTL.Duration > 168*time.Hour { // 1 week
+			return fmt.Errorf("spec.ttl exceeds maximum of 1 week")
 		}
 	}
 
-	return nil, nil
+	return nil
+}
+
+// ttlChanged returns true if TTL field changed between old and new objects.
+func ttlChanged(oldTTL, newTTL *metav1.Duration) bool {
+	if oldTTL == nil && newTTL == nil {
+		return false
+	}
+	if oldTTL == nil || newTTL == nil {
+		return true // one is nil, other isn't
+	}
+	return oldTTL.Duration != newTTL.Duration
+}
+
+// expiresAtChanged returns true if ExpiresAt field changed between old and new objects.
+func expiresAtChanged(oldTime, newTime *metav1.Time) bool {
+	if oldTime == nil && newTime == nil {
+		return false
+	}
+	if oldTime == nil || newTime == nil {
+		return true // one is nil, other isn't
+	}
+	return !oldTime.Equal(newTime)
+}
+
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCUser.
+func (v *BMCUserCustomValidator) ValidateCreate(_ context.Context, obj *metalv1alpha1.BMCUser) (admission.Warnings, error) {
+	bmcuserlog.Info("Validation for BMCUser upon creation", "name", obj.GetName())
+	return nil, validateBMCUserExpirationSpec(&obj.Spec)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCUser.
@@ -70,24 +97,20 @@ func (v *BMCUserCustomValidator) ValidateUpdate(_ context.Context, oldObj, newOb
 
 	var warnings admission.Warnings
 
-	// Validate TTL and ExpiresAt are mutually exclusive
-	if newObj.Spec.TTL != nil && newObj.Spec.ExpiresAt != nil {
-		return warnings, fmt.Errorf("spec.ttl and spec.expiresAt are mutually exclusive")
+	// Apply same validation as create
+	if err := validateBMCUserExpirationSpec(&newObj.Spec); err != nil {
+		return warnings, err
 	}
 
 	// Warn if TTL/ExpiresAt changed after expiration was calculated
 	if oldObj.Status.ExpiresAt != nil {
-		if oldObj.Spec.TTL != nil && newObj.Spec.TTL != nil {
-			if oldObj.Spec.TTL.Duration != newObj.Spec.TTL.Duration {
-				warnings = append(warnings,
-					"TTL was changed but expiration time is already set and will not be recalculated")
-			}
+		if ttlChanged(oldObj.Spec.TTL, newObj.Spec.TTL) {
+			warnings = append(warnings,
+				"TTL was changed but expiration time is already set and will not be recalculated")
 		}
-		if oldObj.Spec.ExpiresAt != nil && newObj.Spec.ExpiresAt != nil {
-			if !oldObj.Spec.ExpiresAt.Equal(newObj.Spec.ExpiresAt) {
-				warnings = append(warnings,
-					"ExpiresAt was changed but expiration time is already calculated and will not be updated")
-			}
+		if expiresAtChanged(oldObj.Spec.ExpiresAt, newObj.Spec.ExpiresAt) {
+			warnings = append(warnings,
+				"ExpiresAt was changed but expiration time is already calculated and will not be updated")
 		}
 	}
 

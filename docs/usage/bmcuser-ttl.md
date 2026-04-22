@@ -37,7 +37,7 @@ metadata:
 spec:
   userName: maintenance
   roleID: "Operator"
-  expiresAt: "2026-04-11T02:00:00Z"  # User expires at this time
+  expiresAt: "2099-04-11T02:00:00Z"  # User expires at this time
   bmcRef:
     name: my-bmc
 ```
@@ -103,11 +103,11 @@ spec:
 apiVersion: metal.ironcore.dev/v1alpha1
 kind: BMCUser
 metadata:
-  name: maintenance-2026-04-10
+  name: maintenance-2099-04-10
 spec:
   userName: maintenance-tech
   roleID: "Operator"
-  expiresAt: "2026-04-11T06:00:00Z"
+  expiresAt: "2099-04-11T06:00:00Z"
   bmcRef:
     name: datacenter-bmc
 ```

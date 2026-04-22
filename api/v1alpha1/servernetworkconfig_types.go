@@ -31,8 +31,8 @@ type SpecNetworkInterface struct {
 	MACAddress string `json:"macAddress"`
 
 	// Expected holds the expected switch connectivity for this interface.
-	// +optional
-	Expected *ExpectedNetworkDetails `json:"expected,omitempty"`
+	// +required
+	Expected ExpectedNetworkDetails `json:"expected"`
 }
 
 // ExpectedNetworkDetails holds the expected switch connectivity for a network interface.

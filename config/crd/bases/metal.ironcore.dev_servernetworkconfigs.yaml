@@ -86,6 +86,7 @@ spec:
                         source.
                       type: string
                   required:
+                  - expected
                   - macAddress
                   - name
                   type: object

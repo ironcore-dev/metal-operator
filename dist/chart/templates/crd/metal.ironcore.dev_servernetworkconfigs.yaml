@@ -20,7 +20,7 @@ spec:
     shortNames:
     - snc
     singular: servernetworkconfig
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .spec.serverRef.name
@@ -92,6 +92,7 @@ spec:
                         source.
                       type: string
                   required:
+                  - expected
                   - macAddress
                   - name
                   type: object

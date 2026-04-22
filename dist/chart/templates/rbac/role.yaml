@@ -126,6 +126,7 @@ rules:
   resources:
   - servernetworkconfigs
   verbs:
+  - create
   - get
   - list
   - patch

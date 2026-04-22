@@ -103,8 +103,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 defaultMockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					Version:                 mockUpServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -553,8 +553,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 defaultMockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					Version:                 mockUpServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},

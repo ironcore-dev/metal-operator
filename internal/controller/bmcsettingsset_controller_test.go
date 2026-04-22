@@ -4,6 +4,9 @@
 package controller
 
 import (
+	"fmt"
+	"net/netip"
+
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,7 +27,13 @@ import (
 var _ = Describe("BMCSettingsSet Controller", func() {
 	Context("When reconciling a resource", func() {
 
-		ns := SetupTest(nil)
+		var (
+			MockServerIPAddrs = []netip.AddrPort{
+				netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort)),
+				netip.MustParseAddrPort(fmt.Sprintf("%s:%d", MockServerIP, MockServerPort+1)),
+			}
+		)
+		ns := SetupTest(MockServerIPAddrs)
 		var server01 *metalv1alpha1.Server
 		var server02 *metalv1alpha1.Server
 		var bmcSecret *metalv1alpha1.BMCSecret
@@ -58,14 +67,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				},
 				Spec: metalv1alpha1.BMCSpec{
 					Endpoint: &metalv1alpha1.InlineEndpoint{
-						IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
+						IP:         metalv1alpha1.MustParseIP(MockServerIPAddrs[0].Addr().String()),
 						MACAddress: "23:11:8A:33:CF:EA",
 					},
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name},
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000},
+						Port: int32(MockServerIPAddrs[0].Port())},
 				},
 			}
 			Expect(k8sClient.Create(ctx, bmc01)).To(Succeed())
@@ -81,14 +90,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				},
 				Spec: metalv1alpha1.BMCSpec{
 					Endpoint: &metalv1alpha1.InlineEndpoint{
-						IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
-						MACAddress: "23:11:8A:33:CF:EA",
+						IP:         metalv1alpha1.MustParseIP(MockServerIPAddrs[1].Addr().String()),
+						MACAddress: "23:11:8A:33:CF:EB",
 					},
 					BMCSecretRef: v1.LocalObjectReference{
 						Name: bmcSecret.Name},
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: 8000},
+						Port: int32(MockServerIPAddrs[1].Port())},
 				},
 			}
 			Expect(k8sClient.Create(ctx, bmc02)).To(Succeed())

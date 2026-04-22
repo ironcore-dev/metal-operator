@@ -13,7 +13,7 @@ require (
 	github.com/safchain/ethtool v0.7.0
 	github.com/siderolabs/go-smbios v0.3.3
 	github.com/spf13/cobra v1.10.2
-	github.com/stmcginnis/gofish v0.21.5
+	github.com/stmcginnis/gofish v0.21.6
 	golang.org/x/crypto v0.50.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.0

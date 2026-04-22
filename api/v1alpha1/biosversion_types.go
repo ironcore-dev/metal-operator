@@ -61,6 +61,8 @@ type BIOSVersionSpec struct {
 	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.fallbackTransferProtocol) || (has(self.transferProtocol) && size(self.transferProtocol) > 0)",message="fallbackTransferProtocol requires a non-empty transferProtocol"
+// +kubebuilder:validation:XValidation:rule="(has(self.fallbackTransferProtocol) && has(self.fallbackURI)) || (!has(self.fallbackTransferProtocol) && !has(self.fallbackURI))",message="fallbackTransferProtocol and fallbackURI must both be set or both be unset"
 type ImageSpec struct {
 	// SecretRef is a reference to the Secret containing the credentials to access the image URI.
 	// +optional
@@ -73,6 +75,16 @@ type ImageSpec struct {
 	// URI is the URI of the software image to install.
 	// +required
 	URI string `json:"URI"`
+
+	// FallbackTransferProtocol is the fallback network protocol used if the primary TransferProtocol
+	// is not supported by the BMC's UpdateService.
+	// +optional
+	FallbackTransferProtocol string `json:"fallbackTransferProtocol,omitempty"`
+
+	// FallbackURI is the fallback URI of the software image to install if the primary TransferProtocol
+	// is not supported by the BMC's UpdateService.
+	// +optional
+	FallbackURI string `json:"fallbackURI,omitempty"`
 }
 
 // BIOSVersionStatus defines the observed state of BIOSVersion.

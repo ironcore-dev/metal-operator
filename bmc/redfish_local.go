@@ -274,3 +274,8 @@ func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, t
 func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
 	return false, nil
 }
+
+// GetSupportedTransferProtocols returns the mock transfer protocols for testing.
+func (r *RedfishLocalBMC) GetSupportedTransferProtocols(_ context.Context) ([]string, error) {
+	return UnitTestMockUps.SupportedTransferProtocols, nil
+}

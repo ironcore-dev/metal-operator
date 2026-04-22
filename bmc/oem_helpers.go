@@ -60,6 +60,42 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.U
 		return "", false, err
 	}
 
+	// Validate TransferProtocol if specified
+	if params.TransferProtocol != "" {
+		allowedProtocols := tUS.Actions.SimpleUpdate.AllowableValues
+
+		// If BMC reports no restrictions, allow any protocol
+		if len(allowedProtocols) > 0 {
+			protocolSupported := false
+			protocolUpper := strings.ToUpper(string(params.TransferProtocol))
+
+			for _, allowed := range allowedProtocols {
+				if strings.ToUpper(allowed) == protocolUpper {
+					protocolSupported = true
+					break
+				}
+			}
+
+			if !protocolSupported {
+				log.Info("Transfer protocol not supported by BMC",
+					"requested", params.TransferProtocol,
+					"supported", allowedProtocols)
+
+				return "", true, // isFatal=true (don't retry - user config error)
+					fmt.Errorf(
+						"transfer protocol %q not supported by BMC. Supported protocols: %v. "+
+							"Please update the spec to use a supported protocol or configure a fallback",
+						params.TransferProtocol,
+						allowedProtocols,
+					)
+			}
+
+			log.V(1).Info("Transfer protocol validated",
+				"protocol", params.TransferProtocol,
+				"supported", allowedProtocols)
+		}
+	}
+
 	requestBody := requestBodyFn(params)
 
 	resp, err := updateService.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &requestBody)

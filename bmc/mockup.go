@@ -27,6 +27,8 @@ type RedfishMockUps struct {
 
 	Accounts              map[string]*schemas.ManagerAccount
 	SimulateUnvailableBMC bool
+
+	SupportedTransferProtocols []string
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -145,6 +147,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		},
 	}
 	r.SimulateUnvailableBMC = false
+	r.SupportedTransferProtocols = []string{"HTTPS", "NFS", "CIFS", "TFTP"}
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {

@@ -138,6 +138,10 @@ type BMC interface {
 	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
 	// for the given component type.
 	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
+
+	// GetSupportedTransferProtocols retrieves the list of transfer protocols supported
+	// by the BMC's UpdateService for SimpleUpdate.
+	GetSupportedTransferProtocols(ctx context.Context) ([]string, error)
 }
 
 type Entity struct {

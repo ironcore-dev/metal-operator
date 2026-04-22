@@ -77,6 +77,16 @@ spec:
                       URI:
                         description: URI is the URI of the software image to install.
                         type: string
+                      fallbackTransferProtocol:
+                        description: |-
+                          FallbackTransferProtocol is the fallback network protocol used if the primary TransferProtocol
+                          is not supported by the BMC's UpdateService.
+                        type: string
+                      fallbackURI:
+                        description: |-
+                          FallbackURI is the fallback URI of the software image to install if the primary TransferProtocol
+                          is not supported by the BMC's UpdateService.
+                        type: string
                       secretRef:
                         description: SecretRef is a reference to the Secret containing
                           the credentials to access the image URI.
@@ -98,6 +108,14 @@ spec:
                     required:
                     - URI
                     type: object
+                    x-kubernetes-validations:
+                    - message: fallbackTransferProtocol requires a non-empty transferProtocol
+                      rule: '!has(self.fallbackTransferProtocol) || (has(self.transferProtocol)
+                        && size(self.transferProtocol) > 0)'
+                    - message: fallbackTransferProtocol and fallbackURI must both
+                        be set or both be unset
+                      rule: (has(self.fallbackTransferProtocol) && has(self.fallbackURI))
+                        || (!has(self.fallbackTransferProtocol) && !has(self.fallbackURI))
                   serverMaintenancePolicy:
                     description: ServerMaintenancePolicy is a maintenance policy to
                       be enforced on the server.

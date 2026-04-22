@@ -264,11 +264,22 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 			return ctrl.Result{}, nil
 		}
 
+		// Validate and issue upgrade FIRST (which validates protocol)
+		result, err := r.handleUpgradeInProgressState(ctx, bmcVersion, bmcClient, bmcObj)
+		if err != nil {
+			return result, err
+		}
+
+		// Only reset BMC if upgrade issuance succeeded and didn't requeue
+		if result.RequeueAfter > 0 {
+			return result, nil
+		}
+
 		if ok, err := r.resetBMC(ctx, bmcVersion, bmcObj, BMCConditionReset); !ok || err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to reset bmc %s: %w", client.ObjectKeyFromObject(bmcObj), err)
 		}
 
-		return r.handleUpgradeInProgressState(ctx, bmcVersion, bmcClient, bmcObj)
+		return result, nil
 	case metalv1alpha1.BMCVersionStateCompleted:
 		return ctrl.Result{}, r.removeServerMaintenanceRefAndResetConditions(ctx, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateFailed:
@@ -1027,12 +1038,50 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 		forceUpdate = true
 	}
 
+	supportedProtocols, err := bmcClient.GetSupportedTransferProtocols(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get supported transfer protocols: %w", err)
+	}
+
+	log.V(1).Info("Retrieved supported transfer protocols", "protocols", supportedProtocols, "bmcVersion", bmcVersion.Spec.Version)
+
+	resolvedProtocol, resolvedURI, err := resolveTransferProtocol(bmcVersion.Spec.Image, supportedProtocols)
+	if err != nil {
+		log.Error(err, "transfer protocol validation failed", "bmcVersion", bmcVersion.Name, "bmc", bmcObj.Name)
+
+		// Clean up ServerMaintenance objects and references
+		if cleanupErr := r.removeServerMaintenances(ctx, bmcVersion); cleanupErr != nil {
+			log.Error(cleanupErr, "failed to clean up serverMaintenance when protocol validation failed")
+		}
+
+		// Update condition and set to Failed state
+		condition := &metav1.Condition{
+			Type:    bmcVersionUpgradeIssued,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ProtocolValidationFailed",
+			Message: fmt.Sprintf("Transfer protocol validation failed: %v", err),
+		}
+		patchErr := r.patchBMCVersionStatusAndCondition(
+			ctx,
+			bmcVersion,
+			metalv1alpha1.BMCVersionStateFailed,
+			nil,
+			condition,
+		)
+		return errors.Join(err, patchErr)
+	}
+
+	if resolvedProtocol != bmcVersion.Spec.Image.TransferProtocol {
+		log.Info("Using fallback transfer protocol", "primary", bmcVersion.Spec.Image.TransferProtocol,
+			"fallback", resolvedProtocol, "supportedProtocols", supportedProtocols)
+	}
+
 	parameters := &schemas.UpdateServiceSimpleUpdateParameters{
 		ForceUpdate:      forceUpdate,
-		ImageURI:         bmcVersion.Spec.Image.URI,
+		ImageURI:         resolvedURI,
 		Password:         password,
 		Username:         username,
-		TransferProtocol: schemas.TransferProtocolType(bmcVersion.Spec.Image.TransferProtocol),
+		TransferProtocol: schemas.TransferProtocolType(resolvedProtocol),
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {

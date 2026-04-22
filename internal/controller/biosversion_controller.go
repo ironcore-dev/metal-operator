@@ -824,12 +824,44 @@ func (r *BIOSVersionReconciler) upgradeBIOSVersion(
 		forceUpdate = true
 	}
 
+	supportedProtocols, err := bmcClient.GetSupportedTransferProtocols(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get supported transfer protocols: %w", err)
+	}
+
+	log.V(1).Info("Retrieved supported transfer protocols", "protocols", supportedProtocols, "biosVersion", biosVersion.Spec.Version)
+
+	resolvedProtocol, resolvedURI, err := resolveTransferProtocol(biosVersion.Spec.Image, supportedProtocols)
+	if err != nil {
+		log.Error(err, "transfer protocol validation failed", "biosVersion", biosVersion.Name, "server", server.Name)
+
+		// Clean up ServerMaintenance references
+		if cleanupErr := r.cleanupServerMaintenanceReferences(ctx, biosVersion); cleanupErr != nil {
+			log.Error(cleanupErr, "failed to clean up serverMaintenance ref when protocol validation failed")
+		}
+
+		// Update condition and set to Failed state
+		condition := &metav1.Condition{
+			Type:    ConditionBIOSUpgradeIssued,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ProtocolValidationFailed",
+			Message: fmt.Sprintf("Transfer protocol validation failed: %v", err),
+		}
+		patchErr := r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateFailed, nil, condition)
+		return errors.Join(err, patchErr)
+	}
+
+	if resolvedProtocol != biosVersion.Spec.Image.TransferProtocol {
+		log.Info("Using fallback transfer protocol", "primary", biosVersion.Spec.Image.TransferProtocol,
+			"fallback", resolvedProtocol, "supportedProtocols", supportedProtocols)
+	}
+
 	parameters := &schemas.UpdateServiceSimpleUpdateParameters{
 		ForceUpdate:      forceUpdate,
-		ImageURI:         biosVersion.Spec.Image.URI,
+		ImageURI:         resolvedURI,
 		Password:         password,
 		Username:         username,
-		TransferProtocol: schemas.TransferProtocolType(biosVersion.Spec.Image.TransferProtocol),
+		TransferProtocol: schemas.TransferProtocolType(resolvedProtocol),
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {

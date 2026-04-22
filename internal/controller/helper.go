@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -428,4 +429,45 @@ func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFiel
 	}
 
 	return false
+}
+
+// resolveTransferProtocol determines the transfer protocol and URI to use for a firmware update
+// based on the BMC's supported transfer protocols. If the primary protocol is supported (or the
+// BMC reports no restrictions), it returns the primary protocol and URI. Otherwise, it falls back
+// to the fallback protocol and URI if configured and supported.
+func resolveTransferProtocol(image metalv1alpha1.ImageSpec, supportedProtocols []string) (string, string, error) {
+	// If the BMC reports no protocol restrictions, use the primary protocol as-is.
+	if len(supportedProtocols) == 0 {
+		return image.TransferProtocol, image.URI, nil
+	}
+
+	// If transferProtocol is empty, let BMC choose default (skip validation)
+	if image.TransferProtocol == "" {
+		return "", image.URI, nil
+	}
+
+	// Case-insensitive comparison for primary protocol
+	primaryUpper := strings.ToUpper(image.TransferProtocol)
+	for _, supported := range supportedProtocols {
+		if strings.ToUpper(supported) == primaryUpper {
+			return image.TransferProtocol, image.URI, nil
+		}
+	}
+
+	// Check fallback protocol if configured
+	if image.FallbackTransferProtocol != "" {
+		fallbackUpper := strings.ToUpper(image.FallbackTransferProtocol)
+		for _, supported := range supportedProtocols {
+			if strings.ToUpper(supported) == fallbackUpper {
+				return image.FallbackTransferProtocol, image.FallbackURI, nil
+			}
+		}
+		return "", "", fmt.Errorf(
+			"neither primary transfer protocol %q nor fallback %q is supported by BMC (supported: %v)",
+			image.TransferProtocol, image.FallbackTransferProtocol, supportedProtocols)
+	}
+
+	return "", "", fmt.Errorf(
+		"transfer protocol %q is not supported by BMC and no fallback configured (supported: %v)",
+		image.TransferProtocol, supportedProtocols)
 }

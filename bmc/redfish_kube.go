@@ -462,3 +462,8 @@ func (r *RedfishKubeBMC) createJob(
 func (r *RedfishKubeBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
 	return false, nil
 }
+
+// GetSupportedTransferProtocols returns the mock transfer protocols for testing.
+func (r *RedfishKubeBMC) GetSupportedTransferProtocols(_ context.Context) ([]string, error) {
+	return UnitTestMockUps.SupportedTransferProtocols, nil
+}

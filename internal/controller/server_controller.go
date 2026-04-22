@@ -108,6 +108,7 @@ type ServerReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermetadata,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverconfigurations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
@@ -218,6 +219,12 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 
 	// do late state initialization
 	if server.Status.State == "" {
+		// Check if ServerMetadata exists — if so, reconstruct status instead of going to Initial
+		if restored, err := r.restoreServerStatusFromMetadata(ctx, server); err != nil {
+			return ctrl.Result{}, err
+		} else if restored {
+			return ctrl.Result{}, nil
+		}
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
 			return ctrl.Result{}, err
 		}
@@ -414,6 +421,11 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 	}
 
 	log.V(1).Info("Extracted Server details")
+
+	if err := r.ensureServerMetadata(ctx, server, serverDetails); err != nil {
+		return false, fmt.Errorf("failed to create ServerMetadata: %w", err)
+	}
+	log.V(1).Info("Ensured ServerMetadata")
 
 	log.V(1).Info("Setting Server state to available")
 	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
@@ -972,6 +984,76 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	return true, nil
 }
 
+func (r *ServerReconciler) ensureServerMetadata(ctx context.Context, server *metalv1alpha1.Server, serverDetails *registry.Server) error {
+	log := ctrl.LoggerFrom(ctx)
+	meta := &metalv1alpha1.ServerMetadata{}
+	meta.Name = server.Name
+	registryToServerMetadata(serverDetails, meta)
+	if err := controllerutil.SetControllerReference(server, meta, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set owner reference on ServerMetadata: %w", err)
+	}
+
+	existing := &metalv1alpha1.ServerMetadata{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name}, existing); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get ServerMetadata: %w", err)
+		}
+		if err := r.Create(ctx, meta); err != nil {
+			return fmt.Errorf("failed to create ServerMetadata: %w", err)
+		}
+		log.V(1).Info("Created ServerMetadata")
+		return nil
+	}
+
+	// Update existing ServerMetadata
+	existingBase := existing.DeepCopy()
+	existing.SystemInfo = meta.SystemInfo
+	existing.CPU = meta.CPU
+	existing.NetworkInterfaces = meta.NetworkInterfaces
+	existing.LLDP = meta.LLDP
+	existing.Storage = meta.Storage
+	existing.Memory = meta.Memory
+	existing.NICs = meta.NICs
+	existing.PCIDevices = meta.PCIDevices
+	if err := r.Patch(ctx, existing, client.MergeFrom(existingBase)); err != nil {
+		return fmt.Errorf("failed to update ServerMetadata: %w", err)
+	}
+	log.V(1).Info("Updated ServerMetadata")
+	return nil
+}
+
+func (r *ServerReconciler) restoreServerStatusFromMetadata(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	meta := &metalv1alpha1.ServerMetadata{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name}, meta); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get ServerMetadata: %w", err)
+	}
+
+	log.V(1).Info("Found ServerMetadata, restoring Server status")
+
+	// Restore network interfaces from ServerMetadata
+	serverBase := server.DeepCopy()
+	server.Status.NetworkInterfaces = metaDataToNetworkInterfaces(log, meta)
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch server network interfaces from ServerMetadata: %w", err)
+	}
+
+	// Determine the restored state: Reserved if there is a claim binding, otherwise Available
+	state := metalv1alpha1.ServerStateAvailable
+	if server.Spec.ServerClaimRef != nil {
+		state = metalv1alpha1.ServerStateReserved
+	}
+	if _, err := r.patchServerState(ctx, server, state); err != nil {
+		return false, err
+	}
+
+	log.V(1).Info("Restored Server status from ServerMetadata", "State", state)
+	return true, nil
+}
+
 func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1alpha1.Server, state metalv1alpha1.ServerState) (bool, error) {
 	if server.Status.State == state {
 		return false, nil
@@ -1196,6 +1278,33 @@ func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, bmcClie
 	operation, ok := annotations[metalv1alpha1.OperationAnnotation]
 	if !ok {
 		return false, nil
+	}
+
+	// Handle rediscover operation: delete ServerMetadata and transition to Initial
+	if operation == metalv1alpha1.OperationAnnotationRediscover {
+		log.V(1).Info("Handling rediscover operation")
+		serverMetadata := &metalv1alpha1.ServerMetadata{}
+		if err := r.Get(ctx, types.NamespacedName{Name: server.Name}, serverMetadata); err == nil {
+			if err := r.Delete(ctx, serverMetadata); err != nil {
+				return false, fmt.Errorf("failed to delete ServerMetadata: %w", err)
+			}
+			log.V(1).Info("Deleted ServerMetadata for rediscovery")
+		} else if !apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("failed to get ServerMetadata: %w", err)
+		}
+
+		serverBase := server.DeepCopy()
+		delete(annotations, metalv1alpha1.OperationAnnotation)
+		server.SetAnnotations(annotations)
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return false, fmt.Errorf("failed to patch server annotations: %w", err)
+		}
+
+		if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil {
+			return false, err
+		}
+		log.V(1).Info("Rediscover operation completed, server set to Initial")
+		return true, nil
 	}
 
 	if value, ok := metalv1alpha1.AnnotationToRedfishMapping[operation]; !ok {

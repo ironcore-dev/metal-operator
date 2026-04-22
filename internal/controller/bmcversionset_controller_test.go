@@ -189,7 +189,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully reconcile the resource", func(ctx SpecContext) {

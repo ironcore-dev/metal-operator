@@ -7,6 +7,7 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**BMC**](/concepts/bmcs): Models Baseboard Management Controllers (BMCs), allowing interaction with server hardware.
 - [**BMCSecret**](/concepts/bmcsecrets): Securely stores credentials required to access BMCs.
 - [**Server**](/concepts/servers): Represents physical servers, managing their state, power, and configurations.
+- [**ServerMetadata**](/concepts/servermetadata): Persists server discovery data (network interfaces, CPUs, storage, etc.) to enable status restoration without rediscovery.
 - [**ServerClaim**](/concepts/serverclaims): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](/concepts/serverbootconfigurations): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](/concepts/servermaintenance): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.

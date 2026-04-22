@@ -47,7 +47,8 @@ A server undergoes the following phases:
     - The `ServerReconciler` interacts with the BMC to retrieve hardware details.
     - An initial boot is performed using a predefined ignition configuration.
     - An agent called [`metalprobe`](https://github.com/ironcore-dev/metal-operator/tree/main/cmd/metalprobe) runs on the server to collect additional data (e.g., network interfaces, disks).
-    - The collected data is reported back to the `metal-operator` and added to the `ServerStatus`.`
+    - The collected data is reported back to the `metal-operator` and added to the `ServerStatus`.
+    - A [`ServerMetadata`](servermetadata.md) resource is created to persist the discovery data.
 
 3. **Available**: The server has completed discovery and is ready for use.
 
@@ -137,3 +138,30 @@ spec:
     name: SSH
     port: 22
 ```
+
+## Status Restoration
+
+If a `Server` resource has its status reset or is recreated without status data, the `ServerReconciler` can
+restore the server's state from its [`ServerMetadata`](servermetadata.md) resource rather than requiring a
+full Discovery cycle.
+
+When a `Server` has an empty `Status.State`:
+
+1. The `ServerReconciler` looks up a `ServerMetadata` with the same name.
+2. If found, it restores network interface data and transitions the server to `Available` (or `Reserved` if
+   `Spec.ServerClaimRef` is set).
+3. The `ServerClaimReconciler` detects bidirectional binding between `ServerClaim` and `Server` and restores
+   the claim's phase to `Bound`.
+
+This allows servers and claims to resume normal operation without rediscovery.
+
+## Rediscover Annotation
+
+To force a full rediscovery of a server's hardware, apply the `rediscover` operation annotation:
+
+```yaml
+kubectl annotate server my-server metal.ironcore.dev/operation=rediscover
+```
+
+This deletes the associated [`ServerMetadata`](servermetadata.md), removes the annotation, and transitions
+the server back to the `Initial` state for a fresh Discovery cycle.

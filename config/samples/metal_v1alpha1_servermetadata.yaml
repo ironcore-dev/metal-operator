@@ -1,0 +1,28 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerMetadata
+metadata:
+  labels:
+    app.kubernetes.io/name: servermetadata
+    app.kubernetes.io/instance: servermetadata-sample
+    app.kubernetes.io/part-of: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: metal-operator
+  name: endpoint-sample-system-0
+systemInfo:
+  biosInformation:
+    vendor: "AMI"
+    version: "1.0.0"
+    date: "01/01/2024"
+  systemInformation:
+    manufacturer: "Contoso"
+    productName: "3500"
+    serialNumber: "437XR1138R2"
+  boardInformation:
+    manufacturer: "Contoso"
+    product: "Board-3500"
+networkInterfaces:
+  - name: eth0
+    macAddress: "aa:bb:cc:dd:ee:ff"
+    ipAddresses:
+      - "192.168.1.100"
+    carrierStatus: "up"

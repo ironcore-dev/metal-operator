@@ -111,7 +111,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -129,7 +129,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied local test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -147,7 +147,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied kube test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -162,8 +162,17 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+func (r *EndpointReconciler) applyBMC(ctx context.Context, bmcClient bmc.BMC, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
 	log := ctrl.LoggerFrom(ctx)
+	var bmcUUID string
+	manager, err := bmcClient.DiscoverManager(ctx)
+	if err != nil {
+		log.V(1).Info("Could not determine manager UUID, proceeding without it", "error", err)
+	} else {
+		bmcUUID = manager.UUID
+		log.V(1).Info("Got manager from BMC client", "ManagerUUID", bmcUUID)
+	}
+
 	bmcObj := &metalv1alpha1.BMC{}
 	bmcObj.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, func() error {
@@ -179,6 +188,7 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alph
 			Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),
 			Port: m.Console.Port,
 		}
+		spec.BMCUUID = bmcUUID
 		return controllerutil.SetControllerReference(endpoint, bmcObj, r.Client.Scheme())
 	})
 	if err != nil {

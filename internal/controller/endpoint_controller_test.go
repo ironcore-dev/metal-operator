@@ -55,13 +55,13 @@ var _ = Describe("Endpoints Controller", func() {
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
 			}))))
 
-		By("Ensuring that the BMC object has been created")
-		bmc := &metalv1alpha1.BMC{
+		By("Ensuring that the BMC object has been created with BMCUUID set")
+		bmcObj := &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: endpoint.Name,
 			},
 		}
-		Eventually(Object(bmc)).Should(SatisfyAll(
+		Eventually(Object(bmcObj)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 				APIVersion:         "metal.ironcore.dev/v1alpha1",
 				Kind:               "Endpoint",
@@ -71,7 +71,7 @@ var _ = Describe("Endpoints Controller", func() {
 				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Spec.EndpointRef.Name", Equal(endpoint.Name)),
-			HaveField("Spec.BMCSecretRef.Name", Equal(bmc.Name)),
+			HaveField("Spec.BMCSecretRef.Name", Equal(bmcObj.Name)),
 			HaveField("Spec.Protocol", metalv1alpha1.Protocol{
 				Name: metalv1alpha1.ProtocolRedfishLocal,
 				Port: MockServerPort,
@@ -79,12 +79,14 @@ var _ = Describe("Endpoints Controller", func() {
 			HaveField("Spec.ConsoleProtocol", &metalv1alpha1.ConsoleProtocol{
 				Name: metalv1alpha1.ConsoleProtocolNameSSH,
 				Port: 22,
-			})))
+			}),
+			HaveField("Spec.BMCUUID", Not(BeEmpty())),
+		))
 
 		By("Ensuring that the server object has been created")
 		server := &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmcObj),
 			},
 		}
 		Eventually(Get(server)).Should(Succeed())
@@ -94,7 +96,7 @@ var _ = Describe("Endpoints Controller", func() {
 
 		By("Ensuring that all subsequent objects have been removed")
 		Eventually(Get(endpoint)).Should(Satisfy(apierrors.IsNotFound))
-		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc))).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcObj))).To(Succeed())
 		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
 		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
 	})

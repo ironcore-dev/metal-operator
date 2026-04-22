@@ -43,7 +43,7 @@ type BMCUserSpec struct {
 
 	// ExpiresAt specifies an absolute timestamp when this user should be deleted.
 	// This is useful for users that need to expire at a specific time.
-	// If not set along with TTL, the user is permanent.
+	// If neither ExpiresAt nor TTL is set, the user is permanent (no automatic deletion).
 	// Mutually exclusive with TTL - only one should be set.
 	// +optional
 	ExpiresAt *metav1.Time `json:"expiresAt,omitempty"`
@@ -73,6 +73,8 @@ type BMCUserStatus struct {
 	// Conditions represents the latest available observations of the BMCUser's current state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
+	// +listType=map
+	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }

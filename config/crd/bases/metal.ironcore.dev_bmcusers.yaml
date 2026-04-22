@@ -102,7 +102,7 @@ spec:
                 description: |-
                   ExpiresAt specifies an absolute timestamp when this user should be deleted.
                   This is useful for users that need to expire at a specific time.
-                  If not set along with TTL, the user is permanent.
+                  If neither ExpiresAt nor TTL is set, the user is permanent (no automatic deletion).
                   Mutually exclusive with TTL - only one should be set.
                 format: date-time
                 type: string
@@ -194,6 +194,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               effectiveBMCSecretRef:
                 description: |-
                   EffectiveBMCSecretRef references the BMCSecret currently used for this user.

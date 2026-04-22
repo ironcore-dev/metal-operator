@@ -36,7 +36,8 @@ spec:
   description: "User for maintenance window"
 
   # Absolute expiration at specific time (end of maintenance window)
-  expiresAt: "2026-04-11T02:00:00Z"
+  # Replace with future date before applying
+  expiresAt: "2099-04-11T02:00:00Z"
 
   bmcRef:
     name: bmc-sample

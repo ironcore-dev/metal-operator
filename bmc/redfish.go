@@ -215,6 +215,9 @@ func (r *RedfishBaseBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	}
 	servers := make([]Server, 0, len(systems))
 	for _, s := range systems {
+		if s.Boot.BootSourceOverrideTarget == "" {
+			continue
+		}
 		servers = append(servers, Server{
 			UUID:         s.UUID,
 			URI:          s.ODataID,
@@ -274,6 +277,28 @@ func (r *RedfishBaseBMC) GetManager(bmcUUID string) (*schemas.Manager, error) {
 		}
 	}
 	return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
+}
+
+// DiscoverManager queries the BMC for available managers and returns the first
+// one that exposes graphical console capabilities (non-zero MaxConcurrentSessions
+// or non-empty ConnectTypesSupported).
+func (r *RedfishBaseBMC) DiscoverManager(_ context.Context) (*schemas.Manager, error) {
+	if r.client == nil {
+		return nil, fmt.Errorf("no client found")
+	}
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range managers {
+		if m.GraphicalConsole.MaxConcurrentSessions != 0 {
+			return m, nil
+		}
+		if len(m.GraphicalConsole.ConnectTypesSupported) != 0 {
+			return m, nil
+		}
+	}
+	return nil, fmt.Errorf("no manager found with graphical console capabilities")
 }
 
 func (r *RedfishBaseBMC) ResetManager(ctx context.Context, bmcUUID string, resetType schemas.ResetType) error {

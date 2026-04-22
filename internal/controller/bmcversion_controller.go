@@ -38,6 +38,11 @@ var legacyBMCVersionConditionTypes = map[string]string{
 	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
 }
 
+// legacyBMCVersionConditionReasons maps old condition reason strings to their new values.
+var legacyBMCVersionConditionReasons = map[string]string{
+	"BMCResetIssued": ReasonResetIssued,
+}
+
 // BMCVersionReconciler reconciles a BMCVersion object
 type BMCVersionReconciler struct {
 	client.Client
@@ -71,8 +76,12 @@ func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log := ctrl.LoggerFrom(ctx)
 	// TODO: Remove this migration in the next release once all CRs have been reconciled.
 	bmcVersionBase := bmcVersion.DeepCopy()
-	if migrateConditionTypes(bmcVersion.Status.Conditions, legacyBMCVersionConditionTypes) {
-		log.Info("Migrated legacy condition types on BMCVersion")
+	migrated := migrateConditionTypes(bmcVersion.Status.Conditions, legacyBMCVersionConditionTypes)
+	if migrateConditionReasons(bmcVersion.Status.Conditions, legacyBMCVersionConditionReasons) {
+		migrated = true
+	}
+	if migrated {
+		log.Info("Migrated legacy conditions on BMCVersion")
 		if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
 		}

@@ -42,6 +42,12 @@ const (
 	bmcAutoResetMessage = "BMC reset initiated automatically after repeated connection failures. Waiting for it to come back online."
 )
 
+// legacyBMCConditionReasons maps old condition reason strings to their new values.
+// TODO: Remove this migration in the next release once all CRs have been reconciled.
+var legacyBMCConditionReasons = map[string]string{
+	"BMCConnected": ReasonConnected,
+}
+
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
@@ -74,6 +80,15 @@ func (r *BMCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	bmcObj := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, req.NamespacedName, bmcObj); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	// TODO: Remove this migration in the next release once all CRs have been reconciled.
+	bmcBase := bmcObj.DeepCopy()
+	if migrateConditionReasons(bmcObj.Status.Conditions, legacyBMCConditionReasons) {
+		log := ctrl.LoggerFrom(ctx)
+		log.Info("Migrated legacy condition reasons on BMC")
+		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
+		}
 	}
 
 	return r.reconcileExists(ctx, bmcObj)

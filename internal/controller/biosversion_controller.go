@@ -51,6 +51,11 @@ var legacyBIOSVersionConditionTypes = map[string]string{
 	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
 }
 
+// legacyBIOSVersionConditionReasons maps old condition reason strings to their new values.
+var legacyBIOSVersionConditionReasons = map[string]string{
+	"BMCResetIssued": ReasonResetIssued,
+}
+
 type BIOSVersionReconciler struct {
 	client.Client
 	ManagerNamespace            string
@@ -80,8 +85,12 @@ func (r *BIOSVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	// TODO: Remove this migration in the next release once all CRs have been reconciled.
 	biosVersionBase := biosVersion.DeepCopy()
-	if migrateConditionTypes(biosVersion.Status.Conditions, legacyBIOSVersionConditionTypes) {
-		log.Info("Migrated legacy condition types on BIOSVersion")
+	migrated := migrateConditionTypes(biosVersion.Status.Conditions, legacyBIOSVersionConditionTypes)
+	if migrateConditionReasons(biosVersion.Status.Conditions, legacyBIOSVersionConditionReasons) {
+		migrated = true
+	}
+	if migrated {
+		log.Info("Migrated legacy conditions on BIOSVersion")
 		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
 		}

@@ -78,6 +78,11 @@ var legacyBIOSSettingsConditionTypes = map[string]string{
 	"SettingsProvidedNotValid":             ConditionSettingsValidationFailed,
 }
 
+// legacyBIOSSettingsConditionReasons maps old condition reason strings to their new values.
+var legacyBIOSSettingsConditionReasons = map[string]string{
+	"BMCResetIssued": ReasonResetIssued,
+}
+
 // BIOSSettingsReconciler reconciles a BIOSSettings object
 type BIOSSettingsReconciler struct {
 	client.Client
@@ -120,8 +125,14 @@ func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *BIOSSettingsReconciler) migrateLegacyConditions(ctx context.Context, settings *metalv1alpha1.BIOSSettings) error {
 	settingsBase := settings.DeepCopy()
 	migrated := migrateConditionTypes(settings.Status.Conditions, legacyBIOSSettingsConditionTypes)
+	if migrateConditionReasons(settings.Status.Conditions, legacyBIOSSettingsConditionReasons) {
+		migrated = true
+	}
 	for i := range settings.Status.FlowState {
 		if migrateConditionTypes(settings.Status.FlowState[i].Conditions, legacyBIOSSettingsConditionTypes) {
+			migrated = true
+		}
+		if migrateConditionReasons(settings.Status.FlowState[i].Conditions, legacyBIOSSettingsConditionReasons) {
 			migrated = true
 		}
 	}

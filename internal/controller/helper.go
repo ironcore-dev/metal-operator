@@ -102,6 +102,20 @@ func migrateConditionTypes(conditions []metav1.Condition, migrations map[string]
 	return migrated
 }
 
+// migrateConditionReasons renames legacy condition reason strings in-place.
+// Returns true if any reasons were migrated.
+// TODO: Remove this function in the next release once all CRs have been reconciled.
+func migrateConditionReasons(conditions []metav1.Condition, migrations map[string]string) bool {
+	migrated := false
+	for i := range conditions {
+		if newReason, ok := migrations[conditions[i].Reason]; ok {
+			conditions[i].Reason = newReason
+			migrated = true
+		}
+	}
+	return migrated
+}
+
 // GetServerByName returns a Server object by its name or an error in case the object can not be found.
 func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}

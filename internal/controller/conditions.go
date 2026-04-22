@@ -64,7 +64,7 @@ const (
 	// ReasonAutoReset indicates an automatic reset.
 	ReasonAutoReset = "AutoResetting"
 	// ReasonConnected indicates a successful connection.
-	ReasonConnected = "BMCConnected"
+	ReasonConnected = "Connected"
 	// ReasonMaintenanceCreated indicates a ServerMaintenance resource has been created.
 	ReasonMaintenanceCreated = "ServerMaintenanceHasBeenCreated"
 	// ReasonMaintenanceDeleted indicates a ServerMaintenance resource has been deleted.

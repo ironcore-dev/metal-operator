@@ -65,6 +65,11 @@ var legacyBMCSettingsConditionTypes = map[string]string{
 	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
 }
 
+// legacyBMCSettingsConditionReasons maps old condition reason strings to their new values.
+var legacyBMCSettingsConditionReasons = map[string]string{
+	"BMCResetIssued": ReasonResetIssued,
+}
+
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings/finalizers,verbs=update
@@ -83,8 +88,12 @@ func (r *BMCSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	log := ctrl.LoggerFrom(ctx)
 	// TODO: Remove this migration in the next release once all CRs have been reconciled.
 	settingsBase := settings.DeepCopy()
-	if migrateConditionTypes(settings.Status.Conditions, legacyBMCSettingsConditionTypes) {
-		log.Info("Migrated legacy condition types on BMCSettings")
+	migrated := migrateConditionTypes(settings.Status.Conditions, legacyBMCSettingsConditionTypes)
+	if migrateConditionReasons(settings.Status.Conditions, legacyBMCSettingsConditionReasons) {
+		migrated = true
+	}
+	if migrated {
+		log.Info("Migrated legacy conditions on BMCSettings")
 		if err := r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
 		}

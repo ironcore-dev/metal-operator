@@ -9,6 +9,7 @@ bin/*
 dev/*
 Dockerfile.cross
 .DS_Store
+.claude
 
 # Test binary, built with `go test -c`
 *.test

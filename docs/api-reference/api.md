@@ -727,6 +727,8 @@ _Appears in:_
 | `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />If not set, the password will not be rotated. |  |  |
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef references the BMCSecret containing the credentials for this user.<br />If not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef references the BMC this user should be created on. |  |  |
+| `ttl` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | TTL specifies the time-to-live duration for this user.<br />When set, the user will be automatically deleted after this duration from creation.<br />This is useful for temporary debugging users.<br />If not set, the user is permanent (no automatic deletion).<br />Mutually exclusive with ExpiresAt - only one should be set. |  | Pattern: `^([0-9]+(\.[0-9]+)?(ns\|us\|µs\|ms\|s\|m\|h))+$` <br />Type: string <br /> |
+| `expiresAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | ExpiresAt specifies an absolute timestamp when this user should be deleted.<br />This is useful for users that need to expire at a specific time.<br />If not set along with TTL, the user is permanent.<br />Mutually exclusive with TTL - only one should be set. |  |  |
 
 
 #### BMCUserStatus
@@ -746,6 +748,8 @@ _Appears in:_
 | `lastRotation` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastRotation is the timestamp of the last password rotation. |  |  |
 | `passwordExpiration` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | PasswordExpiration is the timestamp when the password will expire. |  |  |
 | `id` _string_ | ID is the identifier of the user in the BMC system. |  |  |
+| `expiresAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | ExpiresAt is the calculated absolute time when this user will be deleted.<br />Set by the controller based on TTL or spec.ExpiresAt.<br />Only set for temporary users (when spec.TTL or spec.ExpiresAt is set). |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMCUser's current state. |  |  |
 
 
 #### BMCVersion

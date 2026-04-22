@@ -1,0 +1,61 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCUser
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bmcuser-debug-temporary
+spec:
+  # Temporary debugging user with 8-hour TTL
+  userName: debug-admin
+  roleID: "Administrator"
+  description: "Temporary administrator for debugging"
+
+  # TTL: User will be automatically deleted 8 hours after creation
+  ttl: 8h0m0s
+
+  # Optional: Password rotation during user lifetime
+  rotationPeriod: 2h0m0s
+
+  # BMC reference
+  bmcRef:
+    name: bmc-sample
+
+  # Note: BMCSecretRef is optional - operator will generate secure password
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCUser
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bmcuser-maintenance-window
+spec:
+  userName: maintenance-user
+  roleID: "Operator"
+  description: "User for maintenance window"
+
+  # Absolute expiration at specific time (end of maintenance window)
+  # Replace with future date before applying
+  expiresAt: "2099-04-11T02:00:00Z"
+
+  bmcRef:
+    name: bmc-sample
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMCUser
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bmcuser-vendor-access
+spec:
+  userName: vendor-tech
+  roleID: "ReadOnly"
+  description: "Temporary vendor support access"
+
+  # Give vendor access for 24 hours
+  ttl: 24h
+
+  bmcRef:
+    name: bmc-sample

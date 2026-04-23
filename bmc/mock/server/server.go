@@ -371,7 +371,14 @@ func (s *MockServer) handleSimpleUpdate(w http.ResponseWriter, _ *http.Request, 
 		ImageURI string   `json:"ImageURI"`
 		Targets  []string `json:"Targets"`
 	}
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "malformed SimpleUpdate JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.ImageURI == "" {
+		http.Error(w, "ImageURI is required", http.StatusBadRequest)
+		return
+	}
 
 	stepsPath := upgradeStepsFilePath
 	if strings.Contains(req.ImageURI, "fail") {

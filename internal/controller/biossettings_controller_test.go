@@ -76,11 +76,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		mockServers[0].ResetBIOSSettings(path.Base(server.Spec.SystemURI))
-
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		EnsureCleanState()
+		mockServers[0].ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 	})
 
 	It("should successfully patch its reference to referred server", func(ctx SpecContext) {

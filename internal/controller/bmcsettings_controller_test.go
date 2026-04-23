@@ -84,8 +84,6 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		mockServers[0].ResetBMCSettings("BMC")
-
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
@@ -93,6 +91,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
+		mockServers[0].ResetBMCSettings("BMC")
 	})
 
 	It("should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {

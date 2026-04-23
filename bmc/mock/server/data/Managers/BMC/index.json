@@ -4,6 +4,7 @@
     "Name": "Manager",
     "ManagerType": "BMC",
     "Description": "Contoso BMC",
+    "Manufacturer": "Contoso",
     "ServiceEntryPointUUID": "92384634-2938-2342-8820-489239905423",
     "UUID": "58893887-8974-2487-2389-841168418919",
     "Model": "Joo Janta 200",
@@ -85,6 +86,11 @@
             "@odata.id": "/redfish/v1/Chassis/1U"
         }
     },
+    "Attributes": {
+        "abc": "bar",
+        "fooreboot": 123,
+        "composite": "foo-123"
+    },
     "Actions": {
         "#Manager.Reset": {
             "target": "/redfish/v1/Managers/BMC/Actions/Manager.Reset",
@@ -92,6 +98,11 @@
                 "ForceRestart",
                 "GracefulRestart"
             ]
+        }
+    },
+    "@Redfish.Settings": {
+        "SettingsObject": {
+            "@odata.id": "/redfish/v1/Managers/BMC/Settings"
         }
     },
     "@odata.id": "/redfish/v1/Managers/BMC",

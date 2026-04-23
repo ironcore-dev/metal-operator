@@ -5,10 +5,12 @@ SPDX-PackageDownloadLocation = "https://github.com/ironcore-dev/metal-operator"
 
 [[annotations]]
 path = [
+    ".devcontainer/**",
     ".github/**",
     ".gitignore",
     ".dockerignore",
     ".golangci.yml",
+    ".custom-gcl.yml",
     "CODEOWNERS",
     "Dockerfile",
     "Makefile",
@@ -34,7 +36,8 @@ SPDX-License-Identifier = "Apache-2.0"
 path = [
     "docs/**",
     "README.md",
-    "AGENTS.md"
+    "AGENTS.md",
+    "CLAUDE.md"
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2024 SAP SE or an SAP affiliate company and IronCore contributors"
@@ -45,3 +48,17 @@ path = "bmc/mock/server/data/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Copyright (c) 2016-2024, Contributing Member(s) of Distributed Management Task Force, Inc.. All rights reserved."
 SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third_party/expansion/expand.go"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2014 The Kubernetes Authors"
+SPDX-License-Identifier = "Apache-2.0"
+Comment = "Forked from https://github.com/kubernetes/kubernetes/blob/master/third_party/forked/golang/expansion/expand.go"
+
+[[annotations]]
+path = "third_party/expansion/expand_test.go"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2014 The Kubernetes Authors"
+SPDX-License-Identifier = "Apache-2.0"
+Comment = "Forked from https://github.com/kubernetes/kubernetes/blob/master/third_party/forked/golang/expansion/expand_test.go"

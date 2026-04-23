@@ -13,6 +13,10 @@ the lifecycle of a maintenance task, ensuring servers are properly taken offline
 - `policy` determines how maintenance starts:
     - **OwnerApproval:** Requires a label (e.g., `ok-to-maintenance: "true"`) on the `ServerClaim`.
     - **Enforced:** Does not require owner approval.
+- `priority` determines which pending maintenance starts first for the same server:
+    - Higher value wins.
+    - On equal value, older `ServerMaintenance` wins.
+    - If omitted, `priority` is treated as `0`.
 
 ## Workflow
 
@@ -44,6 +48,7 @@ metadata:
   annotations:
     metal.ironcore.dev/reason: "BIOS update"
 spec:
+  priority: 100
   policy: OwnerApproval
   serverRef:
     name: server-foo

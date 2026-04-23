@@ -4,29 +4,58 @@
 package bmc
 
 import (
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 // RedfishMockUps is an implementation of the BMC interface for Redfish.
 type RedfishMockUps struct {
-	BIOSSettingAttr       map[string]map[string]any
-	PendingBIOSSetting    map[string]map[string]any
-	BIOSVersion           string
-	BIOSUpgradingVersion  string
-	BIOSUpgradeTaskIndex  int
-	BIOSUpgradeTaskStatus []redfish.Task
+	BIOSSettingAttr             map[string]map[string]any
+	PendingBIOSSetting          map[string]map[string]any
+	BIOSVersion                 string
+	BIOSUpgradingVersion        string
+	BIOSUpgradeTaskIndex        int
+	BIOSUpgradeTaskStatus       []schemas.Task
+	BIOSUpgradeTaskFailedStatus []schemas.Task
 
 	BMCSettingAttr    map[string]map[string]any
 	PendingBMCSetting map[string]map[string]any
 
-	BMCVersion           string
-	BMCUpgradingVersion  string
-	BMCUpgradeTaskIndex  int
-	BMCUpgradeTaskStatus []redfish.Task
+	BMCVersion                 string
+	BMCUpgradingVersion        string
+	BMCUpgradeTaskIndex        int
+	BMCUpgradeTaskStatus       []schemas.Task
+	BMCUpgradeTaskFailedStatus []schemas.Task
 
-	Accounts              map[string]*redfish.ManagerAccount
+	Accounts              map[string]*schemas.ManagerAccount
 	SimulateUnvailableBMC bool
+}
+
+// defaultUpgradeFailedTaskStatus returns a canonical failed upgrade task
+// sequence ending in ExceptionTaskState at 99 % completion.
+func defaultUpgradeFailedTaskStatus() []schemas.Task {
+	return []schemas.Task{
+		{TaskState: schemas.NewTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.PendingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.StartingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(10))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(20))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(98))},
+		{TaskState: schemas.ExceptionTaskState, PercentComplete: gofish.ToRef(uint(99))},
+	}
+}
+
+// defaultUpgradeTaskStatus returns a canonical upgrade task sequence ending in CompletedTaskState at 100 % completion.
+func defaultUpgradeTaskStatus() []schemas.Task {
+	return []schemas.Task{
+		{TaskState: schemas.NewTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.PendingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.StartingTaskState, PercentComplete: gofish.ToRef(uint(0))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(10))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(20))},
+		{TaskState: schemas.RunningTaskState, PercentComplete: gofish.ToRef(uint(100))},
+		{TaskState: schemas.CompletedTaskState, PercentComplete: gofish.ToRef(uint(100))},
+	}
 }
 
 func (r *RedfishMockUps) InitializeDefaults() {
@@ -35,44 +64,16 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		"fooreboot": {"type": "integer", "reboot": true, "value": 123},
 	}
 	r.BMCSettingAttr = map[string]map[string]any{
-		"abc":       {"type": redfish.StringAttributeType, "reboot": false, "value": "bar"},
-		"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
+		"abc":       {"type": schemas.StringAttributeType, "reboot": false, "value": "bar"},
+		"fooreboot": {"type": schemas.IntegerAttributeType, "reboot": true, "value": 123},
 	}
 	r.PendingBIOSSetting = map[string]map[string]any{}
 	r.BIOSVersion = ""
 	r.BIOSUpgradingVersion = ""
 
 	r.BIOSUpgradeTaskIndex = 0
-	r.BIOSUpgradeTaskStatus = []redfish.Task{
-		{
-			TaskState:       redfish.NewTaskState,
-			PercentComplete: 0,
-		},
-		{
-			TaskState:       redfish.PendingTaskState,
-			PercentComplete: 0,
-		},
-		{
-			TaskState:       redfish.StartingTaskState,
-			PercentComplete: 0,
-		},
-		{
-			TaskState:       redfish.RunningTaskState,
-			PercentComplete: 10,
-		},
-		{
-			TaskState:       redfish.RunningTaskState,
-			PercentComplete: 20,
-		},
-		{
-			TaskState:       redfish.RunningTaskState,
-			PercentComplete: 100,
-		},
-		{
-			TaskState:       redfish.CompletedTaskState,
-			PercentComplete: 100,
-		},
-	}
+	r.BIOSUpgradeTaskStatus = defaultUpgradeTaskStatus()
+	r.BIOSUpgradeTaskFailedStatus = defaultUpgradeFailedTaskStatus()
 
 	r.PendingBMCSetting = map[string]map[string]any{}
 
@@ -80,40 +81,13 @@ func (r *RedfishMockUps) InitializeDefaults() {
 	r.BMCUpgradingVersion = ""
 
 	r.BMCUpgradeTaskIndex = 0
-	r.BMCUpgradeTaskStatus = []redfish.Task{
-		{
-			TaskState:       redfish.NewTaskState,
-			PercentComplete: 0,
-		},
-		{
-			TaskState:       redfish.PendingTaskState,
-			PercentComplete: 0,
-		},
-		{
-			TaskState:       redfish.StartingTaskState,
-			PercentComplete: 0,
-		},
-		{
-			TaskState:       redfish.RunningTaskState,
-			PercentComplete: 10,
-		},
-		{
-			TaskState:       redfish.RunningTaskState,
-			PercentComplete: 20,
-		},
-		{
-			TaskState:       redfish.RunningTaskState,
-			PercentComplete: 100,
-		},
-		{
-			TaskState:       redfish.CompletedTaskState,
-			PercentComplete: 100,
-		},
-	}
+	r.BMCUpgradeTaskStatus = defaultUpgradeTaskStatus()
 
-	r.Accounts = map[string]*redfish.ManagerAccount{
+	r.BMCUpgradeTaskFailedStatus = defaultUpgradeFailedTaskStatus()
+
+	r.Accounts = map[string]*schemas.ManagerAccount{
 		"foo": {
-			Entity: common.Entity{
+			Entity: schemas.Entity{
 				ID: "0",
 			},
 			UserName: "foo",
@@ -123,7 +97,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 			Password: "bar",
 		},
 		"admin": {
-			Entity: common.Entity{
+			Entity: schemas.Entity{
 				ID: "1",
 			},
 
@@ -134,7 +108,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 			Password: "adminpass",
 		},
 		"user": {
-			Entity: common.Entity{
+			Entity: schemas.Entity{
 				ID: "2",
 			},
 			UserName: "user",
@@ -172,8 +146,8 @@ func (r *RedfishMockUps) ResetPendingBMCSetting() {
 
 func (r *RedfishMockUps) ResetBMCSettings() {
 	r.BMCSettingAttr = map[string]map[string]any{
-		"abc":       {"type": redfish.StringAttributeType, "reboot": false, "value": "bar"},
-		"fooreboot": {"type": redfish.IntegerAttributeType, "reboot": true, "value": 123},
+		"abc":       {"type": schemas.StringAttributeType, "reboot": false, "value": "bar"},
+		"fooreboot": {"type": schemas.IntegerAttributeType, "reboot": true, "value": 123},
 	}
 	r.PendingBMCSetting = map[string]map[string]any{}
 }

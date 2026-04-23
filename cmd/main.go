@@ -8,13 +8,15 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
-	webhookmetalv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/serverevents"
+	webhookv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -28,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -38,6 +41,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
+	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
@@ -68,16 +72,24 @@ func main() { // nolint: gocyclo
 		enableHTTP2                        bool
 		macPrefixesFile                    string
 		insecure                           bool
+		protocol                           string
+		skipCertValidation                 bool
 		managerNamespace                   string
 		probeImage                         string
 		probeOSImage                       string
 		registryPort                       int
 		registryProtocol                   string
 		registryURL                        string
+		eventPort                          int
+		eventURL                           string
+		eventProtocol                      string
+		registryClientTimeout              time.Duration
+		registryDataMaxAge                 time.Duration
 		registryResyncInterval             time.Duration
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
+		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
 		powerPollingInterval               time.Duration
@@ -92,6 +104,7 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
+		defaultFailedAutoRetryCount        int
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -107,6 +120,10 @@ func main() { // nolint: gocyclo
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
 	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
 		"Defines the interval at which the registry is polled for new server information.")
+	flag.DurationVar(&registryClientTimeout, "registry-client-timeout", 5*time.Second,
+		"Timeout for HTTP requests to the registry.")
+	flag.DurationVar(&registryDataMaxAge, "registry-data-max-age", 2*time.Minute,
+		"Maximum age of registry data to accept for discovery completion.")
 	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 2*time.Minute,
 		"Defines the interval at which the server is polled.")
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
@@ -117,13 +134,23 @@ func main() { // nolint: gocyclo
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
+	flag.StringVar(&discoveryIgnitionPath, "discovery-ignition-path", "/etc/metal-operator/ignition-template.yaml",
+		"Path to the ignition template file.")
 	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
 	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
 	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
+	flag.StringVar(&eventURL, "event-url", "", "The URL of the server events endpoint for alerts and metrics.")
+	flag.IntVar(&eventPort, "event-port", 10001, "The port to use for the server events endpoint for alerts and metrics.")
+	flag.StringVar(&eventProtocol, "event-protocol", "http",
+		"The protocol to use for the server events endpoint for alerts and metrics.")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
-	flag.BoolVar(&insecure, "insecure", true, "If true, use http instead of https for connecting to a BMC.")
+	flag.BoolVar(&insecure, "insecure", true, "Deprecated: Use --protocol and --skip-cert-validation instead")
+	flag.StringVar(&protocol, "protocol", "",
+		"Protocol to use for BMC connections: 'http' or 'https'. "+
+			"If not set, defaults based on --insecure flag for compatibility")
+	flag.BoolVar(&skipCertValidation, "skip-cert-validation", false, "Skip TLS certificate validation when using HTTPS")
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -150,6 +177,8 @@ func main() { // nolint: gocyclo
 		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
+	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
+		"The default number of auto retries for a CRD when it fails. 0 for no retries.")
 
 	opts := zap.Options{
 		Development: true,
@@ -158,6 +187,41 @@ func main() { // nolint: gocyclo
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Handle protocol and TLS certificate validation flags with backward compatibility
+	var effectiveProtocol metalv1alpha1.ProtocolScheme
+	var effectiveSkipCert bool
+
+	if protocol != "" {
+		// New flag takes precedence
+		switch protocol {
+		case "http":
+			effectiveProtocol = metalv1alpha1.HTTPProtocolScheme
+		case "https":
+			effectiveProtocol = metalv1alpha1.HTTPSProtocolScheme
+		default:
+			setupLog.Error(nil, "Invalid protocol value. Must be 'http' or 'https'", "protocol", protocol)
+			os.Exit(1)
+		}
+		effectiveSkipCert = skipCertValidation
+	} else {
+		// Backward compatibility: use insecure flag
+		if insecure {
+			effectiveProtocol = metalv1alpha1.HTTPProtocolScheme
+			effectiveSkipCert = true // HTTP doesn't use TLS anyway
+			setupLog.Info("Using deprecated --insecure flag. Please migrate to --protocol=http")
+		} else {
+			effectiveProtocol = metalv1alpha1.HTTPSProtocolScheme
+			// Legacy behavior: insecure=false still skipped cert validation
+			effectiveSkipCert = true
+			setupLog.Info("Using deprecated --insecure=false flag. " +
+				"Please migrate to --protocol=https --skip-cert-validation=false for secure connections")
+		}
+	}
+
+	if effectiveSkipCert && effectiveProtocol == metalv1alpha1.HTTPSProtocolScheme {
+		setupLog.Info("WARNING: TLS certificate verification is disabled. This is not recommended for production")
+	}
 
 	if probeOSImage == "" {
 		setupLog.Error(nil, "probe OS image must be set")
@@ -205,6 +269,22 @@ func main() { // nolint: gocyclo
 		registryURL = fmt.Sprintf("%s://%s:%d", registryProtocol, registryAddr, registryPort)
 	}
 
+	if defaultFailedAutoRetryCount < 0 || defaultFailedAutoRetryCount > math.MaxInt32 {
+		setupLog.Error(nil, "--default-failed-auto-retry-count can not be negative value or greater than int32 max value")
+		os.Exit(1)
+	}
+
+	// set the correct event URL by getting the address from the environment
+	var eventAddr string
+	if eventURL == "" {
+		eventAddr = os.Getenv("EVENT_ADDRESS")
+		if eventAddr == "" {
+			setupLog.Error(nil, "failed to set the event URL as no address is provided")
+		} else {
+			eventURL = fmt.Sprintf("%s://%s:%d", eventProtocol, eventAddr, eventPort)
+		}
+	}
+
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancelation and
@@ -212,7 +292,7 @@ func main() { // nolint: gocyclo
 	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling http/2")
+		setupLog.Info("Disabling HTTP/2")
 		c.NextProtos = []string{"http/1.1"}
 	}
 
@@ -317,64 +397,70 @@ func main() { // nolint: gocyclo
 		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "Failed to start manager")
 		os.Exit(1)
 	}
 
+	// Register custom Prometheus metrics collector for server states
+	serverCollector := metalmetrics.NewServerStateCollector(mgr.GetClient())
+	ctrlmetrics.Registry.MustRegister(serverCollector)
+	setupLog.Info("Registered custom server metrics collector")
+
 	if err = (&controller.EndpointReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		MACPrefixes: macPRefixes,
-		Insecure:    insecure,
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		MACPrefixes:        macPRefixes,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Endpoints")
+		setupLog.Error(err, "Failed to create controller", "controller", "Endpoint")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCSecretReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCSecret")
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCSecret")
 		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBMCSecretWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BMCSecret")
-			os.Exit(1)
-		}
 	}
 	if err = (&controller.BMCReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
-		Insecure:               insecure,
+		DefaultProtocol:        effectiveProtocol,
+		SkipCertValidation:     effectiveSkipCert,
 		BMCFailureResetDelay:   bmcFailureResetDelay,
 		BMCResetWaitTime:       bmcResetWaitingInterval,
 		BMCClientRetryInterval: bmcResetResyncInterval,
 		ManagerNamespace:       managerNamespace,
+		EventURL:               eventURL,
 		DNSRecordTemplate:      dnsRecordTemplate,
 		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMC")
+		setupLog.Error(err, "Failed to create controller", "controller", "BMC")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerReconciler{
 		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
 		Scheme:                  mgr.GetScheme(),
-		Insecure:                insecure,
+		DefaultProtocol:         effectiveProtocol,
+		SkipCertValidation:      effectiveSkipCert,
 		ManagerNamespace:        managerNamespace,
 		ProbeImage:              probeImage,
 		ProbeOSImage:            probeOSImage,
 		RegistryURL:             registryURL,
+		RegistryClientTimeout:   registryClientTimeout,
+		RegistryDataMaxAge:      registryDataMaxAge,
 		RegistryResyncInterval:  registryResyncInterval,
 		ResyncInterval:          serverResyncInterval,
 		EnforceFirstBoot:        enforceFirstBoot,
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		DiscoveryIgnitionPath:   discoveryIgnitionPath,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -384,199 +470,220 @@ func main() { // nolint: gocyclo
 		},
 		DiscoveryTimeout: discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Server")
+		setupLog.Error(err, "Failed to create controller", "controller", "Server")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerBootConfigurationReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServerBootConfiguration")
+		setupLog.Error(err, "Failed to create controller", "controller", "ServerBootConfiguration")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerClaimReconciler{
 		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
 		Cache:                   mgr.GetCache(),
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServerClaim")
+		setupLog.Error(err, "Failed to create controller", "controller", "ServerClaim")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerMaintenanceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServerMaintenance")
+		setupLog.Error(err, "Failed to create controller", "controller", "ServerMaintenance")
+		os.Exit(1)
+	}
+	if err = (&controller.BIOSSettingsReconciler{
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		ResyncInterval:     maintenanceResyncInterval,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+		TimeoutExpiry:               biosSettingsApplyTimeout,
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettings")
+		os.Exit(1)
+	}
+	if err = (&controller.BIOSVersionReconciler{
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		ResyncInterval:     maintenanceResyncInterval,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersion")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCSettingsReconciler{
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		ResyncInterval:     maintenanceResyncInterval,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettings")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCVersionReconciler{
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		ManagerNamespace:   managerNamespace,
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		ResyncInterval:     maintenanceResyncInterval,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersion")
+		os.Exit(1)
+	}
+	if err = (&controller.BIOSVersionSetReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersionSet")
+		os.Exit(1)
+	}
+	if err = (&controller.BIOSSettingsSetReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettingsSet")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCVersionSetReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersionSet")
+		os.Exit(1)
+	}
+	if err := (&controller.BMCSettingsSetReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		ResyncInterval: maintenanceResyncInterval,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettingsSet")
+		os.Exit(1)
+	}
+	if err = (&controller.BMCUserReconciler{
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		BMCOptions: bmc.Options{
+			BasicAuth:               true,
+			PowerPollingInterval:    powerPollingInterval,
+			PowerPollingTimeout:     powerPollingTimeout,
+			ResourcePollingInterval: resourcePollingInterval,
+			ResourcePollingTimeout:  resourcePollingTimeout,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "BMCUser")
 		os.Exit(1)
 	}
 
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupEndpointWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Endpoint")
+		if err := webhookv1alpha1.SetupEndpointWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "Endpoint")
 			os.Exit(1)
 		}
-	}
-	if err = (&controller.BIOSSettingsReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		Insecure:         insecure,
-		ResyncInterval:   maintenanceResyncInterval,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-		TimeoutExpiry: biosSettingsApplyTimeout,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettings")
-		os.Exit(1)
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBIOSSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BIOSSettings")
+		if err := webhookv1alpha1.SetupBMCSecretWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCSecret")
 			os.Exit(1)
 		}
-	}
-	if err = (&controller.BIOSVersionReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		Insecure:         insecure,
-		ResyncInterval:   maintenanceResyncInterval,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSVersion")
-		os.Exit(1)
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BIOSVersion")
+		if err := webhookv1alpha1.SetupServerWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "Server")
 			os.Exit(1)
 		}
-	}
-	if err = (&controller.BMCSettingsReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		ResyncInterval:   maintenanceResyncInterval,
-		Insecure:         insecure,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCSettings")
-		os.Exit(1)
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBMCSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BMCSettings")
+		if err := webhookv1alpha1.SetupBIOSSettingsWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BIOSSettings")
 			os.Exit(1)
 		}
-	}
-	if err = (&controller.BMCVersionReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		ManagerNamespace: managerNamespace,
-		Insecure:         insecure,
-		ResyncInterval:   maintenanceResyncInterval,
-		Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCVersion")
-		os.Exit(1)
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "BMCVersion")
+		if err := webhookv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BIOSVersion")
 			os.Exit(1)
 		}
-	}
-	if err = (&controller.BIOSVersionSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSVersionSet")
-		os.Exit(1)
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookmetalv1alpha1.SetupServerWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Server")
+		if err := webhookv1alpha1.SetupBMCSettingsWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCSettings")
 			os.Exit(1)
 		}
 	}
-	if err = (&controller.BMCVersionSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCVersionSet")
-		os.Exit(1)
-	}
-	if err = (&controller.BIOSSettingsSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BIOSSettingsSet")
-		os.Exit(1)
-	}
-	if err := (&controller.BMCSettingsSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMCSettingsSet")
-		os.Exit(1)
-	}
-	if err = (&controller.BMCUserReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Insecure: insecure,
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "User")
-		os.Exit(1)
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCVersion")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		setupLog.Error(err, "Failed to set up health check")
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		setupLog.Error(err, "Failed to set up ready check")
 		os.Exit(1)
 	}
 
@@ -600,9 +707,24 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	if eventURL != "" {
+		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
+			eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
+			if err := eventServer.Start(ctx); err != nil {
+				return fmt.Errorf("unable to start event server: %w", err)
+			}
+			<-ctx.Done()
+			return nil
+		})); err != nil {
+			setupLog.Error(err, "unable to add event runnable to manager")
+			os.Exit(1)
+		}
+	}
+
+	setupLog.Info("Starting manager")
 	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "Failed to run manager")
 		os.Exit(1)
 	}
 }

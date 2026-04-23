@@ -8,25 +8,89 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BMCSettings refer's to Out-Of-Band_management like IDrac for Dell, iLo for HPE etc Settings
-
+// BMCSettingsTemplate defines the template for BMC settings to be applied.
+// +kubebuilder:validation:XValidation:rule="!has(self.variables) || self.variables.all(v, self.variables.filter(w, w.key == v.key).size() == 1)",message="variable keys must be unique"
 type BMCSettingsTemplate struct {
-
-	// Version defines the BMC firmware for which the settings should be applied.
+	// Version specifies the BMC firmware version for which the settings should be applied.
 	// +required
 	Version string `json:"version"`
 
-	// SettingsMap contains bmc settings as map
+	// SettingsMap contains BMC settings as a map.
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
+
+	// Variables is a list of variables that can be used in the settings for templating.
+	// +kubebuilder:validation:MaxItems=64
+	// +optional
+	Variables []Variable `json:"variables,omitempty"`
+
+	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
+	// +optional
+	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 }
 
-// BMCSettingsSpec defines the desired state of BMCSettings.
+type Variable struct {
+	// Key is the name of the variable to be used in the BMCSettingsTemplate format.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	Key string `json:"key"`
 
+	// ValueFrom defines a simple single source for the variable value.
+	// +required
+	ValueFrom *VariableSourceValueFrom `json:"valueFrom"`
+}
+
+// +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of fieldRef, configMapKeyRef, or secretKeyRef must be provided"
+type VariableSourceValueFrom struct {
+	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+	// Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
+	// +optional
+	FieldRef *FieldRefSelector `json:"fieldRef,omitempty"`
+
+	// ConfigMapKeyRef points to a namespaced ConfigMap key.
+	// +optional
+	ConfigMapKeyRef *NamespacedKeySelector `json:"configMapKeyRef,omitempty"`
+
+	// SecretKeyRef points to a namespaced Secret key.
+	// +optional
+	SecretKeyRef *NamespacedKeySelector `json:"secretKeyRef,omitempty"`
+}
+
+type FieldRefSelector struct {
+	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
+	// Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +required
+	FieldPath string `json:"fieldPath"`
+}
+
+type NamespacedKeySelector struct {
+	// Name is the referenced object name.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Name string `json:"name"`
+
+	// Namespace is the referenced object namespace.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	Namespace string `json:"namespace"`
+
+	// Key is the key within the referenced object.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Key string `json:"key"`
+}
+
+// BMCSettingsSpec defines the desired state of BMCSettings.
 type BMCSettingsSpec struct {
 	BMCSettingsTemplate `json:",inline"`
 
@@ -35,7 +99,7 @@ type BMCSettingsSpec struct {
 	// +optional
 	ServerMaintenanceRefs []ServerMaintenanceRefItem `json:"serverMaintenanceRefs,omitempty"`
 
-	// BMCRef is a reference to a specific BMC to apply setting to.
+	// BMCRef is a reference to a specific BMC to apply settings to.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BMCRef is immutable"
 	// +required
 	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
@@ -52,13 +116,13 @@ type ServerMaintenanceRefItem struct {
 type BMCSettingsState string
 
 const (
-	// BMCSettingsStatePending specifies that the BMC maintenance is waiting
+	// BMCSettingsStatePending specifies that the BMC settings update is waiting.
 	BMCSettingsStatePending BMCSettingsState = "Pending"
-	// BMCSettingsStateInProgress specifies that the BMC setting changes are in progress
+	// BMCSettingsStateInProgress specifies that the BMC settings changes are in progress.
 	BMCSettingsStateInProgress BMCSettingsState = "InProgress"
-	// BMCSettingsStateApplied specifies that the BMC maintenance has been completed.
+	// BMCSettingsStateApplied specifies that the BMC settings have been applied.
 	BMCSettingsStateApplied BMCSettingsState = "Applied"
-	// BMCSettingsStateFailed specifies that the BMC maintenance has failed.
+	// BMCSettingsStateFailed specifies that the BMC settings update has failed.
 	BMCSettingsStateFailed BMCSettingsState = "Failed"
 )
 
@@ -67,6 +131,14 @@ type BMCSettingsStatus struct {
 	// State represents the current state of the BMC configuration task.
 	// +optional
 	State BMCSettingsState `json:"state,omitempty"`
+
+	// FailedAttempts is the number of automatic retry attempts made after failure.
+	// +optional
+	FailedAttempts int32 `json:"failedAttempts,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions represents the latest available observations of the BMC Settings Resource state.
 	// +patchStrategy=merge

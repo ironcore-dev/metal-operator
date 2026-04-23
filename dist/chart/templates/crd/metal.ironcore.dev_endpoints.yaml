@@ -9,7 +9,7 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: endpoints.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -17,6 +17,8 @@ spec:
     kind: Endpoint
     listKind: EndpointList
     plural: endpoints
+    shortNames:
+    - mep
     singular: endpoint
   scope: Cluster
   versions:

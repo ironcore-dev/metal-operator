@@ -5,14 +5,13 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
-	"github.com/ironcore-dev/metal-operator/bmc/common"
-	gofishCommon "github.com/stmcginnis/gofish/common"
-
-	"github.com/stmcginnis/gofish/redfish"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
@@ -23,7 +22,7 @@ const (
 
 // RedfishLocalBMC implements the BMC interface for Redfish.
 type RedfishLocalBMC struct {
-	*RedfishBMC
+	*RedfishBaseBMC
 }
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
@@ -32,29 +31,29 @@ func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error)
 		InitMockUp()
 	}
 	if UnitTestMockUps.SimulateUnvailableBMC {
-		err := &gofishCommon.Error{
+		err := &schemas.Error{
 			HTTPReturnedStatusCode: 503,
 		}
 		return nil, err
 	}
-	bmc, err := NewRedfishBMCClient(ctx, options)
+	bmc, err := newRedfishBaseBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	if acc, ok := UnitTestMockUps.Accounts[options.Username]; ok {
 		if acc.Password == options.Password {
 			// authenticated
-			return &RedfishLocalBMC{RedfishBMC: bmc}, nil
+			return &RedfishLocalBMC{RedfishBaseBMC: bmc}, nil
 		}
 	}
-	return nil, &gofishCommon.Error{
+	return nil, &schemas.Error{
 		HTTPReturnedStatusCode: 401,
 	}
 }
 
 // GetAccounts retrieves all user accounts from the BMC.
-func (r *RedfishLocalBMC) GetAccounts() ([]*redfish.ManagerAccount, error) {
-	accounts := make([]*redfish.ManagerAccount, 0, len(UnitTestMockUps.Accounts))
+func (r *RedfishLocalBMC) GetAccounts() ([]*schemas.ManagerAccount, error) {
+	accounts := make([]*schemas.ManagerAccount, 0, len(UnitTestMockUps.Accounts))
 	for _, a := range UnitTestMockUps.Accounts {
 		accounts = append(accounts, a)
 	}
@@ -74,8 +73,8 @@ func (r *RedfishLocalBMC) CreateOrUpdateAccount(
 			return nil
 		}
 	}
-	newAccount := redfish.ManagerAccount{
-		Entity: gofishCommon.Entity{
+	newAccount := schemas.ManagerAccount{
+		Entity: schemas.Entity{
 			ID: fmt.Sprintf("%d", len(UnitTestMockUps.Accounts)+1),
 		},
 		UserName: userName,
@@ -99,7 +98,7 @@ func (r *RedfishLocalBMC) DeleteAccount(ctx context.Context, userName, id string
 func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BIOSVersion == "" {
 		var err error
-		UnitTestMockUps.BIOSVersion, err = r.RedfishBMC.GetBiosVersion(ctx, systemUUID)
+		UnitTestMockUps.BIOSVersion, err = r.RedfishBaseBMC.GetBiosVersion(ctx, systemUUID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get BIOS version: %w", err)
 		}
@@ -108,12 +107,16 @@ func (r *RedfishLocalBMC) GetBiosVersion(ctx context.Context, systemUUID string)
 }
 
 // UpgradeBiosVersion initiates a BIOS upgrade.
-func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
 	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BIOSUpgradeTaskIndex < len(UnitTestMockUps.BIOSUpgradeTaskStatus)-1 {
+		lenTask := len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
+		if strings.Contains(params.ImageURI, "fail") {
+			lenTask = len(UnitTestMockUps.BIOSUpgradeTaskFailedStatus) - 1
+		}
+		for UnitTestMockUps.BIOSUpgradeTaskIndex < lenTask {
 			time.Sleep(5 * time.Millisecond)
 			UnitTestMockUps.BIOSUpgradeTaskIndex++
 		}
@@ -122,121 +125,150 @@ func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer s
 }
 
 // GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
-func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
+func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
 	index := UnitTestMockUps.BIOSUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BIOSUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
+	taskStatus := UnitTestMockUps.BIOSUpgradeTaskStatus
+	if strings.Contains(UnitTestMockUps.BIOSUpgradingVersion, "fail") {
+		taskStatus = UnitTestMockUps.BIOSUpgradeTaskFailedStatus
 	}
-	task := &UnitTestMockUps.BIOSUpgradeTaskStatus[index]
-	if task.TaskState == redfish.CompletedTaskState {
+
+	if index >= len(taskStatus) {
+		index = len(taskStatus) - 1
+	}
+	task := &taskStatus[index]
+	if task.TaskState == schemas.CompletedTaskState {
 		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
 	}
 	return task, nil
 }
 
-// ResetManager resets the BMC with a delay for pending settings.
-func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error {
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Simulating BMC reset", "UUID", UUID, "ResetType", resetType)
-	go func() {
-		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
-			time.Sleep(150 * time.Millisecond)
-			for key, data := range UnitTestMockUps.PendingBMCSetting {
-				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
-					UnitTestMockUps.BMCSettingAttr[key] = data
-				}
-			}
-			UnitTestMockUps.ResetPendingBMCSetting()
-		}
-	}()
-	return nil
-}
-
-// SetBMCAttributesImmediately sets BMC attributes, applying them immediately or on reset.
-func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) error {
-	for key, value := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
-			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
-				attrData["value"] = value
-			} else {
-				UnitTestMockUps.PendingBMCSetting[key] = map[string]any{
-					"type":   attrData["type"],
-					"reboot": attrData["reboot"],
-					"value":  value,
-				}
-			}
-		}
+// SetBMCAttributesImmediately sets BMC attributes via HTTP PATCH to the BMC Settings endpoint.
+// Navigates from the manager's @Redfish.Settings.SettingsObject link, mirroring the Dell pattern.
+func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) error {
+	if len(attributes) == 0 {
+		return nil
+	}
+	manager, err := r.GetManager(bmcUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get manager: %w", err)
+	}
+	var managerData struct {
+		Settings schemas.Settings `json:"@Redfish.Settings"`
+	}
+	if err := json.Unmarshal(manager.RawData, &managerData); err != nil {
+		return fmt.Errorf("failed to parse manager data: %w", err)
+	}
+	data := map[string]any{
+		"Attributes":                 attributes,
+		"@Redfish.SettingsApplyTime": map[string]string{"ApplyTime": string(schemas.ImmediateSettingsApplyTime)},
+	}
+	resp, err := manager.GetClient().Patch(managerData.Settings.SettingsObject, data)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close() // nolint: errcheck
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("PATCH %s returned status %d", managerData.Settings.SettingsObject, resp.StatusCode)
 	}
 	return nil
 }
 
-// GetBMCAttributeValues retrieves specific BMC attribute values.
-func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (redfish.SettingsAttributes, error) {
+// GetBMCAttributeValues retrieves specific BMC attribute values via HTTP from the BMC manager.
+// Integer-typed attributes are converted from float64 (JSON default) to int to match controller expectations.
+func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
 
-	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
+	filtered, err := r.getFilteredBMCRegistryAttributes(ctx, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get filtered BMC attributes: %w", err)
 	}
 
-	result := make(redfish.SettingsAttributes, len(attributes))
+	manager, err := r.GetManager(UUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BMC manager: %w", err)
+	}
+
+	var raw struct {
+		Attributes schemas.SettingsAttributes `json:"Attributes"`
+	}
+	if err := json.Unmarshal(manager.RawData, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse manager attributes: %w", err)
+	}
+
+	result := make(schemas.SettingsAttributes, len(attributes))
 	for key := range attributes {
-		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok && filtered[key].AttributeName != "" {
-			result[key] = attrData["value"]
+		entry, ok := filtered[key]
+		if !ok {
+			continue
 		}
+		val := raw.Attributes[key]
+		// JSON numbers are float64; convert to int for integer-typed attributes so
+		// the controller's type switch produces int-typed diff values for checkAttributes.
+		if strings.EqualFold(string(entry.Type), "integer") {
+			if f, ok := val.(float64); ok {
+				val = int(f)
+			}
+		}
+		result[key] = val
 	}
 	return result, nil
 }
 
-// GetBMCPendingAttributeValues returns pending BMC attribute values.
-func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(ctx context.Context, systemUUID string) (redfish.SettingsAttributes, error) {
-	pending := UnitTestMockUps.PendingBMCSetting
-	if len(pending) == 0 {
-		return redfish.SettingsAttributes{}, nil
+// GetBMCPendingAttributeValues returns pending BMC attribute values by navigating the manager's
+// @Redfish.Settings.SettingsObject link, mirroring the Dell pattern.
+func (r *RedfishLocalBMC) GetBMCPendingAttributeValues(ctx context.Context, uuid string) (schemas.SettingsAttributes, error) {
+	manager, err := r.GetManager(uuid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager: %w", err)
 	}
-
-	result := make(redfish.SettingsAttributes, len(pending))
-	for key, data := range pending {
-		result[key] = data["value"]
+	var managerData struct {
+		Settings schemas.Settings `json:"@Redfish.Settings"`
 	}
-	return result, nil
+	if err := json.Unmarshal(manager.RawData, &managerData); err != nil {
+		return nil, fmt.Errorf("failed to parse manager data: %w", err)
+	}
+	var pending struct {
+		Attributes schemas.SettingsAttributes `json:"Attributes"`
+	}
+	if err := r.GetEntityFromUri(ctx, managerData.Settings.SettingsObject, manager.GetClient(), &pending); err != nil {
+		return nil, fmt.Errorf("failed to get pending BMC attributes: %w", err)
+	}
+	return pending.Attributes, nil
 }
 
-// getFilteredBMCRegistryAttributes returns filtered BMC registry attributes.
-func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(readOnly, immutable bool) (map[string]redfish.Attribute, error) {
-	if len(UnitTestMockUps.BMCSettingAttr) == 0 {
-		return nil, fmt.Errorf("no BMC setting attributes found")
+// getFilteredBMCRegistryAttributes fetches the BMC attribute registry from the server and
+// filters by readOnly / immutable flags, returning a map keyed by attribute name.
+func (r *RedfishLocalBMC) getFilteredBMCRegistryAttributes(ctx context.Context, readOnly, immutable bool) (map[string]schemas.Attributes, error) {
+	var bmcRegistry schemas.AttributeRegistry
+	if err := r.GetEntityFromUri(ctx, "/redfish/v1/Registries/BMCAttributeRegistry", r.client.GetService().GetClient(), &bmcRegistry); err != nil {
+		return nil, fmt.Errorf("failed to fetch BMC attribute registry: %w", err)
 	}
 
-	filtered := make(map[string]redfish.Attribute)
-	for name, attrData := range UnitTestMockUps.BMCSettingAttr {
-		filtered[name] = redfish.Attribute{
-			AttributeName: name,
-			Immutable:     immutable,
-			ReadOnly:      readOnly,
-			Type:          attrData["type"].(redfish.AttributeType),
-			ResetRequired: attrData["reboot"].(bool),
+	filtered := make(map[string]schemas.Attributes)
+	for _, entry := range bmcRegistry.RegistryEntries.Attributes {
+		if entry.Immutable == immutable && entry.ReadOnly == readOnly && !entry.Hidden {
+			filtered[entry.AttributeName] = entry
 		}
 	}
 	return filtered, nil
 }
 
-// CheckBMCAttributes validates BMC attributes.
-func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, attrs redfish.SettingsAttributes) (bool, error) {
-	filtered, err := r.getFilteredBMCRegistryAttributes(false, false)
+// CheckBMCAttributes validates BMC attributes against the server-side registry.
+func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (bool, error) {
+	filtered, err := r.getFilteredBMCRegistryAttributes(ctx, false, false)
 	if err != nil || len(filtered) == 0 {
 		return false, err
 	}
-	return common.CheckAttribues(attrs, filtered)
+	return checkAttributes(attrs, filtered)
 }
 
 // GetBMCVersion retrieves the BMC version.
 func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) (string, error) {
 	if UnitTestMockUps.BMCVersion == "" {
 		var err error
-		UnitTestMockUps.BMCVersion, err = r.RedfishBMC.GetBMCVersion(ctx, systemUUID)
+		UnitTestMockUps.BMCVersion, err = r.RedfishBaseBMC.GetBMCVersion(ctx, systemUUID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get BMC version: %w", err)
 		}
@@ -245,12 +277,16 @@ func (r *RedfishLocalBMC) GetBMCVersion(ctx context.Context, systemUUID string) 
 }
 
 // UpgradeBMCVersion initiates a BMC upgrade.
-func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *redfish.SimpleUpdateParameters) (string, bool, error) {
+func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	UnitTestMockUps.BMCUpgradeTaskIndex = 0
 	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		for UnitTestMockUps.BMCUpgradeTaskIndex < len(UnitTestMockUps.BMCUpgradeTaskStatus)-1 {
+		lenTask := len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+		if strings.Contains(params.ImageURI, "fail") {
+			lenTask = len(UnitTestMockUps.BMCUpgradeTaskFailedStatus) - 1
+		}
+		for UnitTestMockUps.BMCUpgradeTaskIndex < lenTask {
 			time.Sleep(5 * time.Millisecond)
 			UnitTestMockUps.BMCUpgradeTaskIndex++
 		}
@@ -259,14 +295,27 @@ func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer st
 }
 
 // GetBMCUpgradeTask retrieves the status of a BMC upgrade task.
-func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*redfish.Task, error) {
+func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
 	index := UnitTestMockUps.BMCUpgradeTaskIndex
-	if index >= len(UnitTestMockUps.BMCUpgradeTaskStatus) {
-		index = len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+
+	taskStatus := UnitTestMockUps.BMCUpgradeTaskStatus
+	if strings.Contains(UnitTestMockUps.BMCUpgradingVersion, "fail") {
+		taskStatus = UnitTestMockUps.BMCUpgradeTaskFailedStatus
 	}
-	task := &UnitTestMockUps.BMCUpgradeTaskStatus[index]
-	if task.TaskState == redfish.CompletedTaskState {
+
+	if index >= len(taskStatus) {
+		index = len(taskStatus) - 1
+	}
+	task := &taskStatus[index]
+	if task.TaskState == schemas.CompletedTaskState {
 		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
 	}
 	return task, nil
+}
+
+// CheckBMCPendingComponentUpgrade returns false for local provider.
+// This is the expected behavior for non-real hardware environments; vendor implementations
+// (Dell, HPE, Lenovo) override this to check actual firmware inventory.
+func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
+	return false, nil
 }

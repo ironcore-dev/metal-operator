@@ -6,14 +6,9 @@ package bmc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
-	"github.com/stmcginnis/gofish"
-	"github.com/stmcginnis/gofish/common"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/stmcginnis/gofish/schemas"
 	"k8s.io/apimachinery/pkg/api/resource"
-
-	"github.com/ironcore-dev/metal-operator/bmc/oem"
 )
 
 type Manufacturer string
@@ -23,6 +18,14 @@ const (
 	ManufacturerLenovo     Manufacturer = "Lenovo"
 	ManufacturerHPE        Manufacturer = "HPE"
 	ManufacturerSupermicro Manufacturer = "Supermicro"
+)
+
+// ComponentType represents a firmware component type.
+type ComponentType string
+
+const (
+	ComponentTypeBMC  ComponentType = "BMC"
+	ComponentTypeBIOS ComponentType = "BIOS"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -37,7 +40,7 @@ type BMC interface {
 	ForcePowerOff(ctx context.Context, systemURI string) error
 
 	// Reset performs a reset on the system.
-	Reset(ctx context.Context, systemURI string, resetType redfish.ResetType) error
+	Reset(ctx context.Context, systemURI string, resetType schemas.ResetType) error
 
 	// SetPXEBootOnce sets the boot device for the next system boot.
 	SetPXEBootOnce(ctx context.Context, systemURI string) error
@@ -52,37 +55,37 @@ type BMC interface {
 	GetSystems(ctx context.Context) ([]Server, error)
 
 	// GetManager returns the manager
-	GetManager(UUID string) (*redfish.Manager, error)
+	GetManager(UUID string) (*schemas.Manager, error)
 
 	// ResetManager performs a reset on the Manager.
-	ResetManager(ctx context.Context, UUID string, resetType redfish.ResetType) error
+	ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error
 
 	// GetBootOrder retrieves the boot order for the system.
 	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
 
 	// GetBiosAttributeValues retrieves BIOS attribute values for the system.
-	GetBiosAttributeValues(ctx context.Context, systemURI string, attributes []string) (redfish.SettingsAttributes, error)
+	GetBiosAttributeValues(ctx context.Context, systemURI string, attributes []string) (schemas.SettingsAttributes, error)
 
 	// GetBiosPendingAttributeValues retrieves pending BIOS attribute values for the system.
-	GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (redfish.SettingsAttributes, error)
+	GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (schemas.SettingsAttributes, error)
 
 	// GetBMCAttributeValues retrieves BMC attribute values for the system.
-	GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (redfish.SettingsAttributes, error)
+	GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error)
 
 	// GetBMCPendingAttributeValues retrieves pending BMC attribute values for the system.
-	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result redfish.SettingsAttributes, err error)
+	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result schemas.SettingsAttributes, err error)
 
 	// CheckBiosAttributes checks if the BIOS attributes are valid and returns whether a reset is required.
-	CheckBiosAttributes(attrs redfish.SettingsAttributes) (reset bool, err error)
+	CheckBiosAttributes(attrs schemas.SettingsAttributes) (reset bool, err error)
 
 	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
-	CheckBMCAttributes(ctx context.Context, UUID string, attrs redfish.SettingsAttributes) (reset bool, err error)
+	CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (reset bool, err error)
 
 	// SetBiosAttributesOnReset sets BIOS attributes on the system and applies them on the next reset.
-	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes redfish.SettingsAttributes) (err error)
+	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes schemas.SettingsAttributes) (err error)
 
 	// SetBMCAttributesImmediately sets BMC attributes on the system and applies them immediately.
-	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes redfish.SettingsAttributes) (err error)
+	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) (err error)
 
 	// GetBiosVersion retrieves the BIOS version for the system.
 	GetBiosVersion(ctx context.Context, systemURI string) (string, error)
@@ -100,19 +103,25 @@ type BMC interface {
 	GetProcessors(ctx context.Context, systemURI string) ([]Processor, error)
 
 	// UpgradeBiosVersion upgrades the BIOS version for the system.
-	UpgradeBiosVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error)
+	UpgradeBiosVersion(ctx context.Context, manufacturer string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error)
 
 	// GetBiosUpgradeTask retrieves the task for the BIOS upgrade.
-	GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
+	GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
 	// WaitForServerPowerState waits for the server to reach the specified power state.
-	WaitForServerPowerState(ctx context.Context, systemURI string, powerState redfish.PowerState) error
+	WaitForServerPowerState(ctx context.Context, systemURI string, powerState schemas.PowerState) error
 
 	// UpgradeBMCVersion upgrades the BMC version for the system.
-	UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *redfish.SimpleUpdateParameters) (string, bool, error)
+	UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error)
 
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
-	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*redfish.Task, error)
+	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
+
+	// CreateEventSubscription creates an event subscription for the manager.
+	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
+
+	// DeleteEventSubscription deletes an event subscription for the manager.
+	DeleteEventSubscription(ctx context.Context, uri string) error
 
 	// CreateOrUpdateAccount creates or updates a BMC user account.
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
@@ -121,10 +130,14 @@ type BMC interface {
 	DeleteAccount(ctx context.Context, userName, id string) error
 
 	// GetAccounts retrieves all BMC user accounts.
-	GetAccounts() ([]*redfish.ManagerAccount, error)
+	GetAccounts() ([]*schemas.ManagerAccount, error)
 
 	// GetAccountService retrieves the account service.
-	GetAccountService() (*redfish.AccountService, error)
+	GetAccountService() (*schemas.AccountService, error)
+
+	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
+	// for the given component type.
+	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
 }
 
 type Entity struct {
@@ -163,7 +176,7 @@ type RegistryEntry struct {
 
 // Registry describes the Message Registry file locator Resource.
 type Registry struct {
-	common.Entity
+	schemas.Entity
 	// ODataContext is the odata context.
 	ODataContext string `json:"@odata.context"`
 	// ODataType is the odata type.
@@ -189,7 +202,7 @@ type Server struct {
 	URI          string
 	Model        string
 	Manufacturer string
-	PowerState   redfish.PowerState
+	PowerState   schemas.PowerState
 	SerialNumber string
 }
 
@@ -199,9 +212,9 @@ type Volume struct {
 	// CapacityBytes specifies the capacity of the volume in bytes.
 	SizeBytes int64 `json:"sizeBytes,omitempty"`
 	// Status specifies the status of the volume.
-	State common.State `json:"state,omitempty"`
+	State schemas.State `json:"state,omitempty"`
 	// RAIDType specifies the RAID type of the associated Volume.
-	RAIDType redfish.RAIDType `json:"raidType,omitempty"`
+	RAIDType schemas.RAIDType `json:"raidType,omitempty"`
 	// VolumeUsage specifies the volume usage type for the Volume.
 	VolumeUsage string `json:"volumeUsage,omitempty"`
 }
@@ -212,7 +225,7 @@ type Drive struct {
 	// MediaType specifies the media type of the storage device.
 	MediaType string `json:"mediaType,omitempty"`
 	// Type specifies the type of the storage device.
-	Type redfish.FormFactor `json:"type,omitempty"`
+	Type schemas.FormFactor `json:"type,omitempty"`
 	// SizeBytes specifies the size of the storage device in bytes.
 	SizeBytes int64 `json:"sizeBytes,omitempty"`
 	// Vendor specifies the vendor of the storage device.
@@ -220,14 +233,14 @@ type Drive struct {
 	// Model specifies the model of the storage device.
 	Model string `json:"model,omitempty"`
 	// State specifies the state of the storage device.
-	State common.State `json:"state,omitempty"`
+	State schemas.State `json:"state,omitempty"`
 }
 
 // Storage represents a storage resource.
 type Storage struct {
 	Entity
 	// State specifies the state of the storage.
-	State common.State `json:"state,omitempty"`
+	State schemas.State `json:"state,omitempty"`
 	// Drives is a collection of drives associated with this storage.
 	Drives []Drive `json:"drives,omitempty"`
 	// Volumes is a collection of volumes associated with this storage.
@@ -260,8 +273,8 @@ type Processor struct {
 type SystemInfo struct {
 	Manufacturer      string
 	Model             string
-	Status            common.Status
-	PowerState        redfish.PowerState
+	Status            schemas.Status
+	PowerState        schemas.PowerState
 	TotalSystemMemory resource.Quantity
 	SystemURI         string
 	SystemUUID        string
@@ -283,48 +296,4 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
-}
-
-func NewOEMManager(manager *redfish.Manager, service *gofish.Service) (oem.ManagerInterface, error) {
-	var OEMManager oem.ManagerInterface
-	switch manager.Manufacturer {
-	case string(ManufacturerDell):
-		OEMManager = &oem.DellIdracManager{
-			BMC:     manager,
-			Service: service,
-		}
-	case string(ManufacturerHPE):
-		OEMManager = &oem.HPEILOManager{
-			BMC:     manager,
-			Service: service,
-		}
-	case string(ManufacturerLenovo):
-		OEMManager = &oem.LenovoXCCManager{
-			BMC:     manager,
-			Service: service,
-		}
-	default:
-		return nil, fmt.Errorf("unsupported manufacturer: %v", manager.Manufacturer)
-	}
-	return OEMManager, nil
-}
-
-func NewOEMInterface(manufacturer string, service *gofish.Service) (oem.OEMInterface, error) {
-	var oemInterface oem.OEMInterface
-	switch manufacturer {
-	case string(ManufacturerDell):
-		return &oem.Dell{
-			Service: service,
-		}, nil
-	case string(ManufacturerHPE):
-		return &oem.HPE{
-			Service: service,
-		}, nil
-	case string(ManufacturerLenovo):
-		return &oem.Lenovo{
-			Service: service,
-		}, nil
-	default:
-		return oemInterface, fmt.Errorf("unsupported manufacturer: %v", manufacturer)
-	}
 }

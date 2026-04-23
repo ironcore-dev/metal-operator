@@ -23,7 +23,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 
 	BeforeEach(func(ctx SpecContext) {
 		validator = BIOSSettingsCustomValidator{Client: k8sClient}
-		By("Creating an BIOSSettings")
+		By("Creating a BIOSSettings")
 		biosSettingsV1 = &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -50,7 +50,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{})).To(Succeed())
 	})
 
-	It("Should deny creation if a Server already has a BIOSSettings", func(ctx SpecContext) {
+	It("should deny creation if a Server already has a BIOSSettings", func(ctx SpecContext) {
 		By("Creating another BIOSSettings targeting the same Server")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -72,7 +72,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(validator.ValidateCreate(ctx, biosSettingsV2)).Error().To(HaveOccurred())
 	})
 
-	It("Should allow the creation for a Server without a BIOSSettings", func() {
+	It("should allow creating a BIOSSettings for a Server without one", func() {
 		By("Creating a BIOSSettings targeting a new Server")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -94,7 +94,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
 	})
 
-	It("Should deny update if spec.serverRef is duplicate", func() {
+	It("should deny update if spec.serverRef is duplicate", func() {
 		By("Creating a BIOSSettings with different ServerRef")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -121,8 +121,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().To(HaveOccurred())
 	})
 
-	It("Should allow update if a different field is duplicate", func() {
-		By("Creating an BIOSSetting with different ServerRef")
+	It("should allow update if a different field is duplicate", func() {
+		By("Creating a BIOSSetting with different ServerRef")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -148,8 +148,8 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
 	})
 
-	It("Should allow update if a ServerRef field is NOT duplicate", func() {
-		By("Creating an BIOSSetting with different ServerRef")
+	It("should allow update if a ServerRef field is not duplicate", func() {
+		By("Creating a BIOSSetting with different ServerRef")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
@@ -175,7 +175,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
 	})
 
-	It("Should no allow update of BIOSSettings which are in-progress, but should allow to forcefully deleting it", func() {
+	It("should not allow update of BIOSSettings which are in-progress, but should allow forcefully deleting it", func() {
 		By("Patching the BIOSSettings V1 to InProgress state")
 		Eventually(UpdateStatus(biosSettingsV1, func() {
 			biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress
@@ -201,7 +201,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		})).Should(Succeed())
 	})
 
-	It("Should deny deletion of an in-progress BIOSSettings", func() {
+	It("should deny deletion of an in-progress BIOSSettings", func() {
 		By("Patching the BIOSSettings V1 to InProgress state")
 		Eventually(UpdateStatus(biosSettingsV1, func() {
 			biosSettingsV1.Status.State = metalv1alpha1.BIOSSettingsStateInProgress

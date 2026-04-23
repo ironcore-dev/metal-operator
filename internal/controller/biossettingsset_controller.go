@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,10 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
@@ -30,7 +32,8 @@ const biosSettingsSetFinalizer = "metal.ironcore.dev/biossettingsset"
 // BIOSSettingsSetReconciler reconciles a BIOSSettingsSet object
 type BIOSSettingsSetReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	ResyncInterval time.Duration
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingssets,verbs=get;list;watch;create;update;patch;delete
@@ -40,22 +43,22 @@ type BIOSSettingsSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
 
 func (r *BIOSSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{}
 	if err := r.Get(ctx, req.NamespacedName, biosSettingsSet); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	return r.reconcileExists(ctx, log, biosSettingsSet)
+	return r.reconcileExists(ctx, biosSettingsSet)
 }
 
-func (r *BIOSSettingsSetReconciler) reconcileExists(ctx context.Context, log logr.Logger, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
+func (r *BIOSSettingsSetReconciler) reconcileExists(ctx context.Context, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
 	if !set.DeletionTimestamp.IsZero() {
-		return r.delete(ctx, log, set)
+		return r.delete(ctx, set)
 	}
-	return r.reconcile(ctx, log, set)
+	return r.reconcile(ctx, set)
 }
 
-func (r *BIOSSettingsSetReconciler) delete(ctx context.Context, log logr.Logger, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
+func (r *BIOSSettingsSetReconciler) delete(ctx context.Context, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting BIOSSettingsSet")
 
 	if !controllerutil.ContainsFinalizer(set, biosSettingsSetFinalizer) {
@@ -64,7 +67,7 @@ func (r *BIOSSettingsSetReconciler) delete(ctx context.Context, log logr.Logger,
 
 	// Handle propagation of ignore annotation to child resources when parent is being deleted.
 	// That way the deleted annotations can be passed to children before parent is deleted.
-	if err := r.handleIgnoreAnnotationPropagation(ctx, log, set); err != nil {
+	if err := r.handleIgnoreAnnotationPropagation(ctx, set); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -93,7 +96,7 @@ func (r *BIOSSettingsSetReconciler) delete(ctx context.Context, log logr.Logger,
 
 		// Handle propagation of retry annotation to child when parent is being deleted.
 		// That way the deleted annotations can be passed to children before parent is deleted.
-		if err := r.handleRetryAnnotationPropagation(ctx, log, set); err != nil {
+		if err := r.handleRetryAnnotationPropagation(ctx, set); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -111,7 +114,8 @@ func (r *BIOSSettingsSetReconciler) delete(ctx context.Context, log logr.Logger,
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, set *metalv1alpha1.BIOSSettingsSet) error {
+func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(ctx context.Context, set *metalv1alpha1.BIOSSettingsSet) error {
+	log := ctrl.LoggerFrom(ctx)
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, set)
 	if err != nil {
 		return err
@@ -122,10 +126,11 @@ func (r *BIOSSettingsSetReconciler) handleIgnoreAnnotationPropagation(ctx contex
 		return nil
 	}
 
-	return handleIgnoreAnnotationPropagation(ctx, log, r.Client, set, ownedBiosSettings)
+	return handleIgnoreAnnotationPropagation(ctx, r.Client, set, ownedBiosSettings)
 }
 
-func (r *BIOSSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, set *metalv1alpha1.BIOSSettingsSet) error {
+func (r *BIOSSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, set *metalv1alpha1.BIOSSettingsSet) error {
+	log := ctrl.LoggerFrom(ctx)
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, set)
 	if err != nil {
 		return err
@@ -137,13 +142,14 @@ func (r *BIOSSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context
 	}
 
 	log.V(1).Info("Propagating retry annotation to owned BIOSSettings resources")
-	return handleRetryAnnotationPropagation(ctx, log, r.Client, set, ownedBiosSettings)
+	return handleRetryAnnotationPropagation(ctx, r.Client, set, ownedBiosSettings)
 }
 
-func (r *BIOSSettingsSetReconciler) reconcile(ctx context.Context, log logr.Logger, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
+func (r *BIOSSettingsSetReconciler) reconcile(ctx context.Context, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling BIOSSettingsSet")
 
-	if err := r.handleIgnoreAnnotationPropagation(ctx, log, set); err != nil {
+	if err := r.handleIgnoreAnnotationPropagation(ctx, set); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -160,27 +166,29 @@ func (r *BIOSSettingsSetReconciler) reconcile(ctx context.Context, log logr.Logg
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get Servers for label selector %w", err)
 	}
-	return r.handleBIOSSettings(ctx, log, serverList, set)
+	return r.handleBIOSSettings(ctx, serverList, set)
 }
 
-func (r *BIOSSettingsSetReconciler) handleBIOSSettings(ctx context.Context, log logr.Logger, servers *metalv1alpha1.ServerList, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
+func (r *BIOSSettingsSetReconciler) handleBIOSSettings(ctx context.Context, servers *metalv1alpha1.ServerList, set *metalv1alpha1.BIOSSettingsSet) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	ownedBiosSettings, err := r.getOwnedBIOSSettings(ctx, set)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createMissingBIOSSettings(ctx, log, servers, ownedBiosSettings, set); err != nil {
+	if err := r.createMissingBIOSSettings(ctx, servers, ownedBiosSettings, set); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create missing BIOSSettings: %w", err)
 	}
 
 	log.V(1).Info("Summary of Servers and BIOSSettings", "ServerCount", len(servers.Items),
 		"BIOSSettingsCount", len(ownedBiosSettings.Items))
 
-	if err := r.deleteOrphanBIOSSettings(ctx, log, servers, ownedBiosSettings); err != nil {
+	if err := r.deleteOrphanBIOSSettings(ctx, servers, ownedBiosSettings); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BIOSSettings: %w", err)
 	}
 
-	if err := r.patchBIOSSettingsFromTemplate(ctx, log, &set.Spec.BIOSSettingsTemplate, ownedBiosSettings); err != nil {
+	var pendingPatchingSettings bool
+	if pendingPatchingSettings, err = r.patchBIOSSettingsFromTemplate(ctx, &set.Spec.BIOSSettingsTemplate, ownedBiosSettings); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BIOSSettings spec from template: %w", err)
 	}
 
@@ -194,14 +202,20 @@ func (r *BIOSSettingsSetReconciler) handleBIOSSettings(ctx context.Context, log 
 	log.V(1).Info("Updated BIOSSettingsSet state", "Status", status)
 
 	// handle retry annotation - remove the annotation after retrying reconciliation
-	if err := r.handleRetryAnnotationPropagation(ctx, log, set); err != nil {
+	if err := r.handleRetryAnnotationPropagation(ctx, set); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if status.FullyLabeledServers != status.AvailableBIOSSettings || pendingPatchingSettings {
+		log.V(1).Info("Waiting for all BIOSSettings to be created/Patched for the labeled Servers", "Status", status)
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(ctx context.Context, log logr.Logger, servers *metalv1alpha1.ServerList, settings *metalv1alpha1.BIOSSettingsList, set *metalv1alpha1.BIOSSettingsSet) error {
+func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(ctx context.Context, servers *metalv1alpha1.ServerList, settings *metalv1alpha1.BIOSSettingsList, set *metalv1alpha1.BIOSSettingsSet) error {
+	log := ctrl.LoggerFrom(ctx)
 	serverWithSettings := make(map[string]struct{})
 	for _, settings := range settings.Items {
 		serverWithSettings[settings.Spec.ServerRef.Name] = struct{}{}
@@ -211,9 +225,20 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(ctx context.Contex
 	for _, server := range servers.Items {
 		if _, ok := serverWithSettings[server.Name]; !ok {
 			if server.Spec.BIOSSettingsRef != nil {
-				// this is the case where the server already has a different BIOSSettingsRef, and we should not create a new one for this server
-				log.V(1).Info("Server already has a BIOSSettings", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
-				continue
+				if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, &metalv1alpha1.BIOSSettings{}); err != nil {
+					if apierrors.IsNotFound(err) {
+						log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+						// we will go ahead and create a new BIOSSettings for this server. the ref will be updated when the new BIOSSettings is created
+					} else {
+						log.Error(err, "Error when trying to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+						// we will try this again in next reconciliation loop
+						continue
+					}
+				} else {
+					// the referenced BIOSSettings exists or unable to determining, so we skip creating a new one
+					log.V(1).Info("Server already has a BIOSSettings ref", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+					continue
+				}
 			}
 			newBiosSettingsName := fmt.Sprintf("%s-%s", set.Name, server.Name)
 			var newBiosSetting *metalv1alpha1.BIOSSettings
@@ -244,7 +269,8 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(ctx context.Contex
 	return errors.Join(errs...)
 }
 
-func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(ctx context.Context, log logr.Logger, servers *metalv1alpha1.ServerList, settings *metalv1alpha1.BIOSSettingsList) error {
+func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(ctx context.Context, servers *metalv1alpha1.ServerList, settings *metalv1alpha1.BIOSSettingsList) error {
+	log := ctrl.LoggerFrom(ctx)
 	serverMap := make(map[string]bool)
 	for _, server := range servers.Items {
 		serverMap[server.Name] = true
@@ -265,15 +291,18 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(ctx context.Context
 	return errors.Join(errs...)
 }
 
-func (r *BIOSSettingsSetReconciler) patchBIOSSettingsFromTemplate(ctx context.Context, log logr.Logger, template *metalv1alpha1.BIOSSettingsTemplate, settingsList *metalv1alpha1.BIOSSettingsList) error {
+func (r *BIOSSettingsSetReconciler) patchBIOSSettingsFromTemplate(ctx context.Context, template *metalv1alpha1.BIOSSettingsTemplate, settingsList *metalv1alpha1.BIOSSettingsList) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if len(settingsList.Items) == 0 {
 		log.V(1).Info("No BIOSSettings found, skipping template update")
-		return nil
+		return false, nil
 	}
 
+	var pendingPatchingSettings bool
 	var errs []error
 	for _, settings := range settingsList.Items {
 		if settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+			pendingPatchingSettings = true
 			continue
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &settings, func() error {
@@ -287,7 +316,7 @@ func (r *BIOSSettingsSetReconciler) patchBIOSSettingsFromTemplate(ctx context.Co
 			log.V(1).Info("Patched BIOSSettings with updated spec", "BIOSSettings", settings.Name, "Operation", opResult)
 		}
 	}
-	return errors.Join(errs...)
+	return pendingPatchingSettings, errors.Join(errs...)
 }
 
 func (r *BIOSSettingsSetReconciler) getOwnedBIOSSettingsSetStatus(settingsList *metalv1alpha1.BIOSSettingsList) *metalv1alpha1.BIOSSettingsSetStatus {
@@ -359,7 +388,7 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 	if server.Spec.BIOSSettingsRef != nil {
 		settings := &metalv1alpha1.BIOSSettings{}
 		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, settings); err != nil {
-			log.Error(err, "failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
+			log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
 			return nil
 		}
 		owner := metav1.GetControllerOf(settings)
@@ -382,6 +411,12 @@ func (r *BIOSSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&metalv1alpha1.BIOSSettings{}).
 		Watches(&metalv1alpha1.Server{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
-			builder.WithPredicates(predicate.LabelChangedPredicate{})).
+			builder.WithPredicates(predicate.Funcs{
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldServer := e.ObjectOld.(*metalv1alpha1.Server)
+					newServer := e.ObjectNew.(*metalv1alpha1.Server)
+					return labelChangeOrAnyFieldChangeInObject(e, []any{oldServer.Spec.BIOSSettingsRef}, []any{newServer.Spec.BIOSSettingsRef})
+				},
+			})).
 		Complete(r)
 }

@@ -8,20 +8,23 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"reflect"
 	"slices"
+	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/stmcginnis/gofish/redfish"
+	"github.com/ironcore-dev/metal-operator/third_party/expansion"
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -29,7 +32,37 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
+
+	RetryOfFailedResourceConditionIssued = "RetryOfFailedResourceConditionIssued"
+	RetryOfFailedResourceReasonIssued    = "RetryOfFailedResourceReasonIssued"
+
+	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
+	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
+	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
+	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
+	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
+	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
+	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
+
+type BMCTaskFetchFailedError struct {
+	TaskURI  string
+	Resource string
+	Err      error
+}
+
+func (e BMCTaskFetchFailedError) Error() string {
+	return e.Err.Error()
+}
+
+type MultiErrorTracker struct {
+	Identifier string
+	Err        error
+}
+
+func (e MultiErrorTracker) Error() string {
+	return e.Err.Error()
+}
 
 // GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
 func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client, ref *metalv1alpha1.ObjectReference) (*metalv1alpha1.ServerMaintenance, error) {
@@ -50,7 +83,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 	condFound, err := acc.FindSlice(conditions, conditionType, condition)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find Condition %v. error: %v", conditionType, err)
+		return nil, fmt.Errorf("failed to find Condition %v. error: %w", conditionType, err)
 	}
 	if !condFound {
 		condition.Type = conditionType
@@ -58,7 +91,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
 		); err != nil {
-			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %v", conditionType, err)
+			return condition, fmt.Errorf("failed to create/update new Condition %v. error: %w", conditionType, err)
 		}
 	}
 
@@ -69,10 +102,7 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
 	server := &metalv1alpha1.Server{}
 	if err := c.Get(ctx, client.ObjectKey{Name: serverName}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("server not found")
+		return nil, err
 	}
 	return server, nil
 }
@@ -187,18 +217,13 @@ func enqueueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 	return true
 }
 
-func resetBMCOfServer(
-	ctx context.Context,
-	log logr.Logger,
-	kClient client.Client,
-	server *metalv1alpha1.Server,
-	bmcClient bmc.BMC,
-) error {
+func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.BMCRef != nil {
 		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}
 		BMC := &metalv1alpha1.BMC{}
 		if err := kClient.Get(ctx, key, BMC); err != nil {
-			log.V(1).Error(err, "failed to get referred server's Manager")
+			log.Error(err, "Failed to get referred server's Manager")
 			return err
 		}
 		annotations := BMC.GetAnnotations()
@@ -233,7 +258,7 @@ func resetBMCOfServer(
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
 		log.V(1).Info("Resetting through redfish to stabilize BMC of the server")
-		err = bmcClient.ResetManager(ctx, bmcManager.ID, redfish.GracefulRestartResetType)
+		err = bmcClient.ResetManager(ctx, bmcManager.UUID, schemas.GracefulRestartResetType)
 		if err != nil {
 			return fmt.Errorf("failed to get manager to reset BMC: %w", err)
 		}
@@ -242,7 +267,8 @@ func resetBMCOfServer(
 	return fmt.Errorf("no BMC reference or inline BMC details found in server spec to reset BMC")
 }
 
-func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+func handleIgnoreAnnotationPropagation(ctx context.Context, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
 		childObj, ok := obj.(client.Object)
@@ -284,12 +310,20 @@ func handleIgnoreAnnotationPropagation(ctx context.Context, log logr.Logger, c c
 	return errors.Join(errs...)
 }
 
-func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, parentObj client.Object, ownedObjects client.ObjectList) error {
+	log := ctrl.LoggerFrom(ctx)
 	var errs []error
 	_ = meta.EachListItem(ownedObjects, func(obj runtime.Object) error {
-		childObj, ok := obj.(client.Object)
+		cObj, ok := obj.(client.Object)
 		if !ok {
 			errs = append(errs, fmt.Errorf("item in list is not a client.Object: %T", obj))
+			return nil
+		}
+		// Always fetch the latest version from the API server
+		childObj := cObj.DeepCopyObject().(client.Object)
+		err := c.Get(ctx, client.ObjectKeyFromObject(cObj), childObj)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to fetch latest child %s: %w", cObj.GetName(), err))
 			return nil
 		}
 		// if the child is being deleted, we don't need to propagate
@@ -304,6 +338,28 @@ func handleRetryAnnotationPropagation(ctx context.Context, log logr.Logger, c cl
 			if !shouldChildRetryReconciliation(parentObj) && isChildRetryThroughSets(childObj) && annotations != nil {
 				delete(annotations, metalv1alpha1.OperationAnnotation)
 				childObj.SetAnnotations(annotations)
+			}
+			// Use reflection to access the Status.Conditions field, assuming given child objects have it.
+			v := reflect.ValueOf(childObj).Elem()
+			statusField := v.FieldByName("Status")
+			if statusField.IsValid() {
+				// If there's no Status field, we can't check conditions we continue.
+				conditionsField := statusField.FieldByName("Conditions")
+				if conditionsField.IsValid() {
+					// Same as above, if there's no Conditions field, we can't check this.
+					conditions, ok := conditionsField.Interface().([]metav1.Condition)
+					if ok {
+						acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
+						retriedCondition, err := GetCondition(acc, conditions, RetryOfFailedResourceConditionIssued)
+
+						if err == nil && retriedCondition != nil &&
+							retriedCondition.Status == metav1.ConditionTrue &&
+							retriedCondition.Message == metalv1alpha1.OperationAnnotationRetryFailedPropagated {
+							// retry was already propagated to child, we can skip re-propagation to avoid infinite loop
+							return nil
+						}
+					}
+				}
 			}
 			// should not overwrite the already present retry annotation on child
 			// should not overwrite if the annotation already present on the child
@@ -347,4 +403,189 @@ func GetImageCredentialsForSecretRef(ctx context.Context, c client.Client, secre
 	}
 
 	return string(username), string(password), nil
+}
+
+func clearDeprecatedObjectRefFields(ref *metalv1alpha1.ObjectReference) bool {
+	if ref == nil {
+		return false
+	}
+	changed := ref.APIVersion != "" || ref.Kind != "" || ref.UID != "" //nolint:staticcheck // clearing deprecated fields
+	ref.APIVersion = ""                                                //nolint:staticcheck // clearing deprecated fields
+	ref.Kind = ""                                                      //nolint:staticcheck // clearing deprecated fields
+	ref.UID = ""                                                       //nolint:staticcheck // clearing deprecated fields
+	return changed
+}
+
+func clearDeprecatedImmutableObjectRefFields(ref *metalv1alpha1.ImmutableObjectReference) bool {
+	if ref == nil {
+		return false
+	}
+	changed := ref.APIVersion != "" || ref.Kind != "" || ref.UID != "" //nolint:staticcheck // clearing deprecated fields
+	ref.APIVersion = ""                                                //nolint:staticcheck // clearing deprecated fields
+	ref.Kind = ""                                                      //nolint:staticcheck // clearing deprecated fields
+	ref.UID = ""                                                       //nolint:staticcheck // clearing deprecated fields
+	return changed
+}
+
+func labelChangeOrAnyFieldChangeInObject(e event.UpdateEvent, oldFields, newFields []any) bool {
+	isNil := func(arg any) bool {
+		if v := reflect.ValueOf(arg); !v.IsValid() || ((v.Kind() == reflect.Ptr ||
+			v.Kind() == reflect.Interface ||
+			v.Kind() == reflect.Slice ||
+			v.Kind() == reflect.Map ||
+			v.Kind() == reflect.Chan ||
+			v.Kind() == reflect.Func) && v.IsNil()) {
+			return true
+		}
+		return false
+	}
+	if isNil(e.ObjectOld) {
+		return false
+	}
+	if isNil(e.ObjectNew) {
+		return false
+	}
+
+	labelChange := !maps.Equal(e.ObjectNew.GetLabels(), e.ObjectOld.GetLabels())
+	if labelChange {
+		return true
+	}
+
+	if len(oldFields) != len(newFields) {
+		// This indicates a programming error, but we can handle it defensively.
+		return true
+	}
+
+	for i := range oldFields {
+		if !reflect.DeepEqual(oldFields[i], newFields[i]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ResolveVariables resolves the Variables list into a flat key→value map.
+// Returns an error if any variable cannot be resolved.
+func ResolveVariables(
+	ctx context.Context,
+	c client.Client,
+	owner client.Object,
+	variables []metalv1alpha1.Variable,
+) (map[string]string, error) {
+	resolved := make(map[string]string, len(variables))
+	for _, v := range variables {
+		value, err := resolveVariable(ctx, c, owner, v, resolved)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve variable %q: %w", v.Key, err)
+		}
+		// Apply already-resolved variables to the fetched value so later variables
+		// can reference earlier ones (e.g. a raw secret value containing $(BmcName)).
+		resolved[v.Key] = substituteVars(value, resolved)
+	}
+	return resolved, nil
+}
+
+// ApplyVariables substitutes $(KEY) placeholders in each settingsMap value using the
+// resolved variable map. Returns the original map unchanged if resolved is empty.
+func ApplyVariables(settingsMap map[string]string, resolved map[string]string) map[string]string {
+	if len(resolved) == 0 {
+		return settingsMap
+	}
+	out := make(map[string]string, len(settingsMap))
+	for k, v := range settingsMap {
+		out[k] = substituteVars(v, resolved)
+	}
+	return out
+}
+
+// substituteVars replaces $(KEY) placeholders using the resolved variable map.
+// $$(KEY) produces a literal $(KEY) in the output (escape semantics identical
+// to Kubernetes environment variable expansion).
+func substituteVars(s string, resolved map[string]string) string {
+	return expansion.Expand(s, expansion.MappingFuncFor(resolved))
+}
+
+func resolveVariable(
+	ctx context.Context,
+	c client.Client,
+	owner client.Object,
+	v metalv1alpha1.Variable,
+	resolved map[string]string,
+) (string, error) {
+	if v.ValueFrom == nil {
+		return "", fmt.Errorf("valueFrom is required")
+	}
+	switch {
+	case v.ValueFrom.FieldRef != nil:
+		return resolveFieldRef(owner, v.ValueFrom.FieldRef.FieldPath)
+	case v.ValueFrom.SecretKeyRef != nil:
+		ref := v.ValueFrom.SecretKeyRef
+		// Expand variable references in the selector fields before use.
+		name := substituteVars(ref.Name, resolved)
+		namespace := substituteVars(ref.Namespace, resolved)
+		key := substituteVars(ref.Key, resolved)
+		secret := &corev1.Secret{}
+		if err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, secret); err != nil {
+			return "", fmt.Errorf("failed to get secret %s/%s: %w", namespace, name, err)
+		}
+		val, ok := secret.Data[key]
+		if !ok {
+			return "", fmt.Errorf("key %q not found in secret %s/%s", key, namespace, name)
+		}
+		return string(val), nil
+	case v.ValueFrom.ConfigMapKeyRef != nil:
+		ref := v.ValueFrom.ConfigMapKeyRef
+		// Expand variable references in the selector fields before use.
+		name := substituteVars(ref.Name, resolved)
+		namespace := substituteVars(ref.Namespace, resolved)
+		key := substituteVars(ref.Key, resolved)
+		cm := &corev1.ConfigMap{}
+		if err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, cm); err != nil {
+			return "", fmt.Errorf("failed to get configmap %s/%s: %w", namespace, name, err)
+		}
+		val, ok := cm.Data[key]
+		if !ok {
+			return "", fmt.Errorf("key %q not found in configmap %s/%s", key, namespace, name)
+		}
+		return val, nil
+	default:
+		return "", fmt.Errorf("no source specified in valueFrom")
+	}
+}
+
+// resolveFieldRef navigates a dotted fieldPath on the given object using the
+// unstructured accessor (e.g. "spec.BMCRef.name").
+// resolveFieldRef extracts the value at fieldPath from obj using dot-separated
+// path navigation (e.g. "spec.BMCRef.name"). Only string-typed fields are
+// supported; integer, bool, or map fields will be reported as an error.
+// If broader type coercion is needed in the future, prefer
+// k8s.io/apimachinery/pkg/fieldpath.ExtractFieldPathAsString, which handles
+// the same paths as the Kubernetes downward API and stringifies non-string
+// scalar types automatically.
+func resolveFieldRef(obj client.Object, fieldPath string) (string, error) {
+	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert object for fieldRef: %w", err)
+	}
+	parts := strings.Split(fieldPath, ".")
+	val, found, err := unstructured.NestedString(raw, parts...)
+	if err != nil {
+		return "", fmt.Errorf("failed to navigate fieldPath %q: %w", fieldPath, err)
+	}
+	if !found {
+		return "", fmt.Errorf("fieldPath %q not found on object %s", fieldPath, obj.GetName())
+	}
+	return val, nil
+}
+
+// settingKeys returns only the map keys of a SettingsAttributes map for
+// safe logging. Values are omitted because they may contain secrets resolved
+// from SecretKeyRef variables.
+func settingKeys(attrs schemas.SettingsAttributes) []string {
+	keys := make([]string, 0, len(attrs))
+	for k := range attrs {
+		keys = append(keys, k)
+	}
+	return keys
 }

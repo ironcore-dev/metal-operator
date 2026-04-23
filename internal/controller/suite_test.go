@@ -14,6 +14,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
@@ -47,12 +48,13 @@ const (
 )
 
 var (
-	cfg                            *rest.Config
-	k8sClient                      client.Client
-	testEnv                        *envtest.Environment
-	registryURL                    = "http://localhost:30000"
-	defaultMockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
-	defaultMockUpServerBMCVersion  = "1.45.455b66-rev4"
+	cfg                     *rest.Config
+	k8sClient               client.Client
+	testEnv                 *envtest.Environment
+	registryURL             = "http://localhost:30000"
+	mockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
+	mockUpServerBMCVersion  = "1.45.455b66-rev4"
+	mockServer              *server.MockServer
 )
 
 func TestControllers(t *testing.T) {
@@ -159,11 +161,18 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		accessor := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
 
 		// register reconciler here
+		// NOTE: The test suite uses HTTP protocol with SkipCertValidation=true because
+		// the mock Redfish server only supports HTTP (no TLS). Full HTTPS + certificate
+		// verification testing should be performed in E2E tests against real BMC hardware
+		// or production-like environments with valid TLS certificates.
+		// TODO: Consider adding HTTPS support to the mock server for more comprehensive
+		// unit test coverage of the TLS certificate validation path.
 		Expect((&EndpointReconciler{
-			Client:      k8sManager.GetClient(),
-			Scheme:      k8sManager.GetScheme(),
-			MACPrefixes: prefixDB,
-			Insecure:    true,
+			Client:             k8sManager.GetClient(),
+			Scheme:             k8sManager.GetScheme(),
+			MACPrefixes:        prefixDB,
+			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation: true,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		dnsTemplate, err := dns.LoadTemplate("../../test/data/dns_record_template.yaml")
@@ -172,22 +181,28 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		Expect((&BMCReconciler{
 			Client:                 k8sManager.GetClient(),
 			Scheme:                 k8sManager.GetScheme(),
-			Insecure:               true,
+			DefaultProtocol:        metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation:     true,
 			ManagerNamespace:       ns.Name,
 			BMCResetWaitTime:       400 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
+			EventURL:               "http://localhost:8008",
 			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerReconciler{
 			Client:                  k8sManager.GetClient(),
+			APIReader:               k8sManager.GetAPIReader(),
 			Scheme:                  k8sManager.GetScheme(),
-			Insecure:                true,
+			DefaultProtocol:         metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation:      true,
 			ManagerNamespace:        ns.Name,
 			ProbeImage:              "foo:latest",
 			ProbeOSImage:            "fooOS:latest",
 			RegistryURL:             registryURL,
+			RegistryClientTimeout:   5 * time.Second,
+			RegistryDataMaxAge:      2 * time.Minute,
 			RegistryResyncInterval:  50 * time.Millisecond,
 			ResyncInterval:          50 * time.Millisecond,
 			EnforceFirstBoot:        true,
@@ -198,11 +213,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout: time.Second, // Force timeout to be quick for tests
+			DiscoveryTimeout:      30 * time.Second, // Set a short discovery timeout for testing
+			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{
 			Client:                  k8sManager.GetClient(),
+			APIReader:               k8sManager.GetAPIReader(),
 			Cache:                   k8sManager.GetCache(),
 			Scheme:                  k8sManager.GetScheme(),
 			MaxConcurrentReconciles: 5,
@@ -219,12 +236,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSSettingsReconciler{
-			Client:           k8sManager.GetClient(),
-			ManagerNamespace: ns.Name,
-			Insecure:         true,
-			Scheme:           k8sManager.GetScheme(),
-			ResyncInterval:   10 * time.Millisecond,
-			Conditions:       accessor,
+			Client:             k8sManager.GetClient(),
+			ManagerNamespace:   ns.Name,
+			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation: true,
+			Scheme:             k8sManager.GetScheme(),
+			ResyncInterval:     10 * time.Millisecond,
+			Conditions:         accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -234,12 +252,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSVersionReconciler{
-			Client:           k8sManager.GetClient(),
-			ManagerNamespace: ns.Name,
-			Insecure:         true,
-			Scheme:           k8sManager.GetScheme(),
-			ResyncInterval:   10 * time.Millisecond,
-			Conditions:       accessor,
+			Client:             k8sManager.GetClient(),
+			ManagerNamespace:   ns.Name,
+			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation: true,
+			Scheme:             k8sManager.GetScheme(),
+			ResyncInterval:     10 * time.Millisecond,
+			Conditions:         accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -248,17 +267,19 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSVersionSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCSettingsReconciler{
-			Client:           k8sManager.GetClient(),
-			ManagerNamespace: ns.Name,
-			Insecure:         true,
-			Scheme:           k8sManager.GetScheme(),
-			ResyncInterval:   10 * time.Millisecond,
-			Conditions:       accessor,
+			Client:             k8sManager.GetClient(),
+			ManagerNamespace:   ns.Name,
+			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation: true,
+			Scheme:             k8sManager.GetScheme(),
+			ResyncInterval:     10 * time.Millisecond,
+			Conditions:         accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -267,12 +288,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCVersionReconciler{
-			Client:           k8sManager.GetClient(),
-			ManagerNamespace: ns.Name,
-			Insecure:         true,
-			Scheme:           k8sManager.GetScheme(),
-			ResyncInterval:   10 * time.Millisecond,
-			Conditions:       accessor,
+			Client:             k8sManager.GetClient(),
+			ManagerNamespace:   ns.Name,
+			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation: true,
+			Scheme:             k8sManager.GetScheme(),
+			ResyncInterval:     10 * time.Millisecond,
+			Conditions:         accessor,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -281,24 +303,28 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCSettingsSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCVersionSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BIOSSettingsSetReconciler{
-			Client: k8sManager.GetClient(),
-			Scheme: k8sManager.GetScheme(),
+			Client:         k8sManager.GetClient(),
+			Scheme:         k8sManager.GetScheme(),
+			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&BMCUserReconciler{
-			Client:   k8sManager.GetClient(),
-			Scheme:   k8sManager.GetScheme(),
-			Insecure: true,
+			Client:             k8sManager.GetClient(),
+			Scheme:             k8sManager.GetScheme(),
+			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation: true,
 			BMCOptions: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,
@@ -330,8 +356,8 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			}
 		} else {
 			By("Starting the default mock Redfish server")
+			mockServer = server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort))
 			Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-				mockServer := server.NewMockServer(GinkgoLogr, fmt.Sprintf(":%d", MockServerPort))
 				if err := mockServer.Start(ctx); err != nil {
 					return fmt.Errorf("failed to start mock Redfish server: %w", err)
 				}

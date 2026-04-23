@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -38,7 +39,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
@@ -51,7 +51,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
@@ -77,14 +76,14 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSSettings()
+		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		EnsureCleanState()
 	})
 
-	It("Should successfully patch its reference to referred server", func(ctx SpecContext) {
+	It("should successfully patch its reference to referred server", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string) // no setting to apply
@@ -97,7 +96,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting V1")
 		biosSettingsV1 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-reference",
 			},
 			// settings mocked at
@@ -105,7 +103,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -146,13 +144,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting V2")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-reference-dup",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion + "2",
+					Version: mockUpServerBiosVersion + "2",
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -191,7 +188,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("Should move to completed if no bios setting changes to referred server", func(ctx SpecContext) {
+	It("should move to completed if no bios setting changes to referred server", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -200,12 +197,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -255,7 +251,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("Should reboot server if the resetRequired field is missing in the biosRegistry", func(ctx SpecContext) {
+	It("should reboot server if the resetRequired field is missing in the biosRegistry", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -264,12 +260,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-no-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -315,7 +310,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("Should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
+	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
 		biosSetting := make(map[string]string)
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
@@ -359,12 +354,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -398,11 +392,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: metalv1alpha1.GroupVersion.String(),
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		)
 
@@ -467,7 +458,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 	})
 
-	It("Should create maintenance if setting update needs reboot", func(ctx SpecContext) {
+	It("should create maintenance if setting update needs reboot", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -511,12 +502,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-reboot-change",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -550,11 +540,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: metalv1alpha1.GroupVersion.String(),
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		)
 
@@ -607,7 +594,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		))
 	})
 
-	It("Should update setting if server is in available state", func(ctx SpecContext) {
+	It("should update setting if server is in available state", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -623,12 +610,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-from-server-avail",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -667,11 +653,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: metalv1alpha1.GroupVersion.String(),
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		)
 
@@ -702,7 +685,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("Should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
+	It("should wait for upgrade and reconcile when biosSettings version is correct", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -742,10 +725,9 @@ var _ = Describe("BIOSSettings Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		)
 
-		By("Creating a BMCSetting")
+		By("Creating a BIOSSettings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-upgrade-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
@@ -782,7 +764,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Simulate the server biosSettings version update by matching the spec version")
 		Eventually(Update(biosSettings, func() {
-			biosSettings.Spec.Version = defaultMockUpServerBiosVersion
+			biosSettings.Spec.Version = mockUpServerBiosVersion
 		})).Should(Succeed())
 
 		By("Ensuring that the biosSettings resource has setting updated, and moved the state")
@@ -828,7 +810,85 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
-	It("Should allow retry using annotation", func(ctx SpecContext) {
+	It("should allow retry using annotation", func(ctx SpecContext) {
+		// settings mocked at
+		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
+		biosSetting := make(map[string]string)
+		biosSetting["UnknownData"] = "2"
+
+		failedAutoRetryCount := 2
+
+		By("Creating a BIOSSetting")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-from-server-avail",
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+				},
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: mockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the BIOS setting has started retry and FailedAttempts is set")
+		Eventually(func(g Gomega) bool {
+			g.Expect(Get(biosSettings)()).To(Succeed())
+			return biosSettings.Status.FailedAttempts > int32(0)
+		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
+
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		Eventually(Object(biosSettings)).Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Ensuring that the BIOS setting has not been changed")
+		Consistently(Object(biosSettings), "250ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
+		// clean up maintenance if any, as the test not auto delete child objects
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
+		for _, maintenance := range serverMaintenanceList.Items {
+			if metav1.IsControlledBy(&maintenance, biosSettings) {
+				Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			}
+		}
+		Eventually(func(g Gomega) int {
+			g.Expect(k8sClient.List(ctx, &serverMaintenanceList, client.InNamespace(ns.Name))).To(Succeed())
+			owned := 0
+			for i := range serverMaintenanceList.Items {
+				if metav1.IsControlledBy(&serverMaintenanceList.Items[i], biosSettings) {
+					owned++
+				}
+			}
+			return owned
+		}).Should(Equal(0))
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
+
+	It("should replace missing BIOSSettings ref in server", func(ctx SpecContext) {
 		// settings mocked at
 		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 		biosSetting := make(map[string]string)
@@ -837,12 +897,11 @@ var _ = Describe("BIOSSettings Controller", func() {
 		By("Creating a BIOSSetting")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-from-server-avail",
+				GenerateName: "test-from-server-avail-",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -855,29 +914,87 @@ var _ = Describe("BIOSSettings Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 
-		By("Moving to Failed state")
-		Eventually(UpdateStatus(biosSettings, func() {
-			biosSettings.Status.State = metalv1alpha1.BIOSSettingsStateFailed
-		})).Should(Succeed())
-
-		Eventually(Update(biosSettings, func() {
-			biosSettings.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+		By("Wait for the BIOSSettings to be ref on the Server")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
+			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
+		))
+		// delete the old settings
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+		By("force deletion")
+		Eventually(func() error {
+			err := Update(biosSettings, func() {
+				biosSettings.Finalizers = []string{}
+			})()
+			if apierrors.IsNotFound(err) {
+				return nil
 			}
-		})).Should(Succeed())
+			return err
+		}).Should(Succeed())
+		By("check if maintenance has been created on the server and delete if its present")
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Eventually(func() error {
+			_, err := ObjectList(&serverMaintenanceList)()
+			if err != nil {
+				return err
+			}
+			if len(serverMaintenanceList.Items) > 0 {
+				for _, item := range serverMaintenanceList.Items {
+					if len(item.OwnerReferences) > 0 && item.OwnerReferences[0].UID == biosSettings.UID {
+						By(fmt.Sprintf("Deleting the ServerMaintenance created by biosSettings %v", item.Name))
+						Expect(k8sClient.Delete(ctx, &item)).To(Succeed())
+						Eventually(func() error {
+							err := Update(&item, func() {
+								item.Finalizers = []string{}
+							})()
+							if apierrors.IsNotFound(err) {
+								return nil
+							}
+							return err
+						}).Should(Succeed())
+					}
+				}
+			}
+			return nil
+		}).Should(Succeed())
 
-		Eventually(Object(biosSettings)).Should(SatisfyAny(
+		biosSettings2 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-from-server-recreated-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: mockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings2)).To(Succeed())
+
+		By("Wait for the BIOSSettings2 to be ref on the Server")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
+			HaveField("Spec.BIOSSettingsRef.Name", biosSettings2.Name),
+		))
+
+		Eventually(Object(biosSettings2)).Should(SatisfyAny(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateInProgress),
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 		))
 
-		Eventually(Object(biosSettings)).Should(SatisfyAll(
+		Eventually(Object(biosSettings2)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
 			HaveField("Status.LastAppliedTime.IsZero()", false),
 		))
 
-		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
-		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettings2)).To(Succeed())
+		Eventually(Get(biosSettings2)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
@@ -896,7 +1013,6 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	BeforeEach(func(ctx SpecContext) {
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
 			},
 			Data: map[string][]byte{
@@ -908,7 +1024,6 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		bmcObj = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -941,7 +1056,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSSettings()
+		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
@@ -949,7 +1064,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		EnsureCleanState()
 	})
 
-	It("Should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
+	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
 		biosSetting := make(map[string]string)
 		// settings which does not reboot. mocked at
 		// metal-operator/bmc/redfish_local.go defaultMockedBIOSSetting
@@ -993,12 +1108,11 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		By("Creating a BIOS settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bios-change-poweron",
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -1032,11 +1146,8 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		By("Ensuring that the Maintenance resource has been referenced by biosSettings")
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Spec.ServerMaintenanceRef", &metalv1alpha1.ObjectReference{
-				Kind:       "ServerMaintenance",
-				Name:       serverMaintenance.Name,
-				Namespace:  serverMaintenance.Namespace,
-				UID:        serverMaintenance.UID,
-				APIVersion: metalv1alpha1.GroupVersion.String(),
+				Namespace: serverMaintenance.Namespace,
+				Name:      serverMaintenance.Name,
 			}),
 		)
 
@@ -1096,7 +1207,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		))
 	})
 
-	It("Should fail and create maintenance when pending settings exist", func(ctx SpecContext) {
+	It("should fail and create maintenance when pending settings exist", func(ctx SpecContext) {
 		By("Ensuring BMC is in Enabled state")
 		Eventually(UpdateStatus(bmcObj, func() {
 			bmcObj.Status.State = metalv1alpha1.BMCStateEnabled
@@ -1161,11 +1272,10 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-pending-changes",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
 						Settings: biosSetting,
 						Priority: 1,
@@ -1238,7 +1348,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-",
 			},
 			Data: map[string][]byte{
@@ -1251,7 +1360,6 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-maintenance-",
 			},
 			Spec: metalv1alpha1.ServerSpec{
@@ -1277,25 +1385,24 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSSettings()
+		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		EnsureCleanState()
 	})
 
-	It("Should successfully apply sequence of settings", func(ctx SpecContext) {
+	It("should successfully apply sequence of settings", func(ctx SpecContext) {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1330,18 +1437,17 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		)
 	})
 
-	It("Should fail if settings provide in inValid", func(ctx SpecContext) {
+	It("should fail if settings provided are invalid", func(ctx SpecContext) {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1394,18 +1500,17 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		)
 	})
 
-	It("Should fail if duplicate keys in names or settings found", func(ctx SpecContext) {
+	It("should fail if duplicate keys in names or settings found", func(ctx SpecContext) {
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1447,14 +1552,13 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 
 		biosSettings2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1503,18 +1607,17 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		)
 	})
 
-	It("Should successfully apply sequence of different settings and reconcile from applied state", func(ctx SpecContext) {
+	It("should successfully apply sequence of different settings and reconcile from applied state", func(ctx SpecContext) {
 		By("Creating a BIOSSetting sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-differnet-",
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1571,20 +1674,19 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		)
 	})
 
-	It("Should successfully apply sequence of settings when the names and priority changed, before the settings update was issued on server", func(ctx SpecContext) {
+	It("should successfully apply sequence of settings when the names and priority changed, before the settings update was issued on server", func(ctx SpecContext) {
 		newNames := []string{"1", "10"}
 		oldNames := []string{"100", "1000"}
 		By("Creating a BIOSSetting with sequence of settings")
 		biosSettings := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-setting-flow-",
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
+					Version: mockUpServerBiosVersion,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{
 							Priority: 100,
@@ -1671,7 +1773,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	By("Ensuring right number of conditions are present")
 	Eventually(Object(biosSettings)).Should(
-		HaveField("Status.Conditions", HaveLen(3)),
+		HaveField("Status.Conditions", HaveLen(4)),
 	)
 
 	By("Ensuring the wait for version upgrade condition has NOT been added")
@@ -1685,7 +1787,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", BIOSServerMaintenanceConditionCreated),
+				HaveField("Type", ServerMaintenanceConditionCreated),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1734,7 +1836,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", BIOSServerMaintenanceConditionDeleted),
+				HaveField("Type", ServerMaintenanceConditionDeleted),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1742,7 +1844,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 }
 
 func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, RebootNeeded bool, waitForVersionUpgrade bool) {
-	commonConditions := 3
+	commonConditions := 4
 	flowCondition := 5
 
 	if RebootNeeded {
@@ -1793,7 +1895,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", BIOSServerMaintenanceConditionCreated),
+				HaveField("Type", ServerMaintenanceConditionCreated),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1894,7 +1996,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 	By("Ensuring the server maintenance has been deleted")
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElements(
-			HaveField("Type", BIOSServerMaintenanceConditionDeleted),
+			HaveField("Type", ServerMaintenanceConditionDeleted),
 			HaveField("Status", metav1.ConditionTrue),
 		)),
 	)

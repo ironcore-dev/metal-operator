@@ -2,9 +2,6 @@ name: Lint
 
 on:
   pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
 
 jobs:
   lint:
@@ -22,4 +19,4 @@ jobs:
       - name: Run linter
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.8
+          version: v2.10

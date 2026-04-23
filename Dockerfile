@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.25.6 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.2 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -17,6 +17,7 @@ COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
+COPY third_party/ third_party/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -39,6 +40,7 @@ FROM gcr.io/distroless/static:nonroot AS manager
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
 COPY --from=manager-builder /workspace/manager .
+COPY config/manager/ignition-template.yaml /etc/metal-operator/ignition-template.yaml
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

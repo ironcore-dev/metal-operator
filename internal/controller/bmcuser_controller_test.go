@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -76,7 +77,7 @@ var _ = Describe("BMCUser Controller", func() {
 		EnsureCleanState()
 	})
 
-	It("Should create a bmc user and secret", func(ctx SpecContext) {
+	It("should create a BMC user and secret", func(ctx SpecContext) {
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
@@ -134,7 +135,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Eventually(Get(effectiveSecret)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("Should just create additional bmc users", func(ctx SpecContext) {
+	It("should just create additional BMC users", func(ctx SpecContext) {
 		user01 := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "user01",
@@ -240,7 +241,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Delete(ctx, effectiveSecret02)).To(Succeed())
 	})
 
-	It("Should rotate password if rotationPeriod is set", func(ctx SpecContext) {
+	It("should rotate password if rotationPeriod is set", func(ctx SpecContext) {
 		adminUser := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "admin-user",
@@ -278,10 +279,21 @@ var _ = Describe("BMCUser Controller", func() {
 		Eventually(Get(newSecret)).Should(Succeed())
 		Expect(newSecret.Data).To(Not(HaveKeyWithValue("password", []byte("bar"))))
 		Expect(k8sClient.Delete(ctx, adminUser)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, newSecret)).To(Succeed())
+		// The 1s rotation period may trigger additional rotations that create
+		// extra BMCSecrets before we can delete. Clean up all remaining secrets
+		// owned by this user since envtest has no garbage collector.
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for _, s := range secretList.Items {
+			for _, ref := range s.OwnerReferences {
+				if ref.UID == adminUser.UID {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &s))).To(Succeed())
+				}
+			}
+		}
 	})
 
-	It("Should delete bmc user and secret on User deletion", func(ctx SpecContext) {
+	It("should delete BMC user and secret on User deletion", func(ctx SpecContext) {
 		metalBMC.UnitTestMockUps.InitializeDefaults()
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
@@ -327,7 +339,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Delete(ctx, effectiveSecret)).To(Succeed())
 	})
 
-	It("Should rotate password if OperationAnnotationRotateCredentials is set", func(ctx SpecContext) {
+	It("should rotate password if OperationAnnotationRotateCredentials is set", func(ctx SpecContext) {
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{

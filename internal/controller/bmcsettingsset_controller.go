@@ -7,11 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,13 +21,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 type BMCSettingsSetReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	ResyncInterval time.Duration
 }
 
 const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
@@ -40,34 +43,34 @@ const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 func (r *BMCSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
 	bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{}
 	if err := r.Get(ctx, req.NamespacedName, bmcSettingsSet); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling bmcSettingsSet")
 
-	return r.reconcileExist(ctx, log, bmcSettingsSet)
+	return r.reconcileExist(ctx, bmcSettingsSet)
 }
 
 func (r *BMCSettingsSetReconciler) reconcileExist(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if !bmcSettingsSet.DeletionTimestamp.IsZero() {
 		log.V(1).Info("Object is being deleted")
-		return r.delete(ctx, log, bmcSettingsSet)
+		return r.delete(ctx, bmcSettingsSet)
 	}
 	log.V(1).Info("Object exists and is not being deleted")
-	return r.reconcile(ctx, log, bmcSettingsSet)
+	return r.reconcile(ctx, bmcSettingsSet)
 }
 
 func (r *BMCSettingsSetReconciler) reconcile(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if shouldIgnoreReconciliation(bmcSettingsSet) {
 		log.V(1).Info("Skipped BMCSettingsSet reconciliation")
 		return ctrl.Result{}, nil
@@ -81,14 +84,14 @@ func (r *BMCSettingsSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to get BMCs through bmclabel selector %w", err)
 	}
 
-	return r.handleBMCSettings(ctx, log, bmcList, bmcSettingsSet)
+	return r.handleBMCSettings(ctx, bmcList, bmcSettingsSet)
 }
 
 func (r *BMCSettingsSetReconciler) delete(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if !controllerutil.ContainsFinalizer(bmcSettingsSet, BMCSettingsSetFinalizer) {
 		return ctrl.Result{}, nil
 	}
@@ -108,9 +111,16 @@ func (r *BMCSettingsSetReconciler) delete(
 	}
 	if len(ownedBMCSettings.Items) != len(delTableBMCSettings) || int32(len(ownedBMCSettings.Items)) != bmcSettingsSet.Status.AvailableBMCSettings {
 		currentStatus := r.getOwnedBMCSettingsSetStatus(ownedBMCSettings)
-		err = r.updateStatus(ctx, log, currentStatus, bmcSettingsSet)
+		err = r.updateStatus(ctx, currentStatus, bmcSettingsSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
+		}
+		log.V(1).Info("Updated BMCSettingsSet state", "Status", currentStatus)
+
+		// Handle propagation of retry annotation to child when parent is being deleted.
+		// That way the deleted annotations can be passed to children before parent is deleted.
+		if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+			return ctrl.Result{}, err
 		}
 		log.Info("Waiting on the created BMCSettings to reach terminal status")
 		return ctrl.Result{}, nil
@@ -159,10 +169,10 @@ func (r *BMCSettingsSetReconciler) getOwnedBMCSettingsSetStatus(
 
 func (r *BMCSettingsSetReconciler) updateStatus(
 	ctx context.Context,
-	log logr.Logger,
 	currentStatus *metalv1alpha1.BMCSettingsSetStatus,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcSettingsSetBase := bmcSettingsSet.DeepCopy()
 	bmcSettingsSet.Status = *currentStatus
 	if err := r.Status().Patch(ctx, bmcSettingsSet, client.MergeFrom(bmcSettingsSetBase)); err != nil {
@@ -191,34 +201,45 @@ func (r *BMCSettingsSetReconciler) getBMCsBySelector(
 
 func (r *BMCSettingsSetReconciler) handleBMCSettings(
 	ctx context.Context,
-	log logr.Logger,
 	bmcList *metalv1alpha1.BMCList,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	ownedBMCSettings, err := r.getOwnedBMCSettings(ctx, bmcSettingsSet)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createMissingBMCSettings(ctx, log, bmcList, ownedBMCSettings, bmcSettingsSet); err != nil {
+	if err := r.createMissingBMCSettings(ctx, bmcList, ownedBMCSettings, bmcSettingsSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create missing BMCSettings resources %w", err)
 	}
 	log.V(1).Info("Summary of BMCs and BMCSettings", "BMC count", len(bmcList.Items),
 		"BMCSettings count", len(ownedBMCSettings.Items))
 
-	if err := r.deleteOrphanedBMCSettings(ctx, log, bmcList, ownedBMCSettings); err != nil {
+	if err := r.deleteOrphanedBMCSettings(ctx, bmcList, ownedBMCSettings); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCSettings resource %w", err)
 	}
 
-	if err := r.patchBMCSettingsFromTemplate(ctx, log, bmcSettingsSet, ownedBMCSettings); err != nil {
+	var pendingPatchingSettings bool
+	if pendingPatchingSettings, err = r.patchBMCSettingsFromTemplate(ctx, bmcSettingsSet, ownedBMCSettings); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch BMCSettings from template %w", err)
 	}
 
 	log.V(1).Info("Updating BMCSettingsSet status")
 	currentStatus := r.getOwnedBMCSettingsSetStatus(ownedBMCSettings)
 	currentStatus.FullyLabeledBMCs = int32(len(bmcList.Items))
-	if err := r.updateStatus(ctx, log, currentStatus, bmcSettingsSet); err != nil {
+	if err := r.updateStatus(ctx, currentStatus, bmcSettingsSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
+	}
+
+	// handle retry annotation - remove the annotation after retrying reconciliation
+	if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if currentStatus.FullyLabeledBMCs != currentStatus.AvailableBMCSettings || pendingPatchingSettings {
+		log.V(1).Info("Waiting for all BMCSettings to be created/Patched for the labeled BMCs", "Status", currentStatus)
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -226,11 +247,11 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 
 func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 	ctx context.Context,
-	log logr.Logger,
 	bmcList *metalv1alpha1.BMCList,
 	bmcSettingsList *metalv1alpha1.BMCSettingsList,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcWithSettings := make(map[string]struct{})
 	for _, bmcSettings := range bmcSettingsList.Items {
 		bmcWithSettings[bmcSettings.Spec.BMCRef.Name] = struct{}{}
@@ -240,9 +261,20 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 	for _, bmc := range bmcList.Items {
 		if _, ok := bmcWithSettings[bmc.Name]; !ok {
 			if bmc.Spec.BMCSettingRef != nil {
-				log.V(1).Info("BMC already has different BMCSettingRef, skipping creation",
-					"bmc", bmc.Name, "BMCSettingRef", bmc.Spec.BMCSettingRef)
-				continue
+				if err := r.Get(ctx, client.ObjectKey{Name: bmc.Spec.BMCSettingRef.Name}, &metalv1alpha1.BMCSettings{}); err != nil {
+					if apierrors.IsNotFound(err) {
+						log.V(1).Info("BMCSettings referenced by BMC not found, will create a new one", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+						// proceed to create a new BMCSettings; the ref will be updated when it is created
+					} else {
+						log.Error(err, "Failed to get BMCSettings referenced by BMC", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+						// we will try this again in next reconciliation loop
+						continue
+					}
+				} else {
+					// the referenced BMCSettings exists, so we skip creating a new one
+					log.V(1).Info("BMC already has a BMCSettings ref", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
+					continue
+				}
 			}
 
 			// generate k8s conform name for bmcsettings
@@ -282,10 +314,10 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 
 func (r *BMCSettingsSetReconciler) deleteOrphanedBMCSettings(
 	ctx context.Context,
-	log logr.Logger,
 	bmcList *metalv1alpha1.BMCList,
 	bmcSettingsList *metalv1alpha1.BMCSettingsList,
 ) error {
+	log := ctrl.LoggerFrom(ctx)
 	bmcMap := make(map[string]struct{})
 	for _, bmc := range bmcList.Items {
 		bmcMap[bmc.Name] = struct{}{}
@@ -310,19 +342,21 @@ func (r *BMCSettingsSetReconciler) deleteOrphanedBMCSettings(
 
 func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 	ctx context.Context,
-	log logr.Logger,
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 	bmcSettingsList *metalv1alpha1.BMCSettingsList,
-) error {
+) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	if len(bmcSettingsList.Items) == 0 {
 		log.V(1).Info("No BMCSettings found, skipping spec template update")
-		return nil
+		return false, nil
 	}
 
+	var pendingPatchingSettings bool
 	var errs []error
 	for _, bmcSettings := range bmcSettingsList.Items {
 		if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
 			log.V(1).Info("Skipping BMCSettings spec patching as it is in InProgress state")
+			pendingPatchingSettings = true
 			continue
 		}
 
@@ -337,7 +371,23 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 			log.V(1).Info("Patched BMCSettings with updated spec", "BMCSettings", bmcSettings.Name, "Operation", opResult)
 		}
 	}
-	return errors.Join(errs...)
+	return pendingPatchingSettings, errors.Join(errs...)
+}
+
+func (r *BMCSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, set *metalv1alpha1.BMCSettingsSet) error {
+	log := ctrl.LoggerFrom(ctx)
+	ownedBMCSettings, err := r.getOwnedBMCSettings(ctx, set)
+	if err != nil {
+		return err
+	}
+
+	if len(ownedBMCSettings.Items) == 0 {
+		log.V(1).Info("No BMCSettings found, skipping retry annotation propagation")
+		return nil
+	}
+
+	log.V(1).Info("Propagating retry annotation to owned BMCSettings resources")
+	return handleRetryAnnotationPropagation(ctx, r.Client, set, ownedBMCSettings)
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(
@@ -397,7 +447,13 @@ func (r *BMCSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// Watch BMC resources for label changes to trigger reconciliation
 			&metalv1alpha1.BMC{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByBMC),
-			builder.WithPredicates(predicate.LabelChangedPredicate{})).
+			builder.WithPredicates(predicate.Funcs{
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldBMC := e.ObjectOld.(*metalv1alpha1.BMC)
+					newBMC := e.ObjectNew.(*metalv1alpha1.BMC)
+					return labelChangeOrAnyFieldChangeInObject(e, []any{oldBMC.Spec.BMCSettingRef}, []any{newBMC.Spec.BMCSettingRef})
+				},
+			})).
 		Named("bmcsettingsset").
 		Complete(r)
 }

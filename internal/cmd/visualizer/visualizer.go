@@ -19,6 +19,7 @@ import (
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/cmd/api"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -91,7 +92,7 @@ func (v *Visualizer) handleGetServers() http.HandlerFunc {
 
 		var servers []api.ServerInfo
 		for _, item := range serverList.Items {
-			server, err := parseServerToServerInfo(&item)
+			server, err := v.parseServerToServerInfo(&item)
 			if err != nil {
 				log.Printf("Skipping server due to parsing error: %v", err)
 				continue
@@ -118,7 +119,7 @@ func serveFrontend(w http.ResponseWriter, r *http.Request) {
 }
 
 // parseServerToServerInfo extracts the required fields from a Server object.
-func parseServerToServerInfo(server *metalv1alpha1.Server) (api.ServerInfo, error) {
+func (v *Visualizer) parseServerToServerInfo(server *metalv1alpha1.Server) (api.ServerInfo, error) {
 	var info api.ServerInfo
 	info.Name = server.GetName()
 
@@ -142,5 +143,112 @@ func parseServerToServerInfo(server *metalv1alpha1.Server) (api.ServerInfo, erro
 	info.IndicatorLED = string(server.Spec.IndicatorLED)
 	info.State = string(server.Status.State)
 
+	// Fetch ServerMetadata for enrichment and hardware data
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	serverMetadata := &metalv1alpha1.ServerMetadata{}
+	metadataKey := client.ObjectKey{Name: server.Name}
+
+	if err := v.Client.Get(ctx, metadataKey, serverMetadata); err == nil {
+		// Extract enrichment data
+		if len(serverMetadata.Enrichment) > 0 {
+			info.Enrichment = serverMetadata.Enrichment
+			info.Location = parseLocationFromEnrichment(serverMetadata.Enrichment)
+		}
+
+		// Extract hardware metadata
+		info.Hardware = extractHardwareInfo(serverMetadata)
+	} else if !apierrors.IsNotFound(err) {
+		log.Printf("Warning: Failed to fetch ServerMetadata for %s: %v", info.Name, err)
+	}
+
 	return info, nil
+}
+
+// parseLocationFromEnrichment extracts location hierarchy from enrichment map using well-known keys.
+func parseLocationFromEnrichment(enrichment map[string]string) *api.LocationInfo {
+	loc := &api.LocationInfo{
+		Site:     enrichment[metalv1alpha1.EnrichmentLocationSite],
+		Building: enrichment[metalv1alpha1.EnrichmentLocationBuilding],
+		Room:     enrichment[metalv1alpha1.EnrichmentLocationRoom],
+		RackName: enrichment[metalv1alpha1.EnrichmentLocationRack],
+		Position: enrichment[metalv1alpha1.EnrichmentLocationPosition],
+	}
+
+	// Build hierarchical path for drill-down navigation
+	if loc.Site != "" {
+		loc.HierarchyPath = append(loc.HierarchyPath, loc.Site)
+	}
+	if loc.Building != "" {
+		loc.HierarchyPath = append(loc.HierarchyPath, loc.Building)
+	}
+	if loc.Room != "" {
+		loc.HierarchyPath = append(loc.HierarchyPath, loc.Room)
+	}
+
+	// Return nil if no location data found
+	if len(loc.HierarchyPath) == 0 {
+		return nil
+	}
+
+	return loc
+}
+
+// extractHardwareInfo extracts aggregated hardware summary from ServerMetadata.
+func extractHardwareInfo(metadata *metalv1alpha1.ServerMetadata) *api.HardwareInfo {
+	hw := &api.HardwareInfo{}
+
+	// System information
+	if metadata.SystemInfo.SystemInformation.Manufacturer != "" {
+		hw.Manufacturer = metadata.SystemInfo.SystemInformation.Manufacturer
+		hw.Model = metadata.SystemInfo.SystemInformation.ProductName
+		hw.SerialNumber = metadata.SystemInfo.SystemInformation.SerialNumber
+		hw.UUID = metadata.SystemInfo.SystemInformation.UUID
+	}
+
+	// BIOS information
+	if metadata.SystemInfo.BIOSInformation.Vendor != "" {
+		hw.BIOSVendor = metadata.SystemInfo.BIOSInformation.Vendor
+		hw.BIOSVersion = metadata.SystemInfo.BIOSInformation.Version
+	}
+
+	// CPU summary
+	hw.TotalCPUs = len(metadata.CPU)
+	if len(metadata.CPU) > 0 {
+		hw.CPUModel = metadata.CPU[0].Model
+		for _, cpu := range metadata.CPU {
+			hw.TotalCores += cpu.TotalCores
+			hw.TotalThreads += cpu.TotalHardwareThreads
+		}
+	}
+
+	// Memory summary
+	hw.MemoryModules = len(metadata.Memory)
+	var totalMemoryBytes int64
+	for _, mem := range metadata.Memory {
+		totalMemoryBytes += mem.SizeBytes
+	}
+	hw.TotalMemoryGB = int(totalMemoryBytes / (1024 * 1024 * 1024))
+
+	// Storage summary
+	hw.StorageDevices = len(metadata.Storage)
+	var totalStorageBytes uint64
+	for _, storage := range metadata.Storage {
+		totalStorageBytes += storage.SizeBytes
+	}
+	hw.TotalStorageGB = int(totalStorageBytes / (1024 * 1024 * 1024))
+
+	// Network summary
+	hw.NetworkInterfaces = len(metadata.NetworkInterfaces)
+
+	// PCI devices
+	hw.PCIDeviceCount = len(metadata.PCIDevices)
+
+	// Return nil if no hardware data found
+	if hw.Manufacturer == "" && hw.TotalCPUs == 0 {
+		return nil
+	}
+
+	return hw
 }

@@ -118,19 +118,21 @@ var (
 )
 
 type MockServer struct {
-	log        logr.Logger
-	addr       string
-	handler    http.Handler
-	mu         sync.RWMutex
-	overrides  map[string]any
-	upgradeGen int64 // incremented on each SimpleUpdate to cancel stale goroutines
+	log               logr.Logger
+	addr              string
+	handler           http.Handler
+	mu                sync.RWMutex
+	overrides         map[string]any
+	upgradeGen        int64             // incremented on each SimpleUpdate to cancel stale goroutines
+	upgradedResources map[string]string // odata.id URI → file path for resources updated by the last upgrade
 }
 
 func NewMockServer(log logr.Logger, addr string) *MockServer {
 	s := &MockServer{
-		addr:      addr,
-		log:       log,
-		overrides: make(map[string]any),
+		addr:              addr,
+		log:               log,
+		overrides:         make(map[string]any),
+		upgradedResources: make(map[string]string),
 	}
 
 	mux := http.NewServeMux()
@@ -484,6 +486,7 @@ func (s *MockServer) applyFirmwareVersionsLocked(targets []string, imageURI stri
 				continue
 			}
 			s.overrides[resPath] = res
+			s.upgradedResources[odataID] = resPath
 			s.log.Info("Updated firmware version", "resource", odataID, "version", imageURI)
 		}
 	}
@@ -763,6 +766,41 @@ func (s *MockServer) ResetBIOSSettings(systemID string) {
 	defer s.mu.Unlock()
 	s.resetResourceFromEmbeddedLocked(filePath)
 	s.resetResourceFromEmbeddedLocked(settingsFilePath)
+}
+
+// ResetUpgradeTask resets upgrade state on the mock server.
+//
+// With no arguments it resets everything: the task JSON, any in-flight
+// goroutine, and all System/Manager resources whose firmware version was
+// written by a completed upgrade.
+//
+// With one or more Redfish resource URIs (e.g. server.Spec.SystemURI or
+// "/redfish/v1/Managers/BMC") it resets only the version field for those
+// specific resources, leaving others untouched. The task JSON is also reset
+// once no upgraded resources remain.
+//
+// Call this in AfterEach to ensure a clean slate between upgrade-related tests.
+func (s *MockServer) ResetUpgradeTask(resourceURIs ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.upgradeGen++ // invalidate any running doUpgradeSteps goroutine
+	if len(resourceURIs) == 0 {
+		s.resetResourceFromEmbeddedLocked(upgradeTaskFilePath)
+		for _, p := range s.upgradedResources {
+			s.resetResourceFromEmbeddedLocked(p)
+		}
+		s.upgradedResources = make(map[string]string)
+		return
+	}
+	for _, uri := range resourceURIs {
+		if resPath, ok := s.upgradedResources[uri]; ok {
+			s.resetResourceFromEmbeddedLocked(resPath)
+			delete(s.upgradedResources, uri)
+		}
+	}
+	if len(s.upgradedResources) == 0 {
+		s.resetResourceFromEmbeddedLocked(upgradeTaskFilePath)
+	}
 }
 
 // resetResourceFromEmbeddedLocked replaces the override for filePath with the

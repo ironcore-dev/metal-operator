@@ -90,6 +90,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
+		mockServers[0].ResetUpgradeTask("/redfish/v1/Managers/BMC")
 	})
 
 	It("should successfully mark completed if no BMC version change", func(ctx SpecContext) {

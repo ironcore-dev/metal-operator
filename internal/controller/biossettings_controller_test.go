@@ -76,7 +76,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
+		mockServers[0].ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
@@ -1056,7 +1056,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
+		mockServers[0].ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
@@ -1385,7 +1385,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		mockServer.ResetBIOSSettings(path.Base(server.Spec.SystemURI))
+		mockServers[0].ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())

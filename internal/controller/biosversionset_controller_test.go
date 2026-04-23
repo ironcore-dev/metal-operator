@@ -17,7 +17,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BIOSVersionSet Controller", func() {
@@ -123,14 +122,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
-
 		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-
 		EnsureCleanState()
+		for _, ms := range mockServers {
+			ms.ResetUpgradeTask()
+		}
 	})
 
 	It("should successfully reconcile the resource", func(ctx SpecContext) {

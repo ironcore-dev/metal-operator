@@ -2,6 +2,9 @@ name: Check Codegen
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 jobs:
   check-codegen:

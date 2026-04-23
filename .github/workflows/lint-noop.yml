@@ -1,0 +1,18 @@
+name: Lint
+
+# Noop companion to lint.yml. Fires when a PR only touches docs / markdown
+# files, declaring the same job name so the required "Run linter" status
+# check is satisfied without running the real linter. See
+# https://github.com/ironcore-dev/metal-operator/issues/824.
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '**/*.md'
+
+jobs:
+  lint:
+    name: Run linter
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Docs-only change, skipping linter"

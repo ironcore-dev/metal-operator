@@ -1,0 +1,19 @@
+name: Check Codegen
+
+# Noop companion to check-codegen.yml. Fires when a PR only touches
+# docs / markdown files, declaring the same job name so the required
+# "Run code generation checks" status check is satisfied without running
+# the real codegen diff. See
+# https://github.com/ironcore-dev/metal-operator/issues/824.
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '**/*.md'
+
+jobs:
+  check-codegen:
+    name: Run code generation checks
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Docs-only change, skipping code generation checks"

@@ -1,0 +1,19 @@
+name: Tests
+
+# Noop companion to test.yml. Fires when a PR only touches docs / markdown
+# files, declaring the same job name so the required "Run tests" status
+# check is satisfied without running the real long-running test job. See
+# https://github.com/ironcore-dev/metal-operator/issues/824.
+on:
+  pull_request:
+    types: [ assigned, opened, synchronize, reopened ]
+    paths:
+      - 'docs/**'
+      - '**/*.md'
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Docs-only change, skipping tests"

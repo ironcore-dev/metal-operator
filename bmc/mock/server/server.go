@@ -12,7 +12,6 @@ import (
 	"io"
 	"maps"
 	"net/http"
-	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -35,12 +34,6 @@ type Member struct {
 	OdataID string `json:"@odata.id"`
 }
 
-// upgradeTarget describes a resource path and the field to overwrite with the new version on completion.
-type upgradeTarget struct {
-	path  string
-	field string
-}
-
 const (
 	PowerOffState = "Off"
 	PowerOnState  = "On"
@@ -48,15 +41,52 @@ const (
 	biosSettingsPathSuffix = "Bios/Settings"
 	attributesKey          = "Attributes"
 
-	upgradeTaskPath      = "data/TaskService/Tasks/upgrade/index.json"
-	upgradeTaskStepsPath = "data/TaskService/Tasks/upgrade/steps.json"
+	// Fixed file paths for BMC manager resources.
+	bmcFilePath         = "data/Managers/BMC/index.json"
+	bmcSettingsFilePath = "data/Managers/BMC/Settings/index.json"
 )
 
-// upgradeTaskURI is the @odata.id of the upgrade task, read from the embedded index.json.
-var upgradeTaskURI = embeddedStringField(upgradeTaskPath, "@odata.id")
+// noRebootSettings and noRebootBMCSettings are populated at init time by
+// scanning the embedded attribute registries for entries where ResetRequired == false.
+var (
+	noRebootSettings    []string
+	noRebootBMCSettings []string
+)
 
-// BIOS settings that can be applied without reboot.
-var noRebootSettings = []string{"AdminPhone"}
+func init() {
+	noRebootSettings = mustLoadNoRebootAttrs("data/Registries/BiosAttributeRegistry.v1_0_0.json")
+	noRebootBMCSettings = mustLoadNoRebootAttrs("data/Registries/BMCAttributeRegistry/index.json")
+}
+
+// mustLoadNoRebootAttrs reads an attribute registry JSON from the embedded FS and
+// returns the names of all attributes whose ResetRequired field is false.
+// It panics if the file cannot be read or parsed so that a renamed or malformed
+// embedded registry is caught immediately at startup rather than silently
+// flipping all settings onto the slow (reboot-required) path.
+func mustLoadNoRebootAttrs(registryPath string) []string {
+	data, err := dataFS.ReadFile(registryPath)
+	if err != nil {
+		panic(fmt.Sprintf("read %s: %v", registryPath, err))
+	}
+	var registry struct {
+		RegistryEntries struct {
+			Attributes []struct {
+				AttributeName string `json:"AttributeName"`
+				ResetRequired bool   `json:"ResetRequired"`
+			} `json:"Attributes"`
+		} `json:"RegistryEntries"`
+	}
+	if err := json.Unmarshal(data, &registry); err != nil {
+		panic(fmt.Sprintf("parse %s: %v", registryPath, err))
+	}
+	var result []string
+	for _, attr := range registry.RegistryEntries.Attributes {
+		if !attr.ResetRequired {
+			result = append(result, attr.AttributeName)
+		}
+	}
+	return result
+}
 
 // Power state categories for system reset actions.
 var (
@@ -157,63 +187,8 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 		s.handleSystemReset(w, r, body)
 	case strings.HasSuffix(urlPath, "/Actions/Manager.Reset"):
 		s.handleBMCReset(w, r, body)
-	case strings.HasSuffix(urlPath, "/Actions/UpdateService.SimpleUpdate") ||
-		strings.HasSuffix(urlPath, "/Actions/SimpleUpdate"):
-		var params struct {
-			ImageURI string `json:"ImageURI"`
-		}
-		_ = json.Unmarshal(body, &params)
-
-		// The ImageURI scheme encodes the target type and (for BIOS) the system URI:
-		//   bios:///redfish/v1/Systems/<id>/<version>
-		//   bmc://<version>
-		// This avoids relying on the optional Targets field.
-		isBIOS := strings.HasPrefix(params.ImageURI, "bios://")
-		rest := strings.TrimPrefix(strings.TrimPrefix(params.ImageURI, "bios://"), "bmc://")
-
-		// For BIOS, rest is "<systemURI>/<version>" where systemURI starts with /redfish/v1/Systems/...
-		// For BMC,  rest is just the plain version string.
-		var imageVersion string
-		var targets []upgradeTarget
-		if isBIOS {
-			// rest = "/redfish/v1/Systems/<id>/<encoded-version>" — split off the last path segment as version.
-			// The version is URL-encoded (by the client) to avoid ambiguity with slashes in version strings.
-			// If no system URI is present, fall back to the first system in the collection.
-			lastSlash := strings.LastIndex(rest, "/")
-			var sysPath string
-			if lastSlash > 0 {
-				systemURI := rest[:lastSlash]
-				encodedVersion := rest[lastSlash+1:]
-				imageVersion, _ = url.PathUnescape(encodedVersion)
-				sysPath = resolvePath(systemURI)
-			} else {
-				imageVersion, _ = url.PathUnescape(rest)
-				sysPath = embeddedMemberDataPath("data/Systems/index.json", "")
-			}
-			if sysPath != "" {
-				targets = []upgradeTarget{{path: sysPath, field: "BiosVersion"}}
-			}
-		} else {
-			imageVersion = rest
-			if bmcPath := embeddedMemberDataPath("data/Managers/index.json", ""); bmcPath != "" {
-				targets = append(targets, upgradeTarget{path: bmcPath, field: "FirmwareVersion"})
-			}
-			if fwPath := embeddedMemberDataPath("data/UpdateService/FirmwareInventory/index.json", "/BMC"); fwPath != "" {
-				targets = append(targets, upgradeTarget{path: fwPath, field: "Version"})
-			}
-		}
-
-		steps := loadUpgradeSteps()
-		s.mu.Lock()
-		if len(steps) > 0 {
-			s.overrides[upgradeTaskPath] = buildUpgradeTask(steps[0])
-		}
-		s.mu.Unlock()
-
-		go s.doUpgradeTask(imageVersion, targets)
-
-		w.Header().Set("Location", upgradeTaskURI)
-		s.writeJSON(w, http.StatusAccepted, map[string]string{"@odata.id": upgradeTaskURI})
+	case strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
+		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
 	default:
 		//
 		urlPath := resolvePath(r.URL.Path)
@@ -306,6 +281,11 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.applyBiosSettings(r.URL.Path, update); err != nil {
+		s.handleError(w, r, err)
+		return
+	}
+
+	if err := s.applyBMCSettings(r.URL.Path, update); err != nil {
 		s.handleError(w, r, err)
 		return
 	}
@@ -508,142 +488,161 @@ func (s *MockServer) doPowerReset(systemPath, basePath string) {
 	}
 }
 
-func (s *MockServer) doUpgradeTask(imageVersion string, targets []upgradeTarget) {
-	steps := loadUpgradeSteps()
+func (s *MockServer) doBMCReset(bmcPath string) {
+	// Simulate the BMC being offline during reset.
+	// The lock set by handleBMCReset prevents new POST operations during this window.
+	time.Sleep(150 * time.Millisecond)
 
-	// Step 0 ("New") was already set by handlePost; advance through the remaining steps.
-	for i := 1; i < len(steps); i++ {
-		time.Sleep(50 * time.Millisecond)
-		s.mu.Lock()
-		s.overrides[upgradeTaskPath] = buildUpgradeTask(steps[i])
-		if taskState, _ := steps[i]["TaskState"].(string); taskState == "Completed" {
-			for _, t := range targets {
-				if data, err := s.loadResourceLocked(t.path); err == nil {
-					data[t.field] = imageVersion
-					s.overrides[t.path] = data
-				}
-			}
-		}
-		s.mu.Unlock()
+	s.mu.Lock()
+	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
+		s.setLocked(base, false)
+		s.log.Info("BMC reset complete")
+	}
+	s.mu.Unlock()
+
+	if err := s.applyPendingBMCSettings(); err != nil {
+		s.log.Error(err, "Failed to apply pending BMC settings")
 	}
 }
 
-// loadUpgradeSteps reads the upgrade task step definitions from the embedded JSON file.
-func loadUpgradeSteps() []map[string]any {
-	data, err := dataFS.ReadFile(upgradeTaskStepsPath)
-	if err != nil {
+func (s *MockServer) applyBMCSettings(urlPath string, update map[string]any) error {
+	if !strings.Contains(urlPath, "Managers/BMC/Settings") {
 		return nil
 	}
-	var steps []map[string]any
-	if err := json.Unmarshal(data, &steps); err != nil {
+
+	attrs, ok := update[attributesKey].(map[string]any)
+	if !ok || len(attrs) == 0 {
 		return nil
 	}
-	return steps
-}
 
-// buildUpgradeTask merges a step's fields on top of the base task defined in upgradeTaskPath.
-func buildUpgradeTask(step map[string]any) map[string]any {
-	data, _ := dataFS.ReadFile(upgradeTaskPath)
-	var base map[string]any
-	if err := json.Unmarshal(data, &base); err != nil {
-		base = make(map[string]any)
-	}
-	for k, v := range step {
-		base[k] = v
-	}
-	return base
-}
-
-// embeddedMemberDataPath returns the data file path for a collection member whose @odata.id ends with idSuffix.
-// If idSuffix is empty, the first member's path is returned.
-func embeddedMemberDataPath(collectionDataPath, idSuffix string) string {
-	data, err := dataFS.ReadFile(collectionDataPath)
-	if err != nil {
-		return ""
-	}
-	var col Collection
-	if err := json.Unmarshal(data, &col); err != nil || len(col.Members) == 0 {
-		return ""
-	}
-	if idSuffix == "" {
-		return resolvePath(col.Members[0].OdataID)
-	}
-	for _, m := range col.Members {
-		if strings.HasSuffix(m.OdataID, idSuffix) {
-			return resolvePath(m.OdataID)
+	// Attrs that can be applied immediately without a BMC reset.
+	immediate := make(map[string]any)
+	for key, val := range attrs {
+		if slices.Contains(noRebootBMCSettings, key) {
+			immediate[key] = val
 		}
 	}
-	return ""
-}
 
-// embeddedStringField reads a single top-level string field from an embedded JSON data file.
-func embeddedStringField(filePath, field string) string {
-	data, err := dataFS.ReadFile(filePath)
-	if err != nil {
-		return ""
+	if len(immediate) == 0 {
+		return nil
 	}
-	var m map[string]any
-	if err := json.Unmarshal(data, &m); err != nil {
-		return ""
-	}
-	v, _ := m[field].(string)
-	return v
-}
 
-// ResetBIOSVersion resets the BIOS version and clears any in-progress upgrade task.
-func (s *MockServer) ResetBIOSVersion() {
+	// Apply to the current BMC manager resource.
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.overrides, upgradeTaskPath)
-	sysPath := embeddedMemberDataPath("data/Systems/index.json", "")
-	if sysPath == "" {
+
+	bmcBase, err := s.loadResourceLocked(bmcFilePath)
+	if err != nil {
+		return err
+	}
+
+	// If the BMC is mid-reset (locked), leave the immediate settings in attrs
+	// so they are written to the pending Settings resource and picked up by
+	// applyPendingBMCSettings once the reset completes.
+	if s.isLocked(bmcBase) {
+		return nil
+	}
+
+	s.log.Info("Applying BMC settings without reset", "settings", immediate)
+
+	// Remove immediate settings from the pending update so they are not
+	// written to the Settings (pending) resource.
+	for key := range immediate {
+		delete(attrs, key)
+	}
+
+	if bmcAttrs, ok := bmcBase[attributesKey].(map[string]any); ok {
+		maps.Copy(bmcAttrs, immediate)
+	}
+	s.overrides[bmcFilePath] = bmcBase
+
+	return nil
+}
+
+func (s *MockServer) applyPendingBMCSettings() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pending, err := s.loadResourceLocked(bmcSettingsFilePath)
+	if err != nil {
+		return err
+	}
+
+	pendingAttrs, ok := pending[attributesKey].(map[string]any)
+	if !ok || len(pendingAttrs) == 0 {
+		return nil
+	}
+
+	current, err := s.loadResourceLocked(bmcFilePath)
+	if err != nil {
+		return err
+	}
+
+	currentAttrs, ok := current[attributesKey].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	maps.Copy(currentAttrs, pendingAttrs)
+	pending[attributesKey] = map[string]any{}
+
+	s.overrides[bmcFilePath] = current
+	s.overrides[bmcSettingsFilePath] = pending
+	s.log.Info("Applied pending BMC settings")
+
+	return nil
+}
+
+// GetBMCSettingAttr returns the current BMC Attributes map for the given managerID
+// (e.g. "BMC"). Returns nil if the resource cannot be loaded.
+func (s *MockServer) GetBMCSettingAttr(managerID string) map[string]any {
+	filePath := fmt.Sprintf("data/Managers/%s/index.json", managerID)
+	resource, err := s.loadResource(filePath)
+	if err != nil {
+		return nil
+	}
+	attrs, _ := resource[attributesKey].(map[string]any)
+	return attrs
+}
+
+// ResetBMCSettings resets the BMC attribute state on the server to defaults,
+// clearing both current and pending attributes. managerID is the folder name under data/Managers/ (e.g. "BMC").
+func (s *MockServer) ResetBMCSettings(managerID string) {
+	filePath := fmt.Sprintf("data/Managers/%s/index.json", managerID)
+	settingsFilePath := fmt.Sprintf("data/Managers/%s/Settings/index.json", managerID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetResourceFromEmbeddedLocked(filePath)
+	s.resetResourceFromEmbeddedLocked(settingsFilePath)
+}
+
+// ResetBIOSSettings resets the BIOS attribute state on the server to defaults,
+// clearing both current and pending attributes. systemID is the folder name under data/Systems/ (e.g. "437XR1138R2").
+func (s *MockServer) ResetBIOSSettings(systemID string) {
+	filePath := fmt.Sprintf("data/Systems/%s/Bios/index.json", systemID)
+	settingsFilePath := fmt.Sprintf("data/Systems/%s/Bios/Settings/index.json", systemID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetResourceFromEmbeddedLocked(filePath)
+	s.resetResourceFromEmbeddedLocked(settingsFilePath)
+}
+
+// resetResourceFromEmbeddedLocked replaces the override for filePath with the
+// full contents of the embedded file, clearing all mutated fields including
+// resourceLock, Attributes, and any other state accumulated during a test.
+// The caller must hold s.mu.
+func (s *MockServer) resetResourceFromEmbeddedLocked(filePath string) {
+	raw, err := dataFS.ReadFile(filePath)
+	if err != nil {
+		s.log.Error(err, "Failed to read embedded default", "path", filePath)
 		return
 	}
-	if sysData, err := s.loadResourceLocked(sysPath); err == nil {
-		sysData["BiosVersion"] = embeddedStringField(sysPath, "BiosVersion")
-		s.overrides[sysPath] = sysData
+	var defaults map[string]any
+	if err := json.Unmarshal(raw, &defaults); err != nil {
+		s.log.Error(err, "Failed to parse embedded default", "path", filePath)
+		return
 	}
-}
-
-// ResetBMCVersion resets the BMC firmware version and clears any in-progress upgrade task.
-func (s *MockServer) ResetBMCVersion() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.overrides, upgradeTaskPath)
-	bmcPath := embeddedMemberDataPath("data/Managers/index.json", "")
-	if bmcPath != "" {
-		if bmcData, err := s.loadResourceLocked(bmcPath); err == nil {
-			bmcData["FirmwareVersion"] = embeddedStringField(bmcPath, "FirmwareVersion")
-			s.overrides[bmcPath] = bmcData
-		}
-	}
-	bmcFirmPath := embeddedMemberDataPath("data/UpdateService/FirmwareInventory/index.json", "/BMC")
-	if bmcFirmPath != "" {
-		if bmcFirmData, err := s.loadResourceLocked(bmcFirmPath); err == nil {
-			bmcFirmData["Version"] = embeddedStringField(bmcFirmPath, "Version")
-			s.overrides[bmcFirmPath] = bmcFirmData
-		}
-	}
-}
-
-func (s *MockServer) doBMCReset(bmcPath string) {
-	time.Sleep(150 * time.Millisecond)
-	s.mu.Lock()
-	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
-		base["PowerState"] = PowerOffState
-		s.log.Info("Powered off the BMC")
-	}
-	s.mu.Unlock()
-
-	time.Sleep(150 * time.Millisecond)
-
-	s.mu.Lock()
-	if base, ok := s.overrides[bmcPath].(map[string]any); ok {
-		base["PowerState"] = PowerOnState
-		s.setLocked(base, false)
-		s.log.Info("Powered on the BMC")
-	}
-	s.mu.Unlock()
+	s.overrides[filePath] = defaults
 }
 
 func (s *MockServer) applyBiosSettings(urlPath string, update map[string]any) error {

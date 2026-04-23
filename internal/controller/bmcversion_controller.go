@@ -629,7 +629,7 @@ func (r *BMCVersionReconciler) resetBMC(ctx context.Context, bmcVersion *metalv1
 		if condition.Reason != BMCReasonReset {
 			if annotations != nil {
 				if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
-					if op == metalv1alpha1.GracefulRestartBMC {
+					if op == metalv1alpha1.ForceResetBMC {
 						log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
 						if err := r.Conditions.Update(
 							condition,
@@ -652,7 +652,7 @@ func (r *BMCVersionReconciler) resetBMC(ctx context.Context, bmcVersion *metalv1
 			if annotations == nil {
 				annotations = map[string]string{}
 			}
-			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.GracefulRestartBMC
+			annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
 			bmcObj.SetAnnotations(annotations)
 			if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 				return false, err
@@ -673,7 +673,7 @@ func (r *BMCVersionReconciler) resetBMC(ctx context.Context, bmcVersion *metalv1
 		// we need to wait until the BMC resource annotation is removed
 		if annotations != nil {
 			if op, ok := annotations[metalv1alpha1.OperationAnnotation]; ok {
-				if op == metalv1alpha1.GracefulRestartBMC {
+				if op == metalv1alpha1.ForceResetBMC {
 					log.V(1).Info("Waiting for BMC reset as annotation on BMC object is set")
 					return false, nil
 				}

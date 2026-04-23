@@ -54,19 +54,21 @@ const (
 )
 
 const (
-	// GracefulShutdownServerPower indicates to gracefully restart the baremetal server power.
+	// GracefulRestartServerPower indicates to gracefully restart the baremetal server power.
 	GracefulRestartServerPower = "graceful-restart-server"
 	// HardRestartServerPower indicates to hard restart the baremetal server power.
 	HardRestartServerPower = "hard-restart-server"
-	// PowerOffServerPower indicates to power cycle the baremetal server.
+	// PowerCycleServerPower indicates to power cycle the baremetal server.
 	PowerCycleServerPower = "power-cycle-server"
 	// ForceOffServerPower indicates to force powerOff the baremetal server power.
 	ForceOffServerPower = "force-off-server"
 	// ForceOnServerPower indicates to force powerOn the baremetal server power.
 	ForceOnServerPower = "force-on-server"
-
-	// GracefulShutdownBMC indicates to gracefully restart the baremetal server's BMC's power.
-	GracefulRestartBMC = "graceful-restart-bmc"
+	// ForceResetBMC indicates to forcefully restart the BMC (Baseboard Management Controller).
+	// This triggers a BMC reset operation that will attempt Redfish ForceRestart first,
+	// and fall back to SSH-based reset if the BMC is unresponsive (5xx errors).
+	// The SSH reset commands (e.g., Dell's racreset) perform forceful resets without graceful shutdown.
+	ForceResetBMC = "force-reset-bmc"
 )
 
 var AnnotationToRedfishMapping = map[string]schemas.ResetType{
@@ -75,5 +77,5 @@ var AnnotationToRedfishMapping = map[string]schemas.ResetType{
 	PowerCycleServerPower:      schemas.PowerCycleResetType,
 	ForceOffServerPower:        schemas.ForceOffResetType,
 	ForceOnServerPower:         schemas.ForceOnResetType,
-	GracefulRestartBMC:         schemas.GracefulRestartResetType,
+	ForceResetBMC:              schemas.ForceRestartResetType,
 }

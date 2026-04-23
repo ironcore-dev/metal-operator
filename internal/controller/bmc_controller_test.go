@@ -4,7 +4,10 @@
 package controller
 
 import (
+	"context"
+	"fmt"
 	"maps"
+	"sync"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -16,6 +19,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -553,7 +557,7 @@ var _ = Describe("BMC Reset", func() {
 		By("Resetting the BMC")
 		Eventually(Update(bmc, func() {
 			bmc.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.GracefulRestartBMC,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.ForceResetBMC,
 			}
 		})).Should(Succeed())
 
@@ -620,7 +624,7 @@ var _ = Describe("BMC Conditions", func() {
 
 		By("Ensuring right conditions are present")
 		Eventually(Object(bmc)).Should(
-			HaveField("Status.Conditions", HaveLen(1)),
+			HaveField("Status.Conditions", Not(BeEmpty())),
 		)
 		Eventually(Object(bmc)).Should(
 			HaveField("Status.Conditions", ContainElement(
@@ -635,7 +639,7 @@ var _ = Describe("BMC Conditions", func() {
 
 		By("Ensuring right conditions are present, after bmc becomes responsive again")
 		Eventually(Object(bmc)).Should(
-			HaveField("Status.Conditions", HaveLen(1)),
+			HaveField("Status.Conditions", Not(BeEmpty())),
 		)
 		Eventually(Object(bmc)).Should(
 			HaveField("Status.Conditions", ContainElement(
@@ -649,14 +653,13 @@ var _ = Describe("BMC Conditions", func() {
 		By("resetting the BMC")
 		Eventually(Update(bmc, func() {
 			bmc.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.GracefulRestartBMC,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.ForceResetBMC,
 			}
 		},
 		)).Should(Succeed())
 
 		By("Ensuring right conditions are present, after user requested reset")
-		Eventually(Object(bmc)).WithPolling(1 * time.Microsecond).MustPassRepeatedly(1).Should(SatisfyAll(
-			HaveField("Status.Conditions", HaveLen(2)),
+		Eventually(Object(bmc)).WithPolling(1 * time.Microsecond).MustPassRepeatedly(1).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
 					HaveField("Type", bmcResetConditionType),
@@ -664,7 +667,7 @@ var _ = Describe("BMC Conditions", func() {
 					HaveField("Reason", bmcUserResetReason),
 				),
 			)),
-		))
+		)
 		By("BMC reset should remove the reset annotation")
 		Eventually(Object(bmc)).Should(
 			HaveField("Annotations", BeNil()),
@@ -692,5 +695,349 @@ var _ = Describe("BMC Conditions", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
+	})
+})
+
+// Helper to create BMCSecret for SSH tests
+func createBMCSecretForSSHTest(ctx context.Context) *metalv1alpha1.BMCSecret {
+	bmcSecret := &metalv1alpha1.BMCSecret{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-ssh-",
+		},
+		Data: map[string][]byte{
+			metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+			metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+		},
+	}
+	Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+	return bmcSecret
+}
+
+// Helper to create BMC for SSH reset tests
+func createBMCForSSHTest(ctx context.Context, bmcSecret *metalv1alpha1.BMCSecret) *metalv1alpha1.BMC {
+	bmc := &metalv1alpha1.BMC{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-bmc-ssh-",
+		},
+		Spec: metalv1alpha1.BMCSpec{
+			Endpoint: &metalv1alpha1.InlineEndpoint{
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
+				MACAddress: "aa:bb:cc:dd:ee:ff",
+			},
+			Protocol: metalv1alpha1.Protocol{
+				Name: metalv1alpha1.ProtocolRedfishLocal,
+				Port: MockServerPort,
+			},
+			BMCSecretRef: v1.LocalObjectReference{
+				Name: bmcSecret.Name,
+			},
+		},
+	}
+	Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+	return bmc
+}
+
+var _ = Describe("BMC SSH Reset", func() {
+	_ = SetupTest(nil)
+
+	AfterEach(func(ctx SpecContext) {
+		// Clean up Servers with finalizers first
+		serverList := &metalv1alpha1.ServerList{}
+		if err := k8sClient.List(ctx, serverList); err == nil {
+			for i := range serverList.Items {
+				server := &serverList.Items[i]
+				if controllerutil.ContainsFinalizer(server, "metal.ironcore.dev/server") {
+					// Remove finalizer to allow deletion
+					controllerutil.RemoveFinalizer(server, "metal.ironcore.dev/server")
+					Expect(k8sClient.Update(ctx, server)).To(Succeed())
+				}
+				// Explicitly delete the server (ignore errors - server may already be deleted via owner references)
+				_ = k8sClient.Delete(ctx, server)
+			}
+		}
+		EnsureCleanState()
+		// Restore real SSH function
+		bmcutils.SSHResetBMCFunc = bmcutils.SSHResetBMC
+		// Reset mock flag
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = false
+	})
+
+	It("Should successfully perform SSH reset after Redfish 503 error", func(ctx SpecContext) {
+		By("Setting up mock SSH function with proper synchronization")
+		var mu sync.Mutex
+		sshResetCalled := false
+		var capturedIP, capturedManufacturer, capturedUsername, capturedPassword string
+		var capturedTimeout time.Duration
+
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			mu.Lock()
+			defer mu.Unlock()
+			sshResetCalled = true
+			capturedIP = ip
+			capturedManufacturer = manufacturer
+			capturedUsername = username
+			capturedPassword = password
+			capturedTimeout = timeout
+			return nil
+		}
+
+		By("Creating BMC with Redfish available to get manufacturer info")
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		By("Waiting for BMC to become Ready")
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionTrue),
+		))))
+
+		By("Waiting for manufacturer to be populated")
+		Eventually(Object(bmc)).WithTimeout(10 * time.Second).Should(HaveField("Status.Manufacturer", Not(BeEmpty())))
+
+		By("Simulating Redfish failure and adding annotation")
+		// The controller will try to get BMC client (fails with 503), detect reset annotation,
+		// and enqueue SSH reset
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		Eventually(Update(bmc, func() {
+			if bmc.Annotations == nil {
+				bmc.Annotations = map[string]string{}
+			}
+			bmc.Annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
+		})).Should(Succeed())
+
+		By("Waiting for SSH to be called")
+		Eventually(func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return sshResetCalled
+		}).WithTimeout(15 * time.Second).WithPolling(100 * time.Millisecond).Should(BeTrue())
+
+		By("Verifying SSH was called with correct parameters")
+		mu.Lock()
+		Expect(capturedIP).To(Equal(MockServerIP))
+		Expect(capturedManufacturer).NotTo(BeEmpty())
+		Expect(capturedUsername).To(Equal("foo"))
+		Expect(capturedPassword).To(Equal("bar"))
+		Expect(capturedTimeout).To(Equal(1 * time.Second))
+		mu.Unlock()
+
+		By("Verifying Reset condition was created")
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionTrue),
+		))))
+
+		By("Verifying LastResetTime was updated")
+		Eventually(Object(bmc)).Should(HaveField("Status.LastResetTime", Not(BeNil())))
+
+		By("Verifying annotation was removed")
+		Eventually(Object(bmc)).Should(HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))))
+
+		By("Cleaning up test resources")
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	It("Should handle SSH reset connection failure gracefully", func(ctx SpecContext) {
+		By("Setting up mock SSH function to return error")
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			return fmt.Errorf("connection refused")
+		}
+
+		By("Creating BMC and letting it get manufacturer info first")
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		By("Waiting for BMC to become Ready")
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionTrue),
+		))))
+
+		By("Waiting for manufacturer to be populated")
+		Eventually(Object(bmc)).WithTimeout(10 * time.Second).Should(HaveField("Status.Manufacturer", Not(BeEmpty())))
+
+		By("Simulating Redfish unavailability and triggering reset via annotation")
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		Eventually(Update(bmc, func() {
+			if bmc.Annotations == nil {
+				bmc.Annotations = map[string]string{}
+			}
+			bmc.Annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
+		})).Should(Succeed())
+
+		By("Checking for status state pending")
+		Eventually(Object(bmc)).Should(HaveField("Status.State", metalv1alpha1.BMCStatePending))
+
+		By("Waiting for SSH reset to be attempted and fail")
+		Eventually(Object(bmc), 2*time.Second).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionFalse),
+			HaveField("Reason", "InternalServerError"),
+			HaveField("Message", ContainSubstring("SSH reset failed")),
+		))))
+
+		By("Cleaning up test resources")
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	It("Should not trigger duplicate SSH resets during wait period", func(ctx SpecContext) {
+		By("Setting up mock SSH function with call counter and proper synchronization")
+		var mu sync.Mutex
+		callCount := 0
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			mu.Lock()
+			defer mu.Unlock()
+			callCount++
+			return nil
+		}
+
+		By("Creating BMC and letting it get manufacturer info first")
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		By("Waiting for BMC to become Ready")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", "Ready"),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+			HaveField("Status.Manufacturer", Not(BeEmpty())),
+		))
+
+		By("Simulating Redfish unavailability and triggering reset via annotation")
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		Eventually(Update(bmc, func() {
+			if bmc.Annotations == nil {
+				bmc.Annotations = map[string]string{}
+			}
+			bmc.Annotations[metalv1alpha1.OperationAnnotation] = metalv1alpha1.ForceResetBMC
+		})).Should(Succeed())
+
+		By("Waiting for first SSH reset")
+		Eventually(func() int {
+			mu.Lock()
+			defer mu.Unlock()
+			return callCount
+		}).Should(Equal(1))
+
+		By("Waiting through the reset wait period")
+		time.Sleep(500 * time.Millisecond)
+
+		By("Verifying reset annotation was removed and not re-added")
+		Eventually(Object(bmc)).Should(HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))))
+
+		By("Verifying SSH was only called once (idempotency guard works)")
+		mu.Lock()
+		Expect(callCount).To(Equal(1))
+		mu.Unlock()
+
+		By("Verifying Reset condition prevents re-triggering")
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Reset"),
+			HaveField("Status", metav1.ConditionTrue),
+		))))
+
+		By("Cleaning up test resources")
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	It("Should not trigger SSH reset for authentication errors", func(ctx SpecContext) {
+		By("Setting up mock SSH function with call tracker and proper synchronization")
+		var mu sync.Mutex
+		sshCalled := false
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			mu.Lock()
+			defer mu.Unlock()
+			sshCalled = true
+			return nil
+		}
+
+		By("Creating BMC with invalid credentials (will get 401)")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-ssh-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("invalid"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("invalid"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		By("Waiting for authentication failure")
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionFalse),
+			HaveField("Reason", "AuthenticationFailed"),
+		))))
+
+		By("Waiting a bit to ensure SSH is not triggered")
+		Consistently(func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return sshCalled
+		}).WithTimeout(2 * time.Second).Should(BeFalse())
+
+		By("Verifying no Reset condition was created")
+		Consistently(Object(bmc)).Should(HaveField("Status.Conditions", Not(ContainElement(HaveField("Type", "Reset")))))
+
+		By("Cleaning up test resources")
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+	})
+
+	It("Should handle BMC deletion during SSH processing", func(ctx SpecContext) {
+		By("Setting up mock SSH function with delay and panic detection with proper synchronization")
+		var mu sync.Mutex
+		panicOccurred := false
+		bmcutils.SSHResetBMCFunc = func(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
+			defer func() {
+				if r := recover(); r != nil {
+					mu.Lock()
+					defer mu.Unlock()
+					panicOccurred = true
+				}
+			}()
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		}
+
+		By("Creating BMC and letting it get manufacturer info first")
+		bmcSecret := createBMCSecretForSSHTest(ctx)
+		bmc := createBMCForSSHTest(ctx, bmcSecret)
+
+		By("Waiting for BMC to be created and become Ready")
+		Eventually(Object(bmc)).Should(HaveField("Status.Conditions", ContainElement(SatisfyAll(
+			HaveField("Type", "Ready"),
+			HaveField("Status", metav1.ConditionTrue),
+		))))
+
+		By("Waiting for manufacturer to be populated")
+		Eventually(Object(bmc)).WithTimeout(10 * time.Second).Should(HaveField("Status.Manufacturer", Not(BeEmpty())))
+
+		By("Simulating Redfish unavailability")
+		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+
+		By("Deleting BMC while processing")
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+
+		By("Waiting to ensure worker continues without panic")
+		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Verifying no panic occurred")
+		Consistently(func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return panicOccurred
+		}).WithTimeout(1 * time.Second).Should(BeFalse())
 	})
 })

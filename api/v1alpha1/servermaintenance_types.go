@@ -13,8 +13,8 @@ const (
 	ServerMaintenanceNeededLabelKey = "metal.ironcore.dev/maintenance-needed"
 	// ServerMaintenanceReasonAnnotationKey is an annotation key that is used to store the reason for a server maintenance.
 	ServerMaintenanceReasonAnnotationKey = "metal.ironcore.dev/maintenance-reason"
-	// ServerMaintenanceApprovalKey is a label key that is used to store the approval status for a server maintenance.
-	ServerMaintenanceApprovalKey = "metal.ironcore.dev/maintenance-approval"
+	// ServerMaintenanceApprovedLabelKey is a label key that is used to store the approved status for a server maintenance.
+	ServerMaintenanceApprovedLabelKey = "metal.ironcore.dev/maintenance-approved"
 )
 
 // ServerBootConfigurationTemplate defines the parameters to be used for rendering a boot configuration.

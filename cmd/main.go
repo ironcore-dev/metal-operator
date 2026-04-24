@@ -59,52 +59,61 @@ func init() {
 
 func main() { // nolint: gocyclo
 	var (
-		metricsAddr                        string
-		metricsCertPath                    string
-		metricsCertName                    string
-		metricsCertKey                     string
-		webhookCertPath                    string
-		webhookCertName                    string
-		webhookCertKey                     string
-		enableLeaderElection               bool
-		probeAddr                          string
-		secureMetrics                      bool
-		enableHTTP2                        bool
-		macPrefixesFile                    string
-		insecure                           bool
-		protocol                           string
-		skipCertValidation                 bool
-		managerNamespace                   string
-		probeImage                         string
-		probeOSImage                       string
-		registryPort                       int
-		registryProtocol                   string
-		registryURL                        string
-		eventPort                          int
-		eventURL                           string
-		eventProtocol                      string
-		registryClientTimeout              time.Duration
-		registryDataMaxAge                 time.Duration
-		registryResyncInterval             time.Duration
-		webhookPort                        int
-		enforceFirstBoot                   bool
-		enforcePowerOff                    bool
-		discoveryIgnitionPath              string
-		serverResyncInterval               time.Duration
-		maintenanceResyncInterval          time.Duration
-		powerPollingInterval               time.Duration
-		powerPollingTimeout                time.Duration
-		resourcePollingInterval            time.Duration
-		resourcePollingTimeout             time.Duration
-		discoveryTimeout                   time.Duration
-		biosSettingsApplyTimeout           time.Duration
-		bmcFailureResetDelay               time.Duration
-		bmcResetResyncInterval             time.Duration
-		bmcResetWaitingInterval            time.Duration
-		serverMaxConcurrentReconciles      int
-		serverClaimMaxConcurrentReconciles int
-		dnsRecordTemplatePath              string
-		defaultFailedAutoRetryCount        int
+		metricsAddr                          string
+		metricsCertPath                      string
+		metricsCertName                      string
+		metricsCertKey                       string
+		webhookCertPath                      string
+		webhookCertName                      string
+		webhookCertKey                       string
+		enableLeaderElection                 bool
+		probeAddr                            string
+		secureMetrics                        bool
+		enableHTTP2                          bool
+		macPrefixesFile                      string
+		insecure                             bool
+		protocol                             string
+		skipCertValidation                   bool
+		managerNamespace                     string
+		probeImage                           string
+		probeOSImage                         string
+		registryPort                         int
+		registryProtocol                     string
+		registryURL                          string
+		eventPort                            int
+		eventURL                             string
+		eventProtocol                        string
+		registryClientTimeout                time.Duration
+		registryDataMaxAge                   time.Duration
+		registryResyncInterval               time.Duration
+		webhookPort                          int
+		enforceFirstBoot                     bool
+		enforcePowerOff                      bool
+		discoveryIgnitionPath                string
+		serverResyncInterval                 time.Duration
+		maintenanceResyncInterval            time.Duration
+		powerPollingInterval                 time.Duration
+		powerPollingTimeout                  time.Duration
+		resourcePollingInterval              time.Duration
+		resourcePollingTimeout               time.Duration
+		discoveryTimeout                     time.Duration
+		biosSettingsApplyTimeout             time.Duration
+		bmcFailureResetDelay                 time.Duration
+		bmcResetResyncInterval               time.Duration
+		bmcResetWaitingInterval              time.Duration
+		serverMaxConcurrentReconciles        int
+		serverClaimMaxConcurrentReconciles   int
+		dnsRecordTemplatePath                string
+		defaultFailedAutoRetryCount          int
+		certificateManagementEnabled         bool
+		certificateSignerName                string
+		certificateApprovalMode              string
+		certificateRenewalThreshold          time.Duration
+		certificateSubjectOrganization       string
+		certificateSubjectOrganizationalUnit string
+		certificateSubjectCountry            string
+		certificateSubjectState              string
+		certificateSubjectLocality           string
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -179,6 +188,24 @@ func main() { // nolint: gocyclo
 		"Path to the DNS record template file used for creating DNS records for Servers.")
 	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
 		"The default number of auto retries for a CRD when it fails. 0 for no retries.")
+	flag.BoolVar(&certificateManagementEnabled, "certificate-management-enabled", false,
+		"Enable automatic certificate management for all BMCs by default.")
+	flag.StringVar(&certificateSignerName, "certificate-signer-name", "metal.ironcore.dev/bmc-https",
+		"Default signer name for BMC CertificateSigningRequests.")
+	flag.StringVar(&certificateApprovalMode, "certificate-approval-mode", "external",
+		"Default CSR approval mode: 'auto' or 'external'. Auto-approval should only be used in trusted environments.")
+	flag.DurationVar(&certificateRenewalThreshold, "certificate-renewal-threshold", 720*time.Hour,
+		"Default threshold before certificate expiration to trigger renewal (default: 30 days).")
+	flag.StringVar(&certificateSubjectOrganization, "certificate-subject-organization", "",
+		"Default organization for certificate subject.")
+	flag.StringVar(&certificateSubjectOrganizationalUnit, "certificate-subject-organizational-unit", "",
+		"Default organizational unit for certificate subject.")
+	flag.StringVar(&certificateSubjectCountry, "certificate-subject-country", "",
+		"Default country for certificate subject.")
+	flag.StringVar(&certificateSubjectState, "certificate-subject-state", "",
+		"Default state for certificate subject.")
+	flag.StringVar(&certificateSubjectLocality, "certificate-subject-locality", "",
+		"Default locality for certificate subject.")
 
 	opts := zap.Options{
 		Development: true,
@@ -423,6 +450,33 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCSecret")
 		os.Exit(1)
 	}
+
+	var certificateSubject *metalv1alpha1.CertificateSubject
+	if certificateSubjectOrganization != "" || certificateSubjectOrganizationalUnit != "" ||
+		certificateSubjectCountry != "" || certificateSubjectState != "" || certificateSubjectLocality != "" {
+		certificateSubject = &metalv1alpha1.CertificateSubject{
+			Organization:       certificateSubjectOrganization,
+			OrganizationalUnit: certificateSubjectOrganizationalUnit,
+			Country:            certificateSubjectCountry,
+			State:              certificateSubjectState,
+			Locality:           certificateSubjectLocality,
+		}
+	}
+
+	var certApprovalMode metalv1alpha1.CertificateApprovalPolicy
+	switch certificateApprovalMode {
+	case "auto":
+		certApprovalMode = metalv1alpha1.CertificateApprovalPolicyAuto
+	case "external":
+		certApprovalMode = metalv1alpha1.CertificateApprovalPolicyExternal
+	default:
+		if certificateApprovalMode != "" {
+			setupLog.Error(fmt.Errorf("invalid certificate-approval-mode: %s", certificateApprovalMode),
+				"Valid values are 'auto' or 'external'")
+			os.Exit(1)
+		}
+	}
+
 	if err = (&controller.BMCReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
@@ -438,6 +492,11 @@ func main() { // nolint: gocyclo
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},
+		DefaultCertificateManagementEnabled: certificateManagementEnabled,
+		DefaultCertificateSignerName:        certificateSignerName,
+		DefaultCertificateApprovalMode:      certApprovalMode,
+		DefaultCertificateRenewalThreshold:  certificateRenewalThreshold,
+		DefaultCertificateSubject:           certificateSubject,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "BMC")
 		os.Exit(1)

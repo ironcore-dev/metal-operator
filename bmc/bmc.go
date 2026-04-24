@@ -323,6 +323,16 @@ const (
 	CertificateTypeCA CertificateType = "PEM"
 )
 
+// CertificatePurpose defines the purpose/usage of a certificate.
+type CertificatePurpose string
+
+const (
+	// CertificatePurposeHTTPS indicates an HTTPS/TLS server certificate
+	CertificatePurposeHTTPS CertificatePurpose = "HTTPS"
+	// CertificatePurposeCA indicates a CA certificate
+	CertificatePurposeCA CertificatePurpose = "CA"
+)
+
 // CSRRequest contains parameters for generating a Certificate Signing Request.
 type CSRRequest struct {
 	// CommonName is the common name for the certificate (typically hostname or IP)

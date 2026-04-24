@@ -254,9 +254,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 			log.Error(condErr, "Failed to update certificate condition")
 		}
 	}
-	if err := r.checkCertificateExpiration(ctx, bmcObj); err != nil {
-		log.Error(err, "Failed to check certificate expiration")
-	}
+	r.checkCertificateExpiration(ctx, bmcObj)
 
 	log.V(1).Info("Reconciled BMC")
 	return ctrl.Result{}, nil
@@ -760,9 +758,21 @@ func (r *BMCReconciler) initiateCertificateRequest(ctx context.Context, bmcObj *
 		signerName = DefaultCertificateSignerName
 	}
 
+	// Generate safe CSR name (max 253 chars for Kubernetes metadata.name)
+	// Format: bmc-<bmcName>-<shortUID>
+	// Ensure bmcName is truncated if needed to stay under limit
+	uidStr := string(bmcObj.UID)
+	shortUID := uidStr[:8]               // First 8 chars of UUID
+	maxBMCNameLen := 253 - 4 - 1 - 8 - 1 // 253 - "bmc-" - "-" - shortUID - null = 239
+	bmcName := bmcObj.Name
+	if len(bmcName) > maxBMCNameLen {
+		bmcName = bmcName[:maxBMCNameLen]
+	}
+	csrName := fmt.Sprintf("bmc-%s-%s", bmcName, shortUID)
+
 	k8sCSR := &certificatesv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("bmc-%s-%s", bmcObj.Name, string(bmcObj.UID[:8])),
+			Name: csrName,
 			Labels: map[string]string{
 				"metal.ironcore.dev/bmc": bmcObj.Name,
 			},
@@ -987,13 +997,7 @@ func (r *BMCReconciler) installCertificate(ctx context.Context, bmcObj *metalv1a
 		return fmt.Errorf("certificate missing ServerAuth extended key usage")
 	}
 
-	if err := bmcClient.InstallCertificate(ctx, string(k8sCSR.Status.Certificate), bmc.CertificateTypeHTTPS); err != nil {
-		_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
-			corev1.ConditionFalse, bmcCertificateInstallFailedReason,
-			fmt.Sprintf("Failed to install certificate: %v", err))
-		return err
-	}
-
+	// Create/update secret first
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("bmc-%s-cert", bmcObj.Name),
@@ -1017,16 +1021,26 @@ func (r *BMCReconciler) installCertificate(ctx context.Context, bmcObj *metalv1a
 	}
 	log.Info("Certificate secret created or updated", "operation", opResult)
 
+	// Persist secret reference to status before calling BMC
 	bmcBase := bmcObj.DeepCopy()
 	bmcObj.Status.CertificateSecretRef = &corev1.LocalObjectReference{Name: secret.Name}
 	bmcObj.Status.CertificateSigningRequestRef = nil
 
-	if err := r.updateCertificateInfo(ctx, bmcObj, bmcClient); err != nil {
-		log.Error(err, "Failed to update certificate info")
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return fmt.Errorf("failed to persist certificate secret reference: %w", err)
 	}
 
-	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+	// Now install certificate on BMC
+	// If this fails, on retry we'll have secretRef set and can skip secret creation
+	if err := bmcClient.InstallCertificate(ctx, string(k8sCSR.Status.Certificate), bmc.CertificateTypeHTTPS); err != nil {
+		_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+			corev1.ConditionFalse, bmcCertificateInstallFailedReason,
+			fmt.Sprintf("Failed to install certificate: %v", err))
 		return err
+	}
+
+	if err := r.updateCertificateInfo(ctx, bmcObj, bmcClient); err != nil {
+		log.Error(err, "Failed to update certificate info")
 	}
 
 	log.Info("Certificate installed successfully")
@@ -1037,11 +1051,11 @@ func (r *BMCReconciler) installCertificate(ctx context.Context, bmcObj *metalv1a
 	return nil
 }
 
-func (r *BMCReconciler) checkCertificateExpiration(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+func (r *BMCReconciler) checkCertificateExpiration(ctx context.Context, bmcObj *metalv1alpha1.BMC) {
 	log := ctrl.LoggerFrom(ctx)
 
 	if bmcObj.Status.CertificateInfo == nil {
-		return nil
+		return
 	}
 
 	renewalThreshold := r.DefaultCertificateRenewalThreshold
@@ -1058,28 +1072,20 @@ func (r *BMCReconciler) checkCertificateExpiration(ctx context.Context, bmcObj *
 			_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateExpiringConditionType,
 				corev1.ConditionTrue, bmcCertificateExpiringSoonReason,
 				fmt.Sprintf("Certificate expires in %s", timeUntilExpiry))
-
-			if bmcObj.Spec.CertificateManagementPolicy != nil &&
-				*bmcObj.Spec.CertificateManagementPolicy == metalv1alpha1.CertificateManagementPolicyAutomatic {
-				bmcBase := bmcObj.DeepCopy()
-				bmcObj.Status.CertificateSecretRef = nil
-				if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-					return err
-				}
-			}
 		} else {
 			_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateExpiringConditionType,
 				corev1.ConditionFalse, bmcCertificateValidReason,
 				fmt.Sprintf("Certificate valid until %s", expiryTime))
 		}
 	}
-
-	return nil
 }
 
 func (r *BMCReconciler) approveCSR(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) error {
 	allowedSigners := []string{
 		DefaultCertificateSignerName,
+	}
+	if r.DefaultCertificateSignerName != "" && r.DefaultCertificateSignerName != DefaultCertificateSignerName {
+		allowedSigners = append(allowedSigners, r.DefaultCertificateSignerName)
 	}
 
 	if !slices.Contains(allowedSigners, csr.Spec.SignerName) {
@@ -1096,7 +1102,7 @@ func (r *BMCReconciler) approveCSR(ctx context.Context, csr *certificatesv1.Cert
 		LastTransitionTime: metav1.Now(),
 	})
 
-	if err := r.Status().Update(ctx, csr); err != nil {
+	if err := r.SubResource("approval").Update(ctx, csr); err != nil {
 		return err
 	}
 
@@ -1178,9 +1184,9 @@ func (r *BMCReconciler) updateCertificateInfo(ctx context.Context, bmcObj *metal
 		return err
 	}
 
-	// Find HTTPS certificate
+	// Find HTTPS certificate (determined by URI path, not CertificateType field)
 	for _, cert := range certs {
-		if cert.Type == bmc.CertificateTypeHTTPS {
+		if strings.Contains(cert.URI, "/HTTPS/Certificates") {
 			notBefore, _ := time.Parse(time.RFC3339, cert.ValidNotBefore)
 			notAfter, _ := time.Parse(time.RFC3339, cert.ValidNotAfter)
 

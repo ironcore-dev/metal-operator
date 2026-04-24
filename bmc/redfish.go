@@ -1162,13 +1162,15 @@ func (r *RedfishBaseBMC) GenerateCSR(ctx context.Context, req CSRRequest) (*CSRR
 
 	// Get manager to find certificate collection
 	managers, err := r.client.GetService().Managers()
-	if err != nil || len(managers) == 0 {
+	if err != nil {
 		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
 	}
 	manager := managers[0]
 
-	// Construct certificate collection URI
-	certCollectionURI := fmt.Sprintf("/redfish/v1/Managers/%s/NetworkProtocol/HTTPS/Certificates", manager.UUID)
+	certCollectionURI := manager.ODataID + "/NetworkProtocol/HTTPS/Certificates"
 
 	// Set default key algorithm if not specified
 	keyAlgorithm := req.KeyPairAlgorithm
@@ -1216,13 +1218,15 @@ func (r *RedfishBaseBMC) InstallCertificate(ctx context.Context, certificatePEM 
 
 	// Get manager to find certificate collection
 	managers, err := r.client.GetService().Managers()
-	if err != nil || len(managers) == 0 {
+	if err != nil {
 		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
 	}
 	manager := managers[0]
 
-	// Certificate collection URI
-	certCollectionURI := fmt.Sprintf("/redfish/v1/Managers/%s/NetworkProtocol/HTTPS/Certificates", manager.UUID)
+	certCollectionURI := manager.ODataID + "/NetworkProtocol/HTTPS/Certificates"
 
 	// Prepare certificate installation payload
 	payload := map[string]any{
@@ -1252,13 +1256,15 @@ func (r *RedfishBaseBMC) InstallCertificate(ctx context.Context, certificatePEM 
 func (r *RedfishBaseBMC) GetCertificates(ctx context.Context) ([]CertificateInfo, error) {
 	// Get manager to find certificate collection
 	managers, err := r.client.GetService().Managers()
-	if err != nil || len(managers) == 0 {
+	if err != nil {
 		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
 	}
 	manager := managers[0]
 
-	// Certificate collection URI
-	certCollectionURI := fmt.Sprintf("/redfish/v1/Managers/%s/NetworkProtocol/HTTPS/Certificates", manager.UUID)
+	certCollectionURI := manager.ODataID + "/NetworkProtocol/HTTPS/Certificates"
 
 	resp, err := r.client.Get(certCollectionURI)
 	if err != nil {

@@ -288,6 +288,7 @@ type BMCStatus struct {
 	CertificateSigningRequestRef *string `json:"certificateSigningRequestRef,omitempty"`
 
 	// CertificateSecretRef references the Secret containing the installed certificate.
+	// The Secret is created in the metal-operator controller's namespace.
 	// +optional
 	CertificateSecretRef *v1.LocalObjectReference `json:"certificateSecretRef,omitempty"`
 }

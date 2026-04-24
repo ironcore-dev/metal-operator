@@ -228,8 +228,9 @@ spec:
                     type: string
                 type: object
               certificateSecretRef:
-                description: CertificateSecretRef references the Secret containing
-                  the installed certificate.
+                description: |-
+                  CertificateSecretRef references the Secret containing the installed certificate.
+                  The Secret is created in the metal-operator controller's namespace.
                 properties:
                   name:
                     default: ""

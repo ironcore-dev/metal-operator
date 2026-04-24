@@ -23,10 +23,6 @@ GOOS    := $(shell go env GOOS)
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
 
-# Redfish emulator container
-REDFISH_CONTAINER_NAME=redfish_mockup_server
-REDFISH_CONTAINER_VERSION=latest
-
 # Use the most portable option for core detection
 NPROCS := $(shell getconf _NPROCESSORS_ONLN)
 # Add a fallback just in case the command fails
@@ -117,7 +113,7 @@ startbmc: $(LOCALBIN) ## Build and start Redfish mock server; waits until :$(MOC
 	fi; \
 	echo "Compiling Redfish mock server..."; \
 	go build -o $(MOCKSERVER_BIN) ./bmc/mock/main.go || { echo "Compile failed."; exit 1; }; \
-	$(MOCKSERVER_BIN) & \
+	$(MOCKSERVER_BIN) -addr :$(MOCKSERVER_PORT) & \
 	echo "Waiting for mock server to bind :$(MOCKSERVER_PORT)..."; \
 	for i in {1..30}; do \
 		if port_open; then \

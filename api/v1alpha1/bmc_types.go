@@ -61,6 +61,65 @@ type BMCSpec struct {
 	// Hostname is the hostname of the BMC.
 	// +optional
 	Hostname *string `json:"hostname,omitempty"`
+
+	// CertificateManagementPolicy controls automatic certificate management for this BMC.
+	// When not specified, the BMC inherits the operator-level default (configured via controller flags).
+	// Set to Manual to explicitly disable certificate management for this specific BMC.
+	// Set to Automatic to explicitly enable certificate management (overriding operator default if disabled).
+	//
+	// Certificate configuration (signer name, approval policy, renewal threshold, subject fields) is
+	// configured at the operator level via controller manager flags and cannot be overridden per-BMC.
+	// This ensures consistent certificate policy across all BMCs in the cluster.
+	//
+	// +optional
+	// +kubebuilder:validation:Enum=Manual;Automatic
+	CertificateManagementPolicy *CertificateManagementPolicy `json:"certificateManagementPolicy,omitempty"`
+}
+
+// CertificateManagementPolicy defines the policy for certificate management.
+type CertificateManagementPolicy string
+
+const (
+	// CertificateManagementPolicyManual means no automatic certificate operations
+	CertificateManagementPolicyManual CertificateManagementPolicy = "Manual"
+	// CertificateManagementPolicyAutomatic means automatic certificate creation and renewal
+	CertificateManagementPolicyAutomatic CertificateManagementPolicy = "Automatic"
+)
+
+// CertificateApprovalPolicy defines how CertificateSigningRequests are approved.
+type CertificateApprovalPolicy string
+
+const (
+	// CertificateApprovalPolicyAuto means the controller automatically approves CSRs.
+	// WARNING: Use only in trusted, isolated environments with verified BMC hardware.
+	// Not recommended for multi-tenant or untrusted environments.
+	CertificateApprovalPolicyAuto CertificateApprovalPolicy = "Auto"
+	// CertificateApprovalPolicyExternal means CSRs must be approved by external entity.
+	// Recommended for production environments. Requires cert-manager, admin, or custom approver.
+	CertificateApprovalPolicyExternal CertificateApprovalPolicy = "External"
+)
+
+// CertificateSubject defines certificate subject fields for CSR generation.
+type CertificateSubject struct {
+	// Organization for the certificate subject.
+	// +optional
+	Organization string `json:"organization,omitempty"`
+
+	// OrganizationalUnit for the certificate subject.
+	// +optional
+	OrganizationalUnit string `json:"organizationalUnit,omitempty"`
+
+	// Country for the certificate subject.
+	// +optional
+	Country string `json:"country,omitempty"`
+
+	// State for the certificate subject.
+	// +optional
+	State string `json:"state,omitempty"`
+
+	// Locality (City) for the certificate subject.
+	// +optional
+	Locality string `json:"locality,omitempty"`
 }
 
 // InlineEndpoint defines inline network access configuration for the BMC.
@@ -219,6 +278,39 @@ type BMCStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// CertificateInfo contains information about the BMC's current certificate.
+	// +optional
+	CertificateInfo *CertificateInfo `json:"certificateInfo,omitempty"`
+
+	// CertificateSigningRequestRef references the current CertificateSigningRequest.
+	// +optional
+	CertificateSigningRequestRef *string `json:"certificateSigningRequestRef,omitempty"`
+
+	// CertificateSecretRef references the Secret containing the installed certificate.
+	// +optional
+	CertificateSecretRef *v1.LocalObjectReference `json:"certificateSecretRef,omitempty"`
+}
+
+// CertificateInfo contains information about a BMC certificate.
+type CertificateInfo struct {
+	// Issuer is the certificate issuer DN.
+	Issuer string `json:"issuer,omitempty"`
+
+	// Subject is the certificate subject DN.
+	Subject string `json:"subject,omitempty"`
+
+	// NotBefore is the certificate validity start time.
+	NotBefore *metav1.Time `json:"notBefore,omitempty"`
+
+	// NotAfter is the certificate validity end time.
+	NotAfter *metav1.Time `json:"notAfter,omitempty"`
+
+	// SerialNumber is the certificate serial number.
+	SerialNumber string `json:"serialNumber,omitempty"`
+
+	// Thumbprint is the SHA-256 thumbprint of the certificate.
+	Thumbprint string `json:"thumbprint,omitempty"`
 }
 
 // BMCState defines the possible states of a BMC.

@@ -1,0 +1,74 @@
+---
+# BMC with automatic certificate management (inherits operator defaults)
+# Certificate configuration (signer name, approval policy, renewal threshold, subject)
+# is configured at the operator level via controller manager flags.
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMC
+metadata:
+  name: bmc-with-certificate
+spec:
+  endpoint:
+    ip: 10.0.0.1
+  bmcSecretRef:
+    name: bmc-credentials
+  protocol:
+    name: Redfish
+    port: 443
+    scheme: https
+  # Enable certificate management for this BMC
+  # All other certificate settings inherited from operator flags
+  certificateManagementPolicy: Automatic
+
+---
+# BMC with manual certificate management (opt-out)
+# Certificate management is disabled for this specific BMC.
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMC
+metadata:
+  name: bmc-manual-cert
+spec:
+  endpoint:
+    ip: 10.0.0.2
+  bmcSecretRef:
+    name: bmc-credentials-2
+  protocol:
+    name: Redfish
+    port: 443
+    scheme: https
+  # Explicitly disable certificate management
+  certificateManagementPolicy: Manual
+
+---
+# BMC without certificate field (uses operator default)
+# If operator has --certificate-management-enabled=true, this BMC gets automatic certificates.
+# If operator has --certificate-management-enabled=false, this BMC has manual certificates.
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: BMC
+metadata:
+  name: bmc-default
+spec:
+  endpoint:
+    ip: 10.0.0.3
+  bmcSecretRef:
+    name: bmc-credentials-3
+  protocol:
+    name: Redfish
+    port: 443
+    scheme: https
+  # No certificateManagementPolicy specified - inherits operator default
+
+---
+# Example operator configuration (set via Deployment args or Helm values):
+#
+# args:
+#   - --certificate-management-enabled=true
+#   - --certificate-signer-name=metal.ironcore.dev/bmc-https
+#   - --certificate-approval-mode=external
+#   - --certificate-renewal-threshold=720h
+#   - --certificate-subject-organization="Example Corp"
+#   - --certificate-subject-country=US
+#
+# With these settings:
+# - bmc-with-certificate: Gets automatic certificates (explicitly enabled)
+# - bmc-manual-cert: No certificates (explicitly disabled)
+# - bmc-default: Gets automatic certificates (inherits operator default)

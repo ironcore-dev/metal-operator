@@ -125,6 +125,21 @@ type MockServer struct {
 	overrides         map[string]any
 	upgradeGen        int64             // incremented on each SimpleUpdate to cancel stale goroutines
 	upgradedResources map[string]string // odata.id URI → file path for resources updated by the last upgrade
+	certificates      map[string]CertificateData
+	csrCounter        int
+}
+
+// CertificateData represents a certificate stored on the mock BMC.
+type CertificateData struct {
+	ID                string
+	CertificateString string
+	CertificateType   string
+	Issuer            string
+	Subject           string
+	ValidNotBefore    string
+	ValidNotAfter     string
+	SerialNumber      string
+	Fingerprint       string
 }
 
 func NewMockServer(log logr.Logger, addr string) *MockServer {
@@ -133,6 +148,8 @@ func NewMockServer(log logr.Logger, addr string) *MockServer {
 		log:               log,
 		overrides:         make(map[string]any),
 		upgradedResources: make(map[string]string),
+		certificates:      make(map[string]CertificateData),
+		csrCounter:        0,
 	}
 
 	mux := http.NewServeMux()
@@ -160,6 +177,16 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
+	// Handle certificate-specific GET requests
+	if strings.Contains(r.URL.Path, "/HTTPS/Certificates") && !strings.HasSuffix(r.URL.Path, "/Certificates") {
+		s.handleGetCertificate(w, r)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/HTTPS/Certificates") {
+		s.handleGetCertificateCollection(w, r)
+		return
+	}
+
 	filePath := resolvePath(r.URL.Path)
 
 	s.mu.RLock()
@@ -204,6 +231,10 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 	case strings.Contains(urlPath, "UpdateService/Actions/SimpleUpdate") ||
 		strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
 		s.handleSimpleUpdate(w, r, body)
+	case strings.Contains(urlPath, "CertificateService/Actions/CertificateService.GenerateCSR"):
+		s.handleGenerateCSR(w, r, body)
+	case strings.Contains(urlPath, "/HTTPS/Certificates") && !strings.Contains(urlPath, "CertificateService"):
+		s.handleInstallCertificate(w, r, body)
 	default:
 		//
 		urlPath := resolvePath(r.URL.Path)
@@ -312,6 +343,12 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
+	// Handle certificate deletion
+	if strings.Contains(r.URL.Path, "/HTTPS/Certificates/cert-") {
+		s.handleDeleteCertificate(w, r)
+		return
+	}
+
 	filePath := resolvePath(r.URL.Path)
 	base, err := s.loadResource(filePath)
 	if err != nil {
@@ -1076,4 +1113,169 @@ func containsAny(s string, substrs []string) bool {
 	return slices.ContainsFunc(substrs, func(sub string) bool {
 		return strings.Contains(s, sub)
 	})
+}
+
+func (s *MockServer) handleGenerateCSR(w http.ResponseWriter, _ *http.Request, body []byte) {
+	var req map[string]any
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Extract required fields
+	commonName, _ := req["CommonName"].(string)
+	if commonName == "" {
+		http.Error(w, "CommonName is required", http.StatusBadRequest)
+		return
+	}
+
+	// Generate mock CSR
+	s.mu.Lock()
+	s.csrCounter++
+	csrID := fmt.Sprintf("csr-%d", s.csrCounter)
+	s.mu.Unlock()
+
+	// Create a mock CSR string (PEM-encoded)
+	csrString := `-----BEGIN CERTIFICATE REQUEST-----
+MIICvDCCAaQCAQAwdzELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
+FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xFDASBgNVBAoMC0V4YW1wbGUgQ29ycDEX
+MBUGA1UECwwOSW5mcmFzdHJ1Y3R1cmUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+ggEKAoIBAQC5J3Q==
+-----END CERTIFICATE REQUEST-----`
+
+	_ = csrID // Mark as used for potential future logging
+
+	certCollectionURI := "/redfish/v1/Managers/1/NetworkProtocol/HTTPS/Certificates"
+
+	response := map[string]any{
+		"CSRString": csrString,
+		"CertificateCollection": map[string]string{
+			"@odata.id": certCollectionURI,
+		},
+	}
+
+	s.log.Info("Generated CSR", "id", csrID, "commonName", commonName)
+	s.writeJSON(w, http.StatusOK, response)
+}
+
+func (s *MockServer) handleInstallCertificate(w http.ResponseWriter, _ *http.Request, body []byte) {
+	var req map[string]any
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	certString, ok := req["CertificateString"].(string)
+	if !ok || certString == "" {
+		http.Error(w, "CertificateString is required", http.StatusBadRequest)
+		return
+	}
+
+	certType, _ := req["CertificateType"].(string)
+	if certType == "" {
+		certType = "PEM"
+	}
+
+	// Store certificate
+	s.mu.Lock()
+	certID := fmt.Sprintf("cert-%d", len(s.certificates)+1)
+	s.certificates[certID] = CertificateData{
+		ID:                certID,
+		CertificateString: certString,
+		CertificateType:   certType,
+		Issuer:            "CN=Mock CA",
+		Subject:           "CN=mock-bmc.example.com",
+		ValidNotBefore:    time.Now().Format(time.RFC3339),
+		ValidNotAfter:     time.Now().Add(90 * 24 * time.Hour).Format(time.RFC3339),
+		SerialNumber:      fmt.Sprintf("%d", time.Now().Unix()),
+		Fingerprint:       fmt.Sprintf("sha256-%d", time.Now().Unix()),
+	}
+	s.mu.Unlock()
+
+	certURI := fmt.Sprintf("/redfish/v1/Managers/1/NetworkProtocol/HTTPS/Certificates/%s", certID)
+	w.Header().Set("Location", certURI)
+
+	s.log.Info("Installed certificate", "id", certID, "type", certType)
+	s.writeJSON(w, http.StatusCreated, map[string]string{
+		"@odata.id": certURI,
+		"Id":        certID,
+	})
+}
+
+func (s *MockServer) handleGetCertificateCollection(w http.ResponseWriter, _ *http.Request) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	members := make([]map[string]string, 0, len(s.certificates))
+	for certID := range s.certificates {
+		members = append(members, map[string]string{
+			"@odata.id": fmt.Sprintf("/redfish/v1/Managers/1/NetworkProtocol/HTTPS/Certificates/%s", certID),
+		})
+	}
+
+	response := map[string]any{
+		"@odata.type":         "#CertificateCollection.CertificateCollection",
+		"@odata.id":           "/redfish/v1/Managers/1/NetworkProtocol/HTTPS/Certificates",
+		"Name":                "Certificate Collection",
+		"Members":             members,
+		"Members@odata.count": len(members),
+	}
+
+	s.writeJSON(w, http.StatusOK, response)
+}
+
+func (s *MockServer) handleGetCertificate(w http.ResponseWriter, r *http.Request) {
+	// Extract certificate ID from path
+	parts := strings.Split(r.URL.Path, "/")
+	certID := parts[len(parts)-1]
+
+	s.mu.RLock()
+	cert, exists := s.certificates[certID]
+	s.mu.RUnlock()
+
+	if !exists {
+		http.NotFound(w, r)
+		return
+	}
+
+	response := map[string]any{
+		"@odata.type":       "#Certificate.v1_0_0.Certificate",
+		"@odata.id":         r.URL.Path,
+		"Id":                cert.ID,
+		"Name":              "Certificate " + cert.ID,
+		"CertificateString": cert.CertificateString,
+		"CertificateType":   cert.CertificateType,
+		"Issuer": map[string]string{
+			"CommonName": cert.Issuer,
+		},
+		"Subject": map[string]string{
+			"CommonName": cert.Subject,
+		},
+		"ValidNotBefore": cert.ValidNotBefore,
+		"ValidNotAfter":  cert.ValidNotAfter,
+		"SerialNumber":   cert.SerialNumber,
+		"Fingerprint":    cert.Fingerprint,
+	}
+
+	s.writeJSON(w, http.StatusOK, response)
+}
+
+func (s *MockServer) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
+	// Extract certificate ID from path
+	parts := strings.Split(r.URL.Path, "/")
+	certID := parts[len(parts)-1]
+
+	s.mu.Lock()
+	_, exists := s.certificates[certID]
+	if !exists {
+		s.mu.Unlock()
+		http.NotFound(w, r)
+		return
+	}
+
+	delete(s.certificates, certID)
+	s.mu.Unlock()
+
+	s.log.Info("Deleted certificate", "id", certID)
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -120,6 +120,20 @@ spec:
                 description: BMCUUID is the unique identifier for the BMC as defined
                   in Redfish API.
                 type: string
+              certificateManagementPolicy:
+                description: |-
+                  CertificateManagementPolicy controls automatic certificate management for this BMC.
+                  When not specified, the BMC inherits the operator-level default (configured via controller flags).
+                  Set to Manual to explicitly disable certificate management for this specific BMC.
+                  Set to Automatic to explicitly enable certificate management (overriding operator default if disabled).
+
+                  Certificate configuration (signer name, approval policy, renewal threshold, subject fields) is
+                  configured at the operator level via controller manager flags and cannot be overridden per-BMC.
+                  This ensures consistent certificate policy across all BMCs in the cluster.
+                enum:
+                - Manual
+                - Automatic
+                type: string
               consoleProtocol:
                 description: ConsoleProtocol specifies the protocol to be used for
                   console access to the BMC.
@@ -188,6 +202,49 @@ spec:
           status:
             description: BMCStatus defines the observed state of BMC.
             properties:
+              certificateInfo:
+                description: CertificateInfo contains information about the BMC's
+                  current certificate.
+                properties:
+                  issuer:
+                    description: Issuer is the certificate issuer DN.
+                    type: string
+                  notAfter:
+                    description: NotAfter is the certificate validity end time.
+                    format: date-time
+                    type: string
+                  notBefore:
+                    description: NotBefore is the certificate validity start time.
+                    format: date-time
+                    type: string
+                  serialNumber:
+                    description: SerialNumber is the certificate serial number.
+                    type: string
+                  subject:
+                    description: Subject is the certificate subject DN.
+                    type: string
+                  thumbprint:
+                    description: Thumbprint is the SHA-256 thumbprint of the certificate.
+                    type: string
+                type: object
+              certificateSecretRef:
+                description: CertificateSecretRef references the Secret containing
+                  the installed certificate.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              certificateSigningRequestRef:
+                description: CertificateSigningRequestRef references the current CertificateSigningRequest.
+                type: string
               conditions:
                 description: Conditions represents the latest available observations
                   of the BMC's current state.

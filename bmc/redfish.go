@@ -1140,3 +1140,212 @@ func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string
 	}
 	return nil
 }
+
+// GetCertificateService retrieves the certificate service for the BMC.
+func (r *RedfishBaseBMC) GetCertificateService(ctx context.Context) (*schemas.CertificateService, error) {
+	service := r.client.GetService()
+	certService, err := service.CertificateService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate service: %w", err)
+	}
+	return certService, nil
+}
+
+// GenerateCSR generates a Certificate Signing Request on the BMC.
+func (r *RedfishBaseBMC) GenerateCSR(ctx context.Context, req CSRRequest) (*CSRResponse, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	certService, err := r.GetCertificateService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get manager to find certificate collection
+	managers, err := r.client.GetService().Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
+	}
+	manager := managers[0]
+
+	certCollectionURI := manager.ODataID + "/NetworkProtocol/HTTPS/Certificates"
+
+	// Set default key algorithm if not specified
+	keyAlgorithm := req.KeyPairAlgorithm
+	if keyAlgorithm == "" {
+		keyAlgorithm = "RSA2048"
+	}
+
+	// Prepare CSR generation parameters using gofish schemas
+	params := &schemas.CertificateServiceGenerateCSRParameters{
+		CertificateCollection: certCollectionURI,
+		CommonName:            req.CommonName,
+		Organization:          req.Organization,
+		OrganizationalUnit:    req.OrganizationalUnit,
+		Country:               req.Country,
+		State:                 req.State,
+		City:                  req.City,
+		Email:                 req.Email,
+		KeyPairAlgorithm:      keyAlgorithm,
+		AlternativeNames:      req.AlternativeNames,
+	}
+
+	log.Info("Generating CSR on BMC", "commonName", req.CommonName, "algorithm", keyAlgorithm)
+
+	// Call GenerateCSR using gofish library
+	response, err := certService.GenerateCSR(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate CSR: %w", err)
+	}
+
+	if response.CSRString == "" {
+		return nil, fmt.Errorf("CSR generation returned empty CSR string")
+	}
+
+	log.Info("CSR generated successfully")
+
+	return &CSRResponse{
+		CSRString:             response.CSRString,
+		CertificateCollection: certCollectionURI,
+	}, nil
+}
+
+// InstallCertificate installs a certificate on the BMC.
+func (r *RedfishBaseBMC) InstallCertificate(ctx context.Context, certificatePEM string, certificateType CertificateType) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Get manager to find certificate collection
+	managers, err := r.client.GetService().Managers()
+	if err != nil {
+		return fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return fmt.Errorf("no managers found")
+	}
+	manager := managers[0]
+
+	certCollectionURI := manager.ODataID + "/NetworkProtocol/HTTPS/Certificates"
+
+	// Prepare certificate installation payload
+	payload := map[string]any{
+		"CertificateString": certificatePEM,
+		"CertificateType":   string(certificateType),
+	}
+
+	log.Info("Installing certificate on BMC", "uri", certCollectionURI)
+
+	resp, err := r.client.Post(certCollectionURI, payload)
+	if err != nil {
+		return fmt.Errorf("failed to install certificate: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("certificate installation failed with status: %d", resp.StatusCode)
+	}
+
+	log.Info("Certificate installed successfully")
+	return nil
+}
+
+// GetCertificates retrieves all installed certificates on the BMC.
+func (r *RedfishBaseBMC) GetCertificates(ctx context.Context) ([]CertificateInfo, error) {
+	// Get manager to find certificate collection
+	managers, err := r.client.GetService().Managers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get managers: %w", err)
+	}
+	if len(managers) == 0 {
+		return nil, fmt.Errorf("no managers found")
+	}
+	manager := managers[0]
+
+	certCollectionURI := manager.ODataID + "/NetworkProtocol/HTTPS/Certificates"
+
+	resp, err := r.client.Get(certCollectionURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate collection: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	var collection struct {
+		Members []struct {
+			ODataID string `json:"@odata.id"`
+		} `json:"Members"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&collection); err != nil {
+		return nil, fmt.Errorf("failed to decode certificate collection: %w", err)
+	}
+
+	// Retrieve each certificate
+	var certificates []CertificateInfo
+	for _, member := range collection.Members {
+		certResp, err := r.client.Get(member.ODataID)
+		if err != nil {
+			continue // Skip failed certificates
+		}
+
+		var cert struct {
+			ODataID         string `json:"@odata.id"`
+			CertificateType string `json:"CertificateType"`
+			Issuer          struct {
+				CommonName string `json:"CommonName"`
+			} `json:"Issuer"`
+			Subject struct {
+				CommonName string `json:"CommonName"`
+			} `json:"Subject"`
+			ValidNotBefore string `json:"ValidNotBefore"`
+			ValidNotAfter  string `json:"ValidNotAfter"`
+			SerialNumber   string `json:"SerialNumber"`
+			Fingerprint    string `json:"Fingerprint"`
+		}
+
+		if err := json.NewDecoder(certResp.Body).Decode(&cert); err != nil {
+			_ = certResp.Body.Close()
+			continue
+		}
+		_ = certResp.Body.Close()
+
+		certificates = append(certificates, CertificateInfo{
+			URI:            cert.ODataID,
+			Type:           CertificateType(cert.CertificateType),
+			Issuer:         cert.Issuer.CommonName,
+			Subject:        cert.Subject.CommonName,
+			ValidNotBefore: cert.ValidNotBefore,
+			ValidNotAfter:  cert.ValidNotAfter,
+			SerialNumber:   cert.SerialNumber,
+			Fingerprint:    cert.Fingerprint,
+		})
+	}
+
+	return certificates, nil
+}
+
+// DeleteCertificate deletes a certificate from the BMC.
+func (r *RedfishBaseBMC) DeleteCertificate(ctx context.Context, certificateURI string) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.Info("Deleting certificate from BMC", "uri", certificateURI)
+
+	resp, err := r.client.Delete(certificateURI)
+	if err != nil {
+		return fmt.Errorf("failed to delete certificate: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("certificate deletion failed with status: %d", resp.StatusCode)
+	}
+
+	log.Info("Certificate deleted successfully")
+	return nil
+}

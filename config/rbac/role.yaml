@@ -37,6 +37,38 @@ rules:
   - update
   - watch
 - apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/approval
+  verbs:
+  - update
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - certificates.k8s.io
+  resourceNames:
+  - metal.ironcore.dev/bmc-https
+  resources:
+  - signers
+  verbs:
+  - approve
+- apiGroups:
   - metal.ironcore.dev
   resources:
   - BMC

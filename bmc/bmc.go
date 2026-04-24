@@ -138,6 +138,21 @@ type BMC interface {
 	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
 	// for the given component type.
 	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
+
+	// GetCertificateService retrieves the certificate service for the BMC.
+	GetCertificateService(ctx context.Context) (*schemas.CertificateService, error)
+
+	// GenerateCSR generates a Certificate Signing Request on the BMC.
+	GenerateCSR(ctx context.Context, req CSRRequest) (*CSRResponse, error)
+
+	// InstallCertificate installs a certificate on the BMC.
+	InstallCertificate(ctx context.Context, certificatePEM string, certificateType CertificateType) error
+
+	// GetCertificates retrieves all installed certificates on the BMC.
+	GetCertificates(ctx context.Context) ([]CertificateInfo, error)
+
+	// DeleteCertificate deletes a certificate from the BMC.
+	DeleteCertificate(ctx context.Context, certificateURI string) error
 }
 
 type Entity struct {
@@ -296,4 +311,74 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
+}
+
+// CertificateType defines the type of certificate.
+type CertificateType string
+
+const (
+	// CertificateTypeHTTPS is the HTTPS/TLS certificate type
+	CertificateTypeHTTPS CertificateType = "PEM"
+	// CertificateTypeCA is the CA certificate type
+	CertificateTypeCA CertificateType = "PEM"
+)
+
+// CertificatePurpose defines the purpose/usage of a certificate.
+type CertificatePurpose string
+
+const (
+	// CertificatePurposeHTTPS indicates an HTTPS/TLS server certificate
+	CertificatePurposeHTTPS CertificatePurpose = "HTTPS"
+	// CertificatePurposeCA indicates a CA certificate
+	CertificatePurposeCA CertificatePurpose = "CA"
+)
+
+// CSRRequest contains parameters for generating a Certificate Signing Request.
+type CSRRequest struct {
+	// CommonName is the common name for the certificate (typically hostname or IP)
+	CommonName string
+	// Organization is the organization name
+	Organization string
+	// OrganizationalUnit is the organizational unit
+	OrganizationalUnit string
+	// Country is the two-letter country code
+	Country string
+	// State is the state or province
+	State string
+	// City is the city or locality
+	City string
+	// Email is the email address
+	Email string
+	// KeyPairAlgorithm is the key pair algorithm (e.g., "RSA2048", "RSA4096", "EC256")
+	KeyPairAlgorithm string
+	// AlternativeNames are subject alternative names (DNS names, IP addresses)
+	AlternativeNames []string
+}
+
+// CSRResponse contains the generated Certificate Signing Request.
+type CSRResponse struct {
+	// CSRString is the PEM-encoded PKCS#10 CSR
+	CSRString string
+	// CertificateCollection is the URI where the signed certificate should be installed
+	CertificateCollection string
+}
+
+// CertificateInfo contains information about an installed certificate.
+type CertificateInfo struct {
+	// URI is the Redfish URI of the certificate resource
+	URI string
+	// Type is the certificate type
+	Type CertificateType
+	// Issuer is the certificate issuer distinguished name
+	Issuer string
+	// Subject is the certificate subject distinguished name
+	Subject string
+	// ValidNotBefore is the certificate validity start time
+	ValidNotBefore string
+	// ValidNotAfter is the certificate validity end time
+	ValidNotAfter string
+	// SerialNumber is the certificate serial number
+	SerialNumber string
+	// Fingerprint is the certificate fingerprint/thumbprint
+	Fingerprint string
 }

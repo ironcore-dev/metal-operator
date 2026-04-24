@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -692,5 +693,128 @@ var _ = Describe("BMC Conditions", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	Context("Certificate Management", func() {
+		var (
+			bmcObj    *metalv1alpha1.BMC
+			bmcSecret *metalv1alpha1.BMCSecret
+		)
+
+		BeforeEach(func(ctx SpecContext) {
+			By("Creating a BMCSecret")
+			bmcSecret = &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-bmc-secret-",
+				},
+				Data: map[string][]byte{
+					metalv1alpha1.BMCSecretUsernameKeyName: []byte("admin"),
+					metalv1alpha1.BMCSecretPasswordKeyName: []byte("password"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+			By("Creating a BMC with automatic certificate management")
+			bmcObj = &metalv1alpha1.BMC{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-bmc-cert-",
+				},
+				Spec: metalv1alpha1.BMCSpec{
+					Endpoint: &metalv1alpha1.InlineEndpoint{
+						IP: metalv1alpha1.MustParseIP(MockServerIP),
+					},
+					BMCSecretRef: v1.LocalObjectReference{Name: bmcSecret.Name},
+					Protocol: metalv1alpha1.Protocol{
+						Name:   metalv1alpha1.ProtocolNameRedfish,
+						Port:   MockServerPort,
+						Scheme: metalv1alpha1.HTTPProtocolScheme,
+					},
+					CertificateManagementPolicy: ptr.To(metalv1alpha1.CertificateManagementPolicyAutomatic),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcObj)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, bmcObj)
+			DeferCleanup(k8sClient.Delete, bmcSecret)
+		})
+
+		It("should create a CertificateSigningRequest when automatic policy is enabled", func(ctx SpecContext) {
+			By("Waiting for BMC to be enabled")
+			Eventually(Object(bmcObj)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
+			))
+
+			By("Verifying that certificate management was initiated")
+			// Certificate management might complete quickly, so check for evidence:
+			// - CSR ref exists (pending), OR
+			// - Certificate secret exists (completed)
+			// - Certificate condition is present
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(bmcObj), bmcObj)).To(Succeed())
+				// Either CSR is pending OR certificate is installed
+				hasCSR := bmcObj.Status.CertificateSigningRequestRef != nil
+				hasCert := bmcObj.Status.CertificateSecretRef != nil
+				g.Expect(hasCSR || hasCert).To(BeTrue(), "Expected either CSR ref or certificate secret ref to be set")
+			}).Should(Succeed())
+		})
+
+		It("should skip certificate management when policy is Manual", func(ctx SpecContext) {
+			By("Creating a BMC with manual certificate management")
+			manualBMC := &metalv1alpha1.BMC{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-bmc-manual-",
+				},
+				Spec: metalv1alpha1.BMCSpec{
+					Endpoint: &metalv1alpha1.InlineEndpoint{
+						IP: metalv1alpha1.MustParseIP(MockServerIP),
+					},
+					BMCSecretRef: v1.LocalObjectReference{Name: bmcSecret.Name},
+					Protocol: metalv1alpha1.Protocol{
+						Name:   metalv1alpha1.ProtocolNameRedfish,
+						Port:   MockServerPort,
+						Scheme: metalv1alpha1.HTTPProtocolScheme,
+					},
+					CertificateManagementPolicy: ptr.To(metalv1alpha1.CertificateManagementPolicyManual),
+				},
+			}
+			Expect(k8sClient.Create(ctx, manualBMC)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, manualBMC)
+
+			By("Waiting for BMC to be enabled")
+			Eventually(Object(manualBMC)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
+			))
+
+			By("Verifying that no CSR was created")
+			Consistently(Object(manualBMC)).Should(
+				HaveField("Status.CertificateSigningRequestRef", BeNil()),
+			)
+		})
+
+		It("should update certificate info in status", func(ctx SpecContext) {
+			By("Waiting for BMC to be enabled")
+			Eventually(Object(bmcObj)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
+			))
+
+			By("Updating certificate info")
+			bmcCopy := bmcObj.DeepCopy()
+			bmcCopy.Status.CertificateInfo = &metalv1alpha1.CertificateInfo{
+				Issuer:       "CN=Test CA",
+				Subject:      "CN=test-bmc",
+				NotBefore:    &metav1.Time{Time: time.Now()},
+				NotAfter:     &metav1.Time{Time: time.Now().Add(90 * 24 * time.Hour)},
+				SerialNumber: "12345",
+				Thumbprint:   "abcdef",
+			}
+			Expect(k8sClient.Status().Update(ctx, bmcCopy)).To(Succeed())
+
+			By("Verifying certificate info was stored")
+			Eventually(Object(bmcObj)).Should(
+				HaveField("Status.CertificateInfo", Not(BeNil())),
+			)
+			Eventually(Object(bmcObj)).Should(
+				HaveField("Status.CertificateInfo.Issuer", "CN=Test CA"),
+			)
+		})
 	})
 })

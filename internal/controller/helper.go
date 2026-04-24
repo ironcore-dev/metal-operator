@@ -32,17 +32,6 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
-
-	RetryOfFailedResourceConditionIssued = "RetryOfFailedResourceConditionIssued"
-	RetryOfFailedResourceReasonIssued    = "RetryOfFailedResourceReasonIssued"
-
-	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
-	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
-	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
-	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
-	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
-	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
-	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
 
 type BMCTaskFetchFailedError struct {
@@ -78,6 +67,7 @@ func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client
 }
 
 // GetCondition finds a condition in a condition slice.
+// If the condition is not found, a new one with Status=False is returned.
 func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
 	condition := &metav1.Condition{}
 	condFound, err := acc.FindSlice(conditions, conditionType, condition)
@@ -96,6 +86,34 @@ func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, c
 	}
 
 	return condition, nil
+}
+
+// migrateConditionTypes renames legacy condition type strings in-place.
+// Returns true if any conditions were migrated.
+// TODO: Remove this function in the next release once all CRs have been reconciled.
+func migrateConditionTypes(conditions []metav1.Condition, migrations map[string]string) bool {
+	migrated := false
+	for i := range conditions {
+		if newType, ok := migrations[conditions[i].Type]; ok {
+			conditions[i].Type = newType
+			migrated = true
+		}
+	}
+	return migrated
+}
+
+// migrateConditionReasons renames legacy condition reason strings in-place.
+// Returns true if any reasons were migrated.
+// TODO: Remove this function in the next release once all CRs have been reconciled.
+func migrateConditionReasons(conditions []metav1.Condition, migrations map[string]string) bool {
+	migrated := false
+	for i := range conditions {
+		if newReason, ok := migrations[conditions[i].Reason]; ok {
+			conditions[i].Reason = newReason
+			migrated = true
+		}
+	}
+	return migrated
 }
 
 // GetServerByName returns a Server object by its name or an error in case the object can not be found.
@@ -350,12 +368,21 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 					conditions, ok := conditionsField.Interface().([]metav1.Condition)
 					if ok {
 						acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-						retriedCondition, err := GetCondition(acc, conditions, RetryOfFailedResourceConditionIssued)
+						retriedCondition, err := GetCondition(acc, conditions, ConditionRetryOfFailedResourceIssued)
 
 						if err == nil && retriedCondition != nil &&
 							retriedCondition.Status == metav1.ConditionTrue &&
 							retriedCondition.Message == metalv1alpha1.OperationAnnotationRetryFailedPropagated {
 							// retry was already propagated to child, we can skip re-propagation to avoid infinite loop
+							return nil
+						}
+
+						// Also check legacy condition type for unmigrated CRs.
+						// TODO: Remove this check in the next release once all CRs have been reconciled.
+						legacyCondition, err := GetCondition(acc, conditions, "RetryOfFailedResourceConditionIssued")
+						if err == nil && legacyCondition != nil &&
+							legacyCondition.Status == metav1.ConditionTrue &&
+							legacyCondition.Message == metalv1alpha1.OperationAnnotationRetryFailedPropagated {
 							return nil
 						}
 					}

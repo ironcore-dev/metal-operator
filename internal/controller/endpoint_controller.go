@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	EndpointFinalizer = "metal.ironcore.dev/endpoint"
+	endpointFinalizer = "metal.ironcore.dev/endpoint"
 )
 
 // EndpointReconciler reconciles a Endpoints object
@@ -61,7 +61,7 @@ func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting Endpoint")
 	// TODO: cleanup endpoint
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, EndpointFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, endpointFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Deleted Endpoint")

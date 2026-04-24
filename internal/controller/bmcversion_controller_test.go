@@ -649,7 +649,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 	}).Should(BeNumerically(">=", 1))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeIssued, condIssue)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, ConditionVersionUpgradeIssued, condIssue)).To(BeTrue())
 		return condIssue.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
@@ -668,7 +668,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 	}).Should(BeNumerically(">=", 2))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeCompleted, condComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, ConditionVersionUpgradeCompleted, condComplete)).To(BeTrue())
 		return condComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
@@ -680,7 +680,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 	}).Should(BeNumerically(">=", 4))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeVerificationCondition, verificationComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, ConditionVersionUpgradeVerification, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 }

@@ -34,37 +34,64 @@ import (
 const (
 	BIOSSettingsFinalizer = "metal.ironcore.dev/biossettings"
 
-	BIOSVersionUpdateConditionPending           = "BIOSVersionUpdatePending"
-	BIOSVersionUpgradeReasonPending             = "BIOSVersionNeedsTObeUpgraded"
-	BIOSPendingSettingConditionCheck            = "BIOSSettingsCheckPendingSettings"
-	BIOSPendingSettingsReasonFound              = "BIOSPendingSettingsFound"
-	BIOSSettingsConditionDuplicateKey           = "BIOSSettingsDuplicateKeys"
-	BIOSSettingsReasonFoundDuplicateKeys        = "BIOSSettingsDuplicateKeysFound"
-	BIOSSettingConditionUpdateStartTime         = "BIOSSettingUpdateStartTime"
-	BIOSSettingsReasonUpdateStartTime           = "BIOSSettingsUpdateHasStarted"
-	BIOSSettingConditionUpdateTimedOut          = "BIOSSettingsTimedOut"
-	BIOSSettingsReasonUpdateTimedOut            = "BIOSSettingsTimedOutDuringUpdate"
-	BIOSSettingsConditionServerPowerOn          = "ServerPowerOnCondition"
-	BIOSSettingsReasonServerPoweredOn           = "ServerPoweredHasBeenPoweredOn"
-	BMCConditionReset                           = "BMCResetIssued"
-	BMCReasonReset                              = "BMCResetIssued"
-	BIOSSettingsConditionIssuedUpdate           = "SettingsUpdateIssued"
-	BIOSSettingReasonIssuedUpdate               = "BIOSSettingUpdateIssued"
-	BIOSSettingsConditionUnknownPendingSettings = "UnknownPendingSettingState"
-	BIOSSettingsReasonUnexpectedPendingSettings = "UnexpectedPendingSettingsPostUpdateHasBeenIssued"
-	BIOSSettingsConditionRebootPostUpdate       = "ServerRebootPostUpdateHasBeenIssued"
-	BIOSSettingsReasonSkipReboot                = "SkipServerRebootPostUpdateHasBeenIssued"
-	BIOSSettingsReasonRebootNeeded              = "RebootPostSettingUpdate"
-	BIOSSettingsConditionRebootPowerOff         = "RebootPowerOff"
-	BIOSSettingsReasonRebootServerPowerOff      = "PowerOffCompletedDuringReboot"
-	BIOSSettingsConditionRebootPowerOn          = "RebootPowerOn"
-	BIOSSettingsReasonRebootServerPowerOn       = "PowerOnCompletedDuringReboot"
-	BIOSSettingsConditionVerifySettings         = "VerifySettingsPostUpdate"
-	BIOSSettingsReasonVerificationCompleted     = "VerificationCompleted"
-	BIOSSettingsReasonVerificationNotCompleted  = "VerificationNotCompleted"
-	BIOSSettingsConditionWrongSettings          = "SettingsProvidedNotValid"
-	BIOSSettingsReasonWrongSettings             = "SettingsProvidedAreNotValid"
+	ConditionPendingSettingsCheck     = "PendingSettingsCheck"
+	ConditionSettingsDuplicateKeys    = "SettingsDuplicateKeys"
+	ConditionSettingsUpdateStartTime  = "SettingsUpdateStartTime"
+	ConditionSettingsTimedOut         = "SettingsTimedOut"
+	ConditionSettingsServerPowerOn    = "ServerPowerOn"
+	ConditionSettingsUpdateIssued     = "SettingsUpdateIssued"
+	ConditionSettingsUnknownPending   = "UnknownPendingSettingState"
+	ConditionSettingsRebootPostUpdate = "RebootPostUpdate"
+	ConditionSettingsRebootPowerOff   = "RebootPowerOff"
+	ConditionSettingsRebootPowerOn    = "RebootPowerOn"
+	ConditionSettingsVerify           = "VerifySettingsPostUpdate"
+	ConditionSettingsValidationFailed = "SettingsValidationFailed"
+
+	ReasonPendingSettingsFound          = "PendingSettingsFound"
+	ReasonSettingsDuplicateKeysFound    = "SettingsDuplicateKeysFound"
+	ReasonSettingsUpdateStarted         = "SettingsUpdateStarted"
+	ReasonSettingsTimedOut              = "SettingsTimedOutDuringUpdate"
+	ReasonSettingsServerPoweredOn       = "ServerPoweredOn"
+	ReasonSettingsUpdateIssued          = "SettingsUpdateIssued"
+	ReasonSettingsUnexpectedPending     = "UnexpectedPendingSettings"
+	ReasonSettingsSkipReboot            = "SkipServerReboot"
+	ReasonSettingsRebootNeeded          = "RebootPostSettingUpdate"
+	ReasonSettingsRebootPowerOff        = "PowerOffCompletedDuringReboot"
+	ReasonSettingsRebootPowerOn         = "PowerOnCompletedDuringReboot"
+	ReasonSettingsVerificationCompleted = "VerificationCompleted"
+	ReasonSettingsVerificationNotDone   = "VerificationNotCompleted"
+	ReasonSettingsValidationFailed      = "SettingsValidationFailed"
 )
+
+// legacyBIOSSettingsConditionTypes maps old condition type strings to their new values.
+// This ensures backward compatibility with existing CRs created before the rename.
+var legacyBIOSSettingsConditionTypes = map[string]string{
+	"BIOSSettingsCheckPendingSettings":     ConditionPendingSettingsCheck,
+	"BIOSSettingsDuplicateKeys":            ConditionSettingsDuplicateKeys,
+	"BIOSSettingUpdateStartTime":           ConditionSettingsUpdateStartTime,
+	"BIOSSettingsTimedOut":                 ConditionSettingsTimedOut,
+	"ServerPowerOnCondition":               ConditionSettingsServerPowerOn,
+	"ServerRebootPostUpdateHasBeenIssued":  ConditionSettingsRebootPostUpdate,
+	"BMCResetIssued":                       ConditionResetIssued,
+	"BIOSVersionUpdatePending":             ConditionVersionUpdatePending,
+	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
+	"SettingsProvidedNotValid":             ConditionSettingsValidationFailed,
+}
+
+// legacyBIOSSettingsConditionReasons maps old condition reason strings to their new values.
+var legacyBIOSSettingsConditionReasons = map[string]string{
+	"BMCResetIssued":                                   ReasonResetIssued,
+	"BIOSVersionNeedsTObeUpgraded":                     ReasonVersionUpgradePending,
+	"BIOSPendingSettingsFound":                         ReasonPendingSettingsFound,
+	"BIOSSettingsDuplicateKeysFound":                   ReasonSettingsDuplicateKeysFound,
+	"BIOSSettingsUpdateHasStarted":                     ReasonSettingsUpdateStarted,
+	"BIOSSettingsTimedOutDuringUpdate":                 ReasonSettingsTimedOut,
+	"ServerPoweredHasBeenPoweredOn":                    ReasonSettingsServerPoweredOn,
+	"BIOSSettingUpdateIssued":                          ReasonSettingsUpdateIssued,
+	"UnexpectedPendingSettingsPostUpdateHasBeenIssued": ReasonSettingsUnexpectedPending,
+	"SkipServerRebootPostUpdateHasBeenIssued":          ReasonSettingsSkipReboot,
+	"SettingsProvidedAreNotValid":                      ReasonSettingsValidationFailed,
+}
 
 // BIOSSettingsReconciler reconciles a BIOSSettings object
 type BIOSSettingsReconciler struct {
@@ -97,7 +124,34 @@ func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, biosSettings); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	if err := r.migrateLegacyConditions(ctx, biosSettings); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
+	}
 	return r.reconcileExists(ctx, biosSettings)
+}
+
+// migrateLegacyConditions renames legacy condition type strings on existing CRs.
+// TODO: Remove this migration in the next release once all CRs have been reconciled.
+func (r *BIOSSettingsReconciler) migrateLegacyConditions(ctx context.Context, settings *metalv1alpha1.BIOSSettings) error {
+	settingsBase := settings.DeepCopy()
+	migrated := migrateConditionTypes(settings.Status.Conditions, legacyBIOSSettingsConditionTypes)
+	if migrateConditionReasons(settings.Status.Conditions, legacyBIOSSettingsConditionReasons) {
+		migrated = true
+	}
+	for i := range settings.Status.FlowState {
+		if migrateConditionTypes(settings.Status.FlowState[i].Conditions, legacyBIOSSettingsConditionTypes) {
+			migrated = true
+		}
+		if migrateConditionReasons(settings.Status.FlowState[i].Conditions, legacyBIOSSettingsConditionReasons) {
+			migrated = true
+		}
+	}
+	if !migrated {
+		return nil
+	}
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("Migrated legacy condition types on BIOSSettings")
+	return r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase))
 }
 
 func (r *BIOSSettingsReconciler) reconcileExists(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {
@@ -158,14 +212,14 @@ func (r *BIOSSettingsReconciler) removeServerMaintenance(ctx context.Context, se
 	if err == nil && maintenance.DeletionTimestamp.IsZero() {
 		if metav1.IsControlledBy(maintenance, settings) {
 			log.V(1).Info("Deleting ServerMaintenance", "ServerMaintenance", client.ObjectKeyFromObject(maintenance), "State", maintenance.Status.State)
-			condition, err = GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionDeleted)
+			condition, err = GetCondition(r.Conditions, settings.Status.Conditions, ConditionServerMaintenanceDeleted)
 			if err != nil {
 				return fmt.Errorf("failed to get the delete condition for ServerMaintenance: %w", err)
 			}
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(ServerMaintenanceReasonDeleted),
+				conditionutils.UpdateReason(ReasonMaintenanceDeleted),
 				conditionutils.UpdateMessage(fmt.Sprintf("Deleting %s", maintenance.Name)),
 			); err != nil {
 				return fmt.Errorf("failed to update deleting ServerMaintenance condition: %w", err)
@@ -337,7 +391,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 	if len(pendingSettings) > 0 {
 		log.V(1).Info("Pending BIOS setting tasks found", "TaskCount", len(pendingSettings))
 
-		pendingSettingStateCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSPendingSettingConditionCheck)
+		pendingSettingStateCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionPendingSettingsCheck)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BIOSSettings state: %w", err)
 		}
@@ -345,7 +399,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 		if err := r.Conditions.Update(
 			pendingSettingStateCheckCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BIOSPendingSettingsReasonFound),
+			conditionutils.UpdateReason(ReasonPendingSettingsFound),
 			conditionutils.UpdateMessage(fmt.Sprintf("Found pending BIOS settings (%d)", len(pendingSettings))),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update pending BIOSSettings update condition: %w", err)
@@ -374,14 +428,14 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 
 	if len(duplicateName) > 0 || len(duplicateSettingsNames) > 0 {
 		log.V(1).Info("Found duplicate keys", "DuplicatesCount", len(duplicateName), "DuplicatesSettingsCound", len(duplicateSettingsNames))
-		duplicateCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSSettingsConditionDuplicateKey)
+		duplicateCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionSettingsDuplicateKeys)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for duplicate-key BIOSSettings state: %w", err)
 		}
 		if err := r.Conditions.Update(
 			duplicateCheckCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BIOSSettingsReasonFoundDuplicateKeys),
+			conditionutils.UpdateReason(ReasonSettingsDuplicateKeysFound),
 			conditionutils.UpdateMessage(fmt.Sprintf("Found duplicate keys (%d) and settings (%d)", len(duplicateName), len(duplicateSettingsNames))),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update pending BIOSSettings update condition: %w", err)
@@ -398,7 +452,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 	// if conditions are present, skip this shortcut to be able to capture all conditions states (ex: verifySetting, reboot etc)
 	if len(settingsDiff) == 0 && len(settings.Status.Conditions) == 0 {
 		// move status to completed
-		verifySettingUpdate, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSSettingsConditionVerifySettings)
+		verifySettingUpdate, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionSettingsVerify)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for verified BIOSSettings condition: %w", err)
 		}
@@ -406,7 +460,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 		if err := r.Conditions.Update(
 			verifySettingUpdate,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BIOSSettingsReasonVerificationCompleted),
+			conditionutils.UpdateReason(ReasonSettingsVerificationCompleted),
 			conditionutils.UpdateMessage("Required BIOS settings has been verified on the server"),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update verify biossetting condition: %w", err)
@@ -417,7 +471,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 	var state = metalv1alpha1.BIOSSettingsStateInProgress
 	var condition *metav1.Condition
 	if biosVersion != settings.Spec.Version {
-		versionCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, BIOSVersionUpdateConditionPending)
+		versionCheckCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionVersionUpdatePending)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get Condition for pending BIOSVersion update state: %w", err)
 		}
@@ -428,7 +482,7 @@ func (r *BIOSSettingsReconciler) handleSettingPendingState(ctx context.Context, 
 		if err := r.Conditions.Update(
 			versionCheckCondition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BIOSVersionUpgradeReasonPending),
+			conditionutils.UpdateReason(ReasonVersionUpgradePending),
 			conditionutils.UpdateMessage(fmt.Sprintf("Waiting to update biosVersion: %s, current biosVersion: %s", settings.Spec.Version, biosVersion)),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update Pending BIOSVersion update condition: %w", err)
@@ -445,7 +499,7 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 		return ctrl.Result{}, err
 	}
 
-	condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionWaiting)
+	condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionServerMaintenanceWaiting)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -455,7 +509,7 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateReason(ReasonMaintenanceWaiting),
 				conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", settings.Spec.ServerMaintenanceRef.Name)),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -467,11 +521,11 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 		return ctrl.Result{}, nil
 	}
 	// once in maintenance, clear the waiting condition if present
-	if condition.Reason != ServerMaintenanceReasonApproved {
+	if condition.Reason != ReasonMaintenanceApproved {
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
-			conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
+			conditionutils.UpdateReason(ReasonMaintenanceApproved),
 			conditionutils.UpdateMessage("Server is now in Maintenance mode"),
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -524,7 +578,7 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 					continue
 				}
 				// mark completed, and move on
-				verifySettingUpdate, err := GetCondition(r.Conditions, currentSettingsFlowStatus.Conditions, BIOSSettingsConditionVerifySettings)
+				verifySettingUpdate, err := GetCondition(r.Conditions, currentSettingsFlowStatus.Conditions, ConditionSettingsVerify)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to get Condition for verified BIOSSettings condition: %w", err)
 				}
@@ -532,7 +586,7 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 				if err := r.Conditions.Update(
 					verifySettingUpdate,
 					conditionutils.UpdateStatus(corev1.ConditionTrue),
-					conditionutils.UpdateReason(BIOSSettingsReasonVerificationCompleted),
+					conditionutils.UpdateReason(ReasonSettingsVerificationCompleted),
 					conditionutils.UpdateMessage("Required BIOS settings has been RE verified on the server. Hence, moving out of Pending state"),
 				); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to update verified BIOSSettings condition: %w", err)
@@ -564,7 +618,7 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 
 func (r *BIOSSettingsReconciler) handleBMCReset(ctx context.Context, bmcClient bmc.BMC, settings *metalv1alpha1.BIOSSettings, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	resetBMC, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCConditionReset)
+	resetBMC, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionResetIssued)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for reset of BMC of server: %w", err)
 	}
@@ -572,13 +626,13 @@ func (r *BIOSSettingsReconciler) handleBMCReset(ctx context.Context, bmcClient b
 	if resetBMC.Status != metav1.ConditionTrue {
 		// once the server is powered on, reset the BMC to make sure its in stable state
 		// this avoids problems with some BMCs that hang up in subsequent operations
-		if resetBMC.Reason != BMCReasonReset {
+		if resetBMC.Reason != ReasonResetIssued {
 			if err := resetBMCOfServer(ctx, r.Client, server, bmcClient); err == nil {
 				// mark reset to be issued, wait for next reconcile
 				if err := r.Conditions.Update(
 					resetBMC,
 					conditionutils.UpdateStatus(corev1.ConditionFalse),
-					conditionutils.UpdateReason(BMCReasonReset),
+					conditionutils.UpdateReason(ReasonResetIssued),
 					conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
 				); err != nil {
 					return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
@@ -604,7 +658,7 @@ func (r *BIOSSettingsReconciler) handleBMCReset(ctx context.Context, bmcClient b
 		if err := r.Conditions.Update(
 			resetBMC,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BMCReasonReset),
+			conditionutils.UpdateReason(ReasonResetIssued),
 			conditionutils.UpdateMessage("BMC reset to stabilize BMC of the server is completed"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update power on server condition: %w", err)
@@ -619,7 +673,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 	if modified, err := r.setTimeoutForAppliedSettings(ctx, settings, flowStatus); modified || err != nil {
 		return false, err
 	}
-	turnOnServer, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionServerPowerOn)
+	turnOnServer, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsServerPowerOn)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for Initial powerOn of server: %w", err)
 	}
@@ -629,7 +683,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			if err := r.Conditions.Update(
 				turnOnServer,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BIOSSettingsReasonServerPoweredOn),
+				conditionutils.UpdateReason(ReasonSettingsServerPoweredOn),
 				conditionutils.UpdateMessage("Server is powered On to start the biosUpdate process"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update power on server condition: %w", err)
@@ -653,9 +707,9 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 
 	// check if we have already determined if we need reboot of not.
 	// if the condition is present, we have checked the skip reboot condition.
-	condFound, err := r.Conditions.FindSlice(flowStatus.Conditions, BIOSSettingsConditionRebootPostUpdate, &metav1.Condition{})
+	condFound, err := r.Conditions.FindSlice(flowStatus.Conditions, ConditionSettingsRebootPostUpdate, &metav1.Condition{})
 	if err != nil {
-		return false, fmt.Errorf("failed to find Condition %v. error: %w", BIOSSettingsConditionRebootPostUpdate, err)
+		return false, fmt.Errorf("failed to find Condition %v. error: %w", ConditionSettingsRebootPostUpdate, err)
 	}
 
 	if !condFound {
@@ -673,14 +727,14 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			log.Error(err, "Could not validate settings and determine if reboot needed")
 			var invalidSettingsErr *bmc.InvalidBIOSSettingsError
 			if errors.As(err, &invalidSettingsErr) {
-				inValidSettings, errCond := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionWrongSettings)
+				inValidSettings, errCond := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsValidationFailed)
 				if errCond != nil {
 					return false, errors.Join(fmt.Errorf("failed to get Condition for skip reboot post setting update: %w", errCond), err)
 				}
 				if errCond := r.Conditions.Update(
 					inValidSettings,
 					conditionutils.UpdateStatus(corev1.ConditionTrue),
-					conditionutils.UpdateReason(BIOSSettingsReasonWrongSettings),
+					conditionutils.UpdateReason(ReasonSettingsValidationFailed),
 					conditionutils.UpdateMessage(fmt.Sprintf("Settings provided is invalid. error: %v", err)),
 				); errCond != nil {
 					return false, fmt.Errorf("failed to update Invalid Settings condition: %w", errors.Join(err, errCond))
@@ -691,7 +745,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			return false, err
 		}
 
-		skipReboot, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionRebootPostUpdate)
+		skipReboot, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsRebootPostUpdate)
 		if err != nil {
 			return false, fmt.Errorf("failed to get Condition for skip reboot post setting update: %w", err)
 		}
@@ -702,7 +756,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			if err := r.Conditions.Update(
 				skipReboot,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BIOSSettingsReasonSkipReboot),
+				conditionutils.UpdateReason(ReasonSettingsSkipReboot),
 				conditionutils.UpdateMessage("Settings provided does not need server reboot"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update skip reboot condition: %w", err)
@@ -711,7 +765,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 			if err := r.Conditions.Update(
 				skipReboot,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(BIOSSettingsReasonRebootNeeded),
+				conditionutils.UpdateReason(ReasonSettingsRebootNeeded),
 				conditionutils.UpdateMessage("Settings provided needs server reboot"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update skip reboot condition: %w", err)
@@ -722,7 +776,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 		return false, err
 	}
 
-	issueBiosUpdate, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionIssuedUpdate)
+	issueBiosUpdate, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsUpdateIssued)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for issuing BIOSSetting update to server: %w", err)
 	}
@@ -731,13 +785,13 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 		return false, r.applyBIOSSettings(ctx, bmcClient, settings, flowItem, flowStatus, server, issueBiosUpdate)
 	}
 
-	skipReboot, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionRebootPostUpdate)
+	skipReboot, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsRebootPostUpdate)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for reboot needed condition: %w", err)
 	}
 
 	if skipReboot.Status != metav1.ConditionTrue {
-		rebootPowerOnCondition, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionRebootPowerOn)
+		rebootPowerOnCondition, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsRebootPowerOn)
 		if err != nil {
 			return false, fmt.Errorf("failed to get Condition for reboot PowerOn condition: %w", err)
 		}
@@ -751,7 +805,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 
 func (r *BIOSSettingsReconciler) setTimeoutForAppliedSettings(ctx context.Context, settings *metalv1alpha1.BIOSSettings, flowStatus *metalv1alpha1.BIOSSettingsFlowStatus) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	timeoutCheck, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingConditionUpdateStartTime)
+	timeoutCheck, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsUpdateStartTime)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for TimeOut during setting update: %w", err)
 	}
@@ -759,7 +813,7 @@ func (r *BIOSSettingsReconciler) setTimeoutForAppliedSettings(ctx context.Contex
 		if err := r.Conditions.Update(
 			timeoutCheck,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BIOSSettingsReasonUpdateStartTime),
+			conditionutils.UpdateReason(ReasonSettingsUpdateStarted),
 			conditionutils.UpdateMessage("Settings are being updated on Server. Timeout will occur beyond this point if settings are not applied"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update starting setting update condition: %w", err)
@@ -769,14 +823,14 @@ func (r *BIOSSettingsReconciler) setTimeoutForAppliedSettings(ctx context.Contex
 		startTime := timeoutCheck.LastTransitionTime.Time
 		if time.Now().After(startTime.Add(r.TimeoutExpiry)) {
 			log.V(1).Info("Timeout while updating the biosSettings")
-			timedOut, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingConditionUpdateTimedOut)
+			timedOut, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsTimedOut)
 			if err != nil {
 				return false, fmt.Errorf("failed to get Condition for Timeout of BIOSSettings update: %w", err)
 			}
 			if err := r.Conditions.Update(
 				timedOut,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BIOSSettingsReasonUpdateTimedOut),
+				conditionutils.UpdateReason(ReasonSettingsTimedOut),
 				conditionutils.UpdateMessage(fmt.Sprintf("Timeout after: %v. startTime: %v. timedOut on: %v", r.TimeoutExpiry, startTime, time.Now().String())),
 			); err != nil {
 				return false, fmt.Errorf("failed to update timeout during settings update condition: %w", err)
@@ -790,7 +844,7 @@ func (r *BIOSSettingsReconciler) setTimeoutForAppliedSettings(ctx context.Contex
 
 func (r *BIOSSettingsReconciler) verifySettingsUpdateComplete(ctx context.Context, bmcClient bmc.BMC, biosSettings *metalv1alpha1.BIOSSettings, flowItem *metalv1alpha1.SettingsFlowItem, flowStatus *metalv1alpha1.BIOSSettingsFlowStatus, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	verifySettingUpdate, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionVerifySettings)
+	verifySettingUpdate, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsVerify)
 	if err != nil {
 		return false, fmt.Errorf("failed to get Condition for Verification condition: %w", err)
 	}
@@ -807,7 +861,7 @@ func (r *BIOSSettingsReconciler) verifySettingsUpdateComplete(ctx context.Contex
 			if err := r.Conditions.Update(
 				verifySettingUpdate,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BIOSSettingsReasonVerificationCompleted),
+				conditionutils.UpdateReason(ReasonSettingsVerificationCompleted),
 				conditionutils.UpdateMessage("Required BIOS settings has been applied and verified on the server"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update verify BIOSSetting condition: %w", err)
@@ -817,11 +871,11 @@ func (r *BIOSSettingsReconciler) verifySettingsUpdateComplete(ctx context.Contex
 		}
 
 		log.V(1).Info("Waiting on the BIOS setting to take place")
-		if verifySettingUpdate.Reason != BIOSSettingsReasonVerificationNotCompleted {
+		if verifySettingUpdate.Reason != ReasonSettingsVerificationNotDone {
 			if err := r.Conditions.Update(
 				verifySettingUpdate,
 				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(BIOSSettingsReasonVerificationNotCompleted),
+				conditionutils.UpdateReason(ReasonSettingsVerificationNotDone),
 				conditionutils.UpdateMessage("Required BIOS settings has not yet verified on the server"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update verify BIOSSetting condition: %w", err)
@@ -837,7 +891,7 @@ func (r *BIOSSettingsReconciler) verifySettingsUpdateComplete(ctx context.Contex
 
 func (r *BIOSSettingsReconciler) rebootServer(ctx context.Context, settings *metalv1alpha1.BIOSSettings, flowStatus *metalv1alpha1.BIOSSettingsFlowStatus, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
-	rebootPowerOffCondition, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionRebootPowerOff)
+	rebootPowerOffCondition, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsRebootPowerOff)
 	if err != nil {
 		return fmt.Errorf("failed to get PowerOff condition: %w", err)
 	}
@@ -853,7 +907,7 @@ func (r *BIOSSettingsReconciler) rebootServer(ctx context.Context, settings *met
 			if err := r.Conditions.Update(
 				rebootPowerOffCondition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BIOSSettingsReasonRebootServerPowerOff),
+				conditionutils.UpdateReason(ReasonSettingsRebootPowerOff),
 				conditionutils.UpdateMessage("Server has entered power off state"),
 			); err != nil {
 				return fmt.Errorf("failed to update powerOff condition: %w", err)
@@ -864,7 +918,7 @@ func (r *BIOSSettingsReconciler) rebootServer(ctx context.Context, settings *met
 		return nil
 	}
 
-	rebootPowerOnCondition, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionRebootPowerOn)
+	rebootPowerOnCondition, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsRebootPowerOn)
 	if err != nil {
 		return fmt.Errorf("failed to get PowerOn condition: %w", err)
 	}
@@ -880,7 +934,7 @@ func (r *BIOSSettingsReconciler) rebootServer(ctx context.Context, settings *met
 			if err := r.Conditions.Update(
 				rebootPowerOnCondition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(BIOSSettingsReasonRebootServerPowerOn),
+				conditionutils.UpdateReason(ReasonSettingsRebootPowerOn),
 				conditionutils.UpdateMessage("Server has entered power on state"),
 			); err != nil {
 				return fmt.Errorf("failed to update reboot server powerOn condition: %w", err)
@@ -906,7 +960,7 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 		if err := r.Conditions.Update(
 			issueBiosUpdate,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BIOSSettingReasonIssuedUpdate),
+			conditionutils.UpdateReason(ReasonSettingsUpdateIssued),
 			conditionutils.UpdateMessage("BIOS Settings issue has been Skipped on the server as no difference found"),
 		); err != nil {
 			return fmt.Errorf("failed to update issued settings update condition: %w", err)
@@ -939,7 +993,7 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 		return fmt.Errorf("failed to get pending BIOS settings: %w", err)
 	}
 
-	skipReboot, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionRebootPostUpdate)
+	skipReboot, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsRebootPostUpdate)
 	if err != nil {
 		return fmt.Errorf("failed to get Condition for reboot needed condition: %w", err)
 	}
@@ -963,14 +1017,14 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 	// all required settings should in pending settings.
 	if len(pendingSettingsDiff) > 0 {
 		log.V(1).Info("Difference between the pending settings and that of required", "SettingsDiff", pendingSettingsDiff)
-		unexpectedPendingSettings, err := GetCondition(r.Conditions, flowStatus.Conditions, BIOSSettingsConditionUnknownPendingSettings)
+		unexpectedPendingSettings, err := GetCondition(r.Conditions, flowStatus.Conditions, ConditionSettingsUnknownPending)
 		if err != nil {
 			return fmt.Errorf("failed to get Condition for unexpected pending BIOSSetting state: %w", err)
 		}
 		if err := r.Conditions.Update(
 			unexpectedPendingSettings,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BIOSSettingsReasonUnexpectedPendingSettings),
+			conditionutils.UpdateReason(ReasonSettingsUnexpectedPending),
 			conditionutils.UpdateMessage(fmt.Sprintf("Found unexpected settings after issuing settings update for BIOS. unexpected settings %v", pendingSettingsDiff)),
 		); err != nil {
 			return fmt.Errorf("failed to update unexpected pending BIOSSettings found condition: %w", err)
@@ -982,7 +1036,7 @@ func (r *BIOSSettingsReconciler) applyBIOSSettings(ctx context.Context, bmcClien
 	if err := r.Conditions.Update(
 		issueBiosUpdate,
 		conditionutils.UpdateStatus(corev1.ConditionTrue),
-		conditionutils.UpdateReason(BIOSSettingReasonIssuedUpdate),
+		conditionutils.UpdateReason(ReasonSettingsUpdateIssued),
 		conditionutils.UpdateMessage("BIOS settings update has been triggered on the server"),
 	); err != nil {
 		return fmt.Errorf("failed to update issued BIOSSettings update condition: %w", err)
@@ -1049,7 +1103,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 		settings.Status.ObservedGeneration = settings.Generation
 		annotations := settings.GetAnnotations()
-		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+		retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get retry condition for BIOSSettings: %w", err)
 		}
@@ -1057,7 +1111,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 		if retryCondition.Status != metav1.ConditionTrue {
 			err := r.Conditions.Update(retryCondition,
 				conditionutils.UpdateStatus(metav1.ConditionTrue),
-				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
+				conditionutils.UpdateReason(ReasonRetryOfFailedResourceIssued),
 				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
 			)
 			if err != nil {
@@ -1092,7 +1146,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 			settings.Status.State = metalv1alpha1.BIOSSettingsStatePending
 			settings.Status.FlowState = []metalv1alpha1.BIOSSettingsFlowStatus{}
 			settings.Status.ObservedGeneration = settings.Generation
-			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, RetryOfFailedResourceConditionIssued)
+			retryCondition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionRetryOfFailedResourceIssued)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to get Retry condition for BIOSSettings: %w", err)
 			}
@@ -1128,7 +1182,7 @@ func (r *BIOSSettingsReconciler) handleFailedState(ctx context.Context, settings
 	if settings.Spec.ServerMaintenanceRef == nil {
 		// Check if the failure is due to pending settings
 		for _, condition := range settings.Status.Conditions {
-			if condition.Type == BIOSPendingSettingConditionCheck && condition.Status == metav1.ConditionTrue {
+			if condition.Type == ConditionPendingSettingsCheck && condition.Status == metav1.ConditionTrue {
 				if _, err := r.requestMaintenanceForServer(ctx, settings, server); err != nil {
 					return ctrl.Result{}, err
 				}
@@ -1252,7 +1306,7 @@ func (r *BIOSSettingsReconciler) requestMaintenanceForServer(ctx context.Context
 		} else if err != nil {
 			return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", err)
 		}
-		condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ServerMaintenanceConditionCreated)
+		condition, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionServerMaintenanceCreated)
 		if err != nil {
 			return false, err
 		}
@@ -1264,7 +1318,7 @@ func (r *BIOSSettingsReconciler) requestMaintenanceForServer(ctx context.Context
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(ServerMaintenanceReasonCreated),
+			conditionutils.UpdateReason(ReasonMaintenanceCreated),
 			conditionutils.UpdateMessage(fmt.Sprintf("Created/present %v at %v", settings.Spec.ServerMaintenanceRef.Name, time.Now())),
 		); err != nil {
 			return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -1531,8 +1585,13 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBMC(ctx context.Context, o
 
 		// Only enqueue if BMC reset was issued but not yet completed
 		if settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-			resetCond, err := GetCondition(r.Conditions, settings.Status.Conditions, BMCConditionReset)
-			if err == nil && resetCond.Status != metav1.ConditionTrue && resetCond.Reason == BMCReasonReset {
+			// Normalize legacy condition types/reasons so unmigrated CRs are handled correctly.
+			conditions := settings.Status.Conditions
+			migrateConditionTypes(conditions, legacyBIOSSettingsConditionTypes)
+			migrateConditionReasons(conditions, legacyBIOSSettingsConditionReasons)
+
+			resetCond, err := GetCondition(r.Conditions, conditions, ConditionResetIssued)
+			if err == nil && resetCond.Status != metav1.ConditionTrue && resetCond.Reason == ReasonResetIssued {
 				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 			}
 		}

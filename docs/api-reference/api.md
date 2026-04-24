@@ -762,10 +762,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `userName` _string_ | UserName is the username of the BMC user. |  |  |
-| `roleID` _string_ | RoleID is the ID of the role to assign to the user. |  |  |
-| `description` _string_ | Description is a description for the BMC user. |  |  |
-| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />If not set, the password will not be rotated. |  |  |
+| `userName` _string_ | Username of the BMC user. |  | MinLength: 1 <br /> |
+| `roleID` _string_ | RoleID is the ID of the role to assign to the user.<br />The available roles depend on the BMC implementation.<br />For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly". |  | MinLength: 1 <br /> |
+| `description` _string_ | Description is an optional description for the BMC user. |  |  |
+| `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />if not set, the password will not be rotated. |  |  |
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef references the BMCSecret containing the credentials for this user.<br />If not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef references the BMC this user should be created on. |  |  |
 
@@ -803,8 +803,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `userName` _string_ | Username of the BMC user. |  |  |
-| `roleID` _string_ | RoleID is the ID of the role to assign to the user.<br />The available roles depend on the BMC implementation.<br />For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly". |  |  |
+| `userName` _string_ | Username of the BMC user. |  | MinLength: 1 <br /> |
+| `roleID` _string_ | RoleID is the ID of the role to assign to the user.<br />The available roles depend on the BMC implementation.<br />For Redfish, common role IDs are "Administrator", "Operator", "ReadOnly". |  | MinLength: 1 <br /> |
 | `description` _string_ | Description is an optional description for the BMC user. |  |  |
 | `rotationPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#duration-v1-meta)_ | RotationPeriod defines how often the password should be rotated.<br />if not set, the password will not be rotated. |  |  |
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCSecretRef references the BMCSecret containing the credentials for this user.<br />If not set, the operator will generate a secure password based on BMC manufacturer requirements. |  |  |

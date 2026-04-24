@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,7 +33,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		server03  *metalv1alpha1.Server
 		bmcSecret *metalv1alpha1.BMCSecret
 	)
-	ns := SetupTest(MockServerIPAddrs)
+	_ = SetupTest(MockServerIPAddrs)
 
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")
@@ -125,8 +126,10 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-
 		EnsureCleanState()
+		for _, ms := range mockServers {
+			ms.ResetBIOSSettings("437XR1138R2")
+		}
 	})
 
 	It("should successfully reconcile the resource", func(ctx SpecContext) {
@@ -134,13 +137,12 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSetSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version:                 defaultMockUpServerBiosVersion,
+					Version:                 mockUpServerBiosVersion,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{Settings: map[string]string{"ProcCores": "2"}, Priority: 1, Name: "one"},
@@ -231,13 +233,12 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSetSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version:                 defaultMockUpServerBiosVersion,
+					Version:                 mockUpServerBiosVersion,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{Settings: map[string]string{"AdminPhone": "foo-bar"}, Priority: 10, Name: "foo-bar"},
@@ -411,13 +412,12 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		biosSettingsSet1 := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set1-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSetSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version:                 defaultMockUpServerBiosVersion,
+					Version:                 mockUpServerBiosVersion,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{Settings: map[string]string{"AdminPhone": "foo-bar"}, Priority: 10, Name: "foo-bar"},
@@ -461,13 +461,12 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		biosSettingsSet2 := &metalv1alpha1.BIOSSettingsSet{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-biossettings-set2-",
-				Namespace:    ns.Name,
 			},
 			// settings mocked at
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSetSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version:                 defaultMockUpServerBiosVersion,
+					Version:                 mockUpServerBiosVersion,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{Settings: map[string]string{"AdminPhone": "foo-bar"}, Priority: 10, Name: "foo-bar"},
@@ -605,6 +604,181 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Eventually(Get(biosSettings02_02)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, biosSettings03_02)).To(Succeed())
 		Eventually(Get(biosSettings03_02)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Object(server01)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server02)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+		Eventually(Object(server03)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
+
+	It("Should successfully retry failed state child resources", func(ctx SpecContext) {
+
+		failedAutoRetryCount := 2
+		By("Create resource")
+		biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-biossettings-set-",
+			},
+			// settings mocked at
+			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
+			Spec: metalv1alpha1.BIOSSettingsSetSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 mockUpServerBiosVersion,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+						{Settings: map[string]string{"UnknownSettings": "foo-bar"}, Priority: 10, Name: "foo-bar"},
+					},
+					RetryPolicy: &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+				},
+				ServerSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"metal.ironcore.dev/Manufacturer": "bar",
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettingsSet)).To(Succeed())
+
+		By("Checking if the BIOSSettings has been created")
+		biosSettings02 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosSettingsSet.Name + "-" + server02.Name,
+			},
+		}
+		Eventually(Get(biosSettings02)).Should(Succeed())
+
+		By("Checking if the 2nd BIOSSettings has been created")
+		biosSettings03 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: biosSettingsSet.Name + "-" + server03.Name,
+			},
+		}
+		Eventually(Get(biosSettings03)).Should(Succeed())
+
+		By("Checking if the status has been updated")
+		Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+		))
+
+		By("Ensuring that the BIOSSetting 02 has failed")
+		Eventually(Object(biosSettings02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Ensuring that the BIOSSetting 03 has failed")
+		Eventually(Object(biosSettings03)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Checking if the status has been updated to failed")
+		Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 2)),
+		))
+
+		By("Ensuring that the BIOSSetting02 has not been changed")
+		Consistently(Object(biosSettings02), "50ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Ensuring that the BIOSSetting 03 has not been changed")
+		Consistently(Object(biosSettings03), "50ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Updating the BIOSSettingsSet with retry annotation")
+		Eventually(Update(biosSettingsSet, func() {
+			biosSettingsSet.Annotations = map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryChildAndSelf,
+			}
+		})).Should(Succeed())
+
+		By("Ensuring that the BIOSSetting02 has been retried ")
+		Eventually(Object(biosSettings02)).WithPolling(1 * time.Millisecond).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
+			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
+		))
+
+		By("Ensuring that the BIOSSetting03 has been retried")
+		Eventually(Object(biosSettings03)).WithPolling(10 * time.Millisecond).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
+			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
+		))
+
+		By("Ensuring that the BIOSSetting02 has failed again")
+		Eventually(Object(biosSettings02)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Ensuring that the BIOSSetting03 has failed again")
+		Eventually(Object(biosSettings03)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Ensuring that the BIOSSetting02 has not been changed")
+		Consistently(Object(biosSettings02), "50ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Ensuring that the BIOSSetting 03 has not been changed")
+		Consistently(Object(biosSettings03), "50ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		By("Checking if the status has been updated to failed again")
+		Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 2)),
+		))
+
+		By("Ensuring that the BIOSSetting02 has not been retried again")
+		Consistently(Object(biosSettings02), "50ms").Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Ensuring that the BIOSSetting03 has not been retried again")
+		Consistently(Object(biosSettings03), "50ms").Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Updating the BIOSSettingsSet with NO retry annotation")
+		Eventually(Update(biosSettingsSet, func() {
+			delete(biosSettingsSet.GetAnnotations(), metalv1alpha1.OperationAnnotation)
+			delete(biosSettingsSet.Spec.BIOSSettingsTemplate.SettingsFlow[0].Settings, "UnknownSettings")
+			biosSettingsSet.Spec.BIOSSettingsTemplate.SettingsFlow[0].Settings["AdminPhone"] = "foo-bar"
+		})).Should(Succeed())
+
+		By("Checking if the status has been updated to completed (retried automatically)")
+		Eventually(Object(biosSettingsSet)).Should(SatisfyAll(
+			HaveField("Status.FullyLabeledServers", BeNumerically("==", 2)),
+			HaveField("Status.AvailableBIOSSettings", BeNumerically("==", 2)),
+			HaveField("Status.FailedBIOSSettings", BeNumerically("==", 0)),
+			HaveField("Status.CompletedBIOSSettings", BeNumerically("==", 2)),
+		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, biosSettingsSet)).To(Succeed())
+		Eventually(Get(biosSettingsSet)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettings02)).To(Succeed())
+		Eventually(Get(biosSettings02)).Should(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Delete(ctx, biosSettings03)).To(Succeed())
+		Eventually(Get(biosSettings03)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Object(server01)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)

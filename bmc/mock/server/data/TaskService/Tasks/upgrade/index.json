@@ -1,0 +1,9 @@
+{
+    "@odata.type": "#Task.v1_7_3.Task",
+    "@odata.id": "/redfish/v1/TaskService/Tasks/upgrade",
+    "Id": "upgrade",
+    "Name": "Firmware Upgrade Task",
+    "TaskState": "New",
+    "TaskStatus": "OK",
+    "PercentComplete": 0
+}

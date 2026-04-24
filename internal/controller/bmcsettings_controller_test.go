@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -18,8 +19,6 @@ import (
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
-
-	bmcPkg "github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BMCSettings Controller", func() {
@@ -35,7 +34,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-secret-",
 			},
 			Data: map[string][]byte{
@@ -49,7 +47,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		bmc = &metalv1alpha1.BMC{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-bmc-",
-				Namespace:    ns.Name,
 			},
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -87,8 +84,6 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmcPkg.UnitTestMockUps.ResetBMCSettings()
-
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
@@ -96,6 +91,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
+		mockServers[0].ResetBMCSettings("BMC")
 	})
 
 	It("should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
@@ -104,7 +100,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -136,7 +131,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-nochange",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -180,7 +174,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -267,7 +260,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-change",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -366,7 +358,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -464,7 +455,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -521,7 +511,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("Creating a BMCSettings")
 		settings := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -580,7 +569,6 @@ var _ = Describe("BMCSettings Controller", func() {
 		By("creation of new BMCSettings with same spec")
 		bmcSettings2 := &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
 				GenerateName: "test-bmc-recreate-",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -616,5 +604,376 @@ var _ = Describe("BMCSettings Controller", func() {
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
+	})
+
+	It("Should allow retry using annotation", func(ctx SpecContext) {
+		// settings which does not reboot. mocked at
+		// metal-operator/bmc/redfish_local.go defaultMockedBMCSetting
+		bmcSetting := make(map[string]string)
+		bmcSetting["UnknownData"] = "145"
+
+		failedAutoRetryCount := 2
+
+		By("update the server state to Available  state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
+
+		By("Creating a BMCSetting")
+		bmcSettings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-bmc-upgrade",
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+				},
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version:                 "1.45.455b66-rev4",
+					SettingsMap:             bmcSetting,
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+				}},
+		}
+		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
+
+		By("Ensuring that the BMC setting has started retry and FailedAttempts is set")
+		Eventually(func(g Gomega) bool {
+			g.Expect(Get(bmcSettings)()).To(Succeed())
+			return bmcSettings.Status.FailedAttempts > int32(0)
+		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
+
+		Eventually(Object(bmcSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		Eventually(Object(bmcSettings)).Should(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+		)
+
+		By("Ensuring that the BMC setting has not been changed")
+		Consistently(Object(bmcSettings), "250ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmcSettings)).To(Succeed())
+		// clean up maintenance if any, as the test not auto delete child objects
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
+		for _, maintenance := range serverMaintenanceList.Items {
+			if metav1.IsControlledBy(&maintenance, bmcSettings) {
+				Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			}
+		}
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
+
+	It("should apply BMCSettings with a value resolved from a Secret variable", func(ctx SpecContext) {
+		By("Creating a Secret containing the setting value")
+		varSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-var-secret-",
+			},
+			Data: map[string][]byte{
+				"bmc-setting": []byte("changed-via-secret"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, varSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, varSecret)
+
+		By("Creating a BMCSettings with a secretKeyRef variable")
+		settings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-var-secret-",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version:     "1.45.455b66-rev4",
+					SettingsMap: map[string]string{"abc": "$(SETTING_VAL)"},
+					Variables: []metalv1alpha1.Variable{
+						{
+							Key: "SETTING_VAL",
+							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+								SecretKeyRef: &metalv1alpha1.NamespacedKeySelector{
+									Name:      varSecret.Name,
+									Namespace: ns.Name,
+									Key:       "bmc-setting",
+								},
+							},
+						},
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
+
+		By("Ensuring that the BMC has the BMCSettings ref")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+		))
+
+		By("Ensuring that the BMCSettings reaches Applied state after variable resolution")
+		Eventually(Object(settings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
+		By("Ensuring the resolved secret value was written to the BMC (not the raw placeholder)")
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "changed-via-secret"))
+		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
+	})
+
+	It("should apply BMCSettings with a value resolved from a ConfigMap variable", func(ctx SpecContext) {
+		By("Creating a ConfigMap containing the setting value")
+		varCM := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-var-cm-",
+			},
+			Data: map[string]string{
+				"bmc-setting": "changed-via-configmap",
+			},
+		}
+		Expect(k8sClient.Create(ctx, varCM)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, varCM)
+
+		By("Creating a BMCSettings with a configMapKeyRef variable")
+		settings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-var-cm-",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version:     "1.45.455b66-rev4",
+					SettingsMap: map[string]string{"abc": "$(SETTING_VAL)"},
+					Variables: []metalv1alpha1.Variable{
+						{
+							Key: "SETTING_VAL",
+							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+								ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
+									Name:      varCM.Name,
+									Namespace: ns.Name,
+									Key:       "bmc-setting",
+								},
+							},
+						},
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
+
+		By("Ensuring that the BMC has the BMCSettings ref")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+		))
+
+		By("Ensuring that the BMCSettings reaches Applied state after variable resolution")
+		Eventually(Object(settings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
+		By("Ensuring the resolved ConfigMap value was written to the BMC (not the raw placeholder)")
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "changed-via-configmap"))
+		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
+	})
+
+	It("should apply BMCSettings with a value resolved from a fieldRef variable", func(ctx SpecContext) {
+		By("Creating a BMCSettings with a fieldRef variable pointing to spec.BMCRef.name")
+		settings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-var-field-",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version:     "1.45.455b66-rev4",
+					SettingsMap: map[string]string{"abc": "$(BMC_NAME)"},
+					Variables: []metalv1alpha1.Variable{
+						{
+							Key: "BMC_NAME",
+							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+								FieldRef: &metalv1alpha1.FieldRefSelector{
+									FieldPath: "spec.BMCRef.name",
+								},
+							},
+						},
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
+
+		By("Ensuring that the BMC has the BMCSettings ref")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+		))
+
+		By("Ensuring that the BMCSettings reaches Applied state with the field value substituted")
+		Eventually(Object(settings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
+		By("Ensuring the resolved field value (BMC object name) was written to the BMC")
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", bmc.Name))
+
+		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
+	})
+
+	It("should apply BMCSettings with a single value composed from multiple variables", func(ctx SpecContext) {
+		By("Creating a ConfigMap containing the domain part")
+		domainCM := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-var-domain-cm-",
+			},
+			Data: map[string]string{
+				"search-domain": "example.com",
+			},
+		}
+		Expect(k8sClient.Create(ctx, domainCM)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, domainCM)
+
+		By("Creating a BMCSettings where 'abc' is built from $(BmcName).$(SearchDomain)")
+		settings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-var-multi-",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version: "1.45.455b66-rev4",
+					// Both placeholders resolved from different sources into one value.
+					SettingsMap: map[string]string{"abc": "$(BmcName).$(SearchDomain)"},
+					Variables: []metalv1alpha1.Variable{
+						{
+							Key: "BmcName",
+							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+								FieldRef: &metalv1alpha1.FieldRefSelector{
+									FieldPath: "spec.BMCRef.name",
+								},
+							},
+						},
+						{
+							Key: "SearchDomain",
+							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+								ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
+									Name:      domainCM.Name,
+									Namespace: ns.Name,
+									Key:       "search-domain",
+								},
+							},
+						},
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
+
+		By("Ensuring that the BMC has the BMCSettings ref")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+		))
+
+		By("Ensuring that the BMCSettings reaches Applied state with both variables substituted")
+		Eventually(Object(settings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
+		By("Ensuring both resolved variable values were concatenated and written to the BMC")
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", bmc.Name+".example.com"))
+
+		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
+	})
+
+	It("should apply BMCSettings where a later variable key references an earlier variable (chaining)", func(ctx SpecContext) {
+		// This mirrors the sample YAML pattern:
+		//   - key: BmcName          → fieldRef: spec.BMCRef.name  → e.g. "test-bmc-xxxxx"
+		//   - key: LicenseKey       → configMapKeyRef.key: "$(BmcName)"
+		//                              i.e. the ConfigMap key is the resolved BmcName
+		//   settings: abc: "$(LicenseKey)"
+
+		By("Creating a ConfigMap whose key is the BMC object name")
+		// We don't know the generated bmc name yet, so we create the ConfigMap after
+		// the bmc name is known from the outer BeforeEach.
+		licensesCM := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-licenses-cm-",
+			},
+			// The key is the BMC object name; value is the license string.
+			Data: map[string]string{
+				bmc.Name: "license-key-for-" + bmc.Name,
+			},
+		}
+		Expect(k8sClient.Create(ctx, licensesCM)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, licensesCM)
+
+		By("Creating a BMCSettings with chained variables: BmcName feeds into the ConfigMap key for LicenseKey")
+		settings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-var-chain-",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version:     "1.45.455b66-rev4",
+					SettingsMap: map[string]string{"abc": "$(LicenseKey)"},
+					Variables: []metalv1alpha1.Variable{
+						{
+							// Step 1: resolve BmcName from the object's own field.
+							Key: "BmcName",
+							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+								FieldRef: &metalv1alpha1.FieldRefSelector{
+									FieldPath: "spec.BMCRef.name",
+								},
+							},
+						},
+						{
+							// Step 2: use the already-resolved $(BmcName) as the ConfigMap key.
+							Key: "LicenseKey",
+							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+								ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
+									Name:      licensesCM.Name,
+									Namespace: ns.Name,
+									Key:       "$(BmcName)", // expanded to bmc.Name at resolution time
+								},
+							},
+						},
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
+
+		By("Ensuring that the BMC has the BMCSettings ref")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+		))
+
+		By("Ensuring that the BMCSettings reaches Applied state — chained variable resolved correctly")
+		Eventually(Object(settings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		))
+
+		By("Ensuring the chained variable (LicenseKey looked up via BmcName) was written to the BMC")
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "license-key-for-"+bmc.Name))
+
+		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
 })

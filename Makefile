@@ -27,11 +27,6 @@ CONTAINER_TOOL ?= docker
 REDFISH_CONTAINER_NAME=redfish_mockup_server
 REDFISH_CONTAINER_VERSION=latest
 
-# In-house mock BMC server settings
-MOCKSERVER_BIN      := /tmp/metal-operator-mockserver
-MOCKSERVER_PID_FILE := /tmp/metal-operator-mockserver.pid
-MOCKSERVER_PORT     := 8000
-
 # Use the most portable option for core detection
 NPROCS := $(shell getconf _NPROCESSORS_ONLN)
 # Add a fallback just in case the command fails
@@ -110,42 +105,41 @@ test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated 
 	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: startbmc
-startbmc: ## Build and start in-house Redfish mock server; waits until :$(MOCKSERVER_PORT) is ready
-	@if [ -f "$(MOCKSERVER_PID_FILE)" ] && kill -0 "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null; then \
-		echo "In-house Redfish mock server is already running (PID $$(cat $(MOCKSERVER_PID_FILE)))."; \
+startbmc: $(LOCALBIN) ## Build and start Redfish mock server; waits until :$(MOCKSERVER_PORT) is ready
+	@if pgrep -f "$(MOCKSERVER_BIN)" > /dev/null 2>&1; then \
+		echo "Redfish mock server is already running."; \
 		exit 0; \
 	fi; \
-	echo "Compiling in-house Redfish mock server..."; \
+	if command -v nc > /dev/null 2>&1; then \
+		port_open() { nc -z 127.0.0.1 $(MOCKSERVER_PORT) 2>/dev/null; }; \
+	else \
+		port_open() { (echo > /dev/tcp/127.0.0.1/$(MOCKSERVER_PORT)) 2>/dev/null; }; \
+	fi; \
+	echo "Compiling Redfish mock server..."; \
 	go build -o $(MOCKSERVER_BIN) ./bmc/mock/main.go || { echo "Compile failed."; exit 1; }; \
 	$(MOCKSERVER_BIN) & \
-	echo $$! > "$(MOCKSERVER_PID_FILE)"; \
 	echo "Waiting for mock server to bind :$(MOCKSERVER_PORT)..."; \
 	for i in {1..30}; do \
-		if nc -z 127.0.0.1 $(MOCKSERVER_PORT) 2>/dev/null; then \
-			echo "Mock server ready on :$(MOCKSERVER_PORT) (PID $$(cat $(MOCKSERVER_PID_FILE)))."; \
+		if port_open; then \
+			echo "Mock server ready on :$(MOCKSERVER_PORT)."; \
 			exit 0; \
 		fi; \
-		if ! kill -0 "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null; then \
+		if ! pgrep -f "$(MOCKSERVER_BIN)" > /dev/null 2>&1; then \
 			echo "Mock server process died unexpectedly. Check for startup errors or port collisions."; \
-			rm -f "$(MOCKSERVER_PID_FILE)"; \
 			exit 1; \
 		fi; \
 		sleep 0.5; \
 	done; \
 	echo "Timed out waiting for mock server on :$(MOCKSERVER_PORT)."; \
-	kill "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null || true; \
-	rm -f "$(MOCKSERVER_PID_FILE)"; \
+	pkill -f "$(MOCKSERVER_BIN)" 2>/dev/null || true; \
 	exit 1
 
 .PHONY: stopbmc
-stopbmc: ## Stop in-house Redfish mock server (started by startbmc)
-	@if [ -f "$(MOCKSERVER_PID_FILE)" ] && kill -0 "$$(cat $(MOCKSERVER_PID_FILE))" 2>/dev/null; then \
-		kill "$$(cat $(MOCKSERVER_PID_FILE))"; \
-		rm -f "$(MOCKSERVER_PID_FILE)"; \
-		echo "Stopped in-house Redfish mock server."; \
+stopbmc: ## Stop Redfish mock server (started by startbmc)
+	@if pkill -f "$(MOCKSERVER_BIN)" 2>/dev/null; then \
+		echo "Stopped Redfish mock server."; \
 	else \
-		rm -f "$(MOCKSERVER_PID_FILE)"; \
-		echo "In-house Redfish mock server is not running."; \
+		echo "Redfish mock server is not running."; \
 	fi
 
 
@@ -280,6 +274,10 @@ helm: manifests kubebuilder
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p "$(LOCALBIN)"
+
+# mock BMC server settings
+MOCKSERVER_BIN  = $(LOCALBIN)/metal-operator-mockserver
+MOCKSERVER_PORT := 8000
 
 CURL_RETRIES=3
 

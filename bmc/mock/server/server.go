@@ -44,6 +44,17 @@ const (
 	// Fixed file paths for BMC manager resources.
 	bmcFilePath         = "data/Managers/BMC/index.json"
 	bmcSettingsFilePath = "data/Managers/BMC/Settings/index.json"
+
+	// Fixed file paths for firmware upgrade simulation.
+	upgradeTaskFilePath      = "data/TaskService/Tasks/upgrade/index.json"
+	upgradeStepsFilePath     = "data/TaskService/Tasks/upgrade/steps.json"
+	upgradeStepsFailFilePath = "data/TaskService/Tasks/upgrade/steps-fail.json"
+	upgradeTaskURI           = "/redfish/v1/TaskService/Tasks/upgrade"
+
+	// Firmware version JSON field names updated on upgrade task completion.
+	// The target resource path is resolved dynamically via FirmwareInventory RelatedItem links.
+	biosVersionField = "BiosVersion"
+	bmcVersionField  = "FirmwareVersion"
 )
 
 // noRebootSettings and noRebootBMCSettings are populated at init time by
@@ -107,18 +118,21 @@ var (
 )
 
 type MockServer struct {
-	log       logr.Logger
-	addr      string
-	handler   http.Handler
-	mu        sync.RWMutex
-	overrides map[string]any
+	log               logr.Logger
+	addr              string
+	handler           http.Handler
+	mu                sync.RWMutex
+	overrides         map[string]any
+	upgradeGen        int64             // incremented on each SimpleUpdate to cancel stale goroutines
+	upgradedResources map[string]string // odata.id URI → file path for resources updated by the last upgrade
 }
 
 func NewMockServer(log logr.Logger, addr string) *MockServer {
 	s := &MockServer{
-		addr:      addr,
-		log:       log,
-		overrides: make(map[string]any),
+		addr:              addr,
+		log:               log,
+		overrides:         make(map[string]any),
+		upgradedResources: make(map[string]string),
 	}
 
 	mux := http.NewServeMux()
@@ -187,8 +201,9 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 		s.handleSystemReset(w, r, body)
 	case strings.HasSuffix(urlPath, "/Actions/Manager.Reset"):
 		s.handleBMCReset(w, r, body)
-	case strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
-		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
+	case strings.Contains(urlPath, "UpdateService/Actions/SimpleUpdate") ||
+		strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
+		s.handleSimpleUpdate(w, r, body)
 	default:
 		//
 		urlPath := resolvePath(r.URL.Path)
@@ -349,6 +364,139 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	s.overrides[collectionPath] = collection
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *MockServer) handleSimpleUpdate(w http.ResponseWriter, _ *http.Request, body []byte) {
+	var req struct {
+		ImageURI string   `json:"ImageURI"`
+		Targets  []string `json:"Targets"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "malformed SimpleUpdate JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.ImageURI == "" {
+		http.Error(w, "ImageURI is required", http.StatusBadRequest)
+		return
+	}
+
+	stepsPath := upgradeStepsFilePath
+	if strings.Contains(req.ImageURI, "fail") {
+		stepsPath = upgradeStepsFailFilePath
+	}
+
+	stepsData, err := dataFS.ReadFile(stepsPath)
+	if err != nil {
+		http.Error(w, "steps not found", http.StatusInternalServerError)
+		return
+	}
+	var steps []map[string]any
+	if err := json.Unmarshal(stepsData, &steps); err != nil || len(steps) == 0 {
+		http.Error(w, "corrupt steps JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Load the base task template and seed it with the first step.
+	taskBase, err := s.loadResource(upgradeTaskFilePath)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusInternalServerError)
+		return
+	}
+	mergeJSON(taskBase, steps[0])
+
+	s.mu.Lock()
+	s.upgradeGen++
+	gen := s.upgradeGen
+	s.overrides[upgradeTaskFilePath] = taskBase
+	s.mu.Unlock()
+
+	go s.doUpgradeSteps(gen, steps, req.ImageURI, req.Targets)
+
+	w.Header().Set("Location", upgradeTaskURI)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_, _ = w.Write([]byte(`{"status":"Accepted"}`))
+}
+
+// doUpgradeSteps advances the task through its steps, updating the override on
+// each tick. When the terminal step is reached and it indicates Completed, the
+// firmware version fields in the targeted resources are updated so that
+// GetBiosVersion / GetBMCVersion return the new version. Target resources are
+// resolved dynamically by following the FirmwareInventory items' RelatedItem
+// links — no system UUID is hardcoded here. A stale goroutine (superseded by a
+// newer SimpleUpdate call) exits without side-effects once it detects a
+// generation mismatch.
+func (s *MockServer) doUpgradeSteps(gen int64, steps []map[string]any, imageURI string, targets []string) {
+	time.Sleep(20 * time.Millisecond)
+	for i := 1; i < len(steps); i++ {
+		time.Sleep(5 * time.Millisecond)
+		s.mu.Lock()
+		if s.upgradeGen != gen {
+			s.mu.Unlock()
+			return
+		}
+		taskBase, err := s.loadResourceLocked(upgradeTaskFilePath)
+		if err == nil {
+			mergeJSON(taskBase, steps[i])
+			s.overrides[upgradeTaskFilePath] = taskBase
+		}
+		s.mu.Unlock()
+	}
+
+	// Only update version fields when the task reaches Completed.
+	lastState, _ := steps[len(steps)-1]["TaskState"].(string)
+	if lastState != "Completed" {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.upgradeGen != gen {
+		return
+	}
+
+	s.applyFirmwareVersionsLocked(targets, imageURI)
+}
+
+// applyFirmwareVersionsLocked follows each FirmwareInventory target's
+// RelatedItem links to discover which System or Manager resource to update,
+// then writes the new imageURI into the appropriate version field.
+// The caller must hold s.mu.
+func (s *MockServer) applyFirmwareVersionsLocked(targets []string, imageURI string) {
+	for _, target := range targets {
+		invPath := resolvePath(target)
+		inv, err := s.loadResourceLocked(invPath)
+		if err != nil {
+			s.log.Error(err, "Failed to load firmware inventory item", "target", target)
+			continue
+		}
+		relatedItems, _ := inv["RelatedItem"].([]any)
+		for _, ri := range relatedItems {
+			riMap, _ := ri.(map[string]any)
+			odataID, _ := riMap["@odata.id"].(string)
+			if odataID == "" {
+				continue
+			}
+			resPath := resolvePath(odataID)
+			res, err := s.loadResourceLocked(resPath)
+			if err != nil {
+				s.log.Error(err, "Failed to load related resource", "path", odataID)
+				continue
+			}
+			switch {
+			case strings.Contains(odataID, "/Systems/"):
+				res[biosVersionField] = imageURI
+			case strings.Contains(odataID, "/Managers/"):
+				res[bmcVersionField] = imageURI
+			default:
+				continue
+			}
+			s.overrides[resPath] = res
+			s.upgradedResources[odataID] = resPath
+			s.log.Info("Updated firmware version", "resource", odataID, "version", imageURI)
+		}
+	}
 }
 
 func (s *MockServer) handleSystemReset(w http.ResponseWriter, r *http.Request, body []byte) {
@@ -625,6 +773,41 @@ func (s *MockServer) ResetBIOSSettings(systemID string) {
 	defer s.mu.Unlock()
 	s.resetResourceFromEmbeddedLocked(filePath)
 	s.resetResourceFromEmbeddedLocked(settingsFilePath)
+}
+
+// ResetUpgradeTask resets upgrade state on the mock server.
+//
+// With no arguments it resets everything: the task JSON, any in-flight
+// goroutine, and all System/Manager resources whose firmware version was
+// written by a completed upgrade.
+//
+// With one or more Redfish resource URIs (e.g. server.Spec.SystemURI or
+// "/redfish/v1/Managers/BMC") it resets only the version field for those
+// specific resources, leaving others untouched. The task JSON is also reset
+// once no upgraded resources remain.
+//
+// Call this in AfterEach to ensure a clean slate between upgrade-related tests.
+func (s *MockServer) ResetUpgradeTask(resourceURIs ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.upgradeGen++ // invalidate any running doUpgradeSteps goroutine
+	if len(resourceURIs) == 0 {
+		s.resetResourceFromEmbeddedLocked(upgradeTaskFilePath)
+		for _, p := range s.upgradedResources {
+			s.resetResourceFromEmbeddedLocked(p)
+		}
+		s.upgradedResources = make(map[string]string)
+		return
+	}
+	for _, uri := range resourceURIs {
+		if resPath, ok := s.upgradedResources[uri]; ok {
+			s.resetResourceFromEmbeddedLocked(resPath)
+			delete(s.upgradedResources, uri)
+		}
+	}
+	if len(s.upgradedResources) == 0 {
+		s.resetResourceFromEmbeddedLocked(upgradeTaskFilePath)
+	}
 }
 
 // resetResourceFromEmbeddedLocked replaces the override for filePath with the

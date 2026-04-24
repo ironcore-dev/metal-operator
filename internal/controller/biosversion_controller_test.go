@@ -74,12 +74,10 @@ var _ = Describe("BIOSVersion Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
-
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-
 		EnsureCleanState()
+		mockServers[0].ResetUpgradeTask(server.Spec.SystemURI)
 	})
 
 	It("should successfully mark completed if no BIOS version change", func(ctx SpecContext) {
@@ -476,13 +474,11 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBIOSVersionUpdate()
-
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-
 		EnsureCleanState()
+		mockServers[0].ResetUpgradeTask(server.Spec.SystemURI)
 	})
 	It("should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {
 		// mocked at

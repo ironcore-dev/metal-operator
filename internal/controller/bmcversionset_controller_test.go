@@ -18,7 +18,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmc"
 )
 
 var _ = Describe("BMCVersionSet Controller", func() {
@@ -159,8 +158,6 @@ var _ = Describe("BMCVersionSet Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBMCVersionUpdate()
-
 		maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
 		Eventually(List(maintenanceList)).Should(Succeed())
 		for _, maintenance := range maintenanceList.Items {
@@ -190,6 +187,9 @@ var _ = Describe("BMCVersionSet Controller", func() {
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
+		for _, ms := range mockServers {
+			ms.ResetUpgradeTask()
+		}
 	})
 
 	It("should successfully reconcile the resource", func(ctx SpecContext) {

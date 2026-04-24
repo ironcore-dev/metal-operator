@@ -84,8 +84,6 @@ var _ = Describe("BMCSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		mockServer.ResetBMCSettings("BMC")
-
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
@@ -93,6 +91,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
+		mockServers[0].ResetBMCSettings("BMC")
 	})
 
 	It("should successfully patch BMCSettings reference to referred BMC", func(ctx SpecContext) {
@@ -730,7 +729,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		By("Ensuring the resolved secret value was written to the BMC (not the raw placeholder)")
-		Expect(mockServer.GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "changed-via-secret"))
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "changed-via-secret"))
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
 
@@ -787,7 +786,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		By("Ensuring the resolved ConfigMap value was written to the BMC (not the raw placeholder)")
-		Expect(mockServer.GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "changed-via-configmap"))
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "changed-via-configmap"))
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
 
@@ -829,7 +828,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		By("Ensuring the resolved field value (BMC object name) was written to the BMC")
-		Expect(mockServer.GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", bmc.Name))
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", bmc.Name))
 
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
@@ -896,7 +895,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		By("Ensuring both resolved variable values were concatenated and written to the BMC")
-		Expect(mockServer.GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", bmc.Name+".example.com"))
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", bmc.Name+".example.com"))
 
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
@@ -973,7 +972,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		))
 
 		By("Ensuring the chained variable (LicenseKey looked up via BmcName) was written to the BMC")
-		Expect(mockServer.GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "license-key-for-"+bmc.Name))
+		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "license-key-for-"+bmc.Name))
 
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})

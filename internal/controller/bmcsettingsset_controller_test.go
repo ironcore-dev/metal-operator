@@ -149,6 +149,9 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
 			By("Ensuring all resources are cleaned up")
 			EnsureCleanState()
+			for _, ms := range mockServers {
+				ms.ResetBMCSettings("BMC")
+			}
 		})
 
 		It("should successfully reconcile when BMCSettingsSet was generated, labels match and BMCSettings were generated", func(ctx SpecContext) {

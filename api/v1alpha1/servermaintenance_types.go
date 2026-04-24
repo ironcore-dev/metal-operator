@@ -15,6 +15,9 @@ const (
 	ServerMaintenanceReasonAnnotationKey = "metal.ironcore.dev/maintenance-reason"
 	// ServerMaintenanceApprovedLabelKey is a label key that is used to store the approved status for a server maintenance.
 	ServerMaintenanceApprovedLabelKey = "metal.ironcore.dev/maintenance-approved"
+	// ServerMaintenanceApprovalKey is the previous maintenance approval metadata key.
+	// Deprecated: Use ServerMaintenanceApprovedLabelKey instead. Will be removed in a future release.
+	ServerMaintenanceApprovalKey = "metal.ironcore.dev/maintenance-approval"
 	// ServerMaintenanceRequestedLabelKey is a label key that is used to request server maintenance.
 	ServerMaintenanceRequestedLabelKey = "metal.ironcore.dev/maintenance-requested"
 )

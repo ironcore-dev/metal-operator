@@ -138,6 +138,12 @@ type BMC interface {
 	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
 	// for the given component type.
 	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
+
+	// GetMetricReport retrieves the current metric report from the BMC.
+	GetMetricReport(ctx context.Context) (MetricsReport, error)
+
+	// GetEventLog retrieves recent events from the BMC's System Event Log.
+	GetEventLog(ctx context.Context) ([]Event, error)
 }
 
 type Entity struct {
@@ -296,4 +302,33 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
+}
+
+// MetricsReport represents a Redfish telemetry metric report.
+type MetricsReport struct {
+	ODataID      string        `json:"@odata.id,omitempty"`
+	ODataType    string        `json:"@odata.type,omitempty"`
+	ID           string        `json:"Id,omitempty"`
+	Name         string        `json:"Name,omitempty"`
+	MetricValues []MetricValue `json:"MetricValues,omitempty"`
+}
+
+// MetricValue represents a single metric value in a metric report.
+type MetricValue struct {
+	MetricID        string `json:"MetricId"`
+	MetricProperty  string `json:"MetricProperty"`
+	MetricValue     string `json:"MetricValue"`
+	Units           string `json:"Units"`
+	MetricValueKind string `json:"MetricValueKind"`
+	Timestamp       string `json:"Timestamp"`
+	Oem             any    `json:"Oem"`
+}
+
+// Event represents a Redfish event or alert.
+type Event struct {
+	EventID           string `json:"EventId"`
+	Message           string `json:"Message"`
+	Severity          string `json:"Severity"`
+	EventTimestamp    string `json:"EventTimestamp"`
+	OriginOfCondition string `json:"OriginOfCondition"`
 }

@@ -4,14 +4,17 @@
 package bmc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/stmcginnis/gofish/schemas"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
@@ -23,6 +26,24 @@ const (
 // RedfishLocalBMC implements the BMC interface for Redfish.
 type RedfishLocalBMC struct {
 	*RedfishBaseBMC
+	// registryURL is an optional base URL (e.g. http://host:port). When set,
+	// SetPXEBootOnce posts dummy registration data to simulate a probe boot.
+	registryURL string
+}
+
+// NewRedfishLocalBMCClientWithRegistry creates a RedfishLocalBMC that, after
+// SetPXEBootOnce, simulates probe registration by posting dummy network data to
+// registryBaseURL/register. Use this in place of RedfishWithRegistryPatch for dev/tilt
+// environments where a real probe will not run.
+func NewRedfishLocalBMCClientWithRegistry(ctx context.Context, options Options, registryBaseURL string) (BMC, error) {
+	b, err := NewRedfishLocalBMCClient(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Created RedfishLocalBMC with registry patch", "RegistryURL", registryBaseURL)
+	b.(*RedfishLocalBMC).registryURL = registryBaseURL
+	return b, nil
 }
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
@@ -296,4 +317,43 @@ func localParseTaskDetails(_ context.Context, response *http.Response) (*schemas
 // (Dell, HPE, Lenovo) override this to check actual firmware inventory.
 func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
 	return false, nil
+}
+
+// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
+// When a registryURL is configured, it additionally simulates probe registration
+// by posting dummy network data to the registry in a background goroutine.
+func (r *RedfishLocalBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+	if err := r.RedfishBaseBMC.SetPXEBootOnce(ctx, systemURI); err != nil {
+		return err
+	}
+	if r.registryURL == "" {
+		return nil
+	}
+	go func() {
+		// Use a background context so the POST is not tied to the caller's request lifetime.
+		bgCtx := context.Background()
+		// Small delay simulates the server booting and the probe starting up.
+		time.Sleep(200 * time.Millisecond)
+		system, err := r.getSystemFromUri(bgCtx, systemURI)
+		if err != nil {
+			return
+		}
+		payload := fmt.Sprintf(
+			`{"systemUUID":%q,"data":{"timestamp":%q,"networkInterfaces":[{"name":"dummy0","ipAddresses":["127.0.0.2"],"macAddress":"aa:bb:cc:dd:ee:ff"}]}}`,
+			system.UUID,
+			time.Now().UTC().Format(time.RFC3339),
+		)
+		req, err := http.NewRequestWithContext(bgCtx, http.MethodPost, r.registryURL+"/register", bytes.NewBufferString(payload))
+		if err != nil {
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		c := &http.Client{Timeout: 10 * time.Second}
+		resp, err := c.Do(req)
+		if err != nil {
+			return
+		}
+		resp.Body.Close() // nolint: errcheck
+	}()
+	return nil
 }

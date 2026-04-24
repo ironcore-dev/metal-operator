@@ -55,3 +55,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates bash curl iproute2 iputils-ping net-tools ethtool lldpd && \
     rm -rf /var/lib/apt/lists/*
 ENTRYPOINT ["/launch.sh"]
+
+FROM builder AS mock-builder
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o mock-server bmc/mock/main.go
+
+FROM gcr.io/distroless/static:nonroot AS mock-server
+LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
+WORKDIR /
+COPY --from=mock-builder /workspace/mock-server .
+USER 65532:65532
+ENTRYPOINT ["/mock-server"]

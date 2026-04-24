@@ -40,7 +40,10 @@ var legacyBMCVersionConditionTypes = map[string]string{
 
 // legacyBMCVersionConditionReasons maps old condition reason strings to their new values.
 var legacyBMCVersionConditionReasons = map[string]string{
-	"BMCResetIssued": ReasonResetIssued,
+	"BMCResetIssued":           ReasonResetIssued,
+	"IssueBMCUpgradeFailed":    ReasonUpgradeIssueFailed,
+	"TaskCompleted":            ReasonUpgradeTaskCompleted,
+	"VerifiedBMCVersionUpdate": ReasonVersionUpdateVerified,
 }
 
 // BMCVersionReconciler reconciles a BMCVersion object

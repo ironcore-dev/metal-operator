@@ -53,7 +53,9 @@ var legacyBIOSVersionConditionTypes = map[string]string{
 
 // legacyBIOSVersionConditionReasons maps old condition reason strings to their new values.
 var legacyBIOSVersionConditionReasons = map[string]string{
-	"BMCResetIssued": ReasonResetIssued,
+	"BMCResetIssued":                ReasonResetIssued,
+	"BIOSVersionVerified":           ReasonVersionUpdateVerified,
+	"BIOSVersionVerificationFailed": ReasonVersionVerificationFailed,
 }
 
 type BIOSVersionReconciler struct {
@@ -1062,7 +1064,12 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, ob
 	reqs := make([]ctrl.Request, 0)
 	for _, biosVersion := range biosVersionList.Items {
 		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-			resetBMC, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionResetIssued)
+			// Normalize legacy condition types/reasons so unmigrated CRs are handled correctly.
+			conditions := biosVersion.Status.Conditions
+			migrateConditionTypes(conditions, legacyBIOSVersionConditionTypes)
+			migrateConditionReasons(conditions, legacyBIOSVersionConditionReasons)
+
+			resetBMC, err := GetCondition(r.Conditions, conditions, ConditionResetIssued)
 			if err != nil {
 				log.Error(err, "Failed to get reset BMC condition")
 				continue

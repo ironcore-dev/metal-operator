@@ -80,7 +80,17 @@ var legacyBIOSSettingsConditionTypes = map[string]string{
 
 // legacyBIOSSettingsConditionReasons maps old condition reason strings to their new values.
 var legacyBIOSSettingsConditionReasons = map[string]string{
-	"BMCResetIssued": ReasonResetIssued,
+	"BMCResetIssued":                                   ReasonResetIssued,
+	"BIOSVersionNeedsTObeUpgraded":                     ReasonVersionUpgradePending,
+	"BIOSPendingSettingsFound":                         ReasonPendingSettingsFound,
+	"BIOSSettingsDuplicateKeysFound":                   ReasonSettingsDuplicateKeysFound,
+	"BIOSSettingsUpdateHasStarted":                     ReasonSettingsUpdateStarted,
+	"BIOSSettingsTimedOutDuringUpdate":                 ReasonSettingsTimedOut,
+	"ServerPoweredHasBeenPoweredOn":                    ReasonSettingsServerPoweredOn,
+	"BIOSSettingUpdateIssued":                          ReasonSettingsUpdateIssued,
+	"UnexpectedPendingSettingsPostUpdateHasBeenIssued": ReasonSettingsUnexpectedPending,
+	"SkipServerRebootPostUpdateHasBeenIssued":          ReasonSettingsSkipReboot,
+	"SettingsProvidedAreNotValid":                      ReasonSettingsValidationFailed,
 }
 
 // BIOSSettingsReconciler reconciles a BIOSSettings object
@@ -1575,7 +1585,12 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBMC(ctx context.Context, o
 
 		// Only enqueue if BMC reset was issued but not yet completed
 		if settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-			resetCond, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionResetIssued)
+			// Normalize legacy condition types/reasons so unmigrated CRs are handled correctly.
+			conditions := settings.Status.Conditions
+			migrateConditionTypes(conditions, legacyBIOSSettingsConditionTypes)
+			migrateConditionReasons(conditions, legacyBIOSSettingsConditionReasons)
+
+			resetCond, err := GetCondition(r.Conditions, conditions, ConditionResetIssued)
 			if err == nil && resetCond.Status != metav1.ConditionTrue && resetCond.Reason == ReasonResetIssued {
 				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 			}

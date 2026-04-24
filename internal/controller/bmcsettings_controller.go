@@ -67,7 +67,9 @@ var legacyBMCSettingsConditionTypes = map[string]string{
 
 // legacyBMCSettingsConditionReasons maps old condition reason strings to their new values.
 var legacyBMCSettingsConditionReasons = map[string]string{
-	"BMCResetIssued": ReasonResetIssued,
+	"BMCResetIssued":              ReasonResetIssued,
+	"SettingsProvidedAreNotValid": ReasonBMCSettingsValidationFailed,
+	"ChangesNotYetVerified":       ReasonBMCSettingsVerificationPending,
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettings,verbs=get;list;watch;create;update;patch;delete

@@ -376,6 +376,15 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 							// retry was already propagated to child, we can skip re-propagation to avoid infinite loop
 							return nil
 						}
+
+						// Also check legacy condition type for unmigrated CRs.
+						// TODO: Remove this check in the next release once all CRs have been reconciled.
+						legacyCondition, err := GetCondition(acc, conditions, "RetryOfFailedResourceConditionIssued")
+						if err == nil && legacyCondition != nil &&
+							legacyCondition.Status == metav1.ConditionTrue &&
+							legacyCondition.Message == metalv1alpha1.OperationAnnotationRetryFailedPropagated {
+							return nil
+						}
 					}
 				}
 			}

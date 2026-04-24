@@ -101,34 +101,14 @@ test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated 
 	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: startbmc
-startbmc: $(LOCALBIN) ## Build and start Redfish mock server; waits until :$(MOCKSERVER_PORT) is ready
+startbmc: mockserver ## Start Redfish mock server
 	@if pgrep -f "$(MOCKSERVER_BIN)" > /dev/null 2>&1; then \
 		echo "Redfish mock server is already running."; \
-		exit 0; \
-	fi; \
-	if command -v nc > /dev/null 2>&1; then \
-		port_open() { nc -z 127.0.0.1 $(MOCKSERVER_PORT) 2>/dev/null; }; \
 	else \
-		port_open() { (echo > /dev/tcp/127.0.0.1/$(MOCKSERVER_PORT)) 2>/dev/null; }; \
-	fi; \
-	echo "Compiling Redfish mock server..."; \
-	go build -o $(MOCKSERVER_BIN) ./bmc/mock/main.go || { echo "Compile failed."; exit 1; }; \
-	$(MOCKSERVER_BIN) -addr :$(MOCKSERVER_PORT) & \
-	echo "Waiting for mock server to bind :$(MOCKSERVER_PORT)..."; \
-	for i in {1..30}; do \
-		if port_open; then \
-			echo "Mock server ready on :$(MOCKSERVER_PORT)."; \
-			exit 0; \
-		fi; \
-		if ! pgrep -f "$(MOCKSERVER_BIN)" > /dev/null 2>&1; then \
-			echo "Mock server process died unexpectedly. Check for startup errors or port collisions."; \
-			exit 1; \
-		fi; \
-		sleep 0.5; \
-	done; \
-	echo "Timed out waiting for mock server on :$(MOCKSERVER_PORT)."; \
-	pkill -f "$(MOCKSERVER_BIN)" 2>/dev/null || true; \
-	exit 1
+		$(MOCKSERVER_BIN) -addr :$(MOCKSERVER_PORT) & \
+		curl --silent --retry 5 --retry-connrefused http://127.0.0.1:$(MOCKSERVER_PORT)/redfish/v1 -o /dev/null && \
+		echo "Mock server ready on :$(MOCKSERVER_PORT)."; \
+	fi
 
 .PHONY: stopbmc
 stopbmc: ## Stop Redfish mock server (started by startbmc)
@@ -370,6 +350,11 @@ $(CRD_REF_DOCS): $(LOCALBIN)
 kubebuilder: $(KUBEBUILDER) ## Download kubebuilder locally if necessary.
 $(KUBEBUILDER): $(LOCALBIN)
 	$(call go-install-tool,$(KUBEBUILDER),sigs.k8s.io/kubebuilder/v4,$(KUBEBUILDER_VERSION))
+
+.PHONY: mockserver
+mockserver: $(MOCKSERVER_BIN) ## Build mock Redfish server locally if necessary.
+$(MOCKSERVER_BIN): $(LOCALBIN)
+	go build -o $(MOCKSERVER_BIN) ./bmc/mock/main.go
 
 .PHONY: metalctl
 metalctl: $(METALCTL) ## Build metalctl locally if necessary.

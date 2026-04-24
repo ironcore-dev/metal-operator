@@ -94,8 +94,13 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 mockUpServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBiosVersion},
+					Version: mockUpServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      mockUpServerBiosVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              mockUpServerBiosVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -146,8 +151,13 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBiosVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBiosVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -266,8 +276,13 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBiosVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBiosVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -419,6 +434,54 @@ var _ = Describe("BIOSVersion Controller", func() {
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
 	})
+
+	It("should use fallback protocol when primary is not supported", func(ctx SpecContext) {
+		By("Ensuring mock BMC only supports HTTPS (not HTTP)")
+		// Mock BMC supports: HTTPS, NFS, CIFS, TFTP (default from mockup.go:150)
+		// We configure HTTP as primary (unsupported) and HTTPS as fallback (supported)
+
+		By("Ensuring that the server has Available state")
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+		)
+
+		By("Creating a BIOSVersion with HTTP (unsupported) primary and HTTPS (supported) fallback")
+		biosVersion := &metalv1alpha1.BIOSVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-fallback-",
+			},
+			Spec: metalv1alpha1.BIOSVersionSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBiosVersion,
+						TransferProtocol:         "HTTP",  // NOT supported by mock BMC
+						FallbackTransferProtocol: "HTTPS", // Supported by mock BMC
+						FallbackURI:              upgradeServerBiosVersion,
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosVersion)).To(Succeed())
+
+		By("Ensuring that the biosVersion enters InProgress state (not Failed)")
+		Eventually(Object(biosVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateInProgress),
+		)
+
+		By("Ensuring that BIOS upgrade completes successfully using fallback protocol")
+		Eventually(Object(biosVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BIOSVersionStateCompleted),
+		)
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, biosVersion)).To(Succeed())
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
 })
 
 var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
@@ -502,8 +565,13 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					Version: upgradeServerBiosVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBiosVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBiosVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},

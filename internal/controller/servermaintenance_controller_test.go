@@ -554,4 +554,92 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Expect(k8sClient.Delete(ctx, unsetPriorityMaintenance)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
+
+	It("should approve maintenance using deprecated ServerMaintenanceApprovalKey and clean it up on deletion", func(ctx SpecContext) {
+		By("Patching server to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating an Ignition secret")
+		ignitionSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				"foo": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ignitionSecret)
+
+		By("Creating a ServerClaim object")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             powerOpOff,
+				ServerRef:         &corev1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &corev1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:latest",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+
+		By("Ensuring that the Server is reserved by the ServerClaim")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
+		))
+
+		By("Creating a ServerMaintenance object with OwnerApproval policy")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-deprecated",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-deprecated-key-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+
+		By("Ensuring the ServerMaintenance is in Pending state")
+		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
+		))
+
+		By("Approving maintenance using the deprecated ServerMaintenanceApprovalKey on the ServerClaim")
+		Eventually(Update(serverClaim, func() {
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+		})).Should(Succeed())
+
+		By("Ensuring the ServerMaintenance transitions to InMaintenance state with the deprecated key")
+		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		))
+
+		By("Deleting the ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+
+		By("Ensuring the deprecated approval key and maintenance needed key are removed from the ServerClaim")
+		Eventually(Object(serverClaim)).Should(SatisfyAll(
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.ServerMaintenanceApprovalKey))),
+			HaveField("ObjectMeta.Labels", Not(HaveKey(metalv1alpha1.ServerMaintenanceApprovalKey))),
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededLabelKey))),
+			HaveField("ObjectMeta.Labels", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededLabelKey))),
+		))
+
+		By("Deleting the ServerClaim")
+		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+	})
 })

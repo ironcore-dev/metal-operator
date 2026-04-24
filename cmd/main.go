@@ -43,6 +43,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/controller"
 	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
+	metaltoken "github.com/ironcore-dev/metal-operator/internal/token"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -696,7 +697,13 @@ func main() { // nolint: gocyclo
 	// Run registry server as a runnable to ensure it stops when the manager stops
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		setupLog.Info("starting registry server", "RegistryURL", registryURL)
-		registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort), mgr.GetClient())
+		registryServer := registry.NewServer(
+			setupLog,
+			fmt.Sprintf(":%d", registryPort),
+			mgr.GetClient(),
+			metaltoken.DiscoveryTokenSigningSecretName,
+			managerNamespace,
+		)
 		if err := registryServer.Start(ctx); err != nil {
 			return fmt.Errorf("unable to start registry server: %w", err)
 		}

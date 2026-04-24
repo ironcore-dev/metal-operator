@@ -1140,3 +1140,106 @@ func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string
 	}
 	return nil
 }
+
+// GetMetricReport retrieves the current metric report from the BMC via TelemetryService.
+// If TelemetryService is not available, returns an empty report (fallback to events).
+func (r *RedfishBaseBMC) GetMetricReport(ctx context.Context) (MetricsReport, error) {
+	service := r.client.GetService()
+
+	// Try TelemetryService first (Redfish 2018.3+)
+	telemetry, err := service.TelemetryService()
+	if err == nil && telemetry != nil {
+		// Get metric reports
+		reports, err := telemetry.MetricReports()
+		if err == nil && len(reports) > 0 {
+			// Use the first available report and convert to our format
+			report := reports[0]
+			metricValues := make([]MetricValue, 0)
+
+			// Try to extract metric values - schema may vary by vendor
+			// The report.MetricValues is a slice of report-specific values
+			// We'll create a simple representation
+			for i := 0; i < len(report.MetricValues); i++ {
+				metricValues = append(metricValues, MetricValue{
+					MetricID:        fmt.Sprintf("Metric%d", i),
+					MetricProperty:  report.ODataID,
+					MetricValue:     fmt.Sprintf("%v", report.MetricValues[i]),
+					MetricValueKind: "Gauge",
+					Timestamp:       time.Now().Format(time.RFC3339),
+				})
+			}
+
+			return MetricsReport{
+				ODataID:      report.ODataID,
+				ODataType:    report.ODataType,
+				ID:           report.ID,
+				Name:         report.Name,
+				MetricValues: metricValues,
+			}, nil
+		}
+	}
+
+	// Fallback: Return empty report - polling will rely on event subscriptions or vendor-specific implementations
+	return MetricsReport{
+		ID:           "EmptyMetrics",
+		Name:         "No TelemetryService available",
+		MetricValues: []MetricValue{},
+	}, nil
+}
+
+// GetEventLog retrieves recent events from the BMC's System Event Log (SEL).
+// Returns events from the last 10 minutes by default.
+func (r *RedfishBaseBMC) GetEventLog(ctx context.Context) ([]Event, error) {
+	service := r.client.GetService()
+	systems, err := service.Systems()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get systems: %w", err)
+	}
+	if len(systems) == 0 {
+		return nil, fmt.Errorf("no systems found")
+	}
+
+	system := systems[0]
+
+	// Get log services
+	logServices, err := system.LogServices()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get log services: %w", err)
+	}
+
+	events := []Event{}
+
+	// Query each log service
+	for _, logService := range logServices {
+		entries, err := logService.Entries()
+		if err != nil {
+			continue // Skip log services that fail
+		}
+
+		// Filter to recent entries (last 10 minutes)
+		cutoff := time.Now().Add(-10 * time.Minute)
+
+		for _, entry := range entries {
+			// Parse timestamp
+			var entryTime time.Time
+			if entry.Created != "" {
+				entryTime, _ = time.Parse(time.RFC3339, entry.Created)
+			}
+
+			// Skip old entries
+			if !entryTime.IsZero() && entryTime.Before(cutoff) {
+				continue
+			}
+
+			events = append(events, Event{
+				EventID:           entry.ID,
+				Message:           entry.Message,
+				Severity:          string(entry.Severity),
+				EventTimestamp:    entry.Created,
+				OriginOfCondition: entry.ODataID,
+			})
+		}
+	}
+
+	return events, nil
+}

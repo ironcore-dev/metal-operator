@@ -165,10 +165,12 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 	if maintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
 		annotations := serverClaim.GetAnnotations()
 		labels := serverClaim.GetLabels()
-		_, hasAnnotation := annotations[metalv1alpha1.ServerMaintenanceApprovalKey]
-		_, hasLabel := labels[metalv1alpha1.ServerMaintenanceApprovalKey]
+		_, hasAnnotation := annotations[metalv1alpha1.ServerMaintenanceApprovedLabelKey]
+		_, hasDeprecatedAnnotation := annotations[metalv1alpha1.ServerMaintenanceApprovalKey]
+		_, hasLabel := labels[metalv1alpha1.ServerMaintenanceApprovedLabelKey]
+		_, hasDeprecatedLabel := labels[metalv1alpha1.ServerMaintenanceApprovalKey]
 
-		if hasAnnotation || hasLabel {
+		if hasAnnotation || hasDeprecatedAnnotation || hasLabel || hasDeprecatedLabel {
 			log.V(1).Info("Server approved for maintenance", "Server", server.Name)
 			if err = r.updateServerRef(ctx, maintenance, server); err != nil {
 				return ctrl.Result{}, err
@@ -409,11 +411,13 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metal
 	}
 	serverClaimBase := serverClaim.DeepCopy()
 	metautils.DeleteAnnotations(serverClaim, []string{
+		metalv1alpha1.ServerMaintenanceApprovedLabelKey,
 		metalv1alpha1.ServerMaintenanceApprovalKey,
 		metalv1alpha1.ServerMaintenanceNeededLabelKey,
 		metalv1alpha1.ServerMaintenanceReasonAnnotationKey,
 	})
 	metautils.DeleteLabels(serverClaim, []string{
+		metalv1alpha1.ServerMaintenanceApprovedLabelKey,
 		metalv1alpha1.ServerMaintenanceApprovalKey,
 		metalv1alpha1.ServerMaintenanceNeededLabelKey,
 	})

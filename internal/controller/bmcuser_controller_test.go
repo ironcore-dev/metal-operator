@@ -84,8 +84,10 @@ var _ = Describe("BMCUser Controller", func() {
 				Name: "test-user",
 			},
 			Spec: metalv1alpha1.BMCUserSpec{
-				UserName: "user",
-				RoleID:   "ReadOnly",
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "user",
+					RoleID:   "ReadOnly",
+				},
 				BMCRef: &v1.LocalObjectReference{
 					Name: bmc.Name,
 				},
@@ -141,8 +143,10 @@ var _ = Describe("BMCUser Controller", func() {
 				Name: "user01",
 			},
 			Spec: metalv1alpha1.BMCUserSpec{
-				UserName: "user01",
-				RoleID:   "Readonly",
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "user01",
+					RoleID:   "Readonly",
+				},
 				BMCRef: &v1.LocalObjectReference{
 					Name: bmc.Name,
 				},
@@ -171,8 +175,10 @@ var _ = Describe("BMCUser Controller", func() {
 				Name: "user02",
 			},
 			Spec: metalv1alpha1.BMCUserSpec{
-				UserName: "user02",
-				RoleID:   "Readonly",
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "user02",
+					RoleID:   "Readonly",
+				},
 				BMCRef: &v1.LocalObjectReference{
 					Name: bmc.Name,
 				},
@@ -213,13 +219,15 @@ var _ = Describe("BMCUser Controller", func() {
 				Name: "user03",
 			},
 			Spec: metalv1alpha1.BMCUserSpec{
-				UserName: "user03",
-				RoleID:   "Readonly",
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "user03",
+					RoleID:   "Readonly",
+					BMCSecretRef: &v1.LocalObjectReference{
+						Name: user03Secret.Name,
+					},
+				},
 				BMCRef: &v1.LocalObjectReference{
 					Name: bmc.Name,
-				},
-				BMCSecretRef: &v1.LocalObjectReference{
-					Name: user03Secret.Name,
 				},
 			},
 		}
@@ -247,16 +255,18 @@ var _ = Describe("BMCUser Controller", func() {
 				Name: "admin-user",
 			},
 			Spec: metalv1alpha1.BMCUserSpec{
-				UserName: "admin-user",
-				RoleID:   "Administrator",
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "admin-user",
+					RoleID:   "Administrator",
+					BMCSecretRef: &v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+					RotationPeriod: &metav1.Duration{
+						Duration: 1 * time.Second,
+					},
+				},
 				BMCRef: &v1.LocalObjectReference{
 					Name: bmc.Name,
-				},
-				BMCSecretRef: &v1.LocalObjectReference{
-					Name: bmcSecret.Name,
-				},
-				RotationPeriod: &metav1.Duration{
-					Duration: 1 * time.Second,
 				},
 			},
 		}
@@ -301,8 +311,10 @@ var _ = Describe("BMCUser Controller", func() {
 				Name: "delete-user",
 			},
 			Spec: metalv1alpha1.BMCUserSpec{
-				UserName: "deleteUser",
-				RoleID:   "ReadOnly",
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "deleteUser",
+					RoleID:   "ReadOnly",
+				},
 				BMCRef: &v1.LocalObjectReference{
 					Name: bmc.Name,
 				},
@@ -346,8 +358,10 @@ var _ = Describe("BMCUser Controller", func() {
 				Name: "annotated-user",
 			},
 			Spec: metalv1alpha1.BMCUserSpec{
-				UserName: "annotated-user",
-				RoleID:   "ReadOnly",
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "annotated-user",
+					RoleID:   "ReadOnly",
+				},
 				BMCRef: &v1.LocalObjectReference{
 					Name: bmc.Name,
 				},

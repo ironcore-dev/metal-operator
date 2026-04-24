@@ -5,37 +5,41 @@ package serverevents
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"path"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Server polls BMCs for metrics and events and exposes them via Prometheus.
 type Server struct {
-	addr      string
-	mux       *http.ServeMux
-	log       logr.Logger
-	collector *RedfishEventCollector
+	client           client.Client
+	interval         time.Duration
+	log              logr.Logger
+	collector        *RedfishEventCollector
+	defaultProtocol  metalv1alpha1.ProtocolScheme
+	skipCertValidate bool
+	bmcOptions       bmc.Options
 }
 
-const (
-	// maxEventBodyBytes is the maximum allowed size for event payloads (1MB)
-	// This prevents DoS attacks via large request bodies
-	maxEventBodyBytes = 1 << 20 // 1 MB
-)
+// ServerConfig contains configuration for the metrics polling server.
+type ServerConfig struct {
+	Client           client.Client
+	Interval         time.Duration
+	DefaultProtocol  metalv1alpha1.ProtocolScheme
+	SkipCertValidate bool
+	BMCOptions       bmc.Options
+}
 
 type MetricsReport struct {
-	// Standard Redfish fields
-	ODataID   string `json:"@odata.id,omitempty"`
-	ODataType string `json:"@odata.type,omitempty"`
-	ID        string `json:"Id,omitempty"`
-	Name      string `json:"Name,omitempty"`
-	// Metric values array - correct Redfish field name
+	ODataID      string        `json:"@odata.id,omitempty"`
+	ODataType    string        `json:"@odata.type,omitempty"`
+	ID           string        `json:"Id,omitempty"`
+	Name         string        `json:"Name,omitempty"`
 	MetricValues []MetricValue `json:"MetricValues,omitempty"`
 }
 
@@ -50,8 +54,8 @@ type MetricValue struct {
 }
 
 type EventData struct {
-	Events []Event `json:"Events,omitempty"` // Standard Redfish field
-	Alerts []Event `json:"Alerts,omitempty"` // Alternative vendor field
+	Events []Event `json:"Events,omitempty"`
+	Alerts []Event `json:"Alerts,omitempty"`
 	Name   string  `json:"Name"`
 }
 
@@ -71,139 +75,143 @@ type Event struct {
 	OriginOfCondition string `json:"OriginOfCondition"`
 }
 
-func NewServer(log logr.Logger, addr string) *Server {
-	mux := http.NewServeMux()
-	server := &Server{
-		addr:      addr,
-		mux:       mux,
-		log:       log,
-		collector: NewRedfishEventCollector(),
+// NewServer creates a new metrics polling server.
+func NewServer(log logr.Logger, config ServerConfig) *Server {
+	return &Server{
+		client:           config.Client,
+		interval:         config.Interval,
+		log:              log.WithName("metrics-server"),
+		collector:        GetCollector(),
+		defaultProtocol:  config.DefaultProtocol,
+		skipCertValidate: config.SkipCertValidate,
+		bmcOptions:       config.BMCOptions,
 	}
-	server.routes()
-	return server
 }
 
-func (s *Server) routes() {
-	s.mux.HandleFunc("/serverevents/alerts/", s.alertHandler)
-	s.mux.HandleFunc("/serverevents/metricsreport/", s.metricsreportHandler)
-}
-
-func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	hostname := path.Base(r.URL.Path)
-
-	// Limit request body size to prevent DoS attacks
-	r.Body = http.MaxBytesReader(w, r.Body, maxEventBodyBytes)
-
-	// Read body into buffer so we can log it
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		// Check if error is due to exceeding size limit
-		if err.Error() == "http: request body too large" {
-			s.log.Info("Request body too large", "hostname", hostname, "maxBytes", maxEventBodyBytes)
-			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-		s.log.Error(err, "Failed to read request body", "hostname", hostname)
-		http.Error(w, "Failed to read body", http.StatusBadRequest)
-		return
-	}
-
-	// Log raw payload at V(1) for debugging
-	s.log.V(1).Info("Received alert payload", "hostname", hostname, "payload", string(bodyBytes))
-
-	eventData := EventData{}
-	if err := json.Unmarshal(bodyBytes, &eventData); err != nil {
-		s.log.Error(err, "Failed to decode alert data", "hostname", hostname, "payload", string(bodyBytes))
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	events := eventData.GetEvents()
-	if len(events) == 0 {
-		s.log.Info("Received empty event data - check payload format", "hostname", hostname, "payload", string(bodyBytes))
-	} else {
-		s.log.Info("Processed events successfully", "hostname", hostname, "count", len(events))
-	}
-
-	s.collector.UpdateFromEvent(hostname, eventData)
-	w.WriteHeader(http.StatusOK)
-}
-
-func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	hostname := path.Base(r.URL.Path)
-
-	// Limit request body size to prevent DoS attacks
-	r.Body = http.MaxBytesReader(w, r.Body, maxEventBodyBytes)
-
-	// Read body into buffer
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		// Check if error is due to exceeding size limit
-		if err.Error() == "http: request body too large" {
-			s.log.Info("Request body too large", "hostname", hostname, "maxBytes", maxEventBodyBytes)
-			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-		s.log.Error(err, "Failed to read request body", "hostname", hostname)
-		http.Error(w, "Failed to read body", http.StatusBadRequest)
-		return
-	}
-
-	// Log raw payload at V(1) for debugging
-	s.log.V(1).Info("Received metrics payload", "hostname", hostname, "payload", string(bodyBytes))
-
-	metricsReport := MetricsReport{}
-	if err := json.Unmarshal(bodyBytes, &metricsReport); err != nil {
-		s.log.Error(err, "Failed to decode metrics report", "hostname", hostname, "payload", string(bodyBytes))
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if len(metricsReport.MetricValues) == 0 {
-		s.log.Info("Received empty metrics report - check payload format", "hostname", hostname, "payload", string(bodyBytes))
-	} else {
-		s.log.Info("Processed metrics successfully", "hostname", hostname, "count", len(metricsReport.MetricValues))
-	}
-
-	s.collector.UpdateFromMetricsReport(hostname, metricsReport)
-	w.WriteHeader(http.StatusOK)
-}
-
-// Start starts the server on the specified address and adds logging for key events.
+// Start starts the metrics polling server. It polls all BMCs at the configured interval.
+// This method blocks until the context is cancelled.
 func (s *Server) Start(ctx context.Context) error {
-	s.log.Info("Starting event server", "address", s.addr)
-	server := &http.Server{Addr: s.addr, Handler: s.mux}
+	s.log.Info("Starting BMC metrics polling server", "interval", s.interval)
 
-	errChan := make(chan error, 1)
-	go func() {
-		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			errChan <- fmt.Errorf("HTTP event server ListenAndServe: %w", err)
+	ticker := time.NewTicker(s.interval)
+	defer ticker.Stop()
+
+	s.pollAllBMCs(ctx)
+
+	for {
+		select {
+		case <-ticker.C:
+			s.pollAllBMCs(ctx)
+		case <-ctx.Done():
+			s.log.Info("Stopping metrics polling server")
+			return nil
 		}
-	}()
-	select {
-	case <-ctx.Done():
-		s.log.Info("Shutting down event server")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("HTTP server Shutdown: %w", err)
-		}
-		s.log.Info("Event server graciously stopped")
-		return nil
-	case err := <-errChan:
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
-			s.log.Error(shutdownErr, "Error shutting down event server")
-		}
-		return err
 	}
+}
+
+// pollAllBMCs lists all BMCs and polls each one for metrics and events.
+func (s *Server) pollAllBMCs(ctx context.Context) {
+	bmcList := &metalv1alpha1.BMCList{}
+	if err := s.client.List(ctx, bmcList); err != nil {
+		s.log.Error(err, "Failed to list BMCs for polling")
+		return
+	}
+
+	if len(bmcList.Items) == 0 {
+		s.log.V(2).Info("No BMCs to poll")
+		return
+	}
+
+	s.log.V(1).Info("Polling BMCs for metrics", "count", len(bmcList.Items))
+
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 10)
+
+	for i := range bmcList.Items {
+		bmcObj := &bmcList.Items[i]
+
+		if !bmcObj.DeletionTimestamp.IsZero() {
+			continue
+		}
+
+		wg.Add(1)
+		go func(bmc *metalv1alpha1.BMC) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			s.pollBMC(ctx, bmc)
+		}(bmcObj)
+	}
+
+	wg.Wait()
+	s.log.V(1).Info("Finished polling cycle")
+}
+
+// pollBMC polls a single BMC for metrics and events.
+func (s *Server) pollBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC) {
+	log := s.log.WithValues("bmc", bmcObj.Name)
+
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, s.client, bmcObj, s.defaultProtocol, s.skipCertValidate, s.bmcOptions)
+	if err != nil {
+		log.V(2).Info("Failed to get BMC client for polling", "error", err.Error())
+		return
+	}
+	defer bmcClient.Logout()
+
+	if report, err := bmcClient.GetMetricReport(ctx); err != nil {
+		log.V(2).Info("Failed to poll metrics from BMC", "error", err.Error())
+	} else if len(report.MetricValues) > 0 {
+		seReport := convertToMetricsReport(report)
+		s.collector.UpdateFromMetricsReport(bmcObj.Name, seReport)
+		log.V(2).Info("Updated metrics from poll", "metricCount", len(report.MetricValues))
+	}
+
+	if events, err := bmcClient.GetEventLog(ctx); err != nil {
+		log.V(2).Info("Failed to poll events from BMC", "error", err.Error())
+	} else if len(events) > 0 {
+		seEvents := convertToEvents(events)
+		eventData := EventData{Events: seEvents}
+		s.collector.UpdateFromEvent(bmcObj.Name, eventData)
+		log.V(2).Info("Updated events from poll", "eventCount", len(events))
+	}
+}
+
+// convertToMetricsReport converts bmc.MetricsReport to serverevents.MetricsReport
+func convertToMetricsReport(report bmc.MetricsReport) MetricsReport {
+	metricValues := make([]MetricValue, len(report.MetricValues))
+	for i, mv := range report.MetricValues {
+		metricValues[i] = MetricValue{
+			MetricID:        mv.MetricID,
+			MetricProperty:  mv.MetricProperty,
+			MetricValue:     mv.MetricValue,
+			Units:           mv.Units,
+			MetricValueKind: mv.MetricValueKind,
+			Timestamp:       mv.Timestamp,
+			Oem:             mv.Oem,
+		}
+	}
+	return MetricsReport{
+		ODataID:      report.ODataID,
+		ODataType:    report.ODataType,
+		ID:           report.ID,
+		Name:         report.Name,
+		MetricValues: metricValues,
+	}
+}
+
+// convertToEvents converts []bmc.Event to []serverevents.Event
+func convertToEvents(events []bmc.Event) []Event {
+	seEvents := make([]Event, len(events))
+	for i, e := range events {
+		seEvents[i] = Event{
+			EventID:           e.EventID,
+			Message:           e.Message,
+			Severity:          e.Severity,
+			EventTimestamp:    e.EventTimestamp,
+			OriginOfCondition: e.OriginOfCondition,
+		}
+	}
+	return seEvents
 }

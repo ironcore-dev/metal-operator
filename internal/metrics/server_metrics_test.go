@@ -19,6 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	labelServer = "server"
+)
+
 func TestMetrics(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Metrics Suite")
@@ -90,7 +94,7 @@ var _ = Describe("ServerStateCollector", func() {
 		Expect(count).To(Equal(0))
 	})
 
-	It("should count servers by state", func(ctx SpecContext) {
+	It("should emit enum metrics for all states per server", func(ctx SpecContext) {
 		// Create servers in different states
 		servers := []metalv1alpha1.Server{
 			{
@@ -119,27 +123,54 @@ var _ = Describe("ServerStateCollector", func() {
 		collector.Collect(ch)
 		close(ch)
 
-		// Parse metrics and verify exact counts
-		metrics := make(map[string]float64)
+		// Parse metrics and verify enum pattern: all states emitted per server
+		type stateKey struct {
+			server, state string
+		}
+		stateMetrics := make(map[stateKey]float64)
 		for metric := range ch {
 			var m = metric
 			dto := &prometheus_io.Metric{}
 			Expect(m.Write(dto)).To(Succeed())
 
-			if dto.GetGauge() != nil && len(dto.GetLabel()) > 0 {
-				label := dto.GetLabel()[0]
-				if label.GetName() == "state" {
-					metrics[label.GetValue()] = dto.GetGauge().GetValue()
+			if dto.GetGauge() != nil {
+				var key stateKey
+				for _, label := range dto.GetLabel() {
+					switch label.GetName() {
+					case labelServer:
+						key.server = label.GetValue()
+					case "state":
+						key.state = label.GetValue()
+					}
+				}
+				if key.state != "" {
+					stateMetrics[key] = dto.GetGauge().GetValue()
 				}
 			}
 		}
 
-		// Assert exact label/value pairs
-		Expect(metrics["Available"]).To(Equal(2.0), "Expected 2 Available servers")
-		Expect(metrics["Reserved"]).To(Equal(1.0), "Expected 1 Reserved server")
+		// Assert enum pattern: all 6 states emitted per server with 1 for current, 0 for others
+		// server1 is Available
+		Expect(stateMetrics[stateKey{server: "server1", state: "Initial"}]).To(Equal(0.0))
+		Expect(stateMetrics[stateKey{server: "server1", state: "Discovery"}]).To(Equal(0.0))
+		Expect(stateMetrics[stateKey{server: "server1", state: "Available"}]).To(Equal(1.0))
+		Expect(stateMetrics[stateKey{server: "server1", state: "Reserved"}]).To(Equal(0.0))
+		Expect(stateMetrics[stateKey{server: "server1", state: "Error"}]).To(Equal(0.0))
+		Expect(stateMetrics[stateKey{server: "server1", state: "Maintenance"}]).To(Equal(0.0))
+
+		// server2 is Available
+		Expect(stateMetrics[stateKey{server: "server2", state: "Available"}]).To(Equal(1.0))
+		Expect(stateMetrics[stateKey{server: "server2", state: "Reserved"}]).To(Equal(0.0))
+
+		// server3 is Reserved
+		Expect(stateMetrics[stateKey{server: "server3", state: "Available"}]).To(Equal(0.0))
+		Expect(stateMetrics[stateKey{server: "server3", state: "Reserved"}]).To(Equal(1.0))
+
+		// Total: 3 servers × 6 states = 18 state metrics
+		Expect(stateMetrics).To(HaveLen(18))
 	})
 
-	It("should count servers by power state", func(ctx SpecContext) {
+	It("should emit enum metrics for all power states per server", func(ctx SpecContext) {
 		// Create servers with different power states
 		servers := []metalv1alpha1.Server{
 			{
@@ -177,24 +208,50 @@ var _ = Describe("ServerStateCollector", func() {
 		collector.Collect(ch)
 		close(ch)
 
-		// Parse metrics and verify exact counts
-		metrics := make(map[string]float64)
+		// Parse metrics and verify enum pattern: all power states emitted per server
+		type powerKey struct {
+			server, powerState string
+		}
+		powerMetrics := make(map[powerKey]float64)
 		for metric := range ch {
 			var m = metric
 			dto := &prometheus_io.Metric{}
 			Expect(m.Write(dto)).To(Succeed())
 
-			if dto.GetGauge() != nil && len(dto.GetLabel()) > 0 {
-				label := dto.GetLabel()[0]
-				if label.GetName() == "power_state" {
-					metrics[label.GetValue()] = dto.GetGauge().GetValue()
+			if dto.GetGauge() != nil {
+				var key powerKey
+				for _, label := range dto.GetLabel() {
+					switch label.GetName() {
+					case labelServer:
+						key.server = label.GetValue()
+					case "power_state":
+						key.powerState = label.GetValue()
+					}
+				}
+				if key.powerState != "" {
+					powerMetrics[key] = dto.GetGauge().GetValue()
 				}
 			}
 		}
 
-		// Assert exact label/value pairs
-		Expect(metrics["On"]).To(Equal(2.0), "Expected 2 On servers")
-		Expect(metrics["Off"]).To(Equal(1.0), "Expected 1 Off server")
+		// Assert enum pattern: all 5 power states emitted per server with 1 for current, 0 for others
+		// server1 is On
+		Expect(powerMetrics[powerKey{server: "server1", powerState: "On"}]).To(Equal(1.0))
+		Expect(powerMetrics[powerKey{server: "server1", powerState: "Off"}]).To(Equal(0.0))
+		Expect(powerMetrics[powerKey{server: "server1", powerState: "Paused"}]).To(Equal(0.0))
+		Expect(powerMetrics[powerKey{server: "server1", powerState: "PoweringOn"}]).To(Equal(0.0))
+		Expect(powerMetrics[powerKey{server: "server1", powerState: "PoweringOff"}]).To(Equal(0.0))
+
+		// server2 is On
+		Expect(powerMetrics[powerKey{server: "server2", powerState: "On"}]).To(Equal(1.0))
+		Expect(powerMetrics[powerKey{server: "server2", powerState: "Off"}]).To(Equal(0.0))
+
+		// server3 is Off
+		Expect(powerMetrics[powerKey{server: "server3", powerState: "On"}]).To(Equal(0.0))
+		Expect(powerMetrics[powerKey{server: "server3", powerState: "Off"}]).To(Equal(1.0))
+
+		// Total: 3 servers × 5 power states = 15 power state metrics
+		Expect(powerMetrics).To(HaveLen(15))
 	})
 
 	It("should emit condition metrics", func(ctx SpecContext) {
@@ -225,38 +282,44 @@ var _ = Describe("ServerStateCollector", func() {
 		collector.Collect(ch)
 		close(ch)
 
-		// Parse metrics and verify exact counts
-		conditionMetrics := make(map[string]map[string]float64)
+		// Parse metrics and verify per-server condition metrics with all labels
+		type conditionKey struct {
+			server, conditionType, status string
+		}
+		conditionMetrics := make(map[conditionKey]int)
 		for metric := range ch {
 			var m = metric
 			dto := &prometheus_io.Metric{}
 			Expect(m.Write(dto)).To(Succeed())
 
-			if dto.GetGauge() != nil && len(dto.GetLabel()) >= 2 {
-				var condType, status string
+			if dto.GetGauge() != nil {
+				var key conditionKey
 				for _, label := range dto.GetLabel() {
-					if label.GetName() == "condition_type" {
-						condType = label.GetValue()
-					}
-					if label.GetName() == "status" {
-						status = label.GetValue()
+					switch label.GetName() {
+					case labelServer:
+						key.server = label.GetValue()
+					case "condition_type":
+						key.conditionType = label.GetValue()
+					case "status":
+						key.status = label.GetValue()
 					}
 				}
-				if condType != "" && status != "" {
-					if conditionMetrics[condType] == nil {
-						conditionMetrics[condType] = make(map[string]float64)
-					}
-					conditionMetrics[condType][status] = dto.GetGauge().GetValue()
+				if key.conditionType != "" && key.status != "" {
+					// Each per-server metric has value 1
+					Expect(dto.GetGauge().GetValue()).To(Equal(1.0))
+					conditionMetrics[key]++
 				}
 			}
 		}
 
-		// Assert exact label/value pairs
-		Expect(conditionMetrics["Ready"]["True"]).To(Equal(1.0), "Expected 1 Ready=True condition")
-		Expect(conditionMetrics["Discovered"]["True"]).To(Equal(1.0), "Expected 1 Discovered=True condition")
+		// Assert exact per-server condition metrics
+		Expect(conditionMetrics).To(Equal(map[conditionKey]int{
+			{server: "server1", conditionType: "Ready", status: "True"}:      1,
+			{server: "server1", conditionType: "Discovered", status: "True"}: 1,
+		}))
 	})
 
-	It("should handle servers without state gracefully", func(ctx SpecContext) {
+	It("should emit all enum states with value 0 when server has no state set", func(ctx SpecContext) {
 		// Create server without state set
 		server := metalv1alpha1.Server{
 			ObjectMeta: metav1.ObjectMeta{Name: "server1"},
@@ -266,11 +329,42 @@ var _ = Describe("ServerStateCollector", func() {
 
 		Expect(fakeClient.Create(ctx, &server)).To(Succeed())
 
-		// Collect metrics - should not panic
+		// Collect metrics - should not panic and should emit all states with value 0
 		ch := make(chan prometheus.Metric, 100)
 		Expect(func() {
 			collector.Collect(ch)
 			close(ch)
 		}).NotTo(Panic())
+
+		// Parse metrics and verify all states are emitted with value 0
+		type stateKey struct {
+			server, state string
+		}
+		stateMetrics := make(map[stateKey]float64)
+		for metric := range ch {
+			var m = metric
+			dto := &prometheus_io.Metric{}
+			Expect(m.Write(dto)).To(Succeed())
+
+			if dto.GetGauge() != nil {
+				var key stateKey
+				for _, label := range dto.GetLabel() {
+					switch label.GetName() {
+					case labelServer:
+						key.server = label.GetValue()
+					case "state":
+						key.state = label.GetValue()
+					}
+				}
+				if key.state != "" {
+					stateMetrics[key] = dto.GetGauge().GetValue()
+				}
+			}
+		}
+
+		// All states should be 0 since no state is set
+		Expect(stateMetrics[stateKey{server: "server1", state: "Initial"}]).To(Equal(0.0))
+		Expect(stateMetrics[stateKey{server: "server1", state: "Available"}]).To(Equal(0.0))
+		Expect(stateMetrics).To(HaveLen(6)) // All 6 states emitted
 	})
 })

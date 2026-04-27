@@ -42,61 +42,70 @@ spec:
 
 ### Server State Distribution (`metal_server_state`)
 
-**Type:** Gauge
-**Description:** Current count of servers in each state
+**Type:** Gauge (enum pattern)
+**Description:** Server state as enum metric — emits all possible states for each server with value 1 for the current state and 0 for all others. This pattern prevents series churn when servers change state.
 **Labels:**
+- `server`: Server resource name
 - `state`: ServerState value (Initial, Discovery, Available, Reserved, Error, Maintenance)
 
 **Example values:**
 ```text
-metal_server_state{state="Available"} 5
-metal_server_state{state="Reserved"} 2
-metal_server_state{state="Error"} 0
-metal_server_state{state="Maintenance"} 1
+# Server srv-001 is currently in Available state
+metal_server_state{server="srv-001", state="Initial"} 0
+metal_server_state{server="srv-001", state="Discovery"} 0
+metal_server_state{server="srv-001", state="Available"} 1
+metal_server_state{server="srv-001", state="Reserved"} 0
+metal_server_state{server="srv-001", state="Error"} 0
+metal_server_state{server="srv-001", state="Maintenance"} 0
 ```
 
 **Use cases:**
-- Monitor available server capacity
-- Alert on servers in error states
-- Track server lifecycle distribution
+- Monitor available server capacity: `count(metal_server_state{state="Available"} == 1)`
+- Alert on specific servers in error states: `metal_server_state{state="Error"} == 1`
+- Track server lifecycle distribution: `count by (state) (metal_server_state == 1)`
 
 ### Server Power State Distribution (`metal_server_power_state`)
 
-**Type:** Gauge
-**Description:** Current count of servers in each power state
+**Type:** Gauge (enum pattern)
+**Description:** Server power state as enum metric — emits all possible power states for each server with value 1 for the current state and 0 for all others.
 **Labels:**
+- `server`: Server resource name
 - `power_state`: ServerPowerState value (On, Off, PoweringOn, PoweringOff, Paused)
 
 **Example values:**
 ```text
-metal_server_power_state{power_state="On"} 7
-metal_server_power_state{power_state="Off"} 1
-metal_server_power_state{power_state="PoweringOn"} 0
+# Server srv-001 is currently powered On
+metal_server_power_state{server="srv-001", power_state="On"} 1
+metal_server_power_state{server="srv-001", power_state="Off"} 0
+metal_server_power_state{server="srv-001", power_state="Paused"} 0
+metal_server_power_state{server="srv-001", power_state="PoweringOn"} 0
+metal_server_power_state{server="srv-001", power_state="PoweringOff"} 0
 ```
 
 **Use cases:**
 - Track power operations in progress
-- Identify stuck power transitions
+- Identify specific servers with stuck power transitions
 - Energy consumption estimation
 
 ### Server Condition Status (`metal_server_condition_status`)
 
 **Type:** Gauge
-**Description:** Count of servers with each condition status
+**Description:** Current condition status of each server (value is always 1)
 **Labels:**
+- `server`: Server resource name
 - `condition_type`: Condition type (e.g., "Ready", "PoweringOn", "Discovered")
 - `status`: Condition status (True, False, Unknown)
 
 **Example values:**
 ```text
-metal_server_condition_status{condition_type="Ready",status="True"} 1
-metal_server_condition_status{condition_type="Discovered",status="True"} 1
-metal_server_condition_status{condition_type="PoweringOn",status="False"} 0
+metal_server_condition_status{server="srv-001", condition_type="Ready", status="True"} 1
+metal_server_condition_status{server="srv-001", condition_type="Discovered", status="True"} 1
+metal_server_condition_status{server="srv-002", condition_type="Ready", status="False"} 1
 ```
 
 **Use cases:**
-- Track server health conditions
-- Alert on specific condition failures
+- Track individual server health conditions
+- Alert on specific servers with condition failures
 - Monitor discovery and power operation progress
 
 ### Server Reconciliation Total (`metal_server_reconciliation_total`)
@@ -123,40 +132,49 @@ metal_server_reconciliation_total{result="error_reconcile"} 15
 ### Server Inventory
 
 ```promql
-# Total servers by state
-sum by (state) (metal_server_state)
+# Count of servers by state
+count by (state) (metal_server_state == 1)
 
-# Available server capacity
-metal_server_state{state="Available"}
+# Number of available servers
+count(metal_server_state{state="Available"} == 1)
 
-# Servers requiring attention
-metal_server_state{state="Error"} + metal_server_state{state="Maintenance"}
+# List servers in error state
+metal_server_state{state="Error"} == 1
+
+# Count of servers requiring attention (Error or Maintenance)
+count(metal_server_state{state=~"Error|Maintenance"} == 1)
 
 # Percentage of servers in error state
-metal_server_state{state="Error"} / sum(metal_server_state) * 100
+count(metal_server_state{state="Error"} == 1) / count(metal_server_state{state="Available"} == 1 or metal_server_state{state="Reserved"} == 1 or metal_server_state{state="Error"} == 1) * 100
 ```
 
 ### Power Operations
 
 ```promql
-# Servers currently powered on
-metal_server_power_state{power_state="On"}
+# Count of servers currently powered on
+count(metal_server_power_state{power_state="On"} == 1)
 
-# Servers in transition states (possibly stuck)
-metal_server_power_state{power_state="PoweringOn"} + metal_server_power_state{power_state="PoweringOff"}
+# List servers in transition states (possibly stuck)
+metal_server_power_state{power_state=~"PoweringOn|PoweringOff"} == 1
+
+# Count servers in transition states
+count(metal_server_power_state{power_state=~"PoweringOn|PoweringOff"} == 1)
 
 # Power state distribution
-sum by (power_state) (metal_server_power_state)
+count by (power_state) (metal_server_power_state == 1)
 ```
 
 ### Health and Conditions
 
 ```promql
 # Count of servers with Ready=True
-sum(metal_server_condition_status{condition_type="Ready",status="True"})
+count(metal_server_condition_status{condition_type="Ready", status="True"})
+
+# List servers with Ready=False
+metal_server_condition_status{condition_type="Ready", status="False"}
 
 # Servers with failed power operations
-metal_server_condition_status{condition_type="PoweringOn",status="False"}
+metal_server_condition_status{condition_type="PoweringOn", status="False"}
 ```
 
 ### Reconciliation Performance
@@ -175,7 +193,7 @@ sum(rate(metal_server_reconciliation_total[5m]))
 
 ## Alerting Rules
 
-Example PrometheusRule resource:
+Example PrometheusRule resource (see `config/prometheus/server_alerts.yaml` for the full version):
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -189,29 +207,29 @@ spec:
     interval: 30s
     rules:
     - alert: NoAvailableServers
-      expr: metal_server_state{state="Available"} == 0
+      expr: (count(metal_server_state{state="Available"}) or vector(0)) < 1 and (count(metal_server_state{state="Reserved"}) or vector(0)) < 1
       for: 5m
       annotations:
-        summary: "No available servers in the fleet"
-        description: "All servers are either Reserved, in Maintenance, or in Error state"
+        summary: "No available or reserved servers in the fleet"
+        description: "The fleet is completely idle with no servers in Available or Reserved state"
       labels:
         severity: warning
 
     - alert: ServersInErrorState
-      expr: metal_server_state{state="Error"} > 0
+      expr: metal_server_state{state="Error"} == 1
       for: 2m
       annotations:
-        summary: "Servers are in Error state"
-        description: "{{ $value }} server(s) are in Error state and require attention"
+        summary: "Server {{ $labels.server }} is in Error state"
+        description: "Server {{ $labels.server }} is in Error state and requires attention"
       labels:
         severity: critical
 
     - alert: ServersPoweringOnTooLong
-      expr: metal_server_power_state{power_state="PoweringOn"} > 0
+      expr: metal_server_power_state{power_state="PoweringOn"} == 1
       for: 10m
       annotations:
-        summary: "Servers stuck in PoweringOn state"
-        description: "{{ $value }} server(s) have been in PoweringOn state for over 10 minutes"
+        summary: "Server {{ $labels.server }} stuck in PoweringOn state"
+        description: "Server {{ $labels.server }} has been in PoweringOn state for over 10 minutes"
       labels:
         severity: warning
 
@@ -225,7 +243,7 @@ spec:
         severity: warning
 
     - alert: LowAvailableServerCapacity
-      expr: metal_server_state{state="Available"} < 2
+      expr: (count(metal_server_state{state="Available"}) or vector(0)) < 2
       for: 5m
       annotations:
         summary: "Low available server capacity"
@@ -241,13 +259,13 @@ Example dashboard queries for visualization:
 ### Server State Distribution Panel (Pie Chart)
 
 ```promql
-sum by (state) (metal_server_state)
+count by (state) (metal_server_state == 1)
 ```
 
 ### Server Power State Timeline (Graph)
 
 ```promql
-metal_server_power_state
+count by (power_state) (metal_server_power_state == 1)
 ```
 
 ### Reconciliation Error Rate (Graph)
@@ -260,44 +278,48 @@ rate(metal_server_reconciliation_total{result=~"error_.*"}[5m])
 ### Available Server Capacity (Gauge)
 
 ```promql
-metal_server_state{state="Available"}
+count(metal_server_state{state="Available"} == 1)
 ```
 
 ## Implementation Details
 
 ### Metric Collection Strategy
 
-The operator uses a **custom Collector pattern** to ensure accurate metric counts:
+The operator uses a **custom Collector pattern** with **enum metrics** to emit per-server state information:
 
 1. On each Prometheus scrape (default: 30s interval), the collector lists all Server resources
-2. Counts are computed in-memory and emitted as gauge metrics
-3. This ensures metrics always reflect current cluster state, not accumulated values
+2. For each server, it emits enum metrics for all possible states (value=1 for current state, value=0 for others)
+3. This **enum pattern** prevents series churn when servers change state — values flip but all series remain active
 
 **Benefits:**
-- Accurate counts even if reconciliation loop misses updates
-- No metric staleness from deleted servers
+- Per-server visibility enables targeted alerting (e.g., \"Server X is in Error state\")
+- Accurate counts via `count(metric == 1)` aggregation
+- No stale series when state changes (unlike single-value-per-state approaches)
+- Works correctly with `rate()`, `changes()`, and other Prometheus functions
 - Resilient to operator restarts
 
 **Performance considerations:**
 - ServerList operation uses watch cache (fast)
 - Default scrape interval is 30s (adjustable)
+- Cardinality: (servers × 6 states) + (servers × 5 power states) + conditions
 - For very large clusters (>1000 servers), consider increasing scrape interval
 
 ### Cardinality Control
 
-All metrics use **bounded label value sets** to prevent cardinality explosion:
+Metrics include the `server` label to enable per-server alerting and filtering. Label cardinality is controlled by using **bounded label value sets** for state-related labels:
 
+- `server`: One value per Server resource (scales with fleet size)
 - `state`: 6 possible values
 - `power_state`: 5 possible values
 - `condition_type`: ~10 typical values
 - `result`: 3 values
 
 **Never used as labels:**
-- Server names, UUIDs, or namespaces
+- Server UUIDs
 - IP addresses or MAC addresses
 - Timestamps
 
-This ensures Prometheus performance remains optimal even with large server fleets.
+For very large server fleets (>1000 servers), monitor Prometheus memory usage and consider increasing the scrape interval if needed.
 
 ## Troubleshooting
 

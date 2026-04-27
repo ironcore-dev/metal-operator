@@ -1063,6 +1063,8 @@ _Appears in:_
 | `secretRef` _[SecretReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#secretreference-v1-core)_ | SecretRef is a reference to the Secret containing the credentials to access the image URI. |  |  |
 | `transferProtocol` _string_ | TransferProtocol is the network protocol used to retrieve the image URI. |  |  |
 | `URI` _string_ | URI is the URI of the software image to install. |  |  |
+| `fallbackTransferProtocol` _string_ | FallbackTransferProtocol is the fallback network protocol used if the primary TransferProtocol<br />is not supported by the BMC's UpdateService. |  |  |
+| `fallbackURI` _string_ | FallbackURI is the fallback URI of the software image to install if the primary TransferProtocol<br />is not supported by the BMC's UpdateService. |  |  |
 
 
 #### ImmutableObjectReference

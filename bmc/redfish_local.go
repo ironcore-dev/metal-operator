@@ -26,72 +26,13 @@ type RedfishLocalBMC struct {
 }
 
 // NewRedfishLocalBMCClient creates a new RedfishLocalBMC with the given connection details.
+// Authentication is validated by the mock HTTP server via the standard Basic Auth header.
 func NewRedfishLocalBMCClient(ctx context.Context, options Options) (BMC, error) {
-	if UnitTestMockUps == nil {
-		InitMockUp()
-	}
-	if UnitTestMockUps.SimulateUnvailableBMC {
-		err := &schemas.Error{
-			HTTPReturnedStatusCode: 503,
-		}
-		return nil, err
-	}
 	bmc, err := newRedfishBaseBMCClient(ctx, options)
 	if err != nil {
 		return nil, err
 	}
-	if acc, ok := UnitTestMockUps.Accounts[options.Username]; ok {
-		if acc.Password == options.Password {
-			// authenticated
-			return &RedfishLocalBMC{RedfishBaseBMC: bmc}, nil
-		}
-	}
-	return nil, &schemas.Error{
-		HTTPReturnedStatusCode: 401,
-	}
-}
-
-// GetAccounts retrieves all user accounts from the BMC.
-func (r *RedfishLocalBMC) GetAccounts() ([]*schemas.ManagerAccount, error) {
-	accounts := make([]*schemas.ManagerAccount, 0, len(UnitTestMockUps.Accounts))
-	for _, a := range UnitTestMockUps.Accounts {
-		accounts = append(accounts, a)
-	}
-	return accounts, nil
-}
-
-// CreateOrUpdateAccount creates or updates a user account on the BMC.
-func (r *RedfishLocalBMC) CreateOrUpdateAccount(
-	ctx context.Context, userName, role, password string, enabled bool,
-) error {
-	for _, a := range UnitTestMockUps.Accounts {
-		if a.UserName == userName {
-			a.RoleID = role
-			a.UserName = userName
-			a.Enabled = enabled
-			a.Password = password
-			return nil
-		}
-	}
-	newAccount := schemas.ManagerAccount{
-		Entity: schemas.Entity{
-			ID: fmt.Sprintf("%d", len(UnitTestMockUps.Accounts)+1),
-		},
-		UserName: userName,
-		RoleID:   role,
-		Enabled:  enabled,
-		Password: password,
-	}
-	UnitTestMockUps.Accounts[userName] = &newAccount
-	return nil
-}
-
-func (r *RedfishLocalBMC) DeleteAccount(ctx context.Context, userName, id string) error {
-	if _, ok := UnitTestMockUps.Accounts[userName]; ok {
-		delete(UnitTestMockUps.Accounts, userName)
-		return nil
-	}
-	return fmt.Errorf("account %s not found", userName)
+	return &RedfishLocalBMC{RedfishBaseBMC: bmc}, nil
 }
 
 // UpgradeBiosVersion initiates a BIOS upgrade.

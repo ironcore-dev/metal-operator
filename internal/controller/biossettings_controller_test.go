@@ -1258,6 +1258,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPatch, pendingSettingsURL, bytes.NewReader(pendingBody))
 		Expect(err).NotTo(HaveOccurred())
 		req.Header.Set("Content-Type", "application/json")
+		req.SetBasicAuth(string(bmcSecret.Data[metalv1alpha1.BMCSecretUsernameKeyName]), string(bmcSecret.Data[metalv1alpha1.BMCSecretPasswordKeyName]))
 
 		client := &http.Client{
 			Timeout: 5 * time.Second,
@@ -1310,6 +1311,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 		clearPendingURL := fmt.Sprintf("http://%s:%d/redfish/v1/Systems/437XR1138R2/Bios/Settings", MockServerIP, MockServerPort)
 		clearReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, clearPendingURL, nil)
 		Expect(err).NotTo(HaveOccurred())
+		clearReq.SetBasicAuth(string(bmcSecret.Data[metalv1alpha1.BMCSecretUsernameKeyName]), string(bmcSecret.Data[metalv1alpha1.BMCSecretPasswordKeyName]))
 
 		clearResp, err := client.Do(clearReq)
 		Expect(err).NotTo(HaveOccurred())

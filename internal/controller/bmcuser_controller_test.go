@@ -7,7 +7,6 @@ import (
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	metalBMC "github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -294,7 +293,7 @@ var _ = Describe("BMCUser Controller", func() {
 	})
 
 	It("should delete BMC user and secret on User deletion", func(ctx SpecContext) {
-		metalBMC.UnitTestMockUps.InitializeDefaults()
+		mockServers[0].ResetAccounts()
 		By("Creating a User resource")
 		user := &metalv1alpha1.BMCUser{
 			ObjectMeta: metav1.ObjectMeta{
@@ -311,7 +310,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Create(ctx, user)).To(Succeed())
 		By("Ensuring that the User resource has been created")
 		Eventually(Get(user)).Should(Succeed())
-		Eventually(metalBMC.UnitTestMockUps.Accounts).Should(HaveKey("deleteUser"))
+		Eventually(mockServers[0].GetAccountNames).Should(HaveKey("deleteUser"))
 
 		By("Ensuring that the User resource has been patched with the BMC secret reference")
 		Eventually(Object(user)).Should(SatisfyAll(
@@ -333,7 +332,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Eventually(Get(user)).ShouldNot(Succeed())
 
 		By("Ensuring that the BMC user has been deleted")
-		Eventually(metalBMC.UnitTestMockUps.Accounts).ShouldNot(HaveKey("deleteUser"))
+		Eventually(mockServers[0].GetAccountNames).ShouldNot(HaveKey("deleteUser"))
 
 		By("Ensuring that the effective BMCSecret has been deleted")
 		Expect(k8sClient.Delete(ctx, effectiveSecret)).To(Succeed())

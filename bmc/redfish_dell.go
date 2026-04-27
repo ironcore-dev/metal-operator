@@ -35,6 +35,40 @@ type dellManagerLinksOEM struct {
 	DellAttributesCount int           `json:"DellAttributes@odata.count"`
 }
 
+// dellRegistryAttribute embeds schemas.Attributes and overrides only the fields
+// that Dell iDRAC serializes differently:
+//   - LowerBound/UpperBound: Dell sends negative values (e.g. -1 = "no limit"),
+//     which cannot be represented as *uint64.
+//   - ReadOnly: Dell uses the JSON key "Readonly" (lowercase 'o').
+type dellRegistryAttribute struct {
+	schemas.Attributes
+	LowerBound *int64 `json:"LowerBound,omitempty"` // shadows Attributes.LowerBound (*uint64)
+	UpperBound *int64 `json:"UpperBound,omitempty"` // shadows Attributes.UpperBound (*uint64)
+	ReadOnly   bool   `json:"Readonly"`             // Dell uses "Readonly", not "ReadOnly"
+}
+
+type dellAttributeRegistry struct {
+	RegistryEntries struct {
+		Attributes []dellRegistryAttribute `json:"Attributes"`
+	} `json:"RegistryEntries"`
+}
+
+// toSchemaAttributes converts a dellRegistryAttribute to schemas.Attributes.
+// LowerBound and UpperBound are omitted when negative (not representable as uint64).
+func (d dellRegistryAttribute) toSchemaAttributes() schemas.Attributes {
+	a := d.Attributes
+	a.ReadOnly = d.ReadOnly
+	if d.LowerBound != nil && *d.LowerBound >= 0 {
+		v := uint64(*d.LowerBound)
+		a.LowerBound = &v
+	}
+	if d.UpperBound != nil && *d.UpperBound >= 0 {
+		v := uint64(*d.UpperBound)
+		a.UpperBound = &v
+	}
+	return a
+}
+
 // dellCommonBMCAttributes defines commonly configured Dell iDRAC attributes
 // that may not be in the standard registry but are supported by Dell iDRAC.
 var dellCommonBMCAttributes = map[string]schemas.Attributes{
@@ -139,7 +173,7 @@ func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(manager *schemas.Manag
 		return nil, err
 	}
 	c := manager.GetClient()
-	bmcRegistryAttribute := &schemas.AttributeRegistry{}
+	bmcRegistryAttribute := &dellAttributeRegistry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "ManagerAttributeRegistry") {
 			if len(registry.Location) == 0 {
@@ -155,7 +189,7 @@ func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(manager *schemas.Manag
 	filteredAttr := make(map[string]schemas.Attributes)
 	for _, entry := range bmcRegistryAttribute.RegistryEntries.Attributes {
 		if entry.Immutable == immutable && entry.ReadOnly == readOnly && !entry.Hidden {
-			filteredAttr[entry.AttributeName] = entry
+			filteredAttr[entry.AttributeName] = entry.toSchemaAttributes()
 		}
 	}
 	return filteredAttr, nil

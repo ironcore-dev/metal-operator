@@ -6,7 +6,6 @@ package controller
 import (
 	"fmt"
 	"net/netip"
-
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"

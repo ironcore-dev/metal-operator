@@ -7,11 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
+	"time"
 
 	"github.com/stmcginnis/gofish/schemas"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ BMC = (*RedfishLocalBMC)(nil)
@@ -95,42 +95,73 @@ func (r *RedfishLocalBMC) DeleteAccount(ctx context.Context, userName, id string
 }
 
 // UpgradeBiosVersion initiates a BIOS upgrade.
-func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, _ string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
-	return upgradeVersion(ctx, r.RedfishBaseBMC, params, localBuildBiosRequestBody, localExtractTaskMonitorURI)
+func (r *RedfishLocalBMC) UpgradeBiosVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
+	UnitTestMockUps.BIOSUpgradeTaskIndex = 0
+	UnitTestMockUps.BIOSUpgradingVersion = params.ImageURI
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		lenTask := len(UnitTestMockUps.BIOSUpgradeTaskStatus) - 1
+		if strings.Contains(params.ImageURI, "fail") {
+			lenTask = len(UnitTestMockUps.BIOSUpgradeTaskFailedStatus) - 1
+		}
+		for UnitTestMockUps.BIOSUpgradeTaskIndex < lenTask {
+			time.Sleep(5 * time.Millisecond)
+			UnitTestMockUps.BIOSUpgradeTaskIndex++
+		}
+	}()
+	return DummyMockTaskForUpgrade, false, nil
 }
 
 // GetBiosUpgradeTask retrieves the status of a BIOS upgrade task.
-func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
-	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, localParseTaskDetails)
+func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
+	index := UnitTestMockUps.BIOSUpgradeTaskIndex
+	taskStatus := UnitTestMockUps.BIOSUpgradeTaskStatus
+	if strings.Contains(UnitTestMockUps.BIOSUpgradingVersion, "fail") {
+		taskStatus = UnitTestMockUps.BIOSUpgradeTaskFailedStatus
+	}
+
+	if index >= len(taskStatus) {
+		index = len(taskStatus) - 1
+	}
+	task := &taskStatus[index]
+	if task.TaskState == schemas.CompletedTaskState {
+		UnitTestMockUps.BIOSVersion = UnitTestMockUps.BIOSUpgradingVersion
+	}
+	return task, nil
 }
 
-// SetBMCAttributesImmediately sets BMC attributes via HTTP PATCH to the BMC Settings endpoint.
-// Navigates from the manager's @Redfish.Settings.SettingsObject link, mirroring the Dell pattern.
-func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) error {
-	if len(attributes) == 0 {
-		return nil
-	}
-	manager, err := r.GetManager(bmcUUID)
-	if err != nil {
-		return fmt.Errorf("failed to get manager: %w", err)
-	}
-	var managerData struct {
-		Settings schemas.Settings `json:"@Redfish.Settings"`
-	}
-	if err := json.Unmarshal(manager.RawData, &managerData); err != nil {
-		return fmt.Errorf("failed to parse manager data: %w", err)
-	}
-	data := map[string]any{
-		"Attributes":                 attributes,
-		"@Redfish.SettingsApplyTime": map[string]string{"ApplyTime": string(schemas.ImmediateSettingsApplyTime)},
-	}
-	resp, err := manager.GetClient().Patch(managerData.Settings.SettingsObject, data)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close() // nolint: errcheck
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("PATCH %s returned status %d", managerData.Settings.SettingsObject, resp.StatusCode)
+// ResetManager resets the BMC with a delay for pending settings.
+func (r *RedfishLocalBMC) ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Simulating BMC reset", "UUID", UUID, "ResetType", resetType)
+	go func() {
+		if len(UnitTestMockUps.PendingBMCSetting) > 0 {
+			time.Sleep(150 * time.Millisecond)
+			for key, data := range UnitTestMockUps.PendingBMCSetting {
+				if _, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
+					UnitTestMockUps.BMCSettingAttr[key] = data
+				}
+			}
+			UnitTestMockUps.ResetPendingBMCSetting()
+		}
+	}()
+	return nil
+}
+
+// SetBMCAttributesImmediately sets BMC attributes, applying them immediately or on reset.
+func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) error {
+	for key, value := range attributes {
+		if attrData, ok := UnitTestMockUps.BMCSettingAttr[key]; ok {
+			if reboot, ok := attrData["reboot"].(bool); ok && !reboot {
+				attrData["value"] = value
+			} else {
+				UnitTestMockUps.PendingBMCSetting[key] = map[string]any{
+					"type":   attrData["type"],
+					"reboot": attrData["reboot"],
+					"value":  value,
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -227,66 +258,38 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, a
 }
 
 // UpgradeBMCVersion initiates a BMC upgrade.
-func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, _ string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
-	return upgradeVersion(ctx, r.RedfishBaseBMC, params, localBuildBMCRequestBody, localExtractTaskMonitorURI)
+func (r *RedfishLocalBMC) UpgradeBMCVersion(ctx context.Context, manufacturer string, params *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
+	UnitTestMockUps.BMCUpgradeTaskIndex = 0
+	UnitTestMockUps.BMCUpgradingVersion = params.ImageURI
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		lenTask := len(UnitTestMockUps.BMCUpgradeTaskStatus) - 1
+		if strings.Contains(params.ImageURI, "fail") {
+			lenTask = len(UnitTestMockUps.BMCUpgradeTaskFailedStatus) - 1
+		}
+		for UnitTestMockUps.BMCUpgradeTaskIndex < lenTask {
+			time.Sleep(5 * time.Millisecond)
+			UnitTestMockUps.BMCUpgradeTaskIndex++
+		}
+	}()
+	return DummyMockTaskForUpgrade, false, nil
 }
 
 // GetBMCUpgradeTask retrieves the status of a BMC upgrade task.
-func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
-	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, localParseTaskDetails)
-}
+func (r *RedfishLocalBMC) GetBMCUpgradeTask(ctx context.Context, manufacturer, taskURI string) (*schemas.Task, error) {
+	index := UnitTestMockUps.BMCUpgradeTaskIndex
 
-// localBuildBiosRequestBody builds a SimpleUpdate request body for a BIOS
-// upgrade, injecting the standard BIOS FirmwareInventory URI as the target so
-// the mock server can resolve which System resource to update dynamically.
-func localBuildBiosRequestBody(params *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody {
-	body := &SimpleUpdateRequestBody{UpdateServiceSimpleUpdateParameters: *params}
-	if len(body.Targets) == 0 {
-		body.Targets = []string{"/redfish/v1/UpdateService/FirmwareInventory/BIOS"}
+	taskStatus := UnitTestMockUps.BMCUpgradeTaskStatus
+	if strings.Contains(UnitTestMockUps.BMCUpgradingVersion, "fail") {
+		taskStatus = UnitTestMockUps.BMCUpgradeTaskFailedStatus
 	}
-	return body
-}
 
-// localBuildBMCRequestBody builds a SimpleUpdate request body for a BMC
-// upgrade, injecting the standard BMC FirmwareInventory URI as the target so
-// the mock server can resolve which Manager resource to update dynamically.
-func localBuildBMCRequestBody(params *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody {
-	body := &SimpleUpdateRequestBody{UpdateServiceSimpleUpdateParameters: *params}
-	if len(body.Targets) == 0 {
-		body.Targets = []string{"/redfish/v1/UpdateService/FirmwareInventory/BMC"}
+	if index >= len(taskStatus) {
+		index = len(taskStatus) - 1
 	}
-	return body
-}
-
-// localExtractTaskMonitorURI extracts the task URI from the Location response header.
-func localExtractTaskMonitorURI(response *http.Response) (string, error) {
-	if loc := response.Header.Get("Location"); loc != "" {
-		return loc, nil
-	}
-	var body struct {
-		OdataID string `json:"@odata.id,omitempty"`
-	}
-	data, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-	if len(data) > 0 {
-		if err := json.Unmarshal(data, &body); err == nil && body.OdataID != "" {
-			return body.OdataID, nil
-		}
-	}
-	return "", fmt.Errorf("unable to extract task URI from SimpleUpdate response")
-}
-
-// localParseTaskDetails reads and parses the task from the response body.
-func localParseTaskDetails(_ context.Context, response *http.Response) (*schemas.Task, error) {
-	data, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read task response body: %w", err)
-	}
-	task := &schemas.Task{}
-	if err := json.Unmarshal(data, task); err != nil {
-		return nil, fmt.Errorf("failed to parse task: %w", err)
+	task := &taskStatus[index]
+	if task.TaskState == schemas.CompletedTaskState {
+		UnitTestMockUps.BMCVersion = UnitTestMockUps.BMCUpgradingVersion
 	}
 	return task, nil
 }
@@ -296,4 +299,9 @@ func localParseTaskDetails(_ context.Context, response *http.Response) (*schemas
 // (Dell, HPE, Lenovo) override this to check actual firmware inventory.
 func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ ComponentType) (bool, error) {
 	return false, nil
+}
+
+// GetSupportedTransferProtocols returns the mock transfer protocols for testing.
+func (r *RedfishLocalBMC) GetSupportedTransferProtocols(_ context.Context) ([]string, error) {
+	return UnitTestMockUps.SupportedTransferProtocols, nil
 }

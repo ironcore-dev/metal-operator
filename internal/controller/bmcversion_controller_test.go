@@ -102,8 +102,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 mockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
+					Version: mockUpServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      mockUpServerBMCVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              mockUpServerBMCVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -156,8 +161,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBMCVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBMCVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -274,8 +284,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBMCVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBMCVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 				},
 			},
@@ -375,8 +390,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion + " fail",
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
+					Version: upgradeServerBMCVersion + " fail",
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBMCVersion + " fail",
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBMCVersion + " fail",
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 				},
@@ -429,8 +449,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBMCVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBMCVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -476,8 +501,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBMCVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBMCVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -552,8 +582,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 mockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
+					Version: mockUpServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      mockUpServerBMCVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              mockUpServerBMCVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -602,8 +637,13 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBMCVersion,
+						TransferProtocol:         "HTTPS",
+						FallbackTransferProtocol: "HTTP",
+						FallbackURI:              upgradeServerBMCVersion,
+					},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -636,6 +676,55 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
+	})
+
+	It("should use fallback protocol when primary is not supported", func(ctx SpecContext) {
+		By("Ensuring mock BMC only supports HTTPS (not HTTP)")
+		// Mock BMC supports: HTTPS, NFS, CIFS, TFTP (default from mockup.go:150)
+		// We configure HTTP as primary (unsupported) and HTTPS as fallback (supported)
+
+		By("Update the server state to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
+
+		By("Creating a BMCVersion with HTTP (unsupported) primary and HTTPS (supported) fallback")
+		bmcVersion := &metalv1alpha1.BMCVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-fallback-",
+			},
+			Spec: metalv1alpha1.BMCVersionSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version: upgradeServerBMCVersion,
+					Image: metalv1alpha1.ImageSpec{
+						URI:                      upgradeServerBMCVersion,
+						TransferProtocol:         "HTTP",  // NOT supported by mock BMC
+						FallbackTransferProtocol: "HTTPS", // Supported by mock BMC
+						FallbackURI:              upgradeServerBMCVersion,
+					},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
+
+		By("Ensuring that the bmcVersion enters InProgress state (not Failed)")
+		Eventually(Object(bmcVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateInProgress),
+		)
+
+		By("Ensuring that BMC upgrade completes successfully using fallback protocol")
+		Eventually(Object(bmcVersion)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
+		)
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
 	})
 })
 

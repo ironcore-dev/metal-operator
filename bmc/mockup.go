@@ -29,6 +29,8 @@ type RedfishMockUps struct {
 
 	Accounts              map[string]*schemas.ManagerAccount
 	SimulateUnvailableBMC bool
+
+	SupportedTransferProtocols []string
 }
 
 // defaultUpgradeFailedTaskStatus returns a canonical failed upgrade task
@@ -119,6 +121,7 @@ func (r *RedfishMockUps) InitializeDefaults() {
 		},
 	}
 	r.SimulateUnvailableBMC = false
+	r.SupportedTransferProtocols = []string{"HTTPS", "NFS", "CIFS", "TFTP"}
 }
 
 func (r *RedfishMockUps) ResetBIOSSettings() {

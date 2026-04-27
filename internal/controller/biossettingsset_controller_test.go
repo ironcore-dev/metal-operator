@@ -627,7 +627,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSetSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version:                 mockUpServerBiosVersion,
+					Version:                 defaultMockUpServerBiosVersion,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{Settings: map[string]string{"UnknownSettings": "foo-bar"}, Priority: 10, Name: "foo-bar"},

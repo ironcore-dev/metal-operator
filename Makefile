@@ -131,6 +131,16 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	"$(GOLANGCI_LINT)" config verify
 
+.PHONY: test-alerts
+test-alerts: promtool yq ## Run Prometheus alert rule tests.
+	@"$(YQ)" '.spec' config/prometheus/server_alerts.yaml > config/prometheus/server_alerts_rules.yaml
+	"$(PROMTOOL)" test rules config/prometheus/server_alerts_test.yaml
+
+.PHONY: check-alerts
+check-alerts: promtool yq ## Validate Prometheus alert rules syntax.
+	@"$(YQ)" '.spec' config/prometheus/server_alerts.yaml > config/prometheus/server_alerts_rules.yaml
+	"$(PROMTOOL)" check rules config/prometheus/server_alerts_rules.yaml
+
 .PHONY: startdocs
 startdocs: ## Start the local mkdocs based development environment.
 	docker build -t $(IMAGE) -f docs/Dockerfile . --load
@@ -270,6 +280,8 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
 METALCTL ?= $(LOCALBIN)/metalctl
 GINKGO ?= $(LOCALBIN)/ginkgo
+PROMTOOL ?= $(LOCALBIN)/promtool
+YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
@@ -285,6 +297,8 @@ CRD_REF_DOCS_VERSION ?= v0.2.0
 KUBEBUILDER_VERSION ?= v4.13.0
 ADDLICENSE_VERSION ?= v1.1.1
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
+PROMTOOL_VERSION ?= 3.11.3
+YQ_VERSION ?= v4.44.3
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.
@@ -359,6 +373,16 @@ $(MOCKSERVER_BIN): $(LOCALBIN)
 .PHONY: metalctl
 metalctl: $(METALCTL) ## Build metalctl locally if necessary.
 	go build -o $(METALCTL) ./cmd/metalctl
+
+.PHONY: promtool
+promtool: $(PROMTOOL) ## Download promtool locally if necessary.
+$(PROMTOOL): $(LOCALBIN)
+	@hack/install-promtool.sh "$(PROMTOOL_VERSION)" "$(LOCALBIN)"
+
+.PHONY: yq
+yq: $(YQ) ## Download yq locally if necessary.
+$(YQ): $(LOCALBIN)
+	$(call go-install-tool,$(YQ),github.com/mikefarah/yq/v4,$(YQ_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # Note: All paths are quoted to work in directories containing spaces or parentheses.

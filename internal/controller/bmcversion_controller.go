@@ -295,11 +295,22 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 			return ctrl.Result{}, nil
 		}
 
+		// Validate and issue upgrade FIRST (which validates protocol)
+		result, err := r.handleUpgradeInProgressState(ctx, bmcVersion, bmcClient, bmcObj)
+		if err != nil {
+			return result, err
+		}
+
+		// Only reset BMC if upgrade issuance succeeded and didn't requeue
+		if result.RequeueAfter > 0 {
+			return result, nil
+		}
+
 		if ok, err := r.resetBMC(ctx, bmcVersion, bmcObj, ConditionResetIssued); !ok || err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to reset bmc %s: %w", client.ObjectKeyFromObject(bmcObj), err)
 		}
 
-		return r.handleUpgradeInProgressState(ctx, bmcVersion, bmcClient, bmcObj)
+		return result, nil
 	case metalv1alpha1.BMCVersionStateCompleted:
 		return ctrl.Result{}, r.removeServerMaintenanceRefAndResetConditions(ctx, bmcVersion, bmcClient, bmcObj)
 	case metalv1alpha1.BMCVersionStateFailed:
@@ -453,14 +464,14 @@ func (r *BMCVersionReconciler) handleFailedState(
 		bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
 		annotations := bmcVersion.GetAnnotations()
 
-		retryCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
+		retryCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
 		if err != nil {
 			return fmt.Errorf("failed to get retry condition for BMCVersion: %w", err)
 		}
 		if retryCondition.Status != metav1.ConditionTrue {
 			err := r.Conditions.Update(retryCondition,
 				conditionutils.UpdateStatus(metav1.ConditionTrue),
-				conditionutils.UpdateReason(ReasonRetryOfFailedResourceIssued),
+				conditionutils.UpdateReason(RetryOfFailedResourceReasonIssued),
 				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
 			)
 			if err != nil {
@@ -491,7 +502,7 @@ func (r *BMCVersionReconciler) handleFailedState(
 			bmcVersionBase := bmcVersion.DeepCopy()
 			bmcVersion.Status.State = metalv1alpha1.BMCVersionStatePending
 			bmcVersion.Status.ObservedGeneration = bmcVersion.Generation
-			retryCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
+			retryCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
 			if err != nil {
 				return fmt.Errorf("failed to get Retry condition for BMCVersion: %w", err)
 			}
@@ -597,7 +608,7 @@ func (r *BMCVersionReconciler) removeServerMaintenanceRefAndResetConditions(
 		log.V(1).Info("Upgraded BMC version", "BMCVersion", currentBMCVersion, "BMC", BMC.Name)
 		state = metalv1alpha1.BMCVersionStateCompleted
 	}
-	retryFailedCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
+	retryFailedCondition, err := GetCondition(r.Conditions, bmcVersion.Status.Conditions, RetryOfFailedResourceConditionIssued)
 	if err != nil {
 		return fmt.Errorf("failed to get retry condition for BMCVersion: %w", err)
 	}
@@ -1138,12 +1149,50 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 		forceUpdate = true
 	}
 
+	supportedProtocols, err := bmcClient.GetSupportedTransferProtocols(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get supported transfer protocols: %w", err)
+	}
+
+	log.V(1).Info("Retrieved supported transfer protocols", "protocols", supportedProtocols, "bmcVersion", bmcVersion.Spec.Version)
+
+	resolvedProtocol, resolvedURI, err := resolveTransferProtocol(bmcVersion.Spec.Image, supportedProtocols)
+	if err != nil {
+		log.Error(err, "transfer protocol validation failed", "bmcVersion", bmcVersion.Name, "bmc", bmcObj.Name)
+
+		// Clean up ServerMaintenance objects and references
+		if cleanupErr := r.removeServerMaintenances(ctx, bmcVersion); cleanupErr != nil {
+			log.Error(cleanupErr, "failed to clean up serverMaintenance when protocol validation failed")
+		}
+
+		// Update condition and set to Failed state
+		condition := &metav1.Condition{
+			Type:    ConditionVersionUpgradeIssued,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ProtocolValidationFailed",
+			Message: fmt.Sprintf("Transfer protocol validation failed: %v", err),
+		}
+		patchErr := r.patchBMCVersionStatusAndCondition(
+			ctx,
+			bmcVersion,
+			metalv1alpha1.BMCVersionStateFailed,
+			nil,
+			condition,
+		)
+		return errors.Join(err, patchErr)
+	}
+
+	if resolvedProtocol != bmcVersion.Spec.Image.TransferProtocol {
+		log.Info("Using fallback transfer protocol", "primary", bmcVersion.Spec.Image.TransferProtocol,
+			"fallback", resolvedProtocol, "supportedProtocols", supportedProtocols)
+	}
+
 	parameters := &schemas.UpdateServiceSimpleUpdateParameters{
 		ForceUpdate:      forceUpdate,
-		ImageURI:         bmcVersion.Spec.Image.URI,
+		ImageURI:         resolvedURI,
 		Password:         password,
 		Username:         username,
-		TransferProtocol: schemas.TransferProtocolType(bmcVersion.Spec.Image.TransferProtocol),
+		TransferProtocol: schemas.TransferProtocolType(resolvedProtocol),
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {

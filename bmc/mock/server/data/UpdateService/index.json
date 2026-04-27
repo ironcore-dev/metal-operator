@@ -32,7 +32,8 @@
     "Actions": {
         "#UpdateService.SimpleUpdate": {
             "target": "/redfish/v1/UpdateService/Actions/SimpleUpdate",
-            "@Redfish.ActionInfo": "/redfish/v1/UpdateService/SimpleUpdateActionInfo"
+            "@Redfish.ActionInfo": "/redfish/v1/UpdateService/SimpleUpdateActionInfo",
+            "TransferProtocol@Redfish.AllowableValues": ["HTTPS", "NFS", "CIFS", "TFTP"]
         }
     },
     "@odata.id": "/redfish/v1/UpdateService",

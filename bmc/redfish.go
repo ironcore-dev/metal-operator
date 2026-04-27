@@ -859,6 +859,40 @@ func (r *RedfishBaseBMC) WaitForServerPowerState(ctx context.Context, systemURI 
 	return nil
 }
 
+// GetSupportedTransferProtocols returns the list of transfer protocols supported
+// by the BMC for firmware updates via SimpleUpdate action.
+// Returns protocols like ["HTTP", "HTTPS", "TFTP", "SFTP"] based on BMC capabilities.
+// An empty list indicates the BMC has no protocol restrictions.
+func (r *RedfishBaseBMC) GetSupportedTransferProtocols(ctx context.Context) ([]string, error) {
+	service := r.client.GetService()
+	updateService, err := service.UpdateService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get UpdateService: %w", err)
+	}
+
+	// Reuse existing struct from oem_helpers.go (lines 47-53)
+	type tActions struct {
+		SimpleUpdate struct {
+			AllowableValues []string `json:"TransferProtocol@Redfish.AllowableValues"`
+		} `json:"#UpdateService.SimpleUpdate"`
+	}
+
+	var tUS struct {
+		Actions tActions
+	}
+
+	if err = json.Unmarshal(updateService.RawData, &tUS); err != nil {
+		return nil, fmt.Errorf("failed to parse UpdateService actions: %w", err)
+	}
+
+	protocols := tUS.Actions.SimpleUpdate.AllowableValues
+	if len(protocols) == 0 {
+		return []string{}, nil // No restrictions = all protocols allowed
+	}
+
+	return protocols, nil
+}
+
 // UpgradeBiosVersion is a fallback for unknown vendors. Vendor-specific structs override this.
 func (r *RedfishBaseBMC) UpgradeBiosVersion(_ context.Context, _ string, _ *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
 	return "", false, fmt.Errorf("firmware upgrade not supported for manufacturer %q", r.manufacturer)

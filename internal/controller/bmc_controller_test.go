@@ -8,7 +8,6 @@ import (
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	metalBmc "github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -584,7 +583,7 @@ var _ = Describe("BMC Conditions", func() {
 	})
 
 	It("should create ready conditions when there are BMC connection errors", func(ctx SpecContext) {
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+		mockServers[0].SetUnavailable(true)
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -631,7 +630,7 @@ var _ = Describe("BMC Conditions", func() {
 			)),
 		)
 
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = false
+		mockServers[0].SetUnavailable(false)
 
 		By("Ensuring right conditions are present, after bmc becomes responsive again")
 		Eventually(Object(bmc)).Should(

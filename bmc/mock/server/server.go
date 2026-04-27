@@ -117,22 +117,164 @@ var (
 	errBadReset    = errors.New("unknown reset type")
 )
 
+// memberHook is invoked when a collection member is created (onCreate) or
+// deleted (onDelete). data holds the member resource's JSON fields.
+// Hooks are keyed by collection URL suffix (e.g. "/AccountService/Accounts");
+// register a new entry in NewMockServer to handle additional collection types.
+type memberHook func(s *MockServer, data map[string]any)
+
+// actionHandler pairs a URL path predicate with a POST action handler.
+// Handlers are tested in order; the first match wins and the default
+// collection-creation logic is skipped. Add entries to MockServer.actionHandlers
+// in NewMockServer to support new Redfish action endpoints without touching
+// handlePost.
+type actionHandler struct {
+	matches func(path string) bool
+	handle  func(w http.ResponseWriter, r *http.Request, body []byte)
+}
+
+// Option is a functional option for configuring a MockServer.
+type Option func(*MockServer)
+
+// WithAuth enables HTTP Basic Auth enforcement on all non-service-root endpoints.
+// By default the mock server accepts all requests without credentials, which is
+// convenient for local development. Pass WithAuth() in unit-test suites to
+// exercise the authentication path.
+func WithAuth() Option {
+	return func(s *MockServer) { s.authEnabled = true }
+}
+
 type MockServer struct {
 	log               logr.Logger
 	addr              string
 	handler           http.Handler
 	mu                sync.RWMutex
 	overrides         map[string]any
-	upgradeGen        int64             // incremented on each SimpleUpdate to cancel stale goroutines
-	upgradedResources map[string]string // odata.id URI → file path for resources updated by the last upgrade
+	upgradeGen        int64                 // incremented on each SimpleUpdate to cancel stale goroutines
+	upgradedResources map[string]string     // odata.id URI → file path for resources updated by the last upgrade
+	accounts          map[string]string     // username → password (authentication store)
+	authEnabled       bool                  // when true, all non-service-root requests require Basic Auth
+	unavailable       bool                  // when true, all requests return 503 Service Unavailable
+	actionHandlers    []actionHandler       // ordered POST action dispatch table (first match wins)
+	onCreate          map[string]memberHook // collection URL suffix → hook called after a member is added
+	onDelete          map[string]memberHook // collection URL suffix → hook called before a member is removed
 }
 
-func NewMockServer(log logr.Logger, addr string) *MockServer {
+// loadAccountsFromEmbedded seeds the authentication store by reading the
+// embedded AccountService/Accounts collection and extracting UserName/Password
+// pairs. This keeps the initial credentials in sync with the data files rather
+// than duplicating them in Go code.
+func loadAccountsFromEmbedded() map[string]string {
+	result := make(map[string]string)
+	data, err := dataFS.ReadFile("data/AccountService/Accounts/index.json")
+	if err != nil {
+		return result
+	}
+	var collection Collection
+	if err := json.Unmarshal(data, &collection); err != nil {
+		return result
+	}
+	for _, member := range collection.Members {
+		memberData, err := dataFS.ReadFile(resolvePath(member.OdataID))
+		if err != nil {
+			continue
+		}
+		var account struct {
+			UserName string `json:"UserName"`
+			Password string `json:"Password"`
+		}
+		if err := json.Unmarshal(memberData, &account); err != nil {
+			continue
+		}
+		if account.UserName != "" && account.Password != "" {
+			result[account.UserName] = account.Password
+		}
+	}
+	return result
+}
+
+func NewMockServer(log logr.Logger, addr string, opts ...Option) *MockServer {
 	s := &MockServer{
 		addr:              addr,
 		log:               log,
 		overrides:         make(map[string]any),
 		upgradedResources: make(map[string]string),
+		accounts:          loadAccountsFromEmbedded(),
+		// onCreate hooks run after a new collection member is stored.
+		// Add an entry here to handle side-effects for additional collection types.
+		onCreate: map[string]memberHook{
+			"/AccountService/Accounts": func(s *MockServer, data map[string]any) {
+				// Seed missing fields from the embedded account template so that the
+				// new account has the full Redfish structure (Actions, PasswordExpiration,
+				// AccountTypes, Links, etc.) without enumerating individual fields here.
+				if raw, err := dataFS.ReadFile("data/AccountService/Accounts/2/index.json"); err == nil {
+					var tmpl map[string]any
+					if json.Unmarshal(raw, &tmpl) == nil {
+						for k, v := range tmpl {
+							if _, exists := data[k]; !exists {
+								data[k] = deepCopyAny(v)
+							}
+						}
+					}
+				}
+				// Always overwrite Actions with the correct target for this account's
+				// @odata.id (the template value would point to account 2).
+				if odataID, ok := data["@odata.id"].(string); ok && odataID != "" {
+					data["Actions"] = map[string]any{
+						"#ManagerAccount.ChangePassword": map[string]any{
+							"target": odataID + "/Actions/ManagerAccount.ChangePassword",
+						},
+					}
+					// PasswordExpiration: use template value if present, else one year from now.
+					if exp, ok := data["PasswordExpiration"].(string); !ok || exp == "" {
+						data["PasswordExpiration"] = time.Now().AddDate(1, 0, 0).UTC().Format(time.RFC3339)
+					}
+				}
+				// Update the authentication store with the new account's credentials.
+				if username, ok := data["UserName"].(string); ok && username != "" {
+					password, _ := data["Password"].(string)
+					s.accounts[username] = password
+				}
+			},
+		},
+		// onDelete hooks run before a collection member override is erased.
+		// data is the full member resource loaded prior to deletion.
+		onDelete: map[string]memberHook{
+			"/AccountService/Accounts": func(s *MockServer, data map[string]any) {
+				if username, ok := data["UserName"].(string); ok && username != "" {
+					delete(s.accounts, username)
+				}
+			},
+		},
+	}
+
+	// actionHandlers is the ordered POST dispatch table.
+	// Add a new actionHandler entry here to support additional Redfish action
+	// endpoints — no changes to handlePost are needed.
+	s.actionHandlers = []actionHandler{
+		{
+			matches: hasSuffix("/Actions/ComputerSystem.Reset"),
+			handle:  s.handleSystemReset,
+		},
+		{
+			matches: hasSuffix("/Actions/Manager.Reset"),
+			handle:  s.handleBMCReset,
+		},
+		{
+			matches: func(path string) bool {
+				return strings.Contains(path, "UpdateService/Actions/SimpleUpdate") ||
+					strings.Contains(path, "UpdateService/Actions/UpdateService.SimpleUpdate")
+			},
+			handle: s.handleSimpleUpdate,
+		},
+		{
+			matches: hasSuffix("/Actions/ManagerAccount.ChangePassword"),
+			handle:  s.handleChangePassword,
+		},
+	}
+
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	mux := http.NewServeMux()
@@ -142,8 +284,34 @@ func NewMockServer(log logr.Logger, addr string) *MockServer {
 	return s
 }
 
+// hasSuffix returns a path predicate that checks for a fixed URL suffix.
+// Use this as a shorthand when registering actionHandlers.
+func hasSuffix(suffix string) func(string) bool {
+	return func(path string) bool { return strings.HasSuffix(path, suffix) }
+}
+
 func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 	s.log.Info("Received request", "method", r.Method, "path", r.URL.Path)
+
+	s.mu.RLock()
+	unavailable := s.unavailable
+	s.mu.RUnlock()
+	if unavailable {
+		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	// When auth is enabled, the Redfish service root is the only publicly
+	// accessible endpoint (gofish fetches it without credentials during
+	// ConnectContext). All other requests require valid Basic Auth credentials.
+	if s.authEnabled && r.URL.Path != "/redfish/v1/" && r.URL.Path != "/redfish/v1" {
+		username, password, ok := r.BasicAuth()
+		if !ok || !s.Authenticate(username, password) {
+			w.Header().Set("WWW-Authenticate", `Basic realm="redfish"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
 
 	switch r.Method {
 	case http.MethodGet:
@@ -196,77 +364,96 @@ func (s *MockServer) handlePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	urlPath := r.URL.Path
-	switch {
-	case strings.HasSuffix(urlPath, "/Actions/ComputerSystem.Reset"):
-		s.handleSystemReset(w, r, body)
-	case strings.HasSuffix(urlPath, "/Actions/Manager.Reset"):
-		s.handleBMCReset(w, r, body)
-	case strings.Contains(urlPath, "UpdateService/Actions/SimpleUpdate") ||
-		strings.Contains(urlPath, "UpdateService/Actions/UpdateService.SimpleUpdate"):
-		s.handleSimpleUpdate(w, r, body)
-	default:
-		//
-		urlPath := resolvePath(r.URL.Path)
-		var update map[string]any
-		if err := json.Unmarshal(body, &update); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	for _, a := range s.actionHandlers {
+		if a.matches(urlPath) {
+			a.handle(w, r, body)
 			return
 		}
-		// Handle resource creation in collections
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		cached, hasOverride := s.overrides[urlPath]
-		var base Collection
-		if hasOverride {
-			s.log.Info("Using overridden data for POST", "path", urlPath)
-			var ok bool
-			base, ok = cached.(Collection)
-			if !ok {
+	}
+	s.handleCollectionPost(w, r, body)
+}
+
+func (s *MockServer) handleCollectionPost(w http.ResponseWriter, r *http.Request, body []byte) {
+	var update map[string]any
+	if err := json.Unmarshal(body, &update); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	urlPath := resolvePath(r.URL.Path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cached, hasOverride := s.overrides[urlPath]
+	var base Collection
+	if hasOverride {
+		s.log.Info("Using overridden data for POST", "path", urlPath)
+		switch v := cached.(type) {
+		case Collection:
+			base = v
+		case map[string]any:
+			// Normalise an override stored as map[string]any (e.g. after ResetAccounts).
+			b, err := json.Marshal(v)
+			if err != nil {
 				http.Error(w, "Corrupt overridden JSON", http.StatusInternalServerError)
 				return
 			}
-		} else {
-			s.log.Info("Using embedded data for POST", "path", urlPath)
-			data, err := dataFS.ReadFile(urlPath)
-			if err != nil {
-				s.log.Error(err, "Failed to read embedded data for POST", "path", urlPath)
-				http.NotFound(w, r)
+			if err := json.Unmarshal(b, &base); err != nil {
+				http.Error(w, "Corrupt overridden JSON", http.StatusInternalServerError)
 				return
 			}
-			if err := json.Unmarshal(data, &base); err != nil {
-				http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
-				return
-			}
+		default:
+			http.Error(w, "Corrupt overridden JSON", http.StatusInternalServerError)
+			return
 		}
-		// If resource collection (has "Members"), add a new member
-		if len(base.Members) > 0 {
-			newID := fmt.Sprintf("%d", len(base.Members)+1)
-			location := path.Join(r.URL.Path, newID)
-			newMemberPath := resolvePath(location)
-			base.Members = append(base.Members, Member{
-				OdataID: location,
-			})
-			s.log.Info("Adding new member", "id", newID, "location", location, "memberPath", newMemberPath)
-			if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
-				w.Header().Set("Location", location)
-			}
-			s.overrides[urlPath] = base
-			s.overrides[newMemberPath] = update
-		} else {
-			base.Members = make([]Member, 0)
-			location := r.URL.JoinPath("1").String()
-			base.Members = []Member{
-				{
-					OdataID: r.URL.JoinPath("1").String(),
-				},
-			}
-			s.overrides[urlPath] = base
-			if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
-				w.Header().Set("Location", location)
-			}
+	} else {
+		s.log.Info("Using embedded data for POST", "path", urlPath)
+		data, err := dataFS.ReadFile(urlPath)
+		if err != nil {
+			s.log.Error(err, "Failed to read embedded data for POST", "path", urlPath)
+			http.NotFound(w, r)
+			return
 		}
-		s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
+		if err := json.Unmarshal(data, &base); err != nil {
+			http.Error(w, "Corrupt embedded JSON", http.StatusInternalServerError)
+			return
+		}
 	}
+
+	// Derive the next ID from the maximum numeric ID already in the collection
+	// rather than from len(Members). Using len() causes collisions after a
+	// non-trailing delete (e.g. deleting member 2 from [1,2,3] leaves len=2,
+	// so the next POST computes newID=3 which already exists).
+	maxID := 0
+	for _, m := range base.Members {
+		// member OdataID is e.g. "/redfish/v1/AccountService/Accounts/3"
+		segment := path.Base(m.OdataID)
+		var n int
+		if _, err := fmt.Sscanf(segment, "%d", &n); err == nil && n > maxID {
+			maxID = n
+		}
+	}
+	newID := fmt.Sprintf("%d", maxID+1)
+	location := path.Join(r.URL.Path, newID)
+	newMemberPath := resolvePath(location)
+	base.Members = append(base.Members, Member{OdataID: location})
+	s.log.Info("Adding new member", "id", newID, "location", location, "memberPath", newMemberPath)
+	if strings.HasSuffix(r.URL.Path, "/Subscriptions") {
+		w.Header().Set("Location", location)
+	}
+	// Inject standard Redfish identity fields so gofish can parse Id and ODataID.
+	update["Id"] = newID
+	update["@odata.id"] = location
+	s.overrides[urlPath] = base
+	s.overrides[newMemberPath] = update
+	// Dispatch create hooks for this collection (e.g. credential tracking).
+	for suffix, hook := range s.onCreate {
+		if strings.HasSuffix(r.URL.Path, suffix) {
+			hook(s, update)
+			break
+		}
+	}
+	s.writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
 }
 
 func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
@@ -325,6 +512,14 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	// Hold a single lock for the entire delete + collection update to avoid
 	// unsynchronised reads of s.overrides between the two operations.
 	s.mu.Lock()
+	// Dispatch delete hooks for this resource (e.g. credential cleanup).
+	// base was loaded before the lock and covers both overridden and embedded resources.
+	for suffix, hook := range s.onDelete {
+		if strings.Contains(r.URL.Path, suffix+"/") {
+			hook(s, base)
+			break
+		}
+	}
 	delete(s.overrides, filePath)
 
 	// get collection of the resource
@@ -537,6 +732,40 @@ func (s *MockServer) handleSystemReset(w http.ResponseWriter, r *http.Request, b
 	}
 
 	s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "Accepted"})
+}
+
+func (s *MockServer) handleChangePassword(w http.ResponseWriter, r *http.Request, body []byte) {
+	var req struct {
+		NewPassword string `json:"NewPassword"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.NewPassword == "" {
+		http.Error(w, "NewPassword must not be empty", http.StatusBadRequest)
+		return
+	}
+	accountPath := strings.TrimSuffix(r.URL.Path, "/Actions/ManagerAccount.ChangePassword")
+	filePath := resolvePath(accountPath)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	account, err := s.loadResourceLocked(filePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	username, ok := account["UserName"].(string)
+	if !ok || username == "" {
+		http.Error(w, "account has no UserName", http.StatusBadRequest)
+		return
+	}
+	// Update both the auth store and the persisted resource so that a
+	// subsequent GET returns the current password.
+	s.accounts[username] = req.NewPassword
+	account["Password"] = req.NewPassword
+	s.overrides[filePath] = account
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *MockServer) handleBMCReset(w http.ResponseWriter, r *http.Request, body []byte) {
@@ -930,6 +1159,19 @@ func (s *MockServer) loadResourceLocked(filePath string) (map[string]any, error)
 	if cached, ok := s.overrides[filePath].(map[string]any); ok {
 		return deepCopy(cached), nil
 	}
+	// Collection overrides are stored as Collection structs by handleCollectionPost/handleDelete.
+	// Marshal to map[string]any so this path is uniform with the embedded-data path.
+	if col, ok := s.overrides[filePath].(Collection); ok {
+		b, err := json.Marshal(col)
+		if err != nil {
+			return nil, fmt.Errorf("%w: marshal collection: %w", errCorruptJSON, err)
+		}
+		var result map[string]any
+		if err := json.Unmarshal(b, &result); err != nil {
+			return nil, fmt.Errorf("%w: unmarshal collection: %w", errCorruptJSON, err)
+		}
+		return result, nil
+	}
 
 	data, err := dataFS.ReadFile(filePath)
 	if err != nil {
@@ -985,6 +1227,68 @@ func (s *MockServer) writeJSON(w http.ResponseWriter, status int, data any) {
 	if _, err := w.Write(resp); err != nil {
 		s.log.Error(err, "Failed to write response")
 	}
+}
+
+// SetUnavailable toggles the simulated-unavailable mode. When true every request
+// returns 503 Service Unavailable, allowing tests to verify BMC connection-error
+// handling without touching UnitTestMockUps.
+func (s *MockServer) SetUnavailable(unavailable bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.unavailable = unavailable
+}
+
+// Authenticate returns true if username/password match the stored account credentials.
+func (s *MockServer) Authenticate(username, password string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	stored, ok := s.accounts[username]
+	return ok && stored == password
+}
+
+// GetAccountNames returns the set of UserName values currently in the account
+// collection (including any created by tests). Suitable for gomega HaveKey assertions.
+func (s *MockServer) GetAccountNames() map[string]struct{} {
+	collection, err := s.loadResource("data/AccountService/Accounts/index.json")
+	if err != nil {
+		return map[string]struct{}{}
+	}
+	members, _ := collection["Members"].([]any)
+	result := make(map[string]struct{}, len(members))
+	for _, m := range members {
+		mMap, ok := m.(map[string]any)
+		if !ok {
+			continue
+		}
+		odataID, _ := mMap["@odata.id"].(string)
+		if odataID == "" {
+			continue
+		}
+		member, err := s.loadResource(resolvePath(odataID))
+		if err != nil {
+			continue
+		}
+		if uname, ok := member["UserName"].(string); ok && uname != "" {
+			result[uname] = struct{}{}
+		}
+	}
+	return result
+}
+
+// ResetAccounts clears all account-collection overrides (restoring the embedded
+// default collection) and resets the password store to defaults. Call this in
+// AfterEach to ensure a clean slate between account-related tests.
+func (s *MockServer) ResetAccounts() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetResourceFromEmbeddedLocked("data/AccountService/Accounts/index.json")
+	for key := range s.overrides {
+		if strings.HasPrefix(key, "data/AccountService/Accounts/") &&
+			key != "data/AccountService/Accounts/index.json" {
+			delete(s.overrides, key)
+		}
+	}
+	s.accounts = loadAccountsFromEmbedded()
 }
 
 // Start starts the mock server and stops on ctx cancellation.

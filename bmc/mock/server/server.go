@@ -1230,8 +1230,7 @@ func (s *MockServer) writeJSON(w http.ResponseWriter, status int, data any) {
 }
 
 // SetUnavailable toggles the simulated-unavailable mode. When true every request
-// returns 503 Service Unavailable, allowing tests to verify BMC connection-error
-// handling without touching UnitTestMockUps.
+// returns 503 Service Unavailable, allowing tests to verify BMC connection-error handling.
 func (s *MockServer) SetUnavailable(unavailable bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

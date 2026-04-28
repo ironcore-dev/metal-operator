@@ -134,7 +134,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettingsV1)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionSettingsVerified),
+					HaveField("Type", ConditionSettingsVerify),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -232,7 +232,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionSettingsVerified),
+					HaveField("Type", ConditionSettingsVerify),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -284,8 +284,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.FlowState", ContainElement(SatisfyAll(
 				HaveField("Conditions", ContainElement(SatisfyAll(
-					HaveField("Type", ConditionRebootRequired),
-					HaveField("Reason", ReasonRebootRequired),
+					HaveField("Type", ConditionSettingsRebootPostUpdate),
+					HaveField("Reason", ReasonSettingsRebootNeeded),
 					HaveField("Status", metav1.ConditionTrue)),
 				)),
 				HaveField("Name", "one"),
@@ -1449,8 +1449,8 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 					SatisfyAll(
 						HaveField("Conditions", ContainElement(
 							SatisfyAll(
-								HaveField("Type", ConditionSettingsInvalid),
-								HaveField("Reason", ReasonInvalidSettings),
+								HaveField("Type", ConditionSettingsValidationFailed),
+								HaveField("Reason", ReasonSettingsValidationFailed),
 							),
 						)),
 						HaveField("Name", "100"),
@@ -1519,7 +1519,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Eventually(Object(biosSettings)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionDuplicateKeys),
+					HaveField("Type", ConditionSettingsDuplicateKeys),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1567,7 +1567,7 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 		Eventually(Object(biosSettings2)).Should(
 			HaveField("Status.Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionDuplicateKeys),
+					HaveField("Type", ConditionSettingsDuplicateKeys),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1762,7 +1762,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", ServerMaintenanceConditionCreated),
+				HaveField("Type", ConditionServerMaintenanceCreated),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1775,18 +1775,18 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 		flowStateMatcher := SatisfyAll(
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionUpdateStarted),
+					HaveField("Type", ConditionSettingsUpdateStartTime),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionServerPowerOn),
+					HaveField("Type", ConditionSettingsServerPowerOn),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
 			HaveField("Conditions", ContainElement(
-				HaveField("Type", ConditionRebootRequired),
+				HaveField("Type", ConditionSettingsRebootPostUpdate),
 			)),
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
@@ -1796,7 +1796,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 			)),
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionSettingsVerified),
+					HaveField("Type", ConditionSettingsVerify),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1811,7 +1811,7 @@ func ensureBiosSettingsFlowCondition(biosSettings *metalv1alpha1.BIOSSettings) {
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", ServerMaintenanceConditionDeleted),
+				HaveField("Type", ConditionServerMaintenanceDeleted),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1870,7 +1870,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElement(
 			SatisfyAll(
-				HaveField("Type", ServerMaintenanceConditionCreated),
+				HaveField("Type", ConditionServerMaintenanceCreated),
 				HaveField("Status", metav1.ConditionTrue),
 			),
 		)),
@@ -1881,7 +1881,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		HaveField("Status.FlowState", ContainElement(
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionUpdateStarted),
+					HaveField("Type", ConditionSettingsUpdateStartTime),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1893,7 +1893,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		HaveField("Status.FlowState", ContainElement(
 			HaveField("Conditions", ContainElement(
 				SatisfyAll(
-					HaveField("Type", ConditionServerPowerOn),
+					HaveField("Type", ConditionSettingsServerPowerOn),
 					HaveField("Status", metav1.ConditionTrue),
 				),
 			)),
@@ -1907,12 +1907,12 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 				HaveField("Conditions", SatisfyAll(
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", ConditionRebootRequired),
+							HaveField("Type", ConditionSettingsRebootPostUpdate),
 							HaveField("Status", metav1.ConditionFalse),
 						),
 					),
-					Not(ContainElement(HaveField("Type", ConditionRebootPowerOff))),
-					Not(ContainElement(HaveField("Type", ConditionRebootPowerOn))),
+					Not(ContainElement(HaveField("Type", ConditionSettingsRebootPowerOff))),
+					Not(ContainElement(HaveField("Type", ConditionSettingsRebootPowerOn))),
 				)),
 			)),
 		)
@@ -1923,19 +1923,19 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 				HaveField("Conditions", SatisfyAll(
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", ConditionRebootRequired),
+							HaveField("Type", ConditionSettingsRebootPostUpdate),
 							HaveField("Status", metav1.ConditionTrue),
 						),
 					),
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", ConditionRebootPowerOff),
+							HaveField("Type", ConditionSettingsRebootPowerOff),
 							HaveField("Status", metav1.ConditionTrue),
 						),
 					),
 					ContainElement(
 						SatisfyAll(
-							HaveField("Type", ConditionRebootPowerOn),
+							HaveField("Type", ConditionSettingsRebootPowerOn),
 							HaveField("Status", metav1.ConditionTrue),
 						),
 					),
@@ -1961,7 +1961,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 		HaveField("Status.FlowState", ContainElements(
 			SatisfyAll(
 				HaveField("Conditions", ContainElements(
-					HaveField("Type", ConditionSettingsVerified),
+					HaveField("Type", ConditionSettingsVerify),
 					HaveField("Status", metav1.ConditionTrue),
 				)),
 			),
@@ -1971,7 +1971,7 @@ func ensureBiosSettingsCondition(biosSettings *metalv1alpha1.BIOSSettings, Reboo
 	By("Ensuring the server maintenance has been deleted")
 	Eventually(Object(biosSettings)).Should(
 		HaveField("Status.Conditions", ContainElements(
-			HaveField("Type", ServerMaintenanceConditionDeleted),
+			HaveField("Type", ConditionServerMaintenanceDeleted),
 			HaveField("Status", metav1.ConditionTrue),
 		)),
 	)

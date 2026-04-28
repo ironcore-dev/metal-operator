@@ -102,8 +102,6 @@ var _ = BeforeSuite(func() {
 
 	// set komega client
 	SetClient(k8sClient)
-
-	bmc.InitMockUp()
 })
 
 func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {

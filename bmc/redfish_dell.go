@@ -138,7 +138,11 @@ func (r *DellRedfishBMC) getManagerForOEM() (*schemas.Manager, error) {
 
 func (r *DellRedfishBMC) getCurrentBMCSettingAttribute(manager *schemas.Manager) ([]dellAttributes, error) {
 	type temp struct {
-		DellOEMData dellManagerLinksOEM `json:"Dell"`
+		Links struct {
+			Oem struct {
+				DellOEMData dellManagerLinksOEM `json:"Dell"`
+			} `json:"Oem"`
+		} `json:"Links"`
 	}
 
 	tempData := &temp{}
@@ -150,7 +154,7 @@ func (r *DellRedfishBMC) getCurrentBMCSettingAttribute(manager *schemas.Manager)
 	c := manager.GetClient()
 	bmcDellAttributes := []dellAttributes{}
 	var errs []error
-	for _, data := range tempData.DellOEMData.DellLinkAttributes {
+	for _, data := range tempData.Links.Oem.DellOEMData.DellLinkAttributes {
 		bmcDellAttribute := &dellAttributes{}
 		eTag, err := r.getObjFromURI(c, data.String(), bmcDellAttribute)
 		if err != nil {
@@ -245,16 +249,25 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 			}
 		}
 		if strings.EqualFold(string(entry.Type), string(schemas.EnumerationAttributeType)) {
+			currentVal, hasCurrentVal := mergedBMCAttributes[name]
+			if !hasCurrentVal {
+				errs = append(errs, fmt.Errorf("enum attribute '%v' not found in any DellAttributes endpoint", name))
+				continue
+			}
+			// Translate the DisplayName value reported by iDRAC to the canonical
+			// ValueName used by the registry and the PATCH payload.
+			// currentVal may be nil (iDRAC CurrentValue=null for factory-default attributes),
+			// in which case the loop below will find no match and we error accordingly.
 			for _, attrValue := range entry.Value {
-				if attrValue.ValueDisplayName == mergedBMCAttributes[name] {
+				if attrValue.ValueDisplayName == currentVal {
 					result[name] = attrValue.ValueName
 					break
 				}
 			}
 			if _, ok := result[name]; !ok {
 				errs = append(errs,
-					fmt.Errorf("current setting '%v' for key '%v' not found in possible values for it (%v)",
-						mergedBMCAttributes[name], name, entry.Value))
+					fmt.Errorf("current setting '%v' for key '%v' not found in possible values: %v",
+						currentVal, name, entry.Value))
 			}
 		} else {
 			result[name] = mergedBMCAttributes[name]

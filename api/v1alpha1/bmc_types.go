@@ -16,8 +16,8 @@ const (
 	ProtocolRedfish = "Redfish"
 	// ProtocolRedfishLocal is the RedfishLocal protocol.
 	ProtocolRedfishLocal = "RedfishLocal"
-	// ProtocolRedfishKube is the RedfishKube protocol.
-	ProtocolRedfishKube = "RedfishKube"
+	// ProtocolRedfishWithRegistryPatch is the RedfishWithRegistryPatch protocol.
+	ProtocolRedfishWithRegistryPatch = "RedfishWithRegistryPatch"
 )
 
 // BMCSpec defines the desired state of BMC

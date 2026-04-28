@@ -133,9 +133,9 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
-			case metalv1alpha1.ProtocolRedfishKube:
+			case metalv1alpha1.ProtocolRedfishWithRegistryPatch:
 				log.V(1).Info("Creating client for a kube test BMC", "Address", bmcOptions.Endpoint)
-				bmcClient, err := bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, r.Client, bmcutils.DefaultKubeNamespace)
+				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}

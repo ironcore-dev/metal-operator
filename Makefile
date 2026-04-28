@@ -23,10 +23,6 @@ GOOS    := $(shell go env GOOS)
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
 
-# Redfish emulator container
-REDFISH_CONTAINER_NAME=redfish_mockup_server
-REDFISH_CONTAINER_VERSION=latest
-
 # Use the most portable option for core detection
 NPROCS := $(shell getconf _NPROCESSORS_ONLN)
 # Add a fallback just in case the command fails
@@ -105,21 +101,21 @@ test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated 
 	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: startbmc
-startbmc: ## Start BMC emulator
-	@if [ -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
-		echo "Starting container $(REDFISH_CONTAINER_NAME)..."; \
-		docker run --rm -d -p 8000:8000 --name $(REDFISH_CONTAINER_NAME) dmtf/redfish-mockup-server:$(REDFISH_CONTAINER_VERSION); \
+startbmc: mockserver ## Start Redfish mock server
+	@if pgrep -f "$(MOCKSERVER_BIN)" > /dev/null 2>&1; then \
+		echo "Redfish mock server is already running."; \
 	else \
-		echo "Container $(REDFISH_CONTAINER_NAME) is already running."; \
+		$(MOCKSERVER_BIN) -addr :$(MOCKSERVER_PORT) & \
+		curl --silent --retry 5 --retry-connrefused http://127.0.0.1:$(MOCKSERVER_PORT)/redfish/v1 -o /dev/null && \
+		echo "Mock server ready on :$(MOCKSERVER_PORT)."; \
 	fi
 
 .PHONY: stopbmc
-stopbmc: ## Stop BMC emulator
-	@if [ ! -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
-		echo "Stopping container $(REDFISH_CONTAINER_NAME)..."; \
-		docker stop $(REDFISH_CONTAINER_NAME); \
+stopbmc: ## Stop Redfish mock server (started by startbmc)
+	@if pkill -f "$(MOCKSERVER_BIN)" 2>/dev/null; then \
+		echo "Stopped Redfish mock server."; \
 	else \
-		echo "Container $(REDFISH_CONTAINER_NAME) is not running."; \
+		echo "Redfish mock server is not running."; \
 	fi
 
 
@@ -255,6 +251,10 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p "$(LOCALBIN)"
 
+# mock BMC server settings
+MOCKSERVER_BIN  = $(LOCALBIN)/metal-operator-mockserver
+MOCKSERVER_PORT := 8000
+
 CURL_RETRIES=3
 
 ## Tool Binaries
@@ -350,6 +350,11 @@ $(CRD_REF_DOCS): $(LOCALBIN)
 kubebuilder: $(KUBEBUILDER) ## Download kubebuilder locally if necessary.
 $(KUBEBUILDER): $(LOCALBIN)
 	$(call go-install-tool,$(KUBEBUILDER),sigs.k8s.io/kubebuilder/v4,$(KUBEBUILDER_VERSION))
+
+.PHONY: mockserver
+mockserver: $(MOCKSERVER_BIN) ## Build mock Redfish server locally if necessary.
+$(MOCKSERVER_BIN): $(LOCALBIN)
+	go build -o $(MOCKSERVER_BIN) ./bmc/mock/main.go
 
 .PHONY: metalctl
 metalctl: $(METALCTL) ## Build metalctl locally if necessary.

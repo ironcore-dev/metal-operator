@@ -14,7 +14,7 @@ spec:
         - mountPath: /etc/macdb/
           name: macdb
       - name: redfish
-        image: dmtf/redfish-mockup-server:latest
+        image: mock-server:latest
         ports:
         - containerPort: 8000
       securityContext:

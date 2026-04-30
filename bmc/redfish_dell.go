@@ -248,13 +248,14 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 				continue
 			}
 		}
+		currentVal, hasCurrentVal := mergedBMCAttributes[name]
+		if !hasCurrentVal {
+			errs = append(errs, fmt.Errorf("attribute '%v' not found in any DellAttributes endpoint", name))
+			continue
+		}
+
 		switch entry.Type {
 		case schemas.EnumerationAttributeType:
-			currentVal, hasCurrentVal := mergedBMCAttributes[name]
-			if !hasCurrentVal {
-				errs = append(errs, fmt.Errorf("enum attribute '%v' not found in any DellAttributes endpoint", name))
-				continue
-			}
 			// Translate the DisplayName value reported by iDRAC to the canonical
 			// ValueName used by the registry and the PATCH payload.
 			// currentVal may be nil (iDRAC CurrentValue=null for factory-default attributes),
@@ -274,13 +275,13 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 			// Convert raw JSON value to the correct Go type based on registry metadata.
 			// JSON numbers unmarshal as float64 into map[string]any; convert to int
 			// for IntegerAttributeType so downstream validation (checkAttributes) passes.
-			if f, ok := mergedBMCAttributes[name].(float64); ok {
+			if f, ok := currentVal.(float64); ok {
 				result[name] = int(f)
 			} else {
-				result[name] = mergedBMCAttributes[name]
+				result[name] = currentVal
 			}
 		default:
-			result[name] = mergedBMCAttributes[name]
+			result[name] = currentVal
 		}
 	}
 	if len(errs) > 0 {

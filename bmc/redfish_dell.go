@@ -248,7 +248,8 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 				continue
 			}
 		}
-		if strings.EqualFold(string(entry.Type), string(schemas.EnumerationAttributeType)) {
+		switch entry.Type {
+		case schemas.EnumerationAttributeType:
 			currentVal, hasCurrentVal := mergedBMCAttributes[name]
 			if !hasCurrentVal {
 				errs = append(errs, fmt.Errorf("enum attribute '%v' not found in any DellAttributes endpoint", name))
@@ -269,20 +270,17 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 					fmt.Errorf("current setting '%v' for key '%v' not found in possible values: %v",
 						currentVal, name, entry.Value))
 			}
-		} else {
+		case schemas.IntegerAttributeType:
 			// Convert raw JSON value to the correct Go type based on registry metadata.
 			// JSON numbers unmarshal as float64 into map[string]any; convert to int
 			// for IntegerAttributeType so downstream validation (checkAttributes) passes.
-			switch entry.Type {
-			case schemas.IntegerAttributeType:
-				if f, ok := mergedBMCAttributes[name].(float64); ok {
-					result[name] = int(f)
-				} else {
-					result[name] = mergedBMCAttributes[name]
-				}
-			default:
+			if f, ok := mergedBMCAttributes[name].(float64); ok {
+				result[name] = int(f)
+			} else {
 				result[name] = mergedBMCAttributes[name]
 			}
+		default:
+			result[name] = mergedBMCAttributes[name]
 		}
 	}
 	if len(errs) > 0 {

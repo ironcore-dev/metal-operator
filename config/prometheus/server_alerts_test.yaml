@@ -1,0 +1,164 @@
+# promtool test rules config/prometheus/server_alerts_test.yaml
+# Rules are extracted from server_alerts.yaml (PrometheusRule CRD) at test time
+rule_files:
+  - /tmp/server_alerts_rules.yaml
+
+evaluation_interval: 30s
+
+tests:
+  # Test: ServersInErrorState fires for specific server
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_state{server="srv-error-01", state="Error"}'
+        values: "1 1 1 1 1"
+      - series: 'metal_server_state{server="srv-ok-01", state="Available"}'
+        values: "1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ServersInErrorState
+        exp_alerts:
+          - exp_labels:
+              server: srv-error-01
+              state: Error
+              severity: critical
+            exp_annotations:
+              summary: "Server srv-error-01 is in Error state"
+              description: "Server srv-error-01 is in Error state and requires attention"
+
+  # Test: ServersPoweringOnTooLong fires for specific server
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_power_state{server="srv-stuck-01", power_state="PoweringOn"}'
+        values: "1 1 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ServersPoweringOnTooLong
+        exp_alerts:
+          - exp_labels:
+              server: srv-stuck-01
+              power_state: PoweringOn
+              severity: warning
+            exp_annotations:
+              summary: "Server srv-stuck-01 stuck in PoweringOn state"
+              description: "Server srv-stuck-01 has been in PoweringOn state for over 10 minutes"
+
+  # Test: ServersPoweringOffTooLong fires for specific server
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_power_state{server="srv-stuck-02", power_state="PoweringOff"}'
+        values: "1 1 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ServersPoweringOffTooLong
+        exp_alerts:
+          - exp_labels:
+              server: srv-stuck-02
+              power_state: PoweringOff
+              severity: warning
+            exp_annotations:
+              summary: "Server srv-stuck-02 stuck in PoweringOff state"
+              description: "Server srv-stuck-02 has been in PoweringOff state for over 10 minutes"
+
+  # Test: NoAvailableServers fires when no Available or Reserved servers
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_state{server="srv-01", state="Error"}'
+        values: "1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NoAvailableServers
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "No available or reserved servers in the fleet"
+              description: "The fleet is completely idle with no servers in Available or Reserved state"
+
+  # Test: NoAvailableServers does NOT fire when Available servers exist
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_state{server="srv-01", state="Available"}'
+        values: "1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NoAvailableServers
+        exp_alerts: []
+
+  # Test: NoAvailableServers does NOT fire when Reserved servers exist
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_state{server="srv-01", state="Reserved"}'
+        values: "1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NoAvailableServers
+        exp_alerts: []
+
+  # Test: LowAvailableServerCapacity fires when only 1 server available
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_state{server="srv-01", state="Available"}'
+        values: "1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: LowAvailableServerCapacity
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Low available server capacity"
+              description: "Only 1 server(s) are available"
+
+  # Test: LowAvailableServerCapacity does NOT fire when 2+ servers available
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_state{server="srv-01", state="Available"}'
+        values: "1 1 1 1 1 1 1"
+      - series: 'metal_server_state{server="srv-02", state="Available"}'
+        values: "1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: LowAvailableServerCapacity
+        exp_alerts: []
+
+  # Test: ServerMetricsMissing fires when scrape is down
+  - interval: 1m
+    input_series:
+      - series: 'up{job="metal-operator"}'
+        values: "0 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ServerMetricsMissing
+        exp_alerts:
+          - exp_labels:
+              job: metal-operator
+              severity: critical
+            exp_annotations:
+              summary: "Metal-operator scrape is failing"
+              description: "Prometheus cannot scrape the metal-operator metrics endpoint - check operator health and network connectivity"
+
+  # Test: Multiple servers in Error state fire separate alerts
+  - interval: 1m
+    input_series:
+      - series: 'metal_server_state{server="srv-error-01", state="Error"}'
+        values: "1 1 1 1 1"
+      - series: 'metal_server_state{server="srv-error-02", state="Error"}'
+        values: "1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ServersInErrorState
+        exp_alerts:
+          - exp_labels:
+              server: srv-error-01
+              state: Error
+              severity: critical
+            exp_annotations:
+              summary: "Server srv-error-01 is in Error state"
+              description: "Server srv-error-01 is in Error state and requires attention"
+          - exp_labels:
+              server: srv-error-02
+              state: Error
+              severity: critical
+            exp_annotations:
+              summary: "Server srv-error-02 is in Error state"
+              description: "Server srv-error-02 is in Error state and requires attention"

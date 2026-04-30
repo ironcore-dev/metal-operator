@@ -1,0 +1,26 @@
+name: Test Alerts
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "config/prometheus/**"
+
+jobs:
+  test-alerts:
+    name: Test Prometheus alert rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check alert rules syntax
+        run: make check-alerts
+
+      - name: Run alert rule tests
+        run: make test-alerts

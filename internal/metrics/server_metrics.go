@@ -13,6 +13,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+// AllServerStates defines all possible server states for enum metrics
+var AllServerStates = []metalv1alpha1.ServerState{
+	metalv1alpha1.ServerStateInitial,
+	metalv1alpha1.ServerStateDiscovery,
+	metalv1alpha1.ServerStateAvailable,
+	metalv1alpha1.ServerStateReserved,
+	metalv1alpha1.ServerStateError,
+	metalv1alpha1.ServerStateMaintenance,
+}
+
+// AllServerPowerStates defines all possible server power states for enum metrics
+var AllServerPowerStates = []metalv1alpha1.ServerPowerState{
+	metalv1alpha1.ServerOnPowerState,
+	metalv1alpha1.ServerOffPowerState,
+	metalv1alpha1.ServerPausedPowerState,
+	metalv1alpha1.ServerPoweringOnPowerState,
+	metalv1alpha1.ServerPoweringOffPowerState,
+}
+
 var (
 	// ServerReconciliationTotal tracks reconciliation operations by result
 	ServerReconciliationTotal = prometheus.NewCounterVec(
@@ -47,20 +66,20 @@ func NewServerStateCollector(c client.Client) *ServerStateCollector {
 		Client: c,
 		stateDesc: prometheus.NewDesc(
 			"metal_server_state",
-			"Current count of servers in each state",
-			[]string{"state"},
+			"Server state as enum metric (1 for current state, 0 for others)",
+			[]string{"server", "state"},
 			nil,
 		),
 		powerStateDesc: prometheus.NewDesc(
 			"metal_server_power_state",
-			"Current count of servers in each power state",
-			[]string{"power_state"},
+			"Server power state as enum metric (1 for current state, 0 for others)",
+			[]string{"server", "power_state"},
 			nil,
 		),
 		conditionDesc: prometheus.NewDesc(
 			"metal_server_condition_status",
-			"Count of servers with each condition status",
-			[]string{"condition_type", "status"},
+			"Current condition status of a server (value is always 1)",
+			[]string{"server", "condition_type", "status"},
 			nil,
 		),
 	}
@@ -74,8 +93,9 @@ func (c *ServerStateCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.conditionDesc
 }
 
-// Collect is called by Prometheus when collecting metrics.
-// It queries all servers and emits aggregated metrics.
+// Collect is called by Prometheus when scraping metrics.
+// It queries all Server resources and emits enum metrics for state and power state
+// (1 for current state, 0 for all other states), plus condition metrics.
 func (c *ServerStateCollector) Collect(ch chan<- prometheus.Metric) {
 	// Add 5-second timeout for metrics collection to prevent hanging scrapes
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -90,63 +110,48 @@ func (c *ServerStateCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	// Count servers by state
-	stateCounts := make(map[string]float64)
-	powerStateCounts := make(map[string]float64)
-	conditionCounts := make(map[string]map[string]float64)
-
 	for _, server := range servers.Items {
-		// Count by server state
-		if server.Status.State != "" {
-			stateCounts[string(server.Status.State)]++
-		}
+		serverName := server.Name
 
-		// Count by power state
-		if server.Status.PowerState != "" {
-			powerStateCounts[string(server.Status.PowerState)]++
-		}
-
-		// Count by condition status
-		for _, condition := range server.Status.Conditions {
-			conditionType := condition.Type
-			status := string(condition.Status)
-
-			if conditionCounts[conditionType] == nil {
-				conditionCounts[conditionType] = make(map[string]float64)
+		// Emit enum metrics for all possible states (1 for current, 0 for others)
+		for _, state := range AllServerStates {
+			value := 0.0
+			if server.Status.State == state {
+				value = 1.0
 			}
-			conditionCounts[conditionType][status]++
+			ch <- prometheus.MustNewConstMetric(
+				c.stateDesc,
+				prometheus.GaugeValue,
+				value,
+				serverName,
+				string(state),
+			)
 		}
-	}
 
-	// Emit state metrics
-	for state, count := range stateCounts {
-		ch <- prometheus.MustNewConstMetric(
-			c.stateDesc,
-			prometheus.GaugeValue,
-			count,
-			state,
-		)
-	}
+		// Emit enum metrics for all possible power states (1 for current, 0 for others)
+		for _, powerState := range AllServerPowerStates {
+			value := 0.0
+			if server.Status.PowerState == powerState {
+				value = 1.0
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.powerStateDesc,
+				prometheus.GaugeValue,
+				value,
+				serverName,
+				string(powerState),
+			)
+		}
 
-	// Emit power state metrics
-	for powerState, count := range powerStateCounts {
-		ch <- prometheus.MustNewConstMetric(
-			c.powerStateDesc,
-			prometheus.GaugeValue,
-			count,
-			powerState,
-		)
-	}
-
-	// Emit condition metrics with server counts
-	for conditionType, statusMap := range conditionCounts {
-		for status, count := range statusMap {
+		// Emit per-server condition metrics
+		for _, condition := range server.Status.Conditions {
 			ch <- prometheus.MustNewConstMetric(
 				c.conditionDesc,
 				prometheus.GaugeValue,
-				count,
-				conditionType,
-				status,
+				1,
+				serverName,
+				condition.Type,
+				string(condition.Status),
 			)
 		}
 	}

@@ -188,7 +188,9 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, bmcClient bmc.BMC, en
 			Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),
 			Port: m.Console.Port,
 		}
-		spec.BMCUUID = bmcUUID
+		if bmcUUID != "" {
+			spec.BMCUUID = bmcUUID
+		}
 		return controllerutil.SetControllerReference(endpoint, bmcObj, r.Client.Scheme())
 	})
 	if err != nil {

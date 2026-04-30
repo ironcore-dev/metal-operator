@@ -270,7 +270,19 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 						currentVal, name, entry.Value))
 			}
 		} else {
-			result[name] = mergedBMCAttributes[name]
+			// Convert raw JSON value to the correct Go type based on registry metadata.
+			// JSON numbers unmarshal as float64 into map[string]any; convert to int
+			// for IntegerAttributeType so downstream validation (checkAttributes) passes.
+			switch entry.Type {
+			case schemas.IntegerAttributeType:
+				if f, ok := mergedBMCAttributes[name].(float64); ok {
+					result[name] = int(f)
+				} else {
+					result[name] = mergedBMCAttributes[name]
+				}
+			default:
+				result[name] = mergedBMCAttributes[name]
+			}
 		}
 	}
 	if len(errs) > 0 {

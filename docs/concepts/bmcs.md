@@ -92,7 +92,11 @@ power state.
 
 3. **Update BMCStatus**: Populates the `status` field of the BMC resource with the retrieved information.
 
-4. **Detect Managed Systems**: Identifies all systems (servers) that the BMC manages.
+4. **Detect Managed Systems**: Identifies all systems (servers) that the BMC manages. During detection, systems are 
+filtered to exclude non-bootable entries: any system that does not report a `BootSourceOverrideTarget` in its Redfish 
+Boot configuration is considered non-bootable and is skipped. This filters out auxiliary system entries (e.g. virtual 
+or management subsystems) that appear in the Redfish system collection but do not represent physical servers capable 
+of booting an operating system.
 
 5. **Create Server Resources**: For each detected system, the `BMCReconciler` creates a corresponding [`Server`](servers.md)
 resource to represent the physical server.

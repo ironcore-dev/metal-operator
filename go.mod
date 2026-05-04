@@ -7,7 +7,7 @@ require (
 	github.com/ironcore-dev/controller-utils v0.11.0
 	github.com/jaypipes/ghw v0.24.0
 	github.com/onsi/ginkgo/v2 v2.28.2
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/gomega v1.40.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/safchain/ethtool v0.7.0

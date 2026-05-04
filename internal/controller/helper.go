@@ -32,17 +32,6 @@ import (
 
 const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
-
-	RetryOfFailedResourceConditionIssued = "RetryOfFailedResourceConditionIssued"
-	RetryOfFailedResourceReasonIssued    = "RetryOfFailedResourceReasonIssued"
-
-	ServerMaintenanceConditionCreated = "ServerMaintenanceCreated"
-	ServerMaintenanceReasonCreated    = "ServerMaintenanceHasBeenCreated"
-	ServerMaintenanceConditionDeleted = "ServerMaintenanceDeleted"
-	ServerMaintenanceReasonDeleted    = "ServerMaintenanceHasBeenDeleted"
-	ServerMaintenanceConditionWaiting = "ServerMaintenanceWaiting"
-	ServerMaintenanceReasonWaiting    = "ServerMaintenanceWaitingOnApproval"
-	ServerMaintenanceReasonApproved   = "ServerMaintenanceApproval"
 )
 
 type BMCTaskFetchFailedError struct {
@@ -379,7 +368,7 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 					conditions, ok := conditionsField.Interface().([]metav1.Condition)
 					if ok {
 						acc := conditionutils.NewAccessor(conditionutils.AccessorOptions{})
-						retriedCondition, err := GetCondition(acc, conditions, RetryOfFailedResourceConditionIssued)
+						retriedCondition, err := GetCondition(acc, conditions, ConditionRetryOfFailedResourceIssued)
 
 						if err == nil && retriedCondition != nil &&
 							retriedCondition.Status == metav1.ConditionTrue &&
@@ -638,7 +627,7 @@ func resolveTransferProtocol(image metalv1alpha1.ImageSpec, supportedProtocols [
 	primaryUpper := strings.ToUpper(image.TransferProtocol)
 	for _, supported := range supportedProtocols {
 		if strings.ToUpper(supported) == primaryUpper {
-			return image.TransferProtocol, image.URI, nil
+			return supported, image.URI, nil
 		}
 	}
 
@@ -647,7 +636,7 @@ func resolveTransferProtocol(image metalv1alpha1.ImageSpec, supportedProtocols [
 		fallbackUpper := strings.ToUpper(image.FallbackTransferProtocol)
 		for _, supported := range supportedProtocols {
 			if strings.ToUpper(supported) == fallbackUpper {
-				return image.FallbackTransferProtocol, image.FallbackURI, nil
+				return supported, image.FallbackURI, nil
 			}
 		}
 		return "", "", fmt.Errorf(

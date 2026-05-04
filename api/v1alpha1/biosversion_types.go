@@ -66,7 +66,7 @@ type BIOSVersionSpec struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.fallbackTransferProtocol) || (has(self.transferProtocol) && size(self.transferProtocol) > 0)",message="fallbackTransferProtocol requires a non-empty transferProtocol"
-// +kubebuilder:validation:XValidation:rule="(has(self.fallbackTransferProtocol) && has(self.fallbackURI)) || (!has(self.fallbackTransferProtocol) && !has(self.fallbackURI))",message="fallbackTransferProtocol and fallbackURI must both be set or both be unset"
+// +kubebuilder:validation:XValidation:rule="(has(self.fallbackTransferProtocol) && size(self.fallbackTransferProtocol) > 0 && has(self.fallbackURI) && size(self.fallbackURI) > 0) || (!has(self.fallbackTransferProtocol) && !has(self.fallbackURI))",message="fallbackTransferProtocol and fallbackURI must both be set to non-empty values or both be unset"
 type ImageSpec struct {
 	// SecretRef is a reference to the Secret containing the credentials to access the image URI.
 	// +optional

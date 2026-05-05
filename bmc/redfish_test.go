@@ -173,6 +173,37 @@ var _ = Describe("RedfishBaseBMC DiscoverManager", func() {
 		Expect(manager.GraphicalConsole.MaxConcurrentSessions).To(BeNumerically(">", 0))
 	})
 
+	It("should deterministically select the manager with the smallest ODataID when multiple candidates match", func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootJSON()) //nolint:errcheck
+		})
+		// List managers in reverse alphabetical order to verify sorting
+		mux.HandleFunc("/redfish/v1/Managers", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(managersCollectionJSON([]string{"/redfish/v1/Managers/Z-BMC", "/redfish/v1/Managers/A-BMC"})) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/Managers/Z-BMC", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(managerJSON("Z-BMC", 4, []string{"KVMIP"})) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/Managers/A-BMC", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(managerJSON("A-BMC", 2, []string{"KVMIP"})) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		manager, err := bmc.DiscoverManager(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(manager).NotTo(BeNil())
+		// Should select A-BMC (lexicographically smallest ODataID) despite Z-BMC being listed first
+		Expect(manager.ID).To(Equal("A-BMC"))
+	})
+
 	It("should return an error when no managers have graphical console capabilities", func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {

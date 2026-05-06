@@ -42,7 +42,8 @@ type BMCUserReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcusers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile reconciles a BMCUser object
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *BMCUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	user := &metalv1alpha1.BMCUser{}
 	if err := r.Get(ctx, req.NamespacedName, user); err != nil {

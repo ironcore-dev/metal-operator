@@ -15,7 +15,9 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -111,7 +113,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -129,7 +131,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied local test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -147,7 +149,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied kube test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -162,8 +164,31 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+func (r *EndpointReconciler) applyBMC(ctx context.Context, bmcClient bmc.BMC, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
 	log := ctrl.LoggerFrom(ctx)
+
+	// Check whether the existing BMC object already has a UUID persisted.
+	var bmcUUID string
+	existingBMC := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, types.NamespacedName{Name: endpoint.Name}, existingBMC); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get existing BMC: %w", err)
+		}
+	} else {
+		bmcUUID = existingBMC.Spec.BMCUUID
+	}
+
+	// Only call DiscoverManager when UUID is not yet known.
+	if bmcUUID == "" {
+		manager, err := bmcClient.DiscoverManager(ctx)
+		if err != nil {
+			log.V(1).Info("Could not determine manager UUID, proceeding without it", "error", err)
+		} else {
+			bmcUUID = manager.UUID
+			log.V(1).Info("Got manager from BMC client", "ManagerUUID", bmcUUID)
+		}
+	}
+
 	bmcObj := &metalv1alpha1.BMC{}
 	bmcObj.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, func() error {
@@ -178,6 +203,9 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alph
 		spec.ConsoleProtocol = &metalv1alpha1.ConsoleProtocol{
 			Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),
 			Port: m.Console.Port,
+		}
+		if bmcUUID != "" {
+			spec.BMCUUID = bmcUUID
 		}
 		return controllerutil.SetControllerReference(endpoint, bmcObj, r.Client.Scheme())
 	})

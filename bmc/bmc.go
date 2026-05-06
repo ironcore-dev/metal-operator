@@ -57,6 +57,9 @@ type BMC interface {
 	// GetManager returns the manager
 	GetManager(UUID string) (*schemas.Manager, error)
 
+	// DiscoverManager returns the first manager that exposes graphical console capabilities.
+	DiscoverManager(ctx context.Context) (*schemas.Manager, error)
+
 	// ResetManager performs a reset on the Manager.
 	ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error
 

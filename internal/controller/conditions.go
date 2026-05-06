@@ -51,6 +51,8 @@ const (
 	ReasonVersionUpgradePending = "VersionUpgradePending"
 	// ReasonResetIssued indicates a reset has been issued.
 	ReasonResetIssued = "ResetIssued"
+	// ReasonResetRequired indicates a BMC reset is needed but not yet issued.
+	ReasonResetRequired = "ResetRequired"
 	// ReasonAuthenticationFailed indicates authentication has failed.
 	ReasonAuthenticationFailed = "AuthenticationFailed"
 	// ReasonInternalError indicates an internal server error.

@@ -82,6 +82,8 @@ var legacyBMCSettingsConditionReasons = map[string]string{
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *BMCSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	settings := &metalv1alpha1.BMCSettings{}
 	if err := r.Get(ctx, req.NamespacedName, settings); err != nil {

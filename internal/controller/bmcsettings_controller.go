@@ -430,8 +430,8 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 		return ctrl.Result{}, fmt.Errorf("failed to get condition for settings changes issued: %w", err)
 	}
 
-	if changesIssued.Reason != ReasonBMCSettingsChangesIssued {
-		// Settings not yet issued — apply them now.
+	if changesIssued.Reason != ReasonBMCSettingsChangesIssued || changesIssued.ObservedGeneration < settings.Generation {
+		// Settings not yet issued, or spec changed since last apply — (re-)apply them now.
 		if ok, err := r.handleBMCPowerState(ctx, bmcObj, settings); err != nil || ok {
 			return ctrl.Result{}, err
 		}
@@ -476,6 +476,7 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
 				conditionutils.UpdateReason(ReasonBMCSettingsChangesIssued),
 				conditionutils.UpdateMessage("BMC settings have been issued on the server's BMC"),
+				conditionutils.UpdateObserved(settings),
 			); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update BMCSettings Applied condition: %w", err)
 			}
@@ -566,8 +567,8 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(ctx context.Context, s
 		return fmt.Errorf("failed to fetch and check BMCSettings: %w", err)
 	}
 	if len(settingsDiff) > 0 {
-		// Drift detected — clear the "changes issued" gate so the next InProgress
-		// reconcile will re-enter the apply phase.
+		// Drift detected — clear the "changes issued" and "changes verified" gates
+		// so the next InProgress reconcile will re-enter the apply phase.
 		changesIssued, errCond := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsChangesIssued)
 		if errCond != nil {
 			return fmt.Errorf("failed to get condition for settings changes issued: %w", errCond)
@@ -580,7 +581,22 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(ctx context.Context, s
 		); err != nil {
 			return fmt.Errorf("failed to clear settings changes issued condition: %w", err)
 		}
-		return r.updateBMCSettingsStatus(ctx, settings, "", changesIssued)
+		changesVerified, errCond := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsChangesVerified)
+		if errCond != nil {
+			return fmt.Errorf("failed to get condition for settings changes verified: %w", errCond)
+		}
+		if err := r.Conditions.Update(
+			changesVerified,
+			conditionutils.UpdateStatus(corev1.ConditionFalse),
+			conditionutils.UpdateReason("DriftDetected"),
+			conditionutils.UpdateMessage("Settings drift detected, re-apply needed"),
+		); err != nil {
+			return fmt.Errorf("failed to clear settings changes verified condition: %w", err)
+		}
+		if err := r.updateBMCSettingsStatus(ctx, settings, "", changesIssued); err != nil {
+			return fmt.Errorf("failed to persist settings changes issued condition: %w", err)
+		}
+		return r.updateBMCSettingsStatus(ctx, settings, settings.Status.State, changesVerified)
 	}
 
 	log.V(1).Info("Done with BMC setting update", "BMCSetting", settings.Name, "BMC", bmcObj.Name)
@@ -1178,12 +1194,18 @@ func (r *BMCSettingsReconciler) updateBMCSettingsStatus(ctx context.Context, set
 	settings.Status.State = state
 
 	if condition != nil {
-		if err := r.Conditions.UpdateSlice(
-			&settings.Status.Conditions,
-			condition.Type,
+		updateOpts := []conditionutils.UpdateOption{
 			conditionutils.UpdateStatus(condition.Status),
 			conditionutils.UpdateReason(condition.Reason),
 			conditionutils.UpdateMessage(condition.Message),
+		}
+		if condition.ObservedGeneration > 0 {
+			updateOpts = append(updateOpts, conditionutils.UpdateObservedGeneration(condition.ObservedGeneration))
+		}
+		if err := r.Conditions.UpdateSlice(
+			&settings.Status.Conditions,
+			condition.Type,
+			updateOpts...,
 		); err != nil {
 			return fmt.Errorf("failed to patch BMCSettings condition: %w", err)
 		}

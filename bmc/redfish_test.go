@@ -446,4 +446,68 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/2"))
 	})
+
+	It("should find subscription even if some other subscriptions fail to fetch (CollectionError)", func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(eventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{ //nolint:errcheck
+				"/redfish/v1/EventService/Subscriptions/1", // will return 500
+				"/redfish/v1/EventService/Subscriptions/2", // this is the one we want
+			}))
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/1", func(w http.ResponseWriter, _ *http.Request) {
+			// Simulate a subscription that fails to fetch (causes CollectionError)
+			w.WriteHeader(http.StatusInternalServerError)
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/2", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionJSON("2", "http://operator/serverevents/alerts/node1", "metal-operator")) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/2"))
+	})
+
+	It("should return 'not found' when subscription collection endpoint itself fails", func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(eventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, _ *http.Request) {
+			// Simulate the subscriptions collection endpoint itself being unavailable.
+			// Note: gofish wraps this too as a CollectionError (the collection URI is
+			// added as a failure), so ev.Subscriptions() returns an empty slice +
+			// CollectionError. We tolerate CollectionError, find no subscriptions,
+			// and return "not found".
+			w.WriteHeader(http.StatusForbidden)
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("existing subscription not found"))
+		Expect(link).To(BeEmpty())
+	})
 })

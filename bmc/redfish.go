@@ -1133,7 +1133,15 @@ func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, e
 	// Get all subscriptions
 	subscriptions, err := ev.Subscriptions()
 	if err != nil {
-		return "", fmt.Errorf("failed to list subscriptions: %w", err)
+		// CollectionError means some members failed to fetch but others may have succeeded.
+		// Gofish also wraps a failure on the collection endpoint itself as a CollectionError
+		// (the collection URI is added as a failure entry), so we cannot distinguish between
+		// "collection endpoint unreachable" and "some members failed". Proceed with whatever
+		// was returned; only bail on other error types.
+		var collErr *schemas.CollectionError
+		if !errors.As(err, &collErr) {
+			return "", fmt.Errorf("failed to list subscriptions: %w", err)
+		}
 	}
 
 	// Find subscription matching our destination and context

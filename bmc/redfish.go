@@ -1093,7 +1093,7 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
 					strings.Contains(info.MessageId, "PropertyValueModified") {
 					// Handle duplicate subscription - try to find existing one
-					if existingLink, findErr := r.findExistingSubscription(destination, eventFormatType); findErr == nil {
+					if existingLink, findErr := r.findExistingSubscription(destination); findErr == nil {
 						// Successfully found existing subscription
 						return existingLink, nil
 					}
@@ -1121,10 +1121,9 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 
 // findExistingSubscription queries the BMC for an existing subscription with the given destination.
 // Returns the subscription URI if found, error otherwise.
-func (r *RedfishBaseBMC) findExistingSubscription(
-	destination string,
-	eventFormatType schemas.EventFormatType,
-) (string, error) {
+// Matches by Destination + Context ("metal-operator") rather than EventFormatType,
+// because many BMCs do not return EventFormatType in subscription responses.
+func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, error) {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {
@@ -1137,9 +1136,9 @@ func (r *RedfishBaseBMC) findExistingSubscription(
 		return "", fmt.Errorf("failed to list subscriptions: %w", err)
 	}
 
-	// Find subscription matching our destination and event format
+	// Find subscription matching our destination and context
 	for _, sub := range subscriptions {
-		if sub.Destination == destination && sub.EventFormatType == eventFormatType {
+		if sub.Destination == destination && sub.Context == "metal-operator" {
 			// Extract URI from OData ID
 			if sub.ODataID != "" {
 				return sub.ODataID, nil

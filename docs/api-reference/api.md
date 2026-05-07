@@ -8,7 +8,7 @@
 
 Package v1alpha1 contains API Schema definitions for the metal.ironcore.dev API group
 
-Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API group
+Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API group.
 
 ### Resource Types
 - [BIOSSettings](#biossettings)

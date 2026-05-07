@@ -1093,13 +1093,11 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
 					strings.Contains(info.MessageId, "PropertyValueModified") {
 					// Handle duplicate subscription - try to find existing one
-					if existingLink, findErr := r.findExistingSubscription(destination); findErr == nil {
-						// Successfully found existing subscription
+					existingLink, findErr := r.findExistingSubscription(destination)
+					if findErr == nil {
 						return existingLink, nil
 					}
-					// Failed to find existing subscription - fall through to return original error
-					// This preserves the detailed Redfish error message for troubleshooting
-					break
+					return "", fmt.Errorf("failed to recover existing subscription (%w) after duplicate error: %s", findErr, string(bodyBytes))
 				}
 			}
 		}

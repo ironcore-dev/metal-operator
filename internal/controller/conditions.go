@@ -53,6 +53,8 @@ const (
 	ReasonResetIssued = "ResetIssued"
 	// ReasonResetRequired indicates a BMC reset is needed but not yet issued.
 	ReasonResetRequired = "ResetRequired"
+	// ReasonNoResetRequired indicates no BMC reset is needed for this apply cycle.
+	ReasonNoResetRequired = "NoResetRequired"
 	// ReasonAuthenticationFailed indicates authentication has failed.
 	ReasonAuthenticationFailed = "AuthenticationFailed"
 	// ReasonInternalError indicates an internal server error.

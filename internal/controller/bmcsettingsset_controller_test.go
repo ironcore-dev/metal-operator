@@ -164,9 +164,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
-						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsMap:             bmcSetting,
+						BaseTemplate: metalv1alpha1.BaseTemplate{
+							Version:                 "1.45.455b66-rev4",
+							ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						},
+						SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+							SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+						},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -190,7 +195,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc01.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
+				HaveField("Spec.SettingsFlow", ContainElement(HaveField("Settings", HaveKeyWithValue("abc", changedBMCSetting)))),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",
@@ -242,9 +247,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
-						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsMap:             bmcSetting,
+						BaseTemplate: metalv1alpha1.BaseTemplate{
+							Version:                 "1.45.455b66-rev4",
+							ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						},
+						SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+							SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+						},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -268,7 +278,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc01.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
+				HaveField("Spec.SettingsFlow", ContainElement(HaveField("Settings", HaveKeyWithValue("abc", changedBMCSetting)))),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",
@@ -330,9 +340,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
-						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsMap:             bmcSetting,
+						BaseTemplate: metalv1alpha1.BaseTemplate{
+							Version:                 "1.45.455b66-rev4",
+							ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						},
+						SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+							SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+						},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -377,7 +392,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings02)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc02.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
+				HaveField("Spec.SettingsFlow", ContainElement(HaveField("Settings", HaveKeyWithValue("abc", changedBMCSetting)))),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",
@@ -428,9 +443,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
-						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsMap:             bmcSetting,
+						BaseTemplate: metalv1alpha1.BaseTemplate{
+							Version:                 "1.45.455b66-rev4",
+							ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						},
+						SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+							SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+						},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -453,7 +473,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			Eventually(Object(bmcSettings01)).Should(SatisfyAll(
 				HaveField("Spec.BMCRef.Name", Equal(bmc01.Name)),
 				HaveField("Spec.Version", Equal(bmcSettingsSet.Spec.BMCSettingsTemplate.Version)),
-				HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", changedBMCSetting)),
+				HaveField("Spec.SettingsFlow", ContainElement(HaveField("Settings", HaveKeyWithValue("abc", changedBMCSetting)))),
 				HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
 					APIVersion:         "metal.ironcore.dev/v1alpha1",
 					Kind:               "BMCSettingsSet",
@@ -483,12 +503,12 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 
 			By("Updating the BMCSettingsSet template")
 			Eventually(Update(bmcSettingsSet, func() {
-				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsMap = bmcSettingNew
+				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsTemplate.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSettingNew}}
 			})).Should(Succeed())
 
 			By("Checking if the bmcSettings was updated")
 			Eventually(Object(bmcSettings01)).Should(HaveField("Spec.Version", Equal("1.45.455b66-rev4")))
-			Eventually(Object(bmcSettings01)).Should(HaveField("Spec.SettingsMap", HaveKeyWithValue("abc", "new-bmc-setting")))
+			Eventually(Object(bmcSettings01)).Should(HaveField("Spec.SettingsFlow", ContainElement(HaveField("Settings", HaveKeyWithValue("abc", "new-bmc-setting")))))
 			// Ensure the bmcSettings are in a deletable state
 			Eventually(Object(bmcSettings01)).Should(HaveField("Status.State", Equal(metalv1alpha1.BMCSettingsStateApplied)))
 
@@ -530,9 +550,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					GenerateName: "test-bmcsettingsset1-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
-						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsMap:             bmcSetting,
+						BaseTemplate: metalv1alpha1.BaseTemplate{
+							Version:                 "1.45.455b66-rev4",
+							ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						},
+						SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+							SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+						},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -567,9 +592,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					GenerateName: "test-bmcsettingsset2-"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
-						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsMap:             bmcSetting,
+						BaseTemplate: metalv1alpha1.BaseTemplate{
+							Version:                 "1.45.455b66-rev4",
+							ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						},
+						SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+							SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+						},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -691,10 +721,15 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					GenerateName: "test-bmcsettingsset"},
 				Spec: metalv1alpha1.BMCSettingsSetSpec{
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
-						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-						SettingsMap:             bmcSetting,
-						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+						BaseTemplate: metalv1alpha1.BaseTemplate{
+							Version:                 "1.45.455b66-rev4",
+							ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+							RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+						},
+						SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+							SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+						},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -779,8 +814,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			By("Updating the BMCSettingsSet with NO retry annotation")
 			Eventually(Update(bmcSettingsSet, func() {
 				delete(bmcSettingsSet.GetAnnotations(), metalv1alpha1.OperationAnnotation)
-				delete(bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsMap, "UnknownSettings")
-				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsMap["abc"] = changedBMCSetting
+				delete(bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsFlow[0].Settings, "UnknownSettings")
+				bmcSettingsSet.Spec.BMCSettingsTemplate.SettingsFlow[0].Settings["abc"] = changedBMCSetting
 			})).Should(Succeed())
 
 			By("Checking if the status has been updated to completed (retried automatically)")

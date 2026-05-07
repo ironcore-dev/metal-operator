@@ -28,9 +28,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "one"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: "one"},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: "foo"},
 			},
@@ -51,9 +56,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: "two"},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: "foo"},
 			},
@@ -69,9 +79,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: "asd"},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 			},
@@ -87,9 +102,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: "asd"},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 			},
@@ -110,9 +130,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: "two"},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 			},
@@ -133,9 +158,14 @@ var _ = Describe("BIOSVersion Webhook", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 "P71 v1.45 (12/06/2017)",
-					Image:                   metalv1alpha1.ImageSpec{URI: "asd"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: "asd"},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 			},

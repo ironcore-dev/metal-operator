@@ -1,0 +1,493 @@
+{{- if .Values.crd.enable }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: maintenancepipelines.metal.ironcore.dev
+spec:
+  group: metal.ironcore.dev
+  names:
+    kind: MaintenancePipeline
+    listKind: MaintenancePipelineList
+    plural: maintenancepipelines
+    shortNames:
+    - mp
+    singular: maintenancepipeline
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.maxConcurrent
+      name: MaxConcurrent
+      type: integer
+    - jsonPath: .spec.driftPolicy
+      name: DriftPolicy
+      type: string
+    - jsonPath: .status.runs.total
+      name: Total
+      type: integer
+    - jsonPath: .status.runs.inProgress
+      name: InProgress
+      type: integer
+    - jsonPath: .status.runs.completed
+      name: Completed
+      type: integer
+    - jsonPath: .status.runs.failed
+      name: Failed
+      type: integer
+    - jsonPath: .status.runs.pending
+      name: Pending
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: MaintenancePipeline is the Schema for the maintenancepipelines
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MaintenancePipelineSpec defines the desired state of MaintenancePipeline.
+            properties:
+              driftPolicy:
+                default: Reconcile
+                description: |-
+                  DriftPolicy defines what the pipeline does when hardware deviates from the desired state
+                  after a stage has completed. Only Reconcile and Observe are valid at the pipeline level;
+                  Suspend is reserved for child resources managed by MaintenancePipelineRun.
+                enum:
+                - Reconcile
+                - Observe
+                type: string
+              maxConcurrent:
+                default: 1
+                description: |-
+                  MaxConcurrent caps the number of MaintenancePipelineRun objects (unique BMCs)
+                  that may be in InProgress phase simultaneously. Controls fleet-level blast radius.
+                format: int32
+                minimum: 1
+                type: integer
+              serverSelector:
+                description: |-
+                  ServerSelector selects the Server objects this pipeline targets.
+                  The controller resolves each server's spec.bmcRef to group servers by BMC and create
+                  one MaintenancePipelineRun per unique BMC.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              stages:
+                description: |-
+                  Stages is the ordered list of maintenance stages for this pipeline.
+                  Stages execute strictly in list order; each stage must reach Completed before the next begins.
+                items:
+                  description: |-
+                    PipelineStage defines a single stage in the maintenance pipeline.
+                    Stages execute strictly in list order; each stage must reach Completed before the next begins.
+                    kind acts as the discriminator: it determines which template fields are valid.
+                    CEL rules enforce that settings-only fields (settingsFlow, variables) are present only for
+                    BMCSettings/BIOSSettings kinds, and version-only fields (image) only for BMCVersion/BIOSVersion kinds.
+                  properties:
+                    kind:
+                      description: |-
+                        Kind determines the type of child resource this stage creates and its target scope.
+                        BMCSettings / BMCVersion are BMC-scoped (one child per Run).
+                        BIOSSettings / BIOSVersion are Server-scoped (one child per server in serverRefs).
+                      enum:
+                      - BMCSettings
+                      - BMCVersion
+                      - BIOSSettings
+                      - BIOSVersion
+                      type: string
+                    name:
+                      description: |-
+                        Name is the unique identifier for this stage within the pipeline.
+                        Used as a label value and for status tracking.
+                      maxLength: 253
+                      minLength: 1
+                      type: string
+                    template:
+                      description: |-
+                        Template defines the desired state for the child resource this stage creates.
+                        kind acts as the discriminator — see PipelineStageTemplate for field validity per kind.
+                      properties:
+                        image:
+                          description: Image specifies the firmware image for this
+                            version.
+                          properties:
+                            URI:
+                              description: URI is the URI of the software image to
+                                install.
+                              type: string
+                            secretRef:
+                              description: SecretRef is a reference to the Secret
+                                containing the credentials to access the image URI.
+                              properties:
+                                name:
+                                  description: name is unique within a namespace to
+                                    reference a secret resource.
+                                  type: string
+                                namespace:
+                                  description: namespace defines the space within
+                                    which the secret name must be unique.
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            transferProtocol:
+                              description: TransferProtocol is the network protocol
+                                used to retrieve the image URI.
+                              type: string
+                          required:
+                          - URI
+                          type: object
+                        retryPolicy:
+                          description: RetryPolicy defines the retry behavior for
+                            automatic retries on transient failures.
+                          properties:
+                            maxAttempts:
+                              description: |-
+                                MaxAttempts is the maximum number of automatic retry attempts after failure.
+                                0 means no automatic retries. Must be between 0 and 10 inclusive.
+                                If not set, the operator-level default is used.
+                              format: int32
+                              maximum: 10
+                              minimum: 0
+                              type: integer
+                          type: object
+                        serverMaintenancePolicy:
+                          default: OwnerApproval
+                          description: |-
+                            ServerMaintenancePolicy is the maintenance policy for server maintenance requests.
+                            Defaults to OwnerApproval if not set.
+                          type: string
+                        settingsFlow:
+                          description: |-
+                            SettingsFlow contains the ordered settings sequence to apply.
+                            Items are applied in ascending Priority order (lower number = higher priority).
+                          items:
+                            properties:
+                              name:
+                                description: Name is the name of the flow item.
+                                maxLength: 1000
+                                minLength: 1
+                                type: string
+                              priority:
+                                description: Priority defines the order of applying
+                                  the settings. Lower numbers have higher priority
+                                  (i.e. lower numbers are applied first).
+                                format: int32
+                                maximum: 2147483645
+                                minimum: 1
+                                type: integer
+                              settings:
+                                additionalProperties:
+                                  type: string
+                                description: Settings contains software (e.g. BIOS,
+                                  BMC) settings as a map.
+                                type: object
+                            required:
+                            - name
+                            - priority
+                            type: object
+                          type: array
+                        updatePolicy:
+                          description: UpdatePolicy indicates whether the server's
+                            upgrade service should bypass vendor update policies.
+                          type: string
+                        variables:
+                          description: |-
+                            Variables is a list of variables for settings templating.
+                            Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.
+                            Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule.
+                          items:
+                            properties:
+                              key:
+                                description: Key is the name of the variable to be
+                                  used in the BMCSettingsTemplate format.
+                                maxLength: 63
+                                minLength: 1
+                                type: string
+                              valueFrom:
+                                description: ValueFrom defines a simple single source
+                                  for the variable value.
+                                properties:
+                                  configMapKeyRef:
+                                    description: ConfigMapKeyRef points to a namespaced
+                                      ConfigMap key.
+                                    properties:
+                                      key:
+                                        description: Key is the key within the referenced
+                                          object.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      name:
+                                        description: Name is the referenced object
+                                          name.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      namespace:
+                                        description: Namespace is the referenced object
+                                          namespace.
+                                        maxLength: 63
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - key
+                                    - name
+                                    - namespace
+                                    type: object
+                                  fieldRef:
+                                    description: |-
+                                      FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+                                      Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
+                                    properties:
+                                      fieldPath:
+                                        description: |-
+                                          FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
+                                          Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
+                                        maxLength: 256
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - fieldPath
+                                    type: object
+                                  secretKeyRef:
+                                    description: SecretKeyRef points to a namespaced
+                                      Secret key.
+                                    properties:
+                                      key:
+                                        description: Key is the key within the referenced
+                                          object.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      name:
+                                        description: Name is the referenced object
+                                          name.
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      namespace:
+                                        description: Namespace is the referenced object
+                                          namespace.
+                                        maxLength: 63
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - key
+                                    - name
+                                    - namespace
+                                    type: object
+                                type: object
+                                x-kubernetes-validations:
+                                - message: exactly one of fieldRef, configMapKeyRef,
+                                    or secretKeyRef must be provided
+                                  rule: '(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef)
+                                    ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) ==
+                                    1'
+                            required:
+                            - key
+                            - valueFrom
+                            type: object
+                          maxItems: 64
+                          type: array
+                        version:
+                          description: |-
+                            Version specifies the firmware version.
+                            Optional in pipeline stage templates (hydrated at stamp time when omitted);
+                            enforced non-empty by CEL rules on the concrete template types.
+                          type: string
+                      type: object
+                      x-kubernetes-validations:
+                      - message: variable keys must be unique
+                        rule: '!has(self.variables) || self.variables.all(v, self.variables.filter(w,
+                          w.key == v.key).size() == 1)'
+                  required:
+                  - kind
+                  - name
+                  - template
+                  type: object
+                  x-kubernetes-validations:
+                  - message: image.URI is required for BMCVersion/BIOSVersion stages
+                      and must not be set on settings stages
+                    rule: '(self.kind == ''BMCSettings'' || self.kind == ''BIOSSettings'')
+                      ? !has(self.template.image) : (has(self.template.image) && self.template.image.URI
+                      != ”)'
+                  - message: settingsFlow is only valid on BMCSettings/BIOSSettings
+                      stages
+                    rule: '(self.kind == ''BMCVersion'' || self.kind == ''BIOSVersion'')
+                      ? (!has(self.template.settingsFlow) || self.template.settingsFlow.size()
+                      == 0) : true'
+                  - message: variables is only valid on BMCSettings/BIOSSettings stages
+                    rule: '(self.kind == ''BMCVersion'' || self.kind == ''BIOSVersion'')
+                      ? (!has(self.template.variables) || self.template.variables.size()
+                      == 0) : true'
+                minItems: 1
+                type: array
+            required:
+            - serverSelector
+            - stages
+            type: object
+          status:
+            description: MaintenancePipelineStatus defines the observed state of MaintenancePipeline.
+            properties:
+              conditions:
+                description: Conditions represents the latest observations of the
+                  pipeline.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              runs:
+                description: Runs summarises the phase distribution of all owned MaintenancePipelineRun
+                  objects.
+                properties:
+                  completed:
+                    description: Completed is the number of runs that have reached
+                      Completed phase.
+                    format: int32
+                    type: integer
+                  failed:
+                    description: Failed is the number of runs in Failed phase.
+                    format: int32
+                    type: integer
+                  inProgress:
+                    description: InProgress is the number of runs currently executing.
+                    format: int32
+                    type: integer
+                  pending:
+                    description: Pending is the number of runs in Pending phase.
+                    format: int32
+                    type: integer
+                  total:
+                    description: Total is the total number of MaintenancePipelineRun
+                      objects owned by this pipeline.
+                    format: int32
+                    type: integer
+                required:
+                - total
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end -}}

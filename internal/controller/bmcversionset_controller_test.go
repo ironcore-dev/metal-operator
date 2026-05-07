@@ -200,9 +200,14 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCVersionSetSpec{
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					},
 				},
 				BMCSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -304,9 +309,14 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCVersionSetSpec{
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					},
 				},
 				BMCSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -515,10 +525,15 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BMCVersionSetSpec{
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion + " fail",
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion + " fail",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
+					},
 				},
 				BMCSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{

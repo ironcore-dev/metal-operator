@@ -73,6 +73,11 @@ spec:
                 x-kubernetes-validations:
                 - message: BMCRef is immutable
                   rule: self == oldSelf
+              driftPolicy:
+                description: |-
+                  DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.
+                  Empty (default): active. Observe: drift detection only. Suspend: completely frozen.
+                type: string
               retryPolicy:
                 description: RetryPolicy defines the retry behavior for automatic
                   retries on transient failures.
@@ -88,8 +93,10 @@ spec:
                     type: integer
                 type: object
               serverMaintenancePolicy:
-                description: ServerMaintenancePolicy is a maintenance policy to be
-                  applied on the server.
+                default: OwnerApproval
+                description: |-
+                  ServerMaintenancePolicy is the maintenance policy for server maintenance requests.
+                  Defaults to OwnerApproval if not set.
                 type: string
               serverMaintenanceRefs:
                 description: |-
@@ -129,14 +136,41 @@ spec:
                       type: object
                   type: object
                 type: array
-              settings:
-                additionalProperties:
-                  type: string
-                description: SettingsMap contains BMC settings as a map.
-                type: object
+              settingsFlow:
+                description: |-
+                  SettingsFlow contains the ordered settings sequence to apply.
+                  Items are applied in ascending Priority order (lower number = higher priority).
+                items:
+                  properties:
+                    name:
+                      description: Name is the name of the flow item.
+                      maxLength: 1000
+                      minLength: 1
+                      type: string
+                    priority:
+                      description: Priority defines the order of applying the settings.
+                        Lower numbers have higher priority (i.e. lower numbers are
+                        applied first).
+                      format: int32
+                      maximum: 2147483645
+                      minimum: 1
+                      type: integer
+                    settings:
+                      additionalProperties:
+                        type: string
+                      description: Settings contains software (e.g. BIOS, BMC) settings
+                        as a map.
+                      type: object
+                  required:
+                  - name
+                  - priority
+                  type: object
+                type: array
               variables:
-                description: Variables is a list of variables that can be used in
-                  the settings for templating.
+                description: |-
+                  Variables is a list of variables for settings templating.
+                  Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.
+                  Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule.
                 items:
                   properties:
                     key:
@@ -225,14 +259,17 @@ spec:
                 maxItems: 64
                 type: array
               version:
-                description: Version specifies the BMC firmware version for which
-                  the settings should be applied.
+                description: |-
+                  Version specifies the firmware version.
+                  Optional in pipeline stage templates (hydrated at stamp time when omitted);
+                  enforced non-empty by CEL rules on the concrete template types.
                 type: string
             required:
             - BMCRef
-            - version
             type: object
             x-kubernetes-validations:
+            - message: version is required
+              rule: self.version != ""
             - message: variable keys must be unique
               rule: '!has(self.variables) || self.variables.all(v, self.variables.filter(w,
                 w.key == v.key).size() == 1)'

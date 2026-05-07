@@ -92,9 +92,14 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 mockUpServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBiosVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: mockUpServerBiosVersion},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -144,9 +149,14 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -264,9 +274,14 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -362,10 +377,15 @@ var _ = Describe("BIOSVersion Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion + " fail",
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion + " fail"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBiosVersion + " fail",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion + " fail"},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -498,9 +518,14 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},

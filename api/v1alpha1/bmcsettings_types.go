@@ -9,28 +9,10 @@ import (
 )
 
 // BMCSettingsTemplate defines the template for BMC settings to be applied.
-// +kubebuilder:validation:XValidation:rule="!has(self.variables) || self.variables.all(v, self.variables.filter(w, w.key == v.key).size() == 1)",message="variable keys must be unique"
+// +kubebuilder:validation:XValidation:rule="self.version != \"\"",message="version is required"
 type BMCSettingsTemplate struct {
-	// Version specifies the BMC firmware version for which the settings should be applied.
-	// +required
-	Version string `json:"version"`
-
-	// SettingsMap contains BMC settings as a map.
-	// +optional
-	SettingsMap map[string]string `json:"settings,omitempty"`
-
-	// Variables is a list of variables that can be used in the settings for templating.
-	// +kubebuilder:validation:MaxItems=64
-	// +optional
-	Variables []Variable `json:"variables,omitempty"`
-
-	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
-	// +optional
-	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
-
-	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
-	// +optional
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+	BaseTemplate     `json:",inline"`
+	SettingsTemplate `json:",inline"`
 }
 
 type Variable struct {
@@ -93,6 +75,11 @@ type NamespacedKeySelector struct {
 // BMCSettingsSpec defines the desired state of BMCSettings.
 type BMCSettingsSpec struct {
 	BMCSettingsTemplate `json:",inline"`
+
+	// DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.
+	// Empty (default): active. Observe: drift detection only. Suspend: completely frozen.
+	// +optional
+	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
 	// server that needs to be updated with the BMC settings.

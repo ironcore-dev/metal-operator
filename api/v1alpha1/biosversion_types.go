@@ -28,32 +28,22 @@ const (
 	UpdatePolicyForce UpdatePolicy = "Force"
 )
 
+// +kubebuilder:validation:XValidation:rule="self.version != \"\"",message="version is required"
+// +kubebuilder:validation:XValidation:rule="self.image.URI != \"\"",message="image.URI is required"
 type BIOSVersionTemplate struct {
-	// Version specifies the BIOS version to upgrade to.
-	// +required
-	Version string `json:"version"`
-
-	// UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies.
-	// +optional
-	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
-
-	// Image specifies the image to use to upgrade to the given BIOS version.
-	// +required
-	Image ImageSpec `json:"image"`
-
-	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
-	// +optional
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-
-	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
-	// +optional
-	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
+	BaseTemplate    `json:",inline"`
+	VersionTemplate `json:",inline"`
 }
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
 type BIOSVersionSpec struct {
 	// BIOSVersionTemplate defines the template for Version to be applied on the servers.
 	BIOSVersionTemplate `json:",inline"`
+
+	// DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.
+	// Empty (default): active. Observe: drift detection only. Suspend: completely frozen.
+	// +optional
+	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server.
 	// +optional

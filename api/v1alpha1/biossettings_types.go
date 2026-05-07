@@ -8,22 +8,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +kubebuilder:validation:XValidation:rule="self.version != \"\"",message="version is required"
+// +kubebuilder:validation:XValidation:rule="!has(self.variables)",message="variables is not supported for BIOSSettings"
 type BIOSSettingsTemplate struct {
-	// Version specifies the software version (e.g. BIOS, BMC) these settings apply to.
-	// +required
-	Version string `json:"version"`
-
-	// SettingsFlow contains the BIOS settings sequence to apply in the given order.
-	// +optional
-	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
-
-	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
-	// +optional
-	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
-
-	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
-	// +optional
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+	BaseTemplate     `json:",inline"`
+	SettingsTemplate `json:",inline"`
 }
 
 type SettingsFlowItem struct {
@@ -48,6 +37,11 @@ type SettingsFlowItem struct {
 type BIOSSettingsSpec struct {
 	// BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.
 	BIOSSettingsTemplate `json:",inline"`
+
+	// DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.
+	// Empty (default): active. Observe: drift detection only. Suspend: completely frozen.
+	// +optional
+	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server.
 	// +optional

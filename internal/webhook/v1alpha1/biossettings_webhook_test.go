@@ -31,13 +31,18 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: "foo"},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: map[string]string{},
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 defaultMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}
@@ -59,13 +64,18 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: "foo"},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: map[string]string{},
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 defaultMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}
@@ -81,13 +91,18 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: defaultMockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: map[string]string{},
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 defaultMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}
@@ -103,13 +118,18 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: anotherMockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: map[string]string{},
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 anotherMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}
@@ -130,13 +150,18 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: anotherMockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: map[string]string{},
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 anotherMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}
@@ -157,13 +182,18 @@ var _ = Describe("BIOSSettings Webhook", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: "bar"},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: anotherMockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: map[string]string{},
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 anotherMockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: map[string]string{},
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}

@@ -1,0 +1,199 @@
+# SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# MaintenancePipeline — full HPE iLO 6 upgrade example
+#
+# What this pipeline does (stages execute strictly in list order):
+#   1. bmc-baseline          : Apply BMC network settings (once per BMC)
+#   2. bmc-fw-v160           : Upgrade BMC firmware to iLO 6 v1.60 (once per BMC)
+#   3. bmc-fw-v170           : Upgrade BMC firmware to iLO 6 v1.70 (once per BMC)
+#   4. bmc-fw-v180           : Upgrade BMC firmware to iLO 6 v1.80 (once per BMC)
+#   5. bmc-post-upgrade      : Apply post-upgrade BMC tuning (once per BMC)
+#   6. bios-pre-upgrade      : Prepare BIOS boot settings (once per Server)
+#   7. bios-fw-v240          : Upgrade BIOS firmware to U54 v2.40 (once per Server)
+#   8. bios-fw-v250          : Upgrade BIOS firmware to U54 v2.50 (once per Server)
+#   9. bios-post-upgrade     : Apply post-upgrade BIOS performance tuning (once per Server)
+#
+# Fleet-level coordination:
+#   - The controller resolves serverSelector → servers → unique BMCs.
+#   - One MaintenancePipelineRun (see metal_v1alpha1_maintenancepipelinerun.yaml) is
+#     auto-generated per unique BMC. Each Run owns ALL child resources (BMCSettings,
+#     BMCVersion, BIOSSettings, BIOSVersion) for that BMC and all its servers.
+#   - maxConcurrent: 3 means at most 3 BMCs are actively upgrading at once.
+#     All remaining Runs queue in Pending.
+#
+# BMC-scoped vs Server-scoped stages:
+#   - BMCSettings / BMCVersion → stamped ONCE per Run (one per unique BMC).
+#   - BIOSSettings / BIOSVersion → stamped ONCE PER SERVER in the Run's serverRefs.
+#     Each server advances through Server-scoped stages independently — a server moves
+#     to the next stage as soon as its own child completes, without waiting for other servers.
+#
+# Version hop semantics (flat stage model):
+#   Each BMCVersion/BIOSVersion stage targets exactly one firmware version.
+#   The Run controller stamps a new child for each stage in order and waits for it
+#   to reach Completed before advancing to the next stage. If the BMC/server already
+#   reports the target version exactly, the child completes immediately without flashing.
+#   The Run sets driftPolicy=Suspend on completed intermediate version stages
+#   (hardware is expected to be ahead) and driftPolicy=Observe on the final version
+#   stage and all settings stages.
+#
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: MaintenancePipeline
+metadata:
+  name: ilo6-upgrade-to-v180
+spec:
+  # Selects servers by label. The controller resolves server.spec.bmcRef to group
+  # servers by BMC and auto-create one MaintenancePipelineRun per unique BMC.
+  serverSelector:
+    matchLabels:
+      kubernetes.metal.cloud.sap/bmc-vendor: hpe
+
+  # At most 3 BMCs (MaintenancePipelineRun objects) may be InProgress at once.
+  # Additional Runs stay in Pending until a slot opens. Defaults to 1 (safe default
+  # for production — upgrade one BMC at a time).
+  maxConcurrent: 3
+
+  # What to do when hardware deviates from desired state AFTER a stage completes.
+  # Reconcile (default): re-run the affected stage and all downstream stages.
+  # Observe: surface a DriftDetected condition but take no corrective action.
+  driftPolicy: Reconcile
+
+  stages:
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stage 1: BMC baseline settings  (BMC-scoped — runs once per BMC)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Creates a BMCSettings child. The stage is Completed when the child reaches
+    # BMCSettingsState=Applied.
+    # All subsequent stages are blocked until this stage reaches Completed.
+    - name: bmc-baseline
+      kind: BMCSettings
+      template:
+        # serverMaintenancePolicy omitted → defaults to OwnerApproval (kubebuilder default)
+        settingsFlow:
+          - name: network-baseline
+            priority: 1
+            settings:
+              SyslogServer: "10.0.0.5"
+              DNSServer: "8.8.8.8"
+              SNMPv3AuthProtocol: SHA256
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stages 2–4: BMC firmware upgrade hops  (BMC-scoped — runs once per BMC)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Each stage targets exactly one firmware version. The Run controller stamps a
+    # BMCVersion child, waits for Completed, then advances to the next stage.
+    # If the BMC already reports this exact version, the child completes immediately without flashing.
+    # Completed intermediate hop children receive driftPolicy=Suspend; the final
+    # hop (bmc-fw-v180) receives driftPolicy=Observe after completion.
+    # serverMaintenancePolicy omitted → defaults to OwnerApproval (kubebuilder default)
+
+    - name: bmc-fw-v160
+      kind: BMCVersion
+      template:
+        version: "iLO 6 v1.60"
+        image:
+          URI: "http://firmware-repo.internal/ilo6/v160/ilo6_160.bin"
+
+    - name: bmc-fw-v170
+      kind: BMCVersion
+      template:
+        version: "iLO 6 v1.70"
+        image:
+          URI: "http://firmware-repo.internal/ilo6/v170/ilo6_170.bin"
+
+    # Final BMC target version.
+    - name: bmc-fw-v180
+      kind: BMCVersion
+      template:
+        version: "iLO 6 v1.80"
+        image:
+          URI: "http://firmware-repo.internal/ilo6/v180/ilo6_180.bin"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stage 5: BMC post-upgrade tuning  (BMC-scoped — runs once per BMC)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Only executed after bmc-fw-v180 is Completed (iLO 6 v1.80 required
+    # to expose HPManagementNetworkWorkloads and ProcTurbo).
+    #
+    # Override: Enforced (no approval gate needed — these are non-disruptive tuning
+    # parameters with no server restart required).
+    - name: bmc-post-upgrade
+      kind: BMCSettings
+      template:
+        serverMaintenancePolicy: Enforced
+        settingsFlow:
+          - name: post-upgrade-tuning
+            priority: 1
+            settings:
+              HPManagementNetworkWorkloads: Enabled
+              ProcTurbo: Enabled
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stage 6: BIOS pre-upgrade preparation  (Server-scoped — runs per server)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Creates one BIOSSettings child per server in serverRefs.
+    # Each server advances independently through subsequent Server-scoped stages.
+    #
+    # version is OMITTED here deliberately:
+    #   The Run controller hydrates version from server.status.biosVersion at stamp time,
+    #   so this settings object targets whatever BIOS version is currently installed —
+    #   avoiding a mismatch if some servers are already on a newer BIOS.
+    #
+    # Override: Enforced — PXE boot flag is applied in-band without server restart;
+    # no maintenance window required.
+    - name: bios-pre-upgrade
+      kind: BIOSSettings
+      template:
+        # version omitted → hydrated at stamp time from server.status.biosVersion
+        serverMaintenancePolicy: Enforced
+        settingsFlow:
+          - name: pxe-prepare
+            priority: 1
+            settings:
+              PxeBootToFirstInterface: Enabled
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stages 7–8: BIOS firmware upgrade hops  (Server-scoped — runs per server)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Each stage targets exactly one BIOS version per server. Servers advance
+    # independently; a server already reporting this exact version completes the stage immediately.
+    # Completed intermediate hop children receive driftPolicy=Suspend; the final
+    # hop (bios-fw-v250) receives driftPolicy=Observe after completion.
+    # serverMaintenancePolicy omitted → defaults to OwnerApproval (kubebuilder default)
+
+    - name: bios-fw-v240
+      kind: BIOSVersion
+      template:
+        version: "U54 v2.40"
+        image:
+          URI: "http://firmware-repo.internal/bios/u54/v240/bios_v240.bin"
+
+    # Final BIOS target version.
+    - name: bios-fw-v250
+      kind: BIOSVersion
+      template:
+        version: "U54 v2.50"
+        image:
+          URI: "http://firmware-repo.internal/bios/u54/v250/bios_v250.bin"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stage 9: BIOS post-upgrade performance tuning  (Server-scoped — runs per server)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Only executed after bios-fw-v250 is Completed.
+    # version: "U54 v2.50" explicitly set — the child controller verifies the live
+    # biosVersion matches before applying; if a server unexpectedly reports an older
+    # version the child transitions to Failed (not silently skipped).
+    #
+    # Override: Enforced — performance tuning parameters are applied without restart;
+    # no maintenance window required.
+    - name: bios-post-upgrade
+      kind: BIOSSettings
+      template:
+        version: "U54 v2.50"
+        serverMaintenancePolicy: Enforced
+        settingsFlow:
+          - name: performance-tuning
+            priority: 1
+            settings:
+              ProcHyperthreading: Enabled
+              NUMAGroupSizeOpt: Clustered

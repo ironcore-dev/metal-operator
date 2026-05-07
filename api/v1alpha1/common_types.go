@@ -55,6 +55,89 @@ type ImmutableObjectReference struct {
 	UID types.UID `json:"uid,omitempty"`
 }
 
+// DriftPolicy defines how a controller responds when hardware deviates from the desired state.
+// Used both on MaintenancePipeline (pipeline-level response) and on child resources
+// (BMCSettings, BIOSSettings, BMCVersion, BIOSVersion) to control per-child reconcile mode.
+type DriftPolicy string
+
+const (
+	// DriftPolicyReconcile re-runs the affected stage (and all downstream stages) on drift.
+	// Valid on MaintenancePipeline only.
+	DriftPolicyReconcile DriftPolicy = "Reconcile"
+	// DriftPolicyObserve detects drift and surfaces a DriftDetected condition but takes no corrective action.
+	// Valid on MaintenancePipeline and child resources.
+	// Applied by MaintenancePipelineRun to terminal version children and all settings children after completion.
+	DriftPolicyObserve DriftPolicy = "Observe"
+	// DriftPolicySuspend freezes the controller completely: no reconciliation, no drift detection,
+	// no status updates, no hardware actions.
+	// Valid on child resources only (not applicable at pipeline level).
+	// Applied by MaintenancePipelineRun to intermediate version children superseded by a later
+	// same-kind stage — hardware is expected to be ahead of this child's target version,
+	// so drift detection would produce false positives.
+	DriftPolicySuspend DriftPolicy = "Suspend"
+)
+
+// PipelineStageTemplate is the unified template type for all pipeline stage kinds.
+// kind on the enclosing PipelineStage acts as the discriminator:
+//
+//   - BMCSettings / BIOSSettings stages: use version, settingsFlow, variables, retryPolicy,
+//     serverMaintenancePolicy; image and updatePolicy must be absent.
+//   - BMCVersion / BIOSVersion stages: use version, image, updatePolicy, retryPolicy,
+//     serverMaintenancePolicy; settingsFlow and variables must be absent.
+//
+// CEL rules on PipelineStage enforce kind-specific field constraints.
+type PipelineStageTemplate struct {
+	BaseTemplate     `json:",inline"`
+	SettingsTemplate `json:",inline"`
+	VersionTemplate  `json:",inline"`
+}
+
+// BaseTemplate holds the fields shared by SettingsTemplate and VersionTemplate:
+// version, retryPolicy, and serverMaintenancePolicy.
+type BaseTemplate struct {
+	// Version specifies the firmware version.
+	// Optional in pipeline stage templates (hydrated at stamp time when omitted);
+	// enforced non-empty by CEL rules on the concrete template types.
+	// +optional
+	Version string `json:"version,omitempty"`
+
+	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
+	// +optional
+	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
+
+	// ServerMaintenancePolicy is the maintenance policy for server maintenance requests.
+	// Defaults to OwnerApproval if not set.
+	// +kubebuilder:default=OwnerApproval
+	// +optional
+	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(self.variables) || self.variables.all(v, self.variables.filter(w, w.key == v.key).size() == 1)",message="variable keys must be unique"
+type SettingsTemplate struct {
+	// SettingsFlow contains the ordered settings sequence to apply.
+	// Items are applied in ascending Priority order (lower number = higher priority).
+	// +optional
+	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
+
+	// Variables is a list of variables for settings templating.
+	// Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.
+	// Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule.
+	// +kubebuilder:validation:MaxItems=64
+	// +optional
+	Variables []Variable `json:"variables,omitempty"`
+}
+
+// VersionTemplate holds the version-specific fields shared by BMCVersionTemplate and BIOSVersionTemplate.
+type VersionTemplate struct {
+	// Image specifies the firmware image for this version.
+	// +optional
+	Image ImageSpec `json:"image,omitempty"`
+
+	// UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies.
+	// +optional
+	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
+}
+
 // RetryPolicy defines the retry behavior on transient failures.
 type RetryPolicy struct {
 	// MaxAttempts is the maximum number of automatic retry attempts after failure.

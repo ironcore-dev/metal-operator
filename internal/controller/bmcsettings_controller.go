@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
@@ -763,7 +764,12 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 	if err != nil {
 		return diff, fmt.Errorf("failed to resolve BMCSettings variables: %w", err)
 	}
-	effectiveSettingsMap := ApplyVariables(settings.Spec.SettingsMap, resolvedVars)
+	// TODO: fix this correctly to apply in order.
+	merged := make(map[string]string)
+	for _, item := range settings.Spec.SettingsFlow {
+		maps.Copy(merged, item.Settings)
+	}
+	effectiveSettingsMap := ApplyVariables(merged, resolvedVars)
 
 	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, bmcObj.Spec.BMCUUID, effectiveSettingsMap)
 	if err != nil {

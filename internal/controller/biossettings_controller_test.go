@@ -102,13 +102,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}
@@ -148,13 +153,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion + "2",
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion + "2",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 			},
 		}
@@ -200,13 +210,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -263,13 +278,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -357,13 +377,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -505,13 +530,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -613,13 +643,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -731,13 +766,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: "2.45.455b66-rev4",
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "2.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -827,14 +867,19 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -900,13 +945,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -963,13 +1013,18 @@ var _ = Describe("BIOSSettings Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1111,13 +1166,18 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1275,13 +1335,18 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
-						Settings: biosSetting,
-						Priority: 1,
-						Name:     "one",
-					}},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+							Settings: biosSetting,
+							Priority: 1,
+							Name:     "one",
+						}},
+					},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1403,20 +1468,25 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{
-							Priority: 100,
-							Settings: map[string]string{"AdminPhone": "1010101"},
-							Name:     "100",
-						},
-						{
-							Priority: 1000,
-							Settings: map[string]string{"PowerProfile": "MaxPerf"},
-							Name:     "1000",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{
+								Priority: 100,
+								Settings: map[string]string{"AdminPhone": "1010101"},
+								Name:     "100",
+							},
+							{
+								Priority: 1000,
+								Settings: map[string]string{"PowerProfile": "MaxPerf"},
+								Name:     "1000",
+							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1448,15 +1518,20 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{
-							Priority: 100,
-							Settings: map[string]string{"PowerProfile": "UnKnownValue"},
-							Name:     "100",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{
+								Priority: 100,
+								Settings: map[string]string{"PowerProfile": "UnKnownValue"},
+								Name:     "100",
+							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1511,20 +1586,25 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{
-							Priority: 100,
-							Settings: map[string]string{"PowerProfile": "SysDbpm"},
-							Name:     "100",
-						},
-						{
-							Priority: 1000,
-							Settings: map[string]string{"PowerProfile": "OsDbpm"},
-							Name:     "1000",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{
+								Priority: 100,
+								Settings: map[string]string{"PowerProfile": "SysDbpm"},
+								Name:     "100",
+							},
+							{
+								Priority: 1000,
+								Settings: map[string]string{"PowerProfile": "OsDbpm"},
+								Name:     "1000",
+							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1559,20 +1639,25 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{
-							Priority: 100,
-							Settings: map[string]string{"AdminPhone": "123-456"},
-							Name:     "100",
-						},
-						{
-							Priority: 1000,
-							Settings: map[string]string{"PowerProfile": "OsDbpm"},
-							Name:     "100",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{
+								Priority: 100,
+								Settings: map[string]string{"AdminPhone": "123-456"},
+								Name:     "100",
+							},
+							{
+								Priority: 1000,
+								Settings: map[string]string{"PowerProfile": "OsDbpm"},
+								Name:     "100",
+							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1618,20 +1703,25 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{
-							Priority: 100,
-							Settings: map[string]string{"AdminPhone": "123-123"},
-							Name:     "100",
-						},
-						{
-							Priority: 1000,
-							Settings: map[string]string{"PowerProfile": "SysDbpm"},
-							Name:     "1000",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{
+								Priority: 100,
+								Settings: map[string]string{"AdminPhone": "123-123"},
+								Name:     "100",
+							},
+							{
+								Priority: 1000,
+								Settings: map[string]string{"PowerProfile": "SysDbpm"},
+								Name:     "1000",
+							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -1687,20 +1777,25 @@ var _ = Describe("BIOSSettings Sequence Controller", func() {
 			// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
 			Spec: metalv1alpha1.BIOSSettingsSpec{
 				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
-					Version: mockUpServerBiosVersion,
-					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
-						{
-							Priority: 100,
-							Settings: map[string]string{"AdminPhone": "one-two-three"},
-							Name:     oldNames[0],
-						},
-						{
-							Priority: 1000,
-							Settings: map[string]string{"ProcCores": "1"},
-							Name:     oldNames[1],
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{
+							{
+								Priority: 100,
+								Settings: map[string]string{"AdminPhone": "one-two-three"},
+								Name:     oldNames[0],
+							},
+							{
+								Priority: 1000,
+								Settings: map[string]string{"ProcCores": "1"},
+								Name:     oldNames[1],
+							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},

@@ -102,9 +102,14 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 mockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
+					},
 				},
 			},
 		}
@@ -156,9 +161,14 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					},
 				},
 			},
 		}
@@ -274,9 +284,14 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					},
 				},
 			},
 		}
@@ -375,10 +390,15 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion + " fail",
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion + " fail",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
+					},
 				},
 			},
 		}
@@ -429,9 +449,14 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					},
 				},
 			},
 		}
@@ -476,9 +501,14 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					},
 				},
 			},
 		}
@@ -552,9 +582,14 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 mockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 mockUpServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
+					},
 				},
 			},
 		}
@@ -602,9 +637,14 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBMCVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					},
 				},
 			},
 		}

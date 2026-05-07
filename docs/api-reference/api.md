@@ -23,6 +23,8 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BMCVersion](#bmcversion)
 - [BMCVersionSet](#bmcversionset)
 - [Endpoint](#endpoint)
+- [MaintenancePipeline](#maintenancepipeline)
+- [MaintenancePipelineRun](#maintenancepipelinerun)
 - [Server](#server)
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
@@ -158,10 +160,12 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
-| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the ordered settings sequence to apply.<br />Items are applied in ascending Priority order (lower number = higher priority). |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables for settings templating.<br />Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.<br />Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule. |  | MaxItems: 64 <br /> |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.<br />Empty (default): active. Observe: drift detection only. Suspend: completely frozen. |  |  |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS settings on. |  |  |
 
@@ -220,10 +224,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
-| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the ordered settings sequence to apply.<br />Items are applied in ascending Priority order (lower number = higher priority). |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables for settings templating.<br />Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.<br />Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule. |  | MaxItems: 64 <br /> |
 
 
 #### BIOSVersion
@@ -315,11 +320,12 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BIOS version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the firmware image for this version. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.<br />Empty (default): active. Observe: drift detection only. Suspend: completely frozen. |  |  |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS upgrade on. |  |  |
 
@@ -377,11 +383,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BIOS version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the firmware image for this version. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
 
 
 #### BMC
@@ -552,11 +558,12 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the ordered settings sequence to apply.<br />Items are applied in ascending Priority order (lower number = higher priority). |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables for settings templating.<br />Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.<br />Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule. |  | MaxItems: 64 <br /> |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.<br />Empty (default): active. Observe: drift detection only. Suspend: completely frozen. |  |  |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
 | `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply settings to. |  |  |
 
@@ -613,11 +620,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the ordered settings sequence to apply.<br />Items are applied in ascending Priority order (lower number = higher priority). |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables for settings templating.<br />Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.<br />Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule. |  | MaxItems: 64 <br /> |
 
 
 #### BMCSpec
@@ -837,11 +844,12 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the firmware image for this version. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.<br />Empty (default): active. Observe: drift detection only. Suspend: completely frozen. |  |  |
 | `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply BMC upgrade on. |  |  |
 
@@ -899,11 +907,38 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the firmware image for this version. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
+
+
+#### BaseTemplate
+
+
+
+BaseTemplate holds the fields shared by SettingsTemplate and VersionTemplate:
+version, retryPolicy, and serverMaintenancePolicy.
+
+
+
+_Appears in:_
+- [BIOSSettingsSpec](#biossettingsspec)
+- [BIOSSettingsTemplate](#biossettingstemplate)
+- [BIOSVersionSpec](#biosversionspec)
+- [BIOSVersionTemplate](#biosversiontemplate)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+- [BMCVersionSpec](#bmcversionspec)
+- [BMCVersionTemplate](#bmcversiontemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
 
 
 #### BootOrder
@@ -957,6 +992,30 @@ _Appears in:_
 | `IPMI` | ConsoleProtocolNameIPMI represents the IPMI console protocol.<br /> |
 | `SSH` | ConsoleProtocolNameSSH represents the SSH console protocol.<br /> |
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
+
+
+#### DriftPolicy
+
+_Underlying type:_ _string_
+
+DriftPolicy defines how a controller responds when hardware deviates from the desired state.
+Used both on MaintenancePipeline (pipeline-level response) and on child resources
+(BMCSettings, BIOSSettings, BMCVersion, BIOSVersion) to control per-child reconcile mode.
+
+
+
+_Appears in:_
+- [BIOSSettingsSpec](#biossettingsspec)
+- [BIOSVersionSpec](#biosversionspec)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCVersionSpec](#bmcversionspec)
+- [MaintenancePipelineSpec](#maintenancepipelinespec)
+
+| Field | Description |
+| --- | --- |
+| `Reconcile` | DriftPolicyReconcile re-runs the affected stage (and all downstream stages) on drift.<br />Valid on MaintenancePipeline only.<br /> |
+| `Observe` | DriftPolicyObserve detects drift and surfaces a DriftDetected condition but takes no corrective action.<br />Valid on MaintenancePipeline and child resources.<br />Applied by MaintenancePipelineRun to terminal version children and all settings children after completion.<br /> |
+| `Suspend` | DriftPolicySuspend freezes the controller completely: no reconciliation, no drift detection,<br />no status updates, no hardware actions.<br />Valid on child resources only (not applicable at pipeline level).<br />Applied by MaintenancePipelineRun to intermediate version children superseded by a later<br />same-kind stage — hardware is expected to be ahead of this child's target version,<br />so drift detection would produce false positives.<br /> |
 
 
 #### Endpoint
@@ -1057,6 +1116,8 @@ _Appears in:_
 - [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
+- [VersionTemplate](#versiontemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -1143,6 +1204,205 @@ _Appears in:_
 | `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
 
 
+#### MaintenancePipeline
+
+
+
+MaintenancePipeline is the Schema for the maintenancepipelines API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `MaintenancePipeline` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[MaintenancePipelineSpec](#maintenancepipelinespec)_ |  |  |  |
+| `status` _[MaintenancePipelineStatus](#maintenancepipelinestatus)_ |  |  |  |
+
+
+#### MaintenancePipelineRun
+
+
+
+MaintenancePipelineRun is the Schema for the maintenancepipelineruns API.
+It is auto-generated by the MaintenancePipeline controller — one instance per unique BMC
+covered by the pipeline's serverSelector. It owns all BMCSettings, BMCVersion, BIOSSettings,
+and BIOSVersion child resources for both the BMC and all servers that share it.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `MaintenancePipelineRun` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[MaintenancePipelineRunSpec](#maintenancepipelinerunspec)_ |  |  |  |
+| `status` _[MaintenancePipelineRunStatus](#maintenancepipelinerunstatus)_ |  |  |  |
+
+
+#### MaintenancePipelineRunPhase
+
+_Underlying type:_ _string_
+
+MaintenancePipelineRunPhase describes the current phase of a MaintenancePipelineRun or one of its stages.
+
+
+
+_Appears in:_
+- [MaintenancePipelineRunStageServerStatus](#maintenancepipelinerunstageserverstatus)
+- [MaintenancePipelineRunStageStatus](#maintenancepipelinerunstagestatus)
+- [MaintenancePipelineRunStatus](#maintenancepipelinerunstatus)
+
+| Field | Description |
+| --- | --- |
+| `Pending` | MaintenancePipelineRunPhasePending indicates the run or stage has not yet started.<br /> |
+| `InProgress` | MaintenancePipelineRunPhaseInProgress indicates the run or stage is currently executing.<br /> |
+| `Completed` | MaintenancePipelineRunPhaseCompleted indicates the run or stage has successfully completed.<br /> |
+| `Failed` | MaintenancePipelineRunPhaseFailed indicates the run or stage has failed.<br /> |
+
+
+#### MaintenancePipelineRunSpec
+
+
+
+MaintenancePipelineRunSpec defines the desired state of MaintenancePipelineRun.
+MaintenancePipelineRun objects are auto-generated by the MaintenancePipeline controller —
+one per unique BMC covered by the pipeline's serverSelector.
+
+
+
+_Appears in:_
+- [MaintenancePipelineRun](#maintenancepipelinerun)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef references the BMC that this Run manages.<br />Immutable after creation. |  |  |
+| `serverRefs` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core) array_ | ServerRefs is the list of servers sharing this BMC that are targeted by the pipeline.<br />All servers must have spec.bmcRef pointing to the same BMC as bmcRef. |  | MinItems: 1 <br /> |
+
+
+#### MaintenancePipelineRunStageServerStatus
+
+
+
+MaintenancePipelineRunStageServerStatus tracks per-server progress for Server-scoped stages
+(BIOSSettings and BIOSVersion).
+
+
+
+_Appears in:_
+- [MaintenancePipelineRunStageStatus](#maintenancepipelinerunstagestatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef identifies the server this status entry describes. |  |  |
+| `phase` _[MaintenancePipelineRunPhase](#maintenancepipelinerunphase)_ | Phase is the current phase for this server within the stage. |  |  |
+| `childRef` _[PipelineChildRef](#pipelinechildref)_ | ChildRef references the child resource created for this server.<br />Nil until the stage reaches this server. |  |  |
+
+
+#### MaintenancePipelineRunStageStatus
+
+
+
+MaintenancePipelineRunStageStatus is the observed status of a single stage within a Run.
+
+
+
+_Appears in:_
+- [MaintenancePipelineRunStatus](#maintenancepipelinerunstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name identifies the stage; matches spec.stages[*].name in the owning MaintenancePipeline. |  |  |
+| `phase` _[MaintenancePipelineRunPhase](#maintenancepipelinerunphase)_ | Phase is the aggregate phase for this stage.<br />For Server-scoped stages the aggregate reflects the slowest server; individual servers<br />advance to the next stage independently as soon as their own child completes. |  |  |
+| `childRef` _[PipelineChildRef](#pipelinechildref)_ | ChildRef references the child resource for BMC-scoped stages (BMCSettings, BMCVersion).<br />Nil for Server-scoped stages — see Servers[*].ChildRef instead. |  |  |
+| `servers` _[MaintenancePipelineRunStageServerStatus](#maintenancepipelinerunstageserverstatus) array_ | Servers tracks per-server status for BIOSSettings and BIOSVersion stages.<br />Empty for BMC-scoped stages. |  |  |
+| `completedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | CompletedAt is the time at which this stage reached the Completed phase. |  |  |
+
+
+#### MaintenancePipelineRunStatus
+
+
+
+MaintenancePipelineRunStatus defines the observed state of MaintenancePipelineRun.
+
+
+
+_Appears in:_
+- [MaintenancePipelineRun](#maintenancepipelinerun)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `phase` _[MaintenancePipelineRunPhase](#maintenancepipelinerunphase)_ | Phase is the current aggregate phase of this Run. |  |  |
+| `totalStages` _integer_ | TotalStages is the total number of stages defined in the owning pipeline. |  |  |
+| `pendingStages` _integer_ | PendingStages is the number of stages that have not yet started. |  |  |
+| `activeStages` _integer_ | ActiveStages is the number of stages currently executing. |  |  |
+| `completedStages` _integer_ | CompletedStages is the number of stages that have successfully completed. |  |  |
+| `failedStages` _integer_ | FailedStages is the number of stages that have failed. |  |  |
+| `stages` _[MaintenancePipelineRunStageStatus](#maintenancepipelinerunstagestatus) array_ | Stages mirrors the owning pipeline's spec.stages list with per-stage progress tracking.<br />The controller populates this list when the Run is first reconciled. |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest observations of the Run. |  |  |
+
+
+#### MaintenancePipelineRunSummary
+
+
+
+MaintenancePipelineRunSummary aggregates run phase counts across all owned MaintenancePipelineRun objects.
+
+
+
+_Appears in:_
+- [MaintenancePipelineStatus](#maintenancepipelinestatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `total` _integer_ | Total is the total number of MaintenancePipelineRun objects owned by this pipeline. |  |  |
+| `pending` _integer_ | Pending is the number of runs in Pending phase. |  |  |
+| `inProgress` _integer_ | InProgress is the number of runs currently executing. |  |  |
+| `completed` _integer_ | Completed is the number of runs that have reached Completed phase. |  |  |
+| `failed` _integer_ | Failed is the number of runs in Failed phase. |  |  |
+
+
+#### MaintenancePipelineSpec
+
+
+
+MaintenancePipelineSpec defines the desired state of MaintenancePipeline.
+
+
+
+_Appears in:_
+- [MaintenancePipeline](#maintenancepipeline)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector selects the Server objects this pipeline targets.<br />The controller resolves each server's spec.bmcRef to group servers by BMC and create<br />one MaintenancePipelineRun per unique BMC. |  |  |
+| `maxConcurrent` _integer_ | MaxConcurrent caps the number of MaintenancePipelineRun objects (unique BMCs)<br />that may be in InProgress phase simultaneously. Controls fleet-level blast radius. | 1 | Minimum: 1 <br /> |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy defines what the pipeline does when hardware deviates from the desired state<br />after a stage has completed. Only Reconcile and Observe are valid at the pipeline level;<br />Suspend is reserved for child resources managed by MaintenancePipelineRun. | Reconcile | Enum: [Reconcile Observe] <br /> |
+| `stages` _[PipelineStage](#pipelinestage) array_ | Stages is the ordered list of maintenance stages for this pipeline.<br />Stages execute strictly in list order; each stage must reach Completed before the next begins. |  | MinItems: 1 <br /> |
+
+
+#### MaintenancePipelineStatus
+
+
+
+MaintenancePipelineStatus defines the observed state of MaintenancePipeline.
+
+
+
+_Appears in:_
+- [MaintenancePipeline](#maintenancepipeline)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `runs` _[MaintenancePipelineRunSummary](#maintenancepipelinerunsummary)_ | Runs summarises the phase distribution of all owned MaintenancePipelineRun objects. |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest observations of the pipeline. |  |  |
+
+
 #### NamespacedKeySelector
 
 
@@ -1221,6 +1481,97 @@ _Appears in:_
 | --- | --- |
 | `Bound` | PhaseBound indicates that the server claim is bound to a server.<br /> |
 | `Unbound` | PhaseUnbound indicates that the server claim is not bound to any server.<br /> |
+
+
+#### PipelineChildRef
+
+
+
+PipelineChildRef references a child resource (BMCSettings, BMCVersion, BIOSSettings, or BIOSVersion)
+created by a MaintenancePipelineRun.
+
+
+
+_Appears in:_
+- [MaintenancePipelineRunStageServerStatus](#maintenancepipelinerunstageserverstatus)
+- [MaintenancePipelineRunStageStatus](#maintenancepipelinerunstagestatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `kind` _string_ | Kind is the kind of the child resource.<br />One of: BMCSettings, BMCVersion, BIOSSettings, BIOSVersion. |  |  |
+| `name` _string_ | Name is the generated name of the child resource. |  |  |
+
+
+#### PipelineStage
+
+
+
+PipelineStage defines a single stage in the maintenance pipeline.
+Stages execute strictly in list order; each stage must reach Completed before the next begins.
+kind acts as the discriminator: it determines which template fields are valid.
+CEL rules enforce that settings-only fields (settingsFlow, variables) are present only for
+BMCSettings/BIOSSettings kinds, and version-only fields (image) only for BMCVersion/BIOSVersion kinds.
+
+
+
+_Appears in:_
+- [MaintenancePipelineSpec](#maintenancepipelinespec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the unique identifier for this stage within the pipeline.<br />Used as a label value and for status tracking. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
+| `kind` _[PipelineStageKind](#pipelinestagekind)_ | Kind determines the type of child resource this stage creates and its target scope.<br />BMCSettings / BMCVersion are BMC-scoped (one child per Run).<br />BIOSSettings / BIOSVersion are Server-scoped (one child per server in serverRefs). |  | Enum: [BMCSettings BMCVersion BIOSSettings BIOSVersion] <br /> |
+| `template` _[PipelineStageTemplate](#pipelinestagetemplate)_ | Template defines the desired state for the child resource this stage creates.<br />kind acts as the discriminator — see PipelineStageTemplate for field validity per kind. |  |  |
+
+
+#### PipelineStageKind
+
+_Underlying type:_ _string_
+
+PipelineStageKind identifies the type of child resource a pipeline stage manages.
+
+_Validation:_
+- Enum: [BMCSettings BMCVersion BIOSSettings BIOSVersion]
+
+_Appears in:_
+- [PipelineStage](#pipelinestage)
+
+| Field | Description |
+| --- | --- |
+| `BMCSettings` | PipelineStageKindBMCSettings creates a BMCSettings child (BMC-scoped, once per Run).<br /> |
+| `BMCVersion` | PipelineStageKindBMCVersion creates BMCVersion children, one per hop (BMC-scoped, once per Run).<br /> |
+| `BIOSSettings` | PipelineStageKindBIOSSettings creates BIOSSettings children (Server-scoped, one per server in serverRefs).<br /> |
+| `BIOSVersion` | PipelineStageKindBIOSVersion creates BIOSVersion children, one per hop per server (Server-scoped).<br /> |
+
+
+#### PipelineStageTemplate
+
+
+
+PipelineStageTemplate is the unified template type for all pipeline stage kinds.
+kind on the enclosing PipelineStage acts as the discriminator:
+
+  - BMCSettings / BIOSSettings stages: use version, settingsFlow, variables, retryPolicy,
+    serverMaintenancePolicy; image and updatePolicy must be absent.
+  - BMCVersion / BIOSVersion stages: use version, image, updatePolicy, retryPolicy,
+    serverMaintenancePolicy; settingsFlow and variables must be absent.
+
+CEL rules on PipelineStage enforce kind-specific field constraints.
+
+
+
+_Appears in:_
+- [PipelineStage](#pipelinestage)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `version` _string_ | Version specifies the firmware version.<br />Optional in pipeline stage templates (hydrated at stamp time when omitted);<br />enforced non-empty by CEL rules on the concrete template types. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
+| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is the maintenance policy for server maintenance requests.<br />Defaults to OwnerApproval if not set. | OwnerApproval |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the ordered settings sequence to apply.<br />Items are applied in ascending Priority order (lower number = higher priority). |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables for settings templating.<br />Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.<br />Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule. |  | MaxItems: 64 <br /> |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the firmware image for this version. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
 
 
 #### Power
@@ -1337,6 +1688,8 @@ _Appears in:_
 - [BMCSettingsTemplate](#bmcsettingstemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
+- [BaseTemplate](#basetemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -1543,6 +1896,8 @@ _Appears in:_
 - [BMCSettingsTemplate](#bmcsettingstemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
+- [BaseTemplate](#basetemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
 - [ServerMaintenanceSpec](#servermaintenancespec)
 
 | Field | Description |
@@ -1728,12 +2083,37 @@ _Appears in:_
 _Appears in:_
 - [BIOSSettingsSpec](#biossettingsspec)
 - [BIOSSettingsTemplate](#biossettingstemplate)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
+- [SettingsTemplate](#settingstemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `name` _string_ | Name is the name of the flow item. |  | MaxLength: 1000 <br />MinLength: 1 <br /> |
 | `settings` _object (keys:string, values:string)_ | Settings contains software (e.g. BIOS, BMC) settings as a map. |  |  |
 | `priority` _integer_ | Priority defines the order of applying the settings. Lower numbers have higher priority (i.e. lower numbers are applied first). |  | Maximum: 2.147483645e+09 <br />Minimum: 1 <br /> |
+
+
+#### SettingsTemplate
+
+
+
+
+
+
+
+_Appears in:_
+- [BIOSSettingsSpec](#biossettingsspec)
+- [BIOSSettingsTemplate](#biossettingstemplate)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the ordered settings sequence to apply.<br />Items are applied in ascending Priority order (lower number = higher priority). |  |  |
+| `variables` _[Variable](#variable) array_ | Variables is a list of variables for settings templating.<br />Variable references in SettingsFlow items' Settings maps use the $(KEY) syntax.<br />Only applicable to BMCSettings stages; blocked on BIOSSettings by a CEL rule. |  | MaxItems: 64 <br /> |
 
 
 #### Storage
@@ -1850,6 +2230,8 @@ _Appears in:_
 - [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
+- [VersionTemplate](#versiontemplate)
 
 | Field | Description |
 | --- | --- |
@@ -1865,8 +2247,12 @@ _Appears in:_
 
 
 _Appears in:_
+- [BIOSSettingsSpec](#biossettingsspec)
+- [BIOSSettingsTemplate](#biossettingstemplate)
 - [BMCSettingsSpec](#bmcsettingsspec)
 - [BMCSettingsTemplate](#bmcsettingstemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
+- [SettingsTemplate](#settingstemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -1890,5 +2276,26 @@ _Appears in:_
 | `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).<br />Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error. |  |  |
 | `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
 | `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
+
+
+#### VersionTemplate
+
+
+
+VersionTemplate holds the version-specific fields shared by BMCVersionTemplate and BIOSVersionTemplate.
+
+
+
+_Appears in:_
+- [BIOSVersionSpec](#biosversionspec)
+- [BIOSVersionTemplate](#biosversiontemplate)
+- [BMCVersionSpec](#bmcversionspec)
+- [BMCVersionTemplate](#bmcversiontemplate)
+- [PipelineStageTemplate](#pipelinestagetemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `image` _[ImageSpec](#imagespec)_ | Image specifies the firmware image for this version. |  |  |
+| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
 
 

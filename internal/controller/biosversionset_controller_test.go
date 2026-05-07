@@ -140,9 +140,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					},
 				},
 				ServerSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -240,9 +245,14 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBiosVersion,
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion},
+					},
 				},
 				ServerSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -412,10 +422,15 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			},
 			Spec: metalv1alpha1.BIOSVersionSetSpec{
 				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
-					Version:                 upgradeServerBiosVersion + " fail",
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion + " fail"},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 upgradeServerBiosVersion + " fail",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					},
+					VersionTemplate: metalv1alpha1.VersionTemplate{
+
+						Image: metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion + " fail"},
+					},
 				},
 				ServerSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{

@@ -105,9 +105,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
@@ -136,9 +141,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
@@ -179,9 +189,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
@@ -265,9 +280,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
@@ -363,9 +383,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "2.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "2.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
@@ -460,9 +485,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
@@ -516,9 +546,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
@@ -574,9 +609,14 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings2)).To(Succeed())
@@ -632,10 +672,15 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: bmcSetting}},
+					},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())
@@ -698,21 +743,26 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(SETTING_VAL)"},
-					Variables: []metalv1alpha1.Variable{
-						{
-							Key: "SETTING_VAL",
-							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
-								SecretKeyRef: &metalv1alpha1.NamespacedKeySelector{
-									Name:      varSecret.Name,
-									Namespace: ns.Name,
-									Key:       "bmc-setting",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: map[string]string{"abc": "$(SETTING_VAL)"}}},
+						Variables: []metalv1alpha1.Variable{
+							{
+								Key: "SETTING_VAL",
+								ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+									SecretKeyRef: &metalv1alpha1.NamespacedKeySelector{
+										Name:      varSecret.Name,
+										Namespace: ns.Name,
+										Key:       "bmc-setting",
+									},
 								},
 							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
 		}
@@ -755,21 +805,26 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(SETTING_VAL)"},
-					Variables: []metalv1alpha1.Variable{
-						{
-							Key: "SETTING_VAL",
-							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
-								ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
-									Name:      varCM.Name,
-									Namespace: ns.Name,
-									Key:       "bmc-setting",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: map[string]string{"abc": "$(SETTING_VAL)"}}},
+						Variables: []metalv1alpha1.Variable{
+							{
+								Key: "SETTING_VAL",
+								ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+									ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
+										Name:      varCM.Name,
+										Namespace: ns.Name,
+										Key:       "bmc-setting",
+									},
 								},
 							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
 		}
@@ -799,19 +854,24 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(BMC_NAME)"},
-					Variables: []metalv1alpha1.Variable{
-						{
-							Key: "BMC_NAME",
-							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
-								FieldRef: &metalv1alpha1.FieldRefSelector{
-									FieldPath: "spec.BMCRef.name",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: map[string]string{"abc": "$(BMC_NAME)"}}},
+						Variables: []metalv1alpha1.Variable{
+							{
+								Key: "BMC_NAME",
+								ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+									FieldRef: &metalv1alpha1.FieldRefSelector{
+										FieldPath: "spec.BMCRef.name",
+									},
 								},
 							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
 		}
@@ -855,30 +915,35 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version: "1.45.455b66-rev4",
-					// Both placeholders resolved from different sources into one value.
-					SettingsMap: map[string]string{"abc": "$(BmcName).$(SearchDomain)"},
-					Variables: []metalv1alpha1.Variable{
-						{
-							Key: "BmcName",
-							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
-								FieldRef: &metalv1alpha1.FieldRefSelector{
-									FieldPath: "spec.BMCRef.name",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						// Both placeholders resolved from different sources into one value.
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: map[string]string{"abc": "$(BmcName).$(SearchDomain)"}}},
+						Variables: []metalv1alpha1.Variable{
+							{
+								Key: "BmcName",
+								ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+									FieldRef: &metalv1alpha1.FieldRefSelector{
+										FieldPath: "spec.BMCRef.name",
+									},
 								},
 							},
-						},
-						{
-							Key: "SearchDomain",
-							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
-								ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
-									Name:      domainCM.Name,
-									Namespace: ns.Name,
-									Key:       "search-domain",
+							{
+								Key: "SearchDomain",
+								ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+									ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
+										Name:      domainCM.Name,
+										Namespace: ns.Name,
+										Key:       "search-domain",
+									},
 								},
 							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
 		}
@@ -931,31 +996,36 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(LicenseKey)"},
-					Variables: []metalv1alpha1.Variable{
-						{
-							// Step 1: resolve BmcName from the object's own field.
-							Key: "BmcName",
-							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
-								FieldRef: &metalv1alpha1.FieldRefSelector{
-									FieldPath: "spec.BMCRef.name",
+					BaseTemplate: metalv1alpha1.BaseTemplate{
+						Version:                 "1.45.455b66-rev4",
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					SettingsTemplate: metalv1alpha1.SettingsTemplate{
+
+						SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "default", Priority: 1, Settings: map[string]string{"abc": "$(LicenseKey)"}}},
+						Variables: []metalv1alpha1.Variable{
+							{
+								// Step 1: resolve BmcName from the object's own field.
+								Key: "BmcName",
+								ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+									FieldRef: &metalv1alpha1.FieldRefSelector{
+										FieldPath: "spec.BMCRef.name",
+									},
 								},
 							},
-						},
-						{
-							// Step 2: use the already-resolved $(BmcName) as the ConfigMap key.
-							Key: "LicenseKey",
-							ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
-								ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
-									Name:      licensesCM.Name,
-									Namespace: ns.Name,
-									Key:       "$(BmcName)", // expanded to bmc.Name at resolution time
+							{
+								// Step 2: use the already-resolved $(BmcName) as the ConfigMap key.
+								Key: "LicenseKey",
+								ValueFrom: &metalv1alpha1.VariableSourceValueFrom{
+									ConfigMapKeyRef: &metalv1alpha1.NamespacedKeySelector{
+										Name:      licensesCM.Name,
+										Namespace: ns.Name,
+										Key:       "$(BmcName)", // expanded to bmc.Name at resolution time
+									},
 								},
 							},
 						},
 					},
-					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
 		}

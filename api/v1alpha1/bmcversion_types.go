@@ -21,32 +21,22 @@ const (
 	BMCVersionStateFailed BMCVersionState = "Failed"
 )
 
+// +kubebuilder:validation:XValidation:rule="self.version != \"\"",message="version is required"
+// +kubebuilder:validation:XValidation:rule="self.image.URI != \"\"",message="image.URI is required"
 type BMCVersionTemplate struct {
-	// Version specifies the BMC version to upgrade to.
-	// +required
-	Version string `json:"version"`
-
-	// UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies.
-	// +optional
-	UpdatePolicy *UpdatePolicy `json:"updatePolicy,omitempty"`
-
-	// Image specifies the image to use to upgrade to the given BMC version.
-	// +required
-	Image ImageSpec `json:"image"`
-
-	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
-	// +optional
-	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
-
-	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.
-	// +optional
-	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
+	BaseTemplate    `json:",inline"`
+	VersionTemplate `json:",inline"`
 }
 
 // BMCVersionSpec defines the desired state of BMCVersion.
 type BMCVersionSpec struct {
 	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
 	BMCVersionTemplate `json:",inline"`
+
+	// DriftPolicy controls the controller's reconcile mode when owned by a MaintenancePipelineRun.
+	// Empty (default): active. Observe: drift detection only. Suspend: completely frozen.
+	// +optional
+	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers.
 	// +optional

@@ -481,50 +481,10 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 				return ctrl.Result{}, fmt.Errorf("failed to update BMCSettings Applied condition: %w", err)
 			}
 
-			// Reset later-phase conditions to prevent stale state from a previous generation
-			// leaking into this apply cycle.
-			resetCond, errCond := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCResetPostSettingApply)
-			if errCond != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to get condition for reset of BMC: %w", errCond)
+			if err := r.persistApplyCycleConditions(ctx, settings, changesIssued, resetBMCReq); err != nil {
+				return ctrl.Result{}, err
 			}
-			verifiedCond, errCond := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsChangesVerified)
-			if errCond != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to get condition for settings changes verified: %w", errCond)
-			}
-			if err := r.Conditions.Update(
-				verifiedCond,
-				conditionutils.UpdateStatus(corev1.ConditionFalse),
-				conditionutils.UpdateReason(ReasonBMCSettingsVerificationPending),
-				conditionutils.UpdateMessage("Verification pending for new apply cycle"),
-			); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to reset settings changes verified condition: %w", err)
-			}
-
-			// Mark whether a post-apply reset is needed for Phase 2
-			if resetBMCReq {
-				if err := r.Conditions.Update(
-					resetCond,
-					conditionutils.UpdateStatus(corev1.ConditionFalse),
-					conditionutils.UpdateReason(ReasonResetRequired),
-					conditionutils.UpdateMessage("BMC reset required after settings apply"),
-				); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to update reset required condition: %w", err)
-				}
-			} else {
-				if err := r.Conditions.Update(
-					resetCond,
-					conditionutils.UpdateStatus(corev1.ConditionTrue),
-					conditionutils.UpdateReason(ReasonResetIssued),
-					conditionutils.UpdateMessage("No BMC reset required for this apply cycle"),
-				); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to update reset not required condition: %w", err)
-				}
-			}
-
-			if err := r.updateBMCSettingsStatus(ctx, settings, settings.Status.State, changesIssued); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to persist settings changes issued condition: %w", err)
-			}
-			return ctrl.Result{}, r.updateBMCSettingsStatus(ctx, settings, settings.Status.State, resetCond)
+			return ctrl.Result{}, nil
 		}
 
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
@@ -570,6 +530,55 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 	}
 
 	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+}
+
+// persistApplyCycleConditions resets later-phase conditions (verified, reset) and
+// persists all phase conditions after a successful settings apply in Phase 1.
+func (r *BMCSettingsReconciler) persistApplyCycleConditions(ctx context.Context, settings *metalv1alpha1.BMCSettings, changesIssued *metav1.Condition, resetBMCReq bool) error {
+	resetCond, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCResetPostSettingApply)
+	if err != nil {
+		return fmt.Errorf("failed to get condition for reset of BMC: %w", err)
+	}
+	verifiedCond, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionBMCSettingsChangesVerified)
+	if err != nil {
+		return fmt.Errorf("failed to get condition for settings changes verified: %w", err)
+	}
+	if err := r.Conditions.Update(
+		verifiedCond,
+		conditionutils.UpdateStatus(corev1.ConditionFalse),
+		conditionutils.UpdateReason(ReasonBMCSettingsVerificationPending),
+		conditionutils.UpdateMessage("Verification pending for new apply cycle"),
+	); err != nil {
+		return fmt.Errorf("failed to reset settings changes verified condition: %w", err)
+	}
+
+	if resetBMCReq {
+		if err := r.Conditions.Update(
+			resetCond,
+			conditionutils.UpdateStatus(corev1.ConditionFalse),
+			conditionutils.UpdateReason(ReasonResetRequired),
+			conditionutils.UpdateMessage("BMC reset required after settings apply"),
+		); err != nil {
+			return fmt.Errorf("failed to update reset required condition: %w", err)
+		}
+	} else {
+		if err := r.Conditions.Update(
+			resetCond,
+			conditionutils.UpdateStatus(corev1.ConditionTrue),
+			conditionutils.UpdateReason(ReasonResetIssued),
+			conditionutils.UpdateMessage("No BMC reset required for this apply cycle"),
+		); err != nil {
+			return fmt.Errorf("failed to update reset not required condition: %w", err)
+		}
+	}
+
+	if err := r.updateBMCSettingsStatus(ctx, settings, settings.Status.State, changesIssued); err != nil {
+		return fmt.Errorf("failed to persist settings changes issued condition: %w", err)
+	}
+	if err := r.updateBMCSettingsStatus(ctx, settings, settings.Status.State, verifiedCond); err != nil {
+		return fmt.Errorf("failed to persist settings changes verified condition: %w", err)
+	}
+	return r.updateBMCSettingsStatus(ctx, settings, settings.Status.State, resetCond)
 }
 
 func (r *BMCSettingsReconciler) handleSettingAppliedState(ctx context.Context, settings *metalv1alpha1.BMCSettings, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) error {

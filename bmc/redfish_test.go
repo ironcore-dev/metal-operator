@@ -257,3 +257,193 @@ var _ = Describe("RedfishBaseBMC DiscoverManager", func() {
 		Expect(manager).To(BeNil())
 	})
 })
+
+// eventServiceJSON returns JSON for an EventService with subscriptions link.
+func eventServiceJSON() []byte {
+	svc := map[string]any{
+		"@odata.id":             "/redfish/v1/EventService",
+		"Id":                    "EventService",
+		"Name":                  "Event Service",
+		"ServiceEnabled":        true,
+		"Subscriptions":         map[string]string{"@odata.id": "/redfish/v1/EventService/Subscriptions"},
+		"DeliveryRetryAttempts": 3,
+	}
+	b, _ := json.Marshal(svc)
+	return b
+}
+
+// subscriptionJSON returns JSON for an EventDestination (subscription).
+// Note: EventFormatType is intentionally omitted to match real BMC behavior.
+func subscriptionJSON(id, destination, subContext string) []byte {
+	sub := map[string]any{
+		"@odata.id":   "/redfish/v1/EventService/Subscriptions/" + id,
+		"@odata.type": "#EventDestination.v1_14_0.EventDestination",
+		"Id":          id,
+		"Name":        "EventSubscription " + id,
+		"Destination": destination,
+		"Context":     subContext,
+		"Protocol":    "Redfish",
+		// EventFormatType intentionally omitted - many BMCs don't return it
+	}
+	b, _ := json.Marshal(sub)
+	return b
+}
+
+// subscriptionsCollectionJSON returns JSON for a subscriptions collection.
+func subscriptionsCollectionJSON(memberLinks []string) []byte {
+	type member struct {
+		ODataID string `json:"@odata.id"`
+	}
+	members := make([]member, len(memberLinks))
+	for i, link := range memberLinks {
+		members[i] = member{ODataID: link}
+	}
+	col := map[string]any{
+		"@odata.id":           "/redfish/v1/EventService/Subscriptions",
+		"Name":                "Event Subscriptions Collection",
+		"Members@odata.count": len(memberLinks),
+		"Members":             members,
+	}
+	b, _ := json.Marshal(col)
+	return b
+}
+
+// serviceRootWithEventServiceJSON returns JSON for a service root that includes EventService.
+func serviceRootWithEventServiceJSON() []byte {
+	root := map[string]any{
+		"@odata.id":      "/redfish/v1/",
+		"Id":             "ServiceRoot",
+		"Name":           "Service Root",
+		"RedfishVersion": "1.0.0",
+		"Managers":       map[string]string{"@odata.id": "/redfish/v1/Managers"},
+		"EventService":   map[string]string{"@odata.id": "/redfish/v1/EventService"},
+	}
+	b, _ := json.Marshal(root)
+	return b
+}
+
+var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
+	It("should find subscription matching destination and context", func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(eventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{"/redfish/v1/EventService/Subscriptions/1"})) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/1", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionJSON("1", "http://operator/serverevents/alerts/node1", "metal-operator")) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/1"))
+	})
+
+	It("should not match subscription with different context", func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(eventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{"/redfish/v1/EventService/Subscriptions/1"})) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/1", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			// Same destination but different context (not "metal-operator")
+			w.Write(subscriptionJSON("1", "http://operator/serverevents/alerts/node1", "other-operator")) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("existing subscription not found"))
+		Expect(link).To(BeEmpty())
+	})
+
+	It("should return error when no subscriptions exist", func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(eventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{})) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("existing subscription not found"))
+		Expect(link).To(BeEmpty())
+	})
+
+	It("should find correct subscription among multiple", func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(eventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(subscriptionsCollectionJSON([]string{
+				"/redfish/v1/EventService/Subscriptions/1",
+				"/redfish/v1/EventService/Subscriptions/2",
+				"/redfish/v1/EventService/Subscriptions/3",
+			}))
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/1", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionJSON("1", "http://other/callback", "metal-operator")) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/2", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			// This is the one we're looking for
+			w.Write(subscriptionJSON("2", "http://operator/serverevents/alerts/node1", "metal-operator")) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/3", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionJSON("3", "http://operator/serverevents/alerts/node1", "different-context")) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/2"))
+	})
+})

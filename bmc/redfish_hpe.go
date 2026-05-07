@@ -110,7 +110,7 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 				if strings.Contains(info.MessageID, "ResourceAlreadyExists") ||
 					strings.Contains(info.MessageID, "PropertyValueModified") {
 					// Handle duplicate subscription - try to find existing one
-					if existingLink, findErr := r.findExistingSubscription(destination, eventFormatType); findErr == nil {
+					if existingLink, findErr := r.findExistingSubscription(destination); findErr == nil {
 						// Successfully found existing subscription
 						return existingLink, nil
 					}

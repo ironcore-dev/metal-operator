@@ -511,3 +511,150 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		Expect(link).To(BeEmpty())
 	})
 })
+
+var _ = Describe("RedfishBaseBMC CreateEventSubscription", func() {
+	ctx := context.Background()
+	const destination = "http://operator/serverevents/alerts/node1"
+
+	// baseHandlers registers the service root and event service on mux.
+	baseHandlers := func(mux *http.ServeMux) {
+		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(eventServiceJSON()) //nolint:errcheck
+		})
+	}
+
+	It("should return the subscription link from Location header on success", func() {
+		mux := http.NewServeMux()
+		baseHandlers(mux)
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				w.Header().Set("Location", "/redfish/v1/EventService/Subscriptions/new-1")
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{})) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.CreateEventSubscription(ctx, destination, schemas.EventFormatType("Event"), schemas.DeliveryRetryPolicy("RetryForever"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/new-1"))
+	})
+
+	// This test is the regression guard for the fix. Gofish returns non-2xx responses as errors —
+	// the subscription link can never be recovered from resp.StatusCode because resp is nil when
+	// err != nil. The recovery MUST happen via err.Error() in the if-err block.
+	// If someone re-introduces a resp.StatusCode check instead, this test will fail because
+	// findExistingSubscription will never be called and the function will return the raw error.
+	It("should recover existing subscription when BMC returns ResourceAlreadyExists (via err.Error)", func() {
+		mux := http.NewServeMux()
+		baseHandlers(mux)
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				// Gofish wraps this 409 as an error containing the body text.
+				// strings.Contains(err.Error(), "ResourceAlreadyExists") must be true.
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error":{"@Message.ExtendedInfo":[{"MessageId":"Base.1.0.ResourceAlreadyExists","Message":"already exists"}]}}`)) //nolint:errcheck
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{"/redfish/v1/EventService/Subscriptions/existing-1"})) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/existing-1", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionJSON("existing-1", destination, "metal-operator")) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.CreateEventSubscription(ctx, destination, schemas.EventFormatType("Event"), schemas.DeliveryRetryPolicy("RetryForever"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/existing-1"))
+	})
+
+	It("should recover existing subscription when BMC returns PropertyValueModified with destination in body (Dell iDRAC behavior)", func() {
+		mux := http.NewServeMux()
+		baseHandlers(mux)
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				// Dell iDRAC includes the destination URL in the PropertyValueModified message body.
+				// The narrowed check requires destination to appear in the error text alongside
+				// PropertyValueModified to avoid false-positive recovery on unrelated property errors.
+				w.WriteHeader(http.StatusBadRequest)
+				body := `{"error":{"@Message.ExtendedInfo":[{"MessageId":"Base.1.0.PropertyValueModified","Message":"The value ` + destination + ` for the property Destination is already in use"}]}}` //nolint:errcheck
+				w.Write([]byte(body))                                                                                                                                                                   //nolint:errcheck
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{"/redfish/v1/EventService/Subscriptions/existing-1"})) //nolint:errcheck
+		})
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions/existing-1", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionJSON("existing-1", destination, "metal-operator")) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.CreateEventSubscription(ctx, destination, schemas.EventFormatType("Event"), schemas.DeliveryRetryPolicy("RetryForever"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/existing-1"))
+	})
+
+	It("should return error when BMC returns ResourceAlreadyExists but existing subscription cannot be found", func() {
+		mux := http.NewServeMux()
+		baseHandlers(mux)
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error":{"@Message.ExtendedInfo":[{"MessageId":"Base.1.0.ResourceAlreadyExists"}]}}`)) //nolint:errcheck
+				return
+			}
+			// Return empty collection so findExistingSubscription finds nothing.
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(subscriptionsCollectionJSON([]string{})) //nolint:errcheck
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.CreateEventSubscription(ctx, destination, schemas.EventFormatType("Event"), schemas.DeliveryRetryPolicy("RetryForever"))
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to recover existing subscription"))
+		Expect(link).To(BeEmpty())
+	})
+
+	It("should propagate non-duplicate POST errors unchanged", func() {
+		mux := http.NewServeMux()
+		baseHandlers(mux)
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error":{"message":"internal server error"}}`)) //nolint:errcheck
+				return
+			}
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		link, err := bmc.CreateEventSubscription(ctx, destination, schemas.EventFormatType("Event"), schemas.DeliveryRetryPolicy("RetryForever"))
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).NotTo(ContainSubstring("failed to recover existing subscription"))
+		Expect(link).To(BeEmpty())
+	})
+})

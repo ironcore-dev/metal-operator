@@ -82,47 +82,22 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 
 	resp, err := client.Post(ev.SubscriptionsLink, payload)
 	if err != nil {
+		// Gofish returns non-2xx responses as errors (format: "STATUS_CODE: BODY").
+		// Check if it's a "resource already exists" error and recover the existing subscription URI.
+		// Note: PropertyValueModified is intentionally excluded here — HPE iLO uses it for general
+		// property validation failures (e.g. read-only fields), not duplicate subscriptions.
+		if strings.Contains(err.Error(), "ResourceAlreadyExists") {
+			existingLink, findErr := r.findExistingSubscription(destination)
+			if findErr == nil {
+				return existingLink, nil
+			}
+			return "", fmt.Errorf("%w: failed to recover existing subscription: %v", err, findErr)
+		}
 		return "", err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read error response body
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
-		}
-
-		// Parse Redfish error response
-		var redfishError struct {
-			Error struct {
-				MessageExtendedInfo []struct {
-					MessageID string `json:"MessageId"`
-					Message   string `json:"Message"`
-				} `json:"@Message.ExtendedInfo"`
-			} `json:"error"`
-		}
-
-		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
-			// Check if it's a "resource already exists" error
-			for _, info := range redfishError.Error.MessageExtendedInfo {
-				if strings.Contains(info.MessageID, "ResourceAlreadyExists") ||
-					strings.Contains(info.MessageID, "PropertyValueModified") {
-					// Handle duplicate subscription - try to find existing one
-					existingLink, findErr := r.findExistingSubscription(destination)
-					if findErr == nil {
-						return existingLink, nil
-					}
-					return "", fmt.Errorf("failed to recover existing subscription (%w) after duplicate error: %s", findErr, string(bodyBytes))
-				}
-			}
-		}
-
-		// Not a duplicate error - return original error with details
-		return "", fmt.Errorf("failed to create event subscription status code: %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
 	// return subscription link from returned location
 	subscriptionLink := resp.Header.Get("Location")
 	if subscriptionLink == "" {

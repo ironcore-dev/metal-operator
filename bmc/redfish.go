@@ -1065,46 +1065,27 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
 	resp, err := client.Post(ev.SubscriptionsLink, payload)
 	if err != nil {
+		// Gofish returns non-2xx responses as errors (format: "STATUS_CODE: BODY").
+		// Check if it's a "resource already exists" error and recover the existing subscription URI.
+		// PropertyValueModified is also checked but only when the destination URL appears in the
+		// error text — Dell iDRAC uses it for duplicate subscriptions and the duplicate destination
+		// is included in the error body, which prevents false-positive recovery on unrelated
+		// property validation failures.
+		errText := err.Error()
+		isDuplicate := strings.Contains(errText, "ResourceAlreadyExists") ||
+			(strings.Contains(errText, "PropertyValueModified") && strings.Contains(errText, destination))
+		if isDuplicate {
+			existingLink, findErr := r.findExistingSubscription(destination)
+			if findErr == nil {
+				return existingLink, nil
+			}
+			return "", fmt.Errorf("%w: failed to recover existing subscription: %v", err, findErr)
+		}
 		return "", err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read error response body
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
-		}
-
-		// Parse Redfish error response
-		var redfishError struct {
-			Error struct {
-				MessageExtendedInfo []struct {
-					MessageId string `json:"MessageId"`
-					Message   string `json:"Message"`
-				} `json:"@Message.ExtendedInfo"`
-			} `json:"error"`
-		}
-
-		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
-			// Check if it's a "resource already exists" error
-			for _, info := range redfishError.Error.MessageExtendedInfo {
-				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
-					strings.Contains(info.MessageId, "PropertyValueModified") {
-					// Handle duplicate subscription - try to find existing one
-					existingLink, findErr := r.findExistingSubscription(destination)
-					if findErr == nil {
-						return existingLink, nil
-					}
-					return "", fmt.Errorf("failed to recover existing subscription (%w) after duplicate error: %s", findErr, string(bodyBytes))
-				}
-			}
-		}
-
-		// Not a duplicate error - return original error with details
-		return "", fmt.Errorf("failed to create event subscription status code: %d: %s", resp.StatusCode, string(bodyBytes))
-	}
 	// return subscription link from returned location
 	subscriptionLink := resp.Header.Get("Location")
 	if subscriptionLink == "" {

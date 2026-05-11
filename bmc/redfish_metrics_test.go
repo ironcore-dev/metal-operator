@@ -43,7 +43,7 @@ var _ = Describe("Redfish Metrics Methods", func() {
 					switch r.URL.Path {
 					case "/redfish/v1/":
 						json.NewEncoder(w).Encode(map[string]interface{}{
-							"@odata.id":         "/redfish/v1/",
+							"@odata.id":        "/redfish/v1/",
 							"TelemetryService": map[string]interface{}{"@odata.id": "/redfish/v1/TelemetryService"},
 						})
 					case "/redfish/v1/TelemetryService":

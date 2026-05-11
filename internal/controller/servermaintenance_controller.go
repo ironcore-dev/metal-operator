@@ -378,7 +378,7 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metal
 
 	if server.Spec.ServerMaintenanceRef != nil {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
-			log.Error(err, "Failed to remove ServerMaintenance ref from Server")
+			return fmt.Errorf("failed to remove ServerMaintenance ref from Server: %w", err)
 		}
 	}
 	if server.Spec.MaintenanceBootConfigurationRef != nil {

@@ -487,11 +487,11 @@ func (r *BMCSettingsReconciler) updateSettingsAndVerify(ctx context.Context, set
 			return ctrl.Result{}, nil
 		}
 
+		log.V(1).Info("Pending BMC attributes exist, waiting for them to clear before applying settings")
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
 	}
 
 	// Phase 2: Handle BMC reset if required
-	log.V(1).Info("Handling BMC reset post applying BMC settings")
 	if ok, err := r.handleBMCReset(ctx, settings, bmcObj, ConditionBMCResetPostSettingApply); !ok || err != nil {
 		return ctrl.Result{}, err
 	}
@@ -684,6 +684,8 @@ func (r *BMCSettingsReconciler) handleBMCReset(
 	if conditionType == ConditionBMCResetPostSettingApply && resetBMC.Status == metav1.ConditionTrue && resetBMC.Reason == ReasonNoResetRequired {
 		return true, nil
 	}
+
+	log.V(1).Info("Handling BMC reset", "conditionType", conditionType)
 
 	if resetBMC.Status != metav1.ConditionTrue {
 		annotations := bmcObj.GetAnnotations()

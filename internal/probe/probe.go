@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -221,7 +223,8 @@ func (a *Agent) registerServer(ctx context.Context) error {
 			}()
 
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				a.log.Error(err, "Failed to register server", "url", a.RegistryURL)
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+				a.log.Error(fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body)), "Failed to register server", "url", a.RegistryURL)
 				return false, nil
 			}
 

@@ -96,12 +96,17 @@ func (s *Server) Start(ctx context.Context) error {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
-	s.pollAllBMCs(ctx)
+	// Initial poll with timeout to prevent overlap
+	pollCtx, cancel := context.WithTimeout(ctx, s.interval)
+	s.pollAllBMCs(pollCtx)
+	cancel()
 
 	for {
 		select {
 		case <-ticker.C:
-			s.pollAllBMCs(ctx)
+			pollCtx, cancel := context.WithTimeout(ctx, s.interval)
+			s.pollAllBMCs(pollCtx)
+			cancel()
 		case <-ctx.Done():
 			s.log.Info("Stopping metrics polling server")
 			return nil
@@ -135,14 +140,7 @@ func (s *Server) pollAllBMCs(ctx context.Context) {
 		}
 
 		wg.Add(1)
-		go func(bmc *metalv1alpha1.BMC) {
-			defer wg.Done()
-
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			s.pollBMC(ctx, bmc)
-		}(bmcObj)
+		go s.pollBMC(ctx, bmcObj, &wg, semaphore)
 	}
 
 	wg.Wait()
@@ -150,7 +148,11 @@ func (s *Server) pollAllBMCs(ctx context.Context) {
 }
 
 // pollBMC polls a single BMC for metrics and events.
-func (s *Server) pollBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC) {
+func (s *Server) pollBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, wg *sync.WaitGroup, semaphore chan struct{}) {
+	defer wg.Done()
+
+	semaphore <- struct{}{}
+	defer func() { <-semaphore }()
 	log := s.log.WithValues("bmc", bmcObj.Name)
 
 	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, s.client, bmcObj, s.defaultProtocol, s.skipCertValidate, s.bmcOptions)

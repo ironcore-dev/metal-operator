@@ -1206,6 +1206,7 @@ func (r *RedfishBaseBMC) GetMetricReport(ctx context.Context) (MetricsReport, er
 
 // GetEventLog retrieves recent events from the BMC's System Event Log (SEL).
 // Returns events from the last 10 minutes by default.
+// Queries all bootable systems (those with BootSourceOverrideTarget).
 func (r *RedfishBaseBMC) GetEventLog(ctx context.Context) ([]Event, error) {
 	service := r.client.GetService()
 	systems, err := service.Systems()
@@ -1216,45 +1217,49 @@ func (r *RedfishBaseBMC) GetEventLog(ctx context.Context) ([]Event, error) {
 		return nil, fmt.Errorf("no systems found")
 	}
 
-	system := systems[0]
-
-	// Get log services
-	logServices, err := system.LogServices()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get log services: %w", err)
-	}
-
 	events := []Event{}
+	cutoff := time.Now().Add(-10 * time.Minute)
 
-	// Query each log service
-	for _, logService := range logServices {
-		entries, err := logService.Entries()
-		if err != nil {
-			continue // Skip log services that fail
+	// Query all bootable systems
+	for _, system := range systems {
+		// Filter to bootable systems (same logic as GetSystems)
+		if system.Boot.BootSourceOverrideTarget == "" {
+			continue
 		}
 
-		// Filter to recent entries (last 10 minutes)
-		cutoff := time.Now().Add(-10 * time.Minute)
+		// Get log services for this system
+		logServices, err := system.LogServices()
+		if err != nil {
+			continue // Skip systems where log services fail
+		}
 
-		for _, entry := range entries {
-			// Parse timestamp
-			var entryTime time.Time
-			if entry.Created != "" {
-				entryTime, _ = time.Parse(time.RFC3339, entry.Created)
+		// Query each log service
+		for _, logService := range logServices {
+			entries, err := logService.Entries()
+			if err != nil {
+				continue // Skip log services that fail
 			}
 
-			// Skip old entries
-			if !entryTime.IsZero() && entryTime.Before(cutoff) {
-				continue
-			}
+			for _, entry := range entries {
+				// Parse timestamp
+				var entryTime time.Time
+				if entry.Created != "" {
+					entryTime, _ = time.Parse(time.RFC3339, entry.Created)
+				}
 
-			events = append(events, Event{
-				EventID:           entry.ID,
-				Message:           entry.Message,
-				Severity:          string(entry.Severity),
-				EventTimestamp:    entry.Created,
-				OriginOfCondition: entry.ODataID,
-			})
+				// Skip old entries
+				if !entryTime.IsZero() && entryTime.Before(cutoff) {
+					continue
+				}
+
+				events = append(events, Event{
+					EventID:           entry.ID,
+					Message:           entry.Message,
+					Severity:          string(entry.Severity),
+					EventTimestamp:    entry.Created,
+					OriginOfCondition: entry.ODataID,
+				})
+			}
 		}
 	}
 

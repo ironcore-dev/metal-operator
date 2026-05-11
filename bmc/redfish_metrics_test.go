@@ -42,36 +42,36 @@ var _ = Describe("Redfish Metrics Methods", func() {
 					w.WriteHeader(http.StatusOK)
 					switch r.URL.Path {
 					case "/redfish/v1/":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id":        "/redfish/v1/",
-							"TelemetryService": map[string]interface{}{"@odata.id": "/redfish/v1/TelemetryService"},
+							"TelemetryService": map[string]any{"@odata.id": "/redfish/v1/TelemetryService"},
 						})
 					case "/redfish/v1/TelemetryService":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id":     "/redfish/v1/TelemetryService",
-							"MetricReports": map[string]interface{}{"@odata.id": "/redfish/v1/TelemetryService/MetricReports"},
+							"MetricReports": map[string]any{"@odata.id": "/redfish/v1/TelemetryService/MetricReports"},
 						})
 					case "/redfish/v1/TelemetryService/MetricReports":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/TelemetryService/MetricReports",
-							"Members": []interface{}{
-								map[string]interface{}{"@odata.id": "/redfish/v1/TelemetryService/MetricReports/Report1"},
+							"Members": []any{
+								map[string]any{"@odata.id": "/redfish/v1/TelemetryService/MetricReports/Report1"},
 							},
 						})
 					case "/redfish/v1/TelemetryService/MetricReports/Report1":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id":   "/redfish/v1/TelemetryService/MetricReports/Report1",
 							"@odata.type": "#MetricReport.v1_0_0.MetricReport",
 							"Id":          "Report1",
 							"Name":        "Test Metric Report",
-							"MetricValues": []interface{}{
-								map[string]interface{}{
+							"MetricValues": []any{
+								map[string]any{
 									"MetricId":       "Temp1",
 									"MetricProperty": "/Temperature",
 									"MetricValue":    "42.5",
 									"Timestamp":      "2024-01-01T00:00:00Z",
 								},
-								map[string]interface{}{
+								map[string]any{
 									"MetricId":       "Fan1",
 									"MetricProperty": "/FanSpeed",
 									"MetricValue":    "3000",
@@ -119,7 +119,7 @@ var _ = Describe("Redfish Metrics Methods", func() {
 					w.WriteHeader(http.StatusOK)
 					switch r.URL.Path {
 					case "/redfish/v1/":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/",
 						})
 					default:
@@ -165,44 +165,47 @@ var _ = Describe("Redfish Metrics Methods", func() {
 					w.WriteHeader(http.StatusOK)
 					switch r.URL.Path {
 					case "/redfish/v1/":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/",
-							"Systems":   map[string]interface{}{"@odata.id": "/redfish/v1/Systems"},
+							"Systems":   map[string]any{"@odata.id": "/redfish/v1/Systems"},
 						})
 					case "/redfish/v1/Systems":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/Systems",
-							"Members": []interface{}{
-								map[string]interface{}{"@odata.id": "/redfish/v1/Systems/1"},
+							"Members": []any{
+								map[string]any{"@odata.id": "/redfish/v1/Systems/1"},
 							},
 						})
 					case "/redfish/v1/Systems/1":
-						json.NewEncoder(w).Encode(map[string]interface{}{
-							"@odata.id":   "/redfish/v1/Systems/1",
-							"LogServices": map[string]interface{}{"@odata.id": "/redfish/v1/Systems/1/LogServices"},
+						_ = json.NewEncoder(w).Encode(map[string]any{
+							"@odata.id": "/redfish/v1/Systems/1",
+							"Boot": map[string]any{
+								"BootSourceOverrideTarget": "Pxe",
+							},
+							"LogServices": map[string]any{"@odata.id": "/redfish/v1/Systems/1/LogServices"},
 						})
 					case "/redfish/v1/Systems/1/LogServices":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/Systems/1/LogServices",
-							"Members": []interface{}{
-								map[string]interface{}{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL"},
+							"Members": []any{
+								map[string]any{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL"},
 							},
 						})
 					case "/redfish/v1/Systems/1/LogServices/SEL":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL",
-							"Entries":   map[string]interface{}{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL/Entries"},
+							"Entries":   map[string]any{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL/Entries"},
 						})
 					case "/redfish/v1/Systems/1/LogServices/SEL/Entries":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL/Entries",
-							"Members": []interface{}{
-								map[string]interface{}{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL/Entries/1"},
-								map[string]interface{}{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL/Entries/2"},
+							"Members": []any{
+								map[string]any{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL/Entries/1"},
+								map[string]any{"@odata.id": "/redfish/v1/Systems/1/LogServices/SEL/Entries/2"},
 							},
 						})
 					case "/redfish/v1/Systems/1/LogServices/SEL/Entries/1":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id":   "/redfish/v1/Systems/1/LogServices/SEL/Entries/1",
 							"Id":          "1",
 							"Message":     "Fan 1 speed is below threshold",
@@ -213,7 +216,7 @@ var _ = Describe("Redfish Metrics Methods", func() {
 							"MessageArgs": []string{"Fan1"},
 						})
 					case "/redfish/v1/Systems/1/LogServices/SEL/Entries/2":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id":   "/redfish/v1/Systems/1/LogServices/SEL/Entries/2",
 							"Id":          "2",
 							"Message":     "Temperature sensor reading is critical",
@@ -256,9 +259,10 @@ var _ = Describe("Redfish Metrics Methods", func() {
 
 				var event1, event2 *Event
 				for i := range events {
-					if events[i].EventID == "1" {
+					switch events[i].EventID {
+					case "1":
 						event1 = &events[i]
-					} else if events[i].EventID == "2" {
+					case "2":
 						event2 = &events[i]
 					}
 				}
@@ -279,14 +283,14 @@ var _ = Describe("Redfish Metrics Methods", func() {
 					w.WriteHeader(http.StatusOK)
 					switch r.URL.Path {
 					case "/redfish/v1/":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/",
-							"Systems":   map[string]interface{}{"@odata.id": "/redfish/v1/Systems"},
+							"Systems":   map[string]any{"@odata.id": "/redfish/v1/Systems"},
 						})
 					case "/redfish/v1/Systems":
-						json.NewEncoder(w).Encode(map[string]interface{}{
+						_ = json.NewEncoder(w).Encode(map[string]any{
 							"@odata.id": "/redfish/v1/Systems",
-							"Members":   []interface{}{},
+							"Members":   []any{},
 						})
 					default:
 						w.WriteHeader(http.StatusNotFound)

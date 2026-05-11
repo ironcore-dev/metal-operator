@@ -122,20 +122,25 @@ func parseServerToServerInfo(server *metalv1alpha1.Server) (api.ServerInfo, erro
 	var info api.ServerInfo
 	info.Name = server.GetName()
 
-	// Extract labels
 	labels := server.GetLabels()
-	rack, ok := labels[metalv1alpha1.TopologyRack]
-	if ok {
-		info.Rack = rack
+
+	info.Location = labels[metalv1alpha1.LabelLocation]
+	info.Rack = labels[metalv1alpha1.LabelRack]
+
+	if shelfStr, ok := labels[metalv1alpha1.LabelShelf]; ok {
+		shelf, err := strconv.Atoi(shelfStr)
+		if err != nil {
+			return info, fmt.Errorf("could not parse shelf label for server %s: %w", info.Name, err)
+		}
+		info.Shelf = shelf
 	}
 
-	heightUnitStr, ok := labels[metalv1alpha1.TopologyHeightUnit]
-	if ok {
-		heightUnit, err := strconv.Atoi(heightUnitStr)
+	if heightStr, ok := labels[metalv1alpha1.LabelHeight]; ok {
+		height, err := strconv.Atoi(heightStr)
 		if err != nil {
-			return info, fmt.Errorf("could not parse heightunit label for server %s: %w", info.Name, err)
+			return info, fmt.Errorf("could not parse height label for server %s: %w", info.Name, err)
 		}
-		info.HeightUnit = heightUnit
+		info.Height = height
 	}
 
 	info.Power = string(server.Status.PowerState)

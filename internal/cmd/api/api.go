@@ -6,8 +6,10 @@ package api
 // ServerInfo represents information about a server in the data center.
 type ServerInfo struct {
 	Name         string `json:"name"`
+	Location     string `json:"location"`
 	Rack         string `json:"rack"`
-	HeightUnit   int    `json:"heightUnit"`
+	Shelf        int    `json:"shelf"`
+	Height       int    `json:"height"`
 	Power        string `json:"power"`
 	IndicatorLED string `json:"indicatorLED"`
 	State        string `json:"state"`

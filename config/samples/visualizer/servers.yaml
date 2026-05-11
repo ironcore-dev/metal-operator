@@ -1,0 +1,396 @@
+# Demo servers: 3 rows (lanes) × 3 racks × 2-3 servers = 24 servers
+# Rack label format: "<row>-<rack>" (e.g. "1-2" = row 1, rack 2)
+# States / LEDs are varied to showcase all visualizer colors.
+---
+# ── Row 1, Rack 1 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk1-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-1"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100010001"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk1-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-1"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100010002"
+  indicatorLED: "Off"
+status:
+  powerState: "Off"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk1-srv3
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-1"
+    metadata.metal.ironcore.dev/shelf: "7"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100010003"
+  indicatorLED: "Blinking"
+status:
+  powerState: "On"
+  state: "Reserved"
+---
+# ── Row 1, Rack 2 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk2-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-2"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100020001"
+  indicatorLED: "Off"
+status:
+  powerState: "On"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk2-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-2"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100020002"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Error"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk2-srv3
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-2"
+    metadata.metal.ironcore.dev/shelf: "7"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100020003"
+  indicatorLED: "Off"
+status:
+  powerState: "Off"
+  state: "Maintenance"
+---
+# ── Row 1, Rack 3 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk3-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-3"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100030001"
+  indicatorLED: "Off"
+status:
+  powerState: "On"
+  state: "Discovery"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r1-rk3-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "1-3"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000100030002"
+  indicatorLED: "Off"
+status:
+  powerState: "Off"
+  state: "Initial"
+---
+# ── Row 2, Rack 1 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk1-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-1"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200010001"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk1-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-1"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200010002"
+  indicatorLED: "Blinking"
+status:
+  powerState: "On"
+  state: "Reserved"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk1-srv3
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-1"
+    metadata.metal.ironcore.dev/shelf: "7"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200010003"
+  indicatorLED: "Off"
+status:
+  powerState: "Off"
+  state: "Available"
+---
+# ── Row 2, Rack 2 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk2-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-2"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200020001"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk2-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-2"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200020002"
+  indicatorLED: "Off"
+status:
+  powerState: "On"
+  state: "Error"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk2-srv3
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-2"
+    metadata.metal.ironcore.dev/shelf: "7"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200020003"
+  indicatorLED: "Blinking"
+status:
+  powerState: "On"
+  state: "Maintenance"
+---
+# ── Row 2, Rack 3 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk3-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-3"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200030001"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r2-rk3-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "2-3"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000200030002"
+  indicatorLED: "Off"
+status:
+  powerState: "Off"
+  state: "Discovery"
+---
+# ── Row 3, Rack 1 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk1-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-1"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300010001"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk1-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-1"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300010002"
+  indicatorLED: "Off"
+status:
+  powerState: "Off"
+  state: "Reserved"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk1-srv3
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-1"
+    metadata.metal.ironcore.dev/shelf: "7"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300010003"
+  indicatorLED: "Blinking"
+status:
+  powerState: "On"
+  state: "Error"
+---
+# ── Row 3, Rack 2 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk2-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-2"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300020001"
+  indicatorLED: "Off"
+status:
+  powerState: "On"
+  state: "Available"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk2-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-2"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300020002"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Maintenance"
+---
+# ── Row 3, Rack 3 ──────────────────────────────────────────────────────────────
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk3-srv1
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-3"
+    metadata.metal.ironcore.dev/shelf: "1"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300030001"
+  indicatorLED: "Off"
+status:
+  powerState: "Off"
+  state: "Initial"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk3-srv2
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-3"
+    metadata.metal.ironcore.dev/shelf: "4"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300030002"
+  indicatorLED: "Blinking"
+status:
+  powerState: "On"
+  state: "Discovery"
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: demo-r3-rk3-srv3
+  labels:
+    metadata.metal.ironcore.dev/location: DEMO-DC1
+    metadata.metal.ironcore.dev/rack: "3-3"
+    metadata.metal.ironcore.dev/shelf: "7"
+    metadata.metal.ironcore.dev/height: "2"
+spec:
+  systemUUID: "00000000-0000-0000-0001-000300030003"
+  indicatorLED: "Lit"
+status:
+  powerState: "On"
+  state: "Available"

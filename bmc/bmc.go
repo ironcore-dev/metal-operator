@@ -6,10 +6,14 @@ package bmc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/stmcginnis/gofish/schemas"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
+
+// ErrNotSupported is returned when a BMC operation is not supported by the vendor.
+var ErrNotSupported = errors.New("operation not supported by this vendor")
 
 type Manufacturer string
 

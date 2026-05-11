@@ -60,8 +60,9 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	"$(CONTROLLER_GEN)" rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
-generate: controller-gen goimports ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen goimports ## Generate code containing DeepCopy, DeepCopyInto, DeepCopyObject, and ApplyConfiguration implementations.
 	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	"$(CONTROLLER_GEN)" applyconfiguration:headerFile="hack/boilerplate.go.txt" paths="./api/..." output:applyconfiguration:dir=./client/applyconfiguration
 	"$(GOIMPORTS)" -w .
 
 .PHONY: fmt
@@ -294,7 +295,7 @@ ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -
 GOLANGCI_LINT_VERSION ?= v2.10
 GOIMPORTS_VERSION ?= v0.38.0
 CRD_REF_DOCS_VERSION ?= v0.2.0
-KUBEBUILDER_VERSION ?= v4.13.0
+KUBEBUILDER_VERSION ?= v4.13.1
 ADDLICENSE_VERSION ?= v1.1.1
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 PROMTOOL_VERSION ?= 3.11.3

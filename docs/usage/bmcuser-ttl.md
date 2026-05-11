@@ -138,8 +138,8 @@ $ kubectl get bmcuser -o wide
 
 NAME                        ID   USERNAME          ROLEID         EXPIRESAT               LASTROTATION   AGE
 bmcuser-permanent           5    admin             Administrator  <none>                  2h ago         3d
-bmcuser-debug-temporary     6    debug-admin       Administrator  2026-04-10T23:00:00Z    1h ago         7h
-bmcuser-maintenance-window  7    maintenance-user  Operator       2026-04-11T02:00:00Z    <none>         4h
+bmcuser-debug-temporary     6    debug-admin       Administrator  2026-05-18T23:00:00Z    1h ago         7h
+bmcuser-maintenance-window  7    maintenance-user  Operator       2026-05-19T02:00:00Z    <none>         4h
 ```
 
 ### Check User Status
@@ -150,12 +150,12 @@ $ kubectl describe bmcuser bmcuser-debug-temporary
 ...
 Status:
   Conditions:
-    Last Transition Time:  2026-04-10T22:30:00Z
-    Message:              User will expire in 30m at 2026-04-10T23:00:00Z
+    Last Transition Time:  2026-05-18T22:30:00Z
+    Message:              User will expire in 30m at 2026-05-18T23:00:00Z
     Reason:               ExpiringSoon
     Status:               True
     Type:                 Active
-  Expires At:             2026-04-10T23:00:00Z
+  Expires At:             2026-05-18T23:00:00Z
   ID:                     6
   ...
 ```

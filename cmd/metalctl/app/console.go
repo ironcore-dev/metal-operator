@@ -23,6 +23,7 @@ import (
 
 var (
 	kubeconfig            string
+	kubeContext           string
 	serialConsoleNumber   int
 	skipHostKeyValidation bool
 	knownHostsFile        string
@@ -36,6 +37,7 @@ func NewConsoleCommand() *cobra.Command {
 	}
 
 	consoleCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
+	consoleCmd.Flags().StringVar(&kubeContext, "context", "", "Name of the kubeconfig context to use.")
 	consoleCmd.Flags().IntVar(&serialConsoleNumber, "serial-console-number", 1, "Serial console number.")
 	consoleCmd.Flags().BoolVar(&skipHostKeyValidation, "skip-host-key-validation", false, "Skip host key validation.")
 	consoleCmd.Flags().StringVar(&knownHostsFile, "known-hosts-file", "~/.ssh/known_hosts", "Path to known_hosts file.")
@@ -53,7 +55,7 @@ func runConsole(cmd *cobra.Command, args []string) error {
 	}
 	serverName = args[0]
 
-	k8sClient, err := cmdclient.CreateClient(kubeconfig, scheme)
+	k8sClient, err := cmdclient.CreateClient(kubeconfig, kubeContext, scheme)
 	if err != nil {
 		return err
 	}

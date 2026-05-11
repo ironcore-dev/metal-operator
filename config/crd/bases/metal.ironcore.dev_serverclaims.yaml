@@ -146,6 +146,40 @@ spec:
                 x-kubernetes-validations:
                 - message: serverSelector is immutable
                   rule: self == oldSelf
+              tolerations:
+                description: Tolerations allow a ServerClaim to bind to a Server with
+                  matching taints.
+                items:
+                  description: |-
+                    Toleration allows a ServerClaim to tolerate taints on a Server so that
+                    the claim can be bound to a server that would otherwise be restricted.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to tolerate.
+                      enum:
+                      - NoBind
+                      - Evict
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to.
+                      minLength: 1
+                      type: string
+                    operator:
+                      description: Operator represents the key's relationship to the
+                        value.
+                      enum:
+                      - Equal
+                      - Exists
+                      type: string
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to.
+                      type: string
+                  required:
+                  - key
+                  type: object
+                type: array
             required:
             - image
             - power

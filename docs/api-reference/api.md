@@ -1489,6 +1489,7 @@ _Appears in:_
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br /> |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
+| `tolerations` _[Toleration](#toleration) array_ | Tolerations allow a ServerClaim to bind to a Server with matching taints. |  |  |
 
 
 #### ServerClaimStatus
@@ -1666,6 +1667,7 @@ _Appears in:_
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
+| `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
 
 
 #### ServerState
@@ -1817,6 +1819,44 @@ _Appears in:_
 | `volumeUsage` _string_ | VolumeUsage specifies the volume usage type for the Volume. |  |  |
 
 
+#### Taint
+
+
+
+Taint represents a taint applied to a Server that restricts which
+ServerClaims can be bound to it.
+
+
+
+_Appears in:_
+- [ServerSpec](#serverspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the taint key to be applied to a server. |  | MinLength: 1 <br /> |
+| `value` _string_ | Value is the taint value corresponding to the taint key. |  |  |
+| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the effect of the taint on ServerClaims that do not<br />tolerate the taint. | NoBind | Enum: [NoBind Evict] <br /> |
+
+
+#### TaintEffect
+
+_Underlying type:_ _string_
+
+TaintEffect defines the effect of a taint on a ServerClaim.
+
+_Validation:_
+- Enum: [NoBind Evict]
+
+_Appears in:_
+- [Taint](#taint)
+- [Toleration](#toleration)
+
+| Field | Description |
+| --- | --- |
+| `NoBind` | TaintEffectNoBind prevents new ServerClaims from binding to the server<br />unless they have a matching toleration.<br /> |
+| `Evict` | TaintEffectEvict causes existing ServerClaims bound to the server to be<br />evicted if they do not have a matching toleration.<br /> |
+
+
 #### Task
 
 
@@ -1835,6 +1875,44 @@ _Appears in:_
 | `state` _[TaskState](#taskstate)_ | State is the current state of the task. |  |  |
 | `status` _[Health](#health)_ | Status is the current status of the task. |  |  |
 | `percentageComplete` _integer_ | PercentComplete is the percentage of completion of the task. |  |  |
+
+
+#### Toleration
+
+
+
+Toleration allows a ServerClaim to tolerate taints on a Server so that
+the claim can be bound to a server that would otherwise be restricted.
+
+
+
+_Appears in:_
+- [ServerClaimSpec](#serverclaimspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the taint key that the toleration applies to. |  | MinLength: 1 <br /> |
+| `operator` _[TolerationOperator](#tolerationoperator)_ | Operator represents the key's relationship to the value. |  | Enum: [Equal Exists] <br /> |
+| `value` _string_ | Value is the taint value the toleration matches to. |  |  |
+| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the taint effect to tolerate. |  | Enum: [NoBind Evict] <br /> |
+
+
+#### TolerationOperator
+
+_Underlying type:_ _string_
+
+TolerationOperator represents a key's relationship to a value in a Toleration.
+
+_Validation:_
+- Enum: [Equal Exists]
+
+_Appears in:_
+- [Toleration](#toleration)
+
+| Field | Description |
+| --- | --- |
+| `Equal` | TolerationOperatorEqual requires that the key and value of the toleration<br />match those of the taint exactly.<br /> |
+| `Exists` | TolerationOperatorExists matches any taint with the specified key,<br />regardless of value.<br /> |
 
 
 #### UpdatePolicy

@@ -108,8 +108,15 @@ var _ = Describe("Redfish Metrics Methods", func() {
 				Expect(report.ID).To(Equal("Report1"))
 				Expect(report.Name).To(Equal("Test Metric Report"))
 				Expect(report.MetricValues).To(HaveLen(2))
-				Expect(report.MetricValues[0].MetricID).To(Equal("Metric0"))
-				Expect(report.MetricValues[0].MetricValue).To(ContainSubstring("Temp1"))
+				// Verify extracted structured fields
+				Expect(report.MetricValues[0].MetricID).To(Equal("Temp1"))
+				Expect(report.MetricValues[0].MetricProperty).To(Equal("/Temperature"))
+				Expect(report.MetricValues[0].MetricValue).To(Equal("42.5"))
+				Expect(report.MetricValues[0].Timestamp).To(Equal("2024-01-01T00:00:00Z"))
+				Expect(report.MetricValues[1].MetricID).To(Equal("Fan1"))
+				Expect(report.MetricValues[1].MetricProperty).To(Equal("/FanSpeed"))
+				Expect(report.MetricValues[1].MetricValue).To(Equal("3000"))
+				Expect(report.MetricValues[1].Timestamp).To(Equal("2024-01-01T00:00:00Z"))
 			})
 		})
 

@@ -1175,14 +1175,38 @@ func (r *RedfishBaseBMC) GetMetricReport(ctx context.Context) (MetricsReport, er
 
 			// Try to extract metric values - schema may vary by vendor
 			// The report.MetricValues is a slice of report-specific values
-			// We'll create a simple representation
+			// Extract structured fields from Redfish MetricReport, falling back to safe defaults only if absent
 			for i := 0; i < len(report.MetricValues); i++ {
+				mv := report.MetricValues[i]
+
+				// Extract structured fields from gofish MetricValue
+				metricID := mv.MetricID
+				if metricID == "" {
+					metricID = fmt.Sprintf("Metric%d", i)
+				}
+
+				metricProperty := mv.MetricProperty
+				if metricProperty == "" {
+					metricProperty = report.ODataID
+				}
+
+				metricValue := mv.MetricValue
+				if metricValue == "" {
+					metricValue = fmt.Sprintf("%v", mv)
+				}
+
+				timestamp := mv.Timestamp
+				if timestamp == "" {
+					timestamp = time.Now().Format(time.RFC3339)
+				}
+
 				metricValues = append(metricValues, MetricValue{
-					MetricID:        fmt.Sprintf("Metric%d", i),
-					MetricProperty:  report.ODataID,
-					MetricValue:     fmt.Sprintf("%v", report.MetricValues[i]),
-					MetricValueKind: "Gauge",
-					Timestamp:       time.Now().Format(time.RFC3339),
+					MetricID:        metricID,
+					MetricProperty:  metricProperty,
+					MetricValue:     metricValue,
+					MetricValueKind: "Gauge", // Not available in Redfish MetricValue, keep default
+					Timestamp:       timestamp,
+					Oem:             mv.OEM,
 				})
 			}
 

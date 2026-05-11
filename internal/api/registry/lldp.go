@@ -26,6 +26,23 @@ type Neighbor struct {
 	VlanID            string   `json:"vlanId,omitempty"`
 }
 
+func parseMgmtIP(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	// Try string first
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s
+	}
+	// Try array
+	var arr []string
+	if err := json.Unmarshal(raw, &arr); err == nil && len(arr) > 0 {
+		return arr[0]
+	}
+	return ""
+}
+
 // ParseLLDPCTL converts raw lldpctl JSON (format: {"lldp":{"interface":[{iface:{...}},...]}})
 // into the normalized LLDP struct.
 func ParseLLDPCTL(data []byte) (LLDP, error) {
@@ -44,8 +61,8 @@ func ParseLLDPCTL(data []byte) (LLDP, error) {
 	type rawChassis struct {
 		ID         rawChassisID    `json:"id"`
 		Descr      string          `json:"descr"`
-		MgmtIP     string          `json:"mgmt-ip"`
-		MgmtIface  string          `json:"mgmt-iface"`
+		MgmtIP     json.RawMessage `json:"mgmt-ip"`
+		MgmtIface  json.RawMessage `json:"mgmt-iface"`
 		Capability []rawCapability `json:"capability"`
 	}
 	type rawPort struct {
@@ -104,7 +121,7 @@ func ParseLLDPCTL(data []byte) (LLDP, error) {
 					ChassisID:         ch.ID.Value,
 					PortID:            details.Port.ID.Value,
 					PortDescription:   details.Port.Descr,
-					MgmtIP:            ch.MgmtIP,
+					MgmtIP:            parseMgmtIP(ch.MgmtIP),
 				}
 				// Parse vlan field which can be either a single object or an array
 				if len(details.Vlan) > 0 {

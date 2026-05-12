@@ -556,6 +556,10 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(claim)).Should(
 			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseBound)),
 		)
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })
 

@@ -1854,7 +1854,7 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `NoBind` | TaintEffectNoBind prevents new ServerClaims from binding to the server<br />unless they have a matching toleration.<br /> |
-| `Evict` | TaintEffectEvict causes existing ServerClaims bound to the server to be<br />evicted if they do not have a matching toleration.<br /> |
+| `Evict` | TaintEffectEvict is reserved for future use. It does not currently trigger<br />eviction of existing ServerClaims bound to the server.<br /> |
 
 
 #### Task

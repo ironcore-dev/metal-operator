@@ -12,8 +12,8 @@ const (
 	// unless they have a matching toleration.
 	TaintEffectNoBind TaintEffect = "NoBind"
 
-	// TaintEffectEvict causes existing ServerClaims bound to the server to be
-	// evicted if they do not have a matching toleration.
+	// TaintEffectEvict is reserved for future use. It does not currently trigger
+	// eviction of existing ServerClaims bound to the server.
 	TaintEffectEvict TaintEffect = "Evict"
 )
 

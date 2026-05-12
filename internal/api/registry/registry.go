@@ -7,15 +7,17 @@ package registry
 const BootStateReceivedCondition = "BootStateReceived"
 
 // RegistrationPayload represents the payload to send to the `/register` endpoint,
-// including the systemUUID and the server details.
+// including the systemUUID, discovery token, and the server details.
 type RegistrationPayload struct {
-	SystemUUID string `json:"systemUUID"`
-	Data       Server `json:"data"`
+	SystemUUID     string `json:"systemUUID"`
+	DiscoveryToken string `json:"discoveryToken"`
+	Data           Server `json:"data"`
 }
 
 // BootstatePayload represents the payload to send to the `/bootstate` endpoint,
-// including the systemUUID and the booted state.
+// including the systemUUID, discovery token, and the booted state.
 type BootstatePayload struct {
-	SystemUUID string `json:"systemUUID"`
-	Booted     bool   `json:"booted"`
+	SystemUUID     string `json:"systemUUID"`
+	DiscoveryToken string `json:"discoveryToken"`
+	Booted         bool   `json:"booted"`
 }

@@ -6,16 +6,23 @@ package controller
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -38,8 +45,29 @@ import (
 const (
 	BMCFinalizer = "metal.ironcore.dev/bmc"
 
+	// Certificate management condition types
+	bmcCertificateInstalledConditionType = "CertificateInstalled"
+	bmcCertificateExpiringConditionType  = "CertificateExpiring"
+
+	// Certificate management reasons
+	bmcCertificateInstalledReason     = "CertificateInstalled"
+	bmcCertificateExpiringSoonReason  = "CertificateExpiringSoon"
+	bmcCSRGenerationFailedReason      = "CSRGenerationFailed"
+	bmcCertificateInstallFailedReason = "CertificateInstallFailed"
+	bmcCSRExpiredReason               = "CSRExpired"
+	bmcCSRDeniedReason                = "CSRDenied"
+	bmcCertificateRequestedReason     = "CertificateRequested"
+	bmcCertificateValidReason         = "CertificateValid"
+
 	bmcUserResetMessage = "BMC reset initiated by user. Waiting for it to come back online."
 	bmcAutoResetMessage = "BMC reset initiated automatically after repeated connection failures. Waiting for it to come back online."
+
+	// DefaultCertificateRenewalThreshold is the default time before certificate expiration to trigger renewal.
+	// Set to 30 days (720 hours) which is 1/3 of a typical 90-day certificate lifetime.
+	DefaultCertificateRenewalThreshold = 720 * time.Hour
+
+	// DefaultCertificateSignerName is the default signer for BMC certificates.
+	DefaultCertificateSignerName = "metal.ironcore.dev/bmc-https"
 )
 
 // legacyBMCConditionReasons maps old condition reason strings to their new values.
@@ -66,6 +94,13 @@ type BMCReconciler struct {
 	// DNSRecordTemplatePath is the path to the file containing the DNSRecord template.
 	DNSRecordTemplate string
 	Conditions        *conditionutils.Accessor
+
+	// Certificate management defaults (applied to BMCs that don't specify these fields)
+	DefaultCertificateManagementEnabled bool
+	DefaultCertificateSignerName        string
+	DefaultCertificateApprovalMode      metalv1alpha1.CertificateApprovalPolicy
+	DefaultCertificateRenewalThreshold  time.Duration
+	DefaultCertificateSubject           *metalv1alpha1.CertificateSubject
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -73,6 +108,11 @@ type BMCReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests/approval,verbs=update
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=signers,resourceNames=metal.ironcore.dev/bmc-https,verbs=approve
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -202,6 +242,19 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 	if modified, err := r.handleEventSubscriptions(ctx, bmcClient, bmcObj); err != nil || modified {
 		return ctrl.Result{}, err
 	}
+
+	// Handle certificate management
+	// Certificate reconciliation errors should not prevent BMC from reaching Ready state
+	if err := r.reconcileCertificate(ctx, bmcObj, bmcClient); err != nil {
+		log.Error(err, "Failed to reconcile certificate")
+		// Update condition to reflect certificate error, but continue reconciliation
+		if condErr := r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+			corev1.ConditionFalse, bmcCSRGenerationFailedReason,
+			fmt.Sprintf("Certificate reconciliation failed: %v", err)); condErr != nil {
+			log.Error(condErr, "Failed to update certificate condition")
+		}
+	}
+	r.checkCertificateExpiration(ctx, bmcObj)
 
 	log.V(1).Info("Reconciled BMC")
 	return ctrl.Result{}, nil
@@ -629,11 +682,648 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 	}
 }
 
+func (r *BMCReconciler) applyCertificateDefaults(bmcObj *metalv1alpha1.BMC) {
+	if bmcObj.Spec.CertificateManagementPolicy == nil && r.DefaultCertificateManagementEnabled {
+		bmcObj.Spec.CertificateManagementPolicy = ptr.To(metalv1alpha1.CertificateManagementPolicyAutomatic)
+	}
+}
+
+func (r *BMCReconciler) reconcileCertificate(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	r.applyCertificateDefaults(bmcObj)
+
+	if bmcObj.Spec.CertificateManagementPolicy == nil ||
+		*bmcObj.Spec.CertificateManagementPolicy != metalv1alpha1.CertificateManagementPolicyAutomatic {
+		return nil
+	}
+	if bmcObj.Status.CertificateSigningRequestRef != nil {
+		return r.reconcilePendingCSR(ctx, bmcObj, bmcClient)
+	}
+	if bmcObj.Status.CertificateSecretRef != nil {
+		needsRenewal, err := r.needsCertificateRenewal(ctx, bmcObj)
+		if err != nil {
+			return err
+		}
+		if !needsRenewal {
+			return nil
+		}
+		log.Info("Certificate needs renewal")
+	}
+
+	return r.initiateCertificateRequest(ctx, bmcObj, bmcClient)
+}
+
+func (r *BMCReconciler) initiateCertificateRequest(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("Initiating certificate request for BMC")
+
+	commonName := bmcObj.Status.IP.String()
+	if bmcObj.Spec.Hostname != nil && *bmcObj.Spec.Hostname != "" {
+		commonName = *bmcObj.Spec.Hostname
+	}
+
+	csrReq := bmc.CSRRequest{
+		CommonName:       commonName,
+		KeyPairAlgorithm: "RSA2048",
+		AlternativeNames: []string{commonName, bmcObj.Status.IP.String()},
+	}
+
+	if r.DefaultCertificateSubject != nil {
+		csrReq.Organization = r.DefaultCertificateSubject.Organization
+		csrReq.OrganizationalUnit = r.DefaultCertificateSubject.OrganizationalUnit
+		csrReq.Country = r.DefaultCertificateSubject.Country
+		csrReq.State = r.DefaultCertificateSubject.State
+		csrReq.City = r.DefaultCertificateSubject.Locality
+	}
+
+	log.Info("Generating CSR on BMC", "commonName", commonName)
+	csrResp, err := bmcClient.GenerateCSR(ctx, csrReq)
+	if err != nil {
+		_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+			corev1.ConditionFalse, bmcCSRGenerationFailedReason,
+			fmt.Sprintf("Failed to generate CSR on BMC: %v", err))
+		return err
+	}
+
+	if err := r.validateBMCCSR(csrResp.CSRString, csrReq); err != nil {
+		_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+			corev1.ConditionFalse, bmcCSRGenerationFailedReason,
+			fmt.Sprintf("Invalid CSR from BMC: %v", err))
+		return fmt.Errorf("CSR validation failed: %w", err)
+	}
+
+	signerName := r.DefaultCertificateSignerName
+	if signerName == "" {
+		signerName = DefaultCertificateSignerName
+	}
+
+	// Generate safe CSR name (max 253 chars for Kubernetes metadata.name)
+	// Format: bmc-<bmcName>-<shortUID>
+	// Ensure bmcName is truncated if needed to stay under limit
+	uidStr := string(bmcObj.UID)
+	shortUID := uidStr[:8]               // First 8 chars of UUID
+	maxBMCNameLen := 253 - 4 - 1 - 8 - 1 // 253 - "bmc-" - "-" - shortUID - null = 239
+	bmcName := bmcObj.Name
+	if len(bmcName) > maxBMCNameLen {
+		bmcName = bmcName[:maxBMCNameLen]
+	}
+	csrName := fmt.Sprintf("bmc-%s-%s", bmcName, shortUID)
+
+	k8sCSR := &certificatesv1.CertificateSigningRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csrName,
+			Labels: map[string]string{
+				"metal.ironcore.dev/bmc": bmcObj.Name,
+			},
+		},
+		Spec: certificatesv1.CertificateSigningRequestSpec{
+			Request:    []byte(csrResp.CSRString),
+			SignerName: signerName,
+			Usages: []certificatesv1.KeyUsage{
+				certificatesv1.UsageDigitalSignature,
+				certificatesv1.UsageKeyEncipherment,
+				certificatesv1.UsageServerAuth,
+			},
+			ExpirationSeconds: ptr.To(int32(90 * 24 * 60 * 60)), // 90 days
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(bmcObj, k8sCSR, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set owner reference on CSR: %w", err)
+	}
+
+	if err := r.Create(ctx, k8sCSR); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			log.Info("CSR already exists, validating ownership and content", "name", k8sCSR.Name)
+
+			existingCSR := &certificatesv1.CertificateSigningRequest{}
+			if err := r.Get(ctx, client.ObjectKey{Name: k8sCSR.Name}, existingCSR); err != nil {
+				return fmt.Errorf("failed to fetch existing CSR: %w", err)
+			}
+
+			if !metav1.IsControlledBy(existingCSR, bmcObj) {
+				return fmt.Errorf("CSR %s exists but is owned by a different controller - possible name collision attack", k8sCSR.Name)
+			}
+
+			if !bytes.Equal(existingCSR.Spec.Request, k8sCSR.Spec.Request) {
+				log.Info("CSR exists with different content, deleting and recreating",
+					"name", k8sCSR.Name,
+					"reason", "CSR content mismatch")
+				if err := r.Delete(ctx, existingCSR); err != nil {
+					return fmt.Errorf("failed to delete stale CSR: %w", err)
+				}
+				if err := r.Create(ctx, k8sCSR); err != nil {
+					return fmt.Errorf("failed to recreate CSR after delete: %w", err)
+				}
+			} else {
+				log.V(1).Info("Reusing existing CSR with matching content", "name", k8sCSR.Name)
+				k8sCSR = existingCSR
+			}
+		} else {
+			return fmt.Errorf("failed to create CSR: %w", err)
+		}
+	}
+
+	approvalPolicy := r.DefaultCertificateApprovalMode
+	if approvalPolicy == "" {
+		approvalPolicy = metalv1alpha1.CertificateApprovalPolicyExternal
+	}
+
+	if approvalPolicy == metalv1alpha1.CertificateApprovalPolicyAuto {
+		log.Info("SECURITY: Auto-approving CSR - ensure this BMC is in a trusted environment",
+			"bmc", bmcObj.Name,
+			"bmcIP", bmcObj.Status.IP,
+			"commonName", commonName,
+			"warning", "Auto-approval should only be used with verified, trusted BMC hardware")
+		if err := r.approveCSR(ctx, k8sCSR); err != nil {
+			return fmt.Errorf("failed to auto-approve CSR: %w", err)
+		}
+	}
+
+	bmcBase := bmcObj.DeepCopy()
+	bmcObj.Status.CertificateSigningRequestRef = &k8sCSR.Name
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return err
+	}
+
+	log.Info("CertificateSigningRequest created", "name", k8sCSR.Name)
+	_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+		corev1.ConditionFalse, bmcCertificateRequestedReason,
+		"Certificate signing request submitted")
+
+	return nil
+}
+
+// reconcilePendingCSR handles a pending CertificateSigningRequest.
+func (r *BMCReconciler) reconcilePendingCSR(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	csrName := *bmcObj.Status.CertificateSigningRequestRef
+	k8sCSR := &certificatesv1.CertificateSigningRequest{}
+	if err := r.Get(ctx, client.ObjectKey{Name: csrName}, k8sCSR); err != nil {
+		if apierrors.IsNotFound(err) {
+			return r.clearCSRReference(ctx, bmcObj)
+		}
+		return err
+	}
+
+	if r.isCertificateDenied(k8sCSR) {
+		return r.handleDeniedCSR(ctx, bmcObj, k8sCSR, csrName)
+	}
+
+	if !r.isCertificateApproved(k8sCSR) {
+		log.V(1).Info("Waiting for CertificateSigningRequest approval", "name", csrName)
+		return nil
+	}
+
+	if len(k8sCSR.Status.Certificate) == 0 {
+		return r.handlePendingSignature(ctx, bmcObj, k8sCSR, csrName)
+	}
+
+	return r.installCertificate(ctx, bmcObj, k8sCSR, bmcClient)
+}
+
+func (r *BMCReconciler) clearCSRReference(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+	bmcBase := bmcObj.DeepCopy()
+	bmcObj.Status.CertificateSigningRequestRef = nil
+	return r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase))
+}
+
+func (r *BMCReconciler) handleDeniedCSR(ctx context.Context, bmcObj *metalv1alpha1.BMC, k8sCSR *certificatesv1.CertificateSigningRequest, csrName string) error {
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("CertificateSigningRequest was denied, will retry", "name", csrName)
+
+	if err := r.Delete(ctx, k8sCSR); err != nil {
+		log.Error(err, "Failed to delete denied CSR")
+	}
+
+	if err := r.clearCSRReference(ctx, bmcObj); err != nil {
+		return err
+	}
+
+	_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+		corev1.ConditionFalse, bmcCSRDeniedReason,
+		"CSR was denied, will retry on next reconciliation")
+	return nil
+}
+
+func (r *BMCReconciler) handlePendingSignature(ctx context.Context, bmcObj *metalv1alpha1.BMC, k8sCSR *certificatesv1.CertificateSigningRequest, csrName string) error {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Waiting for CertificateSigningRequest to be signed", "name", csrName)
+
+	if r.isCSRExpired(k8sCSR) {
+		log.Info("CertificateSigningRequest expired before signing, recreating", "name", csrName)
+
+		if err := r.Delete(ctx, k8sCSR); err != nil {
+			log.Error(err, "Failed to delete expired CSR")
+		}
+
+		if err := r.clearCSRReference(ctx, bmcObj); err != nil {
+			return err
+		}
+
+		_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+			corev1.ConditionFalse, bmcCSRExpiredReason,
+			"CSR expired before signing, will recreate")
+	}
+
+	return nil
+}
+
+func (r *BMCReconciler) installCertificate(ctx context.Context, bmcObj *metalv1alpha1.BMC, k8sCSR *certificatesv1.CertificateSigningRequest, bmcClient bmc.BMC) error {
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("Installing certificate on BMC")
+
+	block, _ := pem.Decode(k8sCSR.Status.Certificate)
+	if block == nil {
+		return fmt.Errorf("invalid PEM-encoded certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	if err := r.validateCertificateAgainstCSR(k8sCSR.Status.Certificate, k8sCSR.Spec.Request); err != nil {
+		return fmt.Errorf("certificate validation failed: %w", err)
+	}
+
+	if time.Now().After(cert.NotAfter) {
+		return fmt.Errorf("received expired certificate")
+	}
+	if time.Now().Before(cert.NotBefore) {
+		return fmt.Errorf("received certificate not yet valid")
+	}
+
+	expectedCN := bmcObj.Status.IP.String()
+	if bmcObj.Spec.Hostname != nil && *bmcObj.Spec.Hostname != "" {
+		expectedCN = *bmcObj.Spec.Hostname
+	}
+
+	expectedSANs := map[string]bool{
+		bmcObj.Status.IP.String(): true,
+	}
+	if bmcObj.Spec.Hostname != nil && *bmcObj.Spec.Hostname != "" {
+		expectedSANs[*bmcObj.Spec.Hostname] = true
+	}
+
+	foundValidSAN := false
+	for _, dnsName := range cert.DNSNames {
+		if expectedSANs[dnsName] {
+			foundValidSAN = true
+			break
+		}
+	}
+	if !foundValidSAN {
+		for _, ipAddr := range cert.IPAddresses {
+			if expectedSANs[ipAddr.String()] {
+				foundValidSAN = true
+				break
+			}
+		}
+	}
+
+	if !foundValidSAN {
+		return fmt.Errorf("certificate does not contain any expected SANs: %v (found DNS: %v, IPs: %v)",
+			expectedSANs, cert.DNSNames, cert.IPAddresses)
+	}
+
+	if cert.Subject.CommonName != expectedCN {
+		log.Info("Certificate CN does not match expected value (SANs are valid)",
+			"expected", expectedCN, "actual", cert.Subject.CommonName)
+	}
+
+	if !slices.Contains(cert.ExtKeyUsage, x509.ExtKeyUsageServerAuth) {
+		return fmt.Errorf("certificate missing ServerAuth extended key usage")
+	}
+
+	// Create/update secret first
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("bmc-%s-cert", bmcObj.Name),
+			Namespace: r.ManagerNamespace,
+		},
+	}
+
+	opResult, err := controllerutil.CreateOrUpdate(ctx, r.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = make(map[string]string)
+		}
+		secret.Labels["metal.ironcore.dev/bmc"] = bmcObj.Name
+		secret.Type = corev1.SecretTypeTLS
+		secret.Data = map[string][]byte{
+			"tls.crt": k8sCSR.Status.Certificate,
+		}
+		return controllerutil.SetControllerReference(bmcObj, secret, r.Scheme)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create or update certificate secret: %w", err)
+	}
+	log.Info("Certificate secret created or updated", "operation", opResult)
+
+	// Persist secret reference to status before calling BMC
+	bmcBase := bmcObj.DeepCopy()
+	bmcObj.Status.CertificateSecretRef = &corev1.LocalObjectReference{Name: secret.Name}
+	bmcObj.Status.CertificateSigningRequestRef = nil
+
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return fmt.Errorf("failed to persist certificate secret reference: %w", err)
+	}
+
+	// Now install certificate on BMC
+	// If this fails, on retry we'll have secretRef set and can skip secret creation
+	if err := bmcClient.InstallCertificate(ctx, string(k8sCSR.Status.Certificate), bmc.CertificateTypeHTTPS); err != nil {
+		_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+			corev1.ConditionFalse, bmcCertificateInstallFailedReason,
+			fmt.Sprintf("Failed to install certificate: %v", err))
+		return err
+	}
+
+	if err := r.updateCertificateInfo(ctx, bmcObj, bmcClient); err != nil {
+		log.Error(err, "Failed to update certificate info")
+	}
+
+	log.Info("Certificate installed successfully")
+	_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateInstalledConditionType,
+		corev1.ConditionTrue, bmcCertificateInstalledReason,
+		"Certificate installed on BMC")
+
+	return nil
+}
+
+func (r *BMCReconciler) checkCertificateExpiration(ctx context.Context, bmcObj *metalv1alpha1.BMC) {
+	log := ctrl.LoggerFrom(ctx)
+
+	if bmcObj.Status.CertificateInfo == nil {
+		return
+	}
+
+	renewalThreshold := r.DefaultCertificateRenewalThreshold
+	if renewalThreshold == 0 {
+		renewalThreshold = DefaultCertificateRenewalThreshold
+	}
+
+	if bmcObj.Status.CertificateInfo.NotAfter != nil {
+		expiryTime := bmcObj.Status.CertificateInfo.NotAfter.Time
+		timeUntilExpiry := time.Until(expiryTime)
+
+		if timeUntilExpiry < renewalThreshold {
+			log.Info("Certificate expiring soon", "expiresIn", timeUntilExpiry)
+			_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateExpiringConditionType,
+				corev1.ConditionTrue, bmcCertificateExpiringSoonReason,
+				fmt.Sprintf("Certificate expires in %s", timeUntilExpiry))
+		} else {
+			_ = r.updateConditions(ctx, bmcObj, true, bmcCertificateExpiringConditionType,
+				corev1.ConditionFalse, bmcCertificateValidReason,
+				fmt.Sprintf("Certificate valid until %s", expiryTime))
+		}
+	}
+}
+
+func (r *BMCReconciler) approveCSR(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) error {
+	allowedSigners := []string{
+		DefaultCertificateSignerName,
+	}
+	if r.DefaultCertificateSignerName != "" && r.DefaultCertificateSignerName != DefaultCertificateSignerName {
+		allowedSigners = append(allowedSigners, r.DefaultCertificateSignerName)
+	}
+
+	if !slices.Contains(allowedSigners, csr.Spec.SignerName) {
+		return fmt.Errorf("controller not authorized to approve signer: %s (only allowed: %v)",
+			csr.Spec.SignerName, allowedSigners)
+	}
+
+	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+		Type:               certificatesv1.CertificateApproved,
+		Status:             corev1.ConditionTrue,
+		Reason:             "AutoApproved",
+		Message:            fmt.Sprintf("Auto-approved by BMC controller for BMC %s", csr.Labels["metal.ironcore.dev/bmc"]),
+		LastUpdateTime:     metav1.Now(),
+		LastTransitionTime: metav1.Now(),
+	})
+
+	if err := r.SubResource("approval").Update(ctx, csr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *BMCReconciler) isCertificateApproved(csr *certificatesv1.CertificateSigningRequest) bool {
+	for _, condition := range csr.Status.Conditions {
+		if condition.Type == certificatesv1.CertificateApproved {
+			return condition.Status == corev1.ConditionTrue
+		}
+		if condition.Type == certificatesv1.CertificateDenied {
+			return false
+		}
+	}
+	return false
+}
+
+func (r *BMCReconciler) isCertificateDenied(csr *certificatesv1.CertificateSigningRequest) bool {
+	for _, condition := range csr.Status.Conditions {
+		if condition.Type == certificatesv1.CertificateDenied {
+			return condition.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+func (r *BMCReconciler) isCSRExpired(csr *certificatesv1.CertificateSigningRequest) bool {
+	// CSR expires based on spec.expirationSeconds after creation
+	if csr.Spec.ExpirationSeconds == nil {
+		return false // No expiration set
+	}
+
+	expirationDuration := time.Duration(*csr.Spec.ExpirationSeconds) * time.Second
+	expirationTime := csr.CreationTimestamp.Add(expirationDuration)
+
+	return time.Now().After(expirationTime)
+}
+
+func (r *BMCReconciler) needsCertificateRenewal(ctx context.Context, bmcObj *metalv1alpha1.BMC) (bool, error) {
+	if bmcObj.Status.CertificateSecretRef == nil {
+		return true, nil
+	}
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, client.ObjectKey{
+		Name:      bmcObj.Status.CertificateSecretRef.Name,
+		Namespace: r.ManagerNamespace,
+	}, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+
+	// Parse certificate and check expiration
+	certPEM := secret.Data["tls.crt"]
+	block, _ := pem.Decode(certPEM)
+	if block == nil {
+		return true, nil
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return true, nil
+	}
+
+	renewalThreshold := r.DefaultCertificateRenewalThreshold
+	if renewalThreshold == 0 {
+		renewalThreshold = DefaultCertificateRenewalThreshold
+	}
+
+	timeUntilExpiry := time.Until(cert.NotAfter)
+	return timeUntilExpiry < renewalThreshold, nil
+}
+
+func (r *BMCReconciler) updateCertificateInfo(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC) error {
+	certs, err := bmcClient.GetCertificates(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Find HTTPS certificate (determined by URI path, not CertificateType field)
+	for _, cert := range certs {
+		if strings.Contains(cert.URI, "/HTTPS/Certificates") {
+			notBefore, _ := time.Parse(time.RFC3339, cert.ValidNotBefore)
+			notAfter, _ := time.Parse(time.RFC3339, cert.ValidNotAfter)
+
+			bmcObj.Status.CertificateInfo = &metalv1alpha1.CertificateInfo{
+				Issuer:       cert.Issuer,
+				Subject:      cert.Subject,
+				NotBefore:    &metav1.Time{Time: notBefore},
+				NotAfter:     &metav1.Time{Time: notAfter},
+				SerialNumber: cert.SerialNumber,
+				Thumbprint:   cert.Fingerprint,
+			}
+			break
+		}
+	}
+
+	return nil
+}
+
+// validateBMCCSR validates the CSR received from BMC hardware.
+func (r *BMCReconciler) validateBMCCSR(csrPEM string, expectedReq bmc.CSRRequest) error {
+	csrBlock, _ := pem.Decode([]byte(csrPEM))
+	if csrBlock == nil {
+		return fmt.Errorf("invalid PEM format")
+	}
+	if csrBlock.Type != "CERTIFICATE REQUEST" {
+		return fmt.Errorf("invalid PEM type: expected CERTIFICATE REQUEST, got %s", csrBlock.Type)
+	}
+
+	parsedCSR, err := x509.ParseCertificateRequest(csrBlock.Bytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse CSR: %w", err)
+	}
+
+	if err := parsedCSR.CheckSignature(); err != nil {
+		return fmt.Errorf("invalid CSR signature: %w", err)
+	}
+
+	// Validate CommonName matches what we requested
+	if parsedCSR.Subject.CommonName != expectedReq.CommonName {
+		return fmt.Errorf("CN mismatch: expected %s, got %s (possible MITM/spoofing attack)",
+			expectedReq.CommonName, parsedCSR.Subject.CommonName)
+	}
+
+	// Validate SANs (Subject Alternative Names)
+	expectedSANs := make(map[string]bool)
+	for _, san := range expectedReq.AlternativeNames {
+		expectedSANs[san] = true
+	}
+
+	// Check DNS SANs
+	for _, dnsName := range parsedCSR.DNSNames {
+		if !expectedSANs[dnsName] {
+			return fmt.Errorf("unexpected DNS SAN in CSR: %s", dnsName)
+		}
+		delete(expectedSANs, dnsName)
+	}
+
+	// Check IP SANs
+	for _, ipAddr := range parsedCSR.IPAddresses {
+		ipStr := ipAddr.String()
+		if !expectedSANs[ipStr] {
+			return fmt.Errorf("unexpected IP SAN in CSR: %s", ipStr)
+		}
+		delete(expectedSANs, ipStr)
+	}
+
+	// All expected SANs should be present
+	if len(expectedSANs) > 0 {
+		missing := []string{}
+		for san := range expectedSANs {
+			missing = append(missing, san)
+		}
+		return fmt.Errorf("missing expected SANs in CSR: %v", missing)
+	}
+
+	// Validate key strength
+	switch pub := parsedCSR.PublicKey.(type) {
+	case *rsa.PublicKey:
+		if pub.N.BitLen() < 2048 {
+			return fmt.Errorf("RSA key too weak: %d bits (minimum 2048)", pub.N.BitLen())
+		}
+	case *ecdsa.PublicKey:
+		if pub.Curve.Params().BitSize < 256 {
+			return fmt.Errorf("ECDSA key too weak: %d bits (minimum 256)", pub.Curve.Params().BitSize)
+		}
+	default:
+		return fmt.Errorf("unsupported key type: %T", pub)
+	}
+
+	return nil
+}
+
+// validateCertificateAgainstCSR validates that a signed certificate matches the original CSR.
+func (r *BMCReconciler) validateCertificateAgainstCSR(certPEM []byte, csrPEM []byte) error {
+	certBlock, _ := pem.Decode(certPEM)
+	if certBlock == nil {
+		return fmt.Errorf("invalid certificate PEM")
+	}
+	cert, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	csrBlock, _ := pem.Decode(csrPEM)
+	if csrBlock == nil {
+		return fmt.Errorf("invalid CSR PEM in K8s CSR object")
+	}
+	csr, err := x509.ParseCertificateRequest(csrBlock.Bytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse CSR: %w", err)
+	}
+
+	// Marshal public keys for comparison
+	certPubKey, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to marshal certificate public key: %w", err)
+	}
+	csrPubKey, err := x509.MarshalPKIXPublicKey(csr.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to marshal CSR public key: %w", err)
+	}
+
+	// Compare public keys
+	if !bytes.Equal(certPubKey, csrPubKey) {
+		return fmt.Errorf("certificate public key does not match CSR public key (possible key substitution attack)")
+	}
+
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
 		Owns(&metalv1alpha1.Server{}).
+		Owns(&corev1.Secret{}).
+		Owns(&certificatesv1.CertificateSigningRequest{}).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
 		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
 		Complete(r)

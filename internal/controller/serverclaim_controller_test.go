@@ -561,6 +561,22 @@ var _ = Describe("ServerClaim Controller", func() {
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("should default an empty taint effect to NoBind", func(ctx SpecContext) {
+		By("Updating the server with a taint that has no effect set")
+		Eventually(Update(server, func() {
+			server.Spec.Taints = []metalv1alpha1.Taint{
+				{Key: "dedicated"},
+			}
+		})).Should(Succeed())
+
+		By("Verifying the taint effect is defaulted to NoBind")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.Taints", ConsistOf(
+				HaveField("Effect", metalv1alpha1.TaintEffectNoBind),
+			)),
+		)
+	})
 })
 
 var _ = Describe("ServerClaim Validation", func() {

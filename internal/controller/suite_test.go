@@ -216,8 +216,10 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
-			DiscoveryTimeout:      30 * time.Second, // Set a short discovery timeout for testing
-			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
+			DiscoveryTimeout:        30 * time.Second, // Set a short discovery timeout for testing
+			DiscoveryIgnitionPath:   filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
+			EnableDiskCleaning:      true,
+			DiskCleaningDefaultMode: "secure",
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{

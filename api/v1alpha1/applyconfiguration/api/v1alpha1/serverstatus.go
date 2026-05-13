@@ -41,7 +41,8 @@ type ServerStatusApplyConfiguration struct {
 	// Storages is a list of storages associated with the server.
 	Storages []StorageApplyConfiguration `json:"storages,omitempty"`
 	// Conditions represents the latest available observations of the server's current state.
-	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions         []v1.ConditionApplyConfiguration      `json:"conditions,omitempty"`
+	DiskCleaningStatus *DiskCleaningStatusApplyConfiguration `json:"diskCleaningStatus,omitempty"`
 }
 
 // ServerStatusApplyConfiguration constructs a declarative configuration of the ServerStatus type for use with
@@ -171,5 +172,13 @@ func (b *ServerStatusApplyConfiguration) WithConditions(values ...*v1.ConditionA
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
+	return b
+}
+
+// WithDiskCleaningStatus sets the DiskCleaningStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DiskCleaningStatus field is set to the value of the last call.
+func (b *ServerStatusApplyConfiguration) WithDiskCleaningStatus(value *DiskCleaningStatusApplyConfiguration) *ServerStatusApplyConfiguration {
+	b.DiskCleaningStatus = value
 	return b
 }

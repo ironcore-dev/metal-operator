@@ -98,6 +98,8 @@ type ServerReconciler struct {
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
 	DiscoveryIgnitionPath   string
+	EnableDiskCleaning      bool
+	DiskCleaningDefaultMode string
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -418,6 +420,10 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 		return false, err
 	}
 
+	if err := r.handleDiskCleaningCompletion(ctx, server); err != nil {
+		log.Error(err, "Failed to handle disk cleaning completion")
+	}
+
 	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
 		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
 	}
@@ -714,6 +720,12 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", sshKeyPairNamespacedName)
 
 	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
+	if r.shouldEnableDiskCleaning(server) {
+		cleaningMode := r.getDiskCleaningMode(server)
+		probeFlags = fmt.Sprintf("%s --clean-disks --disk-cleaning-mode=%s", probeFlags, cleaningMode)
+		log.Info("Disk cleaning enabled for server discovery", "server", server.Name, "mode", cleaningMode)
+	}
+
 	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey, password)
 	if err != nil {
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
@@ -1240,6 +1252,73 @@ func (r *ServerReconciler) clearDeprecatedRefFields(ctx context.Context, server 
 		return false, fmt.Errorf("failed to clear deprecated ObjectReference fields on Server: %w", err)
 	}
 	return true, nil
+}
+
+func (r *ServerReconciler) shouldEnableDiskCleaning(server *metalv1alpha1.Server) bool {
+	if server.Spec.DiskCleaningPolicy != nil {
+		if server.Spec.DiskCleaningPolicy.CleanOnce {
+			return true
+		}
+		if server.Spec.DiskCleaningPolicy.Enabled != nil {
+			return *server.Spec.DiskCleaningPolicy.Enabled
+		}
+	}
+	return r.EnableDiskCleaning
+}
+
+func (r *ServerReconciler) getDiskCleaningMode(server *metalv1alpha1.Server) string {
+	if server.Spec.DiskCleaningPolicy != nil && server.Spec.DiskCleaningPolicy.DiskCleaningMode != "" {
+		return string(server.Spec.DiskCleaningPolicy.DiskCleaningMode)
+	}
+	return r.DiskCleaningDefaultMode
+}
+
+func (r *ServerReconciler) handleDiskCleaningCompletion(ctx context.Context, server *metalv1alpha1.Server) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	if server.Spec.DiskCleaningPolicy == nil || !server.Spec.DiskCleaningPolicy.CleanOnce {
+		return nil
+	}
+
+	specBase := server.DeepCopy()
+	server.Spec.DiskCleaningPolicy.CleanOnce = false
+	if err := r.Patch(ctx, server, client.MergeFrom(specBase)); err != nil {
+		return fmt.Errorf("failed to reset CleanOnce flag: %w", err)
+	}
+
+	if err := r.Get(ctx, client.ObjectKeyFromObject(server), server); err != nil {
+		return fmt.Errorf("failed to re-fetch server after spec update: %w", err)
+	}
+
+	statusBase := server.DeepCopy()
+	now := metav1.Now()
+	if server.Status.DiskCleaningStatus == nil {
+		server.Status.DiskCleaningStatus = &metalv1alpha1.DiskCleaningStatus{}
+	}
+	server.Status.DiskCleaningStatus.LastCleanedAt = &now
+	server.Status.DiskCleaningStatus.CleaningMode = server.Spec.DiskCleaningPolicy.DiskCleaningMode
+	if server.Status.DiskCleaningStatus.CleaningMode == "" {
+		server.Status.DiskCleaningStatus.CleaningMode = metalv1alpha1.DiskCleaningMode(r.DiskCleaningDefaultMode)
+	}
+	server.Status.DiskCleaningStatus.Message = "Disk cleaning completed successfully"
+
+	if err := r.Conditions.UpdateSlice(
+		&server.Status.Conditions,
+		ConditionDiskCleaningCompleted,
+		conditionutils.UpdateStatus(metav1.ConditionTrue),
+		conditionutils.UpdateReason("DiskCleaningSucceeded"),
+		conditionutils.UpdateMessage("Disk cleaning completed during discovery"),
+		conditionutils.UpdateObserved(server),
+	); err != nil {
+		return fmt.Errorf("failed to update disk cleaning condition: %w", err)
+	}
+
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(statusBase)); err != nil {
+		return fmt.Errorf("failed to update disk cleaning status: %w", err)
+	}
+
+	log.Info("Disk cleaning 'clean once' operation completed", "server", server.Name)
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

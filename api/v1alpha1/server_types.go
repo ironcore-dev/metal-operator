@@ -81,6 +81,49 @@ type BootOrder struct {
 	Device string `json:"device"`
 }
 
+// DiskCleaningMode defines the disk cleaning method.
+// +kubebuilder:validation:Enum=quick;secure
+type DiskCleaningMode string
+
+const (
+	DiskCleaningModeQuick  DiskCleaningMode = "quick"
+	DiskCleaningModeSecure DiskCleaningMode = "secure"
+)
+
+// DiskCleaningPolicy defines the disk cleaning behavior for a server.
+type DiskCleaningPolicy struct {
+	// Enabled controls whether disk cleaning is enabled for this server.
+	// If nil, the operator-level default is used.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// CleanOnce triggers a one-time disk cleaning operation during the next discovery boot.
+	// The controller will automatically reset this field to false after discovery completes.
+	// +optional
+	CleanOnce bool `json:"cleanOnce,omitempty"`
+
+	// DiskCleaningMode specifies the cleaning method to use.
+	// +kubebuilder:validation:Enum=quick;secure
+	// +kubebuilder:default="quick"
+	// +optional
+	DiskCleaningMode DiskCleaningMode `json:"diskCleaningMode,omitempty"`
+}
+
+// DiskCleaningStatus represents the status of disk cleaning operations.
+type DiskCleaningStatus struct {
+	// +optional
+	LastCleanedAt *metav1.Time `json:"lastCleanedAt,omitempty"`
+
+	// +optional
+	DisksProcessed int `json:"disksProcessed,omitempty"`
+
+	// +optional
+	CleaningMode DiskCleaningMode `json:"cleaningMode,omitempty"`
+
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// SystemUUID is the unique identifier for the server.
@@ -137,6 +180,9 @@ type ServerSpec struct {
 	// Taints control which ServerClaims can be bound to this server.
 	// +optional
 	Taints []Taint `json:"taints,omitempty"`
+
+	// +optional
+	DiskCleaningPolicy *DiskCleaningPolicy `json:"diskCleaningPolicy,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -243,6 +289,9 @@ type ServerStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// +optional
+	DiskCleaningStatus *DiskCleaningStatus `json:"diskCleaningStatus,omitempty"`
 }
 
 // Processor defines the details of a Processor.

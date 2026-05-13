@@ -25,10 +25,13 @@ type Agent struct {
 	log                   logr.Logger
 	LLDPSyncInterval      time.Duration
 	LLDPSyncDuration      time.Duration
+	CleanDisks            bool
+	DiskCleaningMode      string
+	diskCleaningComplete  bool
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
+func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration, cleanDisks bool, diskCleaningMode string) *Agent {
 	return &Agent{
 		log:                   log,
 		SystemUUID:            systemUUID,
@@ -37,6 +40,9 @@ func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registr
 		RegistryClientTimeout: registryClientTimeout,
 		LLDPSyncInterval:      LLDPSyncInterval,
 		LLDPSyncDuration:      LLDPSyncDuration,
+		CleanDisks:            cleanDisks,
+		DiskCleaningMode:      diskCleaningMode,
+		diskCleaningComplete:  false,
 	}
 }
 
@@ -133,6 +139,18 @@ func (a *Agent) Start(ctx context.Context) error {
 		return err
 	}
 	a.log.Info("Server registered", "uuid", a.SystemUUID)
+
+	// Perform disk cleaning after registration if enabled and not yet complete
+	if a.CleanDisks && !a.diskCleaningComplete {
+		a.log.Info("Starting disk cleaning", "mode", a.DiskCleaningMode)
+		if err := cleanDisks(ctx, a.log, a.DiskCleaningMode); err != nil {
+			a.log.Error(err, "Disk cleaning failed, continuing with periodic sync")
+			// Non-fatal - continue with periodic sync even if cleaning fails
+		} else {
+			a.log.Info("Disk cleaning completed successfully")
+			a.diskCleaningComplete = true
+		}
+	}
 
 	for {
 		select {

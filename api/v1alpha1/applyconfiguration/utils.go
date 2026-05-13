@@ -97,6 +97,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BootOrderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ConsoleProtocol"):
 		return &apiv1alpha1.ConsoleProtocolApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("DiskCleaningPolicy"):
+		return &apiv1alpha1.DiskCleaningPolicyApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("DiskCleaningStatus"):
+		return &apiv1alpha1.DiskCleaningStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Endpoint"):
 		return &apiv1alpha1.EndpointApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("EndpointSpec"):

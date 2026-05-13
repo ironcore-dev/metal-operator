@@ -248,7 +248,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond, false, "quick")
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -444,7 +444,7 @@ var _ = Describe("Server Controller", func() {
 		))
 
 		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
+		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond, false, "quick")
 		go func() {
 			defer GinkgoRecover()
 			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
@@ -1202,6 +1202,192 @@ passwd:
 			Expect(ignitionStr).To(ContainSubstring("E2E Custom Probe Service"), "Should use custom description")
 			Expect(ignitionStr).To(ContainSubstring("e2e-user"), "Should use custom username")
 			Expect(ignitionStr).To(ContainSubstring("custom-probe:v1.0.0"), "Should include custom probe image")
+		})
+
+		Describe("Disk Cleaning", func() {
+			DescribeTable("shouldEnableDiskCleaning configuration hierarchy",
+				func(operatorEnabled bool, serverPolicy *metalv1alpha1.DiskCleaningPolicy, expectedResult bool) {
+					server := &metalv1alpha1.Server{
+						Spec: metalv1alpha1.ServerSpec{
+							DiskCleaningPolicy: serverPolicy,
+						},
+					}
+
+					reconciler := &ServerReconciler{
+						EnableDiskCleaning: operatorEnabled,
+					}
+
+					Expect(reconciler.shouldEnableDiskCleaning(server)).To(Equal(expectedResult))
+				},
+				Entry("operator disabled, no policy -> disabled",
+					false,
+					nil,
+					false,
+				),
+				Entry("operator enabled, no policy -> enabled",
+					true,
+					nil,
+					true,
+				),
+				Entry("operator disabled, server disabled -> disabled",
+					false,
+					&metalv1alpha1.DiskCleaningPolicy{Enabled: ptr.To(false)},
+					false,
+				),
+				Entry("operator disabled, server enabled -> enabled",
+					false,
+					&metalv1alpha1.DiskCleaningPolicy{Enabled: ptr.To(true)},
+					true,
+				),
+				Entry("operator enabled, server disabled -> disabled",
+					true,
+					&metalv1alpha1.DiskCleaningPolicy{Enabled: ptr.To(false)},
+					false,
+				),
+				Entry("operator enabled, server enabled -> enabled",
+					true,
+					&metalv1alpha1.DiskCleaningPolicy{Enabled: ptr.To(true)},
+					true,
+				),
+				Entry("operator disabled, CleanOnce=true -> enabled (overrides disabled)",
+					false,
+					&metalv1alpha1.DiskCleaningPolicy{CleanOnce: true},
+					true,
+				),
+				Entry("operator enabled, CleanOnce=true -> enabled",
+					true,
+					&metalv1alpha1.DiskCleaningPolicy{CleanOnce: true},
+					true,
+				),
+				Entry("operator disabled, server disabled, CleanOnce=true -> enabled (CleanOnce overrides)",
+					false,
+					&metalv1alpha1.DiskCleaningPolicy{
+						Enabled:   ptr.To(false),
+						CleanOnce: true,
+					},
+					true,
+				),
+			)
+
+			DescribeTable("getDiskCleaningMode configuration hierarchy",
+				func(operatorMode string, serverPolicy *metalv1alpha1.DiskCleaningPolicy, expectedMode string) {
+					server := &metalv1alpha1.Server{
+						Spec: metalv1alpha1.ServerSpec{
+							DiskCleaningPolicy: serverPolicy,
+						},
+					}
+
+					reconciler := &ServerReconciler{
+						DiskCleaningDefaultMode: operatorMode,
+					}
+
+					Expect(reconciler.getDiskCleaningMode(server)).To(Equal(expectedMode))
+				},
+				Entry("operator=quick, no policy -> quick",
+					"quick",
+					nil,
+					"quick",
+				),
+				Entry("operator=secure, no policy -> secure",
+					"secure",
+					nil,
+					"secure",
+				),
+				Entry("operator=quick, server=secure -> secure",
+					"quick",
+					&metalv1alpha1.DiskCleaningPolicy{DiskCleaningMode: metalv1alpha1.DiskCleaningModeSecure},
+					"secure",
+				),
+				Entry("operator=secure, server=quick -> quick",
+					"secure",
+					&metalv1alpha1.DiskCleaningPolicy{DiskCleaningMode: metalv1alpha1.DiskCleaningModeQuick},
+					"quick",
+				),
+				Entry("operator=quick, server policy with nil mode -> quick",
+					"quick",
+					&metalv1alpha1.DiskCleaningPolicy{Enabled: ptr.To(true)},
+					"quick",
+				),
+			)
+
+			It("should skip disk cleaning flags when disabled at server level", func(ctx SpecContext) {
+				By("Creating a BMCSecret")
+				bmcSecret := &metalv1alpha1.BMCSecret{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "test-server-",
+					},
+					Data: map[string][]byte{
+						"username": []byte("foo"),
+						"password": []byte("bar"),
+					},
+				}
+				Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+				By("Creating a Server with disk cleaning disabled")
+				server := &metalv1alpha1.Server{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "server-",
+					},
+					Spec: metalv1alpha1.ServerSpec{
+						SystemUUID: "38947555-7742-3448-3784-823347823834",
+						BMC: &metalv1alpha1.BMCAccess{
+							Protocol: metalv1alpha1.Protocol{
+								Name: metalv1alpha1.ProtocolRedfishLocal,
+								Port: MockServerPort,
+							},
+							Address: MockServerIP,
+							BMCSecretRef: v1.LocalObjectReference{
+								Name: bmcSecret.Name,
+							},
+						},
+						DiskCleaningPolicy: &metalv1alpha1.DiskCleaningPolicy{
+							Enabled: ptr.To(false),
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+				By("Ensuring the boot configuration has been created")
+				bootConfig := &metalv1alpha1.ServerBootConfiguration{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: ns.Name,
+						Name:      server.Name,
+					},
+				}
+				Eventually(Object(bootConfig)).Should(Succeed())
+
+				By("Ensuring the ignition secret does not include disk cleaning flags")
+				ignitionSecret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: ns.Name,
+						Name:      server.Name,
+					},
+				}
+				Eventually(Get(ignitionSecret)).Should(Succeed())
+
+				var parsedData map[string]any
+				Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).NotTo(HaveOccurred())
+
+				systemdUnits, ok := parsedData["systemd"].(map[string]any)
+				Expect(ok).To(BeTrue())
+				units, ok := systemdUnits["units"].([]any)
+				Expect(ok).To(BeTrue())
+
+				for _, unit := range units {
+					unitMap, ok := unit.(map[string]any)
+					if !ok {
+						continue
+					}
+					if name, ok := unitMap["name"].(string); ok && name == "probe.service" {
+						contents, ok := unitMap["contents"].(string)
+						Expect(ok).To(BeTrue())
+						Expect(contents).NotTo(ContainSubstring("--clean-disks"))
+						break
+					}
+				}
+
+				deleteRegistrySystemIfExists(server.Spec.SystemUUID)
+			})
 		})
 	})
 })

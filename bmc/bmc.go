@@ -135,6 +135,10 @@ type BMC interface {
 	// CreateEventSubscription creates an event subscription for the manager.
 	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
 
+	// GetEventSubscription checks whether the event subscription at the given URI still exists on the BMC.
+	// Returns (true, nil) if the subscription exists, (false, nil) if it does not, or (false, err) on failure.
+	GetEventSubscription(ctx context.Context, uri string) (bool, error)
+
 	// DeleteEventSubscription deletes an event subscription for the manager.
 	DeleteEventSubscription(ctx context.Context, uri string) error
 

@@ -14,6 +14,7 @@ import (
 var (
 	port           int
 	vizKubeContext string
+	vizDryRun      bool
 )
 
 func NewVisualizationCommand() *cobra.Command {
@@ -29,6 +30,7 @@ func NewVisualizationCommand() *cobra.Command {
 	visualizerCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
 	visualizerCmd.Flags().StringVar(&vizKubeContext, "context", "", "Name of the kubeconfig context to use.")
 	visualizerCmd.Flags().IntVar(&port, "port", 8080, "Port to run the web server on")
+	visualizerCmd.Flags().BoolVar(&vizDryRun, "dry-run", false, "Serve sample demo data without connecting to a cluster")
 
 	return visualizerCmd
 }
@@ -36,12 +38,17 @@ func NewVisualizationCommand() *cobra.Command {
 func runVisualizer(_ *cobra.Command, _ []string) error {
 	log.Println("A 3D visualizer for server resources")
 
-	c, err := cmdclient.CreateClient(kubeconfig, vizKubeContext, scheme)
-	if err != nil {
-		log.Fatalf("Error creating kubernetes client: %v", err)
+	var vis *visualizer.Visualizer
+	if vizDryRun {
+		vis = visualizer.NewVisualizer(nil, port)
+		vis.DryRun = true
+	} else {
+		c, err := cmdclient.CreateClient(kubeconfig, vizKubeContext, scheme)
+		if err != nil {
+			log.Fatalf("Error creating kubernetes client: %v", err)
+		}
+		vis = visualizer.NewVisualizer(c, port)
 	}
-
-	vis := visualizer.NewVisualizer(c, port)
 
 	return vis.StartAndServe()
 }

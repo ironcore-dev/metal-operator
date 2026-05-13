@@ -28,6 +28,7 @@ var indexHTML string
 type Visualizer struct {
 	Client  client.Client
 	Address string
+	DryRun  bool
 }
 
 // NewVisualizer creates and returns a new Visualizer instance.
@@ -44,7 +45,9 @@ func (v *Visualizer) StartAndServe() error {
 	url := fmt.Sprintf("http://%s", v.Address)
 
 	http.HandleFunc("/", serveFrontend)
-	http.HandleFunc("/api/servers", v.handleGetServers())
+	if !v.DryRun {
+		http.HandleFunc("/api/servers", v.handleGetServers())
+	}
 
 	srv := &http.Server{
 		Addr:    v.Address,

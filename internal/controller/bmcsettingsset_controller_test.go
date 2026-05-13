@@ -804,6 +804,5 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 				HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 			)
 		})
-
 	})
 })

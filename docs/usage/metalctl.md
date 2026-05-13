@@ -5,7 +5,7 @@
 Install the `metalctl` CLI from source without cloning the repository. Requires [Go](https://go.dev) to be installed.
 
 ```bash
-go install https://github.com/ironcore-dev/metal-operator/cmd/metalctl@latest
+go install github.com/ironcore-dev/metal-operator/cmd/metalctl@latest
 ```
 
 ## Commands
@@ -23,6 +23,14 @@ metalctl visualizer --kubeconfig="path-to-kubeconfig.yaml"
 In order to access the 3D visualization, open your browser and navigate to `http://localhost:8080`.
 
 You can configure the port by setting the `--port` flag.
+
+To preview the visualizer with sample data (no cluster connection required), use the `--dry-run` flag:
+
+```bash
+metalctl visualizer --dry-run
+```
+
+<a href="/metal-operator/visualizer-demo.html" target="_blank">Open interactive demo</a>
 
 ### console
 

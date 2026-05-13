@@ -27,7 +27,8 @@ path = [
     "internal/cmd/visualizer/index.html",
     "test/data/*.json",
     "test/data/*.yaml",
-    "api/v1alpha1/zz_generated.deepcopy.go"
+    "api/v1alpha1/zz_generated.deepcopy.go",
+    "internal/cmd/visualizer/demo_data.json"
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2024 SAP SE or an SAP affiliate company and IronCore contributors"

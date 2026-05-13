@@ -16,18 +16,16 @@ import (
 func CreateClient(kubeconfig, context string, scheme *runtime.Scheme) (client.Client, error) {
 	if len(kubeconfig) == 0 {
 		kubeconfig = os.Getenv("KUBECONFIG")
-		if kubeconfig == "" {
-			fmt.Println("Error: --kubeconfig flag or KUBECONFIG environment variable must be set")
-			os.Exit(1)
-		}
 	}
 
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	paths := filepath.SplitList(kubeconfig)
-	if len(paths) == 1 {
-		loadingRules.ExplicitPath = kubeconfig
-	} else {
-		loadingRules.Precedence = paths
+	if kubeconfig != "" {
+		paths := filepath.SplitList(kubeconfig)
+		if len(paths) == 1 {
+			loadingRules.ExplicitPath = kubeconfig
+		} else {
+			loadingRules.Precedence = paths
+		}
 	}
 	overrides := &clientcmd.ConfigOverrides{}
 	if context != "" {

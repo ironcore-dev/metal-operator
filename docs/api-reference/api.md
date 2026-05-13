@@ -1079,11 +1079,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
-| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  | MaxLength: 63 <br /> |
 | `name` _string_ | Name is the name of the referenced object. |  | MaxLength: 253 <br /> |
-| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
 
 
 #### IndicatorLED
@@ -1199,11 +1196,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
-| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  |  |
 | `name` _string_ | Name is the name of the referenced object. |  |  |
-| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
 
 
 #### Phase

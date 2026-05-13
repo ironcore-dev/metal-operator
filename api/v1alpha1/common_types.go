@@ -8,38 +8,22 @@ import (
 	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // ObjectReference is the namespaced name reference to an object.
 type ObjectReference struct {
-	// Deprecated: APIVersion is no longer used. Retained for backwards compatibility.
-	// +optional
-	APIVersion string `json:"apiVersion,omitempty"`
-	// Deprecated: Kind is no longer used. Retained for backwards compatibility.
-	// +optional
-	Kind string `json:"kind,omitempty"`
 	// Namespace is the namespace of the referenced object.
 	// +required
 	Namespace string `json:"namespace"`
 	// Name is the name of the referenced object.
 	// +required
 	Name string `json:"name"`
-	// Deprecated: UID is no longer used. Retained for backwards compatibility.
-	// +optional
-	UID types.UID `json:"uid,omitempty"`
 }
 
 // ImmutableObjectReference is a namespaced name reference whose name and namespace
 // cannot be changed once set (the entire reference can still be set or cleared).
 type ImmutableObjectReference struct {
-	// Deprecated: APIVersion is no longer used. Retained for backwards compatibility.
-	// +optional
-	APIVersion string `json:"apiVersion,omitempty"`
-	// Deprecated: Kind is no longer used. Retained for backwards compatibility.
-	// +optional
-	Kind string `json:"kind,omitempty"`
 	// Namespace is the namespace of the referenced object.
 	// +required
 	// +kubebuilder:validation:MaxLength=63
@@ -50,9 +34,6 @@ type ImmutableObjectReference struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf"
 	Name string `json:"name"`
-	// Deprecated: UID is no longer used. Retained for backwards compatibility.
-	// +optional
-	UID types.UID `json:"uid,omitempty"`
 }
 
 // RetryPolicy defines the retry behavior on transient failures.

@@ -5,48 +5,22 @@
 
 package v1alpha1
 
-import (
-	types "k8s.io/apimachinery/pkg/types"
-)
-
 // ImmutableObjectReferenceApplyConfiguration represents a declarative configuration of the ImmutableObjectReference type for use
 // with apply.
 //
 // ImmutableObjectReference is a namespaced name reference whose name and namespace
 // cannot be changed once set (the entire reference can still be set or cleared).
 type ImmutableObjectReferenceApplyConfiguration struct {
-	// Deprecated: APIVersion is no longer used. Retained for backwards compatibility.
-	APIVersion *string `json:"apiVersion,omitempty"`
-	// Deprecated: Kind is no longer used. Retained for backwards compatibility.
-	Kind *string `json:"kind,omitempty"`
 	// Namespace is the namespace of the referenced object.
 	Namespace *string `json:"namespace,omitempty"`
 	// Name is the name of the referenced object.
 	Name *string `json:"name,omitempty"`
-	// Deprecated: UID is no longer used. Retained for backwards compatibility.
-	UID *types.UID `json:"uid,omitempty"`
 }
 
 // ImmutableObjectReferenceApplyConfiguration constructs a declarative configuration of the ImmutableObjectReference type for use with
 // apply.
 func ImmutableObjectReference() *ImmutableObjectReferenceApplyConfiguration {
 	return &ImmutableObjectReferenceApplyConfiguration{}
-}
-
-// WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the APIVersion field is set to the value of the last call.
-func (b *ImmutableObjectReferenceApplyConfiguration) WithAPIVersion(value string) *ImmutableObjectReferenceApplyConfiguration {
-	b.APIVersion = &value
-	return b
-}
-
-// WithKind sets the Kind field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Kind field is set to the value of the last call.
-func (b *ImmutableObjectReferenceApplyConfiguration) WithKind(value string) *ImmutableObjectReferenceApplyConfiguration {
-	b.Kind = &value
-	return b
 }
 
 // WithNamespace sets the Namespace field in the declarative configuration to the given value
@@ -62,13 +36,5 @@ func (b *ImmutableObjectReferenceApplyConfiguration) WithNamespace(value string)
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ImmutableObjectReferenceApplyConfiguration) WithName(value string) *ImmutableObjectReferenceApplyConfiguration {
 	b.Name = &value
-	return b
-}
-
-// WithUID sets the UID field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the UID field is set to the value of the last call.
-func (b *ImmutableObjectReferenceApplyConfiguration) WithUID(value types.UID) *ImmutableObjectReferenceApplyConfiguration {
-	b.UID = &value
 	return b
 }

@@ -280,14 +280,6 @@ func (r *BIOSSettingsReconciler) reconcile(ctx context.Context, settings *metalv
 		return ctrl.Result{}, nil
 	}
 
-	base := settings.DeepCopy()
-	if settings.Spec.ServerMaintenanceRef != nil && clearDeprecatedObjectRefFields(settings.Spec.ServerMaintenanceRef) {
-		if err := r.Patch(ctx, settings, client.MergeFrom(base)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BIOSSettings: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	if settings.Spec.ServerRef == nil {
 		log.V(1).Info("BIOSSettings does not have a ServerRef")
 		return ctrl.Result{}, nil

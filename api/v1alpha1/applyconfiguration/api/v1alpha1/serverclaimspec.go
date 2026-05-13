@@ -27,6 +27,8 @@ type ServerClaimSpecApplyConfiguration struct {
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
 	// Image specifies the boot image to be used for the server.
 	Image *string `json:"image,omitempty"`
+	// Tolerations allow a ServerClaim to bind to a Server with matching taints.
+	Tolerations []TolerationApplyConfiguration `json:"tolerations,omitempty"`
 }
 
 // ServerClaimSpecApplyConfiguration constructs a declarative configuration of the ServerClaimSpec type for use with
@@ -72,5 +74,18 @@ func (b *ServerClaimSpecApplyConfiguration) WithIgnitionSecretRef(value v1.Local
 // If called multiple times, the Image field is set to the value of the last call.
 func (b *ServerClaimSpecApplyConfiguration) WithImage(value string) *ServerClaimSpecApplyConfiguration {
 	b.Image = &value
+	return b
+}
+
+// WithTolerations adds the given value to the Tolerations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Tolerations field.
+func (b *ServerClaimSpecApplyConfiguration) WithTolerations(values ...*TolerationApplyConfiguration) *ServerClaimSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTolerations")
+		}
+		b.Tolerations = append(b.Tolerations, *values[i])
+	}
 	return b
 }

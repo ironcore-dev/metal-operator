@@ -159,8 +159,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.StorageDriveApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("StorageVolume"):
 		return &apiv1alpha1.StorageVolumeApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Taint"):
+		return &apiv1alpha1.TaintApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Task"):
 		return &apiv1alpha1.TaskApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Toleration"):
+		return &apiv1alpha1.TolerationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Variable"):
 		return &apiv1alpha1.VariableApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("VariableSourceValueFrom"):

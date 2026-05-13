@@ -432,6 +432,10 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *m
 		log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
 		return false
 	}
+	if !tolerates(server.Spec.Taints, claim.Spec.Tolerations) {
+		log.V(1).Info("Server taints not tolerated by claim", "Server", server.Name, "Claim", claim.Name)
+		return false
+	}
 	return true
 }
 

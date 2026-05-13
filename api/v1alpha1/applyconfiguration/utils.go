@@ -115,6 +115,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.NamespacedKeySelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NetworkInterface"):
 		return &apiv1alpha1.NetworkInterfaceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ObjectFieldRefSelector"):
+		return &apiv1alpha1.ObjectFieldRefSelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ObjectReference"):
 		return &apiv1alpha1.ObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Processor"):

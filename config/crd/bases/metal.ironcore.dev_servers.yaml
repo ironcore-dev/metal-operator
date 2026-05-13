@@ -431,6 +431,7 @@ spec:
                     - secure
                     type: string
                   disksProcessed:
+                    format: int32
                     type: integer
                   lastCleanedAt:
                     format: date-time

@@ -1322,6 +1322,7 @@ passwd:
 					},
 				}
 				Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, bmcSecret)
 
 				By("Creating a Server with disk cleaning disabled")
 				server := &metalv1alpha1.Server{
@@ -1346,6 +1347,7 @@ passwd:
 					},
 				}
 				Expect(k8sClient.Create(ctx, server)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, server)
 
 				By("Ensuring the boot configuration has been created")
 				bootConfig := &metalv1alpha1.ServerBootConfiguration{
@@ -1354,7 +1356,9 @@ passwd:
 						Name:      server.Name,
 					},
 				}
-				Eventually(Object(bootConfig)).Should(Succeed())
+				Eventually(func() error {
+					return Get(bootConfig)()
+				}).Should(Succeed())
 
 				By("Ensuring the ignition secret does not include disk cleaning flags")
 				ignitionSecret := &v1.Secret{

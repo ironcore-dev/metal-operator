@@ -16,7 +16,7 @@ import (
 // DiskCleaningStatus represents the status of disk cleaning operations.
 type DiskCleaningStatusApplyConfiguration struct {
 	LastCleanedAt  *v1.Time                      `json:"lastCleanedAt,omitempty"`
-	DisksProcessed *int                          `json:"disksProcessed,omitempty"`
+	DisksProcessed *int32                        `json:"disksProcessed,omitempty"`
 	CleaningMode   *apiv1alpha1.DiskCleaningMode `json:"cleaningMode,omitempty"`
 	Message        *string                       `json:"message,omitempty"`
 }
@@ -38,7 +38,7 @@ func (b *DiskCleaningStatusApplyConfiguration) WithLastCleanedAt(value v1.Time) 
 // WithDisksProcessed sets the DisksProcessed field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DisksProcessed field is set to the value of the last call.
-func (b *DiskCleaningStatusApplyConfiguration) WithDisksProcessed(value int) *DiskCleaningStatusApplyConfiguration {
+func (b *DiskCleaningStatusApplyConfiguration) WithDisksProcessed(value int32) *DiskCleaningStatusApplyConfiguration {
 	b.DisksProcessed = &value
 	return b
 }

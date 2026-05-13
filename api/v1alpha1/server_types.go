@@ -115,7 +115,7 @@ type DiskCleaningStatus struct {
 	LastCleanedAt *metav1.Time `json:"lastCleanedAt,omitempty"`
 
 	// +optional
-	DisksProcessed int `json:"disksProcessed,omitempty"`
+	DisksProcessed int32 `json:"disksProcessed,omitempty"`
 
 	// +optional
 	CleaningMode DiskCleaningMode `json:"cleaningMode,omitempty"`

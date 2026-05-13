@@ -58,6 +58,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	if diskCleaningMode != "quick" && diskCleaningMode != "secure" {
+		setupLog.Error(nil, "Invalid disk cleaning mode",
+			"mode", diskCleaningMode, "valid", []string{"quick", "secure"})
+		os.Exit(1)
+	}
+
 	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting registry agent")

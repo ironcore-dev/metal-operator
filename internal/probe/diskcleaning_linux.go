@@ -67,7 +67,10 @@ func validateDevicePath(devicePath string) error {
 	}
 
 	if fi.Mode()&os.ModeDevice == 0 {
-		return fmt.Errorf("path is not a block device: %s", devicePath)
+		return fmt.Errorf("path is not a device: %s", devicePath)
+	}
+	if fi.Mode()&os.ModeCharDevice != 0 {
+		return fmt.Errorf("path is a character device, not a block device: %s", devicePath)
 	}
 
 	return nil
@@ -213,10 +216,12 @@ func cleanDisks(ctx context.Context, log logr.Logger, mode string) error {
 		return fmt.Errorf("failed to clean %d out of %d disks", len(results)-successCount, len(results))
 	}
 
-	// Mark disk cleaning as completed to prevent re-runs on agent restart
-	if err := markDiskCleaningCompleted(); err != nil {
-		log.Error(err, "Failed to mark disk cleaning as completed (will re-run on restart)")
-		// Non-fatal - cleaning succeeded, just couldn't write marker
+	if successCount > 0 {
+		if err := markDiskCleaningCompleted(); err != nil {
+			log.Error(err, "Failed to mark disk cleaning as completed (will re-run on restart)")
+		}
+	} else {
+		log.Info("No disks were cleaned (all skipped or none found), not marking as completed")
 	}
 
 	return nil
@@ -257,7 +262,6 @@ func quickCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath s
 }
 
 func secureCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath string) error {
-	// Add timeout for secure clean (24 hours for very large disks)
 	ctx, cancel := context.WithTimeout(ctx, 24*time.Hour)
 	defer cancel()
 
@@ -265,26 +269,22 @@ func secureCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath 
 		return err
 	}
 
-	// Check if drive is flash storage (SSD/NVMe). If so, we must use blkdiscard.
 	if !isRotational(diskName) {
 		log.V(1).Info("Detected non-rotational flash storage. Using blkdiscard.", "disk", diskName)
 		if err := executeBlkDiscard(ctx, devicePath, true); err == nil {
 			return rereadPartitionTable(ctx, devicePath)
 		} else {
 			log.Error(err, "blkdiscard failed, falling back to shred/dd", "disk", diskName)
-			// Proceed to fallback
 		}
 	}
 
 	if _, err := exec.LookPath("shred"); err == nil {
 		log.V(1).Info("Using shred for secure wipe", "disk", diskName)
-		cmd := exec.CommandContext(ctx, "shred", "-v", "-n", "1", "-z", "--force", devicePath)
+		cmd := exec.CommandContext(ctx, "shred", "-n", "1", "-z", "--force", devicePath)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			log.Error(err, "shred failed, falling back to dd", "disk", diskName, "output", string(output))
-			// Fall through to dd instead of returning error
 		} else {
-			// shred succeeded
 			if err := rereadPartitionTable(ctx, devicePath); err != nil {
 				log.V(1).Info("Warning: failed to re-read partition table", "error", err)
 			}
@@ -292,18 +292,16 @@ func secureCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath 
 		}
 	}
 
-	// Use dd as fallback (either shred not found or shred failed)
 	log.V(1).Info("Using dd for secure wipe", "disk", diskName)
 	cmd := exec.CommandContext(ctx, "dd",
 		"if=/dev/urandom",
 		"of="+devicePath,
-		"bs=1M",
-		"status=progress")
+		"bs=1M")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		if !strings.Contains(err.Error(), "No space left on device") &&
-			!strings.Contains(string(output), "No space left on device") {
-			return fmt.Errorf("dd failed: %w, output: %s", err, string(output))
+		outputStr := string(output)
+		if !strings.Contains(outputStr, "No space left on device") {
+			return fmt.Errorf("dd failed: %w, output: %s", err, outputStr)
 		}
 		log.V(1).Info("dd completed (expected 'No space left' at end)", "disk", diskName)
 	}

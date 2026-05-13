@@ -421,7 +421,7 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 	}
 
 	if err := r.handleDiskCleaningCompletion(ctx, server); err != nil {
-		log.Error(err, "Failed to handle disk cleaning completion")
+		return false, fmt.Errorf("failed to handle disk cleaning completion: %w", err)
 	}
 
 	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
@@ -1296,17 +1296,19 @@ func (r *ServerReconciler) handleDiskCleaningCompletion(ctx context.Context, ser
 		server.Status.DiskCleaningStatus = &metalv1alpha1.DiskCleaningStatus{}
 	}
 	server.Status.DiskCleaningStatus.LastCleanedAt = &now
-	server.Status.DiskCleaningStatus.CleaningMode = server.Spec.DiskCleaningPolicy.DiskCleaningMode
+	if server.Spec.DiskCleaningPolicy != nil {
+		server.Status.DiskCleaningStatus.CleaningMode = server.Spec.DiskCleaningPolicy.DiskCleaningMode
+	}
 	if server.Status.DiskCleaningStatus.CleaningMode == "" {
 		server.Status.DiskCleaningStatus.CleaningMode = metalv1alpha1.DiskCleaningMode(r.DiskCleaningDefaultMode)
 	}
-	server.Status.DiskCleaningStatus.Message = "Disk cleaning completed successfully"
+	server.Status.DiskCleaningStatus.Message = "Disk cleaning completed during discovery"
 
 	if err := r.Conditions.UpdateSlice(
 		&server.Status.Conditions,
 		ConditionDiskCleaningCompleted,
 		conditionutils.UpdateStatus(metav1.ConditionTrue),
-		conditionutils.UpdateReason("DiskCleaningSucceeded"),
+		conditionutils.UpdateReason("DiskCleaningCompleted"),
 		conditionutils.UpdateMessage("Disk cleaning completed during discovery"),
 		conditionutils.UpdateObserved(server),
 	); err != nil {

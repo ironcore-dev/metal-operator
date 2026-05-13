@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	port int
+	port           int
+	vizKubeContext string
 )
 
 func NewVisualizationCommand() *cobra.Command {
@@ -26,6 +27,7 @@ func NewVisualizationCommand() *cobra.Command {
 	}
 
 	visualizerCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
+	visualizerCmd.Flags().StringVar(&vizKubeContext, "context", "", "Name of the kubeconfig context to use.")
 	visualizerCmd.Flags().IntVar(&port, "port", 8080, "Port to run the web server on")
 
 	return visualizerCmd
@@ -34,7 +36,7 @@ func NewVisualizationCommand() *cobra.Command {
 func runVisualizer(_ *cobra.Command, _ []string) error {
 	log.Println("A 3D visualizer for server resources")
 
-	c, err := cmdclient.CreateClient(kubeconfig, scheme)
+	c, err := cmdclient.CreateClient(kubeconfig, vizKubeContext, scheme)
 	if err != nil {
 		log.Fatalf("Error creating kubernetes client: %v", err)
 	}

@@ -133,6 +133,10 @@ type ServerSpec struct {
 	// the BIOS configuration for this server.
 	// +optional
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
+
+	// Taints control which ServerClaims can be bound to this server.
+	// +optional
+	Taints []Taint `json:"taints,omitempty"`
 }
 
 // ServerState defines the possible states of a server.

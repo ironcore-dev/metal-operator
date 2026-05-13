@@ -491,6 +491,92 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring that the ServerClaim is deleted")
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("should not claim a server whose taints are not tolerated by the claim", func(ctx SpecContext) {
+		By("Adding a NoBind taint to the server")
+		Eventually(Update(server, func() {
+			server.Spec.Taints = []metalv1alpha1.Taint{
+				{Key: "dedicated", Value: "gpu", Effect: metalv1alpha1.TaintEffectNoBind},
+			}
+		})).Should(Succeed())
+
+		By("Creating a ServerClaim without tolerations")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-taint-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				Image:     "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring the server is not claimed")
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerClaimRef", BeNil()),
+		)
+		Consistently(Object(claim)).Should(
+			HaveField("Status.Phase", Not(Equal(metalv1alpha1.PhaseBound))),
+		)
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	It("should claim a server with a NoBind taint when the claim has a matching toleration", func(ctx SpecContext) {
+		By("Adding a NoBind taint to the server")
+		Eventually(Update(server, func() {
+			server.Spec.Taints = []metalv1alpha1.Taint{
+				{Key: "dedicated", Value: "gpu", Effect: metalv1alpha1.TaintEffectNoBind},
+			}
+		})).Should(Succeed())
+
+		By("Creating a ServerClaim with a matching Exists toleration")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-toleration-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				Image:     "foo:bar",
+				Tolerations: []metalv1alpha1.Toleration{
+					{Key: "dedicated", Operator: metalv1alpha1.TolerationOperatorExists},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring the server is claimed")
+		Eventually(Object(claim)).Should(
+			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseBound)),
+		)
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	It("should default an empty taint effect to NoBind", func(ctx SpecContext) {
+		By("Updating the server with a taint that has no effect set")
+		Eventually(Update(server, func() {
+			server.Spec.Taints = []metalv1alpha1.Taint{
+				{Key: "dedicated"},
+			}
+		})).Should(Succeed())
+
+		By("Verifying the taint effect is defaulted to NoBind")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.Taints", ConsistOf(
+				HaveField("Effect", metalv1alpha1.TaintEffectNoBind),
+			)),
+		)
+	})
 })
 
 var _ = Describe("ServerClaim Validation", func() {

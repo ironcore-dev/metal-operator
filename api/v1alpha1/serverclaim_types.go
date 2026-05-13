@@ -36,6 +36,10 @@ type ServerClaimSpec struct {
 	// Image specifies the boot image to be used for the server.
 	// +required
 	Image string `json:"image"`
+
+	// Tolerations allow a ServerClaim to bind to a Server with matching taints.
+	// +optional
+	Tolerations []Toleration `json:"tolerations,omitempty"`
 }
 
 // Phase defines the possible phases of a ServerClaim.

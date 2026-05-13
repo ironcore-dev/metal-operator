@@ -348,7 +348,12 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 		// Check for pending component upgrade BEFORE issuing upgrade to avoid interrupting staged firmware
 		hasPending, err := bmcClient.CheckBMCPendingComponentUpgrade(ctx, bmc.ComponentTypeBIOS)
 		if err != nil {
-			log.V(1).Info("Failed to check pending component upgrade before BIOS upgrade, proceeding anyway", "error", err)
+			if errors.Is(err, bmc.ErrNotSupported) {
+				log.V(1).Info("Pending component upgrade check not supported by this vendor, proceeding with upgrade", "Server", server.Name)
+			} else {
+				log.Error(err, "Failed to check pending component upgrade, requeueing", "Server", server.Name)
+				return true, nil
+			}
 		} else if hasPending {
 			log.Info("Pending component upgrade detected, deferring BIOS upgrade to avoid interruption", "Server", server.Name)
 			return true, nil

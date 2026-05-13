@@ -45,12 +45,19 @@ type Variable struct {
 	ValueFrom *VariableSourceValueFrom `json:"valueFrom"`
 }
 
-// +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of fieldRef, configMapKeyRef, or secretKeyRef must be provided"
+// +kubebuilder:validation:XValidation:rule="(has(self.fieldRef) ? 1 : 0) + (has(self.objectFieldRef) ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1",message="exactly one of fieldRef, objectFieldRef, configMapKeyRef, or secretKeyRef must be provided"
+// +kubebuilder:validation:XValidation:rule="!has(self.objectFieldRef) || self.objectFieldRef.kind == 'BMC'",message="objectFieldRef.kind must be 'BMC'"
 type VariableSourceValueFrom struct {
-	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+	// FieldRef sources the value from a field of the BMCSettings object itself (e.g. spec.BMCRef.name).
 	// Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
 	// +optional
 	FieldRef *FieldRefSelector `json:"fieldRef,omitempty"`
+
+	// ObjectFieldRef sources the value from a field of a named related object.
+	// The kind must be "BMC". Supports dot-path navigation and bracket notation for map keys
+	// containing dots or slashes (e.g. metadata.labels[kubernetes.metal.cloud.sap/nodename]).
+	// +optional
+	ObjectFieldRef *ObjectFieldRefSelector `json:"objectFieldRef,omitempty"`
 
 	// ConfigMapKeyRef points to a namespaced ConfigMap key.
 	// +optional
@@ -64,6 +71,32 @@ type VariableSourceValueFrom struct {
 type FieldRefSelector struct {
 	// FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
 	// Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +required
+	FieldPath string `json:"fieldPath"`
+}
+
+// ObjectFieldRefSelector selects a field from a named cluster-scoped object.
+// It is intentionally generic; the allowed kinds are constrained at the usage site
+// via kubebuilder CEL rules on the parent type.
+type ObjectFieldRefSelector struct {
+	// Kind is the API kind of the object to read the field from (e.g. "BMC").
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	Kind string `json:"kind"`
+
+	// Name is the name of the object to read the field from.
+	// Supports $(VAR) substitution using previously resolved variables in declaration order.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Name string `json:"name"`
+
+	// FieldPath is the path of the field to select on the target object.
+	// Supports dot-path navigation (e.g. metadata.name) and bracket notation for map
+	// keys containing dots or slashes (e.g. metadata.labels[topology.kubernetes.io/region]).
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
 	// +required

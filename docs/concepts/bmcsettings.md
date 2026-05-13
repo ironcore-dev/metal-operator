@@ -37,6 +37,7 @@ Variables are resolved in list order. A variable defined later in the list can r
 
 Each variable uses exactly one source type (enforced by validation):
 - `fieldRef` — reads a field from the BMCSettings object itself.
+- `objectFieldRef` — reads a field from an external object (currently `BMC` only). The `name` field may contain `$(VarName)` substitutions, enabling late-bound lookups using previously resolved variables.
 - `configMapKeyRef` — reads a key from a ConfigMap. The `key`, `name`, and `namespace` fields may contain `$(VarName)` substitutions.
 - `secretKeyRef` — reads a key from a Secret. The `key`, `name`, and `namespace` fields may contain `$(VarName)` substitutions.
 
@@ -48,6 +49,16 @@ After fetching the raw value from its source, already-resolved variables are als
 |---|---|---|
 | `fieldPath` | Yes | Field path on the BMCSettings object, e.g. `spec.BMCRef.name`. Min 1, max 256 chars. |
 
+#### `valueFrom.objectFieldRef`
+
+Reads a field from an external Kubernetes object identified by `kind` and `name`. Currently only `kind: BMC` is supported (enforced by CEL validation on the parent type).
+
+| Field | Required | Description |
+|---|---|---|
+| `kind` | Yes | API kind of the target object. Currently must be `BMC`. Min 1, max 63 chars. |
+| `name` | Yes | Name of the target object. May contain `$(VarName)` substitutions. Min 1, max 253 chars. |
+| `fieldPath` | Yes | Field path on the target object. Supports dot-path (e.g. `metadata.name`) and bracket notation for map keys containing dots or slashes (e.g. `metadata.labels[topology.kubernetes.io/region]`). Min 1, max 256 chars. |
+
 #### `valueFrom.configMapKeyRef` / `valueFrom.secretKeyRef`
 
 | Field | Required | Description |
@@ -57,7 +68,8 @@ After fetching the raw value from its source, already-resolved variables are als
 | `key` | Yes | Key within the object. May contain `$(VarName)` substitutions. Max 253 chars. |
 
 Validation guarantees:
-- Exactly one of `fieldRef`, `configMapKeyRef`, or `secretKeyRef` per variable.
+- Exactly one of `fieldRef`, `objectFieldRef`, `configMapKeyRef`, or `secretKeyRef` per variable.
+- `objectFieldRef.kind` must be `BMC` (CEL rule on the parent field).
 - Variable `key` values must be unique within the list.
 - Variable `key` is 1–63 characters.
 
@@ -169,12 +181,26 @@ spec:
     BootMode: "UEFI"
     HyperThreading: "Enabled"
     LicenseKey: "$(LicenseKey)"
-    FQDN: "$(BmcName).$(SearchDomain)"
+    FQDN: "$(NodeName)r-$(BB)"
   variables:
+    # BmcName from the BMCSettings object — used as the name for objectFieldRef lookups.
     - key: BmcName
       valueFrom:
         fieldRef:
           fieldPath: spec.BMCRef.name
+    # NodeName and BB from BMC object labels — resolved at reconcile time.
+    - key: NodeName
+      valueFrom:
+        objectFieldRef:
+          kind: BMC
+          name: $(BmcName)
+          fieldPath: metadata.labels[kubernetes.metal.cloud.sap/nodename]
+    - key: BB
+      valueFrom:
+        objectFieldRef:
+          kind: BMC
+          name: $(BmcName)
+          fieldPath: metadata.labels[kubernetes.metal.cloud.sap/bb]
     - key: SearchDomain
       valueFrom:
         configMapKeyRef:

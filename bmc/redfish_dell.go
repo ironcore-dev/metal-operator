@@ -447,6 +447,18 @@ func (r *DellRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, co
 	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.dellGetComponentFilters, r.dellMatchesComponentFilter, r.dellCheckPending)
 }
 
+func (r *DellRedfishBMC) UpgradeNICVersion(_ context.Context, _ string, _ *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
+	return "", false, fmt.Errorf("NIC firmware upgrade not implemented for Dell")
+}
+
+func (r *DellRedfishBMC) GetNICUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
+	return nil, fmt.Errorf("NIC firmware upgrade task not implemented for Dell")
+}
+
+func (r *DellRedfishBMC) GetNICFirmwareInventory(_ context.Context) ([]FirmwareInventoryEntry, error) {
+	return nil, fmt.Errorf("NIC firmware inventory not implemented for Dell")
+}
+
 func (r *DellRedfishBMC) dellGetComponentFilters(componentType ComponentType) []string {
 	switch componentType {
 	case ComponentTypeBMC:

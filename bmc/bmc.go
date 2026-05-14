@@ -26,6 +26,7 @@ type ComponentType string
 const (
 	ComponentTypeBMC  ComponentType = "BMC"
 	ComponentTypeBIOS ComponentType = "BIOS"
+	ComponentTypeNIC  ComponentType = "NIC"
 )
 
 // BMC defines an interface for interacting with a Baseboard Management Controller.
@@ -117,6 +118,15 @@ type BMC interface {
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
+	// UpgradeNICVersion upgrades the NIC firmware via Redfish SimpleUpdate.
+	UpgradeNICVersion(ctx context.Context, manufacturer string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error)
+
+	// GetNICUpgradeTask retrieves the task status for a NIC firmware upgrade.
+	GetNICUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
+
+	// GetNICFirmwareInventory returns FirmwareInventory entries matching NIC components.
+	GetNICFirmwareInventory(ctx context.Context) ([]FirmwareInventoryEntry, error)
+	
 	// CreateEventSubscription creates an event subscription for the manager.
 	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
 
@@ -195,6 +205,20 @@ type NetworkInterface struct {
 	ID                  string
 	MACAddress          string
 	PermanentMACAddress string
+}
+
+// FirmwareInventoryEntry represents a firmware component from Redfish FirmwareInventory.
+type FirmwareInventoryEntry struct {
+	// ID is the FirmwareInventory member ID.
+	ID string
+	// Name is the component name (e.g., "ConnectX-6 Dx 100GE 2P NIC").
+	Name string
+	// Version is the current firmware version.
+	Version string
+	// URI is the Redfish URI (e.g., "/redfish/v1/UpdateService/FirmwareInventory/15/").
+	URI string
+	// Staged indicates whether a firmware update is staged/pending.
+	Staged bool
 }
 
 type Server struct {

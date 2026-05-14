@@ -885,6 +885,18 @@ func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string
 	return nil, fmt.Errorf("firmware upgrade task not supported for manufacturer %q", r.manufacturer)
 }
 
+func (r *RedfishBaseBMC) UpgradeNICVersion(_ context.Context, _ string, _ *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
+	return "", false, fmt.Errorf("NIC firmware upgrade not implemented")
+}
+
+func (r *RedfishBaseBMC) GetNICUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
+	return nil, fmt.Errorf("NIC firmware upgrade task not implemented")
+}
+
+func (r *RedfishBaseBMC) GetNICFirmwareInventory(_ context.Context) ([]FirmwareInventoryEntry, error) {
+	return nil, fmt.Errorf("NIC firmware inventory not implemented")
+}
+
 const (
 	charLower = "abcdefghijklmnopqrstuvwxyz"
 	charUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

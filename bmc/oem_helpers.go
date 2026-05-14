@@ -355,3 +355,36 @@ func checkPendingComponentUpgrade(ctx context.Context, base *RedfishBaseBMC, com
 
 	return false, nil
 }
+
+// getNICFirmwareInventory returns FirmwareInventory entries matching NIC components.
+func getNICFirmwareInventory(ctx context.Context, base *RedfishBaseBMC, getFilters getComponentFiltersFn, matchFilter matchComponentFilterFn) ([]FirmwareInventoryEntry, error) {
+    log := ctrl.LoggerFrom(ctx)
+
+    service := base.client.GetService()
+    updateService, err := service.UpdateService()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get UpdateService: %w", err)
+    }
+
+    firmwareInventory, err := updateService.FirmwareInventory()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get FirmwareInventory: %w", err)
+    }
+
+    filters := getFilters(ComponentTypeNIC)
+    var entries []FirmwareInventoryEntry
+    for _, fw := range firmwareInventory {
+        if !matchFilter(fw, filters) {
+            continue
+        }
+        log.V(1).Info("Found NIC firmware entry", "id", fw.ID, "name", fw.Name, "version", fw.Version)
+        entries = append(entries, FirmwareInventoryEntry{
+            ID:      fw.ID,
+            Name:    fw.Name,
+            Version: fw.Version,
+            URI:     fw.ODataID,
+            Staged:  fw.Staged,
+        })
+    }
+    return entries, nil
+}

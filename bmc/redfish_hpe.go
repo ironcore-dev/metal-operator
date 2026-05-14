@@ -136,24 +136,38 @@ func (r *HPERedfishBMC) GetBMCUpgradeTask(ctx context.Context, _ string, taskURI
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.hpeParseTaskDetails)
 }
 
+func (r *HPERedfishBMC) UpgradeNICVersion(ctx context.Context, _ string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
+    return upgradeVersion(ctx, r.RedfishBaseBMC, parameters, r.hpeBuildRequestBody, r.hpeExtractTaskMonitorURI)
+}
+
+func (r *HPERedfishBMC) GetNICUpgradeTask(ctx context.Context, _ string, taskURI string) (*schemas.Task, error) {
+    return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.hpeParseTaskDetails)
+}
+
+func (r *HPERedfishBMC) GetNICFirmwareInventory(ctx context.Context) ([]FirmwareInventoryEntry, error) {
+    return getNICFirmwareInventory(ctx, r.RedfishBaseBMC, r.hpeGetComponentFilters, r.hpeMatchesComponentFilter)
+}
+
 // CheckBMCPendingComponentUpgrade checks for staged component upgrades (HPE: Staged=true).
 // NOTE: HPE firmware entries use numeric IDs, so matching is done via fw.Name.
 func (r *HPERedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error) {
-	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
-		return false, fmt.Errorf("unsupported component type: %q", componentType)
+	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS && componentType != ComponentTypeNIC {
+	    return false, fmt.Errorf("unsupported component type: %q", componentType)
 	}
 	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.hpeGetComponentFilters, r.hpeMatchesComponentFilter, r.hpeCheckPending)
 }
 
 func (r *HPERedfishBMC) hpeGetComponentFilters(componentType ComponentType) []string {
-	switch componentType {
-	case ComponentTypeBMC:
-		return []string{"iLO"}
-	case ComponentTypeBIOS:
-		return []string{"System ROM"}
-	default:
-		return []string{}
-	}
+    switch componentType {
+    case ComponentTypeBMC:
+        return []string{"iLO"}
+    case ComponentTypeBIOS:
+        return []string{"System ROM"}
+    case ComponentTypeNIC:
+        return []string{"NIC", "Ethernet", "ConnectX", "Adapter"}
+    default:
+        return []string{}
+    }
 }
 
 func (r *HPERedfishBMC) hpeMatchesComponentFilter(fw *schemas.SoftwareInventory, filters []string) bool {

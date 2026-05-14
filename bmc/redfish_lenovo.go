@@ -168,6 +168,18 @@ func (r *LenovoRedfishBMC) CheckBMCPendingComponentUpgrade(ctx context.Context, 
 	return checkPendingComponentUpgrade(ctx, r.RedfishBaseBMC, componentType, r.lenovoGetComponentFilters, r.lenovoMatchesComponentFilter, r.lenovoCheckPending)
 }
 
+func (r *LenovoRedfishBMC) UpgradeNICVersion(_ context.Context, _ string, _ *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error) {
+	return "", false, fmt.Errorf("NIC firmware upgrade not implemented for Lenovo")
+}
+
+func (r *LenovoRedfishBMC) GetNICUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
+	return nil, fmt.Errorf("NIC firmware upgrade task not implemented for Lenovo")
+}
+
+func (r *LenovoRedfishBMC) GetNICFirmwareInventory(_ context.Context) ([]FirmwareInventoryEntry, error) {
+	return nil, fmt.Errorf("NIC firmware inventory not implemented for Lenovo")
+}
+
 func (r *LenovoRedfishBMC) lenovoGetComponentFilters(componentType ComponentType) []string {
 	switch componentType {
 	case ComponentTypeBMC:

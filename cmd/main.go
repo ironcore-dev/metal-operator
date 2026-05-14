@@ -83,6 +83,8 @@ func main() { // nolint: gocyclo
 		eventPort                          int
 		eventURL                           string
 		eventProtocol                      string
+		redfishMetricLabelsFromBMC         string
+		redfishMetricLabelsFromServer      string
 		registryClientTimeout              time.Duration
 		registryDataMaxAge                 time.Duration
 		registryResyncInterval             time.Duration
@@ -143,6 +145,16 @@ func main() { // nolint: gocyclo
 	flag.IntVar(&eventPort, "event-port", 10001, "The port to use for the server events endpoint for alerts and metrics.")
 	flag.StringVar(&eventProtocol, "event-protocol", "http",
 		"The protocol to use for the server events endpoint for alerts and metrics.")
+	flag.StringVar(&redfishMetricLabelsFromBMC, "redfish-metric-labels-from-bmc", "",
+		"Comma-separated list of 'kubernetes-label-key=prometheus-label-name' pairs. "+
+			"Each pair adds an additional label dimension to Redfish telemetry metrics, "+
+			"sourced from the matching label on the BMC resource. "+
+			"Example: topology.kubernetes.io/region=region,topology.kubernetes.io/zone=zone")
+	flag.StringVar(&redfishMetricLabelsFromServer, "redfish-metric-labels-from-server", "",
+		"Comma-separated list of 'kubernetes-label-key=prometheus-label-name' pairs. "+
+			"Each pair adds an additional label dimension to Redfish telemetry metrics, "+
+			"sourced from the matching label on the Server resource linked via spec.bmcRef.name. "+
+			"Example: metadata.metal.ironcore.dev/location=location,metadata.metal.ironcore.dev/rack=rack")
 	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
 	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
@@ -708,9 +720,19 @@ func main() { // nolint: gocyclo
 	}
 
 	if eventURL != "" {
+		bmcLabelMappings, err := serverevents.ParseLabelMappings(redfishMetricLabelsFromBMC)
+		if err != nil {
+			setupLog.Error(err, "Invalid --redfish-metric-labels-from-bmc")
+			os.Exit(1)
+		}
+		serverLabelMappings, err := serverevents.ParseLabelMappings(redfishMetricLabelsFromServer)
+		if err != nil {
+			setupLog.Error(err, "Invalid --redfish-metric-labels-from-server")
+			os.Exit(1)
+		}
 		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 			setupLog.Info("starting event server for alerts and metrics", "EventURL", eventURL)
-			eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort))
+			eventServer := serverevents.NewServer(setupLog, fmt.Sprintf(":%d", eventPort), mgr.GetClient(), bmcLabelMappings, serverLabelMappings)
 			if err := eventServer.Start(ctx); err != nil {
 				return fmt.Errorf("unable to start event server: %w", err)
 			}

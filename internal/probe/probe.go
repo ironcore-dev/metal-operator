@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -221,7 +223,13 @@ func (a *Agent) registerServer(ctx context.Context) error {
 			}()
 
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				a.log.Error(err, "Failed to register server", "url", a.RegistryURL)
+				body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1024))
+				if readErr != nil {
+					a.log.Error(fmt.Errorf("HTTP %d: failed to read response body: %w", resp.StatusCode, readErr), "Failed to register server", "url", a.RegistryURL)
+					return false, nil
+				}
+				a.log.Error(fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body)), "Failed to register server", "url", a.RegistryURL)
+				return false, nil
 				return false, nil
 			}
 

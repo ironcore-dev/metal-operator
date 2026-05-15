@@ -118,6 +118,29 @@ func (a *Agent) Init(ctx context.Context) error {
 	return nil
 }
 
+// PerformDiskCleaning executes disk cleaning if enabled and not already completed.
+// Returns nil if cleaning is disabled or already complete.
+// Returns error only if cleaning was attempted and failed.
+func (a *Agent) PerformDiskCleaning(ctx context.Context) error {
+	if !a.CleanDisks {
+		return nil
+	}
+
+	if a.diskCleaningComplete {
+		a.log.Info("Disk cleaning already completed, skipping")
+		return nil
+	}
+
+	a.log.Info("Starting disk cleaning", "mode", a.DiskCleaningMode)
+	if err := cleanDisks(ctx, a.log, a.DiskCleaningMode); err != nil {
+		return err
+	}
+
+	a.log.Info("Disk cleaning completed successfully")
+	a.diskCleaningComplete = true
+	return nil
+}
+
 // Start begins the periodic registration process.
 func (a *Agent) Start(ctx context.Context) error {
 	ticker := time.NewTicker(30 * time.Second)
@@ -140,16 +163,9 @@ func (a *Agent) Start(ctx context.Context) error {
 	}
 	a.log.Info("Server registered", "uuid", a.SystemUUID)
 
-	// Perform disk cleaning after registration if enabled and not yet complete
-	if a.CleanDisks && !a.diskCleaningComplete {
-		a.log.Info("Starting disk cleaning", "mode", a.DiskCleaningMode)
-		if err := cleanDisks(ctx, a.log, a.DiskCleaningMode); err != nil {
-			a.log.Error(err, "Disk cleaning failed, continuing with periodic sync")
-			// Non-fatal - continue with periodic sync even if cleaning fails
-		} else {
-			a.log.Info("Disk cleaning completed successfully")
-			a.diskCleaningComplete = true
-		}
+	// Perform disk cleaning after registration if enabled
+	if err := a.PerformDiskCleaning(ctx); err != nil {
+		a.log.Error(err, "Disk cleaning failed, continuing with periodic sync")
 	}
 
 	for {

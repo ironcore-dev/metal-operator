@@ -198,33 +198,6 @@ spec:
                   - priority
                   type: object
                 type: array
-              diskCleaningPolicy:
-                description: DiskCleaningPolicy defines the disk cleaning behavior
-                  for a server.
-                properties:
-                  cleanOnce:
-                    description: |-
-                      CleanOnce triggers a one-time disk cleaning operation during the next discovery boot.
-                      The controller will automatically reset this field to false after discovery completes.
-                    type: boolean
-                  diskCleaningMode:
-                    allOf:
-                    - enum:
-                      - quick
-                      - secure
-                    - enum:
-                      - quick
-                      - secure
-                    default: quick
-                    description: DiskCleaningMode specifies the cleaning method to
-                      use.
-                    type: string
-                  enabled:
-                    description: |-
-                      Enabled controls whether disk cleaning is enabled for this server.
-                      If nil, the operator-level default is used.
-                    type: boolean
-                type: object
               indicatorLED:
                 description: IndicatorLED specifies the desired state of the server's
                   indicator LED.
@@ -420,25 +393,6 @@ spec:
                   - type
                   type: object
                 type: array
-              diskCleaningStatus:
-                description: DiskCleaningStatus represents the status of disk cleaning
-                  operations.
-                properties:
-                  cleaningMode:
-                    description: DiskCleaningMode defines the disk cleaning method.
-                    enum:
-                    - quick
-                    - secure
-                    type: string
-                  disksProcessed:
-                    format: int32
-                    type: integer
-                  lastCleanedAt:
-                    format: date-time
-                    type: string
-                  message:
-                    type: string
-                type: object
               indicatorLED:
                 description: IndicatorLED specifies the current state of the server's
                   indicator LED.

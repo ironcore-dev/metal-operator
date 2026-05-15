@@ -105,8 +105,6 @@ func main() { // nolint: gocyclo
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
 		defaultFailedAutoRetryCount        int
-		enableDiskCleaning                 bool
-		diskCleaningDefaultMode            string
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -181,10 +179,6 @@ func main() { // nolint: gocyclo
 		"Path to the DNS record template file used for creating DNS records for Servers.")
 	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
 		"The default number of auto retries for a CRD when it fails. 0 for no retries.")
-	flag.BoolVar(&enableDiskCleaning, "enable-disk-cleaning", false,
-		"Enable automatic disk cleaning feature during server discovery. Individual servers can override this setting.")
-	flag.StringVar(&diskCleaningDefaultMode, "disk-cleaning-mode", "quick",
-		"Default disk cleaning mode: 'quick' or 'secure'. Applies when disk cleaning is enabled.")
 
 	opts := zap.Options{
 		Development: true,
@@ -227,13 +221,6 @@ func main() { // nolint: gocyclo
 
 	if effectiveSkipCert && effectiveProtocol == metalv1alpha1.HTTPSProtocolScheme {
 		setupLog.Info("WARNING: TLS certificate verification is disabled. This is not recommended for production")
-	}
-
-	// Validate disk cleaning mode
-	if diskCleaningDefaultMode != "quick" && diskCleaningDefaultMode != "secure" {
-		setupLog.Error(nil, "Invalid disk-cleaning-mode. Must be 'quick' or 'secure'",
-			"mode", diskCleaningDefaultMode)
-		os.Exit(1)
 	}
 
 	if probeOSImage == "" {
@@ -481,9 +468,7 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		DiscoveryTimeout:        discoveryTimeout,
-		EnableDiskCleaning:      enableDiskCleaning,
-		DiskCleaningDefaultMode: diskCleaningDefaultMode,
+		DiscoveryTimeout: discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "server")
 		os.Exit(1)

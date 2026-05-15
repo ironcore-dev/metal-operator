@@ -43,8 +43,7 @@ type ServerSpecApplyConfiguration struct {
 	// the BIOS configuration for this server.
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 	// Taints control which ServerClaims can be bound to this server.
-	Taints             []TaintApplyConfiguration             `json:"taints,omitempty"`
-	DiskCleaningPolicy *DiskCleaningPolicyApplyConfiguration `json:"diskCleaningPolicy,omitempty"`
+	Taints []TaintApplyConfiguration `json:"taints,omitempty"`
 }
 
 // ServerSpecApplyConfiguration constructs a declarative configuration of the ServerSpec type for use with
@@ -164,13 +163,5 @@ func (b *ServerSpecApplyConfiguration) WithTaints(values ...*TaintApplyConfigura
 		}
 		b.Taints = append(b.Taints, *values[i])
 	}
-	return b
-}
-
-// WithDiskCleaningPolicy sets the DiskCleaningPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DiskCleaningPolicy field is set to the value of the last call.
-func (b *ServerSpecApplyConfiguration) WithDiskCleaningPolicy(value *DiskCleaningPolicyApplyConfiguration) *ServerSpecApplyConfiguration {
-	b.DiskCleaningPolicy = value
 	return b
 }

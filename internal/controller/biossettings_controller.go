@@ -63,36 +63,6 @@ const (
 	ReasonSettingsValidationFailed      = "SettingsValidationFailed"
 )
 
-// legacyBIOSSettingsConditionTypes maps old condition type strings to their new values.
-// This ensures backward compatibility with existing CRs created before the rename.
-var legacyBIOSSettingsConditionTypes = map[string]string{
-	"BIOSSettingsCheckPendingSettings":     ConditionPendingSettingsCheck,
-	"BIOSSettingsDuplicateKeys":            ConditionSettingsDuplicateKeys,
-	"BIOSSettingUpdateStartTime":           ConditionSettingsUpdateStartTime,
-	"BIOSSettingsTimedOut":                 ConditionSettingsTimedOut,
-	"ServerPowerOnCondition":               ConditionSettingsServerPowerOn,
-	"ServerRebootPostUpdateHasBeenIssued":  ConditionSettingsRebootPostUpdate,
-	"BMCResetIssued":                       ConditionResetIssued,
-	"BIOSVersionUpdatePending":             ConditionVersionUpdatePending,
-	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
-	"SettingsProvidedNotValid":             ConditionSettingsValidationFailed,
-}
-
-// legacyBIOSSettingsConditionReasons maps old condition reason strings to their new values.
-var legacyBIOSSettingsConditionReasons = map[string]string{
-	"BMCResetIssued":                                   ReasonResetIssued,
-	"BIOSVersionNeedsTObeUpgraded":                     ReasonVersionUpgradePending,
-	"BIOSPendingSettingsFound":                         ReasonPendingSettingsFound,
-	"BIOSSettingsDuplicateKeysFound":                   ReasonSettingsDuplicateKeysFound,
-	"BIOSSettingsUpdateHasStarted":                     ReasonSettingsUpdateStarted,
-	"BIOSSettingsTimedOutDuringUpdate":                 ReasonSettingsTimedOut,
-	"ServerPoweredHasBeenPoweredOn":                    ReasonSettingsServerPoweredOn,
-	"BIOSSettingUpdateIssued":                          ReasonSettingsUpdateIssued,
-	"UnexpectedPendingSettingsPostUpdateHasBeenIssued": ReasonSettingsUnexpectedPending,
-	"SkipServerRebootPostUpdateHasBeenIssued":          ReasonSettingsSkipReboot,
-	"SettingsProvidedAreNotValid":                      ReasonSettingsValidationFailed,
-}
-
 // BIOSSettingsReconciler reconciles a BIOSSettings object
 type BIOSSettingsReconciler struct {
 	client.Client
@@ -124,34 +94,7 @@ func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, biosSettings); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if err := r.migrateLegacyConditions(ctx, biosSettings); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
-	}
 	return r.reconcileExists(ctx, biosSettings)
-}
-
-// migrateLegacyConditions renames legacy condition type strings on existing CRs.
-// TODO: Remove this migration in the next release once all CRs have been reconciled.
-func (r *BIOSSettingsReconciler) migrateLegacyConditions(ctx context.Context, settings *metalv1alpha1.BIOSSettings) error {
-	settingsBase := settings.DeepCopy()
-	migrated := migrateConditionTypes(settings.Status.Conditions, legacyBIOSSettingsConditionTypes)
-	if migrateConditionReasons(settings.Status.Conditions, legacyBIOSSettingsConditionReasons) {
-		migrated = true
-	}
-	for i := range settings.Status.FlowState {
-		if migrateConditionTypes(settings.Status.FlowState[i].Conditions, legacyBIOSSettingsConditionTypes) {
-			migrated = true
-		}
-		if migrateConditionReasons(settings.Status.FlowState[i].Conditions, legacyBIOSSettingsConditionReasons) {
-			migrated = true
-		}
-	}
-	if !migrated {
-		return nil
-	}
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Migrated legacy condition types on BIOSSettings")
-	return r.Status().Patch(ctx, settings, client.MergeFrom(settingsBase))
 }
 
 func (r *BIOSSettingsReconciler) reconcileExists(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {
@@ -1585,12 +1528,7 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByBMC(ctx context.Context, o
 
 		// Only enqueue if BMC reset was issued but not yet completed
 		if settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-			// Normalize legacy condition types/reasons so unmigrated CRs are handled correctly.
-			conditions := settings.Status.Conditions
-			migrateConditionTypes(conditions, legacyBIOSSettingsConditionTypes)
-			migrateConditionReasons(conditions, legacyBIOSSettingsConditionReasons)
-
-			resetCond, err := GetCondition(r.Conditions, conditions, ConditionResetIssued)
+			resetCond, err := GetCondition(r.Conditions, settings.Status.Conditions, ConditionResetIssued)
 			if err == nil && resetCond.Status != metav1.ConditionTrue && resetCond.Reason == ReasonResetIssued {
 				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})
 			}

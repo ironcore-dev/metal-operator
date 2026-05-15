@@ -31,21 +31,6 @@ const (
 	bmcVersionFinalizer = "metal.ironcore.dev/bmcversion"
 )
 
-// legacyBMCVersionConditionTypes maps old condition type strings to their new values.
-// TODO: Remove this migration in the next release once all CRs have been reconciled.
-var legacyBMCVersionConditionTypes = map[string]string{
-	"BMCResetIssued":                       ConditionResetIssued,
-	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
-}
-
-// legacyBMCVersionConditionReasons maps old condition reason strings to their new values.
-var legacyBMCVersionConditionReasons = map[string]string{
-	"BMCResetIssued":           ReasonResetIssued,
-	"IssueBMCUpgradeFailed":    ReasonUpgradeIssueFailed,
-	"TaskCompleted":            ReasonUpgradeTaskCompleted,
-	"VerifiedBMCVersionUpdate": ReasonVersionUpdateVerified,
-}
-
 // BMCVersionReconciler reconciles a BMCVersion object
 type BMCVersionReconciler struct {
 	client.Client
@@ -77,18 +62,6 @@ func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log := ctrl.LoggerFrom(ctx)
-	// TODO: Remove this migration in the next release once all CRs have been reconciled.
-	bmcVersionBase := bmcVersion.DeepCopy()
-	migrated := migrateConditionTypes(bmcVersion.Status.Conditions, legacyBMCVersionConditionTypes)
-	if migrateConditionReasons(bmcVersion.Status.Conditions, legacyBMCVersionConditionReasons) {
-		migrated = true
-	}
-	if migrated {
-		log.Info("Migrated legacy conditions on BMCVersion")
-		if err := r.Status().Patch(ctx, bmcVersion, client.MergeFrom(bmcVersionBase)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
-		}
-	}
 	log.V(1).Info("Reconciling BMCVersion")
 
 	return r.reconcileExists(ctx, bmcVersion)

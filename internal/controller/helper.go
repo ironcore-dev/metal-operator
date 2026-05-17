@@ -376,15 +376,6 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 							// retry was already propagated to child, we can skip re-propagation to avoid infinite loop
 							return nil
 						}
-
-						// Also check legacy condition type for unmigrated CRs.
-						// TODO: Remove this check in the next release once all CRs have been reconciled.
-						legacyCondition, err := GetCondition(acc, conditions, "RetryOfFailedResourceConditionIssued")
-						if err == nil && legacyCondition != nil &&
-							legacyCondition.Status == metav1.ConditionTrue &&
-							legacyCondition.Message == metalv1alpha1.OperationAnnotationRetryFailedPropagated {
-							return nil
-						}
 					}
 				}
 			}
@@ -615,4 +606,45 @@ func settingKeys(attrs schemas.SettingsAttributes) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// resolveTransferProtocol determines the transfer protocol and URI to use for a firmware update
+// based on the BMC's supported transfer protocols. If the primary protocol is supported (or the
+// BMC reports no restrictions), it returns the primary protocol and URI. Otherwise, it falls back
+// to the fallback protocol and URI if configured and supported.
+func resolveTransferProtocol(image metalv1alpha1.ImageSpec, supportedProtocols []string) (string, string, error) {
+	// If the BMC reports no protocol restrictions, use the primary protocol as-is.
+	if len(supportedProtocols) == 0 {
+		return image.TransferProtocol, image.URI, nil
+	}
+
+	// If transferProtocol is empty, let BMC choose default (skip validation)
+	if image.TransferProtocol == "" {
+		return "", image.URI, nil
+	}
+
+	// Case-insensitive comparison for primary protocol
+	primaryUpper := strings.ToUpper(image.TransferProtocol)
+	for _, supported := range supportedProtocols {
+		if strings.ToUpper(supported) == primaryUpper {
+			return supported, image.URI, nil
+		}
+	}
+
+	// Check fallback protocol if configured
+	if image.FallbackTransferProtocol != "" {
+		fallbackUpper := strings.ToUpper(image.FallbackTransferProtocol)
+		for _, supported := range supportedProtocols {
+			if strings.ToUpper(supported) == fallbackUpper {
+				return supported, image.FallbackURI, nil
+			}
+		}
+		return "", "", fmt.Errorf(
+			"neither primary transfer protocol %q nor fallback %q is supported by BMC (supported: %v)",
+			image.TransferProtocol, image.FallbackTransferProtocol, supportedProtocols)
+	}
+
+	return "", "", fmt.Errorf(
+		"transfer protocol %q is not supported by BMC and no fallback configured (supported: %v)",
+		image.TransferProtocol, supportedProtocols)
 }

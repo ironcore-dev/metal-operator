@@ -210,10 +210,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := r.clearDeprecatedRefFields(ctx, server); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-
 	// do late state initialization
 	if server.Status.State == "" {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
@@ -1225,21 +1221,6 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 		}
 	}
 	return false
-}
-
-func (r *ServerReconciler) clearDeprecatedRefFields(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
-	base := server.DeepCopy()
-	changed := clearDeprecatedImmutableObjectRefFields(server.Spec.ServerClaimRef)
-	changed = clearDeprecatedObjectRefFields(server.Spec.BootConfigurationRef) || changed
-	changed = clearDeprecatedObjectRefFields(server.Spec.MaintenanceBootConfigurationRef) || changed
-	changed = clearDeprecatedObjectRefFields(server.Spec.ServerMaintenanceRef) || changed
-	if !changed {
-		return false, nil
-	}
-	if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
-		return false, fmt.Errorf("failed to clear deprecated ObjectReference fields on Server: %w", err)
-	}
-	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

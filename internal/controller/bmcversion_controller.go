@@ -162,18 +162,6 @@ func (r *BMCVersionReconciler) reconcile(ctx context.Context, bmcVersion *metalv
 		return ctrl.Result{}, nil
 	}
 
-	base := bmcVersion.DeepCopy()
-	changed := false
-	for i := range bmcVersion.Spec.ServerMaintenanceRefs {
-		changed = clearDeprecatedObjectRefFields(&bmcVersion.Spec.ServerMaintenanceRefs[i]) || changed
-	}
-	if changed {
-		if err := r.Patch(ctx, bmcVersion, client.MergeFrom(base)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BMCVersion: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcVersion, bmcVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}

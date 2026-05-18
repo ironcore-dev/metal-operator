@@ -208,18 +208,6 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 		return ctrl.Result{}, nil
 	}
 
-	base := settings.DeepCopy()
-	changed := false
-	for i := range settings.Spec.ServerMaintenanceRefs {
-		changed = clearDeprecatedObjectRefFields(settings.Spec.ServerMaintenanceRefs[i].ServerMaintenanceRef) || changed
-	}
-	if changed {
-		if err := r.Patch(ctx, settings, client.MergeFrom(base)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BMCSettings: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	if settings.Spec.BMCRef == nil {
 		log.V(1).Info("Object does not refer to BMC object")
 		return ctrl.Result{}, nil

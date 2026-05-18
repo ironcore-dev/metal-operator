@@ -38,26 +38,6 @@ const (
 	ReasonRebootPowerOn  = "RebootPowerOn"
 )
 
-// legacyBIOSVersionConditionTypes maps old condition type strings to their new values.
-// TODO: Remove this migration in the next release once all CRs have been reconciled.
-var legacyBIOSVersionConditionTypes = map[string]string{
-	"BIOSUpgradeIssued":                    ConditionVersionUpgradeIssued,
-	"BIOSUpgradeCompleted":                 ConditionVersionUpgradeCompleted,
-	"BIOSUpgradePowerOn":                   ConditionUpgradePowerOn,
-	"BIOSUpgradePowerOff":                  ConditionUpgradePowerOff,
-	"BIOSUpgradeVerification":              ConditionVersionUpgradeVerification,
-	"BIOSVersionUpdatePending":             ConditionVersionUpdatePending,
-	"BMCResetIssued":                       ConditionResetIssued,
-	"RetryOfFailedResourceConditionIssued": ConditionRetryOfFailedResourceIssued,
-}
-
-// legacyBIOSVersionConditionReasons maps old condition reason strings to their new values.
-var legacyBIOSVersionConditionReasons = map[string]string{
-	"BMCResetIssued":                ReasonResetIssued,
-	"BIOSVersionVerified":           ReasonVersionUpdateVerified,
-	"BIOSVersionVerificationFailed": ReasonVersionVerificationFailed,
-}
-
 type BIOSVersionReconciler struct {
 	client.Client
 	ManagerNamespace            string
@@ -86,18 +66,6 @@ func (r *BIOSVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	biosVersion := &metalv1alpha1.BIOSVersion{}
 	if err := r.Get(ctx, req.NamespacedName, biosVersion); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-	// TODO: Remove this migration in the next release once all CRs have been reconciled.
-	biosVersionBase := biosVersion.DeepCopy()
-	migrated := migrateConditionTypes(biosVersion.Status.Conditions, legacyBIOSVersionConditionTypes)
-	if migrateConditionReasons(biosVersion.Status.Conditions, legacyBIOSVersionConditionReasons) {
-		migrated = true
-	}
-	if migrated {
-		log.Info("Migrated legacy conditions on BIOSVersion")
-		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to migrate legacy conditions: %w", err)
-		}
 	}
 	log.V(1).Info("Reconciling BIOSVersion")
 
@@ -1071,12 +1039,7 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, ob
 	reqs := make([]ctrl.Request, 0)
 	for _, biosVersion := range biosVersionList.Items {
 		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-			// Normalize legacy condition types/reasons so unmigrated CRs are handled correctly.
-			conditions := biosVersion.Status.Conditions
-			migrateConditionTypes(conditions, legacyBIOSVersionConditionTypes)
-			migrateConditionReasons(conditions, legacyBIOSVersionConditionReasons)
-
-			resetBMC, err := GetCondition(r.Conditions, conditions, ConditionResetIssued)
+			resetBMC, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionResetIssued)
 			if err != nil {
 				log.Error(err, "Failed to get reset BMC condition")
 				continue

@@ -12,6 +12,7 @@ import (
 	"io"
 	"maps"
 	"math/big"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -1134,6 +1135,27 @@ func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, e
 	}
 
 	return "", fmt.Errorf("existing subscription not found for destination: %s", destination)
+}
+
+func (r *RedfishBaseBMC) GetEventSubscription(_ context.Context, uri string) (bool, error) {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return false, fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return false, fmt.Errorf("event service is not enabled")
+	}
+	event, err := ev.GetEventSubscription(uri)
+	if err != nil {
+		// A 404 means the subscription no longer exists on the BMC — not a real error.
+		var redfishErr *schemas.Error
+		if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get event subscription: %w", err)
+	}
+	return event != nil, nil
 }
 
 func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string) error {

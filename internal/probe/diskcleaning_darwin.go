@@ -8,10 +8,8 @@ package probe
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-logr/logr"
 )
 
-func cleanDisks(_ context.Context, _ logr.Logger, _ string) error {
+func cleanDisks(_ context.Context, _ string) error {
 	return fmt.Errorf("disk cleaning is only supported on Linux")
 }

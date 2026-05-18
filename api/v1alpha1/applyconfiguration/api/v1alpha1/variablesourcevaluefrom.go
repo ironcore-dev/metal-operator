@@ -8,9 +8,13 @@ package v1alpha1
 // VariableSourceValueFromApplyConfiguration represents a declarative configuration of the VariableSourceValueFrom type for use
 // with apply.
 type VariableSourceValueFromApplyConfiguration struct {
-	// FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name).
+	// FieldRef sources the value from a field of the BMCSettings object itself (e.g. spec.BMCRef.name).
 	// Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
 	FieldRef *FieldRefSelectorApplyConfiguration `json:"fieldRef,omitempty"`
+	// ObjectFieldRef sources the value from a field of a named related object.
+	// The kind must be "BMC". Supports dot-path navigation and bracket notation for map keys
+	// containing dots or slashes (e.g. metadata.labels[kubernetes.metal.cloud.sap/nodename]).
+	ObjectFieldRef *ObjectFieldRefSelectorApplyConfiguration `json:"objectFieldRef,omitempty"`
 	// ConfigMapKeyRef points to a namespaced ConfigMap key.
 	ConfigMapKeyRef *NamespacedKeySelectorApplyConfiguration `json:"configMapKeyRef,omitempty"`
 	// SecretKeyRef points to a namespaced Secret key.
@@ -28,6 +32,14 @@ func VariableSourceValueFrom() *VariableSourceValueFromApplyConfiguration {
 // If called multiple times, the FieldRef field is set to the value of the last call.
 func (b *VariableSourceValueFromApplyConfiguration) WithFieldRef(value *FieldRefSelectorApplyConfiguration) *VariableSourceValueFromApplyConfiguration {
 	b.FieldRef = value
+	return b
+}
+
+// WithObjectFieldRef sets the ObjectFieldRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObjectFieldRef field is set to the value of the last call.
+func (b *VariableSourceValueFromApplyConfiguration) WithObjectFieldRef(value *ObjectFieldRefSelectorApplyConfiguration) *VariableSourceValueFromApplyConfiguration {
+	b.ObjectFieldRef = value
 	return b
 }
 

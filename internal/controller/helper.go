@@ -509,6 +509,19 @@ func resolveVariable(
 	switch {
 	case v.ValueFrom.FieldRef != nil:
 		return resolveFieldRef(owner, v.ValueFrom.FieldRef.FieldPath)
+	case v.ValueFrom.ObjectFieldRef != nil:
+		ref := v.ValueFrom.ObjectFieldRef
+		name := substituteVars(ref.Name, resolved)
+		switch ref.Kind {
+		case "BMC":
+			bmcObj := &metalv1alpha1.BMC{}
+			if err := c.Get(ctx, client.ObjectKey{Name: name}, bmcObj); err != nil {
+				return "", fmt.Errorf("objectFieldRef kind=BMC: failed to get BMC %q: %w", name, err)
+			}
+			return resolveFieldRef(bmcObj, ref.FieldPath)
+		default:
+			return "", fmt.Errorf("objectFieldRef kind %q is not supported", ref.Kind)
+		}
 	case v.ValueFrom.SecretKeyRef != nil:
 		ref := v.ValueFrom.SecretKeyRef
 		// Expand variable references in the selector fields before use.
@@ -544,21 +557,56 @@ func resolveVariable(
 	}
 }
 
-// resolveFieldRef navigates a dotted fieldPath on the given object using the
-// unstructured accessor (e.g. "spec.BMCRef.name").
-// resolveFieldRef extracts the value at fieldPath from obj using dot-separated
-// path navigation (e.g. "spec.BMCRef.name"). Only string-typed fields are
-// supported; integer, bool, or map fields will be reported as an error.
-// If broader type coercion is needed in the future, prefer
-// k8s.io/apimachinery/pkg/fieldpath.ExtractFieldPathAsString, which handles
-// the same paths as the Kubernetes downward API and stringifies non-string
-// scalar types automatically.
+// resolveFieldRef extracts the value at fieldPath from obj.
+//
+// fieldPath uses dot-separated navigation. Segments ending with a bracket
+// expression select a map key that may itself contain dots or slashes, e.g.:
+//
+//	metadata.labels[kubernetes.metal.cloud.sap/nodename]
+//
+// Without brackets, only string-typed leaf fields are supported.
 func resolveFieldRef(obj client.Object, fieldPath string) (string, error) {
 	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert object for fieldRef: %w", err)
 	}
-	parts := strings.Split(fieldPath, ".")
+
+	// Split fieldPath into navigation segments, honouring bracket notation.
+	// e.g. "metadata.labels[foo.bar/baz]" → ["metadata", "labels"] then map key "foo.bar/baz".
+	var mapKey string
+	path := fieldPath
+	if idx := strings.Index(path, "["); idx != -1 {
+		if !strings.HasSuffix(path, "]") {
+			return "", fmt.Errorf("fieldPath %q has unclosed bracket", fieldPath)
+		}
+		mapKey = path[idx+1 : len(path)-1]
+		path = path[:idx]
+		// Trim any trailing dot before the bracket segment.
+		path = strings.TrimSuffix(path, ".")
+	}
+
+	parts := strings.Split(path, ".")
+
+	if mapKey != "" {
+		// Navigate to the intermediate map, then do a direct key lookup.
+		intermediate, found, err := unstructured.NestedMap(raw, parts...)
+		if err != nil {
+			return "", fmt.Errorf("failed to navigate fieldPath %q: %w", fieldPath, err)
+		}
+		if !found {
+			return "", fmt.Errorf("fieldPath %q not found on object %s", fieldPath, obj.GetName())
+		}
+		val, ok := intermediate[mapKey]
+		if !ok {
+			return "", fmt.Errorf("fieldPath %q: map key %q not found on object %s", fieldPath, mapKey, obj.GetName())
+		}
+		s, ok := val.(string)
+		if !ok {
+			return "", fmt.Errorf("fieldPath %q: map key %q is not a string on object %s", fieldPath, mapKey, obj.GetName())
+		}
+		return s, nil
+	}
+
 	val, found, err := unstructured.NestedString(raw, parts...)
 	if err != nil {
 		return "", fmt.Errorf("failed to navigate fieldPath %q: %w", fieldPath, err)

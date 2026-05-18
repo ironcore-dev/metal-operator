@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Server struct {
@@ -71,13 +72,17 @@ type Event struct {
 	OriginOfCondition string `json:"OriginOfCondition"`
 }
 
-func NewServer(log logr.Logger, addr string) *Server {
+// NewServer creates a new event server. bmcMappings and serverMappings define which Kubernetes
+// resource labels are propagated to Redfish metrics as additional Prometheus label dimensions;
+// pass nil for either to disable enrichment from that resource. The k8sClient is used to look up
+// the resources at runtime; pass nil to disable all enrichment.
+func NewServer(log logr.Logger, addr string, k8sClient client.Client, bmcMappings, serverMappings []LabelMapping) *Server {
 	mux := http.NewServeMux()
 	server := &Server{
 		addr:      addr,
 		mux:       mux,
 		log:       log,
-		collector: NewRedfishEventCollector(),
+		collector: NewRedfishEventCollector(k8sClient, bmcMappings, serverMappings),
 	}
 	server.routes()
 	return server
@@ -129,7 +134,7 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("Processed events successfully", "hostname", hostname, "count", len(events))
 	}
 
-	s.collector.UpdateFromEvent(hostname, eventData)
+	s.collector.UpdateFromEvent(r.Context(), hostname, eventData)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -173,7 +178,7 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("Processed metrics successfully", "hostname", hostname, "count", len(metricsReport.MetricValues))
 	}
 
-	s.collector.UpdateFromMetricsReport(hostname, metricsReport)
+	s.collector.UpdateFromMetricsReport(r.Context(), hostname, metricsReport)
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -67,6 +67,23 @@ crd:
   # (Certificates, Issuers, ...) due to garbage collection.
   keep: true
 
+# [REDFISH LABEL ENRICHMENT]: Optional label enrichment for Redfish telemetry metrics.
+# Define mappings from Kubernetes resource label keys to Prometheus label names.
+# Mapped labels are appended as additional dimensions to redfish_monitor_reading and
+# redfish_event_alert_total metrics. Leave empty ({}) to disable enrichment.
+redfishLabels:
+  # Labels sourced from the BMC resource (matched by hostname == BMC resource name).
+  bmc: {}
+  # Example:
+  #   topology.kubernetes.io/region: region
+  #   topology.kubernetes.io/zone: zone
+
+  # Labels sourced from the Server resource linked via spec.bmcRef.name.
+  server: {}
+  # Example:
+  #   metadata.metal.ironcore.dev/location: location
+  #   metadata.metal.ironcore.dev/rack: rack
+
 # [METRICS]: Set to true to generate manifests for exporting metrics.
 # To disable metrics export set false, and ensure that the
 # ControllerManager argument "--metrics-bind-address=:8443" is removed.
@@ -101,4 +118,3 @@ ignition:
   # Template content that can be customized - this will be created as a ConfigMap
   # and mounted to override the default template
   # template: |
-    

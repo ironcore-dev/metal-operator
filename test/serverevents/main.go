@@ -28,7 +28,7 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting serverevent agent")
-	server := serverevents.NewServer(setupLog, ":8888")
+	server := serverevents.NewServer(setupLog, ":8888", nil, nil, nil)
 
 	if err := server.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running telemetry server")

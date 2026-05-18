@@ -281,6 +281,97 @@ rate(metal_server_reconciliation_total{result=~"error_.*"}[5m])
 count(metal_server_state{state="Available"} == 1)
 ```
 
+## Redfish Telemetry Metrics
+
+When the operator is configured with an event URL (`--event-url`), it subscribes to Redfish MetricReport and Alert events from each BMC and exposes two additional metrics.
+
+### Sensor Readings (`redfish_monitor_reading`)
+
+**Type:** Gauge
+**Description:** Latest sensor value pushed via a Redfish MetricReport event.
+**Fixed labels:**
+- `hostname`: BMC Kubernetes resource name
+- `metric_id`: Redfish metric ID (e.g., `CPU1Temp`)
+- `type`: Metric type (e.g., `Temperature`, `Voltage`)
+- `unit`: Unit of measure (e.g., `Cel`, `V`)
+- `origin_context`: Originating hardware component path
+
+**Dynamic labels:** Additional label dimensions can be injected from the BMC or Server resource (see [Label Enrichment](#label-enrichment) below).
+
+**Example values:**
+```text
+redfish_monitor_reading{hostname="node001-bmc", metric_id="CPU1Temp", type="Temperature", unit="Cel", origin_context="/Chassis/1/Thermal"} 42.5
+redfish_monitor_reading{hostname="node001-bmc", metric_id="FanSpeed1", type="Rotational", unit="RPM", origin_context="/Chassis/1/Thermal"} 3200
+```
+
+**Use cases:**
+- Alert on thermal readings exceeding thresholds: `redfish_monitor_reading{type="Temperature"} > 80`
+- Track fan speeds: `redfish_monitor_reading{type="Rotational"}`
+- Compare readings across regions or racks when enriched with topology labels
+
+### Alert Event Counter (`redfish_event_alert_total`)
+
+**Type:** Counter
+**Description:** Total count of Redfish alert/event messages received from each BMC.
+**Fixed labels:**
+- `hostname`: BMC Kubernetes resource name
+- `severity`: Event severity (e.g., `OK`, `Warning`, `Critical`)
+- `message_id`: Redfish MessageId (e.g., `Alert.1.0.ResourceStatusChangedOK`)
+- `component`: Originating hardware component
+
+**Dynamic labels:** Same enrichment as `redfish_monitor_reading`.
+
+**Example values:**
+```text
+redfish_event_alert_total{hostname="node001-bmc", severity="Warning", message_id="ThermalEvents.1.0.TemperatureAboveUpperCautionThreshold", component="/Chassis/1/Thermal/CPU1Temp"} 3
+redfish_event_alert_total{hostname="node001-bmc", severity="OK", message_id="Alert.1.0.ResourceStatusChangedOK", component="/Systems/1"} 12
+```
+
+**Use cases:**
+- Alert on sustained critical events: `increase(redfish_event_alert_total{severity="Critical"}[5m]) > 0`
+- Track warning frequency per host: `rate(redfish_event_alert_total{severity="Warning"}[1h])`
+
+### Label Enrichment
+
+When managing a large number of servers, it is often necessary to filter dashboard panels and alert rules by topology or location (e.g., region, availability zone, rack). Both Redfish metrics support optional dynamic label dimensions sourced from Kubernetes resources for exactly this purpose — enabling operators to slice telemetry by any organisational dimension without modifying the operator itself.
+
+This is configured via two CLI flags:
+
+| Flag | Source resource | Match key |
+|------|----------------|-----------|
+| `--redfish-metric-labels-from-bmc` | `BMC` resource | resource name == `hostname` label |
+| `--redfish-metric-labels-from-server` | `Server` resource | `spec.bmcRef.name` == `hostname` label |
+
+**Flag format:** `kubernetes-label-key=prometheus-label-name,...`
+
+**Example:**
+```bash
+--redfish-metric-labels-from-bmc=topology.kubernetes.io/region=region,topology.kubernetes.io/zone=zone
+--redfish-metric-labels-from-server=metadata.metal.ironcore.dev/location=location,metadata.metal.ironcore.dev/rack=rack
+```
+
+When configured, every Redfish metric gains the extra label columns. If a label key is missing from the resource, the value is emitted as an empty string — missing labels never block metric emission.
+
+Label lookups are cached per hostname with a 1-hour TTL to avoid excessive Kubernetes API calls.
+
+#### Helm chart configuration
+
+```yaml
+redfishLabels:
+  bmc:
+    topology.kubernetes.io/region: region
+    topology.kubernetes.io/zone: zone
+  server:
+    metadata.metal.ironcore.dev/location: location
+    metadata.metal.ironcore.dev/rack: rack
+```
+
+#### Example enriched output
+
+```text
+redfish_monitor_reading{hostname="node001-bmc", metric_id="CPU1Temp", type="Temperature", unit="Cel", origin_context="/Chassis/1/Thermal", region="eu-de-1", zone="eu-de-1a", location="building-b", rack="row3-rack7"} 42.5
+```
+
 ## Implementation Details
 
 ### Metric Collection Strategy

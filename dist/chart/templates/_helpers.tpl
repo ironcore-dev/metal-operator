@@ -48,3 +48,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     $hasValidating = true }}{{- end }}
 {{- end }}
 {{ $hasValidating }}}}{{- end }}
+
+{{/*
+chart.redfishLabelFlag renders a single CLI flag string from a map of
+kubernetes-label-key -> prometheus-label-name entries.
+
+Usage: {{ include "chart.redfishLabelFlag" (dict "flag" "redfish-metric-labels-from-bmc" "map" .Values.redfishLabels.bmc) }}
+*/}}
+{{- define "chart.redfishLabelFlag" -}}
+{{- $pairs := list -}}
+{{- range $k, $v := .map -}}
+  {{- $pairs = append $pairs (printf "%s=%s" $k $v) -}}
+{{- end -}}
+{{- printf "--%s=%s" .flag (join "," ($pairs | sortAlpha)) -}}
+{{- end }}

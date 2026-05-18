@@ -34,6 +34,12 @@ spec:
         {{- range .Values.controllerManager.manager.args }}
         - {{ . }}
         {{- end }}
+        {{- if .Values.redfishLabels.bmc }}
+        - {{ include "chart.redfishLabelFlag" (dict "flag" "redfish-metric-labels-from-bmc" "map" .Values.redfishLabels.bmc) | quote }}
+        {{- end }}
+        {{- if .Values.redfishLabels.server }}
+        - {{ include "chart.redfishLabelFlag" (dict "flag" "redfish-metric-labels-from-server" "map" .Values.redfishLabels.server) | quote }}
+        {{- end }}
         command:
         - /manager
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag }}

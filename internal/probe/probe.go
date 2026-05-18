@@ -25,10 +25,13 @@ type Agent struct {
 	log                   logr.Logger
 	LLDPSyncInterval      time.Duration
 	LLDPSyncDuration      time.Duration
+	CleanDisks            bool
+	DiskCleaningMode      string
+	diskCleaningComplete  bool
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration) *Agent {
+func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration, cleanDisks bool, diskCleaningMode string) *Agent {
 	return &Agent{
 		log:                   log,
 		SystemUUID:            systemUUID,
@@ -37,6 +40,9 @@ func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registr
 		RegistryClientTimeout: registryClientTimeout,
 		LLDPSyncInterval:      LLDPSyncInterval,
 		LLDPSyncDuration:      LLDPSyncDuration,
+		CleanDisks:            cleanDisks,
+		DiskCleaningMode:      diskCleaningMode,
+		diskCleaningComplete:  false,
 	}
 }
 
@@ -112,6 +118,32 @@ func (a *Agent) Init(ctx context.Context) error {
 	return nil
 }
 
+// PerformDiskCleaning executes disk cleaning if enabled and not already completed.
+// Returns nil if cleaning is disabled or already complete.
+// Returns error only if cleaning was attempted and failed.
+func (a *Agent) PerformDiskCleaning(ctx context.Context) error {
+	if !a.CleanDisks {
+		return nil
+	}
+
+	if a.diskCleaningComplete {
+		a.log.Info("Disk cleaning already completed, skipping")
+		return nil
+	}
+
+	a.log.Info("Starting disk cleaning", "mode", a.DiskCleaningMode)
+
+	// Add logger to context for cleanDisks
+	ctx = logr.NewContext(ctx, a.log)
+	if err := cleanDisks(ctx, a.DiskCleaningMode); err != nil {
+		return err
+	}
+
+	a.log.Info("Disk cleaning completed successfully")
+	a.diskCleaningComplete = true
+	return nil
+}
+
 // Start begins the periodic registration process.
 func (a *Agent) Start(ctx context.Context) error {
 	ticker := time.NewTicker(30 * time.Second)
@@ -133,6 +165,11 @@ func (a *Agent) Start(ctx context.Context) error {
 		return err
 	}
 	a.log.Info("Server registered", "uuid", a.SystemUUID)
+
+	// Perform disk cleaning after registration if enabled
+	if err := a.PerformDiskCleaning(ctx); err != nil {
+		a.log.Error(err, "Disk cleaning failed, continuing with periodic sync")
+	}
 
 	for {
 		select {

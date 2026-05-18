@@ -714,6 +714,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", sshKeyPairNamespacedName)
 
 	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
+
 	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey, password)
 	if err != nil {
 		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)

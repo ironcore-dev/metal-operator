@@ -77,7 +77,9 @@ func validateDevicePath(devicePath string) error {
 }
 
 // cleanDisks performs disk cleaning based on the specified mode concurrently.
-func cleanDisks(ctx context.Context, log logr.Logger, mode string) error {
+func cleanDisks(ctx context.Context, mode string) error {
+	log := logr.FromContextOrDiscard(ctx)
+
 	// Check if disk cleaning was already completed
 	if wasDiskCleaningCompleted() {
 		log.Info("Disk cleaning already completed, skipping")
@@ -167,9 +169,9 @@ func cleanDisks(ctx context.Context, log logr.Logger, mode string) error {
 
 			switch mode {
 			case "quick":
-				cleanErr = quickCleanDisk(ctx, log, d.Name, path)
+				cleanErr = quickCleanDisk(ctx, d.Name, path)
 			case "secure":
-				cleanErr = secureCleanDisk(ctx, log, d.Name, path)
+				cleanErr = secureCleanDisk(ctx, d.Name, path)
 			default:
 				cleanErr = fmt.Errorf("unsupported cleaning mode: %s", mode)
 			}
@@ -227,7 +229,9 @@ func cleanDisks(ctx context.Context, log logr.Logger, mode string) error {
 	return nil
 }
 
-func quickCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath string) error {
+func quickCleanDisk(ctx context.Context, diskName, devicePath string) error {
+	log := logr.FromContextOrDiscard(ctx)
+
 	// Add timeout for quick clean operations (10 minutes should be enough)
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -261,7 +265,9 @@ func quickCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath s
 	return nil
 }
 
-func secureCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath string) error {
+func secureCleanDisk(ctx context.Context, diskName, devicePath string) error {
+	log := logr.FromContextOrDiscard(ctx)
+
 	ctx, cancel := context.WithTimeout(ctx, 24*time.Hour)
 	defer cancel()
 
@@ -315,11 +321,17 @@ func secureCleanDisk(ctx context.Context, log logr.Logger, diskName, devicePath 
 
 // wipeDiskRangeNative uses standard Go I/O to avoid integer truncation bugs with `dd seek`.
 func wipeDiskRangeNative(ctx context.Context, devicePath string, offset, size int64) error {
+	log := logr.FromContextOrDiscard(ctx)
+
 	f, err := os.OpenFile(devicePath, os.O_WRONLY|os.O_SYNC, 0)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			log.V(1).Info("Failed to close device file after write", "path", devicePath, "error", closeErr)
+		}
+	}()
 
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
 		return fmt.Errorf("failed to seek to offset %d: %w", offset, err)

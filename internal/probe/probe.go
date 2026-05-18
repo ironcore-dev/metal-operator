@@ -132,7 +132,10 @@ func (a *Agent) PerformDiskCleaning(ctx context.Context) error {
 	}
 
 	a.log.Info("Starting disk cleaning", "mode", a.DiskCleaningMode)
-	if err := cleanDisks(ctx, a.log, a.DiskCleaningMode); err != nil {
+
+	// Add logger to context for cleanDisks
+	ctx = logr.NewContext(ctx, a.log)
+	if err := cleanDisks(ctx, a.DiskCleaningMode); err != nil {
 		return err
 	}
 

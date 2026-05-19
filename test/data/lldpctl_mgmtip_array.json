@@ -1,0 +1,28 @@
+{
+    "lldp": {
+        "interface": [{
+            "ens3f0np0": {
+                "via": "LLDP",
+                "rid": "1",
+                "age": "0 day, 00:01:00",
+                "chassis": {
+                    "sw-test-spine-1": {
+                        "id": {"type": "mac", "value": "e8:eb:d3:e4:5a:2e"},
+                        "descr": "Cumulus Linux version 5.11.5",
+                        "mgmt-ip": ["192.168.30.242", "fe80::1"],
+                        "mgmt-iface": ["2", "2"],
+                        "capability": [
+                            {"type": "Bridge", "enabled": true},
+                            {"type": "Router", "enabled": true}
+                        ]
+                    }
+                },
+                "port": {
+                    "id": {"type": "ifname", "value": "swp1s0"},
+                    "descr": "server ACCESS",
+                    "ttl": "120"
+                }
+            }
+        }]
+    }
+}

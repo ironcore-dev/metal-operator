@@ -27,7 +27,9 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
-const biosSettingsSetFinalizer = "metal.ironcore.dev/biossettingsset"
+const (
+	biosSettingsSetFinalizer = "metal.ironcore.dev/biossettingsset"
+)
 
 // BIOSSettingsSetReconciler reconciles a BIOSSettingsSet object
 type BIOSSettingsSetReconciler struct {
@@ -42,6 +44,8 @@ type BIOSSettingsSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *BIOSSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	biosSettingsSet := &metalv1alpha1.BIOSSettingsSet{}
 	if err := r.Get(ctx, req.NamespacedName, biosSettingsSet); err != nil {

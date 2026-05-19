@@ -28,35 +28,27 @@ import (
 )
 
 // BIOSVersionReconciler reconciles a BIOSVersion object
-type BIOSVersionReconciler struct {
-	client.Client
-	ManagerNamespace   string
-	DefaultProtocol    metalv1alpha1.ProtocolScheme
-	SkipCertValidation bool
-	Scheme             *runtime.Scheme
-	BMCOptions         bmc.Options
-	ResyncInterval     time.Duration
-	Conditions         *conditionutils.Accessor
-}
-
 const (
 	BIOSVersionFinalizer = "metal.ironcore.dev/biosversion"
 
-	ConditionBIOSUpgradeIssued       = "BIOSUpgradeIssued"
-	ConditionBIOSUpgradeCompleted    = "BIOSUpgradeCompleted"
-	ConditionBIOSUpgradePowerOn      = "BIOSUpgradePowerOn"
-	ConditionBIOSUpgradePowerOff     = "BIOSUpgradePowerOff"
-	ConditionBIOSUpgradeVerification = "BIOSUpgradeVerification"
+	ConditionUpgradePowerOn  = "VersionUpgradePowerOn"
+	ConditionUpgradePowerOff = "VersionUpgradePowerOff"
 
-	ReasonUpgradeIssued           = "UpgradeIssued"
-	ReasonUpgradeIssueFailed      = "UpgradeIssueFailed"
-	ReasonRebootPowerOff          = "RebootPowerOff"
-	ReasonRebootPowerOn           = "RebootPowerOn"
-	ReasonBIOSVersionVerified     = "BIOSVersionVerified"
-	ReasonBIOSVersionVerification = "BIOSVersionVerificationFailed"
-	ReasonUpgradeTaskFailed       = "UpgradeTaskFailed"
-	ReasonUpgradeTaskCompleted    = "UpgradeTaskCompleted"
+	ReasonRebootPowerOff = "RebootPowerOff"
+	ReasonRebootPowerOn  = "RebootPowerOn"
 )
+
+type BIOSVersionReconciler struct {
+	client.Client
+	ManagerNamespace            string
+	DefaultProtocol             metalv1alpha1.ProtocolScheme
+	SkipCertValidation          bool
+	Scheme                      *runtime.Scheme
+	BMCOptions                  bmc.Options
+	ResyncInterval              time.Duration
+	Conditions                  *conditionutils.Accessor
+	DefaultFailedAutoRetryCount int32
+}
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversions/status,verbs=get;update;patch
@@ -67,6 +59,8 @@ const (
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *BIOSVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	biosVersion := &metalv1alpha1.BIOSVersion{}
@@ -160,14 +154,6 @@ func (r *BIOSVersionReconciler) reconcile(ctx context.Context, biosVersion *meta
 		return ctrl.Result{}, nil
 	}
 
-	base := biosVersion.DeepCopy()
-	if biosVersion.Spec.ServerMaintenanceRef != nil && clearDeprecatedObjectRefFields(biosVersion.Spec.ServerMaintenanceRef) {
-		if err := r.Patch(ctx, biosVersion, client.MergeFrom(base)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated ObjectReference fields on BIOSVersion: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, biosVersion, BIOSVersionFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -207,6 +193,18 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 
 	switch biosVersion.Status.State {
 	case "", metalv1alpha1.BIOSVersionStatePending:
+		// remove the retry annotation if it's present as we are retrying now
+		if shouldRetryReconciliation(biosVersion) {
+			biosVersionBase := biosVersion.DeepCopy()
+			annotations := biosVersion.GetAnnotations()
+			delete(annotations, metalv1alpha1.OperationAnnotation)
+			biosVersion.SetAnnotations(annotations)
+			if err := r.Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+				return true, fmt.Errorf("failed to patch BIOSVersion for retrying: %w", err)
+			}
+			log.V(1).Info("Removed retry annotation from BIOSVersion for retrying", "BIOSVersion", biosVersion.Annotations)
+			return false, nil
+		}
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateInProgress:
 		if ok, err := r.handleServerMaintenance(ctx, bmcClient, biosVersion, server); err != nil || !ok {
@@ -217,22 +215,7 @@ func (r *BIOSVersionReconciler) transitionState(ctx context.Context, biosVersion
 	case metalv1alpha1.BIOSVersionStateCompleted:
 		return false, r.cleanup(ctx, bmcClient, biosVersion, server)
 	case metalv1alpha1.BIOSVersionStateFailed:
-		if shouldRetryReconciliation(biosVersion) {
-			log.V(1).Info("Retrying BIOSVersion reconciliation", "BIOSVersion", biosVersion.Name, "Server", biosVersion.Spec.ServerRef.Name)
-			biosVersionBase := biosVersion.DeepCopy()
-			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
-			biosVersion.Status.Conditions = []metav1.Condition{}
-			annotations := biosVersion.GetAnnotations()
-			delete(annotations, metalv1alpha1.OperationAnnotation)
-			biosVersion.SetAnnotations(annotations)
-
-			if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
-				return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)
-			}
-			return true, nil
-		}
-		log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion, "Server", server.Name)
-		return false, nil
+		return r.processFailedState(ctx, biosVersion, server)
 	}
 
 	log.V(1).Info("Unknown State found", "State", biosVersion.Status.State)
@@ -247,7 +230,7 @@ func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmc
 		}
 	}
 
-	condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ServerMaintenanceConditionWaiting)
+	condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionServerMaintenanceWaiting)
 	if err != nil {
 		return false, err
 	}
@@ -258,7 +241,7 @@ func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmc
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateReason(ReasonMaintenanceWaiting),
 				conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", biosVersion.Spec.ServerMaintenanceRef.Name)),
 			); err != nil {
 				return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -276,7 +259,7 @@ func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmc
 			if err := r.Conditions.Update(
 				condition,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
-				conditionutils.UpdateReason(ServerMaintenanceReasonWaiting),
+				conditionutils.UpdateReason(ReasonMaintenanceWaiting),
 				conditionutils.UpdateMessage(fmt.Sprintf("Waiting for approval of %v", biosVersion.Spec.ServerMaintenanceRef.Name)),
 			); err != nil {
 				return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -288,11 +271,11 @@ func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmc
 		return false, nil
 	}
 
-	if condition.Reason != ServerMaintenanceReasonApproved {
+	if condition.Reason != ReasonMaintenanceApproved {
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionFalse),
-			conditionutils.UpdateReason(ServerMaintenanceReasonApproved),
+			conditionutils.UpdateReason(ReasonMaintenanceApproved),
 			conditionutils.UpdateMessage("Server is now in Maintenance mode"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -311,7 +294,7 @@ func (r *BIOSVersionReconciler) handleServerMaintenance(ctx context.Context, bmc
 
 func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcClient bmc.BMC, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	issuedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeIssued)
+	issuedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionVersionUpgradeIssued)
 	if err != nil {
 		return false, err
 	}
@@ -325,7 +308,12 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 		// Check for pending component upgrade BEFORE issuing upgrade to avoid interrupting staged firmware
 		hasPending, err := bmcClient.CheckBMCPendingComponentUpgrade(ctx, bmc.ComponentTypeBIOS)
 		if err != nil {
-			log.V(1).Info("Failed to check pending component upgrade before BIOS upgrade, proceeding anyway", "error", err)
+			if errors.Is(err, bmc.ErrNotSupported) {
+				log.V(1).Info("Pending component upgrade check not supported by this vendor, proceeding with upgrade", "Server", server.Name)
+			} else {
+				log.Error(err, "Failed to check pending component upgrade, requeueing", "Server", server.Name)
+				return true, nil
+			}
 		} else if hasPending {
 			log.Info("Pending component upgrade detected, deferring BIOS upgrade to avoid interruption", "Server", server.Name)
 			return true, nil
@@ -333,7 +321,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 		return false, r.upgradeBIOSVersion(ctx, bmcClient, biosVersion, server, issuedCondition)
 	}
 
-	completedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeCompleted)
+	completedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionVersionUpgradeCompleted)
 	if err != nil {
 		return false, err
 	}
@@ -371,7 +359,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 		return requeue, err
 	}
 
-	rebootPowerOffCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradePowerOff)
+	rebootPowerOffCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionUpgradePowerOff)
 	if err != nil {
 		return false, err
 	}
@@ -395,7 +383,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 		return false, r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, rebootPowerOffCondition)
 	}
 
-	rebootPowerOnCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradePowerOn)
+	rebootPowerOnCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionUpgradePowerOn)
 	if err != nil {
 		return false, err
 	}
@@ -419,7 +407,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 		return false, r.updateStatus(ctx, biosVersion, biosVersion.Status.State, biosVersion.Status.UpgradeTask, rebootPowerOnCondition)
 	}
 
-	condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionBIOSUpgradeVerification)
+	condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionVersionUpgradeVerification)
 	if err != nil {
 		return false, err
 	}
@@ -438,7 +426,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 				if err := r.Conditions.Update(
 					condition,
 					conditionutils.UpdateStatus(corev1.ConditionFalse),
-					conditionutils.UpdateReason(ReasonBIOSVersionVerification),
+					conditionutils.UpdateReason(ReasonVersionVerificationFailed),
 					conditionutils.UpdateMessage("waiting for BIOS Version update"),
 				); err != nil {
 					return false, fmt.Errorf("failed to update the verification condition: %w", err)
@@ -451,7 +439,7 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(ReasonBIOSVersionVerified),
+			conditionutils.UpdateReason(ReasonVersionUpdateVerified),
 			conditionutils.UpdateMessage("BIOS Version updated"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update conditions: %w", err)
@@ -464,6 +452,87 @@ func (r *BIOSVersionReconciler) processInProgressState(ctx context.Context, bmcC
 	return false, nil
 }
 
+func (r *BIOSVersionReconciler) processFailedState(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	if shouldRetryReconciliation(biosVersion) {
+		log.V(1).Info("Retrying BIOSVersion as per annotation")
+		biosVersionBase := biosVersion.DeepCopy()
+		biosVersion.Status.FailedAttempts = 0
+		biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+		biosVersion.Status.ObservedGeneration = biosVersion.Generation
+		annotations := biosVersion.GetAnnotations()
+		retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
+		if err != nil {
+			return true, fmt.Errorf("failed to get retry condition for BIOSVersion: %w", err)
+		}
+		// update only once
+		if retryCondition.Status != metav1.ConditionTrue {
+			err := r.Conditions.Update(retryCondition,
+				conditionutils.UpdateStatus(metav1.ConditionTrue),
+				conditionutils.UpdateReason(ReasonRetryOfFailedResourceIssued),
+				conditionutils.UpdateMessage(annotations[metalv1alpha1.OperationAnnotation]),
+			)
+			if err != nil {
+				return true, fmt.Errorf("failed to update retry condition for BIOSVersion: %w", err)
+			}
+		}
+		biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
+		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+			return true, fmt.Errorf("failed to patch BIOSVersion status for retrying: %w", err)
+		}
+		return true, nil
+	}
+	var maxAttempts int32
+	if biosVersion.Spec.RetryPolicy != nil && biosVersion.Spec.RetryPolicy.MaxAttempts != nil {
+		// if RetryPolicy is given (even if MaxAttempts is 0), do not use the default value.
+		maxAttempts = *biosVersion.Spec.RetryPolicy.MaxAttempts
+	} else if r.DefaultFailedAutoRetryCount > 0 {
+		// set the retry to this, if the optional RetryPolicy is not given and default retry count is set on the reconciler.
+		maxAttempts = r.DefaultFailedAutoRetryCount
+	}
+	if maxAttempts > 0 {
+		if biosVersion.Status.ObservedGeneration != biosVersion.Generation {
+			// if the generation has changed, it means the spec has been updated after the failure, we can reset the retry count and retry.
+			biosVersion.Status.FailedAttempts = 0
+		}
+		if biosVersion.Status.FailedAttempts < maxAttempts {
+			log.V(1).Info("Retrying BIOSVersion automatically", "FailedAttempts", biosVersion.Status.FailedAttempts)
+			biosVersionBase := biosVersion.DeepCopy()
+			biosVersion.Status.State = metalv1alpha1.BIOSVersionStatePending
+			biosVersion.Status.ObservedGeneration = biosVersion.Generation
+			retryCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
+			if err != nil {
+				return true, fmt.Errorf("failed to get Retry condition for BIOSVersion: %w", err)
+			}
+			if retryCondition.Status == metav1.ConditionTrue {
+				// keep the condition if it's already true,
+				// otherwise SET resource will patch the retry annotation again.
+				biosVersion.Status.Conditions = []metav1.Condition{*retryCondition}
+			} else {
+				biosVersion.Status.Conditions = nil
+			}
+			biosVersion.Status.FailedAttempts++
+			if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+				return true, fmt.Errorf("failed to patch BIOSVersion status for auto-retrying: %w", err)
+			}
+			return true, nil
+		}
+	}
+
+	// Keep status consistent when retries are disabled or exhausted.
+	if biosVersion.Status.FailedAttempts != 0 &&
+		(maxAttempts == 0 || biosVersion.Status.ObservedGeneration != biosVersion.Generation) {
+		biosVersionBase := biosVersion.DeepCopy()
+		biosVersion.Status.FailedAttempts = 0
+		biosVersion.Status.ObservedGeneration = biosVersion.Generation
+		if err := r.Status().Patch(ctx, biosVersion, client.MergeFrom(biosVersionBase)); err != nil {
+			return true, fmt.Errorf("failed to patch BIOSVersion status for disabled auto-retry: %w", err)
+		}
+	}
+	log.V(1).Info("Failed to upgrade BIOSVersion", "BIOSVersion", biosVersion.Name, "Status", biosVersion.Status, "Server", server.Name)
+	return false, nil
+}
+
 func (r *BIOSVersionReconciler) handleBMCReset(
 	ctx context.Context,
 	bmcClient bmc.BMC,
@@ -472,7 +541,7 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 ) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	// reset BMC if not already done
-	resetBMC, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, BMCConditionReset)
+	resetBMC, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionResetIssued)
 	if err != nil {
 		return false, fmt.Errorf("failed to get condition for reset of BMC of server: %w", err)
 	}
@@ -480,13 +549,13 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 	if resetBMC.Status != metav1.ConditionTrue {
 		// once the server is powered on, reset the BMC to make sure its in stable state
 		// this avoids problems with some BMCs that hang up in subsequent operations
-		if resetBMC.Reason != BMCReasonReset {
+		if resetBMC.Reason != ReasonResetIssued {
 			if err := resetBMCOfServer(ctx, r.Client, server, bmcClient); err == nil {
 				// mark reset to be issued, wait for next reconcile
 				if err := r.Conditions.Update(
 					resetBMC,
 					conditionutils.UpdateStatus(corev1.ConditionFalse),
-					conditionutils.UpdateReason(BMCReasonReset),
+					conditionutils.UpdateReason(ReasonResetIssued),
 					conditionutils.UpdateMessage("Issued BMC reset to stabilize BMC of the server"),
 				); err != nil {
 					return false, fmt.Errorf("failed to update reset BMC condition: %w", err)
@@ -516,7 +585,7 @@ func (r *BIOSVersionReconciler) handleBMCReset(
 		if err := r.Conditions.Update(
 			resetBMC,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(BMCReasonReset),
+			conditionutils.UpdateReason(ReasonResetIssued),
 			conditionutils.UpdateMessage("BMC reset to stabilize BMC of the server is completed"),
 		); err != nil {
 			return false, fmt.Errorf("failed to update power on server condition: %w", err)
@@ -550,6 +619,13 @@ func (r *BIOSVersionReconciler) cleanup(ctx context.Context, bmcClient bmc.BMC, 
 		log.V(1).Info("Upgraded BIOS version", "Version", currentBiosVersion, "Server", server.Name)
 		return r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateCompleted, nil, nil)
 	}
+	retryFailedCondition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionRetryOfFailedResourceIssued)
+	if err != nil {
+		return fmt.Errorf("failed to get retry condition for BIOSVersion: %w", err)
+	}
+	if retryFailedCondition.Status == metav1.ConditionTrue {
+		return r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateInProgress, nil, retryFailedCondition)
+	}
 	return r.updateStatus(ctx, biosVersion, metalv1alpha1.BIOSVersionStateInProgress, nil, nil)
 }
 
@@ -579,6 +655,7 @@ func (r *BIOSVersionReconciler) updateStatus(
 
 	biosVersionBase := biosVersion.DeepCopy()
 	biosVersion.Status.State = state
+	biosVersion.Status.ObservedGeneration = biosVersion.Generation
 
 	if condition != nil {
 		if err := r.Conditions.UpdateSlice(
@@ -652,7 +729,7 @@ func (r *BIOSVersionReconciler) requestServerMaintenance(ctx context.Context, bi
 		} else if err != nil {
 			return false, fmt.Errorf("failed to verify ServerMaintenance existence: %w", err)
 		}
-		condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ServerMaintenanceConditionCreated)
+		condition, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionServerMaintenanceCreated)
 		if err != nil {
 			return false, err
 		}
@@ -662,7 +739,7 @@ func (r *BIOSVersionReconciler) requestServerMaintenance(ctx context.Context, bi
 		if err := r.Conditions.Update(
 			condition,
 			conditionutils.UpdateStatus(corev1.ConditionTrue),
-			conditionutils.UpdateReason(ServerMaintenanceReasonCreated),
+			conditionutils.UpdateReason(ReasonMaintenanceCreated),
 			conditionutils.UpdateMessage(fmt.Sprintf("Created/Present %v at %v", biosVersion.Spec.ServerMaintenanceRef.Name, time.Now())),
 		); err != nil {
 			return false, fmt.Errorf("failed to update creating ServerMaintenance condition: %w", err)
@@ -954,7 +1031,7 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, ob
 	reqs := make([]ctrl.Request, 0)
 	for _, biosVersion := range biosVersionList.Items {
 		if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-			resetBMC, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, BMCConditionReset)
+			resetBMC, err := GetCondition(r.Conditions, biosVersion.Status.Conditions, ConditionResetIssued)
 			if err != nil {
 				log.Error(err, "Failed to get reset BMC condition")
 				continue
@@ -963,7 +1040,7 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, ob
 				continue
 			}
 			// enqueue only if the BMC reset is requested for this BMC
-			if resetBMC.Reason == BMCReasonReset {
+			if resetBMC.Reason == ReasonResetIssued {
 				reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: biosVersion.Namespace, Name: biosVersion.Name}})
 			}
 		}

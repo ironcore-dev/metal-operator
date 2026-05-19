@@ -1,28 +1,18 @@
 {
     "@odata.type": "#ManagerAccount.v1_12_0.ManagerAccount",
     "Id": "2",
-    "Name": "Employee #457",
-    "Description": "This user is both a Redfish administrator and a SNMPv3 user.",
+    "Name": "Test User",
+    "Description": "Default test account used by controller tests.",
     "Enabled": true,
-    "Password": null,
-    "UserName": "contoso_employee457",
-    "MFABypass": {
-        "BypassTypes": [
-            "All"
-        ]
-    },
+    "Password": "bar",
+    "PasswordChangeRequired": false,
+    "PasswordExpiration": "2026-12-31T23:59:59Z",
+    "UserName": "foo",
     "RoleId": "Administrator",
     "Locked": false,
     "AccountTypes": [
-        "Redfish",
-        "SNMP"
+        "Redfish"
     ],
-    "SNMP": {
-        "AuthenticationKey": null,
-        "AuthenticationProtocol": "None",
-        "EncryptionKey": null,
-        "EncryptionProtocol": "CFB128_AES128"
-    },
     "Links": {
         "Role": {
             "@odata.id": "/redfish/v1/AccountService/Roles/Administrator"

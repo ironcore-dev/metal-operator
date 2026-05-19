@@ -94,6 +94,7 @@ def waitforsystem():
 deploy_cert_manager()
 
 docker_build('controller', '.', target = 'manager')
+docker_build('mock-server', '.', target = 'mock-server')
 
 yaml_metal = kustomize('./config/dev')
 new_args = settings.get("new_args").get("metal")

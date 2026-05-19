@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -85,12 +86,11 @@ var _ = Describe("BMCVersion Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		bmc.UnitTestMockUps.ResetBMCVersionUpdate()
-
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState()
+		mockServers[0].ResetUpgradeTask("/redfish/v1/Managers/BMC")
 	})
 
 	It("should successfully mark completed if no BMC version change", func(ctx SpecContext) {
@@ -102,8 +102,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 defaultMockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					Version:                 mockUpServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -317,8 +317,8 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
 		By("Ensuring that Server in Maintenance state")
@@ -363,39 +363,58 @@ var _ = Describe("BMCVersion Controller", func() {
 	})
 
 	It("should allow retry using annotation", func(ctx SpecContext) {
+		failedAutoRetryCount := 2
 		By("Creating a BMCVersion")
 		bmcVersion := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+				},
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 upgradeServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					Version:                 upgradeServerBMCVersion + " fail",
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
 				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
 
-		By("Moving to Failed state")
-		Eventually(UpdateStatus(bmcVersion, func() {
-			bmcVersion.Status.State = metalv1alpha1.BMCVersionStateFailed
-		})).Should(Succeed())
+		By("Ensuring that the BMC Version has started retry and FailedAttempts is set")
+		Eventually(func(g Gomega) bool {
+			g.Expect(Get(bmcVersion)()).To(Succeed())
+			return bmcVersion.Status.FailedAttempts > int32(0)
+		}).WithPolling((1 * time.Millisecond)).Should(BeTrue())
 
-		Eventually(Update(bmcVersion, func() {
-			bmcVersion.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
-			}
-		})).Should(Succeed())
+		Eventually(Object(bmcVersion)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
 
 		Eventually(Object(bmcVersion)).Should(
-			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
+			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		)
+
+		By("Ensuring that the BIOS setting has not been changed")
+		Consistently(Object(bmcVersion), "250ms").Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateFailed),
+			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
+		))
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
+		// clean up maintenance if any, as the test not auto delete child objects
+		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
+		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
+		for _, maintenance := range serverMaintenanceList.Items {
+			if metav1.IsControlledBy(&maintenance, bmcVersion) {
+				Expect(k8sClient.Delete(ctx, &maintenance)).To(Succeed())
+			}
+		}
 		Eventually(UpdateStatus(server, func() {
 			server.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
@@ -533,8 +552,8 @@ var _ = Describe("BMCVersion Controller", func() {
 			Spec: metalv1alpha1.BMCVersionSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
 				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-					Version:                 defaultMockUpServerBMCVersion,
-					Image:                   metalv1alpha1.ImageSpec{URI: defaultMockUpServerBMCVersion},
+					Version:                 mockUpServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: mockUpServerBMCVersion},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				},
 			},
@@ -630,7 +649,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 	}).Should(BeNumerically(">=", 1))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeIssued, condIssue)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, ConditionVersionUpgradeIssued, condIssue)).To(BeTrue())
 		return condIssue.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
@@ -649,7 +668,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 	}).Should(BeNumerically(">=", 2))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeCompleted, condComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, ConditionVersionUpgradeCompleted, condComplete)).To(BeTrue())
 		return condComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
@@ -661,7 +680,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 	}).Should(BeNumerically(">=", 4))
 	Eventually(func(g Gomega) bool {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
-		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, bmcVersionUpgradeVerificationCondition, verificationComplete)).To(BeTrue())
+		g.Expect(acc.FindSlice(bmcVersion.Status.Conditions, ConditionVersionUpgradeVerification, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 }

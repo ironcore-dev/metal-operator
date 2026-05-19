@@ -6,10 +6,14 @@ package bmc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/stmcginnis/gofish/schemas"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
+
+// ErrNotSupported is returned when a BMC operation is not supported by the vendor.
+var ErrNotSupported = errors.New("operation not supported by this vendor")
 
 type Manufacturer string
 
@@ -56,6 +60,9 @@ type BMC interface {
 
 	// GetManager returns the manager
 	GetManager(UUID string) (*schemas.Manager, error)
+
+	// DiscoverManager returns the first manager that exposes graphical console capabilities.
+	DiscoverManager(ctx context.Context) (*schemas.Manager, error)
 
 	// ResetManager performs a reset on the Manager.
 	ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error

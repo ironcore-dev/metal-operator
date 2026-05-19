@@ -6,13 +6,14 @@ package client
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-func CreateClient(kubeconfig string, scheme *runtime.Scheme) (client.Client, error) {
+func CreateClient(kubeconfig, context string, scheme *runtime.Scheme) (client.Client, error) {
 	if len(kubeconfig) == 0 {
 		kubeconfig = os.Getenv("KUBECONFIG")
 		if kubeconfig == "" {
@@ -21,7 +22,18 @@ func CreateClient(kubeconfig string, scheme *runtime.Scheme) (client.Client, err
 		}
 	}
 
-	clientConfig, err := config.GetConfigWithContext("")
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	paths := filepath.SplitList(kubeconfig)
+	if len(paths) == 1 {
+		loadingRules.ExplicitPath = kubeconfig
+	} else {
+		loadingRules.Precedence = paths
+	}
+	overrides := &clientcmd.ConfigOverrides{}
+	if context != "" {
+		overrides.CurrentContext = context
+	}
+	clientConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides).ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed getting client config: %w", err)
 	}

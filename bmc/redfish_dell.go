@@ -35,6 +35,40 @@ type dellManagerLinksOEM struct {
 	DellAttributesCount int           `json:"DellAttributes@odata.count"`
 }
 
+// dellRegistryAttribute embeds schemas.Attributes and overrides only the fields
+// that Dell iDRAC serializes differently:
+//   - LowerBound/UpperBound: Dell sends negative values (e.g. -1 = "no limit"),
+//     which cannot be represented as *uint64.
+//   - ReadOnly: Dell uses the JSON key "Readonly" (lowercase 'o').
+type dellRegistryAttribute struct {
+	schemas.Attributes
+	LowerBound *int64 `json:"LowerBound,omitempty"` // shadows Attributes.LowerBound (*uint64)
+	UpperBound *int64 `json:"UpperBound,omitempty"` // shadows Attributes.UpperBound (*uint64)
+	ReadOnly   bool   `json:"Readonly"`             // Dell uses "Readonly", not "ReadOnly"
+}
+
+type dellAttributeRegistry struct {
+	RegistryEntries struct {
+		Attributes []dellRegistryAttribute `json:"Attributes"`
+	} `json:"RegistryEntries"`
+}
+
+// toSchemaAttributes converts a dellRegistryAttribute to schemas.Attributes.
+// LowerBound and UpperBound are omitted when negative (not representable as uint64).
+func (d dellRegistryAttribute) toSchemaAttributes() schemas.Attributes {
+	a := d.Attributes
+	a.ReadOnly = d.ReadOnly
+	if d.LowerBound != nil && *d.LowerBound >= 0 {
+		v := uint64(*d.LowerBound)
+		a.LowerBound = &v
+	}
+	if d.UpperBound != nil && *d.UpperBound >= 0 {
+		v := uint64(*d.UpperBound)
+		a.UpperBound = &v
+	}
+	return a
+}
+
 // dellCommonBMCAttributes defines commonly configured Dell iDRAC attributes
 // that may not be in the standard registry but are supported by Dell iDRAC.
 var dellCommonBMCAttributes = map[string]schemas.Attributes{
@@ -104,7 +138,11 @@ func (r *DellRedfishBMC) getManagerForOEM() (*schemas.Manager, error) {
 
 func (r *DellRedfishBMC) getCurrentBMCSettingAttribute(manager *schemas.Manager) ([]dellAttributes, error) {
 	type temp struct {
-		DellOEMData dellManagerLinksOEM `json:"Dell"`
+		Links struct {
+			Oem struct {
+				DellOEMData dellManagerLinksOEM `json:"Dell"`
+			} `json:"Oem"`
+		} `json:"Links"`
 	}
 
 	tempData := &temp{}
@@ -116,7 +154,7 @@ func (r *DellRedfishBMC) getCurrentBMCSettingAttribute(manager *schemas.Manager)
 	c := manager.GetClient()
 	bmcDellAttributes := []dellAttributes{}
 	var errs []error
-	for _, data := range tempData.DellOEMData.DellLinkAttributes {
+	for _, data := range tempData.Links.Oem.DellOEMData.DellLinkAttributes {
 		bmcDellAttribute := &dellAttributes{}
 		eTag, err := r.getObjFromURI(c, data.String(), bmcDellAttribute)
 		if err != nil {
@@ -139,7 +177,7 @@ func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(manager *schemas.Manag
 		return nil, err
 	}
 	c := manager.GetClient()
-	bmcRegistryAttribute := &schemas.AttributeRegistry{}
+	bmcRegistryAttribute := &dellAttributeRegistry{}
 	for _, registry := range registries {
 		if strings.Contains(registry.ID, "ManagerAttributeRegistry") {
 			if len(registry.Location) == 0 {
@@ -155,7 +193,7 @@ func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(manager *schemas.Manag
 	filteredAttr := make(map[string]schemas.Attributes)
 	for _, entry := range bmcRegistryAttribute.RegistryEntries.Attributes {
 		if entry.Immutable == immutable && entry.ReadOnly == readOnly && !entry.Hidden {
-			filteredAttr[entry.AttributeName] = entry
+			filteredAttr[entry.AttributeName] = entry.toSchemaAttributes()
 		}
 	}
 	return filteredAttr, nil
@@ -210,20 +248,40 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 				continue
 			}
 		}
-		if strings.EqualFold(string(entry.Type), string(schemas.EnumerationAttributeType)) {
+		currentVal, hasCurrentVal := mergedBMCAttributes[name]
+		if !hasCurrentVal {
+			errs = append(errs, fmt.Errorf("attribute '%v' not found in any DellAttributes endpoint", name))
+			continue
+		}
+
+		switch entry.Type {
+		case schemas.EnumerationAttributeType:
+			// Translate the DisplayName value reported by iDRAC to the canonical
+			// ValueName used by the registry and the PATCH payload.
+			// currentVal may be nil (iDRAC CurrentValue=null for factory-default attributes),
+			// in which case the loop below will find no match and we error accordingly.
 			for _, attrValue := range entry.Value {
-				if attrValue.ValueDisplayName == mergedBMCAttributes[name] {
+				if attrValue.ValueDisplayName == currentVal {
 					result[name] = attrValue.ValueName
 					break
 				}
 			}
 			if _, ok := result[name]; !ok {
 				errs = append(errs,
-					fmt.Errorf("current setting '%v' for key '%v' not found in possible values for it (%v)",
-						mergedBMCAttributes[name], name, entry.Value))
+					fmt.Errorf("current setting '%v' for key '%v' not found in possible values: %v",
+						currentVal, name, entry.Value))
 			}
-		} else {
-			result[name] = mergedBMCAttributes[name]
+		case schemas.IntegerAttributeType:
+			// Convert raw JSON value to the correct Go type based on registry metadata.
+			// JSON numbers unmarshal as float64 into map[string]any; convert to int
+			// for IntegerAttributeType so downstream validation (checkAttributes) passes.
+			if f, ok := currentVal.(float64); ok {
+				result[name] = int(f)
+			} else {
+				result[name] = currentVal
+			}
+		default:
+			result[name] = currentVal
 		}
 	}
 	if len(errs) > 0 {

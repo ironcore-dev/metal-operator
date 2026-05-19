@@ -26,13 +26,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const (
+	BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
+)
+
 type BMCSettingsSetReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
 	ResyncInterval time.Duration
 }
-
-const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettingssets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsettingssets/status,verbs=get;update;patch
@@ -42,6 +44,8 @@ const BMCSettingsSetFinalizer = "metal.ironcore.dev/bmcsettingsset"
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *BMCSettingsSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	bmcSettingsSet := &metalv1alpha1.BMCSettingsSet{}
 	if err := r.Get(ctx, req.NamespacedName, bmcSettingsSet); err != nil {
@@ -114,6 +118,13 @@ func (r *BMCSettingsSetReconciler) delete(
 		err = r.updateStatus(ctx, currentStatus, bmcSettingsSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
+		}
+		log.V(1).Info("Updated BMCSettingsSet state", "Status", currentStatus)
+
+		// Handle propagation of retry annotation to child when parent is being deleted.
+		// That way the deleted annotations can be passed to children before parent is deleted.
+		if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+			return ctrl.Result{}, err
 		}
 		log.Info("Waiting on the created BMCSettings to reach terminal status")
 		return ctrl.Result{}, nil
@@ -223,6 +234,11 @@ func (r *BMCSettingsSetReconciler) handleBMCSettings(
 	currentStatus.FullyLabeledBMCs = int32(len(bmcList.Items))
 	if err := r.updateStatus(ctx, currentStatus, bmcSettingsSet); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCSettingsSet Status %w", err)
+	}
+
+	// handle retry annotation - remove the annotation after retrying reconciliation
+	if err := r.handleRetryAnnotationPropagation(ctx, bmcSettingsSet); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if currentStatus.FullyLabeledBMCs != currentStatus.AvailableBMCSettings || pendingPatchingSettings {
@@ -360,6 +376,22 @@ func (r *BMCSettingsSetReconciler) patchBMCSettingsFromTemplate(
 		}
 	}
 	return pendingPatchingSettings, errors.Join(errs...)
+}
+
+func (r *BMCSettingsSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, set *metalv1alpha1.BMCSettingsSet) error {
+	log := ctrl.LoggerFrom(ctx)
+	ownedBMCSettings, err := r.getOwnedBMCSettings(ctx, set)
+	if err != nil {
+		return err
+	}
+
+	if len(ownedBMCSettings.Items) == 0 {
+		log.V(1).Info("No BMCSettings found, skipping retry annotation propagation")
+		return nil
+	}
+
+	log.V(1).Info("Propagating retry annotation to owned BMCSettings resources")
+	return handleRetryAnnotationPropagation(ctx, r.Client, set, ownedBMCSettings)
 }
 
 func (r *BMCSettingsSetReconciler) enqueueByBMC(

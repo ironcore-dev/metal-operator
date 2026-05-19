@@ -2,10 +2,7 @@ name: Tests
 
 on:
   pull_request:
-    types: [ assigned, opened, synchronize, reopened ]
-    paths-ignore:
-    - 'docs/**'
-    - '**/*.md'
+    types: [assigned, opened, synchronize, reopened]
 
 jobs:
   test:
@@ -33,3 +30,21 @@ jobs:
         run: |
           sudo --preserve-env=GOROOT,GOPATH,PATH go mod tidy
           sudo --preserve-env=GOROOT,GOPATH,PATH make test-only
+
+  test-alerts:
+    name: Test Prometheus alert rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Check alert rules syntax
+        run: make check-alerts
+
+      - name: Run alert rule tests
+        run: make test-alerts

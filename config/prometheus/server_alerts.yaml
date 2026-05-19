@@ -7,82 +7,82 @@ metadata:
     control-plane: controller-manager
 spec:
   groups:
-  - name: metal_operator_servers
-    interval: 30s
-    rules:
-    - alert: NoAvailableServers
-      expr: sum(metal_server_state{state="Available"} or on() vector(0)) < 1 AND sum(metal_server_state{state="Reserved"} or on() vector(0)) == 0
-      for: 5m
-      annotations:
-        summary: "No available or reserved servers in the fleet"
-        description: "The fleet is completely idle with no servers in Available or Reserved state"
-      labels:
-        severity: warning
+    - name: metal_operator_servers
+      interval: 30s
+      rules:
+        - alert: NoAvailableServers
+          expr: (count(metal_server_state{state="Available"}) or vector(0)) < 1 and (count(metal_server_state{state="Reserved"}) or vector(0)) < 1
+          for: 5m
+          annotations:
+            summary: "No available or reserved servers in the fleet"
+            description: "The fleet is completely idle with no servers in Available or Reserved state"
+          labels:
+            severity: warning
 
-    - alert: ServersInErrorState
-      expr: metal_server_state{state="Error"} > 0
-      for: 2m
-      annotations:
-        summary: "Servers are in Error state"
-        description: "{{ $value }} server(s) are in Error state and require attention"
-      labels:
-        severity: critical
+        - alert: ServersInErrorState
+          expr: metal_server_state{state="Error"} == 1
+          for: 2m
+          annotations:
+            summary: "Server {{ $labels.server }} is in Error state"
+            description: "Server {{ $labels.server }} is in Error state and requires attention"
+          labels:
+            severity: critical
 
-    - alert: ServersPoweringOnTooLong
-      expr: metal_server_power_state{power_state="PoweringOn"} > 0
-      for: 10m
-      annotations:
-        summary: "Servers stuck in PoweringOn state"
-        description: "{{ $value }} server(s) have been in PoweringOn state for over 10 minutes"
-      labels:
-        severity: warning
+        - alert: ServersPoweringOnTooLong
+          expr: metal_server_power_state{power_state="PoweringOn"} == 1
+          for: 10m
+          annotations:
+            summary: "Server {{ $labels.server }} stuck in PoweringOn state"
+            description: "Server {{ $labels.server }} has been in PoweringOn state for over 10 minutes"
+          labels:
+            severity: warning
 
-    - alert: ServersPoweringOffTooLong
-      expr: metal_server_power_state{power_state="PoweringOff"} > 0
-      for: 10m
-      annotations:
-        summary: "Servers stuck in PoweringOff state"
-        description: "{{ $value }} server(s) have been in PoweringOff state for over 10 minutes"
-      labels:
-        severity: warning
+        - alert: ServersPoweringOffTooLong
+          expr: metal_server_power_state{power_state="PoweringOff"} == 1
+          for: 10m
+          annotations:
+            summary: "Server {{ $labels.server }} stuck in PoweringOff state"
+            description: "Server {{ $labels.server }} has been in PoweringOff state for over 10 minutes"
+          labels:
+            severity: warning
 
-    - alert: HighReconciliationErrorRate
-      expr: rate(metal_server_reconciliation_total{result=~"error_.*"}[5m]) > 0.1
-      for: 5m
-      annotations:
-        summary: "High server reconciliation error rate"
-        description: "Server reconciliation errors are occurring at {{ $value | humanize }} per second"
-      labels:
-        severity: warning
+        - alert: HighReconciliationErrorRate
+          expr: rate(metal_server_reconciliation_total{result=~"error_.*"}[5m]) > 0.1
+          for: 5m
+          annotations:
+            summary: "High server reconciliation error rate"
+            description: "Server reconciliation errors are occurring at {{ $value | humanize }} per second"
+          labels:
+            severity: warning
 
-    - alert: LowAvailableServerCapacity
-      expr: sum(metal_server_state{state="Available"} or on() vector(0)) < 2
-      for: 5m
-      annotations:
-        summary: "Low available server capacity"
-        description: "Only {{ $value }} server(s) are available"
-      labels:
-        severity: warning
+        - alert: LowAvailableServerCapacity
+          expr: (count(metal_server_state{state="Available"}) or vector(0)) < 2
+          for: 5m
+          annotations:
+            summary: "Low available server capacity"
+            description: "Only {{ $value }} server(s) are available"
+          labels:
+            severity: warning
 
-    - alert: ServerMetricsMissing
-      expr: absent(metal_server_state)
-      for: 5m
-      annotations:
-        summary: "Server metrics are not being collected"
-        description: "The metal-operator metrics endpoint is not reporting server state metrics"
-      labels:
-        severity: critical
+        - alert: ServerMetricsMissing
+          expr: up{job="metal-operator"} == 0
+          for: 5m
+          annotations:
+            summary: "Metal-operator scrape is failing"
+            description: "Prometheus cannot scrape the metal-operator metrics endpoint - check operator health and network connectivity"
+          labels:
+            severity: critical
 
-    - alert: ServerReconciliationFailureSpike
-      expr: |
-        (
-          sum(rate(metal_server_reconciliation_total{result=~"error_.*"}[5m]))
-          /
-          sum(rate(metal_server_reconciliation_total[5m]))
-        ) > 0.5
-      for: 10m
-      annotations:
-        summary: "High rate of server reconciliation failures"
-        description: "More than 50% of server reconciliations are failing"
-      labels:
-        severity: critical
+        - alert: ServerReconciliationFailureSpike
+          expr: |
+            (
+              sum(rate(metal_server_reconciliation_total{result=~"error_.*"}[5m]))
+              /
+              sum(rate(metal_server_reconciliation_total[5m]))
+            ) > 0.5
+          for: 10m
+          annotations:
+            summary: "High rate of server reconciliation failures"
+            description: "More than 50% of server reconciliations are failing"
+          labels:
+            severity: critical

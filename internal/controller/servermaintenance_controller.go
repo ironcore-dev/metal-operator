@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	// ServerMaintenanceFinalizer is the finalizer for the ServerMaintenance resource.
-	ServerMaintenanceFinalizer = "metal.ironcore.dev/servermaintenance"
+	// serverMaintenanceFinalizer is the finalizer for the ServerMaintenance resource.
+	serverMaintenanceFinalizer = "metal.ironcore.dev/servermaintenance"
 
 	// trueValue represents the string value "true" used for labels and annotations
 	trueValue = "true"
@@ -77,7 +77,7 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, maintenance
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get Server: %w", err)
 	}
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, maintenance, ServerMaintenanceFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, maintenance, serverMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 
@@ -165,8 +165,8 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 	if maintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
 		annotations := serverClaim.GetAnnotations()
 		labels := serverClaim.GetLabels()
-		_, hasAnnotation := annotations[metalv1alpha1.ServerMaintenanceApprovalKey]
-		_, hasLabel := labels[metalv1alpha1.ServerMaintenanceApprovalKey]
+		_, hasAnnotation := annotations[metalv1alpha1.ServerMaintenanceApprovedLabelKey]
+		_, hasLabel := labels[metalv1alpha1.ServerMaintenanceApprovedLabelKey]
 
 		if hasAnnotation || hasLabel {
 			log.V(1).Info("Server approved for maintenance", "Server", server.Name)
@@ -361,7 +361,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, maintenance *m
 	log.V(1).Info("Removed dependencies")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, maintenance, ServerMaintenanceFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, maintenance, serverMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer is removed")
@@ -378,7 +378,7 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metal
 
 	if server.Spec.ServerMaintenanceRef != nil {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
-			log.Error(err, "Failed to remove ServerMaintenance ref from Server")
+			return fmt.Errorf("failed to remove ServerMaintenance ref from Server: %w", err)
 		}
 	}
 	if server.Spec.MaintenanceBootConfigurationRef != nil {
@@ -409,12 +409,12 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metal
 	}
 	serverClaimBase := serverClaim.DeepCopy()
 	metautils.DeleteAnnotations(serverClaim, []string{
-		metalv1alpha1.ServerMaintenanceApprovalKey,
+		metalv1alpha1.ServerMaintenanceApprovedLabelKey,
 		metalv1alpha1.ServerMaintenanceNeededLabelKey,
 		metalv1alpha1.ServerMaintenanceReasonAnnotationKey,
 	})
 	metautils.DeleteLabels(serverClaim, []string{
-		metalv1alpha1.ServerMaintenanceApprovalKey,
+		metalv1alpha1.ServerMaintenanceApprovedLabelKey,
 		metalv1alpha1.ServerMaintenanceNeededLabelKey,
 	})
 	if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {

@@ -19,11 +19,17 @@ const (
 	// PowerOff indicates that the device is powered off.
 	PowerOff Power = "Off"
 
-	// TopologyHeightUnit is the annotation key for the height unit of a server in a rack.
-	TopologyHeightUnit = "topology.metal.ironcore.dev/heightunit"
+	// LabelLocation is the label key for the user-defined location identifier (e.g. FRA-DC5-3F).
+	LabelLocation = "metadata.metal.ironcore.dev/location"
 
-	// TopologyRack is the annotation key for the rack of a server.
-	TopologyRack = "topology.metal.ironcore.dev/rack"
+	// LabelRack is the label key for the opaque rack identifier within a location.
+	LabelRack = "metadata.metal.ironcore.dev/rack"
+
+	// LabelShelf is the label key for the position within the rack (bottom-up U number).
+	LabelShelf = "metadata.metal.ironcore.dev/shelf"
+
+	// LabelHeight is the label key for the device height in rack units (U).
+	LabelHeight = "metadata.metal.ironcore.dev/height"
 )
 
 // ServerPowerState defines the possible power states for a server.
@@ -127,6 +133,10 @@ type ServerSpec struct {
 	// the BIOS configuration for this server.
 	// +optional
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
+
+	// Taints control which ServerClaims can be bound to this server.
+	// +optional
+	Taints []Taint `json:"taints,omitempty"`
 }
 
 // ServerState defines the possible states of a server.

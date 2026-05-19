@@ -7,17 +7,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stmcginnis/gofish/schemas"
 )
-
-func TestDellOEM(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Dell OEM Suite")
-}
 
 var _ = Describe("Dell OEM", func() {
 	var dell *DellRedfishBMC

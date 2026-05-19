@@ -25,6 +25,10 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
+const (
+	BMCVersionSetFinalizer = "metal.ironcore.dev/bmcversionset"
+)
+
 // BMCVersionSetReconciler reconciles a BMCVersionSet object
 type BMCVersionSetReconciler struct {
 	client.Client
@@ -32,14 +36,14 @@ type BMCVersionSetReconciler struct {
 	ResyncInterval time.Duration
 }
 
-const BMCVersionSetFinalizer = "metal.ironcore.dev/bmcversionset"
-
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *BMCVersionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	bmcVersionSet := &metalv1alpha1.BMCVersionSet{}
 	if err := r.Get(ctx, req.NamespacedName, bmcVersionSet); err != nil {

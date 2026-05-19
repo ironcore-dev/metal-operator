@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -105,6 +106,7 @@ func main() { // nolint: gocyclo
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
+		defaultFailedAutoRetryCount        int
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -181,6 +183,8 @@ func main() { // nolint: gocyclo
 		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
+	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
+		"The default number of auto retries for a CRD when it fails. 0 for no retries.")
 
 	opts := zap.Options{
 		Development: true,
@@ -271,6 +275,11 @@ func main() { // nolint: gocyclo
 		registryURL = fmt.Sprintf("%s://%s:%d", registryProtocol, registryAddr, registryPort)
 	}
 
+	if defaultFailedAutoRetryCount < 0 || defaultFailedAutoRetryCount > math.MaxInt32 {
+		setupLog.Error(nil, "--default-failed-auto-retry-count can not be negative value or greater than int32 max value")
+		os.Exit(1)
+	}
+
 	// set the correct event URL by getting the address from the environment
 	var eventAddr string
 	if eventURL == "" {
@@ -331,7 +340,7 @@ func main() { // nolint: gocyclo
 
 	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
 	// More info:
-	// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/metrics/server
+	// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.23.3/pkg/metrics/server
 	// - https://book.kubebuilder.io/reference/metrics.html
 	metricsServerOptions := metricsserver.Options{
 		BindAddress:   metricsAddr,
@@ -343,7 +352,7 @@ func main() { // nolint: gocyclo
 		// FilterProvider is used to protect the metrics endpoint with authn/authz.
 		// These configurations ensure that only authorized users and service accounts
 		// can access the metrics endpoint. The RBAC are configured in 'config/rbac/kustomization.yaml'. More info:
-		// https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/metrics/filters#WithAuthenticationAndAuthorization
+		// https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.23.3/pkg/metrics/filters#WithAuthenticationAndAuthorization
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
@@ -410,14 +419,14 @@ func main() { // nolint: gocyclo
 		DefaultProtocol:    effectiveProtocol,
 		SkipCertValidation: effectiveSkipCert,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "Endpoint")
+		setupLog.Error(err, "Failed to create controller", "controller", "endpoint")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCSecretReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BMCSecret")
+		setupLog.Error(err, "Failed to create controller", "controller", "bmcsecret")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
@@ -438,7 +447,7 @@ func main() { // nolint: gocyclo
 			BasicAuth: true,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BMC")
+		setupLog.Error(err, "Failed to create controller", "controller", "bmc")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerReconciler{
@@ -469,14 +478,14 @@ func main() { // nolint: gocyclo
 		},
 		DiscoveryTimeout: discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "Server")
+		setupLog.Error(err, "Failed to create controller", "controller", "server")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerBootConfigurationReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ServerBootConfiguration")
+		setupLog.Error(err, "Failed to create controller", "controller", "serverbootconfiguration")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerClaimReconciler{
@@ -486,14 +495,14 @@ func main() { // nolint: gocyclo
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ServerClaim")
+		setupLog.Error(err, "Failed to create controller", "controller", "serverclaim")
 		os.Exit(1)
 	}
 	if err = (&controller.ServerMaintenanceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ServerMaintenance")
+		setupLog.Error(err, "Failed to create controller", "controller", "servermaintenance")
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSSettingsReconciler{
@@ -511,9 +520,10 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		TimeoutExpiry: biosSettingsApplyTimeout,
+		TimeoutExpiry:               biosSettingsApplyTimeout,
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettings")
+		setupLog.Error(err, "Failed to create controller", "controller", "biossettings")
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSVersionReconciler{
@@ -531,8 +541,9 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersion")
+		setupLog.Error(err, "Failed to create controller", "controller", "biosversion")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCSettingsReconciler{
@@ -550,8 +561,9 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettings")
+		setupLog.Error(err, "Failed to create controller", "controller", "bmcsettings")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCVersionReconciler{
@@ -569,8 +581,9 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
+		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersion")
+		setupLog.Error(err, "Failed to create controller", "controller", "bmcversion")
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSVersionSetReconciler{
@@ -578,7 +591,7 @@ func main() { // nolint: gocyclo
 		Scheme:         mgr.GetScheme(),
 		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BIOSVersionSet")
+		setupLog.Error(err, "Failed to create controller", "controller", "biosversionset")
 		os.Exit(1)
 	}
 	if err = (&controller.BIOSSettingsSetReconciler{
@@ -586,7 +599,7 @@ func main() { // nolint: gocyclo
 		Scheme:         mgr.GetScheme(),
 		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BIOSSettingsSet")
+		setupLog.Error(err, "Failed to create controller", "controller", "biossettingsset")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCVersionSetReconciler{
@@ -594,7 +607,7 @@ func main() { // nolint: gocyclo
 		Scheme:         mgr.GetScheme(),
 		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersionSet")
+		setupLog.Error(err, "Failed to create controller", "controller", "bmcversionset")
 		os.Exit(1)
 	}
 	if err := (&controller.BMCSettingsSetReconciler{
@@ -602,7 +615,7 @@ func main() { // nolint: gocyclo
 		Scheme:         mgr.GetScheme(),
 		ResyncInterval: maintenanceResyncInterval,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BMCSettingsSet")
+		setupLog.Error(err, "Failed to create controller", "controller", "bmcsettingsset")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCUserReconciler{
@@ -618,56 +631,56 @@ func main() { // nolint: gocyclo
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "BMCUser")
+		setupLog.Error(err, "Failed to create controller", "controller", "bmcuser")
 		os.Exit(1)
 	}
 
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupEndpointWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "Endpoint")
+			setupLog.Error(err, "Failed to create webhook", "webhook", "endpoint")
 			os.Exit(1)
 		}
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupBMCSecretWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCSecret")
+			setupLog.Error(err, "Failed to create webhook", "webhook", "bmcsecret")
 			os.Exit(1)
 		}
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupServerWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "Server")
+			setupLog.Error(err, "Failed to create webhook", "webhook", "server")
 			os.Exit(1)
 		}
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupBIOSSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "BIOSSettings")
+			setupLog.Error(err, "Failed to create webhook", "webhook", "biossettings")
 			os.Exit(1)
 		}
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "BIOSVersion")
+			setupLog.Error(err, "Failed to create webhook", "webhook", "biosversion")
 			os.Exit(1)
 		}
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupBMCSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCSettings")
+			setupLog.Error(err, "Failed to create webhook", "webhook", "bmcsettings")
 			os.Exit(1)
 		}
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "BMCVersion")
+			setupLog.Error(err, "Failed to create webhook", "webhook", "bmcversion")
 			os.Exit(1)
 		}
 	}

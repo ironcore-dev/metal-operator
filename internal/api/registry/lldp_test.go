@@ -4,11 +4,60 @@
 package registry
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 )
+
+func TestParseMgmtIP(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    json.RawMessage
+		expected string
+	}{
+		{
+			name:     "string value",
+			input:    json.RawMessage(`"192.168.1.1"`),
+			expected: "192.168.1.1",
+		},
+		{
+			name:     "array with single value",
+			input:    json.RawMessage(`["192.168.1.1"]`),
+			expected: "192.168.1.1",
+		},
+		{
+			name:     "array with multiple values returns first",
+			input:    json.RawMessage(`["192.168.1.1", "10.0.0.1"]`),
+			expected: "192.168.1.1",
+		},
+		{
+			name:     "empty raw message",
+			input:    json.RawMessage(``),
+			expected: "",
+		},
+		{
+			name:     "empty array",
+			input:    json.RawMessage(`[]`),
+			expected: "",
+		},
+		{
+			name:     "null",
+			input:    json.RawMessage(`null`),
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseMgmtIP(tt.input)
+			if result != tt.expected {
+				t.Errorf("parseMgmtIP(%s) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
 
 func TestParseLLDPCTL(t *testing.T) {
 	// Determine test data directory, search upward from the test file location for a test/data directory
@@ -40,6 +89,7 @@ func TestParseLLDPCTL(t *testing.T) {
 		{filepath.Join(baseDir, "lldpctl_incomplete.json"), "incomplete"},
 		{filepath.Join(baseDir, "lldpctl_partial.json"), "partial"},
 		{filepath.Join(baseDir, "lldpctl_single.json"), "single"},
+		{filepath.Join(baseDir, "lldpctl_mgmtip_array.json"), "mgmtip_array"},
 	}
 
 	for _, f := range fixtures {
@@ -64,6 +114,8 @@ func TestParseLLDPCTL(t *testing.T) {
 				validatePartial(t, parsed)
 			case "single":
 				validateSingle(t, parsed)
+			case "mgmtip_array":
+				validateMgmtIPArray(t, parsed)
 			}
 		})
 	}
@@ -134,5 +186,24 @@ func validateSingle(t *testing.T, parsed LLDP) {
 	}
 	if n.PortID != "Eth1/17" {
 		t.Errorf("unexpected port id in single fixture: %s", n.PortID)
+	}
+}
+
+func validateMgmtIPArray(t *testing.T, parsed LLDP) {
+	if len(parsed.Interfaces) != 1 {
+		t.Fatalf("expected 1 interface in mgmtip_array fixture, got %d", len(parsed.Interfaces))
+	}
+	if parsed.Interfaces[0].Name != "ens3f0np0" {
+		t.Fatalf("expected interface name ens3f0np0, got %s", parsed.Interfaces[0].Name)
+	}
+	if len(parsed.Interfaces[0].Neighbors) != 1 {
+		t.Fatalf("expected 1 neighbor, got %d", len(parsed.Interfaces[0].Neighbors))
+	}
+	n := parsed.Interfaces[0].Neighbors[0]
+	if n.ChassisID != "e8:eb:d3:e4:5a:2e" {
+		t.Errorf("unexpected chassis id: %s", n.ChassisID)
+	}
+	if n.MgmtIP != "192.168.30.242" {
+		t.Errorf("expected MgmtIP 192.168.30.242, got %q", n.MgmtIP)
 	}
 }

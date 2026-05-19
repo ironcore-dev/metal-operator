@@ -191,18 +191,18 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
 		maintenanceAnnotations := map[string]string{
 			metalv1alpha1.ServerMaintenanceNeededLabelKey:      trueValue,
 			metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
-			metalv1alpha1.ServerMaintenanceApprovalKey:         trueValue,
+			metalv1alpha1.ServerMaintenanceApprovedLabelKey:    trueValue,
 		}
 		maintenanceLabels := map[string]string{
-			metalv1alpha1.ServerMaintenanceNeededLabelKey: trueValue,
-			metalv1alpha1.ServerMaintenanceApprovalKey:    trueValue,
+			metalv1alpha1.ServerMaintenanceNeededLabelKey:   trueValue,
+			metalv1alpha1.ServerMaintenanceApprovedLabelKey: trueValue,
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance.Name),
@@ -433,8 +433,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving maintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
 		By("Ensuring high-priority maintenance starts first")
@@ -448,8 +448,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Get(highPriorityMaintenance)).ShouldNot(Succeed())
 		By("Approving lowPriorityMaintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 		By("Ensuring low-priority maintenance can proceed afterwards")
 		Eventually(Object(lowPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
@@ -528,8 +528,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving maintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
 		By("Ensuring maintenance with explicit priority runs before unset priority")
@@ -543,8 +543,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving lowPriorityMaintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovalKey, trueValue)
+			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
 		By("Ensuring unset-priority maintenance can proceed afterwards")

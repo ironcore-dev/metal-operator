@@ -162,23 +162,11 @@ spec:
                   BootConfigurationRef is a reference to a BootConfiguration object that specifies
                   the boot configuration for this server.
                 properties:
-                  apiVersion:
-                    description: 'Deprecated: APIVersion is no longer used. Retained
-                      for backwards compatibility.'
-                    type: string
-                  kind:
-                    description: 'Deprecated: Kind is no longer used. Retained for
-                      backwards compatibility.'
-                    type: string
                   name:
                     description: Name is the name of the referenced object.
                     type: string
                   namespace:
                     description: Namespace is the namespace of the referenced object.
-                    type: string
-                  uid:
-                    description: 'Deprecated: UID is no longer used. Retained for
-                      backwards compatibility.'
                     type: string
                 required:
                 - name
@@ -213,23 +201,11 @@ spec:
                   MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
                   the boot configuration for this server during maintenance.
                 properties:
-                  apiVersion:
-                    description: 'Deprecated: APIVersion is no longer used. Retained
-                      for backwards compatibility.'
-                    type: string
-                  kind:
-                    description: 'Deprecated: Kind is no longer used. Retained for
-                      backwards compatibility.'
-                    type: string
                   name:
                     description: Name is the name of the referenced object.
                     type: string
                   namespace:
                     description: Namespace is the namespace of the referenced object.
-                    type: string
-                  uid:
-                    description: 'Deprecated: UID is no longer used. Retained for
-                      backwards compatibility.'
                     type: string
                 required:
                 - name
@@ -242,14 +218,6 @@ spec:
                 description: ServerClaimRef is a reference to a ServerClaim object
                   that claims this server.
                 properties:
-                  apiVersion:
-                    description: 'Deprecated: APIVersion is no longer used. Retained
-                      for backwards compatibility.'
-                    type: string
-                  kind:
-                    description: 'Deprecated: Kind is no longer used. Retained for
-                      backwards compatibility.'
-                    type: string
                   name:
                     description: Name is the name of the referenced object.
                     maxLength: 253
@@ -262,10 +230,6 @@ spec:
                     type: string
                     x-kubernetes-validations:
                     - rule: self == oldSelf
-                  uid:
-                    description: 'Deprecated: UID is no longer used. Retained for
-                      backwards compatibility.'
-                    type: string
                 required:
                 - name
                 - namespace
@@ -274,23 +238,11 @@ spec:
                 description: ServerMaintenanceRef is a reference to a ServerMaintenance
                   object that maintains this server.
                 properties:
-                  apiVersion:
-                    description: 'Deprecated: APIVersion is no longer used. Retained
-                      for backwards compatibility.'
-                    type: string
-                  kind:
-                    description: 'Deprecated: Kind is no longer used. Retained for
-                      backwards compatibility.'
-                    type: string
                   name:
                     description: Name is the name of the referenced object.
                     type: string
                   namespace:
                     description: Namespace is the namespace of the referenced object.
-                    type: string
-                  uid:
-                    description: 'Deprecated: UID is no longer used. Retained for
-                      backwards compatibility.'
                     type: string
                 required:
                 - name
@@ -303,6 +255,35 @@ spec:
               systemUUID:
                 description: SystemUUID is the unique identifier for the server.
                 type: string
+              taints:
+                description: Taints control which ServerClaims can be bound to this
+                  server.
+                items:
+                  description: |-
+                    Taint represents a taint applied to a Server that restricts which
+                    ServerClaims can be bound to it.
+                  properties:
+                    effect:
+                      default: NoBind
+                      description: |-
+                        Effect indicates the effect of the taint on ServerClaims that do not
+                        tolerate the taint.
+                      enum:
+                      - NoBind
+                      - Evict
+                      type: string
+                    key:
+                      description: Key is the taint key to be applied to a server.
+                      minLength: 1
+                      type: string
+                    value:
+                      description: Value is the taint value corresponding to the taint
+                        key.
+                      type: string
+                  required:
+                  - key
+                  type: object
+                type: array
             required:
             - systemUUID
             type: object

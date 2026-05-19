@@ -65,8 +65,6 @@ const (
 	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
 	// InternalAnnotationTypeValue is the value for the internal annotation type
 	InternalAnnotationTypeValue = "Internal"
-	// PoweringOnCondition is the condition type for powering on a server
-	PoweringOnCondition = "PoweringOn"
 )
 
 const (
@@ -212,10 +210,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		return ctrl.Result{}, nil
 	}
 
-	if modified, err := r.clearDeprecatedRefFields(ctx, server); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-
 	// do late state initialization
 	if server.Status.State == "" {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
@@ -223,7 +217,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		}
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, bmcutils.WithRegistryURL(r.RegistryURL))
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
@@ -1081,7 +1075,7 @@ func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *m
 	original := server.DeepCopy()
 	err := r.Conditions.UpdateSlice(
 		&server.Status.Conditions,
-		PoweringOnCondition,
+		ConditionPoweringOn,
 		conditionutils.UpdateStatus(metav1.ConditionTrue),
 		conditionutils.UpdateReason("ServerPowerOn"),
 		conditionutils.UpdateMessage("Server is powering on"),
@@ -1227,21 +1221,6 @@ func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, se
 		}
 	}
 	return false
-}
-
-func (r *ServerReconciler) clearDeprecatedRefFields(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
-	base := server.DeepCopy()
-	changed := clearDeprecatedImmutableObjectRefFields(server.Spec.ServerClaimRef)
-	changed = clearDeprecatedObjectRefFields(server.Spec.BootConfigurationRef) || changed
-	changed = clearDeprecatedObjectRefFields(server.Spec.MaintenanceBootConfigurationRef) || changed
-	changed = clearDeprecatedObjectRefFields(server.Spec.ServerMaintenanceRef) || changed
-	if !changed {
-		return false, nil
-	}
-	if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
-		return false, fmt.Errorf("failed to clear deprecated ObjectReference fields on Server: %w", err)
-	}
-	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

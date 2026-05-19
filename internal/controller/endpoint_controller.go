@@ -15,14 +15,16 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
-	EndpointFinalizer = "metal.ironcore.dev/endpoint"
+	endpointFinalizer = "metal.ironcore.dev/endpoint"
 )
 
 // EndpointReconciler reconciles a Endpoints object
@@ -41,6 +43,8 @@ type EndpointReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints/finalizers,verbs=update
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *EndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	endpoint := &metalv1alpha1.Endpoint{}
 	if err := r.Get(ctx, req.NamespacedName, endpoint); err != nil {
@@ -61,7 +65,7 @@ func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting Endpoint")
 	// TODO: cleanup endpoint
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, EndpointFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, endpointFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Deleted Endpoint")
@@ -111,7 +115,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -129,13 +133,13 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied local test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
-			case metalv1alpha1.ProtocolRedfishKube:
+			case metalv1alpha1.ProtocolRedfishWithRegistryPatch:
 				log.V(1).Info("Creating client for a kube test BMC", "Address", bmcOptions.Endpoint)
-				bmcClient, err := bmc.NewRedfishKubeBMCClient(ctx, bmcOptions, r.Client, bmcutils.DefaultKubeNamespace)
+				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}
@@ -147,7 +151,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				}
 				log.V(1).Info("Applied kube test BMC secret for Endpoint")
 
-				if err := r.applyBMC(ctx, endpoint, bmcSecret, m); err != nil {
+				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
@@ -162,8 +166,31 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 	return ctrl.Result{}, nil
 }
 
-func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
+func (r *EndpointReconciler) applyBMC(ctx context.Context, bmcClient bmc.BMC, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {
 	log := ctrl.LoggerFrom(ctx)
+
+	// Check whether the existing BMC object already has a UUID persisted.
+	var bmcUUID string
+	existingBMC := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, types.NamespacedName{Name: endpoint.Name}, existingBMC); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get existing BMC: %w", err)
+		}
+	} else {
+		bmcUUID = existingBMC.Spec.BMCUUID
+	}
+
+	// Only call DiscoverManager when UUID is not yet known.
+	if bmcUUID == "" {
+		manager, err := bmcClient.DiscoverManager(ctx)
+		if err != nil {
+			log.V(1).Info("Could not determine manager UUID, proceeding without it", "error", err)
+		} else {
+			bmcUUID = manager.UUID
+			log.V(1).Info("Got manager from BMC client", "ManagerUUID", bmcUUID)
+		}
+	}
+
 	bmcObj := &metalv1alpha1.BMC{}
 	bmcObj.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, func() error {
@@ -178,6 +205,9 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, endpoint *metalv1alph
 		spec.ConsoleProtocol = &metalv1alpha1.ConsoleProtocol{
 			Name: metalv1alpha1.ConsoleProtocolName(m.Console.Type),
 			Port: m.Console.Port,
+		}
+		if bmcUUID != "" {
+			spec.BMCUUID = bmcUUID
 		}
 		return controllerutil.SetControllerReference(endpoint, bmcObj, r.Client.Scheme())
 	})

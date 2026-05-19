@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	BMCUserFinalizer = "metal.ironcore.dev/bmcuser"
+	bmcUserFinalizer = "metal.ironcore.dev/bmcuser"
 )
 
 // BMCUserReconciler reconciles a BMCUser object
@@ -42,7 +42,8 @@ type BMCUserReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcusers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcsecrets,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile reconciles a BMCUser object
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
 func (r *BMCUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	user := &metalv1alpha1.BMCUser{}
 	if err := r.Get(ctx, req.NamespacedName, user); err != nil {
@@ -71,7 +72,7 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.B
 	if err := r.updateEffectiveSecret(ctx, user, bmcObj); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update effective BMCSecret: %w", err)
 	}
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	bmcClient, err := r.getBMCClient(ctx, bmcObj)
@@ -368,6 +369,18 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
+	// With BasicAuth, ConnectContext only stores credentials without making an
+	// authenticated request (it skips CreateSession). Probe an authenticated
+	// endpoint here so that invalid/rotated credentials are detected.
+	if r.BMCOptions.BasicAuth {
+		if _, err := bmcClient.GetAccountService(); err != nil {
+			var httpErr *schemas.Error
+			if errors.As(err, &httpErr) && (httpErr.HTTPReturnedStatusCode == 401 || httpErr.HTTPReturnedStatusCode == 403) {
+				return true, nil
+			}
+			return false, fmt.Errorf("failed to verify BMC credentials: %w", err)
+		}
+	}
 	return false, nil
 }
 
@@ -375,7 +388,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCU
 	log := ctrl.LoggerFrom(ctx)
 	if user.Spec.BMCRef == nil {
 		log.Info("No BMC reference set for User, removing finalizer")
-		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+		if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -385,7 +398,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCU
 	if err := r.Get(ctx, client.ObjectKey{Name: user.Spec.BMCRef.Name}, bmcObj); err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			log.Info("BMC not found, removing finalizer")
-			if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+			if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
@@ -408,7 +421,7 @@ func (r *BMCUserReconciler) delete(ctx context.Context, user *metalv1alpha1.BMCU
 			return ctrl.Result{}, fmt.Errorf("failed to delete BMC account: %w", err)
 		}
 	}
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, BMCUserFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, user, bmcUserFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.Info("Successfully deleted BMC account and removed finalizer for User")

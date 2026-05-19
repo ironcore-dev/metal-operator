@@ -1,0 +1,9 @@
+[
+    {"TaskState": "New",       "TaskStatus": "OK", "PercentComplete": 0},
+    {"TaskState": "Pending",   "TaskStatus": "OK", "PercentComplete": 0},
+    {"TaskState": "Starting",  "TaskStatus": "OK", "PercentComplete": 0},
+    {"TaskState": "Running",   "TaskStatus": "OK", "PercentComplete": 10},
+    {"TaskState": "Running",   "TaskStatus": "OK", "PercentComplete": 20},
+    {"TaskState": "Running",   "TaskStatus": "OK", "PercentComplete": 98},
+    {"TaskState": "Exception", "TaskStatus": "OK", "PercentComplete": 99}
+]

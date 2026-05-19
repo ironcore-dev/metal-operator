@@ -1,0 +1,41 @@
+{
+    "@odata.type": "#AttributeRegistry.v1_3_7.AttributeRegistry",
+    "Id": "BMCAttributeRegistry",
+    "Name": "BMC Attribute Registry",
+    "Language": "en",
+    "OwningEntity": "Metal Operator",
+    "RegistryVersion": "1.0.0",
+    "RegistryEntries": {
+        "Attributes": [
+            {
+                "AttributeName": "abc",
+                "DisplayName": "abc",
+                "Type": "String",
+                "ReadOnly": false,
+                "Immutable": false,
+                "Hidden": false,
+                "ResetRequired": false
+            },
+            {
+                "AttributeName": "fooreboot",
+                "DisplayName": "fooreboot",
+                "Type": "Integer",
+                "ReadOnly": false,
+                "Immutable": false,
+                "Hidden": false,
+                "ResetRequired": true
+            },
+            {
+                "AttributeName": "composite",
+                "DisplayName": "composite",
+                "Type": "String",
+                "ReadOnly": false,
+                "Immutable": false,
+                "Hidden": false,
+                "ResetRequired": false
+            }
+        ]
+    },
+    "@odata.id": "/redfish/v1/Registries/BMCAttributeRegistry",
+    "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

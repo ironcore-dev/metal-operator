@@ -17,6 +17,10 @@ type BIOSSettingsTemplate struct {
 	// +optional
 	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
+	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
+	// +optional
+	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
+
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	// +optional
 	ServerMaintenancePolicy ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
@@ -93,6 +97,14 @@ type BIOSSettingsStatus struct {
 	// LastAppliedTime represents the timestamp when the last setting was successfully applied.
 	// +optional
 	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
+
+	// FailedAttempts is the number of automatic retry attempts made after failure.
+	// +optional
+	FailedAttempts int32 `json:"failedAttempts,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions represents the latest available observations of the BIOSSettings's current state.
 	// +patchStrategy=merge

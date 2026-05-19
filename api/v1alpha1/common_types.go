@@ -8,38 +8,22 @@ import (
 	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // ObjectReference is the namespaced name reference to an object.
 type ObjectReference struct {
-	// Deprecated: APIVersion is no longer used. Retained for backwards compatibility.
-	// +optional
-	APIVersion string `json:"apiVersion,omitempty"`
-	// Deprecated: Kind is no longer used. Retained for backwards compatibility.
-	// +optional
-	Kind string `json:"kind,omitempty"`
 	// Namespace is the namespace of the referenced object.
 	// +required
 	Namespace string `json:"namespace"`
 	// Name is the name of the referenced object.
 	// +required
 	Name string `json:"name"`
-	// Deprecated: UID is no longer used. Retained for backwards compatibility.
-	// +optional
-	UID types.UID `json:"uid,omitempty"`
 }
 
 // ImmutableObjectReference is a namespaced name reference whose name and namespace
 // cannot be changed once set (the entire reference can still be set or cleared).
 type ImmutableObjectReference struct {
-	// Deprecated: APIVersion is no longer used. Retained for backwards compatibility.
-	// +optional
-	APIVersion string `json:"apiVersion,omitempty"`
-	// Deprecated: Kind is no longer used. Retained for backwards compatibility.
-	// +optional
-	Kind string `json:"kind,omitempty"`
 	// Namespace is the namespace of the referenced object.
 	// +required
 	// +kubebuilder:validation:MaxLength=63
@@ -50,9 +34,17 @@ type ImmutableObjectReference struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf"
 	Name string `json:"name"`
-	// Deprecated: UID is no longer used. Retained for backwards compatibility.
+}
+
+// RetryPolicy defines the retry behavior on transient failures.
+type RetryPolicy struct {
+	// MaxAttempts is the maximum number of automatic retry attempts after failure.
+	// 0 means no automatic retries. Must be between 0 and 10 inclusive.
+	// If not set, the operator-level default is used.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
 	// +optional
-	UID types.UID `json:"uid,omitempty"`
+	MaxAttempts *int32 `json:"maxAttempts,omitempty"`
 }
 
 // IP is an IP address.
@@ -277,4 +269,72 @@ func PtrToIPPrefix(prefix IPPrefix) *IPPrefix {
 
 func EqualIPPrefixes(a, b IPPrefix) bool {
 	return a == b
+}
+
+// TaintEffect defines the effect of a taint on a ServerClaim.
+// +kubebuilder:validation:Enum=NoBind;Evict
+type TaintEffect string
+
+const (
+	// TaintEffectNoBind prevents new ServerClaims from binding to the server
+	// unless they have a matching toleration.
+	TaintEffectNoBind TaintEffect = "NoBind"
+
+	// TaintEffectEvict is reserved for future use. It does not currently trigger
+	// eviction of existing ServerClaims bound to the server.
+	TaintEffectEvict TaintEffect = "Evict"
+)
+
+// Taint represents a taint applied to a Server that restricts which
+// ServerClaims can be bound to it.
+type Taint struct {
+	// Key is the taint key to be applied to a server.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Key string `json:"key"`
+
+	// Value is the taint value corresponding to the taint key.
+	// +optional
+	Value string `json:"value,omitempty"`
+
+	// Effect indicates the effect of the taint on ServerClaims that do not
+	// tolerate the taint.
+	// +kubebuilder:default=NoBind
+	// +optional
+	Effect TaintEffect `json:"effect,omitempty"`
+}
+
+// TolerationOperator represents a key's relationship to a value in a Toleration.
+// +kubebuilder:validation:Enum=Equal;Exists
+type TolerationOperator string
+
+const (
+	// TolerationOperatorEqual requires that the key and value of the toleration
+	// match those of the taint exactly.
+	TolerationOperatorEqual TolerationOperator = "Equal"
+
+	// TolerationOperatorExists matches any taint with the specified key,
+	// regardless of value.
+	TolerationOperatorExists TolerationOperator = "Exists"
+)
+
+// Toleration allows a ServerClaim to tolerate taints on a Server so that
+// the claim can be bound to a server that would otherwise be restricted.
+type Toleration struct {
+	// Key is the taint key that the toleration applies to.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Key string `json:"key"`
+
+	// Operator represents the key's relationship to the value.
+	// +optional
+	Operator TolerationOperator `json:"operator,omitempty"`
+
+	// Value is the taint value the toleration matches to.
+	// +optional
+	Value string `json:"value,omitempty"`
+
+	// Effect indicates the taint effect to tolerate.
+	// +optional
+	Effect TaintEffect `json:"effect,omitempty"`
 }

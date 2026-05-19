@@ -73,6 +73,20 @@ spec:
                 x-kubernetes-validations:
                 - message: BMCRef is immutable
                   rule: self == oldSelf
+              retryPolicy:
+                description: RetryPolicy defines the retry behavior for automatic
+                  retries on transient failures.
+                properties:
+                  maxAttempts:
+                    description: |-
+                      MaxAttempts is the maximum number of automatic retry attempts after failure.
+                      0 means no automatic retries. Must be between 0 and 10 inclusive.
+                      If not set, the operator-level default is used.
+                    format: int32
+                    maximum: 10
+                    minimum: 0
+                    type: integer
+                type: object
               serverMaintenancePolicy:
                 description: ServerMaintenancePolicy is a maintenance policy to be
                   applied on the server.
@@ -90,24 +104,12 @@ spec:
                         object that the BMCSettings has requested for the referred
                         server.
                       properties:
-                        apiVersion:
-                          description: 'Deprecated: APIVersion is no longer used.
-                            Retained for backwards compatibility.'
-                          type: string
-                        kind:
-                          description: 'Deprecated: Kind is no longer used. Retained
-                            for backwards compatibility.'
-                          type: string
                         name:
                           description: Name is the name of the referenced object.
                           type: string
                         namespace:
                           description: Namespace is the namespace of the referenced
                             object.
-                          type: string
-                        uid:
-                          description: 'Deprecated: UID is no longer used. Retained
-                            for backwards compatibility.'
                           type: string
                       required:
                       - name
@@ -160,17 +162,51 @@ spec:
                           - namespace
                           type: object
                         fieldRef:
-                          description: FieldRef sources the value from a field of
-                            the BMCSettings object (e.g. spec.BMCRef.name).
+                          description: |-
+                            FieldRef sources the value from a field of the BMCSettings object itself (e.g. spec.BMCRef.name).
+                            Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
                           properties:
                             fieldPath:
-                              description: FieldPath is the path of the field on the
-                                BMCSettings object to select (e.g. spec.BMCRef.name).
+                              description: |-
+                                FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).
+                                Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error.
                               maxLength: 256
                               minLength: 1
                               type: string
                           required:
                           - fieldPath
+                          type: object
+                        objectFieldRef:
+                          description: |-
+                            ObjectFieldRef sources the value from a field of a named related object.
+                            The kind must be "BMC". Supports dot-path navigation and bracket notation for map keys
+                            containing dots or slashes (e.g. metadata.labels[kubernetes.metal.cloud.sap/nodename]).
+                          properties:
+                            fieldPath:
+                              description: |-
+                                FieldPath is the path of the field to select on the target object.
+                                Supports dot-path navigation (e.g. metadata.name) and bracket notation for map
+                                keys containing dots or slashes (e.g. metadata.labels[topology.kubernetes.io/region]).
+                              maxLength: 256
+                              minLength: 1
+                              type: string
+                            kind:
+                              description: Kind is the API kind of the object to read
+                                the field from (e.g. "BMC").
+                              maxLength: 63
+                              minLength: 1
+                              type: string
+                            name:
+                              description: |-
+                                Name is the name of the object to read the field from.
+                                Supports $(VAR) substitution using previously resolved variables in declaration order.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                          required:
+                          - fieldPath
+                          - kind
+                          - name
                           type: object
                         secretKeyRef:
                           description: SecretKeyRef points to a namespaced Secret
@@ -198,10 +234,14 @@ spec:
                           type: object
                       type: object
                       x-kubernetes-validations:
-                      - message: exactly one of fieldRef, configMapKeyRef, or secretKeyRef
-                          must be provided
-                        rule: '(has(self.fieldRef) ? 1 : 0) + (has(self.configMapKeyRef)
-                          ? 1 : 0) + (has(self.secretKeyRef) ? 1 : 0) == 1'
+                      - message: exactly one of fieldRef, objectFieldRef, configMapKeyRef,
+                          or secretKeyRef must be provided
+                        rule: '(has(self.fieldRef) ? 1 : 0) + (has(self.objectFieldRef)
+                          ? 1 : 0) + (has(self.configMapKeyRef) ? 1 : 0) + (has(self.secretKeyRef)
+                          ? 1 : 0) == 1'
+                      - message: objectFieldRef.kind must be 'BMC'
+                        rule: '!has(self.objectFieldRef) || self.objectFieldRef.kind
+                          == ''BMC'''
                   required:
                   - key
                   - valueFrom
@@ -281,6 +321,16 @@ spec:
                   - type
                   type: object
                 type: array
+              failedAttempts:
+                description: FailedAttempts is the number of automatic retry attempts
+                  made after failure.
+                format: int32
+                type: integer
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               state:
                 description: State represents the current state of the BMC configuration
                   task.

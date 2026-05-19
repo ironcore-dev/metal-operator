@@ -8,7 +8,7 @@
 
 Package v1alpha1 contains API Schema definitions for the metal.ironcore.dev API group
 
-Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API group
+Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API group.
 
 ### Resource Types
 - [BIOSSettings](#biossettings)
@@ -160,6 +160,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS settings on. |  |  |
@@ -200,6 +201,8 @@ _Appears in:_
 | `state` _[BIOSSettingsState](#biossettingsstate)_ | State represents the current state of the BIOS settings update. |  |  |
 | `flowState` _[BIOSSettingsFlowStatus](#biossettingsflowstatus) array_ | FlowState is a list of individual BIOSSettings operation flows. |  |  |
 | `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
+| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOSSettings's current state. |  |  |
 
 
@@ -219,6 +222,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 
 
@@ -315,6 +319,7 @@ _Appears in:_
 | `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS upgrade on. |  |  |
 
@@ -353,6 +358,8 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `state` _[BIOSVersionState](#biosversionstate)_ | State represents the current state of the BIOS upgrade task. |  |  |
 | `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the Upgrade Task created by the BMC |  |  |
+| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOS version upgrade state. |  |  |
 
 
@@ -374,6 +381,7 @@ _Appears in:_
 | `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 
 
 #### BMC
@@ -547,6 +555,7 @@ _Appears in:_
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
 | `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply settings to. |  |  |
@@ -585,6 +594,8 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `state` _[BMCSettingsState](#bmcsettingsstate)_ | State represents the current state of the BMC configuration task. |  |  |
+| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC Settings Resource state. |  |  |
 
 
@@ -605,6 +616,7 @@ _Appears in:_
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
 | `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
 
 
@@ -828,6 +840,7 @@ _Appears in:_
 | `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
 | `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
 | `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply BMC upgrade on. |  |  |
@@ -867,6 +880,8 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `state` _[BMCVersionState](#bmcversionstate)_ | State represents the current state of the BMC configuration task. |  |  |
 | `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the upgrade task created by the BMC. |  |  |
+| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC version upgrade state. |  |  |
 
 
@@ -887,6 +902,7 @@ _Appears in:_
 | `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
 | `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
+| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
 
 
@@ -1005,7 +1021,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).<br />Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error. |  | MaxLength: 256 <br />MinLength: 1 <br /> |
 
 
 #### IP
@@ -1063,11 +1079,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
-| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  | MaxLength: 63 <br /> |
 | `name` _string_ | Name is the name of the referenced object. |  | MaxLength: 253 <br /> |
-| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
 
 
 #### IndicatorLED
@@ -1166,6 +1179,26 @@ _Appears in:_
 | `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
 
 
+#### ObjectFieldRefSelector
+
+
+
+ObjectFieldRefSelector selects a field from a named cluster-scoped object.
+It is intentionally generic; the allowed kinds are constrained at the usage site
+via kubebuilder CEL rules on the parent type.
+
+
+
+_Appears in:_
+- [VariableSourceValueFrom](#variablesourcevaluefrom)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `kind` _string_ | Kind is the API kind of the object to read the field from (e.g. "BMC"). |  | MaxLength: 63 <br />MinLength: 1 <br /> |
+| `name` _string_ | Name is the name of the object to read the field from.<br />Supports $(VAR) substitution using previously resolved variables in declaration order. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
+| `fieldPath` _string_ | FieldPath is the path of the field to select on the target object.<br />Supports dot-path navigation (e.g. metadata.name) and bracket notation for map<br />keys containing dots or slashes (e.g. metadata.labels[topology.kubernetes.io/region]). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
+
+
 #### ObjectReference
 
 
@@ -1183,11 +1216,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `apiVersion` _string_ | Deprecated: APIVersion is no longer used. Retained for backwards compatibility. |  |  |
-| `kind` _string_ | Deprecated: Kind is no longer used. Retained for backwards compatibility. |  |  |
 | `namespace` _string_ | Namespace is the namespace of the referenced object. |  |  |
 | `name` _string_ | Name is the name of the referenced object. |  |  |
-| `uid` _[UID](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#uid-types-pkg)_ | Deprecated: UID is no longer used. Retained for backwards compatibility. |  |  |
 
 
 #### Phase
@@ -1302,6 +1332,29 @@ _Appears in:_
 | --- | --- |
 | `http` | HTTPProtocolScheme is the http protocol scheme<br /> |
 | `https` | HTTPSProtocolScheme is the https protocol scheme<br /> |
+
+
+#### RetryPolicy
+
+
+
+RetryPolicy defines the retry behavior on transient failures.
+
+
+
+_Appears in:_
+- [BIOSSettingsSpec](#biossettingsspec)
+- [BIOSSettingsTemplate](#biossettingstemplate)
+- [BIOSVersionSpec](#biosversionspec)
+- [BIOSVersionTemplate](#biosversiontemplate)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
+- [BMCVersionSpec](#bmcversionspec)
+- [BMCVersionTemplate](#bmcversiontemplate)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `maxAttempts` _integer_ | MaxAttempts is the maximum number of automatic retry attempts after failure.<br />0 means no automatic retries. Must be between 0 and 10 inclusive.<br />If not set, the operator-level default is used. |  | Maximum: 10 <br />Minimum: 0 <br /> |
 
 
 #### Server
@@ -1450,6 +1503,7 @@ _Appears in:_
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br /> |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
+| `tolerations` _[Toleration](#toleration) array_ | Tolerations allow a ServerClaim to bind to a Server with matching taints. |  |  |
 
 
 #### ServerClaimStatus
@@ -1627,6 +1681,7 @@ _Appears in:_
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
+| `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
 
 
 #### ServerState
@@ -1778,6 +1833,44 @@ _Appears in:_
 | `volumeUsage` _string_ | VolumeUsage specifies the volume usage type for the Volume. |  |  |
 
 
+#### Taint
+
+
+
+Taint represents a taint applied to a Server that restricts which
+ServerClaims can be bound to it.
+
+
+
+_Appears in:_
+- [ServerSpec](#serverspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the taint key to be applied to a server. |  | MinLength: 1 <br /> |
+| `value` _string_ | Value is the taint value corresponding to the taint key. |  |  |
+| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the effect of the taint on ServerClaims that do not<br />tolerate the taint. | NoBind | Enum: [NoBind Evict] <br /> |
+
+
+#### TaintEffect
+
+_Underlying type:_ _string_
+
+TaintEffect defines the effect of a taint on a ServerClaim.
+
+_Validation:_
+- Enum: [NoBind Evict]
+
+_Appears in:_
+- [Taint](#taint)
+- [Toleration](#toleration)
+
+| Field | Description |
+| --- | --- |
+| `NoBind` | TaintEffectNoBind prevents new ServerClaims from binding to the server<br />unless they have a matching toleration.<br /> |
+| `Evict` | TaintEffectEvict is reserved for future use. It does not currently trigger<br />eviction of existing ServerClaims bound to the server.<br /> |
+
+
 #### Task
 
 
@@ -1796,6 +1889,44 @@ _Appears in:_
 | `state` _[TaskState](#taskstate)_ | State is the current state of the task. |  |  |
 | `status` _[Health](#health)_ | Status is the current status of the task. |  |  |
 | `percentageComplete` _integer_ | PercentComplete is the percentage of completion of the task. |  |  |
+
+
+#### Toleration
+
+
+
+Toleration allows a ServerClaim to tolerate taints on a Server so that
+the claim can be bound to a server that would otherwise be restricted.
+
+
+
+_Appears in:_
+- [ServerClaimSpec](#serverclaimspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `key` _string_ | Key is the taint key that the toleration applies to. |  | MinLength: 1 <br /> |
+| `operator` _[TolerationOperator](#tolerationoperator)_ | Operator represents the key's relationship to the value. |  | Enum: [Equal Exists] <br /> |
+| `value` _string_ | Value is the taint value the toleration matches to. |  |  |
+| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the taint effect to tolerate. |  | Enum: [NoBind Evict] <br /> |
+
+
+#### TolerationOperator
+
+_Underlying type:_ _string_
+
+TolerationOperator represents a key's relationship to a value in a Toleration.
+
+_Validation:_
+- Enum: [Equal Exists]
+
+_Appears in:_
+- [Toleration](#toleration)
+
+| Field | Description |
+| --- | --- |
+| `Equal` | TolerationOperatorEqual requires that the key and value of the toleration<br />match those of the taint exactly.<br /> |
+| `Exists` | TolerationOperatorExists matches any taint with the specified key,<br />regardless of value.<br /> |
 
 
 #### UpdatePolicy
@@ -1848,7 +1979,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object (e.g. spec.BMCRef.name). |  |  |
+| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object itself (e.g. spec.BMCRef.name).<br />Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error. |  |  |
+| `objectFieldRef` _[ObjectFieldRefSelector](#objectfieldrefselector)_ | ObjectFieldRef sources the value from a field of a named related object.<br />The kind must be "BMC". Supports dot-path navigation and bracket notation for map keys<br />containing dots or slashes (e.g. metadata.labels[kubernetes.metal.cloud.sap/nodename]). |  |  |
 | `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
 | `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
 

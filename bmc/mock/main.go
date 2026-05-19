@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +17,10 @@ import (
 )
 
 func main() {
+	var addr string
+	flag.StringVar(&addr, "addr", ":8000", "Address for the mock Redfish server to listen on (e.g. :8000)")
+	flag.Parse()
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -26,7 +31,7 @@ func main() {
 	log := ctrl.Log.WithName("RedfishMockServer")
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	srv := server.NewMockServer(log, ":8000")
+	srv := server.NewMockServer(log, addr)
 
 	if err := srv.Start(ctx); err != nil {
 		log.Error(err, "Failed to start mock server")

@@ -4,16 +4,13 @@
     "Name": "User Account",
     "Description": "User Account",
     "Enabled": true,
-    "Password": null,
+    "Password": "adminpass",
     "PasswordChangeRequired": false,
     "PasswordExpiration": "2026-12-31T23:59:59Z",
     "AccountTypes": [
         "Redfish"
     ],
-    "UserName": "Administrator",
-    "EmailAddress": "Tiffany@contoso.com",
-    "PhoneNumber": "312-555-1212",
-    "OneTimePasscodeDeliveryAddress": "3125551212@smsrelay.contoso.com",
+    "UserName": "admin",
     "RoleId": "Administrator",
     "Locked": false,
     "Certificates": {

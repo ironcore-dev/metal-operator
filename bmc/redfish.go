@@ -215,6 +215,9 @@ func (r *RedfishBaseBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	}
 	servers := make([]Server, 0, len(systems))
 	for _, s := range systems {
+		if s.Boot.BootSourceOverrideTarget == "" {
+			continue
+		}
 		servers = append(servers, Server{
 			UUID:         s.UUID,
 			URI:          s.ODataID,
@@ -274,6 +277,34 @@ func (r *RedfishBaseBMC) GetManager(bmcUUID string) (*schemas.Manager, error) {
 		}
 	}
 	return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
+}
+
+// DiscoverManager queries the BMC for available managers and returns the one
+// with graphical console capabilities (non-zero MaxConcurrentSessions or
+// non-empty ConnectTypesSupported). When multiple candidates match, the manager
+// with the lexicographically smallest ODataID is returned for determinism.
+func (r *RedfishBaseBMC) DiscoverManager(_ context.Context) (*schemas.Manager, error) {
+	if r.client == nil {
+		return nil, fmt.Errorf("no client found")
+	}
+	managers, err := r.client.Service.Managers()
+	if err != nil {
+		return nil, err
+	}
+	var candidates []*schemas.Manager
+	for _, m := range managers {
+		if m.GraphicalConsole.MaxConcurrentSessions != 0 ||
+			len(m.GraphicalConsole.ConnectTypesSupported) != 0 {
+			candidates = append(candidates, m)
+		}
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no manager found with graphical console capabilities")
+	}
+	slices.SortFunc(candidates, func(a, b *schemas.Manager) int {
+		return strings.Compare(a.ODataID, b.ODataID)
+	})
+	return candidates[0], nil
 }
 
 func (r *RedfishBaseBMC) ResetManager(ctx context.Context, bmcUUID string, resetType schemas.ResetType) error {
@@ -542,7 +573,7 @@ func (r *RedfishBaseBMC) CheckBiosAttributes(attrs schemas.SettingsAttributes) (
 func (r *RedfishBaseBMC) checkAttributes(attrs schemas.SettingsAttributes, filtered map[string]RegistryEntryAttributes) (bool, error) {
 	reset := false
 	var errs []error
-	// TODO: add more types like maps and Enumerations
+	// TODO: add support for Map/Object attribute types
 	for name, value := range attrs {
 		entryAttribute, ok := filtered[name]
 		if !ok {
@@ -874,14 +905,14 @@ func (r *RedfishBaseBMC) UpgradeBMCVersion(_ context.Context, _ string, _ *schem
 }
 
 // CheckBMCPendingComponentUpgrade is a fallback for unknown vendors.
-// Returns an error indicating the feature is not supported.
+// Returns ErrNotSupported indicating the feature is not supported.
 // Vendor-specific implementations (Dell, HPE, Lenovo) override this to check actual firmware inventory
 // and return whether a pending component upgrade exists for the specified component type.
 func (r *RedfishBaseBMC) CheckBMCPendingComponentUpgrade(_ context.Context, componentType ComponentType) (bool, error) {
 	if componentType != ComponentTypeBMC && componentType != ComponentTypeBIOS {
 		return false, fmt.Errorf("unsupported component type: %q", componentType)
 	}
-	return false, fmt.Errorf("check pending component upgrade is not supported for manufacturer %q", r.manufacturer)
+	return false, fmt.Errorf("check pending component upgrade not supported for manufacturer %q: %w", r.manufacturer, ErrNotSupported)
 }
 
 func (r *RedfishBaseBMC) GetBMCUpgradeTask(_ context.Context, _ string, _ string) (*schemas.Task, error) {
@@ -1034,48 +1065,27 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
 	resp, err := client.Post(ev.SubscriptionsLink, payload)
 	if err != nil {
+		// Gofish returns non-2xx responses as errors (format: "STATUS_CODE: BODY").
+		// Check if it's a "resource already exists" error and recover the existing subscription URI.
+		// PropertyValueModified is also checked but only when the destination URL appears in the
+		// error text — Dell iDRAC uses it for duplicate subscriptions and the duplicate destination
+		// is included in the error body, which prevents false-positive recovery on unrelated
+		// property validation failures.
+		errText := err.Error()
+		isDuplicate := strings.Contains(errText, "ResourceAlreadyExists") ||
+			(strings.Contains(errText, "PropertyValueModified") && strings.Contains(errText, destination))
+		if isDuplicate {
+			existingLink, findErr := r.findExistingSubscription(destination)
+			if findErr == nil {
+				return existingLink, nil
+			}
+			return "", fmt.Errorf("%w: failed to recover existing subscription: %v", err, findErr)
+		}
 		return "", err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read error response body
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "", fmt.Errorf("failed to create event subscription status code: %d", resp.StatusCode)
-		}
-
-		// Parse Redfish error response
-		var redfishError struct {
-			Error struct {
-				MessageExtendedInfo []struct {
-					MessageId string `json:"MessageId"`
-					Message   string `json:"Message"`
-				} `json:"@Message.ExtendedInfo"`
-			} `json:"error"`
-		}
-
-		if err := json.Unmarshal(bodyBytes, &redfishError); err == nil {
-			// Check if it's a "resource already exists" error
-			for _, info := range redfishError.Error.MessageExtendedInfo {
-				if strings.Contains(info.MessageId, "ResourceAlreadyExists") ||
-					strings.Contains(info.MessageId, "PropertyValueModified") {
-					// Handle duplicate subscription - try to find existing one
-					if existingLink, findErr := r.findExistingSubscription(destination, eventFormatType); findErr == nil {
-						// Successfully found existing subscription
-						return existingLink, nil
-					}
-					// Failed to find existing subscription - fall through to return original error
-					// This preserves the detailed Redfish error message for troubleshooting
-					break
-				}
-			}
-		}
-
-		// Not a duplicate error - return original error with details
-		return "", fmt.Errorf("failed to create event subscription status code: %d: %s", resp.StatusCode, string(bodyBytes))
-	}
 	// return subscription link from returned location
 	subscriptionLink := resp.Header.Get("Location")
 	if subscriptionLink == "" {
@@ -1090,10 +1100,9 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 
 // findExistingSubscription queries the BMC for an existing subscription with the given destination.
 // Returns the subscription URI if found, error otherwise.
-func (r *RedfishBaseBMC) findExistingSubscription(
-	destination string,
-	eventFormatType schemas.EventFormatType,
-) (string, error) {
+// Matches by Destination + Context ("metal-operator") rather than EventFormatType,
+// because many BMCs do not return EventFormatType in subscription responses.
+func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, error) {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {
@@ -1103,12 +1112,20 @@ func (r *RedfishBaseBMC) findExistingSubscription(
 	// Get all subscriptions
 	subscriptions, err := ev.Subscriptions()
 	if err != nil {
-		return "", fmt.Errorf("failed to list subscriptions: %w", err)
+		// CollectionError means some members failed to fetch but others may have succeeded.
+		// Gofish also wraps a failure on the collection endpoint itself as a CollectionError
+		// (the collection URI is added as a failure entry), so we cannot distinguish between
+		// "collection endpoint unreachable" and "some members failed". Proceed with whatever
+		// was returned; only bail on other error types.
+		var collErr *schemas.CollectionError
+		if !errors.As(err, &collErr) {
+			return "", fmt.Errorf("failed to list subscriptions: %w", err)
+		}
 	}
 
-	// Find subscription matching our destination and event format
+	// Find subscription matching our destination and context
 	for _, sub := range subscriptions {
-		if sub.Destination == destination && sub.EventFormatType == eventFormatType {
+		if sub.Destination == destination && sub.Context == "metal-operator" {
 			// Extract URI from OData ID
 			if sub.ODataID != "" {
 				return sub.ODataID, nil

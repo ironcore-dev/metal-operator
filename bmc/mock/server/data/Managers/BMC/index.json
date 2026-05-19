@@ -86,6 +86,11 @@
             "@odata.id": "/redfish/v1/Chassis/1U"
         }
     },
+    "Attributes": {
+        "abc": "bar",
+        "fooreboot": 123,
+        "composite": "foo-123"
+    },
     "Actions": {
         "#Manager.Reset": {
             "target": "/redfish/v1/Managers/BMC/Actions/Manager.Reset",
@@ -93,6 +98,11 @@
                 "ForceRestart",
                 "GracefulRestart"
             ]
+        }
+    },
+    "@Redfish.Settings": {
+        "SettingsObject": {
+            "@odata.id": "/redfish/v1/Managers/BMC/Settings"
         }
     },
     "@odata.id": "/redfish/v1/Managers/BMC",

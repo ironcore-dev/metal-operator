@@ -87,5 +87,13 @@ the device.
 Controller (`type: "bmc"`), it automatically creates a [`BMC`](bmcs.md) and a [`BMCSecret`](bmcsecrets.md)
 object using the data from the MAC Prefix Database. These objects are used to manage and authenticate with the BMC device.
 
-6. **Configuration Application**: Additional settings such as console access and communication ports are applied based 
+6. **Manager Discovery**: During BMC creation, the `EndpointReconciler` queries the BMC for available Redfish managers 
+and attempts to identify the primary management controller. A manager is considered a valid BMC manager if it exposes 
+graphical console capabilities (non-zero `MaxConcurrentSessions` or non-empty `ConnectTypesSupported`). This heuristic 
+distinguishes actual BMC managers from auxiliary controllers (e.g. network switches or storage controllers) that may 
+also appear in the Redfish manager collection. If a matching manager is found, its UUID is stored in the `BMC` 
+resource's `spec.bmcUUID` field. If no suitable manager can be determined, the `BMC` resource is still created without 
+a UUID since the field is optional.
+
+7. **Configuration Application**: Additional settings such as console access and communication ports are applied based 
 on the database entries.

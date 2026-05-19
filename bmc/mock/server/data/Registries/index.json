@@ -2,13 +2,16 @@
     "@odata.type": "#MessageRegistryFileCollection.MessageRegistryFileCollection",
     "Name": "Registry File Collection",
     "Description": "Registry Repository",
-    "Members@odata.count": 1,
+    "Members@odata.count": 3,
     "Members": [
         {
             "@odata.id": "/redfish/v1/Registries/Base.1.5.0"
         },
         {
             "@odata.id": "/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0"
+        },
+        {
+            "@odata.id": "/redfish/v1/Registries/BMCAttributeRegistry"
         }
     ],
     "@odata.id": "/redfish/v1/Registries",

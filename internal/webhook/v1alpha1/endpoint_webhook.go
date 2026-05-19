@@ -46,8 +46,7 @@ type EndpointCustomValidator struct {
 func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
 	endpointlog.Info("Validation for Endpoint upon creation", "name", obj.GetName())
 
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateMACAddressCreate(ctx, v.Client, obj.Spec, field.NewPath("spec"))...)
+	allErrs := ValidateMACAddressCreate(ctx, v.Client, obj.Spec, field.NewPath("spec"))
 
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(
@@ -62,8 +61,7 @@ func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj *metal
 func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
 	endpointlog.Info("Validation for Endpoint upon update", "name", newObj.GetName())
 
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateMACAddressUpdate(ctx, v.Client, newObj, field.NewPath("spec"))...)
+	allErrs := ValidateMACAddressUpdate(ctx, v.Client, newObj, field.NewPath("spec"))
 
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(

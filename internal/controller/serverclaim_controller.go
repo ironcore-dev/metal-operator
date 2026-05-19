@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	ServerClaimFinalizer = "metal.ironcore.dev/serverclaim"
+	serverClaimFinalizer = "metal.ironcore.dev/serverclaim"
 )
 
 // ServerClaimReconciler reconciles a ServerClaim object
@@ -66,7 +66,7 @@ func (r *ServerClaimReconciler) reconcileExists(ctx context.Context, claim *meta
 func (r *ServerClaimReconciler) delete(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting server claim")
-	if !controllerutil.ContainsFinalizer(claim, ServerClaimFinalizer) {
+	if !controllerutil.ContainsFinalizer(claim, serverClaimFinalizer) {
 		log.V(1).Info("Deleted server claim")
 		return ctrl.Result{}, nil
 	}
@@ -74,7 +74,7 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, claim *metalv1alpha1
 	if err := r.cleanupAndShutdownServer(ctx, claim); err != nil {
 		return ctrl.Result{}, err
 	}
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); !apierrors.IsNotFound(err) || modified {
+	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, serverClaimFinalizer); !apierrors.IsNotFound(err) || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer has been removed")
@@ -145,7 +145,7 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 		}
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, claim, ServerClaimFinalizer); err != nil || modified {
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, claim, serverClaimFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured finalizer has been added")
@@ -430,6 +430,10 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *m
 	// is undergoing maintenance and not in Reserved State, we should not claim this server
 	if err != nil || isUnderMaintenance {
 		log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
+		return false
+	}
+	if !tolerates(server.Spec.Taints, claim.Spec.Tolerations) {
+		log.V(1).Info("Server taints not tolerated by claim", "Server", server.Name, "Claim", claim.Name)
 		return false
 	}
 	return true

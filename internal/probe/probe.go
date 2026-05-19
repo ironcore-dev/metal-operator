@@ -230,7 +230,6 @@ func (a *Agent) registerServer(ctx context.Context) error {
 				}
 				a.log.Error(fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body)), "Failed to register server", "url", a.RegistryURL)
 				return false, nil
-				return false, nil
 			}
 
 			a.log.Info("Server registered")

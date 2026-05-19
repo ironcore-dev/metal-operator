@@ -41,6 +41,15 @@ const (
 
 	bmcUserResetMessage = "BMC reset initiated by user. Waiting for it to come back online."
 	bmcAutoResetMessage = "BMC reset initiated automatically after repeated connection failures. Waiting for it to come back online."
+
+	// BMC-specific condition and reason aliases for shared constants
+	bmcResetConditionType         = ConditionReset
+	bmcAutoResetReason            = ReasonAutoReset
+	bmcUserResetReason            = ReasonUserReset
+	bmcUnknownErrorReason         = ReasonUnknownError
+	bmcAuthenticationFailedReason = ReasonAuthenticationFailed
+	bmcConnectionFailedReason     = ReasonConnectionFailed
+	bmcInternalErrorReason        = ReasonInternalError
 )
 
 // BMCReconciler reconciles a BMC object

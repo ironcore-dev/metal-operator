@@ -5,7 +5,9 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"maps"
+	"sync"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -16,6 +18,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -733,10 +736,6 @@ func createBMCForSSHTest(ctx context.Context, bmcSecret *metalv1alpha1.BMCSecret
 	return bmc
 }
 
-/*
-TODO: SSH reset tests require mock infrastructure (metalBmc.UnitTestMockUps.SimulateUnvailableBMC) that is not yet implemented.
-The tests below reference undefined variables and need the mock server to support failure simulation.
-
 var _ = Describe("BMC SSH Reset", func() {
 	_ = SetupTest(nil)
 
@@ -759,7 +758,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		// Restore real SSH function
 		bmcutils.SSHResetBMCFunc = bmcutils.SSHResetBMC
 		// Reset mock flag
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = false
+		mockServers[0].SetUnavailable(false)
 	})
 
 	It("Should successfully perform SSH reset after Redfish 503 error", func(ctx SpecContext) {
@@ -797,7 +796,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		By("Simulating Redfish failure and adding annotation")
 		// The controller will try to get BMC client (fails with 503), detect reset annotation,
 		// and enqueue SSH reset
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+		mockServers[0].SetUnavailable(true)
 
 		Eventually(Update(bmc, func() {
 			if bmc.Annotations == nil {
@@ -859,7 +858,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		Eventually(Object(bmc)).WithTimeout(10 * time.Second).Should(HaveField("Status.Manufacturer", Not(BeEmpty())))
 
 		By("Simulating Redfish unavailability and triggering reset via annotation")
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+		mockServers[0].SetUnavailable(true)
 
 		Eventually(Update(bmc, func() {
 			if bmc.Annotations == nil {
@@ -909,7 +908,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		))
 
 		By("Simulating Redfish unavailability and triggering reset via annotation")
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+		mockServers[0].SetUnavailable(true)
 
 		Eventually(Update(bmc, func() {
 			if bmc.Annotations == nil {
@@ -1024,7 +1023,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		Eventually(Object(bmc)).WithTimeout(10 * time.Second).Should(HaveField("Status.Manufacturer", Not(BeEmpty())))
 
 		By("Simulating Redfish unavailability")
-		metalBmc.UnitTestMockUps.SimulateUnvailableBMC = true
+		mockServers[0].SetUnavailable(true)
 
 		By("Deleting BMC while processing")
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
@@ -1041,4 +1040,3 @@ var _ = Describe("BMC SSH Reset", func() {
 		}).WithTimeout(1 * time.Second).Should(BeFalse())
 	})
 })
-*/

@@ -137,23 +137,11 @@ spec:
                   description: ObjectReference is the namespaced name reference to
                     an object.
                   properties:
-                    apiVersion:
-                      description: 'Deprecated: APIVersion is no longer used. Retained
-                        for backwards compatibility.'
-                      type: string
-                    kind:
-                      description: 'Deprecated: Kind is no longer used. Retained for
-                        backwards compatibility.'
-                      type: string
                     name:
                       description: Name is the name of the referenced object.
                       type: string
                     namespace:
                       description: Namespace is the namespace of the referenced object.
-                      type: string
-                    uid:
-                      description: 'Deprecated: UID is no longer used. Retained for
-                        backwards compatibility.'
                       type: string
                   required:
                   - name

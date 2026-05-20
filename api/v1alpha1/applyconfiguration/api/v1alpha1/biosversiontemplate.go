@@ -20,8 +20,6 @@ type BIOSVersionTemplateApplyConfiguration struct {
 	Image *ImageSpecApplyConfiguration `json:"image,omitempty"`
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	ServerMaintenancePolicy *apiv1alpha1.ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
-	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
-	RetryPolicy *RetryPolicyApplyConfiguration `json:"retryPolicy,omitempty"`
 }
 
 // BIOSVersionTemplateApplyConfiguration constructs a declarative configuration of the BIOSVersionTemplate type for use with
@@ -59,13 +57,5 @@ func (b *BIOSVersionTemplateApplyConfiguration) WithImage(value *ImageSpecApplyC
 // If called multiple times, the ServerMaintenancePolicy field is set to the value of the last call.
 func (b *BIOSVersionTemplateApplyConfiguration) WithServerMaintenancePolicy(value apiv1alpha1.ServerMaintenancePolicy) *BIOSVersionTemplateApplyConfiguration {
 	b.ServerMaintenancePolicy = &value
-	return b
-}
-
-// WithRetryPolicy sets the RetryPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RetryPolicy field is set to the value of the last call.
-func (b *BIOSVersionTemplateApplyConfiguration) WithRetryPolicy(value *RetryPolicyApplyConfiguration) *BIOSVersionTemplateApplyConfiguration {
-	b.RetryPolicy = value
 	return b
 }

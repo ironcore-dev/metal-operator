@@ -19,10 +19,6 @@ type BMCVersionStatusApplyConfiguration struct {
 	State *apiv1alpha1.BMCVersionState `json:"state,omitempty"`
 	// UpgradeTask contains the state of the upgrade task created by the BMC.
 	UpgradeTask *TaskApplyConfiguration `json:"upgradeTask,omitempty"`
-	// FailedAttempts is the number of automatic retry attempts made after failure.
-	FailedAttempts *int32 `json:"failedAttempts,omitempty"`
-	// ObservedGeneration is the most recent generation observed by the controller.
-	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 	// Conditions represents the latest available observations of the BMC version upgrade state.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
@@ -46,22 +42,6 @@ func (b *BMCVersionStatusApplyConfiguration) WithState(value apiv1alpha1.BMCVers
 // If called multiple times, the UpgradeTask field is set to the value of the last call.
 func (b *BMCVersionStatusApplyConfiguration) WithUpgradeTask(value *TaskApplyConfiguration) *BMCVersionStatusApplyConfiguration {
 	b.UpgradeTask = value
-	return b
-}
-
-// WithFailedAttempts sets the FailedAttempts field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the FailedAttempts field is set to the value of the last call.
-func (b *BMCVersionStatusApplyConfiguration) WithFailedAttempts(value int32) *BMCVersionStatusApplyConfiguration {
-	b.FailedAttempts = &value
-	return b
-}
-
-// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ObservedGeneration field is set to the value of the last call.
-func (b *BMCVersionStatusApplyConfiguration) WithObservedGeneration(value int64) *BMCVersionStatusApplyConfiguration {
-	b.ObservedGeneration = &value
 	return b
 }
 

@@ -23,6 +23,10 @@ GOOS    := $(shell go env GOOS)
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
 
+# Redfish emulator container
+REDFISH_CONTAINER_NAME=redfish_mockup_server
+REDFISH_CONTAINER_VERSION=latest
+
 # Use the most portable option for core detection
 NPROCS := $(shell getconf _NPROCESSORS_ONLN)
 # Add a fallback just in case the command fails
@@ -62,7 +66,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: generate
 generate: controller-gen goimports ## Generate code containing DeepCopy, DeepCopyInto, DeepCopyObject, and ApplyConfiguration implementations.
 	"$(CONTROLLER_GEN)" object paths="./..."
-	"$(CONTROLLER_GEN)" applyconfiguration:headerFile="hack/boilerplate.go.txt" paths="./api/..." output:applyconfiguration:dir=./client/applyconfiguration
+	"$(CONTROLLER_GEN)" applyconfiguration:headerFile="hack/boilerplate.go.txt" paths="./api/..." output:applyconfiguration:dir=./api/v1alpha1/applyconfiguration
 	"$(GOIMPORTS)" -w .
 
 .PHONY: fmt
@@ -102,21 +106,21 @@ test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated 
 	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: startbmc
-startbmc: mockserver ## Start Redfish mock server
-	@if pgrep -f "$(MOCKSERVER_BIN)" > /dev/null 2>&1; then \
-		echo "Redfish mock server is already running."; \
+startbmc: ## Start BMC emulator
+	@if [ -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
+		echo "Starting container $(REDFISH_CONTAINER_NAME)..."; \
+		docker run --rm -d -p 8000:8000 --name $(REDFISH_CONTAINER_NAME) dmtf/redfish-mockup-server:$(REDFISH_CONTAINER_VERSION); \
 	else \
-		$(MOCKSERVER_BIN) -addr :$(MOCKSERVER_PORT) & \
-		curl --silent --retry 5 --retry-connrefused http://127.0.0.1:$(MOCKSERVER_PORT)/redfish/v1 -o /dev/null && \
-		echo "Mock server ready on :$(MOCKSERVER_PORT)."; \
+		echo "Container $(REDFISH_CONTAINER_NAME) is already running."; \
 	fi
 
 .PHONY: stopbmc
-stopbmc: ## Stop Redfish mock server (started by startbmc)
-	@if pkill -f "$(MOCKSERVER_BIN)" 2>/dev/null; then \
-		echo "Stopped Redfish mock server."; \
+stopbmc: ## Stop BMC emulator
+	@if [ ! -z "$$(docker ps -q -f name=$(REDFISH_CONTAINER_NAME))" ]; then \
+		echo "Stopping container $(REDFISH_CONTAINER_NAME)..."; \
+		docker stop $(REDFISH_CONTAINER_NAME); \
 	else \
-		echo "Redfish mock server is not running."; \
+		echo "Container $(REDFISH_CONTAINER_NAME) is not running."; \
 	fi
 
 
@@ -132,16 +136,6 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	"$(GOLANGCI_LINT)" config verify
 
-.PHONY: test-alerts
-test-alerts: promtool yq ## Run Prometheus alert rule tests.
-	@"$(YQ)" '.spec' config/prometheus/server_alerts.yaml > config/prometheus/server_alerts_rules.yaml
-	"$(PROMTOOL)" test rules config/prometheus/server_alerts_test.yaml
-
-.PHONY: check-alerts
-check-alerts: promtool yq ## Validate Prometheus alert rules syntax.
-	@"$(YQ)" '.spec' config/prometheus/server_alerts.yaml > config/prometheus/server_alerts_rules.yaml
-	"$(PROMTOOL)" check rules config/prometheus/server_alerts_rules.yaml
-
 .PHONY: startdocs
 startdocs: ## Start the local mkdocs based development environment.
 	docker build -t $(IMAGE) -f docs/Dockerfile . --load
@@ -153,11 +147,11 @@ cleandocs: ## Remove all local mkdocs Docker images (cleanup).
 
 .PHONY: add-license
 add-license: addlicense ## Add license headers to all go files.
-	find . -path ./third_party -prune -o -name '*.go' -exec "$(ADDLICENSE)" -f hack/license-header.txt {} +
+	find . -name '*.go' -exec "$(ADDLICENSE)" -f hack/license-header.txt {} +
 
 .PHONY: check-license
 check-license: addlicense ## Check that every file has a license header present.
-	find . -path ./third_party -prune -o -name '*.go' -exec "$(ADDLICENSE)" -check -c 'IronCore authors' {} +
+	find . -name '*.go' -exec "$(ADDLICENSE)" -check -c 'IronCore authors' {} +
 
 .PHONY: check
 check: generate manifests add-license fmt lint test # Generate manifests, code, lint, add licenses, test
@@ -262,10 +256,6 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p "$(LOCALBIN)"
 
-# mock BMC server settings
-MOCKSERVER_BIN  = $(LOCALBIN)/metal-operator-mockserver
-MOCKSERVER_PORT := 8000
-
 CURL_RETRIES=3
 
 ## Tool Binaries
@@ -281,8 +271,6 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
 METALCTL ?= $(LOCALBIN)/metalctl
 GINKGO ?= $(LOCALBIN)/ginkgo
-PROMTOOL ?= $(LOCALBIN)/promtool
-YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
@@ -295,11 +283,9 @@ ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -
 GOLANGCI_LINT_VERSION ?= v2.10
 GOIMPORTS_VERSION ?= v0.38.0
 CRD_REF_DOCS_VERSION ?= v0.2.0
-KUBEBUILDER_VERSION ?= v4.14.0
+KUBEBUILDER_VERSION ?= v4.13.0
 ADDLICENSE_VERSION ?= v1.1.1
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
-PROMTOOL_VERSION ?= 3.11.3
-YQ_VERSION ?= v4.44.3
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.
@@ -366,24 +352,9 @@ kubebuilder: $(KUBEBUILDER) ## Download kubebuilder locally if necessary.
 $(KUBEBUILDER): $(LOCALBIN)
 	$(call go-install-tool,$(KUBEBUILDER),sigs.k8s.io/kubebuilder/v4,$(KUBEBUILDER_VERSION))
 
-.PHONY: mockserver
-mockserver: $(MOCKSERVER_BIN) ## Build mock Redfish server locally if necessary.
-$(MOCKSERVER_BIN): $(LOCALBIN)
-	go build -o $(MOCKSERVER_BIN) ./bmc/mock/main.go
-
 .PHONY: metalctl
 metalctl: $(METALCTL) ## Build metalctl locally if necessary.
 	go build -o $(METALCTL) ./cmd/metalctl
-
-.PHONY: promtool
-promtool: $(PROMTOOL) ## Download promtool locally if necessary.
-$(PROMTOOL): $(LOCALBIN)
-	@hack/install-promtool.sh "$(PROMTOOL_VERSION)" "$(LOCALBIN)"
-
-.PHONY: yq
-yq: $(YQ) ## Download yq locally if necessary.
-$(YQ): $(LOCALBIN)
-	$(call go-install-tool,$(YQ),github.com/mikefarah/yq/v4,$(YQ_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # Note: All paths are quoted to work in directories containing spaces or parentheses.

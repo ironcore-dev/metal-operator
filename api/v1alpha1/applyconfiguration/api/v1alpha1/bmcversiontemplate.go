@@ -18,8 +18,6 @@ type BMCVersionTemplateApplyConfiguration struct {
 	UpdatePolicy *apiv1alpha1.UpdatePolicy `json:"updatePolicy,omitempty"`
 	// Image specifies the image to use to upgrade to the given BMC version.
 	Image *ImageSpecApplyConfiguration `json:"image,omitempty"`
-	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
-	RetryPolicy *RetryPolicyApplyConfiguration `json:"retryPolicy,omitempty"`
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC.
 	ServerMaintenancePolicy *apiv1alpha1.ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 }
@@ -51,14 +49,6 @@ func (b *BMCVersionTemplateApplyConfiguration) WithUpdatePolicy(value apiv1alpha
 // If called multiple times, the Image field is set to the value of the last call.
 func (b *BMCVersionTemplateApplyConfiguration) WithImage(value *ImageSpecApplyConfiguration) *BMCVersionTemplateApplyConfiguration {
 	b.Image = value
-	return b
-}
-
-// WithRetryPolicy sets the RetryPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RetryPolicy field is set to the value of the last call.
-func (b *BMCVersionTemplateApplyConfiguration) WithRetryPolicy(value *RetryPolicyApplyConfiguration) *BMCVersionTemplateApplyConfiguration {
-	b.RetryPolicy = value
 	return b
 }
 

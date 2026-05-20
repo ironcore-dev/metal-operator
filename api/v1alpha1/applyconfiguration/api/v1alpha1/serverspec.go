@@ -42,8 +42,6 @@ type ServerSpecApplyConfiguration struct {
 	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
-	// Taints control which ServerClaims can be bound to this server.
-	Taints []TaintApplyConfiguration `json:"taints,omitempty"`
 }
 
 // ServerSpecApplyConfiguration constructs a declarative configuration of the ServerSpec type for use with
@@ -150,18 +148,5 @@ func (b *ServerSpecApplyConfiguration) WithBootOrder(values ...*BootOrderApplyCo
 // If called multiple times, the BIOSSettingsRef field is set to the value of the last call.
 func (b *ServerSpecApplyConfiguration) WithBIOSSettingsRef(value v1.LocalObjectReference) *ServerSpecApplyConfiguration {
 	b.BIOSSettingsRef = &value
-	return b
-}
-
-// WithTaints adds the given value to the Taints field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Taints field.
-func (b *ServerSpecApplyConfiguration) WithTaints(values ...*TaintApplyConfiguration) *ServerSpecApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithTaints")
-		}
-		b.Taints = append(b.Taints, *values[i])
-	}
 	return b
 }

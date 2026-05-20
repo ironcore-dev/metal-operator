@@ -61,14 +61,6 @@ func (b *BIOSVersionSpecApplyConfiguration) WithServerMaintenancePolicy(value ap
 	return b
 }
 
-// WithRetryPolicy sets the RetryPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RetryPolicy field is set to the value of the last call.
-func (b *BIOSVersionSpecApplyConfiguration) WithRetryPolicy(value *RetryPolicyApplyConfiguration) *BIOSVersionSpecApplyConfiguration {
-	b.BIOSVersionTemplateApplyConfiguration.RetryPolicy = value
-	return b
-}
-
 // WithServerMaintenanceRef sets the ServerMaintenanceRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ServerMaintenanceRef field is set to the value of the last call.

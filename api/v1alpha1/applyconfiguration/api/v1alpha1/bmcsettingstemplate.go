@@ -18,10 +18,6 @@ type BMCSettingsTemplateApplyConfiguration struct {
 	Version *string `json:"version,omitempty"`
 	// SettingsMap contains BMC settings as a map.
 	SettingsMap map[string]string `json:"settings,omitempty"`
-	// Variables is a list of variables that can be used in the settings for templating.
-	Variables []VariableApplyConfiguration `json:"variables,omitempty"`
-	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
-	RetryPolicy *RetryPolicyApplyConfiguration `json:"retryPolicy,omitempty"`
 	// ServerMaintenancePolicy is a maintenance policy to be applied on the server.
 	ServerMaintenancePolicy *apiv1alpha1.ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 }
@@ -51,27 +47,6 @@ func (b *BMCSettingsTemplateApplyConfiguration) WithSettingsMap(entries map[stri
 	for k, v := range entries {
 		b.SettingsMap[k] = v
 	}
-	return b
-}
-
-// WithVariables adds the given value to the Variables field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Variables field.
-func (b *BMCSettingsTemplateApplyConfiguration) WithVariables(values ...*VariableApplyConfiguration) *BMCSettingsTemplateApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithVariables")
-		}
-		b.Variables = append(b.Variables, *values[i])
-	}
-	return b
-}
-
-// WithRetryPolicy sets the RetryPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RetryPolicy field is set to the value of the last call.
-func (b *BMCSettingsTemplateApplyConfiguration) WithRetryPolicy(value *RetryPolicyApplyConfiguration) *BMCSettingsTemplateApplyConfiguration {
-	b.RetryPolicy = value
 	return b
 }
 

@@ -16,6 +16,8 @@ import (
 type BMCSettingsSetSpecApplyConfiguration struct {
 	// BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs.
 	BMCSettingsTemplate *BMCSettingsTemplateApplyConfiguration `json:"bmcSettingsTemplate,omitempty"`
+	// DynamicSettings defines dynamic settings to resolve per BMC when creating BMCSettings resources.
+	DynamicSettings []DynamicSettingApplyConfiguration `json:"dynamicSettings,omitempty"`
 	// BMCSelector specifies a label selector to identify the BMCs to be selected.
 	BMCSelector *v1.LabelSelectorApplyConfiguration `json:"bmcSelector,omitempty"`
 }
@@ -31,6 +33,19 @@ func BMCSettingsSetSpec() *BMCSettingsSetSpecApplyConfiguration {
 // If called multiple times, the BMCSettingsTemplate field is set to the value of the last call.
 func (b *BMCSettingsSetSpecApplyConfiguration) WithBMCSettingsTemplate(value *BMCSettingsTemplateApplyConfiguration) *BMCSettingsSetSpecApplyConfiguration {
 	b.BMCSettingsTemplate = value
+	return b
+}
+
+// WithDynamicSettings adds the given value to the DynamicSettings field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the DynamicSettings field.
+func (b *BMCSettingsSetSpecApplyConfiguration) WithDynamicSettings(values ...*DynamicSettingApplyConfiguration) *BMCSettingsSetSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithDynamicSettings")
+		}
+		b.DynamicSettings = append(b.DynamicSettings, *values[i])
+	}
 	return b
 }
 

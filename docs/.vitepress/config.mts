@@ -84,6 +84,7 @@ export default withMermaid({
         collapsed: false,
         items: [
           { text: 'metalctl', link: '/usage/metalctl' },
+          { text: 'Temporary BMC Users', link: '/usage/bmcuser-ttl' },
         ]
       },
       {

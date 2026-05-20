@@ -256,20 +256,42 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID stri
 
 		switch entry.Type {
 		case schemas.EnumerationAttributeType:
-			// Translate the DisplayName value reported by iDRAC to the canonical
-			// ValueName used by the registry and the PATCH payload.
-			// currentVal may be nil (iDRAC CurrentValue=null for factory-default attributes),
-			// in which case the loop below will find no match and we error accordingly.
+			// iDRAC reports enumeration current values as ValueDisplayName (e.g. "Enabled").
+			// The spec may use either ValueDisplayName ("Enabled") or ValueName ("1").
+			// To make the diff comparison work correctly regardless of which format the spec
+			// uses, we return the current value in the same format as the spec value:
+			//   - spec uses ValueName  → translate current DisplayName → ValueName
+			//   - spec uses DisplayName → return current DisplayName as-is
+			// This avoids spurious diffs (and unnecessary BMC resets) when the attribute is
+			// already at the desired value but the two strings differ only in format.
+			specVal := attributes[name]
+			// Build lookup maps in a single pass.
+			displayNameToValueName := make(map[string]string)
+			valueNameExists := make(map[string]bool)
 			for _, attrValue := range entry.Value {
-				if attrValue.ValueDisplayName == currentVal {
-					result[name] = attrValue.ValueName
-					break
-				}
+				displayNameToValueName[attrValue.ValueDisplayName] = attrValue.ValueName
+				valueNameExists[attrValue.ValueName] = true
 			}
-			if _, ok := result[name]; !ok {
+			currentDisplayName, ok := currentVal.(string)
+			if !ok {
+				errs = append(errs,
+					fmt.Errorf("current setting '%v' for key '%v' has unexpected type",
+						currentVal, name))
+				continue
+			}
+			// Validate that iDRAC returned a known DisplayName.
+			if _, exists := displayNameToValueName[currentDisplayName]; !exists {
 				errs = append(errs,
 					fmt.Errorf("current setting '%v' for key '%v' not found in possible values: %v",
 						currentVal, name, entry.Value))
+				continue
+			}
+			if valueNameExists[specVal] {
+				// Spec uses ValueName; translate current DisplayName to ValueName.
+				result[name] = displayNameToValueName[currentDisplayName]
+			} else {
+				// Spec uses ValueDisplayName; return as-is.
+				result[name] = currentDisplayName
 			}
 		case schemas.IntegerAttributeType:
 			// Convert raw JSON value to the correct Go type based on registry metadata.

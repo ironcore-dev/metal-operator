@@ -335,6 +335,12 @@ func checkAttributes(
 					validEnum = true
 					break
 				}
+				// Accept ValueDisplayName as input and substitute the canonical ValueName.
+				if attrValue.ValueDisplayName == value.(string) {
+					attrs[name] = attrValue.ValueName
+					validEnum = true
+					break
+				}
 			}
 			if !validEnum {
 				err := &InvalidBMCSettingsError{

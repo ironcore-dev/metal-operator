@@ -1,0 +1,235 @@
+{{- if .Values.crd.enable }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "metal-operator.resourceName" (dict "suffix" "serving-cert" "context" $) }}
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: serverclaims.metal.ironcore.dev
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          name: {{ include "metal-operator.resourceName" (dict "suffix" "webhook-service" "context" $) }}
+          namespace: {{ .Release.Namespace }}
+          path: /convert
+      conversionReviewVersions:
+      - v1
+  group: metal.ironcore.dev
+  names:
+    kind: ServerClaim
+    listKind: ServerClaimList
+    plural: serverclaims
+    shortNames:
+    - scl
+    singular: serverclaim
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.serverRef.name
+      name: Server
+      type: string
+    - jsonPath: .spec.ignitionSecretRef.name
+      name: Ignition
+      type: string
+    - jsonPath: .spec.image
+      name: Image
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServerClaim is the Schema for the serverclaims API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServerClaimSpec defines the desired state of ServerClaim.
+            properties:
+              ignitionSecretRef:
+                description: |-
+                  IgnitionSecretRef is a reference to the Secret object that contains
+                  the ignition configuration for the server.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              image:
+                description: Image specifies the boot image to be used for the server.
+                type: string
+              power:
+                description: Power specifies the desired power state of the server.
+                type: string
+              serverRef:
+                description: ServerRef is a reference to a specific server to be claimed.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: serverRef is immutable
+                  rule: self == oldSelf
+              serverSelector:
+                description: ServerSelector specifies a label selector to identify
+                  the server to be claimed.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: serverSelector is immutable
+                  rule: self == oldSelf
+              tolerations:
+                description: Tolerations allow a ServerClaim to bind to a Server with
+                  matching taints.
+                items:
+                  description: |-
+                    Toleration allows a ServerClaim to tolerate taints on a Server so that
+                    the claim can be bound to a server that would otherwise be restricted.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to tolerate.
+                      enum:
+                      - NoBind
+                      - Evict
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to.
+                      minLength: 1
+                      type: string
+                    operator:
+                      description: Operator represents the key's relationship to the
+                        value.
+                      enum:
+                      - Equal
+                      - Exists
+                      type: string
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to.
+                      type: string
+                  required:
+                  - key
+                  type: object
+                type: array
+              userDataRef:
+                description: |-
+                  UserDataRef references a Secret in the same namespace as this ServerClaim
+                  containing user-data exposed to the claimed server via the metaldata
+                  service. The referenced Secret must be of type metal.ironcore.dev/user-data.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - image
+            - power
+            type: object
+            x-kubernetes-validations:
+            - message: serverRef is required once set
+              rule: '!has(oldSelf.serverRef) || has(self.serverRef)'
+            - message: serverSelector is required once set
+              rule: '!has(oldSelf.serverSelector) || has(self.serverSelector)'
+          status:
+            description: ServerClaimStatus defines the observed state of ServerClaim.
+            properties:
+              phase:
+                description: Phase represents the current phase of the server claim.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end }}

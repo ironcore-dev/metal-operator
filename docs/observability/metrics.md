@@ -352,7 +352,7 @@ This is configured via two CLI flags:
 
 When configured, every Redfish metric gains the extra label columns. If a label key is missing from the resource, the value is emitted as an empty string — missing labels never block metric emission.
 
-Label lookups are cached per hostname with a 1-hour TTL to avoid excessive Kubernetes API calls.
+Labels are read from the controller-runtime informer cache, which is watch-based and always reflects the current cluster state. There is no TTL — label changes on BMC or Server resources are visible immediately.
 
 #### Helm chart configuration
 

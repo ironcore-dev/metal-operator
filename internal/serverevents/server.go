@@ -134,7 +134,7 @@ func (s *Server) alertHandler(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("Processed events successfully", "hostname", hostname, "count", len(events))
 	}
 
-	s.collector.UpdateFromEvent(r.Context(), hostname, eventData)
+	s.collector.UpdateFromEvent(hostname, eventData)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -178,7 +178,7 @@ func (s *Server) metricsreportHandler(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("Processed metrics successfully", "hostname", hostname, "count", len(metricsReport.MetricValues))
 	}
 
-	s.collector.UpdateFromMetricsReport(r.Context(), hostname, metricsReport)
+	s.collector.UpdateFromMetricsReport(hostname, metricsReport)
 	w.WriteHeader(http.StatusOK)
 }
 

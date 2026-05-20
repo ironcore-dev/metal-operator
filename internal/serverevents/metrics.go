@@ -14,15 +14,8 @@ import (
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/prometheus/client_golang/prometheus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
-)
-
-const (
-	// labelCacheTTL is how long a cached label set is considered fresh.
-	// After expiry the next incoming metrics event will re-fetch from the API.
-	labelCacheTTL = 1 * time.Hour
 )
 
 // LabelMapping maps a Kubernetes resource label key to a Prometheus label name.
@@ -83,12 +76,6 @@ type MetricEntry struct {
 	Timestamp     time.Time
 }
 
-// labelCacheEntry holds the enrichment label values for a given hostname along with an expiry time.
-type labelCacheEntry struct {
-	vals      []string
-	expiresAt time.Time
-}
-
 type RedfishEventCollector struct {
 	lastReadings map[string]MetricEntry
 	alertCounts  map[EventKey]uint64
@@ -100,8 +87,6 @@ type RedfishEventCollector struct {
 	bmcMappings    []LabelMapping
 	serverMappings []LabelMapping
 	allLabelCount  int
-	labelCache     map[string]labelCacheEntry
-	labelMux       sync.RWMutex
 }
 
 type EventKey struct {
@@ -129,7 +114,6 @@ func NewRedfishEventCollector(k8sClient client.Client, bmcMappings, serverMappin
 	c := &RedfishEventCollector{
 		lastReadings:   make(map[string]MetricEntry),
 		alertCounts:    make(map[EventKey]uint64),
-		labelCache:     make(map[string]labelCacheEntry),
 		k8sClient:      k8sClient,
 		bmcMappings:    bmcMappings,
 		serverMappings: serverMappings,
@@ -151,42 +135,21 @@ func NewRedfishEventCollector(k8sClient client.Client, bmcMappings, serverMappin
 	return c
 }
 
-// lookupLabels fetches and caches BMC + Server label values for the given hostname.
-// The hostname is the BMC Kubernetes resource name, which equals Server.spec.bmcRef.name.
-//
-// Caching behaviour:
-//   - Cache hit and not expired → return cached values immediately (no API calls).
-//   - Cache miss or expired → fetch from API, cache the result for labelCacheTTL, return values.
-//   - BMC not found (IsNotFound) → cache empty BMC labels, still attempt Server lookup.
-//   - BMC transient error → do not cache, return current values so the next event retries.
-//   - Server lookup failure or unexpected count → cache whatever BMC labels we have with empty
-//     Server labels (avoids hammering the API when the Server does not exist yet).
-//
-// Missing individual label keys on a resource return empty strings via Go map defaults.
-// Metrics are always emitted regardless of label availability.
-func (c *RedfishEventCollector) lookupLabels(ctx context.Context, hostname string) []string {
-	c.labelMux.RLock()
-	if entry, ok := c.labelCache[hostname]; ok && time.Now().Before(entry.expiresAt) {
-		c.labelMux.RUnlock()
-		return entry.vals
-	}
-	c.labelMux.RUnlock()
-
+// getLabels returns the enrichment label values for the given hostname by reading from the
+// controller-runtime informer cache. Reads are local in-memory operations — the informer cache
+// is watch-based and always reflects the current cluster state without making API server calls.
+// Returns empty strings for any label that cannot be resolved.
+func (c *RedfishEventCollector) getLabels(hostname string) []string {
 	vals := make([]string, c.allLabelCount)
 	if c.k8sClient == nil || c.allLabelCount == 0 {
 		return vals
 	}
+	ctx := context.Background()
 
 	// --- BMC labels ---
 	if len(c.bmcMappings) > 0 {
 		bmc := &metalv1alpha1.BMC{}
-		if err := c.k8sClient.Get(ctx, client.ObjectKey{Name: hostname}, bmc); err != nil {
-			if !apierrors.IsNotFound(err) {
-				// Transient error: do not cache, let the next event retry.
-				return vals
-			}
-			// BMC not found: leave BMC slots empty and fall through to Server lookup.
-		} else {
+		if err := c.k8sClient.Get(ctx, client.ObjectKey{Name: hostname}, bmc); err == nil {
 			for i, m := range c.bmcMappings {
 				vals[i] = bmc.Labels[m.K8sKey]
 			}
@@ -202,31 +165,11 @@ func (c *RedfishEventCollector) lookupLabels(ctx context.Context, hostname strin
 			}
 		}
 	}
-	// On Server lookup failure or unexpected item count we leave Server slots empty and still
-	// cache so we don't hammer the API. The cache will expire after labelCacheTTL.
-
-	c.labelMux.Lock()
-	c.labelCache[hostname] = labelCacheEntry{vals: vals, expiresAt: time.Now().Add(labelCacheTTL)}
-	c.labelMux.Unlock()
 	return vals
 }
 
-// labelsCached returns the cached combined label values for a hostname without making an API call.
-// Returns a slice of empty strings when the hostname is not cached or the cache entry has expired.
-func (c *RedfishEventCollector) labelsCached(hostname string) []string {
-	c.labelMux.RLock()
-	defer c.labelMux.RUnlock()
-	if entry, ok := c.labelCache[hostname]; ok && time.Now().Before(entry.expiresAt) {
-		return entry.vals
-	}
-	return make([]string, c.allLabelCount)
-}
-
 // UpdateFromMetricsReport processes incoming MetricReport events and updates the internal state.
-func (c *RedfishEventCollector) UpdateFromMetricsReport(ctx context.Context, hostname string, report MetricsReport) {
-	// Populate the label cache before acquiring the main lock (different mutex).
-	c.lookupLabels(ctx, hostname)
-
+func (c *RedfishEventCollector) UpdateFromMetricsReport(hostname string, report MetricsReport) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -262,10 +205,7 @@ func (c *RedfishEventCollector) UpdateFromMetricsReport(ctx context.Context, hos
 }
 
 // UpdateFromEvent processes incoming Redfish events and updates the alert counts.
-func (c *RedfishEventCollector) UpdateFromEvent(ctx context.Context, hostname string, data EventData) {
-	// Populate the label cache before acquiring the main lock (different mutex).
-	c.lookupLabels(ctx, hostname)
-
+func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -304,7 +244,7 @@ func (c *RedfishEventCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		labelValues := append(
 			[]string{data.Source, data.MetricID, data.Type, data.Unit, data.OriginContext},
-			c.labelsCached(data.Source)...,
+			c.getLabels(data.Source)...,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.sensorDesc,
@@ -316,7 +256,7 @@ func (c *RedfishEventCollector) Collect(ch chan<- prometheus.Metric) {
 	for key, count := range c.alertCounts {
 		labelValues := append(
 			[]string{key.Source, key.Severity, key.EventID, key.Component},
-			c.labelsCached(key.Source)...,
+			c.getLabels(key.Source)...,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.alertDesc,

@@ -6,8 +6,11 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -24,13 +27,52 @@ type BIOSSettingsApplyConfiguration struct {
 
 // BIOSSettings constructs a declarative configuration of the BIOSSettings type for use with
 // apply.
-func BIOSSettings(name, namespace string) *BIOSSettingsApplyConfiguration {
+func BIOSSettings(name string) *BIOSSettingsApplyConfiguration {
 	b := &BIOSSettingsApplyConfiguration{}
 	b.WithName(name)
-	b.WithNamespace(namespace)
 	b.WithKind("BIOSSettings")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractBIOSSettingsFrom extracts the applied configuration owned by fieldManager from
+// bIOSSettings for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// bIOSSettings must be a unmodified BIOSSettings API object that was retrieved from the Kubernetes API.
+// ExtractBIOSSettingsFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBIOSSettingsFrom(bIOSSettings *apiv1alpha1.BIOSSettings, fieldManager string, subresource string) (*BIOSSettingsApplyConfiguration, error) {
+	b := &BIOSSettingsApplyConfiguration{}
+	err := managedfields.ExtractInto(bIOSSettings, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettings"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(bIOSSettings.Name)
+
+	b.WithKind("BIOSSettings")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractBIOSSettings extracts the applied configuration owned by fieldManager from
+// bIOSSettings. If no managedFields are found in bIOSSettings for fieldManager, a
+// BIOSSettingsApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// bIOSSettings must be a unmodified BIOSSettings API object that was retrieved from the Kubernetes API.
+// ExtractBIOSSettings provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBIOSSettings(bIOSSettings *apiv1alpha1.BIOSSettings, fieldManager string) (*BIOSSettingsApplyConfiguration, error) {
+	return ExtractBIOSSettingsFrom(bIOSSettings, fieldManager, "")
+}
+
+// ExtractBIOSSettingsStatus extracts the applied configuration owned by fieldManager from
+// bIOSSettings for the status subresource.
+func ExtractBIOSSettingsStatus(bIOSSettings *apiv1alpha1.BIOSSettings, fieldManager string) (*BIOSSettingsApplyConfiguration, error) {
+	return ExtractBIOSSettingsFrom(bIOSSettings, fieldManager, "status")
 }
 
 func (b BIOSSettingsApplyConfiguration) IsApplyConfiguration() {}

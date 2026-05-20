@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Power defines the possible power states for a device.
@@ -443,5 +444,8 @@ type ServerList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&Server{}, &ServerList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &Server{}, &ServerList{})
+		return nil
+	})
 }

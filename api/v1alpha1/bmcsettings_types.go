@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // BMCSettingsTemplate defines the template for BMC settings to be applied.
@@ -206,5 +207,8 @@ type BMCSettingsList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&BMCSettings{}, &BMCSettingsList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &BMCSettings{}, &BMCSettingsList{})
+		return nil
+	})
 }

@@ -6,8 +6,11 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -24,13 +27,52 @@ type BIOSVersionApplyConfiguration struct {
 
 // BIOSVersion constructs a declarative configuration of the BIOSVersion type for use with
 // apply.
-func BIOSVersion(name, namespace string) *BIOSVersionApplyConfiguration {
+func BIOSVersion(name string) *BIOSVersionApplyConfiguration {
 	b := &BIOSVersionApplyConfiguration{}
 	b.WithName(name)
-	b.WithNamespace(namespace)
 	b.WithKind("BIOSVersion")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractBIOSVersionFrom extracts the applied configuration owned by fieldManager from
+// bIOSVersion for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// bIOSVersion must be a unmodified BIOSVersion API object that was retrieved from the Kubernetes API.
+// ExtractBIOSVersionFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBIOSVersionFrom(bIOSVersion *apiv1alpha1.BIOSVersion, fieldManager string, subresource string) (*BIOSVersionApplyConfiguration, error) {
+	b := &BIOSVersionApplyConfiguration{}
+	err := managedfields.ExtractInto(bIOSVersion, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersion"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(bIOSVersion.Name)
+
+	b.WithKind("BIOSVersion")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractBIOSVersion extracts the applied configuration owned by fieldManager from
+// bIOSVersion. If no managedFields are found in bIOSVersion for fieldManager, a
+// BIOSVersionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// bIOSVersion must be a unmodified BIOSVersion API object that was retrieved from the Kubernetes API.
+// ExtractBIOSVersion provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBIOSVersion(bIOSVersion *apiv1alpha1.BIOSVersion, fieldManager string) (*BIOSVersionApplyConfiguration, error) {
+	return ExtractBIOSVersionFrom(bIOSVersion, fieldManager, "")
+}
+
+// ExtractBIOSVersionStatus extracts the applied configuration owned by fieldManager from
+// bIOSVersion for the status subresource.
+func ExtractBIOSVersionStatus(bIOSVersion *apiv1alpha1.BIOSVersion, fieldManager string) (*BIOSVersionApplyConfiguration, error) {
+	return ExtractBIOSVersionFrom(bIOSVersion, fieldManager, "status")
 }
 
 func (b BIOSVersionApplyConfiguration) IsApplyConfiguration() {}

@@ -6,8 +6,11 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -31,6 +34,47 @@ func ServerClaim(name, namespace string) *ServerClaimApplyConfiguration {
 	b.WithKind("ServerClaim")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractServerClaimFrom extracts the applied configuration owned by fieldManager from
+// serverClaim for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// serverClaim must be a unmodified ServerClaim API object that was retrieved from the Kubernetes API.
+// ExtractServerClaimFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractServerClaimFrom(serverClaim *apiv1alpha1.ServerClaim, fieldManager string, subresource string) (*ServerClaimApplyConfiguration, error) {
+	b := &ServerClaimApplyConfiguration{}
+	err := managedfields.ExtractInto(serverClaim, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaim"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(serverClaim.Name)
+	b.WithNamespace(serverClaim.Namespace)
+
+	b.WithKind("ServerClaim")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractServerClaim extracts the applied configuration owned by fieldManager from
+// serverClaim. If no managedFields are found in serverClaim for fieldManager, a
+// ServerClaimApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// serverClaim must be a unmodified ServerClaim API object that was retrieved from the Kubernetes API.
+// ExtractServerClaim provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractServerClaim(serverClaim *apiv1alpha1.ServerClaim, fieldManager string) (*ServerClaimApplyConfiguration, error) {
+	return ExtractServerClaimFrom(serverClaim, fieldManager, "")
+}
+
+// ExtractServerClaimStatus extracts the applied configuration owned by fieldManager from
+// serverClaim for the status subresource.
+func ExtractServerClaimStatus(serverClaim *apiv1alpha1.ServerClaim, fieldManager string) (*ServerClaimApplyConfiguration, error) {
+	return ExtractServerClaimFrom(serverClaim, fieldManager, "status")
 }
 
 func (b ServerClaimApplyConfiguration) IsApplyConfiguration() {}

@@ -14,7 +14,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -127,8 +126,8 @@ var _ = Describe("ServerClaim Controller", func() {
 				Kind:               "ServerClaim",
 				Name:               claim.Name,
 				UID:                claim.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.ServerRef.Name", server.Name),
 			HaveField("Spec.Image", "foo:bar"),

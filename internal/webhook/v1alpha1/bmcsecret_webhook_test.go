@@ -4,12 +4,10 @@
 package v1alpha1
 
 import (
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -42,7 +40,7 @@ var _ = Describe("BMCSecret Webhook", func() {
 		It("should deny update BMCSecret if immutable is set to true", func(ctx SpecContext) {
 			By("Setting Immutable to True")
 			Eventually(Update(BMCSecret, func() {
-				BMCSecret.Immutable = ptr.To(true)
+				BMCSecret.Immutable = new(true)
 			})).Should(Succeed())
 
 			By("Updating an BMCSecret with Immutable set to True")
@@ -54,7 +52,7 @@ var _ = Describe("BMCSecret Webhook", func() {
 		It("should allow update BMCSecret if immutable is set to false", func(ctx SpecContext) {
 			By("Updating an BMCSecret with Immutable set to False")
 			BMCSecretMutable := BMCSecret.DeepCopy()
-			BMCSecretMutable.Immutable = ptr.To(false)
+			BMCSecretMutable.Immutable = new(false)
 			Expect(k8sClient.Update(ctx, BMCSecretMutable)).To(Succeed())
 
 			BMCSecretUpdated := BMCSecretMutable.DeepCopy()

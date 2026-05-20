@@ -6,8 +6,11 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -24,13 +27,52 @@ type ServerApplyConfiguration struct {
 
 // Server constructs a declarative configuration of the Server type for use with
 // apply.
-func Server(name, namespace string) *ServerApplyConfiguration {
+func Server(name string) *ServerApplyConfiguration {
 	b := &ServerApplyConfiguration{}
 	b.WithName(name)
-	b.WithNamespace(namespace)
 	b.WithKind("Server")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractServerFrom extracts the applied configuration owned by fieldManager from
+// server for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// server must be a unmodified Server API object that was retrieved from the Kubernetes API.
+// ExtractServerFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractServerFrom(server *apiv1alpha1.Server, fieldManager string, subresource string) (*ServerApplyConfiguration, error) {
+	b := &ServerApplyConfiguration{}
+	err := managedfields.ExtractInto(server, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.Server"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(server.Name)
+
+	b.WithKind("Server")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractServer extracts the applied configuration owned by fieldManager from
+// server. If no managedFields are found in server for fieldManager, a
+// ServerApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// server must be a unmodified Server API object that was retrieved from the Kubernetes API.
+// ExtractServer provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractServer(server *apiv1alpha1.Server, fieldManager string) (*ServerApplyConfiguration, error) {
+	return ExtractServerFrom(server, fieldManager, "")
+}
+
+// ExtractServerStatus extracts the applied configuration owned by fieldManager from
+// server for the status subresource.
+func ExtractServerStatus(server *apiv1alpha1.Server, fieldManager string) (*ServerApplyConfiguration, error) {
+	return ExtractServerFrom(server, fieldManager, "status")
 }
 
 func (b ServerApplyConfiguration) IsApplyConfiguration() {}

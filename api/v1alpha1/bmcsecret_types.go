@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -66,5 +67,8 @@ type BMCSecretList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&BMCSecret{}, &BMCSecretList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &BMCSecret{}, &BMCSecretList{})
+		return nil
+	})
 }

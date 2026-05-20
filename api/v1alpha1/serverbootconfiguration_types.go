@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration.
@@ -77,5 +78,8 @@ type ServerBootConfigurationList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&ServerBootConfiguration{}, &ServerBootConfigurationList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &ServerBootConfiguration{}, &ServerBootConfigurationList{})
+		return nil
+	})
 }

@@ -12,11 +12,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
+	"net/netip"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-
-	"net/netip"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
@@ -174,8 +173,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				Kind:               "BIOSSettingsSet",
 				Name:               biosSettingsSet.Name,
 				UID:                biosSettingsSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -196,8 +195,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				Kind:               "BIOSSettingsSet",
 				Name:               biosSettingsSet.Name,
 				UID:                biosSettingsSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -284,8 +283,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				Kind:               "BIOSSettingsSet",
 				Name:               biosSettingsSet.Name,
 				UID:                biosSettingsSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -297,8 +296,8 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 				Kind:               "BIOSSettingsSet",
 				Name:               biosSettingsSet.Name,
 				UID:                biosSettingsSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -632,7 +631,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 					SettingsFlow: []metalv1alpha1.SettingsFlowItem{
 						{Settings: map[string]string{"UnknownSettings": "foo-bar"}, Priority: 10, Name: "foo-bar"},
 					},
-					RetryPolicy: &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					RetryPolicy: &metalv1alpha1.RetryPolicy{MaxAttempts: new(int32(failedAutoRetryCount))},
 				},
 				ServerSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{

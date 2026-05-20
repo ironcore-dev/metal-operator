@@ -1,41 +1,40 @@
 name: Test Chart
 
-permissions:
-  contents: read
-
 on:
   pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
 
+permissions: {}
+
 jobs:
   test-e2e:
-    name: Run test chart
+    permissions:
+      contents: read
+    name: Run on Ubuntu
     runs-on: ubuntu-latest
+    env:
+      IMG: controller:latest
     steps:
       - name: Clone the code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
-      - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-      - name: Verify Helm installation
-        run: helm version
-
-      - name: Lint Helm Chart
-        run: |
-          helm lint ./dist/chart
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v4.2.2
 
       - name: Install the latest version of kind
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-$(go env GOARCH)
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
 
@@ -47,26 +46,39 @@ jobs:
 
       - name: Prepare metal-operator
         run: |
-          go mod download
-          make docker-build CONTROLLER_IMG=metal-operator:v0.1.0 METALPROBE_IMG=metal-probe:v0.1.0
-          kind load docker-image metal-operator:v0.1.0 metal-probe:v0.1.0
+          go mod tidy
+          make docker-build
+          kind load docker-image $IMG
 
-      - name: Install cert-manager via Helm
+      - name: Lint Helm Chart
+        run: |
+          helm lint ./dist/chart
+
+      - name: Install cert-manager via Helm (wait for readiness)
         run: |
           helm repo add jetstack https://charts.jetstack.io
           helm repo update
-          helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set installCRDs=true
+          helm install cert-manager jetstack/cert-manager \
+            --namespace cert-manager \
+            --create-namespace \
+            --set crds.enabled=true \
+            --wait \
+            --timeout 300s
 
-      - name: Wait for cert-manager to be ready
-        run: |
-          kubectl wait --namespace cert-manager --for=condition=available --timeout=300s deployment/cert-manager
-          kubectl wait --namespace cert-manager --for=condition=available --timeout=300s deployment/cert-manager-cainjector
-          kubectl wait --namespace cert-manager --for=condition=available --timeout=300s deployment/cert-manager-webhook
+# TODO: Uncomment if Prometheus is enabled
+#      - name: Install Prometheus Operator CRDs
+#        run: |
+#          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#          helm repo update
+#          helm install prometheus-crds prometheus-community/prometheus-operator-crds
 
-      - name: Install Helm chart for project
+      - name: Deploy manager via Helm
         run: |
-          helm install my-release ./dist/chart --create-namespace --namespace metal-operator-system
+          helm upgrade --install metal-operator ./dist/chart \
+            --namespace metal-operator-system \
+            --create-namespace \
+            --set manager.image.tag=latest
 
       - name: Check Helm release status
         run: |
-          helm status my-release --namespace metal-operator-system
+          helm status metal-operator --namespace metal-operator-system

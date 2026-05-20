@@ -105,14 +105,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BootOrderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ConsoleProtocol"):
 		return &apiv1alpha1.ConsoleProtocolApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("DynamicSetting"):
-		return &apiv1alpha1.DynamicSettingApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("DynamicSettingSource"):
-		return &apiv1alpha1.DynamicSettingSourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Endpoint"):
 		return &apiv1alpha1.EndpointApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("EndpointSpec"):
 		return &apiv1alpha1.EndpointSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("FieldRefSelector"):
+		return &apiv1alpha1.FieldRefSelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImageSpec"):
 		return &apiv1alpha1.ImageSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImmutableObjectReference"):
@@ -125,12 +123,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.NamespacedKeySelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NetworkInterface"):
 		return &apiv1alpha1.NetworkInterfaceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ObjectFieldRefSelector"):
+		return &apiv1alpha1.ObjectFieldRefSelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ObjectReference"):
 		return &apiv1alpha1.ObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Processor"):
 		return &apiv1alpha1.ProcessorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Protocol"):
 		return &apiv1alpha1.ProtocolApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RetryPolicy"):
+		return &apiv1alpha1.RetryPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Server"):
 		return &apiv1alpha1.ServerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerBootConfiguration"):
@@ -167,8 +169,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.StorageDriveApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("StorageVolume"):
 		return &apiv1alpha1.StorageVolumeApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Taint"):
+		return &apiv1alpha1.TaintApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Task"):
 		return &apiv1alpha1.TaskApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Toleration"):
+		return &apiv1alpha1.TolerationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Variable"):
+		return &apiv1alpha1.VariableApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("VariableSourceValueFrom"):
+		return &apiv1alpha1.VariableSourceValueFromApplyConfiguration{}
 
 	}
 	return nil

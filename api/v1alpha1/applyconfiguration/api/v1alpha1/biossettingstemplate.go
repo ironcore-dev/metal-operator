@@ -16,6 +16,8 @@ type BIOSSettingsTemplateApplyConfiguration struct {
 	Version *string `json:"version,omitempty"`
 	// SettingsFlow contains the BIOS settings sequence to apply in the given order.
 	SettingsFlow []SettingsFlowItemApplyConfiguration `json:"settingsFlow,omitempty"`
+	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
+	RetryPolicy *RetryPolicyApplyConfiguration `json:"retryPolicy,omitempty"`
 	// ServerMaintenancePolicy is a maintenance policy to be enforced on the server.
 	ServerMaintenancePolicy *apiv1alpha1.ServerMaintenancePolicy `json:"serverMaintenancePolicy,omitempty"`
 }
@@ -44,6 +46,14 @@ func (b *BIOSSettingsTemplateApplyConfiguration) WithSettingsFlow(values ...*Set
 		}
 		b.SettingsFlow = append(b.SettingsFlow, *values[i])
 	}
+	return b
+}
+
+// WithRetryPolicy sets the RetryPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RetryPolicy field is set to the value of the last call.
+func (b *BIOSSettingsTemplateApplyConfiguration) WithRetryPolicy(value *RetryPolicyApplyConfiguration) *BIOSSettingsTemplateApplyConfiguration {
+	b.RetryPolicy = value
 	return b
 }
 

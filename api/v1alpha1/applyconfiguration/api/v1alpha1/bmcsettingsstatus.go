@@ -17,6 +17,10 @@ import (
 type BMCSettingsStatusApplyConfiguration struct {
 	// State represents the current state of the BMC configuration task.
 	State *apiv1alpha1.BMCSettingsState `json:"state,omitempty"`
+	// FailedAttempts is the number of automatic retry attempts made after failure.
+	FailedAttempts *int32 `json:"failedAttempts,omitempty"`
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 	// Conditions represents the latest available observations of the BMC Settings Resource state.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
@@ -32,6 +36,22 @@ func BMCSettingsStatus() *BMCSettingsStatusApplyConfiguration {
 // If called multiple times, the State field is set to the value of the last call.
 func (b *BMCSettingsStatusApplyConfiguration) WithState(value apiv1alpha1.BMCSettingsState) *BMCSettingsStatusApplyConfiguration {
 	b.State = &value
+	return b
+}
+
+// WithFailedAttempts sets the FailedAttempts field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FailedAttempts field is set to the value of the last call.
+func (b *BMCSettingsStatusApplyConfiguration) WithFailedAttempts(value int32) *BMCSettingsStatusApplyConfiguration {
+	b.FailedAttempts = &value
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *BMCSettingsStatusApplyConfiguration) WithObservedGeneration(value int64) *BMCSettingsStatusApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }
 

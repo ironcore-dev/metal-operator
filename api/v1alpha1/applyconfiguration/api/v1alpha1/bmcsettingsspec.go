@@ -51,6 +51,27 @@ func (b *BMCSettingsSpecApplyConfiguration) WithSettingsMap(entries map[string]s
 	return b
 }
 
+// WithVariables adds the given value to the Variables field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Variables field.
+func (b *BMCSettingsSpecApplyConfiguration) WithVariables(values ...*VariableApplyConfiguration) *BMCSettingsSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVariables")
+		}
+		b.BMCSettingsTemplateApplyConfiguration.Variables = append(b.BMCSettingsTemplateApplyConfiguration.Variables, *values[i])
+	}
+	return b
+}
+
+// WithRetryPolicy sets the RetryPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RetryPolicy field is set to the value of the last call.
+func (b *BMCSettingsSpecApplyConfiguration) WithRetryPolicy(value *RetryPolicyApplyConfiguration) *BMCSettingsSpecApplyConfiguration {
+	b.BMCSettingsTemplateApplyConfiguration.RetryPolicy = value
+	return b
+}
+
 // WithServerMaintenancePolicy sets the ServerMaintenancePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ServerMaintenancePolicy field is set to the value of the last call.

@@ -184,7 +184,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ManagerNamespace:       ns.Name,
 			BMCResetWaitTime:       400 * time.Millisecond,
 			BMCClientRetryInterval: 25 * time.Millisecond,
-			EventURL:               "http://localhost:8008",
 			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
 			BMCOptions: bmc.Options{

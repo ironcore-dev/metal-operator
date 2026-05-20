@@ -13,6 +13,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+var (
+	// globalCollector is the shared Prometheus collector for Redfish events and metrics
+	globalCollector     *RedfishEventCollector
+	globalCollectorOnce sync.Once
+)
+
 type MetricEntry struct {
 	MetricID      string
 	Value         float64
@@ -39,25 +45,34 @@ type EventKey struct {
 }
 
 // NewRedfishEventCollector initializes a new RedfishEventCollector and registers it with Prometheus.
+// Returns the shared global collector instance.
 func NewRedfishEventCollector() *RedfishEventCollector {
-	c := &RedfishEventCollector{
-		lastReadings: make(map[string]MetricEntry),
-		alertCounts:  make(map[EventKey]uint64),
-		sensorDesc: prometheus.NewDesc(
-			"redfish_monitor_reading",
-			"Latest value pushed via Redfish MetricReport event",
-			[]string{"hostname", "metric_id", "type", "unit", "origin_context"},
-			nil,
-		),
-		alertDesc: prometheus.NewDesc(
-			"redfish_event_alert_total",
-			"Total count of Redfish alerts/events received",
-			[]string{"hostname", "severity", "message_id", "component"},
-			nil,
-		),
-	}
-	metrics.Registry.MustRegister(c)
-	return c
+	globalCollectorOnce.Do(func() {
+		globalCollector = &RedfishEventCollector{
+			lastReadings: make(map[string]MetricEntry),
+			alertCounts:  make(map[EventKey]uint64),
+			sensorDesc: prometheus.NewDesc(
+				"redfish_monitor_reading",
+				"Latest value pushed via Redfish MetricReport event",
+				[]string{"hostname", "metric_id", "type", "unit", "origin_context"},
+				nil,
+			),
+			alertDesc: prometheus.NewDesc(
+				"redfish_event_alert_total",
+				"Total count of Redfish alerts/events received",
+				[]string{"hostname", "severity", "message_id", "component"},
+				nil,
+			),
+		}
+		metrics.Registry.MustRegister(globalCollector)
+	})
+	return globalCollector
+}
+
+// GetCollector returns the shared global collector instance.
+// If the collector hasn't been initialized yet, it initializes it first.
+func GetCollector() *RedfishEventCollector {
+	return NewRedfishEventCollector()
 }
 
 // UpdateFromMetricsReport processes incoming MetricReport events and updates the internal state.

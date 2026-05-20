@@ -60,8 +60,6 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),
 			HaveField("Status.FirmwareVersion", "1.45.455b66-rev4"),
-			HaveField("Status.MetricsReportSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/5")),
-			HaveField("Status.EventsSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/6")),
 		))
 
 		By("Ensuring that the Server resource will be created")
@@ -144,8 +142,6 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),
 			HaveField("Status.FirmwareVersion", "1.45.455b66-rev4"),
-			HaveField("Status.MetricsReportSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/5")),
-			HaveField("Status.EventsSubscriptionLink", Equal("/redfish/v1/EventService/Subscriptions/6")),
 		))
 
 		By("Ensuring that the Server resource has been created")

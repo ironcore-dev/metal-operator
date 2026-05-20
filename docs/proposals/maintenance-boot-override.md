@@ -105,6 +105,7 @@ When `ServerMaintenanceRef` is removed in `handleMaintenanceState`:
 ## Lifecycle Flow
 
 ### Entry with boot image
+<!-- /mermaid -->
 
 ```mermaid
 sequenceDiagram

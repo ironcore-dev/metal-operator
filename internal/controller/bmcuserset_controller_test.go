@@ -498,4 +498,182 @@ var _ = Describe("BMCUserSet Controller", func() {
 			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
 		}
 	})
+
+	It("Should filter out OperationAnnotation during propagation", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "bmc-secret-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a BMC")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-bmc-operation-annotation",
+				Labels: map[string]string{
+					"test": "operation-annotation",
+				},
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
+					MACAddress: "23:11:8A:33:CF:F0",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: MockServerPort,
+				},
+				BMCSecretRef: corev1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		By("Creating a BMCUserSet with OperationAnnotation")
+		bmcUserSet := &metalv1alpha1.BMCUserSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmcuserset-",
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: "Restart",
+					"example.com/user-annotation":     "should-propagate",
+				},
+			},
+			Spec: metalv1alpha1.BMCUserSetSpec{
+				BMCSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"test": "operation-annotation"},
+				},
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "test-user",
+					RoleID:   "Administrator",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcUserSet)).To(Succeed())
+
+		By("Ensuring BMCUser is created without OperationAnnotation")
+		bmcUserList := &metalv1alpha1.BMCUserList{}
+		Eventually(ObjectList(bmcUserList)).Should(SatisfyAll(
+			HaveField("Items", HaveLen(1)),
+			HaveField("Items", ContainElement(SatisfyAll(
+				HaveField("Annotations", HaveKeyWithValue("example.com/user-annotation", "should-propagate")),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			))),
+		))
+
+		Expect(k8sClient.Delete(ctx, bmcUserSet)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+		Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(HaveField("Items", HaveLen(0)))
+
+		Expect(k8sClient.List(ctx, bmcUserList)).To(Succeed())
+		for i := range bmcUserList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &bmcUserList.Items[i]))).To(Succeed())
+		}
+		Eventually(ObjectList(&metalv1alpha1.BMCUserList{})).Should(HaveField("Items", HaveLen(0)))
+
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for i := range secretList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
+		}
+	})
+
+	It("Should remove finalizer immediately when all owned BMCUsers are deleted", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "bmc-secret-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating BMCs")
+		bmc := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-bmc-finalizer",
+				Labels: map[string]string{
+					"test": "finalizer",
+				},
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
+					MACAddress: "23:11:8A:33:CF:F1",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: MockServerPort,
+				},
+				BMCSecretRef: corev1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
+
+		By("Creating a BMCUserSet")
+		bmcUserSet := &metalv1alpha1.BMCUserSet{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmcuserset-",
+			},
+			Spec: metalv1alpha1.BMCUserSetSpec{
+				BMCSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"test": "finalizer"},
+				},
+				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
+					UserName: "test-user",
+					RoleID:   "Administrator",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcUserSet)).To(Succeed())
+
+		By("Ensuring BMCUser is created and finalizer is added to BMCUserSet")
+		bmcUserList := &metalv1alpha1.BMCUserList{}
+		Eventually(ObjectList(bmcUserList)).Should(HaveField("Items", HaveLen(1)))
+		Eventually(Object(bmcUserSet)).Should(HaveField("Finalizers", ContainElement(BMCUserSetFinalizer)))
+
+		By("Deleting the BMCUserSet")
+		Expect(k8sClient.Delete(ctx, bmcUserSet)).To(Succeed())
+
+		By("Ensuring the finalizer is removed after BMCUsers are deleted")
+		Eventually(Object(bmcUserSet)).Should(HaveField("DeletionTimestamp", Not(BeNil())))
+		Eventually(func(g Gomega) {
+			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(bmcUserSet), bmcUserSet)
+			g.Expect(client.IgnoreNotFound(err)).To(Succeed())
+		}).Should(Succeed())
+
+		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
+
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
+			},
+		}
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+		Eventually(ObjectList(&metalv1alpha1.ServerList{})).Should(HaveField("Items", HaveLen(0)))
+
+		secretList := &metalv1alpha1.BMCSecretList{}
+		Expect(k8sClient.List(ctx, secretList)).To(Succeed())
+		for i := range secretList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &secretList.Items[i]))).To(Succeed())
+		}
+	})
 })

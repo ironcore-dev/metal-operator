@@ -135,6 +135,13 @@ func (r *BMCUserSetReconciler) delete(
 		}
 	}
 
+	// Re-fetch to get current state after deletion
+	ownedBMCUsers, err = r.getOwnedBMCUsers(ctx, bmcUserSet)
+	if err != nil {
+		log.Error(err, "Failed to re-fetch owned BMCUsers after deletion")
+		return ctrl.Result{}, fmt.Errorf("failed to get owned BMCUsers after deletion: %w", err)
+	}
+
 	if len(ownedBMCUsers.Items) > 0 {
 		currentStatus := r.getOwnedBMCUserSetStatus(ownedBMCUsers)
 		if err := r.updateStatus(ctx, log, currentStatus, bmcUserSet); err != nil {

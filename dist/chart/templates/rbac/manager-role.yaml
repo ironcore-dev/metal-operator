@@ -1,0 +1,128 @@
+apiVersion: rbac.authorization.k8s.io/v1
+{{- if .Values.rbac.namespaced }}
+kind: Role
+{{- else }}
+kind: ClusterRole
+{{- end }}
+metadata:
+{{- if .Values.rbac.namespaced }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+  name: {{ include "metal-operator.resourceName" (dict "suffix" "manager-role" "context" $) }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - BMC
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - biossettings
+  - biossettingssets
+  - biosversions
+  - biosversionsets
+  - bmcs
+  - bmcsecrets
+  - bmcsettings
+  - bmcsettingssets
+  - bmcusers
+  - bmcversions
+  - bmcversionsets
+  - endpoints
+  - serverbootconfigurations
+  - serverclaims
+  - serverconfigurations
+  - servermaintenances
+  - serverreadinessrules
+  - servers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - biossettings/finalizers
+  - biossettingssets/finalizers
+  - biosversions/finalizers
+  - biosversionsets/finalizers
+  - bmcs/finalizers
+  - bmcsecrets/finalizers
+  - bmcsettings/finalizers
+  - bmcsettingssets/finalizers
+  - bmcusers/finalizers
+  - bmcversions/finalizers
+  - bmcversionsets/finalizers
+  - endpoints/finalizers
+  - serverbootconfigurations/finalizers
+  - serverclaims/finalizers
+  - servermaintenances/finalizers
+  - serverreadinessrules/finalizers
+  - servers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - biossettings/status
+  - biossettingssets/status
+  - biosversions/status
+  - biosversionsets/status
+  - bmcs/status
+  - bmcsecrets/status
+  - bmcsettings/status
+  - bmcsettingssets/status
+  - bmcusers/status
+  - bmcversions/status
+  - bmcversionsets/status
+  - endpoints/status
+  - serverbootconfigurations/status
+  - serverclaims/status
+  - servermaintenances/status
+  - serverreadinessrules/status
+  - servers/status
+  verbs:
+  - get
+  - patch
+  - update

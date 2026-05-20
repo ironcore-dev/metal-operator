@@ -259,7 +259,7 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 
 .PHONY: helm
 helm: manifests kubebuilder
-	"$(KUBEBUILDER)" edit --plugins=helm/v1-alpha
+	"$(KUBEBUILDER)" edit --plugins=helm/v2-alpha
 
 ##@ Dependencies
 

@@ -1,0 +1,24 @@
+{{- if ne .Values.serviceAccount.enable false }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: metal-operator
+    app.kubernetes.io/instance: controller-manager-sa
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: serviceaccount
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/part-of: metal-operator
+    {{- with .Values.serviceAccount.labels }}
+    {{- with omit . "app.kubernetes.io/component" "app.kubernetes.io/created-by" "app.kubernetes.io/instance" "app.kubernetes.io/managed-by" "app.kubernetes.io/name" "helm.sh/chart" "app.kubernetes.io/part-of" }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- end }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  name: {{ include "metal-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -15,13 +15,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
 )
 
 var _ = Describe("BMCSettingsSet Controller", func() {
@@ -196,8 +194,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					Kind:               "BMCSettingsSet",
 					Name:               bmcSettingsSet.Name,
 					UID:                bmcSettingsSet.UID,
-					Controller:         ptr.To(true),
-					BlockOwnerDeletion: ptr.To(true),
+					Controller:         new(true),
+					BlockOwnerDeletion: new(true),
 				})),
 			))
 
@@ -274,8 +272,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					Kind:               "BMCSettingsSet",
 					Name:               bmcSettingsSet.Name,
 					UID:                bmcSettingsSet.UID,
-					Controller:         ptr.To(true),
-					BlockOwnerDeletion: ptr.To(true),
+					Controller:         new(true),
+					BlockOwnerDeletion: new(true),
 				})),
 			))
 
@@ -383,8 +381,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					Kind:               "BMCSettingsSet",
 					Name:               bmcSettingsSet.Name,
 					UID:                bmcSettingsSet.UID,
-					Controller:         ptr.To(true),
-					BlockOwnerDeletion: ptr.To(true),
+					Controller:         new(true),
+					BlockOwnerDeletion: new(true),
 				})),
 			))
 
@@ -459,8 +457,8 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 					Kind:               "BMCSettingsSet",
 					Name:               bmcSettingsSet.Name,
 					UID:                bmcSettingsSet.UID,
-					Controller:         ptr.To(true),
-					BlockOwnerDeletion: ptr.To(true),
+					Controller:         new(true),
+					BlockOwnerDeletion: new(true),
 				})),
 			))
 
@@ -694,7 +692,7 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 						Version:                 "1.45.455b66-rev4",
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 						SettingsMap:             bmcSetting,
-						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+						RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: new(int32(failedAutoRetryCount))},
 					},
 					BMCSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{

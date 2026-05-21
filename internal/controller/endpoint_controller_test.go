@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -47,8 +46,8 @@ var _ = Describe("Endpoints Controller", func() {
 				Kind:               "Endpoint",
 				Name:               endpoint.Name,
 				UID:                endpoint.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", Equal(map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
@@ -67,8 +66,8 @@ var _ = Describe("Endpoints Controller", func() {
 				Kind:               "Endpoint",
 				Name:               endpoint.Name,
 				UID:                endpoint.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.EndpointRef.Name", Equal(endpoint.Name)),
 			HaveField("Spec.BMCSecretRef.Name", Equal(bmcObj.Name)),

@@ -365,7 +365,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 					Version:                 upgradeServerBiosVersion + " fail",
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBiosVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: new(int32(failedAutoRetryCount))},
 				},
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
@@ -658,8 +658,4 @@ func ensureBiosVersionConditionTransition(acc *conditionutils.Accessor, biosVers
 		g.Expect(acc.FindSlice(biosVersion.Status.Conditions, ConditionVersionUpgradeVerification, verificationComplete)).To(BeTrue())
 		return verificationComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
-}
-
-func GetPtr[T any](v T) *T {
-	return &v
 }

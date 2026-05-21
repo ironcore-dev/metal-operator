@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // BIOSVersionSetSpec defines the desired state of BIOSVersionSet.
@@ -64,5 +65,8 @@ type BIOSVersionSetList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&BIOSVersionSet{}, &BIOSVersionSetList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &BIOSVersionSet{}, &BIOSVersionSetList{})
+		return nil
+	})
 }

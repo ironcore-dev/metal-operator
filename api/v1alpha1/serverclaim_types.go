@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // ServerClaimSpec defines the desired state of ServerClaim.
@@ -87,5 +88,8 @@ type ServerClaimList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&ServerClaim{}, &ServerClaimList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &ServerClaim{}, &ServerClaimList{})
+		return nil
+	})
 }

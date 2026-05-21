@@ -26,6 +26,1645 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettings
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: flowState
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowState
+    - name: lastAppliedTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: name
+      type:
+        scalar: string
+    - name: priority
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSet
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetSpec
+  map:
+    fields:
+    - name: biosSettingsTemplate
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsTemplate
+    - name: serverSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetStatus
+  map:
+    fields:
+    - name: availableBIOSSettings
+      type:
+        scalar: numeric
+    - name: completedBIOSSettings
+      type:
+        scalar: numeric
+    - name: failedBIOSSettings
+      type:
+        scalar: numeric
+    - name: fullyLabeledServers
+      type:
+        scalar: numeric
+    - name: inProgressBIOSSettings
+      type:
+        scalar: numeric
+    - name: pendingBIOSSettings
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSpec
+  map:
+    fields:
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: serverMaintenanceRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+    - name: serverRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: settingsFlow
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
+          elementRelationship: atomic
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: failedAttempts
+      type:
+        scalar: numeric
+    - name: flowState
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowStatus
+          elementRelationship: atomic
+    - name: lastAppliedTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsState
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsTemplate
+  map:
+    fields:
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: settingsFlow
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
+          elementRelationship: atomic
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersion
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSet
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSetSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSetStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSetSpec
+  map:
+    fields:
+    - name: biosVersionTemplate
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionTemplate
+    - name: serverSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSetStatus
+  map:
+    fields:
+    - name: availableBIOSVersion
+      type:
+        scalar: numeric
+    - name: completedBIOSVersion
+      type:
+        scalar: numeric
+    - name: failedBIOSVersion
+      type:
+        scalar: numeric
+    - name: fullyLabeledServers
+      type:
+        scalar: numeric
+    - name: inProgressBIOSVersion
+      type:
+        scalar: numeric
+    - name: pendingBIOSVersion
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSpec
+  map:
+    fields:
+    - name: image
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: serverMaintenanceRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+    - name: serverRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: updatePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: failedAttempts
+      type:
+        scalar: numeric
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionState
+    - name: upgradeTask
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Task
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionTemplate
+  map:
+    fields:
+    - name: image
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: updatePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMC
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCAccess
+  map:
+    fields:
+    - name: address
+      type:
+        scalar: string
+    - name: bmcSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: protocol
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Protocol
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCPowerState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSecret
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: data
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: immutable
+      type:
+        scalar: boolean
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: stringData
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: type
+      type:
+        namedType: io.k8s.api.core.v1.SecretType
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettings
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSet
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetSpec
+  map:
+    fields:
+    - name: bmcSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: bmcSettingsTemplate
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsTemplate
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetStatus
+  map:
+    fields:
+    - name: availableBMCSettings
+      type:
+        scalar: numeric
+    - name: completedBMCSettings
+      type:
+        scalar: numeric
+    - name: failedBMCSettings
+      type:
+        scalar: numeric
+    - name: fullyLabeledBMCs
+      type:
+        scalar: numeric
+    - name: inProgressBMCSettings
+      type:
+        scalar: numeric
+    - name: pendingBMCSettings
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSpec
+  map:
+    fields:
+    - name: BMCRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: serverMaintenanceRefs
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceRefItem
+          elementRelationship: atomic
+    - name: settings
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: variables
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Variable
+          elementRelationship: atomic
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: failedAttempts
+      type:
+        scalar: numeric
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsState
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsTemplate
+  map:
+    fields:
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: settings
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: variables
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Variable
+          elementRelationship: atomic
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSpec
+  map:
+    fields:
+    - name: access
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.InlineEndpoint
+    - name: bmcSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: bmcSettingsRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: bmcUUID
+      type:
+        scalar: string
+    - name: consoleProtocol
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConsoleProtocol
+    - name: endpointRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: hostname
+      type:
+        scalar: string
+    - name: protocol
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Protocol
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: eventsSubscriptionLink
+      type:
+        scalar: string
+    - name: firmwareVersion
+      type:
+        scalar: string
+    - name: ip
+      type:
+        scalar: string
+    - name: lastResetTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: macAddress
+      type:
+        scalar: string
+    - name: manufacturer
+      type:
+        scalar: string
+    - name: metricsReportSubscriptionLink
+      type:
+        scalar: string
+    - name: model
+      type:
+        scalar: string
+    - name: powerState
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCPowerState
+    - name: serialNumber
+      type:
+        scalar: string
+    - name: sku
+      type:
+        scalar: string
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCState
+      default: Pending
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUser
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSpec
+  map:
+    fields:
+    - name: bmcRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: bmcSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: description
+      type:
+        scalar: string
+    - name: roleID
+      type:
+        scalar: string
+    - name: rotationPeriod
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
+    - name: userName
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserStatus
+  map:
+    fields:
+    - name: effectiveBMCSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: id
+      type:
+        scalar: string
+    - name: lastRotation
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: passwordExpiration
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersion
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSet
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetSpec
+  map:
+    fields:
+    - name: bmcSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: bmcVersionTemplate
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionTemplate
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetStatus
+  map:
+    fields:
+    - name: availableBMCVersion
+      type:
+        scalar: numeric
+    - name: completedBMCVersion
+      type:
+        scalar: numeric
+    - name: failedBMCVersion
+      type:
+        scalar: numeric
+    - name: fullyLabeledBMCs
+      type:
+        scalar: numeric
+    - name: inProgressBMCVersion
+      type:
+        scalar: numeric
+    - name: pendingBMCVersion
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSpec
+  map:
+    fields:
+    - name: bmcRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: image
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: serverMaintenanceRefs
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+          elementRelationship: atomic
+    - name: updatePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: failedAttempts
+      type:
+        scalar: numeric
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionState
+    - name: upgradeTask
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Task
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionTemplate
+  map:
+    fields:
+    - name: image
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
+    - name: retryPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+    - name: serverMaintenancePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: updatePolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
+    - name: version
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootOrder
+  map:
+    fields:
+    - name: device
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: priority
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConsoleProtocol
+  map:
+    fields:
+    - name: name
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConsoleProtocolName
+    - name: port
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConsoleProtocolName
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Endpoint
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.EndpointSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.EndpointStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.EndpointSpec
+  map:
+    fields:
+    - name: ip
+      type:
+        scalar: string
+    - name: macAddress
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.EndpointStatus
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.FieldRefSelector
+  map:
+    fields:
+    - name: fieldPath
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.IP
+  scalar: untyped
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
+  map:
+    fields:
+    - name: URI
+      type:
+        scalar: string
+    - name: secretRef
+      type:
+        namedType: io.k8s.api.core.v1.SecretReference
+    - name: transferProtocol
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.InlineEndpoint
+  map:
+    fields:
+    - name: ip
+      type:
+        scalar: string
+    - name: macAddress
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.LLDPNeighbor
+  map:
+    fields:
+    - name: macAddress
+      type:
+        scalar: string
+    - name: portDescription
+      type:
+        scalar: string
+    - name: portID
+      type:
+        scalar: string
+    - name: systemDescription
+      type:
+        scalar: string
+    - name: systemName
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.NamespacedKeySelector
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.NetworkInterface
+  map:
+    fields:
+    - name: carrierStatus
+      type:
+        scalar: string
+    - name: ip
+      type:
+        scalar: string
+    - name: ips
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IP
+          elementRelationship: atomic
+    - name: macAddress
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: neighbors
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.LLDPNeighbor
+          elementRelationship: atomic
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectFieldRefSelector
+  map:
+    fields:
+    - name: fieldPath
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Phase
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Processor
+  map:
+    fields:
+    - name: architecture
+      type:
+        scalar: string
+    - name: id
+      type:
+        scalar: string
+    - name: instructionSet
+      type:
+        scalar: string
+    - name: manufacturer
+      type:
+        scalar: string
+    - name: maxSpeedMHz
+      type:
+        scalar: numeric
+    - name: model
+      type:
+        scalar: string
+    - name: totalCores
+      type:
+        scalar: numeric
+    - name: totalThreads
+      type:
+        scalar: numeric
+    - name: type
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Protocol
+  map:
+    fields:
+    - name: name
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ProtocolName
+    - name: port
+      type:
+        scalar: numeric
+    - name: scheme
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ProtocolScheme
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ProtocolName
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ProtocolScheme
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
+  map:
+    fields:
+    - name: maxAttempts
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Server
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfiguration
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationSpec
+  map:
+    fields:
+    - name: ignitionSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: image
+      type:
+        scalar: string
+    - name: serverRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationState
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationTemplate
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationSpec
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaim
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaimSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaimStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaimSpec
+  map:
+    fields:
+    - name: ignitionSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: image
+      type:
+        scalar: string
+    - name: power
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
+    - name: serverRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: serverSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Toleration
+          elementRelationship: atomic
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaimStatus
+  map:
+    fields:
+    - name: phase
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Phase
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenance
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceRefItem
+  map:
+    fields:
+    - name: serverMaintenanceRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceSpec
+  map:
+    fields:
+    - name: policy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
+    - name: priority
+      type:
+        scalar: numeric
+      default: 0
+    - name: serverBootConfigurationTemplate
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationTemplate
+    - name: serverPower
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
+    - name: serverRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceStatus
+  map:
+    fields:
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceState
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerPowerState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerSpec
+  map:
+    fields:
+    - name: biosSettingsRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: bmc
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCAccess
+    - name: bmcRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: bootConfigurationRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+    - name: bootOrder
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootOrder
+          elementRelationship: atomic
+    - name: indicatorLED
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
+    - name: maintenanceBootConfigurationRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+    - name: power
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
+    - name: serverClaimRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference
+    - name: serverMaintenanceRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+    - name: systemURI
+      type:
+        scalar: string
+    - name: systemUUID
+      type:
+        scalar: string
+    - name: taints
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Taint
+          elementRelationship: atomic
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerStatus
+  map:
+    fields:
+    - name: biosVersion
+      type:
+        scalar: string
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
+    - name: indicatorLED
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
+    - name: manufacturer
+      type:
+        scalar: string
+    - name: model
+      type:
+        scalar: string
+    - name: networkInterfaces
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.NetworkInterface
+          elementRelationship: atomic
+    - name: powerState
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerPowerState
+    - name: processors
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Processor
+          elementRelationship: atomic
+    - name: serialNumber
+      type:
+        scalar: string
+    - name: sku
+      type:
+        scalar: string
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerState
+    - name: storages
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Storage
+          elementRelationship: atomic
+    - name: totalSystemMemory
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: priority
+      type:
+        scalar: numeric
+    - name: settings
+      type:
+        map:
+          elementType:
+            scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Storage
+  map:
+    fields:
+    - name: drives
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageDrive
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageState
+    - name: volumes
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageVolume
+          elementRelationship: atomic
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageDrive
+  map:
+    fields:
+    - name: capacity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: mediaType
+      type:
+        scalar: string
+    - name: model
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageState
+    - name: type
+      type:
+        scalar: string
+    - name: vendor
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageState
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageVolume
+  map:
+    fields:
+    - name: capacity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: name
+      type:
+        scalar: string
+    - name: raidType
+      type:
+        scalar: string
+    - name: state
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.StorageState
+    - name: volumeUsage
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Taint
+  map:
+    fields:
+    - name: effect
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.TaintEffect
+      default: NoBind
+    - name: key
+      type:
+        scalar: string
+    - name: value
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.TaintEffect
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Task
+  map:
+    fields:
+    - name: URI
+      type:
+        scalar: string
+    - name: percentageComplete
+      type:
+        scalar: numeric
+    - name: state
+      type:
+        namedType: com.github.stmcginnis.gofish.schemas.TaskState
+    - name: status
+      type:
+        namedType: com.github.stmcginnis.gofish.schemas.Health
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Toleration
+  map:
+    fields:
+    - name: effect
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.TaintEffect
+    - name: key
+      type:
+        scalar: string
+    - name: operator
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.TolerationOperator
+    - name: value
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.TolerationOperator
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Variable
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+    - name: valueFrom
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.VariableSourceValueFrom
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.VariableSourceValueFrom
+  map:
+    fields:
+    - name: configMapKeyRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.NamespacedKeySelector
+    - name: fieldRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.FieldRefSelector
+    - name: objectFieldRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectFieldRefSelector
+    - name: secretKeyRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.NamespacedKeySelector
+- name: com.github.stmcginnis.gofish.schemas.Health
+  scalar: string
+- name: com.github.stmcginnis.gofish.schemas.TaskState
+  scalar: string
+- name: io.k8s.api.core.v1.LocalObjectReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    elementRelationship: atomic
+- name: io.k8s.api.core.v1.SecretReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+    elementRelationship: atomic
+- name: io.k8s.api.core.v1.SecretType
+  scalar: string
+- name: io.k8s.apimachinery.pkg.api.resource.Quantity
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_deduced_
+    elementRelationship: separable
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: message
+      type:
+        scalar: string
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ConditionStatus
+    - name: type
+      type:
+        scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ConditionStatus
+  scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
+  scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+  map:
+    fields:
+    - name: matchExpressions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
+          elementRelationship: atomic
+    - name: matchLabels
+      type:
+        map:
+          elementType:
+            scalar: string
+    elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorOperator
+  scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+    - name: operator
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorOperator
+    - name: values
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: fieldsType
+      type:
+        scalar: string
+    - name: fieldsV1
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
+    - name: manager
+      type:
+        scalar: string
+    - name: operation
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsOperationType
+    - name: subresource
+      type:
+        scalar: string
+    - name: time
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsOperationType
+  scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+  map:
+    fields:
+    - name: annotations
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: creationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: deletionGracePeriodSeconds
+      type:
+        scalar: numeric
+    - name: deletionTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: finalizers
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: generateName
+      type:
+        scalar: string
+    - name: generation
+      type:
+        scalar: numeric
+    - name: labels
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: managedFields
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+    - name: ownerReferences
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
+          elementRelationship: associative
+          keys:
+          - uid
+    - name: resourceVersion
+      type:
+        scalar: string
+    - name: selfLink
+      type:
+        scalar: string
+    - name: uid
+      type:
+        namedType: io.k8s.apimachinery.pkg.types.UID
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: blockOwnerDeletion
+      type:
+        scalar: boolean
+    - name: controller
+      type:
+        scalar: boolean
+    - name: kind
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: uid
+      type:
+        namedType: io.k8s.apimachinery.pkg.types.UID
+    elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+  scalar: untyped
+- name: io.k8s.apimachinery.pkg.types.UID
+  scalar: string
 - name: __untyped_atomic_
   scalar: untyped
   list:

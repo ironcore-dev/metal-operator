@@ -6,9 +6,12 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -43,13 +46,46 @@ type BMCSecretApplyConfiguration struct {
 
 // BMCSecret constructs a declarative configuration of the BMCSecret type for use with
 // apply.
-func BMCSecret(name, namespace string) *BMCSecretApplyConfiguration {
+func BMCSecret(name string) *BMCSecretApplyConfiguration {
 	b := &BMCSecretApplyConfiguration{}
 	b.WithName(name)
-	b.WithNamespace(namespace)
 	b.WithKind("BMCSecret")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractBMCSecretFrom extracts the applied configuration owned by fieldManager from
+// bMCSecret for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// bMCSecret must be a unmodified BMCSecret API object that was retrieved from the Kubernetes API.
+// ExtractBMCSecretFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBMCSecretFrom(bMCSecret *apiv1alpha1.BMCSecret, fieldManager string, subresource string) (*BMCSecretApplyConfiguration, error) {
+	b := &BMCSecretApplyConfiguration{}
+	err := managedfields.ExtractInto(bMCSecret, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSecret"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(bMCSecret.Name)
+
+	b.WithKind("BMCSecret")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractBMCSecret extracts the applied configuration owned by fieldManager from
+// bMCSecret. If no managedFields are found in bMCSecret for fieldManager, a
+// BMCSecretApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// bMCSecret must be a unmodified BMCSecret API object that was retrieved from the Kubernetes API.
+// ExtractBMCSecret provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBMCSecret(bMCSecret *apiv1alpha1.BMCSecret, fieldManager string) (*BMCSecretApplyConfiguration, error) {
+	return ExtractBMCSecretFrom(bMCSecret, fieldManager, "")
 }
 
 func (b BMCSecretApplyConfiguration) IsApplyConfiguration() {}

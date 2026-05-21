@@ -12,7 +12,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -254,7 +253,7 @@ func (r *BMCUserReconciler) createBMCSecretForUser(ctx context.Context, user *me
 			metalv1alpha1.BMCSecretUsernameKeyName: []byte(user.Spec.UserName),
 			metalv1alpha1.BMCSecretPasswordKeyName: []byte(password),
 		},
-		Immutable: ptr.To(true), // Make the secret immutable
+		Immutable: new(true), // Make the secret immutable
 	}
 	op, err := controllerutil.CreateOrPatch(ctx, r.Client, secret, func() error {
 		if err := controllerutil.SetControllerReference(user, secret, r.Scheme); err != nil {

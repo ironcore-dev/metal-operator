@@ -253,9 +253,8 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	log.V(1).Info("Updated Server status")
 
 	if err := r.applyBootOrder(ctx, bmcClient, server); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update server bios boot order: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to apply server BIOS boot order: %w", err)
 	}
-	log.V(1).Info("Updated Server BIOS boot order")
 
 	_, err = r.ensureServerStateTransition(ctx, bmcClient, server)
 	if err != nil {
@@ -1162,23 +1161,28 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, bmcClient bmc.BMC
 		return nil
 	}
 
+	if len(server.Spec.BootOrder) == 0 {
+		return nil
+	}
+
 	order, err := bmcClient.GetBootOrder(ctx, server.Spec.SystemURI)
 	if err != nil {
-		return fmt.Errorf("failed to create BMC client: %w", err)
+		return fmt.Errorf("failed to get boot order: %w", err)
 	}
 
 	sort.Slice(server.Spec.BootOrder, func(i, j int) bool {
 		return server.Spec.BootOrder[i].Priority < server.Spec.BootOrder[j].Priority
 	})
 	newOrder := []string{}
-	change := false
+	change := len(order) != len(server.Spec.BootOrder)
 	for i, boot := range server.Spec.BootOrder {
 		newOrder = append(newOrder, boot.Device)
-		if order[i] != boot.Device {
+		if i >= len(order) || order[i] != boot.Device {
 			change = true
 		}
 	}
 	if change {
+		log.V(1).Info("Applying boot order update", "newOrder", newOrder)
 		return bmcClient.SetBootOrder(ctx, server.Spec.SystemURI, newOrder)
 	}
 	return nil

@@ -77,7 +77,7 @@ func validateDevicePath(devicePath string) error {
 }
 
 // cleanDisks performs disk cleaning based on the specified mode concurrently.
-func cleanDisks(ctx context.Context, mode string) error {
+func cleanDisks(ctx context.Context, mode DiskCleaningMode) error {
 	log := logr.FromContextOrDiscard(ctx)
 
 	// Check if disk cleaning was already completed
@@ -87,8 +87,9 @@ func cleanDisks(ctx context.Context, mode string) error {
 	}
 
 	// Validate mode upfront before launching goroutines
-	if mode != "quick" && mode != "secure" {
-		return fmt.Errorf("unsupported cleaning mode: %s (must be 'quick' or 'secure')", mode)
+	if mode != DiskCleaningModeQuick && mode != DiskCleaningModeSecure {
+		return fmt.Errorf("unsupported cleaning mode: %s (must be '%s' or '%s')",
+			mode, DiskCleaningModeQuick, DiskCleaningModeSecure)
 	}
 
 	log.Info("Starting concurrent disk cleaning", "mode", mode)
@@ -168,9 +169,9 @@ func cleanDisks(ctx context.Context, mode string) error {
 			var cleanErr error
 
 			switch mode {
-			case "quick":
+			case DiskCleaningModeQuick:
 				cleanErr = quickCleanDisk(ctx, d.Name, path)
-			case "secure":
+			case DiskCleaningModeSecure:
 				cleanErr = secureCleanDisk(ctx, d.Name, path)
 			default:
 				cleanErr = fmt.Errorf("unsupported cleaning mode: %s", mode)

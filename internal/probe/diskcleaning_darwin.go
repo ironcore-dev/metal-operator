@@ -10,6 +10,6 @@ import (
 	"fmt"
 )
 
-func cleanDisks(_ context.Context, _ string) error {
+func cleanDisks(_ context.Context, _ DiskCleaningMode) error {
 	return fmt.Errorf("disk cleaning is only supported on Linux")
 }

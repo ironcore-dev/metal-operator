@@ -25,13 +25,12 @@ type Agent struct {
 	log                   logr.Logger
 	LLDPSyncInterval      time.Duration
 	LLDPSyncDuration      time.Duration
-	CleanDisks            bool
-	DiskCleaningMode      string
+	DiskCleaningMode      DiskCleaningMode
 	diskCleaningComplete  bool
 }
 
 // NewAgent creates a new Agent with the specified system UUID and registry URL.
-func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration, cleanDisks bool, diskCleaningMode string) *Agent {
+func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registryClientTimeout, LLDPSyncInterval, LLDPSyncDuration time.Duration, diskCleaningMode DiskCleaningMode) *Agent {
 	return &Agent{
 		log:                   log,
 		SystemUUID:            systemUUID,
@@ -40,7 +39,6 @@ func NewAgent(log logr.Logger, systemUUID, registryURL string, duration, registr
 		RegistryClientTimeout: registryClientTimeout,
 		LLDPSyncInterval:      LLDPSyncInterval,
 		LLDPSyncDuration:      LLDPSyncDuration,
-		CleanDisks:            cleanDisks,
 		DiskCleaningMode:      diskCleaningMode,
 		diskCleaningComplete:  false,
 	}
@@ -122,7 +120,7 @@ func (a *Agent) Init(ctx context.Context) error {
 // Returns nil if cleaning is disabled or already complete.
 // Returns error only if cleaning was attempted and failed.
 func (a *Agent) PerformDiskCleaning(ctx context.Context) error {
-	if !a.CleanDisks {
+	if a.DiskCleaningMode == "" {
 		return nil
 	}
 

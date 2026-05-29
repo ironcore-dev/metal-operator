@@ -64,8 +64,6 @@ spec:
         - /manager
         args:
         - --leader-elect
-        - --enable-disk-cleaning=false
-        - --disk-cleaning-mode=quick
         image: controller:latest
         name: manager
         ports:

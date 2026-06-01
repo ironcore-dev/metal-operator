@@ -12,6 +12,7 @@ import (
 	"io"
 	"maps"
 	"math/big"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -796,11 +797,53 @@ func (r *RedfishBaseBMC) CreateOrUpdateAccount(
 			return nil
 		}
 	}
-	_, err = service.CreateAccount(userName, password, role)
-	if err != nil {
-		return fmt.Errorf("failed to create account: %w", err)
+
+	// Try standard Redfish POST method first (per Redfish spec)
+	account, err := service.CreateAccount(userName, password, role)
+	if err == nil {
+		// POST succeeded - but CreateAccount always sets Enabled=true
+		// If caller requested enabled=false, we need to update it
+		if !enabled && account != nil {
+			account.Enabled = false
+			if err := account.Update(); err != nil {
+				return fmt.Errorf("failed to disable account after creation: %w", err)
+			}
+		}
+		return nil
 	}
-	return nil
+
+	// Check if error is HTTP 405 (Method Not Allowed)
+	// If so, fall back to empty-slot PATCH approach.
+	// Many BMC vendors (Dell, HPE, Lenovo, etc.) don't support POST to /AccountService/Accounts
+	// but do support PATCH to individual pre-allocated account slots.
+	var redfishErr *schemas.Error
+	if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusMethodNotAllowed {
+		// HTTP 405 received - try empty-slot PATCH approach as fallback
+		for _, a := range accounts {
+			// Check if slot is truly empty (no username set)
+			// Do NOT reuse disabled accounts - they are real accounts that are just disabled
+			if a.UserName == "" {
+				// PATCH this slot with new account data including password in one call
+				a.UserName = userName
+				a.RoleID = role
+				a.Enabled = enabled
+				a.Password = password
+
+				// Apply all changes via single PATCH
+				if err := a.Update(); err != nil {
+					return fmt.Errorf("failed to create account via PATCH on slot %s: %w", a.ID, err)
+				}
+
+				return nil
+			}
+		}
+
+		// No empty slots available for fallback method
+		return fmt.Errorf("failed to create account: POST method not supported (HTTP 405) and no available account slots found (all %d slots occupied)", len(accounts))
+	}
+
+	// For non-405 errors, return immediately (e.g., auth failure, network issue, etc.)
+	return fmt.Errorf("failed to create account: %w", err)
 }
 
 func (r *RedfishBaseBMC) DeleteAccount(ctx context.Context, userName, id string) error {

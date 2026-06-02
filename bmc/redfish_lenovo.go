@@ -22,7 +22,8 @@ type LenovoRedfishBMC struct {
 
 // --- BMC interface method overrides ---
 
-func (r *LenovoRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
+func (r *LenovoRedfishBMC) GetBMCAttributeValues(ctx context.Context, req GetBMCAttributeValuesRequest) (schemas.SettingsAttributes, error) {
+	attributes := req.Attributes
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -39,11 +40,12 @@ func (r *LenovoRedfishBMC) GetBMCPendingAttributeValues(_ context.Context, _ str
 	return schemas.SettingsAttributes{}, nil
 }
 
-func (r *LenovoRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ string, attributes schemas.SettingsAttributes) error {
+func (r *LenovoRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
 	if len(attributes) == 0 {
-		return nil
+		return nil, nil
 	}
-	return httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, schemas.ImmediateSettingsApplyTime)
+	err := httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, schemas.ImmediateSettingsApplyTime)
+	return nil, err
 }
 
 func (r *LenovoRedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ schemas.SettingsAttributes) (bool, error) {

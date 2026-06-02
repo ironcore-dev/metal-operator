@@ -513,7 +513,8 @@ func (r *RedfishBaseBMC) GetBiosAttributeValues(ctx context.Context, systemURI s
 	return result, err
 }
 
-func (r *RedfishBaseBMC) GetBMCAttributeValues(_ context.Context, _ string, attributes map[string]string) (schemas.SettingsAttributes, error) {
+func (r *RedfishBaseBMC) GetBMCAttributeValues(_ context.Context, req GetBMCAttributeValuesRequest) (schemas.SettingsAttributes, error) {
+	attributes := req.Attributes
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -606,11 +607,11 @@ func (r *RedfishBaseBMC) SetBiosAttributesOnReset(ctx context.Context, systemURI
 	return bios.UpdateBiosAttributesApplyAt(attrs, schemas.OnResetSettingsApplyTime)
 }
 
-func (r *RedfishBaseBMC) SetBMCAttributesImmediately(_ context.Context, _ string, attributes schemas.SettingsAttributes) error {
+func (r *RedfishBaseBMC) SetBMCAttributesImmediately(_ context.Context, _ string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
 	if len(attributes) == 0 {
-		return nil
+		return nil, nil
 	}
-	return fmt.Errorf("BMC attribute operations not supported for manufacturer %q", r.manufacturer)
+	return nil, fmt.Errorf("BMC attribute operations not supported for manufacturer %q", r.manufacturer)
 }
 
 // SetBootOrder sets bios boot order

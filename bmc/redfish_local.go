@@ -68,19 +68,19 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, _ string, task
 
 // SetBMCAttributesImmediately sets BMC attributes via HTTP PATCH to the BMC Settings endpoint.
 // Navigates from the manager's @Redfish.Settings.SettingsObject link, mirroring the Dell pattern.
-func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) error {
+func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
 	if len(attributes) == 0 {
-		return nil
+		return nil, nil
 	}
 	manager, err := r.GetManager(bmcUUID)
 	if err != nil {
-		return fmt.Errorf("failed to get manager: %w", err)
+		return nil, fmt.Errorf("failed to get manager: %w", err)
 	}
 	var managerData struct {
 		Settings schemas.Settings `json:"@Redfish.Settings"`
 	}
 	if err := json.Unmarshal(manager.RawData, &managerData); err != nil {
-		return fmt.Errorf("failed to parse manager data: %w", err)
+		return nil, fmt.Errorf("failed to parse manager data: %w", err)
 	}
 	data := map[string]any{
 		"Attributes":                 attributes,
@@ -88,18 +88,18 @@ func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUU
 	}
 	resp, err := manager.GetClient().Patch(managerData.Settings.SettingsObject, data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close() // nolint: errcheck
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("PATCH %s returned status %d", managerData.Settings.SettingsObject, resp.StatusCode)
+		return nil, fmt.Errorf("PATCH %s returned status %d", managerData.Settings.SettingsObject, resp.StatusCode)
 	}
-	return nil
+	return nil, nil
 }
 
 // GetBMCAttributeValues retrieves specific BMC attribute values via HTTP from the BMC manager.
 // Integer-typed attributes are converted from float64 (JSON default) to int to match controller expectations.
-func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
+func (r *RedfishLocalBMC) GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string, _ map[string]ApplyResult) (schemas.SettingsAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}

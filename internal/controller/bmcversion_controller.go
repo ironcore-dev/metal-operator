@@ -1104,12 +1104,50 @@ func (r *BMCVersionReconciler) issueBMCUpgrade(
 		forceUpdate = true
 	}
 
+	supportedProtocols, err := bmcClient.GetSupportedTransferProtocols(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get supported transfer protocols: %w", err)
+	}
+
+	log.V(1).Info("Retrieved supported transfer protocols", "protocols", supportedProtocols, "bmcVersion", bmcVersion.Spec.Version)
+
+	resolvedProtocol, resolvedURI, err := resolveTransferProtocol(bmcVersion.Spec.Image, supportedProtocols)
+	if err != nil {
+		log.Error(err, "transfer protocol validation failed", "bmcVersion", bmcVersion.Name, "bmc", bmcObj.Name)
+
+		// Clean up ServerMaintenance objects and references
+		if cleanupErr := r.removeServerMaintenances(ctx, bmcVersion); cleanupErr != nil {
+			log.Error(cleanupErr, "failed to clean up serverMaintenance when protocol validation failed")
+		}
+
+		// Update condition and set to Failed state
+		condition := &metav1.Condition{
+			Type:    ConditionVersionUpgradeIssued,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ProtocolValidationFailed",
+			Message: fmt.Sprintf("Transfer protocol validation failed: %v", err),
+		}
+		patchErr := r.patchBMCVersionStatusAndCondition(
+			ctx,
+			bmcVersion,
+			metalv1alpha1.BMCVersionStateFailed,
+			nil,
+			condition,
+		)
+		return errors.Join(err, patchErr)
+	}
+
+	if resolvedProtocol != bmcVersion.Spec.Image.TransferProtocol {
+		log.Info("Using fallback transfer protocol", "primary", bmcVersion.Spec.Image.TransferProtocol,
+			"fallback", resolvedProtocol, "supportedProtocols", supportedProtocols)
+	}
+
 	parameters := &schemas.UpdateServiceSimpleUpdateParameters{
 		ForceUpdate:      forceUpdate,
-		ImageURI:         bmcVersion.Spec.Image.URI,
+		ImageURI:         resolvedURI,
 		Password:         password,
 		Username:         username,
-		TransferProtocol: schemas.TransferProtocolType(bmcVersion.Spec.Image.TransferProtocol),
+		TransferProtocol: schemas.TransferProtocolType(resolvedProtocol),
 	}
 
 	taskMonitor, isFatal, err := func() (string, bool, error) {

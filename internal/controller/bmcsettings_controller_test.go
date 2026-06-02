@@ -787,6 +787,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring the resolved ConfigMap value was written to the BMC (not the raw placeholder)")
 		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "changed-via-configmap"))
+
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})
 

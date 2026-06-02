@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -465,11 +466,43 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 	return true, nil
 }
 
+func addTaints(server *metalv1alpha1.Server, taintsToAdd []metalv1alpha1.Taint) bool {
+	var modified bool
+	for _, taintToAdd := range taintsToAdd {
+		if slices.ContainsFunc(server.Spec.Taints, func(t metalv1alpha1.Taint) bool {
+			return t.Key == taintToAdd.Key &&
+				t.Effect == taintToAdd.Effect &&
+				t.Value == taintToAdd.Value
+		}) {
+			continue
+		}
+
+		server.Spec.Taints = append(server.Spec.Taints, taintToAdd)
+		modified = true
+	}
+	return modified
+}
+
+func (r *ServerReconciler) ensureReclaimTaints(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	base := server.DeepCopy()
+	if !addTaints(server, server.Spec.ReclaimTaints) {
+		return false, nil
+	}
+
+	if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+		return false, fmt.Errorf("failed to add server reclaim taints: %w", err)
+	}
+	return true, nil
+}
+
 func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
-	// 		 back to available state.
 	if server.Spec.ServerClaimRef == nil {
+		modified, err := r.ensureReclaimTaints(ctx, server)
+		if err != nil || modified {
+			return modified, err
+		}
+
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
 			return true, err
 		}

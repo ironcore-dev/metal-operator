@@ -37,6 +37,90 @@ var _ = Describe("Server Controller", func() {
 		EnsureCleanState()
 	})
 
+	It("should add reclaim taints to a server once it transitions from reserved to available", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration and claiming it")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+				ReclaimTaints: []metalv1alpha1.Taint{
+					{
+						Key:    "sanitization",
+						Value:  "required",
+						Effect: metalv1alpha1.TaintEffectNoBind,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Updating the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating a ServerClaim for the server")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-claim",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				ServerRef: &v1.LocalObjectReference{
+					Name: server.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring that the Server is set to reserved")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
+
+		By("deleting the claim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("waiting for the server to be in available state but with taints")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+			HaveField("Spec.Taints", []metalv1alpha1.Taint{
+				{
+					Key:    "sanitization",
+					Value:  "required",
+					Effect: metalv1alpha1.TaintEffectNoBind,
+				},
+			}),
+		))
+
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Eventually(Get(bmcSecret)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
 	It("should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
 		endpoint := &metalv1alpha1.Endpoint{

@@ -138,6 +138,11 @@ type ServerSpec struct {
 	// Taints control which ServerClaims can be bound to this server.
 	// +optional
 	Taints []Taint `json:"taints,omitempty"`
+
+	// ReclaimTaints specify which taints to add when a server transitions from
+	// reserved to available state.
+	// +optional
+	ReclaimTaints []Taint `json:"reclaimTaints,omitempty"`
 }
 
 // ServerState defines the possible states of a server.

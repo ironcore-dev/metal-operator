@@ -1221,6 +1221,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: power
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
+    - name: reclaimTaints
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Taint
+          elementRelationship: atomic
     - name: serverClaimRef
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference

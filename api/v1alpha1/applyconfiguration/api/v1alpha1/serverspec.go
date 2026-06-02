@@ -44,6 +44,9 @@ type ServerSpecApplyConfiguration struct {
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 	// Taints control which ServerClaims can be bound to this server.
 	Taints []TaintApplyConfiguration `json:"taints,omitempty"`
+	// ReclaimTaints specify which taints to add when a server transitions from
+	// reserved to available state.
+	ReclaimTaints []TaintApplyConfiguration `json:"reclaimTaints,omitempty"`
 }
 
 // ServerSpecApplyConfiguration constructs a declarative configuration of the ServerSpec type for use with
@@ -162,6 +165,19 @@ func (b *ServerSpecApplyConfiguration) WithTaints(values ...*TaintApplyConfigura
 			panic("nil value passed to WithTaints")
 		}
 		b.Taints = append(b.Taints, *values[i])
+	}
+	return b
+}
+
+// WithReclaimTaints adds the given value to the ReclaimTaints field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ReclaimTaints field.
+func (b *ServerSpecApplyConfiguration) WithReclaimTaints(values ...*TaintApplyConfiguration) *ServerSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithReclaimTaints")
+		}
+		b.ReclaimTaints = append(b.ReclaimTaints, *values[i])
 	}
 	return b
 }

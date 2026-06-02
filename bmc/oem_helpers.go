@@ -18,6 +18,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// ApplyResult holds the outcome of a single settings apply operation.
+type ApplyResult struct {
+	// URI is the resource URI. For POST: Location header (created resource); for PATCH: request URI.
+	URI string
+	// ETag from the response header or follow-up GET.
+	// May be a real ETag (e.g. "W/\"abc\"") or a body hash (prefixed "hash:sha256:...").
+	ETag string
+}
+
 // SimpleUpdateRequestBody extends SimpleUpdateParameters with an OEM apply-time field.
 type SimpleUpdateRequestBody struct {
 	schemas.UpdateServiceSimpleUpdateParameters

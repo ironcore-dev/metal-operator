@@ -116,13 +116,15 @@ type BMCSettingsManager interface {
 	GetBMCVersion(ctx context.Context, UUID string) (string, error)
 
 	// GetBMCAttributeValues retrieves BMC attribute values for the system.
-	GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error)
+	// storedETags provides previously captured ETags for ETag-based drift detection.
+	GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string, storedETags map[string]ApplyResult) (schemas.SettingsAttributes, error)
 
 	// GetBMCPendingAttributeValues retrieves pending BMC attribute values for the system.
 	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result schemas.SettingsAttributes, err error)
 
 	// SetBMCAttributesImmediately sets BMC attributes on the system and applies them immediately.
-	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) (err error)
+	// Returns a map of attribute keys to ApplyResult containing URI and ETag from the response.
+	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error)
 
 	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
 	CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (reset bool, err error)

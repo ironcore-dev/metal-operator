@@ -1656,6 +1656,23 @@ _Appears in:_
 | `PoweringOff` | ServerPoweringOffPowerState indicates a temporary state between On and Off.<br />The power off action can take time while the OS is in the shutdown process.<br /> |
 
 
+#### ServerReclaimPolicy
+
+_Underlying type:_ _string_
+
+
+
+
+
+_Appears in:_
+- [ServerSpec](#serverspec)
+
+| Field | Description |
+| --- | --- |
+| `Recycle` |  |
+| `Retain` |  |
+
+
 #### ServerSpec
 
 
@@ -1673,6 +1690,7 @@ _Appears in:_
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
 | `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |
+| `reclaimPolicy` _[ServerReclaimPolicy](#serverreclaimpolicy)_ | ReclaimPolicy specifies how the server is reclaimed after use.<br />Can be<br />* Recycle (default), immediately transitioning the server to `Available` after use.<br />* Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,<br />  transitioning to `Available` once `spec.serverClaimRef` is removed. | Recycle | Enum: [Recycle Retain] <br /> |
 | `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server. |  |  |
@@ -1701,6 +1719,7 @@ _Appears in:_
 | `Discovery` | ServerStateDiscovery indicates that the server is in its discovery state.<br /> |
 | `Available` | ServerStateAvailable indicates that the server is available for use.<br /> |
 | `Reserved` | ServerStateReserved indicates that the server is reserved for a specific use or user.<br /> |
+| `Released` | ServerStateReleased indicates that the server is released after use.<br /> |
 | `Error` | ServerStateError indicates that there is an error with the server.<br /> |
 | `Maintenance` | ServerStateMaintenance indicates that the server is in maintenance.<br /> |
 

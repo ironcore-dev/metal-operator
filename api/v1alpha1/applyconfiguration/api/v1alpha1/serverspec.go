@@ -23,6 +23,12 @@ type ServerSpecApplyConfiguration struct {
 	Power *apiv1alpha1.Power `json:"power,omitempty"`
 	// IndicatorLED specifies the desired state of the server's indicator LED.
 	IndicatorLED *apiv1alpha1.IndicatorLED `json:"indicatorLED,omitempty"`
+	// ReclaimPolicy specifies how the server is reclaimed after use.
+	// Can be
+	// * Recycle (default), immediately transitioning the server to `Available` after use.
+	// * Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,
+	// transitioning to `Available` once `spec.serverClaimRef` is removed.
+	ReclaimPolicy *apiv1alpha1.ServerReclaimPolicy `json:"reclaimPolicy,omitempty"`
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	ServerClaimRef *ImmutableObjectReferenceApplyConfiguration `json:"serverClaimRef,omitempty"`
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
@@ -81,6 +87,14 @@ func (b *ServerSpecApplyConfiguration) WithPower(value apiv1alpha1.Power) *Serve
 // If called multiple times, the IndicatorLED field is set to the value of the last call.
 func (b *ServerSpecApplyConfiguration) WithIndicatorLED(value apiv1alpha1.IndicatorLED) *ServerSpecApplyConfiguration {
 	b.IndicatorLED = &value
+	return b
+}
+
+// WithReclaimPolicy sets the ReclaimPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ReclaimPolicy field is set to the value of the last call.
+func (b *ServerSpecApplyConfiguration) WithReclaimPolicy(value apiv1alpha1.ServerReclaimPolicy) *ServerSpecApplyConfiguration {
+	b.ReclaimPolicy = &value
 	return b
 }
 

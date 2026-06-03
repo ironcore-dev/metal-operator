@@ -214,6 +214,18 @@ spec:
               power:
                 description: Power specifies the desired power state of the server.
                 type: string
+              reclaimPolicy:
+                default: Recycle
+                description: |-
+                  ReclaimPolicy specifies how the server is reclaimed after use.
+                  Can be
+                  * Recycle (default), immediately transitioning the server to `Available` after use.
+                  * Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,
+                    transitioning to `Available` once `spec.serverClaimRef` is removed.
+                enum:
+                - Recycle
+                - Retain
+                type: string
               serverClaimRef:
                 description: ServerClaimRef is a reference to a ServerClaim object
                   that claims this server.

@@ -1191,6 +1191,8 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceState
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerPowerState
   scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReclaimPolicy
+  scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerSpec
   map:
     fields:
@@ -1221,6 +1223,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: power
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
+    - name: reclaimPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReclaimPolicy
+      default: Recycle
     - name: serverClaimRef
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference

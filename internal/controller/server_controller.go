@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -250,7 +251,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	if err := r.updateServerStatus(ctx, bmcClient, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
-	log.V(1).Info("Updated Server status")
 
 	if err := r.applyBootOrder(ctx, bmcClient, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply server BIOS boot order: %w", err)
@@ -308,6 +308,8 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, bmcC
 		return r.handleAvailableState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateReserved:
 		return r.handleReservedState(ctx, bmcClient, server)
+	case metalv1alpha1.ServerStateReleased:
+		return r.handleReleasedState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateMaintenance:
 		return r.handleMaintenanceState(ctx, bmcClient, server)
 	default:
@@ -467,33 +469,44 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 
 func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	// TODO: This needs be reworked later as the Server cleanup has to happen here. For now we just transition the server
-	// 		 back to available state.
-	if server.Spec.ServerClaimRef == nil {
+	serverClaimRef := server.Spec.ServerClaimRef
+	if serverClaimRef == nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
 			return true, err
 		}
 	}
 
-	// TODO: fix properly, we need to free up the server if the claim does not exist anymore
+	log = log.WithValues("ServerClaimRef", serverClaimRef)
+
 	claim := &metalv1alpha1.ServerClaim{}
-	err := r.Get(ctx, client.ObjectKey{
+	claimKey := client.ObjectKey{
 		Name:      server.Spec.ServerClaimRef.Name,
-		Namespace: server.Spec.ServerClaimRef.Namespace}, claim)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			log.V(1).Info(
-				"ServerClaim not found, removing ServerClaimRef",
-				"Server", server.Name,
-				"ServerClaim", server.Spec.ServerClaimRef.Name)
+		Namespace: server.Spec.ServerClaimRef.Namespace,
+	}
+	if err := r.Get(ctx, claimKey, claim); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("getting server claim %s: %w", claimKey, err)
+		}
+
+		if modified, err := r.ensureServerPoweredOffWithoutBootConfig(ctx, bmcClient, server); err != nil || modified {
+			return modified, err
+		}
+
+		switch server.Spec.ReclaimPolicy {
+		case metalv1alpha1.ServerReclaimPolicyRetain:
+			log.V(1).Info("Transitioning server to released state")
+			return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReleased)
+		case metalv1alpha1.ServerReclaimPolicyRecycle:
+			log.V(1).Info("Server claim not found, releasing server")
 			serverBase := server.DeepCopy()
 			server.Spec.ServerClaimRef = nil
 			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 				return false, fmt.Errorf("failed to remove ServerClaimRef: %w", err)
 			}
 			return false, nil
+		default:
+			return false, reconcile.TerminalError(fmt.Errorf("unknown reclaim policy %q", server.Spec.ReclaimPolicy))
 		}
-		return false, fmt.Errorf("failed to get ServerClaim: %w", err)
 	}
 
 	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
@@ -518,6 +531,41 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 	}
 	log.V(1).Info("Reconciled reserved state")
 	return true, nil
+}
+
+func (r *ServerReconciler) ensureServerPoweredOffWithoutBootConfig(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (modified bool, err error) {
+	if server.Spec.Power == metalv1alpha1.PowerOff && server.Spec.BootConfigurationRef == nil {
+		return false, nil
+	}
+
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Server claim is gone, powering off server and removing boot configuration")
+	base := server.DeepCopy()
+	server.Spec.Power = metalv1alpha1.PowerOff
+	server.Spec.BootConfigurationRef = nil
+	if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+		return false, fmt.Errorf("failed to update server power state: %w", err)
+	}
+	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
+		return true, fmt.Errorf("failed to power off server after claim deletion: %w", err)
+	}
+	return true, nil
+}
+
+func (r *ServerReconciler) handleReleasedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	if modified, err := r.ensureServerPoweredOffWithoutBootConfig(ctx, bmcClient, server); err != nil || modified {
+		return modified, err
+	}
+
+	if serverClaimRef := server.Spec.ServerClaimRef; serverClaimRef != nil {
+		log.V(1).Info("ServerClaimRef still present, nothing to do", "ServerClaimRef", serverClaimRef)
+		return false, nil
+	}
+
+	log.V(1).Info("ServerClaimRef is gone, transitioning server to available state")
+	return r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
 }
 
 func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
@@ -561,9 +609,17 @@ func (r *ServerReconciler) updateServerStatus(ctx context.Context, bmcClient bmc
 	if err != nil {
 		return fmt.Errorf("failed to get system info for Server: %w", err)
 	}
+
+	updatedPowerState := metalv1alpha1.ServerPowerState(systemInfo.PowerState)
+	updatedIndicatorLED := metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
+
+	if updatedPowerState == server.Status.PowerState && updatedIndicatorLED == server.Status.IndicatorLED {
+		return nil
+	}
+
 	serverBase := server.DeepCopy()
-	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
-	server.Status.IndicatorLED = metalv1alpha1.IndicatorLED(systemInfo.IndicatorLED)
+	server.Status.PowerState = updatedPowerState
+	server.Status.IndicatorLED = updatedIndicatorLED
 	if err = r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return fmt.Errorf("failed to patch Server status: %w", err)
 	}

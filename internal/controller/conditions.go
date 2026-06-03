@@ -31,8 +31,6 @@ const (
 	ConditionReady = "Ready"
 	// ConditionRetryOfFailedResourceIssued indicates a retry of a failed resource has been issued.
 	ConditionRetryOfFailedResourceIssued = "RetryOfFailedResourceIssued"
-	// ConditionDiskCleaningCompleted indicates that disk cleaning was completed
-	ConditionDiskCleaningCompleted = "DiskCleaningCompleted"
 )
 
 // Shared reason strings used across multiple controllers.

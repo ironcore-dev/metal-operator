@@ -36,7 +36,10 @@ func main() {
 	flag.DurationVar(&LLDPSyncDuration, "lldp-sync-duration", 30*time.Second,
 		"Timeout for the lldpctl run.")
 	flag.StringVar(&diskCleaningMode, "disk-cleaning", "",
-		"Disk cleaning mode: 'quick' or 'secure'. Empty or absent disables disk cleaning.")
+		"Disk cleaning mode: 'quick' (wipefs, 10min timeout) or "+
+			"'secure' (full cryptographic wipe, 24h timeout). Empty disables cleaning. "+
+			"For SSDs in secure mode, uses blkdiscard if supported; "+
+			"falls back to dd otherwise. Multipath devices supported.")
 
 	opts := zap.Options{
 		Development: true,
@@ -72,8 +75,16 @@ func main() {
 
 	setupLog.Info("starting registry agent")
 
-	agent := probe.NewAgent(setupLog, serverUUID, registryURL, duration, registryClientTimeout,
-		LLDPSyncInterval, LLDPSyncDuration, cleaningMode)
+	agent := probe.NewAgent(probe.AgentConfig{
+		Logger:                setupLog,
+		SystemUUID:            serverUUID,
+		RegistryURL:           registryURL,
+		Duration:              duration,
+		RegistryClientTimeout: registryClientTimeout,
+		LLDPSyncInterval:      LLDPSyncInterval,
+		LLDPSyncDuration:      LLDPSyncDuration,
+		DiskCleaningMode:      cleaningMode,
+	})
 	if err := agent.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running probe agent")
 		os.Exit(1)

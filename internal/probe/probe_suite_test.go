@@ -46,7 +46,16 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 
 	// Initialize your probe server
-	probeAgent = probe.NewAgent(GinkgoLogr, systemUUID, registryURL, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond, "")
+	probeAgent = probe.NewAgent(probe.AgentConfig{
+		Logger:                GinkgoLogr,
+		SystemUUID:            systemUUID,
+		RegistryURL:           registryURL,
+		Duration:              100 * time.Millisecond,
+		RegistryClientTimeout: 1 * time.Second,
+		LLDPSyncInterval:      50 * time.Millisecond,
+		LLDPSyncDuration:      250 * time.Millisecond,
+		DiskCleaningMode:      "", // No disk cleaning in tests
+	})
 	go func() {
 		defer GinkgoRecover()
 		Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")

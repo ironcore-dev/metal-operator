@@ -8,29 +8,19 @@ package probe
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/jaypipes/ghw"
+	"golang.org/x/sync/errgroup"
 )
 
 const diskCleaningMarkerFile = "/var/run/metal-operator/disk-cleaning-complete"
-
-// DiskCleaningResult represents the result of cleaning a single disk.
-type DiskCleaningResult struct {
-	DeviceName string
-	Success    bool
-	Error      error
-	Duration   time.Duration
-}
 
 // devicePathRegex validates that device paths match expected format.
 // Updated to support multipath/RAID devices (e.g., /dev/mapper/mpatha, /dev/cciss/c0d0)
@@ -86,12 +76,6 @@ func cleanDisks(ctx context.Context, mode DiskCleaningMode) error {
 		return nil
 	}
 
-	// Validate mode upfront before launching goroutines
-	if mode != DiskCleaningModeQuick && mode != DiskCleaningModeSecure {
-		return fmt.Errorf("unsupported cleaning mode: %s (must be '%s' or '%s')",
-			mode, DiskCleaningModeQuick, DiskCleaningModeSecure)
-	}
-
 	log.Info("Starting concurrent disk cleaning", "mode", mode)
 
 	// Get all block devices
@@ -105,128 +89,89 @@ func cleanDisks(ctx context.Context, mode DiskCleaningMode) error {
 		return nil
 	}
 
-	var mu sync.Mutex
-	results := make([]DiskCleaningResult, 0, len(blockStorage.Disks))
-	var wg sync.WaitGroup
-	skippedCount := 0
-
-	// Limit concurrent disk wipes to avoid overwhelming the system
-	const maxConcurrentWipes = 4
-	semaphore := make(chan struct{}, maxConcurrentWipes)
-
+	// Filter eligible disks
+	var eligibleDisks []*ghw.Disk
 	for _, disk := range blockStorage.Disks {
 		ro, err := isReadOnly(disk.Name)
 		if err != nil {
 			log.Error(err, "Failed to check read-only status, skipping disk", "disk", disk.Name)
-			skippedCount++
 			continue
 		}
 		if ro {
 			log.Info("Skipping read-only disk", "disk", disk.Name)
-			skippedCount++
 			continue
 		}
 
 		if disk.IsRemovable {
 			log.Info("Skipping removable disk", "disk", disk.Name)
-			skippedCount++
 			continue
 		}
 
 		devicePath := "/dev/" + disk.Name
 		if _, err := os.Stat(devicePath); err != nil {
 			log.Error(err, "Device path does not exist, skipping", "disk", disk.Name, "path", devicePath)
-			skippedCount++
 			continue
 		}
 
-		wg.Add(1)
-		// Launch each disk wipe in its own goroutine
-		go func(d *ghw.Disk, path string) {
-			defer wg.Done()
+		eligibleDisks = append(eligibleDisks, disk)
+	}
 
-			// Acquire semaphore to limit concurrency
-			select {
-			case semaphore <- struct{}{}:
-				defer func() { <-semaphore }()
-			case <-ctx.Done():
-				log.Info("Disk cleaning cancelled before starting", "disk", d.Name)
-				mu.Lock()
-				results = append(results, DiskCleaningResult{
-					DeviceName: d.Name,
-					Success:    false,
-					Error:      ctx.Err(),
-					Duration:   0,
-				})
-				mu.Unlock()
-				return
-			}
+	if len(eligibleDisks) == 0 {
+		log.Info("No eligible disks to clean (all read-only, removable, or missing)")
+		return nil
+	}
 
-			log.Info("Cleaning disk", "disk", d.Name, "model", d.Model, "vendor", d.Vendor,
-				"size", d.SizeBytes, "removable", d.IsRemovable)
+	log.Info("Found eligible disks to clean", "count", len(eligibleDisks), "total", len(blockStorage.Disks))
 
-			start := time.Now()
-			var cleanErr error
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(4) // Limit to 4 concurrent disk wipes
 
-			switch mode {
-			case DiskCleaningModeQuick:
-				cleanErr = quickCleanDisk(ctx, d.Name, path)
-			case DiskCleaningModeSecure:
-				cleanErr = secureCleanDisk(ctx, d.Name, path)
-			default:
-				cleanErr = fmt.Errorf("unsupported cleaning mode: %s", mode)
-			}
-
-			duration := time.Since(start)
-			result := DiskCleaningResult{
-				DeviceName: d.Name,
-				Success:    cleanErr == nil,
-				Error:      cleanErr,
-				Duration:   duration,
-			}
-
-			if cleanErr != nil {
-				log.Error(cleanErr, "Failed to clean disk", "disk", d.Name, "duration", duration)
-			} else {
-				log.Info("Successfully cleaned disk", "disk", d.Name, "duration", duration)
-			}
-
-			mu.Lock()
-			results = append(results, result)
-			mu.Unlock()
-
-		}(disk, devicePath)
+	for _, disk := range eligibleDisks {
+		g.Go(func() error {
+			return cleanOne(ctx, disk, mode)
+		})
 	}
 
 	// Wait for all disk wipes to complete
-	wg.Wait()
-
-	successCount := 0
-	for _, r := range results {
-		if r.Success {
-			successCount++
-		}
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("disk cleaning failed: %w", err)
 	}
 
-	log.Info("Disk cleaning completed",
-		"total", len(blockStorage.Disks),
-		"processed", len(results),
-		"success", successCount,
-		"failed", len(results)-successCount,
-		"skipped", skippedCount)
-
-	if successCount < len(results) {
-		return fmt.Errorf("failed to clean %d out of %d disks", len(results)-successCount, len(results))
+	// Mark as completed only if all disks were successfully cleaned
+	if err := markDiskCleaningCompleted(); err != nil {
+		log.Error(err, "Failed to mark disk cleaning as completed (will re-run on restart)")
 	}
 
-	if successCount > 0 {
-		if err := markDiskCleaningCompleted(); err != nil {
-			log.Error(err, "Failed to mark disk cleaning as completed (will re-run on restart)")
-		}
-	} else {
-		log.Info("No disks were cleaned (all skipped or none found), not marking as completed")
+	log.Info("All disks cleaned successfully", "count", len(eligibleDisks))
+	return nil
+}
+
+// cleanOne cleans a single disk based on the specified mode.
+func cleanOne(ctx context.Context, disk *ghw.Disk, mode DiskCleaningMode) error {
+	log := logr.FromContextOrDiscard(ctx)
+	devicePath := "/dev/" + disk.Name
+
+	log.Info("Cleaning disk", "disk", disk.Name, "model", disk.Model, "vendor", disk.Vendor,
+		"size", disk.SizeBytes, "mode", mode)
+
+	start := time.Now()
+	var err error
+
+	switch mode {
+	case DiskCleaningModeQuick:
+		err = quickCleanDisk(ctx, disk.Name, devicePath)
+	case DiskCleaningModeSecure:
+		err = secureCleanDisk(ctx, disk.Name, devicePath)
 	}
 
+	duration := time.Since(start)
+
+	if err != nil {
+		log.Error(err, "Failed to clean disk", "disk", disk.Name, "duration", duration)
+		return fmt.Errorf("failed to clean disk %s: %w", disk.Name, err)
+	}
+
+	log.Info("Successfully cleaned disk", "disk", disk.Name, "duration", duration)
 	return nil
 }
 
@@ -241,22 +186,10 @@ func quickCleanDisk(ctx context.Context, diskName, devicePath string) error {
 		return err
 	}
 
-	log.V(1).Info("Wiping disk header", "disk", diskName)
-	if err := wipeDiskRangeNative(ctx, devicePath, 0, 10*1024*1024); err != nil {
-		return fmt.Errorf("failed to wipe disk header: %w", err)
-	}
-
-	sizeBytes, err := getDiskSize(ctx, devicePath)
-	if err != nil {
-		return fmt.Errorf("failed to get disk size: %w", err)
-	}
-
-	if sizeBytes > 10*1024*1024 {
-		log.V(1).Info("Wiping disk footer", "disk", diskName)
-		offset := sizeBytes - (10 * 1024 * 1024)
-		if err := wipeDiskRangeNative(ctx, devicePath, offset, 10*1024*1024); err != nil {
-			return fmt.Errorf("failed to wipe disk footer: %w", err)
-		}
+	log.V(1).Info("Using wipefs to remove filesystem signatures", "disk", diskName)
+	cmd := exec.CommandContext(ctx, "wipefs", "-a", devicePath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("wipefs failed: %w, output: %s", err, string(output))
 	}
 
 	if err := rereadPartitionTable(ctx, devicePath); err != nil {
@@ -276,37 +209,29 @@ func secureCleanDisk(ctx context.Context, diskName, devicePath string) error {
 		return err
 	}
 
+	// Try blkdiscard for SSDs first
 	if !isRotational(diskName) {
-		log.V(1).Info("Detected non-rotational flash storage. Using blkdiscard.", "disk", diskName)
-		if err := executeBlkDiscard(ctx, devicePath, true); err == nil {
+		log.V(1).Info("Detected non-rotational flash storage, using blkdiscard", "disk", diskName)
+		if err := executeBlkDiscard(ctx, devicePath, true); err != nil {
+			log.Error(err, "blkdiscard failed, falling back to dd", "disk", diskName)
+		} else {
 			return rereadPartitionTable(ctx, devicePath)
-		} else {
-			log.Error(err, "blkdiscard failed, falling back to shred/dd", "disk", diskName)
 		}
 	}
 
-	if _, err := exec.LookPath("shred"); err == nil {
-		log.V(1).Info("Using shred for secure wipe", "disk", diskName)
-		cmd := exec.CommandContext(ctx, "shred", "-n", "1", "-z", "--force", devicePath)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Error(err, "shred failed, falling back to dd", "disk", diskName, "output", string(output))
-		} else {
-			if err := rereadPartitionTable(ctx, devicePath); err != nil {
-				log.V(1).Info("Warning: failed to re-read partition table", "error", err)
-			}
-			return nil
-		}
-	}
-
+	// Use dd for HDDs or when blkdiscard fails
 	log.V(1).Info("Using dd for secure wipe", "disk", diskName)
 	cmd := exec.CommandContext(ctx, "dd",
 		"if=/dev/urandom",
 		"of="+devicePath,
-		"bs=1M")
+		"bs=1M",
+		"status=progress",
+		"oflag=direct")
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		outputStr := string(output)
+		// "No space left on device" is expected when dd fills the disk
 		if !strings.Contains(outputStr, "No space left on device") {
 			return fmt.Errorf("dd failed: %w, output: %s", err, outputStr)
 		}
@@ -320,55 +245,33 @@ func secureCleanDisk(ctx context.Context, diskName, devicePath string) error {
 	return nil
 }
 
-// wipeDiskRangeNative uses standard Go I/O to avoid integer truncation bugs with `dd seek`.
-func wipeDiskRangeNative(ctx context.Context, devicePath string, offset, size int64) error {
-	log := logr.FromContextOrDiscard(ctx)
-
-	f, err := os.OpenFile(devicePath, os.O_WRONLY|os.O_SYNC, 0)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil {
-			log.V(1).Info("Failed to close device file after write", "path", devicePath, "error", closeErr)
-		}
-	}()
-
-	if _, err := f.Seek(offset, io.SeekStart); err != nil {
-		return fmt.Errorf("failed to seek to offset %d: %w", offset, err)
-	}
-
-	chunkSize := int64(1024 * 1024) // 1MB
-	zeros := make([]byte, chunkSize)
-	remaining := size
-
-	for remaining > 0 {
-		// Respect context cancellation during long writes
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		writeSize := min(chunkSize, remaining)
-		if _, err := f.Write(zeros[:writeSize]); err != nil {
-			return fmt.Errorf("failed to write zeros: %w", err)
-		}
-		remaining -= writeSize
-	}
-
-	return nil
-}
-
 // isRotational checks sysfs to determine if the drive is a spinning HDD (true) or SSD/NVMe (false).
+// For multipath/dm devices, checks underlying slaves. Defaults to true (HDD) if unknown for safety.
 func isRotational(diskName string) bool {
 	// Need just the base name for sysfs, handles paths like /dev/mapper/mpatha properly
 	baseName := filepath.Base(diskName)
-	path := fmt.Sprintf("/sys/block/%s/queue/rotational", baseName)
 
+	// Check if this is a device-mapper/multipath device
+	dmPath := fmt.Sprintf("/sys/block/%s/dm/name", baseName)
+	if _, err := os.Stat(dmPath); err == nil {
+		// This is a dm device - check its slaves
+		slavesDir := fmt.Sprintf("/sys/block/%s/slaves", baseName)
+		entries, err := os.ReadDir(slavesDir)
+		if err == nil && len(entries) > 0 {
+			// Check first slave device's rotational status
+			slaveName := entries[0].Name()
+			slavePath := fmt.Sprintf("/sys/block/%s/queue/rotational", slaveName)
+			if data, err := os.ReadFile(slavePath); err == nil {
+				return strings.TrimSpace(string(data)) == "1"
+			}
+		}
+	}
+
+	// Not dm device, or couldn't determine from slaves - check direct path
+	path := fmt.Sprintf("/sys/block/%s/queue/rotational", baseName)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		// If we can't tell, assume true (rotational) to be safe and use shred
+		// Can't determine - assume rotational (HDD) for safety
 		return true
 	}
 
@@ -396,26 +299,14 @@ func isReadOnly(diskName string) (bool, error) {
 	roPath := fmt.Sprintf("/sys/class/block/%s/ro", baseName)
 	data, err := os.ReadFile(roPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Sysfs file missing (e.g., multipath devices) - assume writable
+			return false, nil
+		}
 		return false, fmt.Errorf("failed to read ro sysfs attribute: %w", err)
 	}
 
 	return strings.TrimSpace(string(data)) == "1", nil
-}
-
-func getDiskSize(ctx context.Context, devicePath string) (int64, error) {
-	cmd := exec.CommandContext(ctx, "blockdev", "--getsize64", devicePath)
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get disk size: %w", err)
-	}
-
-	sizeStr := strings.TrimSpace(string(output))
-	size, err := strconv.ParseInt(sizeStr, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse disk size: %w", err)
-	}
-
-	return size, nil
 }
 
 func rereadPartitionTable(ctx context.Context, devicePath string) error {

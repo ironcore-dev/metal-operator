@@ -27,6 +27,7 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
 - [ServerMaintenance](#servermaintenance)
+- [ServerReadinessRule](#serverreadinessrule)
 
 
 
@@ -924,6 +925,24 @@ _Appears in:_
 | `device` _string_ | Device is the device to boot from. |  |  |
 
 
+#### ConditionRequirement
+
+
+
+ConditionRequirement defines a specific Server condition and the status value
+required to trigger the controller's action.
+
+
+
+_Appears in:_
+- [ServerReadinessRuleSpec](#serverreadinessrulespec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `type` _string_ | Type of server condition<br />Following kubebuilder validation is referred from https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Condition |  | MaxLength: 316 <br />MinLength: 1 <br /> |
+| `requiredStatus` _[ConditionStatus](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#conditionstatus-v1-meta)_ | RequiredStatus is status of the condition, one of True, False, Unknown. |  | Enum: [True False Unknown] <br /> |
+
+
 #### ConsoleProtocol
 
 
@@ -1006,6 +1025,24 @@ EndpointStatus defines the observed state of Endpoint
 _Appears in:_
 - [Endpoint](#endpoint)
 
+
+
+#### EnforcementMode
+
+_Underlying type:_ _string_
+
+EnforcementMode specifies how the controller maintains the desired state.
+
+_Validation:_
+- Enum: [BootstrapOnly Continuous]
+
+_Appears in:_
+- [ServerReadinessRuleSpec](#serverreadinessrulespec)
+
+| Field | Description |
+| --- | --- |
+| `BootstrapOnly` | EnforcementModeBootstrapOnly applies configuration only during the first reconcile.<br /> |
+| `Continuous` | EnforcementModeContinuous continuously monitors and enforces the configuration.<br /> |
 
 
 #### FieldRefSelector
@@ -1656,6 +1693,60 @@ _Appears in:_
 | `PoweringOff` | ServerPoweringOffPowerState indicates a temporary state between On and Off.<br />The power off action can take time while the OS is in the shutdown process.<br /> |
 
 
+#### ServerReadinessRule
+
+
+
+ServerReadinessRule is the Schema for the serverreadinessrules API
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
+| `kind` _string_ | `ServerReadinessRule` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[ServerReadinessRuleSpec](#serverreadinessrulespec)_ | spec defines the desired state of ServerReadinessRule |  |  |
+| `status` _[ServerReadinessRuleStatus](#serverreadinessrulestatus)_ | status defines the observed state of ServerReadinessRule |  |  |
+
+
+#### ServerReadinessRuleSpec
+
+
+
+ServerReadinessRuleSpec defines the desired state of ServerReadinessRule
+
+
+
+_Appears in:_
+- [ServerReadinessRule](#serverreadinessrule)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `conditions` _[ConditionRequirement](#conditionrequirement) array_ | Conditions contains a list of the Server conditions that defines the specific<br />criteria that must be met for taints to be managed on the target Server.<br />The presence or status of these conditions directly triggers the application or removal of Server taints. |  | MaxItems: 32 <br />MinItems: 1 <br /> |
+| `enforcementMode` _[EnforcementMode](#enforcementmode)_ | EnforcementMode specifies how the controller maintains the desired state.<br />enforcementMode is one of BootstrapOnly, Continuous.<br />"BootstrapOnly" applies the configuration once during initial setup.<br />"Continuous" ensures the state is monitored and corrected throughout the resource lifecycle. |  | Enum: [BootstrapOnly Continuous] <br /> |
+| `taint` _[Taint](#taint)_ | Taint defines the specific Taint (Key, Value, and Effect) to be managed<br />on Servers that meet the defined condition criteria. |  |  |
+| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector limits the scope of this rule to a specific subset of Servers. |  |  |
+
+
+#### ServerReadinessRuleStatus
+
+
+
+ServerReadinessRuleStatus defines the observed state of ServerReadinessRule.
+
+
+
+_Appears in:_
+- [ServerReadinessRule](#serverreadinessrule)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | conditions represent the current state of the ServerReadinessRule resource.<br />Each condition has a unique type and reflects the status of a specific aspect of the resource.<br />Standard condition types include:<br />- "Available": the resource is fully functional<br />- "Progressing": the resource is being created or updated<br />- "Degraded": the resource failed to reach or maintain its desired state<br />The status of each condition is one of True, False, or Unknown. |  |  |
+
+
 #### ServerReclaimPolicy
 
 _Underlying type:_ _string_
@@ -1690,7 +1781,7 @@ _Appears in:_
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
 | `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |
-| `reclaimPolicy` _[ServerReclaimPolicy](#serverreclaimpolicy)_ | ReclaimPolicy specifies how the server is reclaimed after use.<br />Can be<br />* Recycle (default), immediately transitioning the server to `Available` after use.<br />* Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,<br />  transitioning to `Available` once `spec.serverClaimRef` is removed. | Recycle | Enum: [Recycle Retain] <br /> |
+| `reclaimPolicy` _[ServerReclaimPolicy](#serverreclaimpolicy)_ | ReclaimPolicy specifies how the server is reclaimed after use.<br />Can be<br />- Recycle (default), immediately transitioning the server to `Available` after use.<br />- Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,<br />  transitioning to `Available` once `spec.serverClaimRef` is removed. | Recycle | Enum: [Recycle Retain] <br /> |
 | `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server. |  |  |
@@ -1862,6 +1953,7 @@ ServerClaims can be bound to it.
 
 
 _Appears in:_
+- [ServerReadinessRuleSpec](#serverreadinessrulespec)
 - [ServerSpec](#serverspec)
 
 | Field | Description | Default | Validation |
@@ -1888,6 +1980,8 @@ _Appears in:_
 | --- | --- |
 | `NoBind` | TaintEffectNoBind prevents new ServerClaims from binding to the server<br />unless they have a matching toleration.<br /> |
 | `Evict` | TaintEffectEvict is reserved for future use. It does not currently trigger<br />eviction of existing ServerClaims bound to the server.<br /> |
+
+
 
 
 #### Task

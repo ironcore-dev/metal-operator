@@ -793,6 +793,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: priority
       type:
         scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConditionRequirement
+  map:
+    fields:
+    - name: requiredStatus
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ConditionStatus
+    - name: type
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConsoleProtocol
   map:
     fields:
@@ -843,6 +852,8 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.EnforcementMode
+  scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.FieldRefSelector
   map:
     fields:
@@ -1191,6 +1202,55 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceState
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerPowerState
   scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReadinessRule
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReadinessRuleSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReadinessRuleStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReadinessRuleSpec
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConditionRequirement
+          elementRelationship: associative
+          keys:
+          - type
+    - name: enforcementMode
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.EnforcementMode
+    - name: serverSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: taint
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Taint
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReadinessRuleStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReclaimPolicy
   scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerSpec

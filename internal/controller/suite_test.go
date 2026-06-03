@@ -13,13 +13,9 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
+
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 
-	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
-	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
-	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +31,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
+	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -332,6 +334,14 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerReadinessRuleReconciler{
+			Client: k8sManager.GetClient(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerReadinessRuleServerReconciler{
+			Client: k8sManager.GetClient(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		By("Starting the registry server")

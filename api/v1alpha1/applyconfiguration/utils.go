@@ -95,6 +95,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BMCVersionTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BootOrder"):
 		return &apiv1alpha1.BootOrderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ConditionRequirement"):
+		return &apiv1alpha1.ConditionRequirementApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ConsoleProtocol"):
 		return &apiv1alpha1.ConsoleProtocolApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Endpoint"):
@@ -149,6 +151,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ServerMaintenanceSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenanceStatus"):
 		return &apiv1alpha1.ServerMaintenanceStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ServerReadinessRule"):
+		return &apiv1alpha1.ServerReadinessRuleApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ServerReadinessRuleSpec"):
+		return &apiv1alpha1.ServerReadinessRuleSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ServerReadinessRuleStatus"):
+		return &apiv1alpha1.ServerReadinessRuleStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerSpec"):
 		return &apiv1alpha1.ServerSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerStatus"):

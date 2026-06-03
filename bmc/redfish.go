@@ -791,18 +791,13 @@ func (r *RedfishBaseBMC) CreateOrUpdateAccount(
 			// Update password using the official Redfish ChangePassword action
 			if password != "" {
 				if _, err := a.ChangePassword(password, r.options.Password); err != nil {
-					// Fall back to direct PATCH
-					goto patchPasswordFallback
+					// Fallback: Use PATCH to update password
+					// This is needed for BMCs with buggy Redfish implementations
+					a.Password = password
+					if err := a.Update(); err != nil {
+						return fmt.Errorf("failed to update account password via PATCH: %w", err)
+					}
 				}
-			}
-			return nil
-
-		patchPasswordFallback:
-			// Fallback: Use PATCH to update password
-			// This is needed for BMCs with buggy Redfish implementations
-			a.Password = password
-			if err := a.Update(); err != nil {
-				return fmt.Errorf("failed to update account: %w", err)
 			}
 			return nil
 		}

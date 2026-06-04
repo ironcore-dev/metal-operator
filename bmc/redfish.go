@@ -770,7 +770,7 @@ func (r *RedfishBaseBMC) GetStorages(ctx context.Context, systemURI string) ([]S
 }
 
 func (r *RedfishBaseBMC) CreateOrUpdateAccount(
-	ctx context.Context, userName,
+	_ context.Context, userName,
 	role, password string, enabled bool,
 ) error {
 	service, err := r.client.GetService().AccountService()
@@ -784,14 +784,19 @@ func (r *RedfishBaseBMC) CreateOrUpdateAccount(
 	for _, a := range accounts {
 		if a.UserName == userName {
 			a.RoleID = role
-			a.UserName = userName
 			a.Enabled = enabled
 			if err := a.Update(); err != nil {
 				return fmt.Errorf("failed to update account: %w", err)
 			}
+			// Update password using the official Redfish ChangePassword action
 			if password != "" {
 				if _, err := a.ChangePassword(password, r.options.Password); err != nil {
-					return fmt.Errorf("failed to change account password: %w", err)
+					// Fallback: Use PATCH to update password
+					// This is needed for BMCs with buggy Redfish implementations
+					a.Password = password
+					if err := a.Update(); err != nil {
+						return fmt.Errorf("failed to update account password via PATCH: %w", err)
+					}
 				}
 			}
 			return nil
@@ -821,23 +826,19 @@ func (r *RedfishBaseBMC) CreateOrUpdateAccount(
 		// HTTP 405 received - try empty-slot PATCH approach as fallback
 		for _, a := range accounts {
 			// Check if slot is truly empty (no username set)
-			// Do NOT reuse disabled accounts - they are real accounts that are just disabled
-			if a.UserName == "" {
-				// PATCH this slot with new account data including password in one call
+			// Skip reserved/protected slots like slot 1 (root user on Dell iDRAC)
+			if a.UserName == "" && a.ID != "1" {
 				a.UserName = userName
 				a.RoleID = role
 				a.Enabled = enabled
 				a.Password = password
 
-				// Apply all changes via single PATCH
 				if err := a.Update(); err != nil {
-					return fmt.Errorf("failed to create account via PATCH on slot %s: %w", a.ID, err)
+					return fmt.Errorf("failed to disable account: %w", err)
 				}
-
 				return nil
 			}
 		}
-
 		// No empty slots available for fallback method
 		return fmt.Errorf("failed to create account: POST method not supported (HTTP 405) and no available account slots found (all %d slots occupied)", len(accounts))
 	}
@@ -861,6 +862,18 @@ func (r *RedfishBaseBMC) DeleteAccount(ctx context.Context, userName, id string)
 		if a.UserName == userName && a.ID == id {
 			resp, err := r.client.Delete(a.ODataID)
 			if err != nil {
+				var redfishErr *schemas.Error
+				if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusMethodNotAllowed {
+					// HTTP 405: DELETE not supported - fall back to PATCH
+					// Clear username and disable account. Do NOT include Password field as some BMCs
+					// (e.g., Dell iDRAC) reject PATCH with empty username AND password field present.
+					a.UserName = ""
+					a.Enabled = false
+					if err := a.Update(); err != nil {
+						return fmt.Errorf("failed to delete account via PATCH on slot %s: %w", a.ID, err)
+					}
+					return nil
+				}
 				return err
 			}
 			if err = resp.Body.Close(); err != nil {
@@ -1179,7 +1192,7 @@ func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, e
 	return "", fmt.Errorf("existing subscription not found for destination: %s", destination)
 }
 
-func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
+func (r *RedfishBaseBMC) DeleteEventSubscription(_ context.Context, uri string) error {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {

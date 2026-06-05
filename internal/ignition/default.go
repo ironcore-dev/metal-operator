@@ -10,7 +10,7 @@ import (
 	"text/template"
 )
 
-// Config holds the Docker image and flags.
+// Config holds the container image and flags for the metalprobe ignition template.
 type Config struct {
 	Image        string
 	Flags        string

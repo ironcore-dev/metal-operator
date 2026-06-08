@@ -70,3 +70,7 @@ resources:
   - servermaintenance_admin_role.yaml
   - servermaintenance_editor_role.yaml
   - servermaintenance_viewer_role.yaml
+  - serverreadinessrule_admin_role.yaml
+  - serverreadinessrule_editor_role.yaml
+  - serverreadinessrule_viewer_role.yaml
+

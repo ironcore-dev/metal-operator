@@ -1,0 +1,19 @@
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerReadinessRule
+metadata:
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: serverreadinessrule-sample
+spec:
+  serverSelector:
+    matchLabels:
+      foo: bar
+  conditions:
+  - type: MyCondition
+    requiredStatus: True
+  enforcementMode: Continuous
+  taint:
+    key: Tainted
+    value: Value
+    effect: NoBind

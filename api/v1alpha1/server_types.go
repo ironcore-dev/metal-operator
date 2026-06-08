@@ -108,8 +108,8 @@ type ServerSpec struct {
 
 	// ReclaimPolicy specifies how the server is reclaimed after use.
 	// Can be
-	// * Recycle (default), immediately transitioning the server to `Available` after use.
-	// * Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,
+	// - Recycle (default), immediately transitioning the server to `Available` after use.
+	// - Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,
 	//   transitioning to `Available` once `spec.serverClaimRef` is removed.
 	// +kubebuilder:default=Recycle
 	// +kubebuilder:validation:Enum=Recycle;Retain

@@ -50,10 +50,16 @@ spec:
     - This resource specifies how the server should be booted, including the image and ignition configuration.
 
 - **State Transitions**:
-    - Available → Reserved: When a server is successfully claimed.
-    - Reserved → Cleanup: When the `ServerClaim` is deleted.
-    - Cleanup → Available: After cleanup tasks are completed.
+    - `Available` → `Reserved`: When a server is successfully claimed.
+    - `Reserved` → `Available`: When the `ServerClaim` is deleted and the server's
+      [`spec.reclaimPolicy`](servers.md#reclaim-policy) is `Recycle` (the default).
+    - `Reserved` → `Released`: When the `ServerClaim` is deleted and the server's
+      [`spec.reclaimPolicy`](servers.md#reclaim-policy) is `Retain`. The server stays in `Released`
+      with `spec.serverClaimRef` set until an operator clears the reference, at which point it
+      transitions back to `Available`.
 
-- **Cleanup Process**:
-    - Ensures that servers are sanitized before being made available again.
-    - Tasks may include wiping disks, resetting BIOS settings, and clearing configurations.
+- **Release Process**:
+    - On claim deletion the server is powered off and its `BootConfigurationRef` is cleared.
+    - With `Recycle`, `spec.serverClaimRef` is also removed automatically and the server returns to `Available`.
+    - With `Retain`, `spec.serverClaimRef` is preserved so the binding can be inspected before the
+      server is released back into the pool.

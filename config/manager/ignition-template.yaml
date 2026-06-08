@@ -2,36 +2,45 @@ variant: fcos
 version: "1.3.0"
 systemd:
   units:
-    - name: docker-install.service
+    - name: var-lib-containerd.mount
       enabled: true
       contents: |-
         [Unit]
-        Description=Install Docker
-        Before=metalprobe.service
-        [Service]
-        Restart=on-failure
-        RestartSec=20
-        Type=oneshot
-        RemainAfterExit=yes
-        ExecStart=/usr/bin/apt-get update
-        ExecStart=/usr/bin/apt-get install docker.io docker-cli -y
+        Description=tmpfs for containerd image cache
+        DefaultDependencies=no
+        Before=containerd.service
+
+        [Mount]
+        What=tmpfs
+        Where=/var/lib/containerd
+        Type=tmpfs
+        Options=mode=0700,size=4g
+
         [Install]
         WantedBy=multi-user.target
-    - name: docker.service
+    - name: containerd.service
       enabled: true
+      dropins:
+        - name: 10-wait-mount.conf
+          contents: |-
+            [Unit]
+            After=var-lib-containerd.mount
+            Requires=var-lib-containerd.mount
     - name: metalprobe.service
       enabled: true
       contents: |-
         [Unit]
-        Description=Run Metalprobe Docker Container
+        Description=Run Metalprobe Container
+        After=containerd.service
+        Requires=containerd.service
         [Service]
         Restart=on-failure
         RestartSec=20
-        ExecStartPre=-/usr/bin/docker stop metalprobe
-        ExecStartPre=-/usr/bin/docker rm metalprobe
-        ExecStartPre=/usr/bin/docker pull {{.Image}}
-        ExecStart=/usr/bin/docker run --network host --privileged --name metalprobe {{.Image}} {{.Flags}}
-        ExecStop=/usr/bin/docker stop metalprobe
+        ExecStartPre=/usr/bin/ctr images pull {{.Image}}
+        ExecStartPre=-/usr/bin/ctr tasks delete --force metalprobe
+        ExecStartPre=-/usr/bin/ctr containers delete metalprobe
+        ExecStart=/usr/bin/ctr run --rm --net-host --privileged {{.Image}} metalprobe ./launch.sh {{.Flags}}
+        TimeoutSec=600
         [Install]
         WantedBy=multi-user.target
 storage:

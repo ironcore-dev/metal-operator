@@ -531,6 +531,32 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "BMCVersionSet")
 		os.Exit(1)
 	}
+	if err = (&controller.NICVersionReconciler{
+        Client:           mgr.GetClient(),
+        Scheme:           mgr.GetScheme(),
+        ManagerNamespace: managerNamespace,
+        Insecure:         insecure,
+        ResyncInterval:   maintenanceResyncInterval,
+        Conditions:       conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+        BMCOptions: bmc.Options{
+            BasicAuth:               true,
+            PowerPollingInterval:    powerPollingInterval,
+            PowerPollingTimeout:     powerPollingTimeout,
+            ResourcePollingInterval: resourcePollingInterval,
+            ResourcePollingTimeout:  resourcePollingTimeout,
+        },
+    }).SetupWithManager(mgr); err != nil {
+        setupLog.Error(err, "Failed to create controller", "controller", "NICVersion")
+        os.Exit(1)
+    }
+    if err = (&controller.NICVersionSetReconciler{
+        Client:         mgr.GetClient(),
+        Scheme:         mgr.GetScheme(),
+        ResyncInterval: maintenanceResyncInterval,
+    }).SetupWithManager(mgr); err != nil {
+        setupLog.Error(err, "Failed to create controller", "controller", "NICVersionSet")
+        os.Exit(1)
+    }
 	if err := (&controller.BMCSettingsSetReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),

@@ -68,13 +68,13 @@ if ! git cherry-pick -x -m1 "${MERGE_COMMIT}"; then
     echo ""
     echo "Cherry-pick has conflicts. Please resolve them, then run:"
     echo "  git cherry-pick --continue"
-    echo "  git push origin ${CHERRY_PICK_BRANCH}"
+    echo "  git push origin ${CHERRY_PICK_BRANCH}:${CHERRY_PICK_BRANCH}"
     echo "  gh pr create --base ${RELEASE_BRANCH} --title \"🍒 [${RELEASE_BRANCH}] ${PR_TITLE}\" --body \"Cherry-pick of #${PR_NUMBER} into ${RELEASE_BRANCH}.\""
     exit 1
 fi
 
 # Push and create PR
-git push origin "${CHERRY_PICK_BRANCH}"
+git push origin "${CHERRY_PICK_BRANCH}:${CHERRY_PICK_BRANCH}"
 gh pr create \
     --base "${RELEASE_BRANCH}" \
     --title "🍒 [${RELEASE_BRANCH}] ${PR_TITLE}" \

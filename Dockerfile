@@ -14,6 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/main.go cmd/main.go
 COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
+COPY cmd/metaldata/main.go cmd/metaldata/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
@@ -33,6 +34,11 @@ FROM builder AS probe-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/metalprobe/main.go
+
+FROM builder AS metaldata-builder
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metaldata cmd/metaldata/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -67,3 +73,10 @@ WORKDIR /
 COPY --from=mock-builder /workspace/mock-server .
 USER 65532:65532
 ENTRYPOINT ["/mock-server"]
+
+FROM gcr.io/distroless/static:nonroot AS metaldata
+LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
+WORKDIR /
+COPY --from=metaldata-builder /workspace/metaldata .
+USER 65532:65532
+ENTRYPOINT ["/metaldata"]

@@ -21,16 +21,16 @@ const (
 	PowerOff Power = "Off"
 
 	// LabelLocation is the label key for the user-defined location identifier (e.g. FRA-DC5-3F).
-	LabelLocation = "metadata.metal.ironcore.dev/location"
+	LabelLocation = MetadataKeyPrefix + "location"
 
 	// LabelRack is the label key for the opaque rack identifier within a location.
-	LabelRack = "metadata.metal.ironcore.dev/rack"
+	LabelRack = MetadataKeyPrefix + "rack"
 
 	// LabelShelf is the label key for the position within the rack (bottom-up U number).
-	LabelShelf = "metadata.metal.ironcore.dev/shelf"
+	LabelShelf = MetadataKeyPrefix + "shelf"
 
 	// LabelHeight is the label key for the device height in rack units (U).
-	LabelHeight = "metadata.metal.ironcore.dev/height"
+	LabelHeight = MetadataKeyPrefix + "height"
 )
 
 // ServerPowerState defines the possible power states for a server.

@@ -1875,6 +1875,11 @@ func (in *ServerClaimSpec) DeepCopyInto(out *ServerClaimSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	if in.UserDataRef != nil {
+		in, out := &in.UserDataRef, &out.UserDataRef
+		*out = new(v1.LocalObjectReference)
+		**out = **in
+	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]Toleration, len(*in))

@@ -45,7 +45,7 @@ type createBMCClientConfig struct {
 }
 
 // WithRegistryURL configures the BMC client to POST dummy registration data to
-// the given base URL after SetPXEBootOnce. Used with ProtocolRedfishWithRegistryPatch to
+// the given base URL after SetBootOverride. Used with ProtocolRedfishWithRegistryPatch to
 // simulate probe boot registration without a real K8s Job.
 func WithRegistryURL(url string) CreateBMCClientOption {
 	return func(c *createBMCClientConfig) {

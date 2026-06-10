@@ -27,12 +27,12 @@ const (
 type RedfishLocalBMC struct {
 	*RedfishBaseBMC
 	// registryURL is an optional base URL (e.g. http://host:port). When set,
-	// SetPXEBootOnce posts dummy registration data to simulate a probe boot.
+	// SetBootOverride posts dummy registration data to simulate a probe boot.
 	registryURL string
 }
 
 // NewRedfishLocalBMCClientWithRegistry creates a RedfishLocalBMC that, after
-// SetPXEBootOnce, simulates probe registration by posting dummy network data to
+// SetBootOverride, simulates probe registration by posting dummy network data to
 // registryBaseURL/register. Use this in place of RedfishWithRegistryPatch for dev/tilt
 // environments where a real probe will not run.
 func NewRedfishLocalBMCClientWithRegistry(ctx context.Context, options Options, registryBaseURL string) (BMC, error) {
@@ -260,14 +260,16 @@ func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ C
 	return false, nil
 }
 
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-// When a registryURL is configured, it additionally simulates probe registration
-// by posting dummy network data to the registry in a background goroutine.
-func (r *RedfishLocalBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
-	if err := r.RedfishBaseBMC.SetPXEBootOnce(ctx, systemURI); err != nil {
+// SetBootOverride sets the network-boot override and, for one-shot overrides
+// only, simulates probe registration by posting dummy network data to the
+// configured registryURL in a background goroutine. The persistent override
+// path skips the registration simulation since maintenance flows do not go
+// through discovery.
+func (r *RedfishLocalBMC) SetBootOverride(ctx context.Context, systemURI string, persistent bool) error {
+	if err := r.RedfishBaseBMC.SetBootOverride(ctx, systemURI, persistent); err != nil {
 		return err
 	}
-	if r.registryURL == "" {
+	if persistent || r.registryURL == "" {
 		return nil
 	}
 	go func() {

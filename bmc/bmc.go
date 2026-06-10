@@ -46,8 +46,16 @@ type BMC interface {
 	// Reset performs a reset on the system.
 	Reset(ctx context.Context, systemURI string, resetType schemas.ResetType) error
 
-	// SetPXEBootOnce sets the boot device for the next system boot.
-	SetPXEBootOnce(ctx context.Context, systemURI string) error
+	// SetBootOverride configures the system to network-boot on its next
+	// power-on, bypassing the persistent boot order. If persistent is false
+	// the override applies to a single boot only; if true it applies to every
+	// subsequent boot until ClearBootOverride is called.
+	SetBootOverride(ctx context.Context, systemURI string, persistent bool) error
+
+	// ClearBootOverride removes any active boot override so the system uses
+	// its persistent boot order on the next power-on. No-op when no override
+	// is currently set.
+	ClearBootOverride(ctx context.Context, systemURI string) error
 
 	// GetSystemInfo retrieves information about the system.
 	GetSystemInfo(ctx context.Context, systemURI string) (SystemInfo, error)

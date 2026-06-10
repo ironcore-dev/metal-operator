@@ -65,14 +65,9 @@ type RedfishBaseBMC struct {
 	manufacturer string
 }
 
-var pxeBootWithSettingUEFIBootMode = schemas.Boot{
-	BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideMode:    schemas.UEFIBootSourceOverrideMode,
-	BootSourceOverrideTarget:  schemas.PxeBootSource,
-}
-var pxeBootWithoutSettingUEFIBootMode = schemas.Boot{
-	BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideTarget:  schemas.PxeBootSource,
+var clearedBootOverride = schemas.Boot{
+	BootSourceOverrideEnabled: schemas.DisabledBootSourceOverrideEnabled,
+	BootSourceOverrideTarget:  schemas.NoneBootSource,
 }
 
 type InvalidBIOSSettingsError struct {
@@ -231,26 +226,65 @@ func (r *RedfishBaseBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	return servers, nil
 }
 
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBaseBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+// SetBootOverride sets a Redfish boot source override targeting network boot.
+// With persistent=false it sets BootSourceOverrideEnabled=Once; with
+// persistent=true it sets Continuous, which is preserved across power cycles.
+// When the requested persistent override already matches the current state
+// the call is a no-op.
+func (r *RedfishBaseBMC) SetBootOverride(ctx context.Context, systemURI string, persistent bool) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	var setBoot schemas.Boot
+	wantEnabled := schemas.OnceBootSourceOverrideEnabled
+	if persistent {
+		wantEnabled = schemas.ContinuousBootSourceOverrideEnabled
+		if system.Boot.BootSourceOverrideEnabled == schemas.ContinuousBootSourceOverrideEnabled &&
+			system.Boot.BootSourceOverrideTarget == schemas.PxeBootSource &&
+			(system.Boot.BootSourceOverrideMode == "" ||
+				system.Boot.BootSourceOverrideMode == schemas.UEFIBootSourceOverrideMode) {
+			return nil
+		}
+	}
+
+	setBoot := schemas.Boot{
+		BootSourceOverrideEnabled: wantEnabled,
+		BootSourceOverrideTarget:  schemas.PxeBootSource,
+	}
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
+	// Only set BootSourceOverrideMode when the BMC reports it; older BMCs that
+	// don't expose it will reject the field.
 	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != schemas.UEFIBootSourceOverrideMode {
-		setBoot = pxeBootWithSettingUEFIBootMode
-	} else {
-		setBoot = pxeBootWithoutSettingUEFIBootMode
+		setBoot.BootSourceOverrideMode = schemas.UEFIBootSourceOverrideMode
 	}
 
 	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
+	log.V(2).Info("Setting boot override", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(&setBoot); err != nil {
-		return fmt.Errorf("failed to set the boot order: %w", err)
+		return fmt.Errorf("failed to set boot override: %w", err)
+	}
+	return nil
+}
+
+// ClearBootOverride disables any active Redfish boot source override so the
+// system uses its persistent boot order on the next power-on. No SetBoot call
+// is issued when the override is already disabled.
+func (r *RedfishBaseBMC) ClearBootOverride(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if system.Boot.BootSourceOverrideEnabled == "" ||
+		system.Boot.BootSourceOverrideEnabled == schemas.DisabledBootSourceOverrideEnabled {
+		return nil
+	}
+
+	setBoot := clearedBootOverride
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("Clearing boot override", "SystemURI", systemURI, "Boot settings", setBoot)
+	if err := system.SetBoot(&setBoot); err != nil {
+		return fmt.Errorf("failed to clear boot override: %w", err)
 	}
 	return nil
 }

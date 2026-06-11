@@ -79,7 +79,7 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.B
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
-	if err = r.patchUserStatus(ctx, user, bmcClient); err != nil {
+	if err = r.patchUserStatus(ctx, user, bmcClient, metav1.Time{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update User status: %w", err)
 	}
 
@@ -103,14 +103,8 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.B
 		if err = bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, password, true); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create or update BMC account with new password: %w", err)
 		}
-		if err = r.patchUserStatus(ctx, user, bmcClient); err != nil {
+		if err = r.patchUserStatus(ctx, user, bmcClient, metav1.Now()); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update User status after creating BMC account: %w", err)
-		}
-		// Set initial rotation timestamp to prevent immediate rotation after account creation
-		userBase := user.DeepCopy()
-		user.Status.LastRotation = &metav1.Time{Time: metav1.Now().Time}
-		if err := r.Status().Patch(ctx, user, client.MergeFrom(userBase)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to set initial rotation time: %w", err)
 		}
 	}
 	if user.Status.EffectiveBMCSecretRef != nil &&
@@ -123,7 +117,7 @@ func (r *BMCUserReconciler) reconcile(ctx context.Context, user *metalv1alpha1.B
 	return r.handleRotatingPassword(ctx, user, bmcObj, bmcClient)
 }
 
-func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, user *metalv1alpha1.BMCUser, bmcClient bmc.BMC) error {
+func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, user *metalv1alpha1.BMCUser, bmcClient bmc.BMC, lastRotation metav1.Time) error {
 	log := ctrl.LoggerFrom(ctx)
 	accounts, err := bmcClient.GetAccounts()
 	if err != nil {
@@ -134,6 +128,9 @@ func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, user *metalv1al
 			log.V(1).Info("BMC account already exists", "ID", account.ID)
 			userBase := user.DeepCopy()
 			user.Status.ID = account.ID
+			if !lastRotation.IsZero() {
+				user.Status.LastRotation = &lastRotation
+			}
 			// Only parse password expiration if it's set (empty string is valid)
 			if account.PasswordExpiration != "" {
 				exp, err := time.Parse(time.RFC3339, account.PasswordExpiration)
@@ -148,7 +145,6 @@ func (r *BMCUserReconciler) patchUserStatus(ctx context.Context, user *metalv1al
 			}
 			log.V(1).Info("Updated User status with BMC account ID", "AccountID", account.ID)
 			return nil
-
 		}
 	}
 	return nil
@@ -197,11 +193,11 @@ func (r *BMCUserReconciler) handleRotatingPassword(ctx context.Context, user *me
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create BMCSecret: %w", err)
 	}
-	if err := r.setBMCUserSecretRef(ctx, user, secret); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to set BMCSecret reference for User: %w", err)
-	}
 	if err := bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, newPassword, true); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create or update BMC account with new password: %w", err)
+	}
+	if err := r.setBMCUserSecretRef(ctx, user, secret); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to set BMCSecret reference for User: %w", err)
 	}
 
 	// Update the last rotation time
@@ -235,11 +231,6 @@ func (r *BMCUserReconciler) ensureBMCSecretForUser(ctx context.Context, bmcClien
 	if err := r.setBMCUserSecretRef(ctx, user, secret); err != nil {
 		return fmt.Errorf("failed to set BMCSecret reference for User: %w", err)
 	}
-	log.V(1).Info("Creating BMC account with new password", "Account", user.Name)
-	if err := bmcClient.CreateOrUpdateAccount(ctx, user.Spec.UserName, user.Spec.RoleID, newPassword, true); err != nil {
-		return fmt.Errorf("failed to create or update BMC account with new password: %w", err)
-	}
-	log.V(1).Info("BMC account created with new password", "Account", user.Name)
 	return nil
 }
 

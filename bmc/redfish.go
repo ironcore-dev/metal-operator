@@ -819,19 +819,13 @@ func (r *RedfishBaseBMC) CreateOrUpdateAccount(
 		if a.UserName == userName {
 			a.RoleID = role
 			a.Enabled = enabled
+			// Always include the password in the same PATCH. Some BMCs (e.g. Dell iDRAC) return
+			// HTTP 400 when RoleId/Enabled are modified without a password in the request body.
+			if password != "" {
+				a.Password = password
+			}
 			if err := a.Update(); err != nil {
 				return fmt.Errorf("failed to update account: %w", err)
-			}
-			// Update password using the official Redfish ChangePassword action
-			if password != "" {
-				if _, err := a.ChangePassword(password, r.options.Password); err != nil {
-					// Fallback: Use PATCH to update password
-					// This is needed for BMCs with buggy Redfish implementations
-					a.Password = password
-					if err := a.Update(); err != nil {
-						return fmt.Errorf("failed to update account password via PATCH: %w", err)
-					}
-				}
 			}
 			return nil
 		}

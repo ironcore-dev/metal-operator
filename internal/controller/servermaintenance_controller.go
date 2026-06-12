@@ -343,16 +343,25 @@ func (r *ServerMaintenanceReconciler) handleFailedState(ctx context.Context, _ *
 func (r *ServerMaintenanceReconciler) delete(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting ServerMaintenance")
+	if !controllerutil.ContainsFinalizer(maintenance, serverMaintenanceFinalizer) {
+		return ctrl.Result{}, nil
+	}
 	if maintenance.Spec.ServerRef == nil {
 		return ctrl.Result{}, nil
 	}
 	server, err := GetServerByName(ctx, r.Client, maintenance.Spec.ServerRef.Name)
-	if err != nil {
+	if err == nil {
+		if err := r.cleanup(ctx, server); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else if apierrors.IsNotFound(err) {
+		// note: if the server is already deleted, we can skip the cleanup and just remove the finalizer
+		// if its transent error of server not found, the servermaintenance will be deleted and server will free up the ref automatically once this is deleted
+		log.V(1).Info("Server not found, continue with cleanup", "Server", maintenance.Spec.ServerRef.Name)
+	} else {
 		return ctrl.Result{}, err
 	}
-	if err := r.cleanup(ctx, server); err != nil {
-		return ctrl.Result{}, err
-	}
+
 	log.V(1).Info("Removed dependencies")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")

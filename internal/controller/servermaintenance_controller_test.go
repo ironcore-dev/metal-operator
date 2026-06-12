@@ -541,4 +541,72 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Expect(k8sClient.Delete(ctx, unsetPriorityMaintenance)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
+
+	It("should complete deletion when the referenced Server is already gone", func(ctx SpecContext) {
+		By("Creating a ServerMaintenance object")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-server-gone",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+
+		By("Waiting for the ServerMaintenance to reach InMaintenance state")
+		Eventually(Object(serverMaintenance)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Deleting the Server before deleting the ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Eventually(Get(server)).ShouldNot(Succeed())
+
+		By("Deleting the ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+
+		By("Ensuring the ServerMaintenance is fully deleted despite the Server being gone")
+		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
+	})
+
+	It("should skip cleanup and remove finalizer when no finalizer is present on deletion", func(ctx SpecContext) {
+		By("Creating a ServerMaintenance object without going through reconciliation (no finalizer)")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-no-finalizer",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+
+		By("Waiting for the finalizer to be added by the reconciler")
+		Eventually(Object(serverMaintenance)).Should(
+			HaveField("Finalizers", ContainElement(serverMaintenanceFinalizer)),
+		)
+
+		By("Manually removing the finalizer to simulate a no-finalizer state")
+		Eventually(Update(serverMaintenance, func() {
+			serverMaintenance.Finalizers = nil
+		})).Should(Succeed())
+
+		By("Deleting the ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+
+		By("Ensuring the ServerMaintenance is deleted immediately without cleanup side-effects")
+		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
+
+		By("Ensuring the Server was not modified during deletion")
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		)
+	})
 })

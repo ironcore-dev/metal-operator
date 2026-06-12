@@ -79,26 +79,16 @@ func (r *BMCVersionReconciler) reconcileExists(ctx context.Context, bmcVersion *
 }
 
 func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if bmcVersion.DeletionTimestamp.IsZero() {
-		return false, nil
-	}
-
-	if controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) && len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
-		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
-			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcVersion.Spec.BMCRef.Name)
-			return true, nil
-		}
-		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
-		if err != nil {
-			return false, fmt.Errorf("failed to check maintenance state: %w", err)
-		}
-		if active {
-			log.V(1).Info("Postponing deletion as BMCVersion is under active maintenance")
+	isProgressing := func() (bool, error) {
+		if bmcVersion.Status.State != metalv1alpha1.BMCVersionStateInProgress {
 			return false, nil
 		}
+		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
 	}
-	return true, nil
+	return shouldProceedWithDeletion(ctx, bmcVersion, bmcVersionFinalizer, isProgressing)
 }
 
 func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {

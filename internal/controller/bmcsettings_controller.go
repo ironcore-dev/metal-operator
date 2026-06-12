@@ -100,15 +100,12 @@ func (r *BMCSettingsReconciler) reconcileExists(ctx context.Context, settings *m
 }
 
 func (r *BMCSettingsReconciler) shouldDelete(ctx context.Context, bmcSetting *metalv1alpha1.BMCSettings) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if bmcSetting.DeletionTimestamp.IsZero() {
-		return false, nil
-	}
-
-	if controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) && len(bmcSetting.Spec.ServerMaintenanceRefs) > 0 {
+	isProgressing := func() (bool, error) {
+		if bmcSetting.Status.State != metalv1alpha1.BMCSettingsStateInProgress {
+			return false, nil
+		}
 		if _, err := r.getBMC(ctx, bmcSetting); apierrors.IsNotFound(err) {
-			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcSetting.Spec.BMCRef.Name)
-			return true, nil
+			return false, nil
 		}
 		refs := make([]metalv1alpha1.ObjectReference, 0, len(bmcSetting.Spec.ServerMaintenanceRefs))
 		for _, item := range bmcSetting.Spec.ServerMaintenanceRefs {
@@ -116,16 +113,9 @@ func (r *BMCSettingsReconciler) shouldDelete(ctx context.Context, bmcSetting *me
 				refs = append(refs, *item.ServerMaintenanceRef)
 			}
 		}
-		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, refs)
-		if err != nil {
-			return false, fmt.Errorf("failed to check maintenance state: %w", err)
-		}
-		if active {
-			log.V(1).Info("Postponing delete as BMCSettings is under active maintenance")
-			return false, nil
-		}
+		return IsAnyServerMaintenanceActive(ctx, r.Client, refs)
 	}
-	return true, nil
+	return shouldProceedWithDeletion(ctx, bmcSetting, BMCSettingFinalizer, isProgressing)
 }
 
 func (r *BMCSettingsReconciler) delete(ctx context.Context, settings *metalv1alpha1.BMCSettings) (ctrl.Result, error) {

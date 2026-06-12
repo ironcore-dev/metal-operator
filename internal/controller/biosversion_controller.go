@@ -84,29 +84,21 @@ func (r *BIOSVersionReconciler) reconcileExists(ctx context.Context, biosVersion
 }
 
 func (r *BIOSVersionReconciler) shouldDelete(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if biosVersion.DeletionTimestamp.IsZero() {
-		return false, nil
-	}
-
-	if controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) && biosVersion.Spec.ServerMaintenanceRef != nil {
-		if biosVersion.Spec.ServerRef != nil {
-			if _, err := GetServerByName(ctx, r.Client, biosVersion.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
-				log.V(1).Info("Server not found, proceeding with deletion", "Server", biosVersion.Spec.ServerRef.Name)
-				return true, nil
-			}
-		}
-		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
-		if err != nil {
-			return false, fmt.Errorf("failed to check maintenance state: %w", err)
-		}
-		if active {
-			log.V(1).Info("Postponing deletion as BIOSVersion is under active maintenance")
+	isProgressing := func() (bool, error) {
+		if biosVersion.Status.State != metalv1alpha1.BIOSVersionStateInProgress {
 			return false, nil
 		}
+		if biosVersion.Spec.ServerRef != nil {
+			if _, err := GetServerByName(ctx, r.Client, biosVersion.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+				return false, nil
+			}
+		}
+		if biosVersion.Spec.ServerMaintenanceRef == nil {
+			return false, nil
+		}
+		return IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
 	}
-
-	return true, nil
+	return shouldProceedWithDeletion(ctx, biosVersion, BIOSVersionFinalizer, isProgressing)
 }
 
 func (r *BIOSVersionReconciler) delete(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {

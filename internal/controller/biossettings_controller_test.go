@@ -403,7 +403,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
@@ -551,7 +550,6 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
@@ -1157,7 +1155,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, "true")
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, "true")
 		})).Should(Succeed())
 
 		By("Ensuring that the biosSettings resource has started bios setting update")

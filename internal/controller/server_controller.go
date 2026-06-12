@@ -232,7 +232,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		return ctrl.Result{}, err
 	}
 
-	if modified, err := r.handleAnnotionOperations(ctx, bmcClient, server); err != nil || modified {
+	if modified, err := r.handleAnnotationOperations(ctx, bmcClient, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Handled annotation operations")
@@ -1266,7 +1266,7 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, bmcClient bmc.BMC
 	return nil
 }
 
-func (r *ServerReconciler) handleAnnotionOperations(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) handleAnnotationOperations(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	annotations := server.GetAnnotations()
 	operation, ok := annotations[metalv1alpha1.OperationAnnotation]

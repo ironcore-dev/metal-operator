@@ -9,8 +9,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -447,6 +447,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting low-priority maintenance")
 		Expect(k8sClient.Delete(ctx, lowPriorityMaintenance)).To(Succeed())
+		Eventually(Get(lowPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
@@ -541,6 +542,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting unset-priority maintenance")
 		Expect(k8sClient.Delete(ctx, unsetPriorityMaintenance)).To(Succeed())
+		Eventually(Get(unsetPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 

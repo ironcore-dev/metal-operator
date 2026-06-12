@@ -341,7 +341,7 @@ func (r *BMCSettingsSetReconciler) deleteOrphanedBMCSettings(
 	var errs []error
 	for _, bmcSettings := range bmcSettingsList.Items {
 		if _, ok := bmcMap[bmcSettings.Spec.BMCRef.Name]; !ok {
-			if len(bmcSettings.Spec.ServerMaintenanceRefs) > 0 {
+			if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress && len(bmcSettings.Spec.ServerMaintenanceRefs) > 0 {
 				refs := make([]metalv1alpha1.ObjectReference, 0, len(bmcSettings.Spec.ServerMaintenanceRefs))
 				for _, item := range bmcSettings.Spec.ServerMaintenanceRefs {
 					if item.ServerMaintenanceRef != nil {

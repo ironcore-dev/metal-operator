@@ -43,6 +43,7 @@ type BIOSSettingsSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettingssets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biossettings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -289,7 +290,7 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(ctx context.Context
 	var errs []error
 	for _, biosSettings := range settings.Items {
 		if _, ok := serverMap[biosSettings.Spec.ServerRef.Name]; !ok {
-			if biosSettings.Spec.ServerMaintenanceRef != nil {
+			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && biosSettings.Spec.ServerMaintenanceRef != nil {
 				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosSettings.Spec.ServerMaintenanceRef})
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSSettings %s: %w", biosSettings.Name, err))

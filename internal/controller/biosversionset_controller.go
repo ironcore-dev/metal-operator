@@ -41,6 +41,7 @@ type BIOSVersionSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -241,7 +242,7 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(ctx context.Context,
 	var errs []error
 	for _, biosVersion := range versions.Items {
 		if !serverMap[biosVersion.Spec.ServerRef.Name] {
-			if biosVersion.Spec.ServerMaintenanceRef != nil {
+			if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress && biosVersion.Spec.ServerMaintenanceRef != nil {
 				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSVersion %s: %w", biosVersion.Name, err))

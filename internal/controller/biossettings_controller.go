@@ -116,9 +116,11 @@ func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *met
 	log.V(1).Info("Reconciling BIOSSettings")
 
 	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) && settings.Spec.ServerMaintenanceRef != nil {
-		if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
-			log.V(1).Info("Server not found, proceeding with deletion", "Server", settings.Spec.ServerRef.Name)
-			return true, nil
+		if settings.Spec.ServerRef != nil {
+			if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+				log.V(1).Info("Server not found, proceeding with deletion", "Server", settings.Spec.ServerRef.Name)
+				return true, nil
+			}
 		}
 		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*settings.Spec.ServerMaintenanceRef})
 		if err != nil {

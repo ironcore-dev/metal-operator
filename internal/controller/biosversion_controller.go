@@ -90,9 +90,11 @@ func (r *BIOSVersionReconciler) shouldDelete(ctx context.Context, biosVersion *m
 	}
 
 	if controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) && biosVersion.Spec.ServerMaintenanceRef != nil {
-		if _, err := GetServerByName(ctx, r.Client, biosVersion.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
-			log.V(1).Info("Server not found, proceeding with deletion", "Server", biosVersion.Spec.ServerRef.Name)
-			return true, nil
+		if biosVersion.Spec.ServerRef != nil {
+			if _, err := GetServerByName(ctx, r.Client, biosVersion.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+				log.V(1).Info("Server not found, proceeding with deletion", "Server", biosVersion.Spec.ServerRef.Name)
+				return true, nil
+			}
 		}
 		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
 		if err != nil {
@@ -989,20 +991,21 @@ func (r *BIOSVersionReconciler) enqueueBiosVersionByServerRefs(ctx context.Conte
 	}
 
 	for _, biosVersion := range biosVersionList.Items {
-		if biosVersion.Spec.ServerRef.Name == host.Name {
-			// states where we do not need to requeue for host changes
-			if biosVersion.Spec.ServerMaintenanceRef == nil ||
-				biosVersion.Status.State == metalv1alpha1.BIOSVersionStateCompleted ||
-				biosVersion.Status.State == metalv1alpha1.BIOSVersionStateFailed {
-				return nil
-			}
-			if biosVersion.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
-				return nil
-			}
-			return []ctrl.Request{{
-				NamespacedName: types.NamespacedName{Namespace: biosVersion.Namespace, Name: biosVersion.Name},
-			}}
+		if biosVersion.Spec.ServerRef == nil || biosVersion.Spec.ServerRef.Name != host.Name {
+			continue
 		}
+		// states where we do not need to requeue for host changes
+		if biosVersion.Spec.ServerMaintenanceRef == nil ||
+			biosVersion.Status.State == metalv1alpha1.BIOSVersionStateCompleted ||
+			biosVersion.Status.State == metalv1alpha1.BIOSVersionStateFailed {
+			return nil
+		}
+		if biosVersion.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
+			return nil
+		}
+		return []ctrl.Request{{
+			NamespacedName: types.NamespacedName{Namespace: biosVersion.Namespace, Name: biosVersion.Name},
+		}}
 	}
 	return nil
 }
@@ -1028,6 +1031,9 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, ob
 	biosVersionList := &metalv1alpha1.BIOSVersionList{}
 	if err := clientutils.ListAndFilter(ctx, r.Client, biosVersionList, func(object client.Object) (bool, error) {
 		biosVersion := object.(*metalv1alpha1.BIOSVersion)
+		if biosVersion.Spec.ServerRef == nil {
+			return false, nil
+		}
 		if _, exists := serverMap[biosVersion.Spec.ServerRef.Name]; !exists {
 			return false, nil
 		}

@@ -174,6 +174,12 @@ type AccountManager interface {
 	GetAccountService() (*schemas.AccountService, error)
 }
 
+// IndicatorController controls the physical indicator (locator) LED on a system.
+type IndicatorController interface {
+	// SetIndicatorLED sets the indicator LED state on the system.
+	SetIndicatorLED(ctx context.Context, systemURI string, state schemas.IndicatorLED) error
+}
+
 // EventSubscriber manages Redfish event subscriptions on the BMC.
 type EventSubscriber interface {
 	// CreateEventSubscription creates an event subscription for the manager.
@@ -196,6 +202,7 @@ type BMC interface {
 	FirmwareUpdater
 	ManagerController
 	AccountManager
+	IndicatorController
 	EventSubscriber
 
 	// Logout closes the BMC client connection by logging out.

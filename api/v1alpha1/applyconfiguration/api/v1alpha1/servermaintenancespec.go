@@ -21,6 +21,9 @@ type ServerMaintenanceSpecApplyConfiguration struct {
 	ServerRef *v1.LocalObjectReference `json:"serverRef,omitempty"`
 	// ServerPower specifies the power state of the server during maintenance.
 	ServerPower *apiv1alpha1.Power `json:"serverPower,omitempty"`
+	// LocatorLED specifies the desired state of the server's locator LED during maintenance.
+	// When maintenance ends, the locator LED is turned off.
+	LocatorLED *apiv1alpha1.IndicatorLED `json:"locatorLED,omitempty"`
 	// Priority determines ordering when multiple ServerMaintenance resources target the same server.
 	// Higher values are processed first. If priorities are equal, older resources are processed first.
 	// If omitted, priority is treated as 0.
@@ -56,6 +59,14 @@ func (b *ServerMaintenanceSpecApplyConfiguration) WithServerRef(value v1.LocalOb
 // If called multiple times, the ServerPower field is set to the value of the last call.
 func (b *ServerMaintenanceSpecApplyConfiguration) WithServerPower(value apiv1alpha1.Power) *ServerMaintenanceSpecApplyConfiguration {
 	b.ServerPower = &value
+	return b
+}
+
+// WithLocatorLED sets the LocatorLED field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LocatorLED field is set to the value of the last call.
+func (b *ServerMaintenanceSpecApplyConfiguration) WithLocatorLED(value apiv1alpha1.IndicatorLED) *ServerMaintenanceSpecApplyConfiguration {
+	b.LocatorLED = &value
 	return b
 }
 

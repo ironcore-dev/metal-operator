@@ -68,28 +68,37 @@ func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 func (r *BMCVersionReconciler) reconcileExists(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
-	if r.shouldDelete(ctx, bmcVersion) {
+	ok, err := r.shouldDelete(ctx, bmcVersion)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if ok {
 		return r.delete(ctx, bmcVersion)
 	}
 	return r.reconcile(ctx, bmcVersion)
 }
 
-func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) bool {
+func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if bmcVersion.DeletionTimestamp.IsZero() {
-		return false
+		return false, nil
 	}
 
-	if controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) &&
-		bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
+	if controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) && len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
 		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
 			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcVersion.Spec.BMCRef.Name)
-			return true
+			return true, nil
 		}
-		log.V(1).Info("Postponing deletion as BMC version update is in progress")
-		return false
+		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+		if err != nil {
+			return false, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			log.V(1).Info("Postponing deletion as BMCVersion is under active maintenance")
+			return false, nil
+		}
 	}
-	return true
+	return true, nil
 }
 
 func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
@@ -99,9 +108,15 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1al
 		return ctrl.Result{}, nil
 	}
 
-	if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-		log.V(1).Info("Skipping delete as version update is in progress")
-		return r.reconcile(ctx, bmcVersion)
+	if len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
+		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			log.V(1).Info("Skipping delete as BMCVersion is under active maintenance")
+			return r.reconcile(ctx, bmcVersion)
+		}
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")

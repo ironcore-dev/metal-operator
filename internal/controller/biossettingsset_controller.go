@@ -82,9 +82,15 @@ func (r *BIOSSettingsSetReconciler) delete(ctx context.Context, set *metalv1alph
 
 	deletableBIOSSettings := map[string]struct{}{}
 	for _, biosSettings := range ownedBIOSSettings.Items {
-		if biosSettings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
+		if biosSettings.Spec.ServerMaintenanceRef == nil {
 			deletableBIOSSettings[biosSettings.Name] = struct{}{}
-		} else if biosSettings.Spec.ServerMaintenanceRef == nil {
+			continue
+		}
+		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosSettings.Spec.ServerMaintenanceRef})
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state for BIOSSettings %s: %w", biosSettings.Name, err)
+		}
+		if !active {
 			deletableBIOSSettings[biosSettings.Name] = struct{}{}
 		}
 	}
@@ -283,9 +289,16 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(ctx context.Context
 	var errs []error
 	for _, biosSettings := range settings.Items {
 		if _, ok := serverMap[biosSettings.Spec.ServerRef.Name]; !ok {
-			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-				log.V(1).Info("Waiting for BIOSSettings to move out of InProgress state", "BIOSSettings", biosSettings.Name, "Status", biosSettings.Status)
-				continue
+			if biosSettings.Spec.ServerMaintenanceRef != nil {
+				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosSettings.Spec.ServerMaintenanceRef})
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSSettings %s: %w", biosSettings.Name, err))
+					continue
+				}
+				if active {
+					log.V(1).Info("Waiting for BIOSSettings maintenance to complete before deletion", "BIOSSettings", biosSettings.Name)
+					continue
+				}
 			}
 			if err := r.Delete(ctx, &biosSettings); err != nil {
 				errs = append(errs, err)

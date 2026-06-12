@@ -20,6 +20,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/third_party/expansion"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -64,6 +65,28 @@ func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client
 	}
 
 	return maintenance, nil
+}
+
+// IsAnyServerMaintenanceActive returns true if any of the referenced ServerMaintenance
+// objects has State == InMaintenance. References whose objects are not found or are
+// being deleted are skipped (treated as inactive).
+func IsAnyServerMaintenanceActive(ctx context.Context, c client.Client, refs []metalv1alpha1.ObjectReference) (bool, error) {
+	for _, ref := range refs {
+		sm := &metalv1alpha1.ServerMaintenance{}
+		if err := c.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: ref.Namespace}, sm); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return false, fmt.Errorf("failed to get ServerMaintenance %s/%s: %w", ref.Namespace, ref.Name, err)
+		}
+		if !sm.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if sm.Status.State == metalv1alpha1.ServerMaintenanceStateInMaintenance {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // GetCondition finds a condition in a condition slice.

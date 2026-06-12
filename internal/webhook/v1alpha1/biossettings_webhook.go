@@ -54,13 +54,18 @@ func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *m
 func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
 	settingsLog.Info("Validation for BIOSSettings upon update", "name", newObj.GetName())
 
-	// we do not allow Updates to BIOSSettings post server Maintenance creation
-	if oldObj.Status.State == metalv1alpha1.BIOSSettingsStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRef != nil {
-		err := fmt.Errorf("BIOSSettings (%s) is in progress, unable to update %s", oldObj.Name, newObj.Name)
-		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
-			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	// Block updates while the referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRef != nil {
+		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*oldObj.Spec.ServerMaintenanceRef})
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			msg := fmt.Errorf("BIOSSettings %s is under active maintenance, unable to update", oldObj.Name)
+			return nil, apierrors.NewInvalid(
+				schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
+				newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), msg.Error())})
+		}
 	}
 
 	settingsList := &metalv1alpha1.BIOSSettingsList{}
@@ -72,11 +77,18 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
-func (v *BIOSSettingsCustomValidator) ValidateDelete(_ context.Context, obj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
+func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
 	settingsLog.Info("Validation for BIOSSettings upon deletion", "name", obj.GetName())
 
-	if obj.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
-		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
+	// Block deletion while the referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceDeleteInProgress(obj) && obj.Spec.ServerMaintenanceRef != nil {
+		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*obj.Spec.ServerMaintenanceRef})
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			return nil, apierrors.NewBadRequest("BIOSSettings is under active maintenance, unable to delete")
+		}
 	}
 
 	return nil, nil

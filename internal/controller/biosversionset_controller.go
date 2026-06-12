@@ -241,9 +241,16 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(ctx context.Context,
 	var errs []error
 	for _, biosVersion := range versions.Items {
 		if !serverMap[biosVersion.Spec.ServerRef.Name] {
-			if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-				log.V(1).Info("Waiting for BIOSVersion to move out of InProgress state", "BIOSVersion", biosVersion.Name, "Status", biosVersion.Status)
-				continue
+			if biosVersion.Spec.ServerMaintenanceRef != nil {
+				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSVersion %s: %w", biosVersion.Name, err))
+					continue
+				}
+				if active {
+					log.V(1).Info("Waiting for BIOSVersion maintenance to complete before deletion", "BIOSVersion", biosVersion.Name, "Status", biosVersion.Status)
+					continue
+				}
 			}
 			if err := r.Delete(ctx, &biosVersion); err != nil {
 				errs = append(errs, err)

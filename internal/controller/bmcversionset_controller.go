@@ -259,10 +259,17 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	var warnings []string
 	for _, bmcVersion := range bmcVersionList.Items {
 		if _, ok := bmcMap[bmcVersion.Spec.BMCRef.Name]; !ok {
-			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-				log.V(1).Info("Waiting for BMCVersion to move out of InProgress state", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
-				warnings = append(warnings, fmt.Sprintf("BMCVersion %s is still in progress, skipping deletion", bmcVersion.Name))
-				continue
+			if len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
+				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to check maintenance state for BMCVersion %s: %w", bmcVersion.Name, err))
+					continue
+				}
+				if active {
+					log.V(1).Info("Waiting for BMCVersion maintenance to complete before deletion", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
+					warnings = append(warnings, fmt.Sprintf("BMCVersion %s is under active maintenance, skipping deletion", bmcVersion.Name))
+					continue
+				}
 			}
 			if err := r.Delete(ctx, &bmcVersion); err != nil {
 				errs = append(errs, err)

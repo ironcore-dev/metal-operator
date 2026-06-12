@@ -98,29 +98,38 @@ func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *BIOSSettingsReconciler) reconcileExists(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {
-	if r.shouldDelete(ctx, settings) {
+	ok, err := r.shouldDelete(ctx, settings)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if ok {
 		return r.delete(ctx, settings)
 	}
 	return r.reconcile(ctx, settings)
 }
 
-func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *metalv1alpha1.BIOSSettings) bool {
+func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if settings.DeletionTimestamp.IsZero() {
-		return false
+		return false, nil
 	}
 	log.V(1).Info("Reconciling BIOSSettings")
 
-	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) &&
-		settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
+	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) && settings.Spec.ServerMaintenanceRef != nil {
 		if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
 			log.V(1).Info("Server not found, proceeding with deletion", "Server", settings.Spec.ServerRef.Name)
-			return true
+			return true, nil
 		}
-		log.V(1).Info("Postponing delete as BIOSSettings update is in progress")
-		return false
+		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*settings.Spec.ServerMaintenanceRef})
+		if err != nil {
+			return false, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			log.V(1).Info("Postponing delete as BIOSSettings is under active maintenance")
+			return false, nil
+		}
 	}
-	return true
+	return true, nil
 }
 
 func (r *BIOSSettingsReconciler) delete(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {

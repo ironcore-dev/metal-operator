@@ -56,14 +56,24 @@ func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *me
 func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
 	bmcsettingslog.Info("Validation for BMCSettings upon update", "name", newObj.GetName())
 
-	if oldObj.Status.State == metalv1alpha1.BMCSettingsStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRefs != nil {
-		err := fmt.Errorf("BMCSettings (%s) is in progress, unable to update %s",
-			oldObj.Name,
-			newObj.Name)
-		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: oldObj.Kind},
-			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	// Block updates while any referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceUpdateInProgress(newObj) && len(oldObj.Spec.ServerMaintenanceRefs) > 0 {
+		refs := make([]metalv1alpha1.ObjectReference, 0, len(oldObj.Spec.ServerMaintenanceRefs))
+		for _, item := range oldObj.Spec.ServerMaintenanceRefs {
+			if item.ServerMaintenanceRef != nil {
+				refs = append(refs, *item.ServerMaintenanceRef)
+			}
+		}
+		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, refs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			msg := fmt.Errorf("BMCSettings %s is under active maintenance, unable to update", oldObj.Name)
+			return nil, apierrors.NewInvalid(
+				schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: oldObj.Kind},
+				newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), msg.Error())})
+		}
 	}
 
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
@@ -77,8 +87,21 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
 	bmcsettingslog.Info("Validation for BMCSettings upon deletion", "name", obj.GetName())
 
-	if obj.Status.State == metalv1alpha1.BMCSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
-		return nil, apierrors.NewBadRequest("The BMC settings in progress, unable to delete")
+	// Block deletion while any referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceDeleteInProgress(obj) && len(obj.Spec.ServerMaintenanceRefs) > 0 {
+		refs := make([]metalv1alpha1.ObjectReference, 0, len(obj.Spec.ServerMaintenanceRefs))
+		for _, item := range obj.Spec.ServerMaintenanceRefs {
+			if item.ServerMaintenanceRef != nil {
+				refs = append(refs, *item.ServerMaintenanceRef)
+			}
+		}
+		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, refs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			return nil, apierrors.NewBadRequest("BMCSettings is under active maintenance, unable to delete")
+		}
 	}
 
 	return nil, nil

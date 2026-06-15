@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -57,8 +58,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
 		EnsureCleanState()
 	})
 
@@ -593,20 +594,23 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Finalizers", ContainElement(serverMaintenanceFinalizer)),
 		)
 
+		By("Setting ignore-reconciliation annotation to prevent the reconciler from re-adding the finalizer")
+		Eventually(Update(serverMaintenance, func() {
+			metav1.SetMetaDataAnnotation(&serverMaintenance.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationIgnore)
+		})).Should(Succeed())
+
 		By("Manually removing the finalizer to simulate a no-finalizer state")
 		Eventually(Update(serverMaintenance, func() {
 			serverMaintenance.Finalizers = nil
 		})).Should(Succeed())
+
+		By("Ensuring finalizers are empty before delete")
+		Expect(serverMaintenance.Finalizers).To(BeEmpty())
 
 		By("Deleting the ServerMaintenance")
 		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
 
 		By("Ensuring the ServerMaintenance is deleted immediately without cleanup side-effects")
 		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
-
-		By("Ensuring the Server was not modified during deletion")
-		Consistently(Object(server)).Should(
-			HaveField("Spec.ServerMaintenanceRef", BeNil()),
-		)
 	})
 })

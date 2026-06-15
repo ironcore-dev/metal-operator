@@ -356,8 +356,7 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, maintenance *m
 		}
 	} else if apierrors.IsNotFound(err) {
 		// note: if the server is already deleted, we can skip the cleanup and just remove the finalizer
-		// if its transent error of server not found, the servermaintenance will be deleted and server will free up the ref automatically once this is deleted
-		log.V(1).Info("Server not found, continue with cleanup", "Server", maintenance.Spec.ServerRef.Name)
+		log.V(1).Info("Server not found, skipping cleanup", "Server", maintenance.Spec.ServerRef.Name)
 	} else {
 		return ctrl.Result{}, err
 	}

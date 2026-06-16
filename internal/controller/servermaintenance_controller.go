@@ -73,6 +73,13 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, maintenance
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, client.ObjectKey{Name: maintenance.Spec.ServerRef.Name}, server); err != nil {
 		if apierrors.IsNotFound(err) {
+			log.V(1).Info("Referenced Server not found, transitioning to Pending state",
+				"ServerMaintenance", client.ObjectKeyFromObject(maintenance),
+				"Server", maintenance.Spec.ServerRef.Name,
+			)
+			if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStatePending); err != nil || modified {
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get Server: %w", err)

@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 // log is for logging in this package.
@@ -56,7 +57,7 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 
 	// Block updates while the referenced ServerMaintenance is InMaintenance.
 	if !ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRef != nil {
-		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*oldObj.Spec.ServerMaintenanceRef})
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*oldObj.Spec.ServerMaintenanceRef})
 		if err != nil {
 			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
 		}
@@ -82,7 +83,7 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *m
 
 	// Block deletion while the referenced ServerMaintenance is InMaintenance.
 	if !ShouldAllowForceDeleteInProgress(obj) && obj.Spec.ServerMaintenanceRef != nil {
-		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*obj.Spec.ServerMaintenanceRef})
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*obj.Spec.ServerMaintenanceRef})
 		if err != nil {
 			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
 		}

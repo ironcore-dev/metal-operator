@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 // log is for logging in this package.
@@ -55,7 +56,7 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 
 	// Block updates while any referenced ServerMaintenance is InMaintenance.
 	if !ShouldAllowForceUpdateInProgress(newObj) && len(oldObj.Spec.ServerMaintenanceRefs) > 0 {
-		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, oldObj.Spec.ServerMaintenanceRefs)
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, oldObj.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
 		}
@@ -81,7 +82,7 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj *met
 
 	// Block deletion while any referenced ServerMaintenance is InMaintenance.
 	if !ShouldAllowForceDeleteInProgress(obj) && len(obj.Spec.ServerMaintenanceRefs) > 0 {
-		active, err := IsAnyServerMaintenanceActive(ctx, v.Client, obj.Spec.ServerMaintenanceRefs)
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, obj.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
 		}

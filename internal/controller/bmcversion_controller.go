@@ -14,6 +14,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +87,7 @@ func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *met
 		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
 			return false, nil
 		}
-		return IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
 	}
 	return shouldProceedWithDeletion(ctx, bmcVersion, bmcVersionFinalizer, isProgressing)
 }
@@ -99,7 +100,7 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1al
 	}
 
 	if len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
-		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state: %w", err)
 		}

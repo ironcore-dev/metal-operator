@@ -14,6 +14,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
@@ -96,7 +97,7 @@ func (r *BIOSVersionReconciler) shouldDelete(ctx context.Context, biosVersion *m
 		if biosVersion.Spec.ServerMaintenanceRef == nil {
 			return false, nil
 		}
-		return IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
 	}
 	return shouldProceedWithDeletion(ctx, biosVersion, BIOSVersionFinalizer, isProgressing)
 }

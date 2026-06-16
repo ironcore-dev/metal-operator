@@ -29,6 +29,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -121,7 +122,7 @@ func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *met
 		if settings.Spec.ServerMaintenanceRef == nil {
 			return false, nil
 		}
-		return IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*settings.Spec.ServerMaintenanceRef})
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*settings.Spec.ServerMaintenanceRef})
 	}
 	return shouldProceedWithDeletion(ctx, settings, BIOSSettingsFinalizer, isProgressing)
 }

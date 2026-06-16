@@ -25,6 +25,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -87,7 +88,7 @@ func (r *BIOSSettingsSetReconciler) delete(ctx context.Context, set *metalv1alph
 			deletableBIOSSettings[biosSettings.Name] = struct{}{}
 			continue
 		}
-		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosSettings.Spec.ServerMaintenanceRef})
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosSettings.Spec.ServerMaintenanceRef})
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state for BIOSSettings %s: %w", biosSettings.Name, err)
 		}
@@ -291,7 +292,7 @@ func (r *BIOSSettingsSetReconciler) deleteOrphanBIOSSettings(ctx context.Context
 	for _, biosSettings := range settings.Items {
 		if _, ok := serverMap[biosSettings.Spec.ServerRef.Name]; !ok {
 			if biosSettings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && biosSettings.Spec.ServerMaintenanceRef != nil {
-				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosSettings.Spec.ServerMaintenanceRef})
+				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosSettings.Spec.ServerMaintenanceRef})
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSSettings %s: %w", biosSettings.Name, err))
 					continue

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,7 +118,7 @@ func (r *BMCSettingsSetReconciler) delete(
 				refs = append(refs, *item.ServerMaintenanceRef)
 			}
 		}
-		active, err := IsAnyServerMaintenanceActive(ctx, r.Client, refs)
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, refs)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state for BMCSettings %s: %w", bmcSettings.Name, err)
 		}
@@ -348,7 +349,7 @@ func (r *BMCSettingsSetReconciler) deleteOrphanedBMCSettings(
 						refs = append(refs, *item.ServerMaintenanceRef)
 					}
 				}
-				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, refs)
+				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, refs)
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to check maintenance state for BMCSettings %s: %w", bmcSettings.Name, err))
 					continue

@@ -23,6 +23,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -243,7 +244,7 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(ctx context.Context,
 	for _, biosVersion := range versions.Items {
 		if !serverMap[biosVersion.Spec.ServerRef.Name] {
 			if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress && biosVersion.Spec.ServerMaintenanceRef != nil {
-				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
+				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSVersion %s: %w", biosVersion.Name, err))
 					continue

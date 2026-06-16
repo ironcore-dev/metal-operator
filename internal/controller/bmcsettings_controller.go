@@ -25,6 +25,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 	"github.com/stmcginnis/gofish/schemas"
 )
 
@@ -113,7 +114,7 @@ func (r *BMCSettingsReconciler) shouldDelete(ctx context.Context, bmcSetting *me
 				refs = append(refs, *item.ServerMaintenanceRef)
 			}
 		}
-		return IsAnyServerMaintenanceActive(ctx, r.Client, refs)
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, refs)
 	}
 	return shouldProceedWithDeletion(ctx, bmcSetting, BMCSettingFinalizer, isProgressing)
 }

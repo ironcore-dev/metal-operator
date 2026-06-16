@@ -23,6 +23,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -261,7 +262,7 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	for _, bmcVersion := range bmcVersionList.Items {
 		if _, ok := bmcMap[bmcVersion.Spec.BMCRef.Name]; !ok {
 			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress && len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
-				active, err := IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to check maintenance state for BMCVersion %s: %w", bmcVersion.Name, err))
 					continue

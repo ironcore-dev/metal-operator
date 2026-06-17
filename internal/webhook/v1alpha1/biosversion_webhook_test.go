@@ -125,6 +125,52 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().ToNot(HaveOccurred())
 	})
 
+	It("should allow update if spec.serverRef changes to an existing one but version differs", func() {
+		By("Creating a BIOSVersion with different ServerRef and version")
+		biosVersionV2 := &metalv1alpha1.BIOSVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BIOSVersionSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 "P79 v1.45 (12/06/2017)",
+					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: "bar"},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
+
+		By("Updating BIOSVersion V2 serverRef to match V1 while keeping a different version")
+		biosVersionV2Updated := biosVersionV2.DeepCopy()
+		biosVersionV2Updated.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
+		Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().ToNot(HaveOccurred())
+	})
+
+	It("should allow update when spec.serverRef is unchanged even if version now matches another record", func() {
+		By("Creating a BIOSVersion with different ServerRef")
+		biosVersionV2 := &metalv1alpha1.BIOSVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BIOSVersionSpec{
+				BIOSVersionTemplate: metalv1alpha1.BIOSVersionTemplate{
+					Version:                 "P79 v1.45 (12/06/2017)",
+					Image:                   metalv1alpha1.ImageSpec{URI: "two"},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: "bar"},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosVersionV2)).To(Succeed())
+
+		By("Updating BIOSVersion V2 version to match V1 without changing serverRef")
+		biosVersionV2Updated := biosVersionV2.DeepCopy()
+		biosVersionV2Updated.Spec.Version = biosVersionV1.Spec.Version
+		Expect(validator.ValidateUpdate(ctx, biosVersionV2, biosVersionV2Updated)).Error().ToNot(HaveOccurred())
+	})
+
 	It("should allow update if a ServerRef field is not a duplicate", func() {
 		By("Creating a BIOSVersion with different ServerRef")
 		biosVersionV2 := &metalv1alpha1.BIOSVersion{

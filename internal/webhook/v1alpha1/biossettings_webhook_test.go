@@ -98,7 +98,7 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
 	})
 
-	It("should deny update if spec.serverRef is duplicate", func() {
+	It("should deny update if spec.serverRef and version are both duplicate", func() {
 		By("Creating a BIOSSettings with different ServerRef")
 		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{
@@ -119,10 +119,65 @@ var _ = Describe("BIOSSettings Webhook", func() {
 		}
 		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
 
-		By("Updating an biosSettingsV2 with a conflicting ServerRef")
+		By("Updating biosSettingsV2 with both a conflicting ServerRef and matching version")
 		biosSettingsV2Updated := biosSettingsV2.DeepCopy()
 		biosSettingsV2Updated.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
+		biosSettingsV2Updated.Spec.Version = defaultMockUpServerBiosVersion
 		Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().To(HaveOccurred())
+	})
+
+	It("should allow update if spec.serverRef changes to an existing one but version differs", func() {
+		By("Creating a BIOSSettings with different ServerRef")
+		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				ServerRef: &v1.LocalObjectReference{Name: "bar"},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: anotherMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: map[string]string{},
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
+
+		By("Updating biosSettingsV2 with a serverRef matching V1 but a different version")
+		biosSettingsV2Updated := biosSettingsV2.DeepCopy()
+		biosSettingsV2Updated.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
+		Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
+	})
+
+	It("should allow update when spec.serverRef is unchanged even if version now matches another record", func() {
+		By("Creating a BIOSSettings with different ServerRef")
+		biosSettingsV2 := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				ServerRef: &v1.LocalObjectReference{Name: "bar"},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: anotherMockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: map[string]string{},
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettingsV2)).To(Succeed())
+
+		By("Updating biosSettingsV2 version to match V1 without changing serverRef")
+		biosSettingsV2Updated := biosSettingsV2.DeepCopy()
+		biosSettingsV2Updated.Spec.Version = defaultMockUpServerBiosVersion
+		Expect(validator.ValidateUpdate(ctx, biosSettingsV2, biosSettingsV2Updated)).Error().ToNot(HaveOccurred())
 	})
 
 	It("should allow update if a different field is duplicate", func() {

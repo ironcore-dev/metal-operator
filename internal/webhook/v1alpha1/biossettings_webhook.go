@@ -69,6 +69,13 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 		}
 	}
 
+	// If neither the serverRef nor the version changed, no new duplicate can be introduced.
+	if oldObj.Spec.ServerRef != nil && newObj.Spec.ServerRef != nil &&
+		oldObj.Spec.ServerRef.Name == newObj.Spec.ServerRef.Name &&
+		oldObj.Spec.Version == newObj.Spec.Version {
+		return nil, nil
+	}
+
 	settingsList := &metalv1alpha1.BIOSSettingsList{}
 	if err := v.List(ctx, settingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
@@ -100,16 +107,23 @@ func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSe
 		if settings.Name == bs.Name {
 			continue
 		}
-		if settings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
-			err := fmt.Errorf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
-				settings.Spec.ServerRef.Name,
-				settings.Name,
-				bs.Spec.ServerRef.Name,
-				bs.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
-				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef"), err)})
+		if settings.Spec.ServerRef == nil || bs.Spec.ServerRef == nil {
+			continue
 		}
+		if settings.Spec.ServerRef.Name != bs.Spec.ServerRef.Name {
+			continue
+		}
+		if bs.Spec.Version != settings.Spec.Version {
+			continue
+		}
+		err := fmt.Errorf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
+			settings.Spec.ServerRef.Name,
+			settings.Name,
+			bs.Spec.ServerRef.Name,
+			bs.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
+			settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef"), err)})
 	}
 	return nil, nil
 }

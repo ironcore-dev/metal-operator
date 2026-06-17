@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -44,6 +45,8 @@ var _ = Describe("BMCSettings Webhook", func() {
 	AfterEach(func() {
 		By("Deleting BMCSettings resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSettings{})).To(Succeed())
+		By("Deleting ServerMaintenance resources if created")
+		Expect(client.IgnoreNotFound(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerMaintenance{}))).To(Succeed())
 	})
 
 	Context("When creating or updating BMCSettings under Validating Webhook", func() {

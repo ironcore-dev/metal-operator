@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -47,7 +48,10 @@ var _ = Describe("BIOSSettings Webhook", func() {
 	AfterEach(func(ctx SpecContext) {
 		By("Deleting the BIOSSettings and Server resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BIOSSettings{})).To(Succeed())
-		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{})).To(Succeed())
+		By("Deleting Server resources if created")
+		Expect(client.IgnoreNotFound(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.Server{}))).To(Succeed())
+		By("Deleting ServerMaintenance resources if created")
+		Expect(client.IgnoreNotFound(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerMaintenance{}))).To(Succeed())
 	})
 
 	It("should deny creation if a Server already has a BIOSSettings", func(ctx SpecContext) {

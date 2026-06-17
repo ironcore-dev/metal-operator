@@ -891,7 +891,7 @@ func (r *ServerReconciler) getOrCreateSigningSecret(ctx context.Context) ([]byte
 			ctrl.LoggerFrom(ctx).Info("Signing secret already exists, retrieving it")
 
 			secret := &v1.Secret{}
-			if err := r.Get(ctx, types.NamespacedName{
+			if err := r.APIReader.Get(ctx, types.NamespacedName{
 				Name:      secretName,
 				Namespace: r.ManagerNamespace,
 			}, secret); err != nil {

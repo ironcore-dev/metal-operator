@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -107,8 +106,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
@@ -179,8 +178,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeNil()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
@@ -256,8 +255,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
 		))
@@ -275,8 +274,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
@@ -400,8 +399,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
@@ -449,8 +448,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
 			WithTransform(func(secret *v1.Secret) error {
@@ -994,8 +993,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerClaim",
 				Name:               claim.Name,
 				UID:                claim.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.ServerRef.Name", server.Name),
 			HaveField("Spec.Image", "foo:bar"),

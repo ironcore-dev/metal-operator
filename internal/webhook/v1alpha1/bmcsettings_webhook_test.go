@@ -60,7 +60,7 @@ var _ = Describe("BMCSettings Webhook", func() {
 				Spec: metalv1alpha1.BMCSettingsSpec{
 					BMCRef: &v1.LocalObjectReference{Name: "foo"},
 					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-						Version:                 "1.45.455b66-rev4",
+						Version:                 "P70 v1.45 (12/06/2017)",
 						SettingsMap:             map[string]string{},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					}},
@@ -126,6 +126,73 @@ var _ = Describe("BMCSettings Webhook", func() {
 			By("Updating an BMCSettingsV2 to refer to new BMC")
 			BMCSettingsV2Updated := BMCSettingsV2.DeepCopy()
 			BMCSettingsV2Updated.Spec.BMCRef = &v1.LocalObjectReference{Name: "new-bmc2"}
+			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().NotTo(HaveOccurred())
+		})
+
+		It("should deny update if both bmcRef and version match an existing record", func() {
+			By("Creating another BMCSetting with different BMCRef")
+			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-",
+				},
+				Spec: metalv1alpha1.BMCSettingsSpec{
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "other-version",
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					}},
+			}
+			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
+
+			By("Updating BMCSettingsV2 to match both bmcRef and version of V1")
+			BMCSettingsV2Updated := BMCSettingsV2.DeepCopy()
+			BMCSettingsV2Updated.Spec.BMCRef = BMCSettingsV1.Spec.BMCRef
+			BMCSettingsV2Updated.Spec.Version = BMCSettingsV1.Spec.Version
+			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().To(HaveOccurred())
+		})
+
+		It("should allow update if bmcRef changes to an existing one but version differs", func() {
+			By("Creating another BMCSetting with different BMCRef and version")
+			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-",
+				},
+				Spec: metalv1alpha1.BMCSettingsSpec{
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "other-version",
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					}},
+			}
+			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
+
+			By("Updating BMCSettingsV2 bmcRef to match V1 while keeping a different version")
+			BMCSettingsV2Updated := BMCSettingsV2.DeepCopy()
+			BMCSettingsV2Updated.Spec.BMCRef = BMCSettingsV1.Spec.BMCRef
+			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().NotTo(HaveOccurred())
+		})
+
+		It("should allow update when bmcRef is unchanged even if version now matches another record", func() {
+			By("Creating another BMCSetting with different BMCRef")
+			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-",
+				},
+				Spec: metalv1alpha1.BMCSettingsSpec{
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+					BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+						Version:                 "other-version",
+						SettingsMap:             map[string]string{},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					}},
+			}
+			Expect(k8sClient.Create(ctx, BMCSettingsV2)).To(Succeed())
+
+			By("Updating BMCSettingsV2 version to match V1 without changing bmcRef")
+			BMCSettingsV2Updated := BMCSettingsV2.DeepCopy()
+			BMCSettingsV2Updated.Spec.Version = BMCSettingsV1.Spec.Version
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV2, BMCSettingsV2Updated)).Error().NotTo(HaveOccurred())
 		})
 

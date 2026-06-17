@@ -636,6 +636,55 @@ var _ = Describe("BMCVersion Controller", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
 	})
+	It("should re-upgrade BMC when firmware is rolled back after completion", func(ctx SpecContext) {
+		By("Updating the server state to Available with power off for maintenance")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
+		})).Should(Succeed())
+
+		By("Creating a BMCVersion targeting the upgraded version")
+		bmcVersion := &metalv1alpha1.BMCVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.BMCVersionSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
+				BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+					Version:                 upgradeServerBMCVersion,
+					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcVersion)).To(Succeed())
+
+		By("Waiting for BMCVersion to reach Completed state")
+		Eventually(Object(bmcVersion), "60s").Should(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
+		)
+
+		By("Simulating a firmware rollback on the mock BMC")
+		mockServers[0].ResetUpgradeTask("/redfish/v1/Managers/BMC")
+
+		By("Triggering a BMC watch event to prompt re-reconciliation")
+		Eventually(Update(bmcObj, func() {
+			metautils.SetAnnotation(bmcObj, "trigger-reconcile", "rollback-test")
+		})).Should(Succeed())
+
+		By("Ensuring BMCVersion transitions back to InProgress after detecting the rollback")
+		Eventually(Object(bmcVersion), "30s").Should(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateInProgress),
+		)
+
+		By("Ensuring BMCVersion reaches Completed again after re-upgrade")
+		Eventually(Object(bmcVersion), "60s").Should(
+			HaveField("Status.State", metalv1alpha1.BMCVersionStateCompleted),
+		)
+
+		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
+	})
+
 })
 
 func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersion *metalv1alpha1.BMCVersion) {

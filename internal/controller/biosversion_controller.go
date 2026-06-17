@@ -614,7 +614,11 @@ func (r *BIOSVersionReconciler) cleanup(ctx context.Context, bmcClient bmc.BMC, 
 	if err != nil {
 		return err
 	}
-
+	if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateCompleted &&
+		currentBiosVersion == biosVersion.Spec.Version &&
+		biosVersion.Spec.ServerMaintenanceRef == nil {
+		return nil
+	}
 	if currentBiosVersion == biosVersion.Spec.Version {
 		if err := r.cleanupServerMaintenanceReferences(ctx, biosVersion); err != nil {
 			return err
@@ -988,9 +992,7 @@ func (r *BIOSVersionReconciler) enqueueBiosVersionByServerRefs(ctx context.Conte
 			continue
 		}
 		// states where we do not need to requeue for host changes
-		if biosVersion.Spec.ServerMaintenanceRef == nil ||
-			biosVersion.Status.State == metalv1alpha1.BIOSVersionStateCompleted ||
-			biosVersion.Status.State == metalv1alpha1.BIOSVersionStateFailed {
+		if biosVersion.Spec.ServerMaintenanceRef == nil {
 			return nil
 		}
 		if biosVersion.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {

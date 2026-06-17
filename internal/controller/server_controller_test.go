@@ -23,7 +23,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/registry"
 	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	"github.com/ironcore-dev/metal-operator/internal/probe"
-	metaltoken "github.com/ironcore-dev/metal-operator/internal/token"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -33,28 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
-
-// getSignedDiscoveryToken retrieves the signing secret and generates a signed discovery token
-// for the given systemUUID. This is a test helper to avoid code duplication.
-func getSignedDiscoveryToken(ctx SpecContext, k8sClient client.Client, ns, systemUUID string) (string, error) {
-	secretName := metaltoken.DiscoveryTokenSigningSecretName
-	secret := &v1.Secret{}
-
-	err := k8sClient.Get(ctx, client.ObjectKey{
-		Name:      secretName,
-		Namespace: ns,
-	}, secret)
-	if err != nil {
-		return "", err
-	}
-
-	signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]
-	if !ok || len(signingKey) != 32 {
-		return "", fmt.Errorf("invalid signing secret")
-	}
-
-	return metaltoken.GenerateSignedDiscoveryToken(signingKey, systemUUID)
-}
 
 var _ = Describe("Server Controller", func() {
 	ns := SetupTest(nil)

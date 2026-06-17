@@ -4,13 +4,36 @@
 package controller
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metaltoken "github.com/ironcore-dev/metal-operator/internal/token"
 )
+
+// getSignedDiscoveryToken retrieves the signing secret and generates a signed discovery token
+// for the given systemUUID.
+func getSignedDiscoveryToken(ctx SpecContext, k8sClient client.Client, ns, systemUUID string) (string, error) {
+	secret := &corev1.Secret{}
+	if err := k8sClient.Get(ctx, client.ObjectKey{
+		Name:      metaltoken.DiscoveryTokenSigningSecretName,
+		Namespace: ns,
+	}, secret); err != nil {
+		return "", err
+	}
+
+	signingKey, ok := secret.Data[metaltoken.DiscoveryTokenSigningSecretKey]
+	if !ok || len(signingKey) != 32 {
+		return "", fmt.Errorf("invalid signing secret")
+	}
+
+	return metaltoken.GenerateSignedDiscoveryToken(signingKey, systemUUID)
+}
 
 var _ = Describe("Variable templating", func() {
 

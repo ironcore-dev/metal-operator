@@ -73,7 +73,7 @@ func (o *OriginOfConditionRef) UnmarshalJSON(data []byte) error {
 	var ref struct {
 		ODataID string `json:"@odata.id"`
 	}
-	if err := json.Unmarshal(data, &ref); err == nil && ref.ODataID != "" {
+	if err := json.Unmarshal(data, &ref); err == nil {
 		o.ODataID = ref.ODataID
 		return nil
 	}

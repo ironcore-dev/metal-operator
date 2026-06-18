@@ -218,6 +218,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				BasicAuth:            true,
 			},
 			DiscoveryTimeout:      30 * time.Second, // Set a short discovery timeout for testing
+			DiscoveryTokenExpiry:  time.Hour,
 			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

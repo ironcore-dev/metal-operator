@@ -97,6 +97,7 @@ type ServerReconciler struct {
 	ResyncInterval          time.Duration
 	BMCOptions              bmc.Options
 	DiscoveryTimeout        time.Duration
+	DiscoveryTokenExpiry    time.Duration
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
 	DiscoveryIgnitionPath   string
@@ -770,7 +771,7 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 	}
 
 	// Generate signed discovery token
-	discoveryToken, err := metaltoken.GenerateSignedDiscoveryToken(signingSecret, server.Spec.SystemUUID)
+	discoveryToken, err := metaltoken.GenerateSignedDiscoveryToken(signingSecret, server.Spec.SystemUUID, r.DiscoveryTokenExpiry)
 	if err != nil {
 		return fmt.Errorf("failed to generate discovery token: %w", err)
 	}

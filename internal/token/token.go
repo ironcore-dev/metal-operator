@@ -33,8 +33,9 @@ func GenerateSigningSecret() ([]byte, error) {
 //
 // signingSecret: 32-byte shared secret between controller and registry
 // systemUUID: The server's system UUID (must be RFC 4122 format)
+// expiry: how long the token should be valid for
 // Returns: signed JWT token
-func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string) (string, error) {
+func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string, expiry time.Duration) (string, error) {
 	if len(signingSecret) != 32 {
 		return "", fmt.Errorf("signing secret must be exactly 32 bytes")
 	}
@@ -46,9 +47,9 @@ func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string) (stri
 
 	// Create JWT claims
 	claims := jwt.MapClaims{
-		"sub": systemUUID,                                        // Subject: scoped to this server
-		"iat": jwt.NewNumericDate(time.Now()),                    // Issued at
-		"exp": jwt.NewNumericDate(time.Now().Add(1 * time.Hour)), // Expires in 1 hour
+		"sub": systemUUID,                     // Subject: scoped to this server
+		"iat": jwt.NewNumericDate(time.Now()), // Issued at
+		"exp": jwt.NewNumericDate(time.Now().Add(expiry)),
 	}
 
 	// Create token with HS256 signing method

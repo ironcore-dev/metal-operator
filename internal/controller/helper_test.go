@@ -5,6 +5,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,7 +33,7 @@ func getSignedDiscoveryToken(ctx SpecContext, k8sClient client.Client, ns, syste
 		return "", fmt.Errorf("invalid signing secret")
 	}
 
-	return metaltoken.GenerateSignedDiscoveryToken(signingKey, systemUUID)
+	return metaltoken.GenerateSignedDiscoveryToken(signingKey, systemUUID, time.Hour)
 }
 
 var _ = Describe("Variable templating", func() {

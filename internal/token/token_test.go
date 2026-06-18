@@ -47,7 +47,7 @@ var _ = Describe("GenerateSignedDiscoveryToken", func() {
 
 	Context("Token Format", func() {
 		It("should generate a valid JWT token", func() {
-			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(token).NotTo(BeEmpty())
 
@@ -57,29 +57,29 @@ var _ = Describe("GenerateSignedDiscoveryToken", func() {
 		})
 
 		It("should generate different tokens for different UUIDs", func() {
-			token1, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token1, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
-			token2, err := GenerateSignedDiscoveryToken(signingSecret, "49947555-7742-3448-3784-823347823835")
+			token2, err := GenerateSignedDiscoveryToken(signingSecret, "49947555-7742-3448-3784-823347823835", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(token1).NotTo(Equal(token2))
 		})
 
 		It("should generate different tokens at different times", func() {
-			token1, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token1, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Wait 1+ second to ensure different timestamp
 			time.Sleep(1100 * time.Millisecond)
-			token2, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token2, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(token2).NotTo(Equal(token1))
 		})
 
 		It("should return error for invalid secret length", func() {
 			shortSecret := []byte("too-short")
-			_, err := GenerateSignedDiscoveryToken(shortSecret, "38947555-7742-3448-3784-823347823834")
+			_, err := GenerateSignedDiscoveryToken(shortSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("32 bytes"))
 		})
@@ -98,7 +98,7 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 	Context("Valid Tokens", func() {
 		It("should verify a valid token", func() {
 			systemUUID := "49947555-7742-3448-3784-823347823835"
-			token, err := GenerateSignedDiscoveryToken(signingSecret, systemUUID)
+			token, err := GenerateSignedDiscoveryToken(signingSecret, systemUUID, time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			extractedUUID, timestamp, valid, err := VerifySignedDiscoveryToken(signingSecret, token)
@@ -110,7 +110,7 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 
 		It("should extract the correct systemUUID", func() {
 			systemUUID := "38947555-7742-3448-3784-823347823834"
-			token, err := GenerateSignedDiscoveryToken(signingSecret, systemUUID)
+			token, err := GenerateSignedDiscoveryToken(signingSecret, systemUUID, time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			extractedUUID, _, valid, err := VerifySignedDiscoveryToken(signingSecret, token)
@@ -122,7 +122,7 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 
 	Context("Invalid Tokens", func() {
 		It("should reject token with wrong signature", func() {
-			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Use different secret for verification
@@ -155,7 +155,7 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 		})
 
 		It("should reject tampered token", func() {
-			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Tamper with token
@@ -196,7 +196,7 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 		It("should use JWT library constant-time comparison", func() {
 			// JWT library provides constant-time comparison via HMAC
 			// This test verifies the signature mechanism works
-			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, _, valid, err := VerifySignedDiscoveryToken(signingSecret, token)
@@ -206,7 +206,7 @@ var _ = Describe("VerifySignedDiscoveryToken", func() {
 
 		It("should prevent replay of UUID substitution", func() {
 			// Generate token for uuid-1
-			token1, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834")
+			token1, err := GenerateSignedDiscoveryToken(signingSecret, "38947555-7742-3448-3784-823347823834", time.Hour)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify - should extract uuid-1, not uuid-2

@@ -99,6 +99,7 @@ func main() { // nolint: gocyclo
 		resourcePollingInterval            time.Duration
 		resourcePollingTimeout             time.Duration
 		discoveryTimeout                   time.Duration
+		discoveryTokenExpiry               time.Duration
 		biosSettingsApplyTimeout           time.Duration
 		bmcFailureResetDelay               time.Duration
 		bmcResetResyncInterval             time.Duration
@@ -114,6 +115,8 @@ func main() { // nolint: gocyclo
 	flag.IntVar(&serverClaimMaxConcurrentReconciles, "server-claim-max-concurrent-reconciles", 5,
 		"The maximum number of concurrent ServerClaim reconciles.")
 	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
+	flag.DurationVar(&discoveryTokenExpiry, "discovery-token-expiry", 1*time.Hour,
+		"Validity duration of signed discovery tokens issued to servers")
 	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second,
 		"Interval between polling resources")
 	flag.DurationVar(&resourcePollingTimeout, "resource-polling-timeout", 2*time.Minute, "Timeout for polling resources")
@@ -470,7 +473,8 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		DiscoveryTimeout: discoveryTimeout,
+		DiscoveryTimeout:     discoveryTimeout,
+		DiscoveryTokenExpiry: discoveryTokenExpiry,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "server")
 		os.Exit(1)

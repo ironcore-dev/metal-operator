@@ -116,7 +116,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server has the correct server bios setting ref")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettingsV1.Name),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettingsV1.Name})),
 		)
 
 		By("Ensuring that the BIOS setting has reached next state: Applied")
@@ -162,7 +162,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server has the correct server bios setting ref")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettingsV2.Name),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettingsV2.Name})),
 		)
 
 		Eventually(Object(biosSettingsV2)).Should(SatisfyAll(
@@ -175,12 +175,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server has the correct server bios setting ref")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettingsV2.Name),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettingsV2.Name})),
 		)
 		By("Deleting the BIOSSettings V2 (new)")
 		Expect(k8sClient.Delete(ctx, biosSettingsV2)).To(Succeed())
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
@@ -215,7 +215,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server has the bios setting ref")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings.Name})),
 		)
 
 		Eventually(Object(biosSettings)).Should(SatisfyAll(
@@ -243,7 +243,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the bios ref is empty")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
@@ -278,7 +278,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server has the bios setting ref")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings.Name})),
 		)
 
 		Eventually(Object(biosSettings)).Should(
@@ -302,7 +302,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the bios ref is empty")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
@@ -445,7 +445,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server BIOSSettings ref is empty")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 
 		// cleanup
@@ -632,7 +632,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server has the bios setting ref")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", &v1.LocalObjectReference{Name: biosSettings.Name}),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings.Name})),
 		)
 
 		By("Ensuring that the Maintenance resource has been created")
@@ -675,7 +675,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the bios ref is empty")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
@@ -744,8 +744,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the BMC has the correct BMC settings ref")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
+			HaveField("Spec.BIOSSettingsRefs", Not(BeEmpty())),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings.Name})),
 		))
 
 		By("Ensuring that the biosSettings resource state is correct State inVersionUpgrade")
@@ -794,10 +794,10 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Ensuring that the Server biosSettings ref is empty on BMC")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 		Consistently(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 
 		// cleanup
@@ -913,8 +913,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Wait for the BIOSSettings to be ref on the Server")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
+			HaveField("Spec.BIOSSettingsRefs", Not(BeEmpty())),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings.Name})),
 		))
 		// delete the old settings
 		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
@@ -976,8 +976,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 
 		By("Wait for the BIOSSettings2 to be ref on the Server")
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BIOSSettingsRef", Not(BeNil())),
-			HaveField("Spec.BIOSSettingsRef.Name", biosSettings2.Name),
+			HaveField("Spec.BIOSSettingsRefs", Not(BeEmpty())),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings2.Name})),
 		))
 
 		Eventually(Object(biosSettings2)).Should(SatisfyAny(
@@ -995,6 +995,53 @@ var _ = Describe("BIOSSettings Controller", func() {
 		Eventually(Object(server)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
 		)
+	})
+
+	It("should migrate deprecated Server.spec.biosSettingsRef to Server.spec.biosSettingsRefs on first reconcile", func(ctx SpecContext) {
+		By("Creating a BIOSSettings to trigger the ref write path")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bios-migrate-ref-",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version:                 "1.0.0",
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Waiting for the ref to appear in BIOSSettingsRefs")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings.Name})),
+		)
+
+		By("Patching the deprecated Server.spec.biosSettingsRef field to simulate a pre-migration Server object")
+		Eventually(Update(server, func() {
+			server.Spec.BIOSSettingsRef = &v1.LocalObjectReference{Name: biosSettings.Name}
+			server.Spec.BIOSSettingsRefs = nil
+		})).Should(Succeed())
+
+		// Touch the BIOSSettings object with a no-op annotation to re-trigger reconciliation
+		// so the migration path in patchBIOSSettingsRefForServer is exercised.
+		By("Forcing a BIOSSettings reconcile via a no-op annotation to re-trigger migration")
+		Eventually(Update(biosSettings, func() {
+			if biosSettings.Annotations == nil {
+				biosSettings.Annotations = map[string]string{}
+			}
+			biosSettings.Annotations["metal.ironcore.dev/migration-trigger"] = "true"
+		})).Should(Succeed())
+
+		By("Ensuring the controller migrates biosSettingsRef into biosSettingsRefs and clears biosSettingsRef")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings.Name})),
+			HaveField("Spec.BIOSSettingsRef", BeNil()),
+		))
+
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })
 
@@ -1193,7 +1240,7 @@ var _ = Describe("BIOSSettings Controller with BMCRef BMC", func() {
 
 		By("Ensuring that the Server BIOSSettings ref is empty")
 		Eventually(Object(server)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 
 		// cleanup

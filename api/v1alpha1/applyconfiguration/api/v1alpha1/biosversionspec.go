@@ -17,6 +17,10 @@ import (
 type BIOSVersionSpecApplyConfiguration struct {
 	// BIOSVersionTemplate defines the template for Version to be applied on the servers.
 	BIOSVersionTemplateApplyConfiguration `json:",inline"`
+	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
+	// after the upgrade completes. Empty string (default) means the controller is fully active.
+	// Set by the parent CRD; must not be set manually.
+	DriftPolicy *apiv1alpha1.DriftPolicy `json:"driftPolicy,omitempty"`
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server.
 	ServerMaintenanceRef *ObjectReferenceApplyConfiguration `json:"serverMaintenanceRef,omitempty"`
 	// ServerRef is a reference to a specific server to apply the BIOS upgrade on.
@@ -66,6 +70,14 @@ func (b *BIOSVersionSpecApplyConfiguration) WithServerMaintenancePolicy(value ap
 // If called multiple times, the RetryPolicy field is set to the value of the last call.
 func (b *BIOSVersionSpecApplyConfiguration) WithRetryPolicy(value *RetryPolicyApplyConfiguration) *BIOSVersionSpecApplyConfiguration {
 	b.BIOSVersionTemplateApplyConfiguration.RetryPolicy = value
+	return b
+}
+
+// WithDriftPolicy sets the DriftPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DriftPolicy field is set to the value of the last call.
+func (b *BIOSVersionSpecApplyConfiguration) WithDriftPolicy(value apiv1alpha1.DriftPolicy) *BIOSVersionSpecApplyConfiguration {
+	b.DriftPolicy = &value
 	return b
 }
 

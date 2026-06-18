@@ -69,6 +69,15 @@ spec:
           spec:
             description: BIOSVersionSpec defines the desired state of BIOSVersion.
             properties:
+              driftPolicy:
+                description: |-
+                  DriftPolicy controls how the controller reacts when hardware deviates from the desired state
+                  after the upgrade completes. Empty string (default) means the controller is fully active.
+                  Set by the parent CRD; must not be set manually.
+                enum:
+                - Observe
+                - Suspend
+                type: string
               image:
                 description: Image specifies the image to use to upgrade to the given
                   BIOS version.
@@ -158,6 +167,9 @@ spec:
             - image
             - version
             type: object
+            x-kubernetes-validations:
+            - message: serverRef is required
+              rule: has(self.serverRef)
           status:
             description: BIOSVersionStatus defines the observed state of BIOSVersion.
             properties:

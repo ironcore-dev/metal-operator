@@ -47,7 +47,12 @@ type ServerSpecApplyConfiguration struct {
 	BootOrder []BootOrderApplyConfiguration `json:"bootOrder,omitempty"`
 	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.
+	// Deprecated: use biosSettingsRefs instead. Will be removed in next release.
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
+	// BIOSSettingsRefs is a list of references to BIOSSettings objects that specify
+	// the BIOS configuration for this server. Replaces the single biosSettingsRef to support
+	// multiple simultaneous settings objects created.
+	BIOSSettingsRefs []v1.LocalObjectReference `json:"biosSettingsRefs,omitempty"`
 	// Taints control which ServerClaims can be bound to this server.
 	Taints []TaintApplyConfiguration `json:"taints,omitempty"`
 }
@@ -164,6 +169,16 @@ func (b *ServerSpecApplyConfiguration) WithBootOrder(values ...*BootOrderApplyCo
 // If called multiple times, the BIOSSettingsRef field is set to the value of the last call.
 func (b *ServerSpecApplyConfiguration) WithBIOSSettingsRef(value v1.LocalObjectReference) *ServerSpecApplyConfiguration {
 	b.BIOSSettingsRef = &value
+	return b
+}
+
+// WithBIOSSettingsRefs adds the given value to the BIOSSettingsRefs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BIOSSettingsRefs field.
+func (b *ServerSpecApplyConfiguration) WithBIOSSettingsRefs(values ...v1.LocalObjectReference) *ServerSpecApplyConfiguration {
+	for i := range values {
+		b.BIOSSettingsRefs = append(b.BIOSSettingsRefs, values[i])
+	}
 	return b
 }
 

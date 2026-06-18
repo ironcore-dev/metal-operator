@@ -17,6 +17,10 @@ import (
 type BMCVersionSpecApplyConfiguration struct {
 	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
 	BMCVersionTemplateApplyConfiguration `json:",inline"`
+	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
+	// after the upgrade completes. Empty string (default) means the controller is fully active.
+	// Set by the parent CRD; must not be set manually.
+	DriftPolicy *apiv1alpha1.DriftPolicy `json:"driftPolicy,omitempty"`
 	// ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers.
 	ServerMaintenanceRefs []ObjectReferenceApplyConfiguration `json:"serverMaintenanceRefs,omitempty"`
 	// BMCRef is a reference to a specific BMC to apply BMC upgrade on.
@@ -66,6 +70,14 @@ func (b *BMCVersionSpecApplyConfiguration) WithRetryPolicy(value *RetryPolicyApp
 // If called multiple times, the ServerMaintenancePolicy field is set to the value of the last call.
 func (b *BMCVersionSpecApplyConfiguration) WithServerMaintenancePolicy(value apiv1alpha1.ServerMaintenancePolicy) *BMCVersionSpecApplyConfiguration {
 	b.BMCVersionTemplateApplyConfiguration.ServerMaintenancePolicy = &value
+	return b
+}
+
+// WithDriftPolicy sets the DriftPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DriftPolicy field is set to the value of the last call.
+func (b *BMCVersionSpecApplyConfiguration) WithDriftPolicy(value apiv1alpha1.DriftPolicy) *BMCVersionSpecApplyConfiguration {
+	b.DriftPolicy = &value
 	return b
 }
 

@@ -329,7 +329,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 
 		By("creating the server02")
 		server02.ResourceVersion = ""
-		server02.Spec.BIOSSettingsRef = nil
+		server02.Spec.BIOSSettingsRefs = nil
 		Expect(k8sClient.Create(ctx, server02)).Should(Succeed())
 
 		By("Checking if the BIOSSettings have been created")
@@ -491,16 +491,16 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 
 		By("Checking if the server BIOSSetting Ref has not be overritten by the 2nd BIOSSettingsSet")
 		Eventually(Object(server02)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings02.Name})),
 		)
 		Consistently(Object(server02)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings02.Name})),
 		)
 		Eventually(Object(server03)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings03.Name})),
 		)
 		Consistently(Object(server03)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings03.Name})),
 		)
 
 		By("Checking the status of the 2nd BIOSSettingsSet")
@@ -529,10 +529,10 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 
 		By("Checking if the server BIOSSetting Ref is empty")
 		Eventually(Object(server02)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 		Eventually(Object(server03)).Should(
-			HaveField("Spec.BIOSSettingsRef", BeNil()),
+			HaveField("Spec.BIOSSettingsRefs", BeEmpty()),
 		)
 
 		By("Checking the status at the 2nd BIOSSettingsSet")
@@ -574,16 +574,16 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 
 		By("Checking if the server BIOSSetting Ref has been set by the 2nd BIOSSettingsSet")
 		Eventually(Object(server02)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02_02.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings02_02.Name})),
 		)
 		Consistently(Object(server02)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings02_02.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings02_02.Name})),
 		)
 		Eventually(Object(server03)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03_02.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings03_02.Name})),
 		)
 		Consistently(Object(server03)).Should(
-			HaveField("Spec.BIOSSettingsRef.Name", Equal(biosSettings03_02.Name)),
+			HaveField("Spec.BIOSSettingsRefs", ContainElement(v1.LocalObjectReference{Name: biosSettings03_02.Name})),
 		)
 
 		By("Checking if the status has been updated")

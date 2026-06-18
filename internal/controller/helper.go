@@ -605,3 +605,44 @@ func settingKeys(attrs schemas.SettingsAttributes) []string {
 	}
 	return keys
 }
+
+// containsRef reports whether refs contains an entry with the given name.
+func containsRef(refs []corev1.LocalObjectReference, name string) bool {
+	for _, r := range refs {
+		if r.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// removeRef returns a copy of refs with any entry matching name removed.
+func removeRef(refs []corev1.LocalObjectReference, name string) []corev1.LocalObjectReference {
+	out := refs[:0:0]
+	for _, r := range refs {
+		if r.Name != name {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// flattenSettingsFlow merges all SettingsFlowItems into a single map for BMCSettings flow as temp solution.
+// this follows the current workflows in the BMCSettings controller,
+// but will need to be reworked when we want to support firing each SettingsFlowItem separately in list order.
+// Items are processed in ascending priority order (lower number = higher priority,
+// applied first), so higher-priority items win on key conflicts.
+// TODO: fire each SettingsFlowItem separately in list order rather than merging
+// them into one flat map — required for correct ordering semantics.
+func flattenSettingsFlow(flow []metalv1alpha1.SettingsFlowItem) map[string]string {
+	sorted := make([]metalv1alpha1.SettingsFlowItem, len(flow))
+	copy(sorted, flow)
+	slices.SortFunc(sorted, func(a, b metalv1alpha1.SettingsFlowItem) int {
+		return int(a.Priority) - int(b.Priority)
+	})
+	merged := make(map[string]string)
+	for _, item := range sorted {
+		maps.Copy(merged, item.Settings)
+	}
+	return merged
+}

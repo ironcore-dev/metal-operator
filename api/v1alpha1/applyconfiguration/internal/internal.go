@@ -118,6 +118,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSpec
   map:
     fields:
+    - name: driftPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.DriftPolicy
     - name: retryPolicy
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
@@ -255,6 +258,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersionSpec
   map:
     fields:
+    - name: driftPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.DriftPolicy
     - name: image
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
@@ -449,6 +455,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: BMCRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: driftPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.DriftPolicy
     - name: retryPolicy
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
@@ -466,6 +475,12 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+    - name: settingsFlow
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
+          elementRelationship: atomic
     - name: variables
       type:
         list:
@@ -509,6 +524,12 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+    - name: settingsFlow
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
+          elementRelationship: atomic
     - name: variables
       type:
         list:
@@ -530,6 +551,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: bmcSettingsRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: bmcSettingsRefsList
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.LocalObjectReference
+          elementRelationship: atomic
     - name: bmcUUID
       type:
         scalar: string
@@ -719,6 +746,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: bmcRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: driftPolicy
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.DriftPolicy
     - name: image
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
@@ -812,6 +842,8 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConsoleProtocolName
+  scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.DriftPolicy
   scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Endpoint
   map:
@@ -1259,6 +1291,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: biosSettingsRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: biosSettingsRefs
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.LocalObjectReference
+          elementRelationship: atomic
     - name: bmc
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCAccess

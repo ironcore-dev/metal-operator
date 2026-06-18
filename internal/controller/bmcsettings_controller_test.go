@@ -106,7 +106,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -114,7 +114,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		Eventually(Object(settings)).Should(SatisfyAny(
@@ -137,7 +137,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -145,7 +145,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		Eventually(Object(settings)).Should(SatisfyAll(
@@ -157,7 +157,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingsRefs", BeEmpty()),
 		))
 	})
 
@@ -180,7 +180,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -188,7 +188,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings has reached next state")
@@ -213,7 +213,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingsRefs", BeEmpty()),
 		))
 
 		// cleanup
@@ -266,7 +266,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
 				}},
 		}
@@ -300,7 +300,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		Eventually(Object(settings)).Should(SatisfyAny(
@@ -334,7 +334,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingsRefs", BeEmpty()),
 		))
 
 		// cleanup
@@ -364,7 +364,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "2.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -372,8 +372,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the correct BMC settings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", settings.Name),
+			HaveField("Spec.BMCSettingsRefs", Not(BeEmpty())),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings resource state is Pending while waiting for version upgrade")
@@ -433,7 +433,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the Server BMCSettings ref is empty on BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", BeNil()),
+			HaveField("Spec.BMCSettingsRefs", BeEmpty()),
 		))
 
 		Eventually(Object(server)).Should(
@@ -461,7 +461,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -517,7 +517,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -525,8 +525,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Wait for the BMCSettings to be ref on the BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", settings.Name),
+			HaveField("Spec.BMCSettingsRefs", Not(BeEmpty())),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 		By("Forcing deletion of the object by removing finalizers")
@@ -575,7 +575,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 				}},
 		}
@@ -583,8 +583,8 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Wait for the BMCSettings2 to be ref on the BMC")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", Not(BeNil())),
-			HaveField("Spec.BMCSettingRef.Name", bmcSettings2.Name),
+			HaveField("Spec.BMCSettingsRefs", Not(BeEmpty())),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: bmcSettings2.Name})),
 		))
 
 		Eventually(Object(bmcSettings2)).Should(SatisfyAny(
@@ -633,7 +633,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version:                 "1.45.455b66-rev4",
-					SettingsMap:             bmcSetting,
+					SettingsFlow:            []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: bmcSetting}},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: new(int32(failedAutoRetryCount))},
 				}},
@@ -698,8 +698,8 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(SETTING_VAL)"},
+					Version:      "1.45.455b66-rev4",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: map[string]string{"abc": "$(SETTING_VAL)"}}},
 					Variables: []metalv1alpha1.Variable{
 						{
 							Key: "SETTING_VAL",
@@ -720,7 +720,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings reaches Applied state after variable resolution")
@@ -755,8 +755,8 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(SETTING_VAL)"},
+					Version:      "1.45.455b66-rev4",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: map[string]string{"abc": "$(SETTING_VAL)"}}},
 					Variables: []metalv1alpha1.Variable{
 						{
 							Key: "SETTING_VAL",
@@ -777,7 +777,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings reaches Applied state after variable resolution")
@@ -799,8 +799,8 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(BMC_NAME)"},
+					Version:      "1.45.455b66-rev4",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: map[string]string{"abc": "$(BMC_NAME)"}}},
 					Variables: []metalv1alpha1.Variable{
 						{
 							Key: "BMC_NAME",
@@ -819,7 +819,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings reaches Applied state with the field value substituted")
@@ -857,7 +857,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
 					Version: "1.45.455b66-rev4",
 					// Both placeholders resolved from different sources into one value.
-					SettingsMap: map[string]string{"abc": "$(BmcName).$(SearchDomain)"},
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: map[string]string{"abc": "$(BmcName).$(SearchDomain)"}}},
 					Variables: []metalv1alpha1.Variable{
 						{
 							Key: "BmcName",
@@ -886,7 +886,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings reaches Applied state with both variables substituted")
@@ -931,8 +931,8 @@ var _ = Describe("BMCSettings Controller", func() {
 			Spec: metalv1alpha1.BMCSettingsSpec{
 				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
 				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
-					Version:     "1.45.455b66-rev4",
-					SettingsMap: map[string]string{"abc": "$(LicenseKey)"},
+					Version:      "1.45.455b66-rev4",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{Name: "settings", Priority: 1, Settings: map[string]string{"abc": "$(LicenseKey)"}}},
 					Variables: []metalv1alpha1.Variable{
 						{
 							// Step 1: resolve BmcName from the object's own field.
@@ -963,7 +963,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring that the BMC has the BMCSettings ref")
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("Spec.BMCSettingRef", &v1.LocalObjectReference{Name: settings.Name}),
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
 		))
 
 		By("Ensuring that the BMCSettings reaches Applied state — chained variable resolved correctly")
@@ -973,6 +973,97 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		By("Ensuring the chained variable (LicenseKey looked up via BmcName) was written to the BMC")
 		Expect(mockServers[0].GetBMCSettingAttr("BMC")).To(HaveKeyWithValue("abc", "license-key-for-"+bmc.Name))
+
+		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
+	})
+
+	It("should migrate deprecated spec.settings (flat SettingsMap) to spec.settingsFlow on first reconcile", func(ctx SpecContext) {
+		By("Creating a BMCSettings using the deprecated SettingsMap field directly via a patch")
+		settings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-migrate-settings-",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version: "1.45.455b66-rev4",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Name:     "settings",
+						Priority: 1,
+						Settings: map[string]string{"abc": "migrate-test"},
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
+
+		By("Patching spec.settings with the deprecated flat map to simulate a pre-migration resource")
+		Eventually(Update(settings, func() {
+			settings.Spec.SettingsMap = map[string]string{"abc": "migrate-test"}
+			settings.Spec.SettingsFlow = nil
+		})).Should(Succeed())
+
+		By("Ensuring the controller migrates SettingsMap to SettingsFlow and clears SettingsMap")
+		Eventually(Object(settings)).Should(SatisfyAll(
+			HaveField("Spec.SettingsFlow", ContainElement(HaveField("Settings", HaveKeyWithValue("abc", "migrate-test")))),
+			HaveField("Spec.SettingsMap", BeEmpty()),
+		))
+
+		By("Ensuring the settings are applied after migration")
+		Eventually(Object(settings)).Should(
+			HaveField("Status.State", metalv1alpha1.BMCSettingsStateApplied),
+		)
+
+		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
+	})
+
+	It("should migrate deprecated BMC.spec.bmcSettingsRef to BMC.spec.bmcSettingsRefs on first reconcile", func(ctx SpecContext) {
+		By("Creating a BMCSettings to trigger the ref write path")
+		settings := &metalv1alpha1.BMCSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-migrate-ref-",
+			},
+			Spec: metalv1alpha1.BMCSettingsSpec{
+				BMCRef: &v1.LocalObjectReference{Name: bmc.Name},
+				BMCSettingsTemplate: metalv1alpha1.BMCSettingsTemplate{
+					Version: "1.45.455b66-rev4",
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Name: "settings", Priority: 1,
+						Settings: map[string]string{},
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, settings)).To(Succeed())
+
+		By("Waiting for the ref to appear in BMCSettingsRefs")
+		Eventually(Object(bmc)).Should(
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
+		)
+
+		By("Patching the deprecated BMC.spec.bmcSettingsRef field to simulate a pre-migration BMC object")
+		Eventually(Update(bmc, func() {
+			bmc.Spec.BMCSettingRef = &v1.LocalObjectReference{Name: settings.Name}
+			bmc.Spec.BMCSettingsRefs = nil
+		})).Should(Succeed())
+
+		// Touch the BMCSettings object with a no-op annotation to re-trigger reconciliation
+		// so the migration path in patchBMCSettingsRefOnBMC is exercised.
+		By("Forcing a BMCSettings reconcile via a no-op annotation to re-trigger migration")
+		Eventually(Update(settings, func() {
+			if settings.Annotations == nil {
+				settings.Annotations = map[string]string{}
+			}
+			settings.Annotations["metal.ironcore.dev/migration-trigger"] = "true"
+		})).Should(Succeed())
+
+		By("Ensuring the controller migrates bmcSettingsRef into bmcSettingsRefs and clears bmcSettingsRef")
+		Eventually(Object(bmc)).Should(SatisfyAll(
+			HaveField("Spec.BMCSettingsRefs", ContainElement(v1.LocalObjectReference{Name: settings.Name})),
+			HaveField("Spec.BMCSettingRef", BeNil()),
+		))
 
 		Expect(k8sClient.Delete(ctx, settings)).To(Succeed())
 	})

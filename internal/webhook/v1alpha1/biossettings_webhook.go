@@ -41,20 +41,20 @@ type BIOSSettingsCustomValidator struct {
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
 func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
 	settingsLog.Info("Validation for BIOSSettings upon creation", "name", obj.GetName())
-
-	settingsList := &metalv1alpha1.BIOSSettingsList{}
-	if err := v.List(ctx, settingsList); err != nil {
+	if errs := validateDriftPolicy(obj, obj.Spec.DriftPolicy); len(errs) > 0 {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: obj.GroupVersionKind().Group, Kind: obj.Kind}, obj.GetName(), errs)
+	}
+	list := &metalv1alpha1.BIOSSettingsList{}
+	if err := v.List(ctx, list); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
 	}
-
-	return checkForDuplicateBIOSSettingsRefToServer(settingsList, obj)
+	return nil, checkDuplicateBIOSSettings(list, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
 func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
 	settingsLog.Info("Validation for BIOSSettings upon update", "name", newObj.GetName())
 
-	// we do not allow Updates to BIOSSettings post server Maintenance creation
 	if oldObj.Status.State == metalv1alpha1.BIOSSettingsStateInProgress &&
 		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRef != nil {
 		err := fmt.Errorf("BIOSSettings (%s) is in progress, unable to update %s", oldObj.Name, newObj.Name)
@@ -63,12 +63,15 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
 	}
 
-	settingsList := &metalv1alpha1.BIOSSettingsList{}
-	if err := v.List(ctx, settingsList); err != nil {
-		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
+	if errs := validateDriftPolicy(newObj, newObj.Spec.DriftPolicy); len(errs) > 0 {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind}, newObj.GetName(), errs)
 	}
 
-	return checkForDuplicateBIOSSettingsRefToServer(settingsList, newObj)
+	list := &metalv1alpha1.BIOSSettingsList{}
+	if err := v.List(ctx, list); err != nil {
+		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
+	}
+	return nil, checkDuplicateBIOSSettings(list, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
@@ -79,24 +82,5 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(_ context.Context, obj *met
 		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
 	}
 
-	return nil, nil
-}
-
-func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSettingsList, settings *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
-	for _, bs := range settingsList.Items {
-		if settings.Name == bs.Name {
-			continue
-		}
-		if settings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
-			err := fmt.Errorf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
-				settings.Spec.ServerRef.Name,
-				settings.Name,
-				bs.Spec.ServerRef.Name,
-				bs.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
-				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef"), err)})
-		}
-	}
 	return nil, nil
 }

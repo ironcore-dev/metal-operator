@@ -195,8 +195,8 @@ func (r *BMCSettingsReconciler) cleanupReferences(ctx context.Context, settings 
 		return err
 	}
 
-	if bmcObj.Spec.BMCSettingRef != nil && bmcObj.Spec.BMCSettingRef.Name == settings.Name {
-		return r.patchBMCSettingsRefOnBMC(ctx, bmcObj, nil)
+	if containsRef(bmcObj.Spec.BMCSettingsRefs, settings.Name) {
+		return r.removeBMCSettingsRefFromBMC(ctx, bmcObj, settings.Name)
 	}
 	return nil
 }
@@ -213,41 +213,33 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 		return ctrl.Result{}, nil
 	}
 
+	// Migrate deprecated spec.settings (flat map) to spec.settingsFlow.
+	// The patch triggers a new reconcile on the updated generation; return here so the
+	// remainder of the loop always operates on the canonical field.
+	if len(settings.Spec.SettingsMap) > 0 && len(settings.Spec.SettingsFlow) == 0 {
+		log.V(1).Info("Migrating deprecated spec.settings to spec.settingsFlow")
+		base := settings.DeepCopy()
+		settings.Spec.SettingsFlow = []metalv1alpha1.SettingsFlowItem{{
+			Name:     "migrated",
+			Priority: 1,
+			Settings: settings.Spec.SettingsMap,
+		}}
+		settings.Spec.SettingsMap = nil
+		if err := r.Patch(ctx, settings, client.MergeFrom(base)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to migrate spec.settings to spec.settingsFlow: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	bmcObj, err := r.getBMC(ctx, settings)
 	if err != nil {
 		log.V(1).Info("Failed to fetch referred BMC object")
 		return ctrl.Result{}, err
 	}
-	if bmcObj.Spec.BMCSettingRef == nil {
+	if !containsRef(bmcObj.Spec.BMCSettingsRefs, settings.Name) {
 		if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
 			return ctrl.Result{}, err
 		}
-	} else if bmcObj.Spec.BMCSettingRef.Name != settings.Name {
-		referredBMCSettings, err := r.getReferredBMCSettings(ctx, bmcObj.Spec.BMCSettingRef)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				log.V(1).Info("Referred BMC contains reference to non-existing BMCSettings, updating reference")
-				if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
-					return ctrl.Result{}, err
-				}
-				// Requeue since updating the BMC object does not trigger reconciliation here
-				return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
-			}
-			log.V(1).Info("Referred BMC contains reference to different BMCSettings, unable to fetch the referenced BMCSettings")
-			return ctrl.Result{}, err
-		}
-		// TODO: Handle version checks correctly
-		if referredBMCSettings.Spec.Version < settings.Spec.Version {
-			log.V(1).Info("Updating BMCSettings reference to the latest BMC version")
-			if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
-				return ctrl.Result{}, err
-			}
-			// Requeue to reconcile with the updated BMC reference
-			return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
-		}
-		// This BMCSettings does not own the BMC — stop reconciliation
-		log.V(1).Info("BMC is owned by a newer or equal version BMCSettings, skipping reconciliation")
-		return ctrl.Result{}, nil
 	}
 
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, settings, BMCSettingFinalizer); err != nil || modified {
@@ -805,7 +797,7 @@ func (r *BMCSettingsReconciler) getBMCSettingsDifference(ctx context.Context, se
 	if err != nil {
 		return diff, fmt.Errorf("failed to resolve BMCSettings variables: %w", err)
 	}
-	effectiveSettingsMap := ApplyVariables(settings.Spec.SettingsMap, resolvedVars)
+	effectiveSettingsMap := ApplyVariables(flattenSettingsFlow(settings.Spec.SettingsFlow), resolvedVars)
 
 	currentSettings, err := bmcClient.GetBMCAttributeValues(ctx, bmcObj.Spec.BMCUUID, effectiveSettingsMap)
 	if err != nil {
@@ -1147,14 +1139,50 @@ func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenan
 }
 
 func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, BMCSettingsReference *corev1.LocalObjectReference) error {
-	if (bmcObj.Spec.BMCSettingRef == nil && BMCSettingsReference == nil) ||
-		(bmcObj.Spec.BMCSettingRef != nil && BMCSettingsReference != nil &&
-			bmcObj.Spec.BMCSettingRef.Name == BMCSettingsReference.Name) {
+	// Migrate deprecated spec.bmcSettingsRef into spec.bmcSettingsRefsList.
+	// The old single-ref field is cleared once moved so it is ready for removal in the next release.
+	needsMigration := bmcObj.Spec.BMCSettingRef != nil &&
+		!containsRef(bmcObj.Spec.BMCSettingsRefs, bmcObj.Spec.BMCSettingRef.Name)
+
+	if !needsMigration && containsRef(bmcObj.Spec.BMCSettingsRefs, BMCSettingsReference.Name) {
 		return nil
 	}
 
 	bmcObjBase := bmcObj.DeepCopy()
-	bmcObj.Spec.BMCSettingRef = BMCSettingsReference
+
+	if needsMigration {
+		bmcObj.Spec.BMCSettingsRefs = append(bmcObj.Spec.BMCSettingsRefs, *bmcObj.Spec.BMCSettingRef)
+		bmcObj.Spec.BMCSettingRef = nil
+	}
+
+	if !containsRef(bmcObj.Spec.BMCSettingsRefs, BMCSettingsReference.Name) {
+		bmcObj.Spec.BMCSettingsRefs = append(bmcObj.Spec.BMCSettingsRefs, *BMCSettingsReference)
+	}
+
+	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcObjBase)); err != nil {
+		return fmt.Errorf("failed to patch BMC settings ref: %w", err)
+	}
+	return nil
+}
+
+func (r *BMCSettingsReconciler) removeBMCSettingsRefFromBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, name string) error {
+	// Migrate deprecated spec.bmcSettingsRef into spec.bmcSettingsRefsList.
+	needsMigration := bmcObj.Spec.BMCSettingRef != nil &&
+		!containsRef(bmcObj.Spec.BMCSettingsRefs, bmcObj.Spec.BMCSettingRef.Name)
+
+	if !needsMigration && !containsRef(bmcObj.Spec.BMCSettingsRefs, name) {
+		return nil
+	}
+
+	bmcObjBase := bmcObj.DeepCopy()
+
+	if needsMigration {
+		bmcObj.Spec.BMCSettingsRefs = append(bmcObj.Spec.BMCSettingsRefs, *bmcObj.Spec.BMCSettingRef)
+		bmcObj.Spec.BMCSettingRef = nil
+	}
+
+	bmcObj.Spec.BMCSettingsRefs = removeRef(bmcObj.Spec.BMCSettingsRefs, name)
+
 	if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcObjBase)); err != nil {
 		return fmt.Errorf("failed to patch BMC settings ref: %w", err)
 	}

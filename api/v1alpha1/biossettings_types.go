@@ -11,8 +11,8 @@ import (
 
 type BIOSSettingsTemplate struct {
 	// Version specifies the software version (e.g. BIOS, BMC) these settings apply to.
-	// +required
-	Version string `json:"version"`
+	// +optional
+	Version string `json:"version,omitempty"`
 
 	// SettingsFlow contains the BIOS settings sequence to apply in the given order.
 	// +optional
@@ -46,9 +46,17 @@ type SettingsFlowItem struct {
 }
 
 // BIOSSettingsSpec defines the desired state of BIOSSettings.
+// +kubebuilder:validation:XValidation:rule="size(self.version) > 0",message="version is required on BIOSSettings"
+// +kubebuilder:validation:XValidation:rule="has(self.serverRef)",message="serverRef is required"
 type BIOSSettingsSpec struct {
 	// BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.
 	BIOSSettingsTemplate `json:",inline"`
+
+	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
+	// after the resource has been applied. Empty string (default) means the controller is fully active.
+	// Set by the parent CRD; must not be set manually.
+	// +optional
+	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server.
 	// +optional
@@ -56,7 +64,7 @@ type BIOSSettingsSpec struct {
 
 	// ServerRef is a reference to a specific server to apply the BIOS settings on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
+	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
 }
 
 // BIOSSettingsState specifies the current state of the BIOS Settings update.

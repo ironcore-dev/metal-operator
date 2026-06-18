@@ -11,14 +11,22 @@ import (
 
 // BMCSettingsTemplate defines the template for BMC settings to be applied.
 // +kubebuilder:validation:XValidation:rule="!has(self.variables) || self.variables.all(v, self.variables.filter(w, w.key == v.key).size() == 1)",message="variable keys must be unique"
+// +kubebuilder:validation:XValidation:rule="!(has(self.settings) && has(self.settingsFlow))",message="settings and settingsFlow are mutually exclusive; migrate to settingsFlow"
 type BMCSettingsTemplate struct {
 	// Version specifies the BMC firmware version for which the settings should be applied.
-	// +required
-	Version string `json:"version"`
+	// +optional
+	Version string `json:"version,omitempty"`
 
-	// SettingsMap contains BMC settings as a map.
+	// SettingsMap contains BMC settings as a flat key/value map.
+	// Deprecated: use settingsFlow instead. If both fields are set, settingsFlow takes precedence.
+	// This field will be removed in next release.
 	// +optional
 	SettingsMap map[string]string `json:"settings,omitempty"`
+
+	// SettingsFlow contains BMC settings as a named, priority-ordered list of groups.
+	// Replaces the flat settings map. Preferred over settings;
+	// +optional
+	SettingsFlow []SettingsFlowItem `json:"settingsFlow,omitempty"`
 
 	// Variables is a list of variables that can be used in the settings for templating.
 	// +kubebuilder:validation:MaxItems=64
@@ -125,8 +133,16 @@ type NamespacedKeySelector struct {
 }
 
 // BMCSettingsSpec defines the desired state of BMCSettings.
+// +kubebuilder:validation:XValidation:rule="size(self.version) > 0",message="version is required on BMCSettings"
+// +kubebuilder:validation:XValidation:rule="has(self.BMCRef)",message="BMCRef is required"
 type BMCSettingsSpec struct {
 	BMCSettingsTemplate `json:",inline"`
+
+	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
+	// after the resource has been applied. Empty string (default) means the controller is fully active.
+	// Set by the parent CRD; must not be set manually.
+	// +optional
+	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
 	// server that needs to be updated with the BMC settings.
@@ -136,7 +152,7 @@ type BMCSettingsSpec struct {
 	// BMCRef is a reference to a specific BMC to apply settings to.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="BMCRef is immutable"
 	// +required
-	BMCRef *corev1.LocalObjectReference `json:"BMCRef,omitempty"`
+	BMCRef *corev1.LocalObjectReference `json:"BMCRef"`
 }
 
 // ServerMaintenanceRefItem is a reference to a ServerMaintenance object.

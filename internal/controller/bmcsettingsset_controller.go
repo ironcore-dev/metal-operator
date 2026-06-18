@@ -12,7 +12,6 @@ import (
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -256,29 +255,39 @@ func (r *BMCSettingsSetReconciler) createMissingBMCSettings(
 	bmcSettingsSet *metalv1alpha1.BMCSettingsSet,
 ) error {
 	log := ctrl.LoggerFrom(ctx)
+
+	// bmcWithSettings: BMC name → exists in this set's owned list.
 	bmcWithSettings := make(map[string]struct{})
 	for _, bmcSettings := range bmcSettingsList.Items {
 		bmcWithSettings[bmcSettings.Spec.BMCRef.Name] = struct{}{}
 	}
 
+	// Fetch all BMCSettings cluster-wide to detect same-version duplicates owned by other sets.
+	// We build a set of (bmcName, version) pairs that already exist so we can skip creating
+	// duplicates without making per-BMC API calls inside the loop.
+	allBMCSettings := &metalv1alpha1.BMCSettingsList{}
+	if err := r.List(ctx, allBMCSettings); err != nil {
+		return fmt.Errorf("failed to list all BMCSettings: %w", err)
+	}
+	type bmcVersion struct{ bmc, version string }
+	existingByBMCVersion := make(map[bmcVersion]struct{}, len(allBMCSettings.Items))
+	for _, s := range allBMCSettings.Items {
+		if s.Spec.BMCRef != nil {
+			existingByBMCVersion[bmcVersion{s.Spec.BMCRef.Name, s.Spec.Version}] = struct{}{}
+		}
+	}
+
+	desiredVersion := bmcSettingsSet.Spec.BMCSettingsTemplate.Version
+
 	var errs []error
 	for _, bmc := range bmcList.Items {
 		if _, ok := bmcWithSettings[bmc.Name]; !ok {
-			if bmc.Spec.BMCSettingRef != nil {
-				if err := r.Get(ctx, client.ObjectKey{Name: bmc.Spec.BMCSettingRef.Name}, &metalv1alpha1.BMCSettings{}); err != nil {
-					if apierrors.IsNotFound(err) {
-						log.V(1).Info("BMCSettings referenced by BMC not found, will create a new one", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-						// proceed to create a new BMCSettings; the ref will be updated when it is created
-					} else {
-						log.Error(err, "Failed to get BMCSettings referenced by BMC", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-						// we will try this again in next reconciliation loop
-						continue
-					}
-				} else {
-					// the referenced BMCSettings exists, so we skip creating a new one
-					log.V(1).Info("BMC already has a BMCSettings ref", "BMC", bmc.Name, "BMCSettings", bmc.Spec.BMCSettingRef.Name)
-					continue
-				}
+			// Skip if another BMCSettings already exists for this BMC at the same version —
+			// it was created by a different set and creating a duplicate would be a conflict.
+			if _, exists := existingByBMCVersion[bmcVersion{bmc.Name, desiredVersion}]; exists {
+				log.V(1).Info("BMCSettings for this BMC and version already exists, skipping",
+					"BMC", bmc.Name, "version", desiredVersion)
+				continue
 			}
 
 			// generate k8s conform name for bmcsettings
@@ -455,7 +464,7 @@ func (r *BMCSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					oldBMC := e.ObjectOld.(*metalv1alpha1.BMC)
 					newBMC := e.ObjectNew.(*metalv1alpha1.BMC)
-					return labelChangeOrAnyFieldChangeInObject(e, []any{oldBMC.Spec.BMCSettingRef}, []any{newBMC.Spec.BMCSettingRef})
+					return labelChangeOrAnyFieldChangeInObject(e, []any{oldBMC.Spec.BMCSettingsRefs}, []any{newBMC.Spec.BMCSettingsRefs})
 				},
 			})).
 		Named("bmcsettingsset").

@@ -29,7 +29,7 @@ type BMCSpecApplyConfiguration struct {
 	ConsoleProtocol *ConsoleProtocolApplyConfiguration `json:"consoleProtocol,omitempty"`
 	// BMCSettingRef is a reference to a BMCSettings object that specifies
 	// the BMC configuration for this BMC.
-	// Deprecated: use bmcSettingsRefs instead. Will be removed in next release.
+	// Deprecated: use bmcSettingsRefsList instead. Will be removed in next release.
 	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
 	// BMCSettingsRefs is a list of references to BMCSettings objects that specify
 	// the BMC configuration for this BMC. Replaces the single bmcSettingsRef to support

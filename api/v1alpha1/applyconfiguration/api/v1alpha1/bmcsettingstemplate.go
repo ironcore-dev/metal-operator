@@ -17,7 +17,7 @@ type BMCSettingsTemplateApplyConfiguration struct {
 	// Version specifies the BMC firmware version for which the settings should be applied.
 	Version *string `json:"version,omitempty"`
 	// SettingsMap contains BMC settings as a flat key/value map.
-	// Deprecated: use settingsFlow instead. If both fields are set, settingsFlow takes precedence.
+	// Deprecated: use settingsFlow instead. This field is mutually exclusive with settingsFlow.
 	// This field will be removed in next release.
 	SettingsMap map[string]string `json:"settings,omitempty"`
 	// SettingsFlow contains BMC settings as a named, priority-ordered list of groups.

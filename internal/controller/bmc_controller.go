@@ -92,19 +92,21 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 	// todo: delete this post migration once BMCSettingRef is removed from BMC spec
 	if bmcObj.Spec.BMCSettingRef != nil {
 		bmcSettings := &metalv1alpha1.BMCSettings{}
-		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSettingRef.Name}, bmcSettings); client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
-		}
-		if err := r.Delete(ctx, bmcSettings); err != nil {
+		if err := r.Get(ctx, client.ObjectKey{Name: bmcObj.Spec.BMCSettingRef.Name}, bmcSettings); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
+			}
+		} else if err := r.Delete(ctx, bmcSettings); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to delete referred BMCSettings. %w", err)
 		}
 	}
 	for _, ref := range bmcObj.Spec.BMCSettingsRefs {
 		bmcSettings := &metalv1alpha1.BMCSettings{}
-		if err := r.Get(ctx, client.ObjectKey{Name: ref.Name}, bmcSettings); client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
-		}
-		if err := r.Delete(ctx, bmcSettings); err != nil {
+		if err := r.Get(ctx, client.ObjectKey{Name: ref.Name}, bmcSettings); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("failed to get BMCSettings for BMC: %w", err)
+			}
+		} else if err := r.Delete(ctx, bmcSettings); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to delete referred BMCSettings: %w", err)
 		}
 	}

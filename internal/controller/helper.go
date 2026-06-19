@@ -630,15 +630,15 @@ func removeRef(refs []corev1.LocalObjectReference, name string) []corev1.LocalOb
 // flattenSettingsFlow merges all SettingsFlowItems into a single map for BMCSettings flow as temp solution.
 // this follows the current workflows in the BMCSettings controller,
 // but will need to be reworked when we want to support firing each SettingsFlowItem separately in list order.
-// Items are processed in ascending priority order (lower number = higher priority,
-// applied first), so higher-priority items win on key conflicts.
+// Items are processed in descending priority order so that higher-priority items (lower number) are
+// applied last and win on key conflicts.
 // TODO: fire each SettingsFlowItem separately in list order rather than merging
 // them into one flat map — required for correct ordering semantics.
 func flattenSettingsFlow(flow []metalv1alpha1.SettingsFlowItem) map[string]string {
 	sorted := make([]metalv1alpha1.SettingsFlowItem, len(flow))
 	copy(sorted, flow)
 	slices.SortFunc(sorted, func(a, b metalv1alpha1.SettingsFlowItem) int {
-		return int(a.Priority) - int(b.Priority)
+		return int(b.Priority) - int(a.Priority) // descending: lower priority number applied last, wins
 	})
 	merged := make(map[string]string)
 	for _, item := range sorted {

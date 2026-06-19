@@ -165,6 +165,7 @@ spec:
                 type: string
             required:
             - image
+            - serverRef
             - version
             type: object
             x-kubernetes-validations:

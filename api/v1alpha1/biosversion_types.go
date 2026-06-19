@@ -69,7 +69,6 @@ type BIOSVersionSpec struct {
 
 	// ServerRef is a reference to a specific server to apply the BIOS upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	// +optional
 	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
 }
 

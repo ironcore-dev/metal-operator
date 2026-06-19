@@ -556,7 +556,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a flat key/value map.<br />Deprecated: use settingsFlow instead. If both fields are set, settingsFlow takes precedence.<br />This field will be removed in next release. |  |  |
+| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a flat key/value map.<br />Deprecated: use settingsFlow instead. This field is mutually exclusive with settingsFlow.<br />This field will be removed in next release. |  |  |
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains BMC settings as a named, priority-ordered list of groups.<br />Replaces the flat settings map. Preferred over settings; |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
@@ -619,7 +619,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a flat key/value map.<br />Deprecated: use settingsFlow instead. If both fields are set, settingsFlow takes precedence.<br />This field will be removed in next release. |  |  |
+| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a flat key/value map.<br />Deprecated: use settingsFlow instead. This field is mutually exclusive with settingsFlow.<br />This field will be removed in next release. |  |  |
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains BMC settings as a named, priority-ordered list of groups.<br />Replaces the flat settings map. Preferred over settings; |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
@@ -645,7 +645,7 @@ _Appears in:_
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
-| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC.<br />Deprecated: use bmcSettingsRefs instead. Will be removed in next release. |  |  |
+| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC.<br />Deprecated: use bmcSettingsRefsList instead. Will be removed in next release. |  |  |
 | `bmcSettingsRefsList` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core) array_ | BMCSettingsRefs is a list of references to BMCSettings objects that specify<br />the BMC configuration for this BMC. Replaces the single bmcSettingsRef to support<br />multiple simultaneous settings objects created. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 

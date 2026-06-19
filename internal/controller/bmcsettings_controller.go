@@ -198,6 +198,9 @@ func (r *BMCSettingsReconciler) cleanupReferences(ctx context.Context, settings 
 	if containsRef(bmcObj.Spec.BMCSettingsRefs, settings.Name) {
 		return r.removeBMCSettingsRefFromBMC(ctx, bmcObj, settings.Name)
 	}
+	if bmcObj.Spec.BMCSettingRef != nil && bmcObj.Spec.BMCSettingRef.Name == settings.Name {
+		return r.removeBMCSettingsRefFromBMC(ctx, bmcObj, settings.Name)
+	}
 	return nil
 }
 
@@ -211,6 +214,10 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 	if settings.Spec.BMCRef == nil {
 		log.V(1).Info("Object does not refer to BMC object")
 		return ctrl.Result{}, nil
+	}
+
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, settings, BMCSettingFinalizer); err != nil || modified {
+		return ctrl.Result{}, err
 	}
 
 	// Migrate deprecated spec.settings (flat map) to spec.settingsFlow.
@@ -240,10 +247,6 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 		if err := r.patchBMCSettingsRefOnBMC(ctx, bmcObj, &corev1.LocalObjectReference{Name: settings.Name}); err != nil {
 			return ctrl.Result{}, err
 		}
-	}
-
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, settings, BMCSettingFinalizer); err != nil || modified {
-		return ctrl.Result{}, err
 	}
 
 	return r.ensureBMCSettingsMaintenanceStateTransition(ctx, settings, bmcObj)
@@ -1130,7 +1133,7 @@ func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenan
 }
 
 func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, BMCSettingsReference *corev1.LocalObjectReference) error {
-	// Migrate deprecated spec.bmcSettingsRef into spec.bmcSettingsRefsList.
+	// Migrate deprecated spec.bmcSettingsRef into spec.bmcSettingsRefs.
 	// The old single-ref field is cleared once moved so it is ready for removal in the next release.
 	needsMigration := bmcObj.Spec.BMCSettingRef != nil &&
 		!containsRef(bmcObj.Spec.BMCSettingsRefs, bmcObj.Spec.BMCSettingRef.Name)
@@ -1157,7 +1160,7 @@ func (r *BMCSettingsReconciler) patchBMCSettingsRefOnBMC(ctx context.Context, bm
 }
 
 func (r *BMCSettingsReconciler) removeBMCSettingsRefFromBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, name string) error {
-	// Migrate deprecated spec.bmcSettingsRef into spec.bmcSettingsRefsList.
+	// Migrate deprecated spec.bmcSettingsRef into spec.bmcSettingsRefs.
 	needsMigration := bmcObj.Spec.BMCSettingRef != nil &&
 		!containsRef(bmcObj.Spec.BMCSettingsRefs, bmcObj.Spec.BMCSettingRef.Name)
 

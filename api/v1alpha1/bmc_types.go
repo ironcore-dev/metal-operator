@@ -56,7 +56,7 @@ type BMCSpec struct {
 
 	// BMCSettingRef is a reference to a BMCSettings object that specifies
 	// the BMC configuration for this BMC.
-	// Deprecated: use bmcSettingsRefsList instead. Will be removed in next release.
+	// Deprecated: use bmcSettingsRefs instead. Will be removed in next release.
 	// +optional
 	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
 
@@ -64,7 +64,7 @@ type BMCSpec struct {
 	// the BMC configuration for this BMC. Replaces the single bmcSettingsRef to support
 	// multiple simultaneous settings objects created.
 	// +optional
-	BMCSettingsRefs []v1.LocalObjectReference `json:"bmcSettingsRefsList,omitempty"`
+	BMCSettingsRefs []v1.LocalObjectReference `json:"bmcSettingsRefs,omitempty"`
 
 	// Hostname is the hostname of the BMC.
 	// +optional

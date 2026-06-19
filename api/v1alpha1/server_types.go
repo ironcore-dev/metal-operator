@@ -148,7 +148,7 @@ type ServerSpec struct {
 
 	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.
-	// Deprecated: use biosSettingsRefsList instead. Will be removed in next release.
+	// Deprecated: use biosSettingsRefs instead. Will be removed in next release.
 	// +optional
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 
@@ -156,7 +156,7 @@ type ServerSpec struct {
 	// the BIOS configuration for t1his server. Replaces the single biosSettingsRef to support
 	// multiple simultaneous settings objects created.
 	// +optional
-	BIOSSettingsRefs []v1.LocalObjectReference `json:"biosSettingsRefsList,omitempty"`
+	BIOSSettingsRefs []v1.LocalObjectReference `json:"biosSettingsRefs,omitempty"`
 
 	// Taints control which ServerClaims can be bound to this server.
 	// +optional

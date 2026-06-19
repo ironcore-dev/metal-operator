@@ -207,6 +207,9 @@ func (r *BIOSSettingsReconciler) cleanupReferences(ctx context.Context, settings
 	if containsRef(server.Spec.BIOSSettingsRefs, settings.Name) {
 		return r.removeBIOSSettingsRefFromServer(ctx, server, settings.Name)
 	}
+	if server.Spec.BIOSSettingsRef != nil && server.Spec.BIOSSettingsRef.Name == settings.Name {
+		return r.removeBIOSSettingsRefFromServer(ctx, server, settings.Name)
+	}
 	return nil
 }
 
@@ -234,14 +237,14 @@ func (r *BIOSSettingsReconciler) reconcile(ctx context.Context, settings *metalv
 		return ctrl.Result{}, err
 	}
 
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, settings, BIOSSettingsFinalizer); err != nil || modified {
+		return ctrl.Result{}, err
+	}
+
 	if !containsRef(server.Spec.BIOSSettingsRefs, settings.Name) {
 		if err := r.patchBIOSSettingsRefForServer(ctx, server, settings); err != nil {
 			return ctrl.Result{}, err
 		}
-	}
-
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, settings, BIOSSettingsFinalizer); err != nil || modified {
-		return ctrl.Result{}, err
 	}
 
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)

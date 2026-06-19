@@ -1265,14 +1265,6 @@ func (r *BIOSSettingsReconciler) requestMaintenanceForServer(ctx context.Context
 	return true, nil
 }
 
-func (r *BIOSSettingsReconciler) getBIOSSettingsByName(ctx context.Context, name string) (*metalv1alpha1.BIOSSettings, error) {
-	biosSettings := &metalv1alpha1.BIOSSettings{}
-	if err := r.Get(ctx, client.ObjectKey{Name: name}, biosSettings); err != nil {
-		return nil, fmt.Errorf("failed to get referred BIOSSetting: %w", err)
-	}
-	return biosSettings, nil
-}
-
 func (r *BIOSSettingsReconciler) patchBIOSSettingsRefForServer(ctx context.Context, server *metalv1alpha1.Server, settings *metalv1alpha1.BIOSSettings) error {
 	if server == nil {
 		return nil

@@ -1120,15 +1120,6 @@ func (r *BMCSettingsReconciler) getReferredServerMaintenances(ctx context.Contex
 	return serverMaintenances, nil
 }
 
-func (r *BMCSettingsReconciler) getReferredBMCSettings(ctx context.Context, referredBMCSettingsRef *corev1.LocalObjectReference) (*metalv1alpha1.BMCSettings, error) {
-	key := client.ObjectKey{Name: referredBMCSettingsRef.Name, Namespace: metav1.NamespaceNone}
-	settings := &metalv1alpha1.BMCSettings{}
-	if err := r.Get(ctx, key, settings); err != nil {
-		return nil, err
-	}
-	return settings, nil
-}
-
 func (r *BMCSettingsReconciler) getServerMaintenanceRefForServer(ServerMaintenanceRefs []metalv1alpha1.ServerMaintenanceRefItem, name, namespace string) *metalv1alpha1.ObjectReference {
 	for _, serverMaintenanceRef := range ServerMaintenanceRefs {
 		if serverMaintenanceRef.ServerMaintenanceRef.Name == name && serverMaintenanceRef.ServerMaintenanceRef.Namespace == namespace {

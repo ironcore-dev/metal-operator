@@ -1031,7 +1031,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			if biosSettings.Annotations == nil {
 				biosSettings.Annotations = map[string]string{}
 			}
-			biosSettings.Annotations["metal.ironcore.dev/migration-trigger"] = "true"
+			biosSettings.Annotations["metal.ironcore.dev/migration-trigger"] = trueValue
 		})).Should(Succeed())
 
 		By("Ensuring the controller migrates biosSettingsRef into biosSettingsRefs and clears biosSettingsRef")

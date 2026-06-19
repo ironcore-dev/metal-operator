@@ -142,8 +142,41 @@ spec:
                   settings:
                     additionalProperties:
                       type: string
-                    description: SettingsMap contains BMC settings as a map.
+                    description: |-
+                      SettingsMap contains BMC settings as a flat key/value map.
+                      Deprecated: use settingsFlow instead. If both fields are set, settingsFlow takes precedence.
+                      This field will be removed in next release.
                     type: object
+                  settingsFlow:
+                    description: |-
+                      SettingsFlow contains BMC settings as a named, priority-ordered list of groups.
+                      Replaces the flat settings map. Preferred over settings;
+                    items:
+                      properties:
+                        name:
+                          description: Name is the name of the flow item.
+                          maxLength: 1000
+                          minLength: 1
+                          type: string
+                        priority:
+                          description: Priority defines the order of applying the
+                            settings. Lower numbers have higher priority (i.e. lower
+                            numbers are applied first).
+                          format: int32
+                          maximum: 2147483645
+                          minimum: 1
+                          type: integer
+                        settings:
+                          additionalProperties:
+                            type: string
+                          description: Settings contains software (e.g. BIOS, BMC)
+                            settings as a map.
+                          type: object
+                      required:
+                      - name
+                      - priority
+                      type: object
+                    type: array
                   variables:
                     description: Variables is a list of variables that can be used
                       in the settings for templating.
@@ -278,13 +311,14 @@ spec:
                     description: Version specifies the BMC firmware version for which
                       the settings should be applied.
                     type: string
-                required:
-                - version
                 type: object
                 x-kubernetes-validations:
                 - message: variable keys must be unique
                   rule: '!has(self.variables) || self.variables.all(v, self.variables.filter(w,
                     w.key == v.key).size() == 1)'
+                - message: settings and settingsFlow are mutually exclusive; migrate
+                    to settingsFlow
+                  rule: '!(has(self.settings) && has(self.settingsFlow))'
             required:
             - bmcSelector
             - bmcSettingsTemplate

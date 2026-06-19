@@ -163,6 +163,7 @@ _Appears in:_
 | `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls how the controller reacts when hardware deviates from the desired state<br />after the resource has been applied. Empty string (default) means the controller is fully active.<br />Set by the parent CRD; must not be set manually. |  | Enum: [Observe Suspend] <br /> |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS settings on. |  |  |
 
@@ -321,6 +322,7 @@ _Appears in:_
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls how the controller reacts when hardware deviates from the desired state<br />after the upgrade completes. Empty string (default) means the controller is fully active.<br />Set by the parent CRD; must not be set manually. |  | Enum: [Observe Suspend] <br /> |
 | `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS upgrade on. |  |  |
 
@@ -554,10 +556,12 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
+| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a flat key/value map.<br />Deprecated: use settingsFlow instead. If both fields are set, settingsFlow takes precedence.<br />This field will be removed in next release. |  |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains BMC settings as a named, priority-ordered list of groups.<br />Replaces the flat settings map. Preferred over settings; |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls how the controller reacts when hardware deviates from the desired state<br />after the resource has been applied. Empty string (default) means the controller is fully active.<br />Set by the parent CRD; must not be set manually. |  | Enum: [Observe Suspend] <br /> |
 | `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
 | `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply settings to. |  |  |
 
@@ -615,7 +619,8 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
+| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a flat key/value map.<br />Deprecated: use settingsFlow instead. If both fields are set, settingsFlow takes precedence.<br />This field will be removed in next release. |  |  |
+| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains BMC settings as a named, priority-ordered list of groups.<br />Replaces the flat settings map. Preferred over settings; |  |  |
 | `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
@@ -640,7 +645,8 @@ _Appears in:_
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
-| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
+| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC.<br />Deprecated: use bmcSettingsRefs instead. Will be removed in next release. |  |  |
+| `bmcSettingsRefsList` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core) array_ | BMCSettingsRefs is a list of references to BMCSettings objects that specify<br />the BMC configuration for this BMC. Replaces the single bmcSettingsRef to support<br />multiple simultaneous settings objects created. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 
 
@@ -843,6 +849,7 @@ _Appears in:_
 | `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
 | `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 | `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
+| `driftPolicy` _[DriftPolicy](#driftpolicy)_ | DriftPolicy controls how the controller reacts when hardware deviates from the desired state<br />after the upgrade completes. Empty string (default) means the controller is fully active.<br />Set by the parent CRD; must not be set manually. |  | Enum: [Observe Suspend] <br /> |
 | `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply BMC upgrade on. |  |  |
 
@@ -976,6 +983,27 @@ _Appears in:_
 | `IPMI` | ConsoleProtocolNameIPMI represents the IPMI console protocol.<br /> |
 | `SSH` | ConsoleProtocolNameSSH represents the SSH console protocol.<br /> |
 | `SSHLenovo` | ConsoleProtocolNameSSHLenovo represents the SSH console protocol specific to Lenovo hardware.<br /> |
+
+
+#### DriftPolicy
+
+_Underlying type:_ _string_
+
+DriftPolicy specifies what action to take when hardware deviates from the desired state.
+
+_Validation:_
+- Enum: [Observe Suspend]
+
+_Appears in:_
+- [BIOSSettingsSpec](#biossettingsspec)
+- [BIOSVersionSpec](#biosversionspec)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCVersionSpec](#bmcversionspec)
+
+| Field | Description |
+| --- | --- |
+| `Observe` | DriftPolicyObserve detects drift and surfaces a DriftDetected condition but does not apply any hardware changes.<br /> |
+| `Suspend` | DriftPolicySuspend completely freezes reconciliation: no drift detection, no status updates, no hardware actions.<br /> |
 
 
 #### Endpoint
@@ -1789,7 +1817,8 @@ _Appears in:_
 | `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. |  |  |
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
-| `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
+| `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server.<br />Deprecated: use biosSettingsRefs instead. Will be removed in next release. |  |  |
+| `biosSettingsRefs` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core) array_ | BIOSSettingsRefs is a list of references to BIOSSettings objects that specify<br />the BIOS configuration for this server. Replaces the single biosSettingsRef to support<br />multiple simultaneous settings objects created. |  |  |
 | `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
 
 
@@ -1854,6 +1883,8 @@ _Appears in:_
 _Appears in:_
 - [BIOSSettingsSpec](#biossettingsspec)
 - [BIOSSettingsTemplate](#biossettingstemplate)
+- [BMCSettingsSpec](#bmcsettingsspec)
+- [BMCSettingsTemplate](#bmcsettingstemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |

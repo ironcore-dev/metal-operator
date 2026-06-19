@@ -85,6 +85,7 @@ spec:
                 description: |-
                   BIOSSettingsRef is a reference to a biossettings object that specifies
                   the BIOS configuration for this server.
+                  Deprecated: use biosSettingsRefs instead. Will be removed in next release.
                 properties:
                   name:
                     default: ""
@@ -97,6 +98,28 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              biosSettingsRefs:
+                description: |-
+                  BIOSSettingsRefs is a list of references to BIOSSettings objects that specify
+                  the BIOS configuration for this server. Replaces the single biosSettingsRef to support
+                  multiple simultaneous settings objects created.
+                items:
+                  description: |-
+                    LocalObjectReference contains enough information to let you locate the
+                    referenced object inside the same namespace.
+                  properties:
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
               bmc:
                 description: BMC contains the access details for the BMC.
                 properties:

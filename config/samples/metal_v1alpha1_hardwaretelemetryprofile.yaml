@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+---
+# Example 1: Polling profile for Dell BMCs
+# Collects specified metrics every 30 s via operator-side polling.
+# If the BMC supports MetricReportDefinition writes (e.g. iDRAC9) the operator
+# programs a server-side MRD and stops polling; otherwise it polls natively.
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: HardwareTelemetryProfile
+metadata:
+  name: dell-polling
+spec:
+  nodeSelector:
+    matchLabels:
+      metal.ironcore.dev/manufacturer: dell
+  collectionInterval: 30s
+  delivery:
+    mode: Polling
+  collectEventLog: true
+  metrics:
+    - metricId: CPU1Temp
+      properties:
+        - /redfish/v1/Chassis/System.Embedded.1/Thermal#/Temperatures/0/ReadingCelsius
+    - metricId: CPU2Temp
+      properties:
+        - /redfish/v1/Chassis/System.Embedded.1/Thermal#/Temperatures/1/ReadingCelsius
+    - metricId: FanSpeed
+      properties:
+        - /redfish/v1/Chassis/System.Embedded.1/Thermal#/Fans/0/Reading
+    - metricId: SystemPower
+      properties:
+        - /redfish/v1/Chassis/System.Embedded.1/Power#/PowerControl/0/PowerConsumedWatts
+  categories:
+    - Temperature
+    - Fan
+    - Power
+---
+# Example 2: EventBased profile for HPE BMCs
+# The operator creates a Redfish event subscription; the BMC pushes MetricReports.
+# collectEventLog is ignored under EventBased mode (alerts arrive via subscription).
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: HardwareTelemetryProfile
+metadata:
+  name: hpe-eventbased
+spec:
+  nodeSelector:
+    matchLabels:
+      metal.ironcore.dev/manufacturer: hpe
+  collectionInterval: 60s
+  delivery:
+    mode: EventBased
+  metrics:
+    - metricId: AmbientTemp
+      properties:
+        - /redfish/v1/Chassis/1/Thermal#/Temperatures/0/ReadingCelsius
+    - metricId: CpuUtil
+      properties:
+        - /redfish/v1/Systems/1/ProcessorSummary/ProcessorMetrics#/AverageFrequencyMHz
+  categories:
+    - Temperature
+    - Utilization

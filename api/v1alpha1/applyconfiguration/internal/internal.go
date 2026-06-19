@@ -26,6 +26,24 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.AppliedNodeStatus
+  map:
+    fields:
+    - name: lastAppliedAt
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: mode
+      type:
+        scalar: string
+    - name: mrdActive
+      type:
+        scalar: boolean
+    - name: mrdSupported
+      type:
+        scalar: boolean
+    - name: name
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettings
   map:
     fields:
@@ -580,6 +598,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: model
       type:
         scalar: string
+    - name: mrdActive
+      type:
+        scalar: boolean
+    - name: mrdLink
+      type:
+        scalar: string
     - name: powerState
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCPowerState
@@ -813,6 +837,8 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: numeric
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConsoleProtocolName
   scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.DeliveryMode
+  scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Endpoint
   map:
     fields:
@@ -860,6 +886,70 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fieldPath
       type:
         scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.HardwareTelemetryProfile
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.HardwareTelemetryProfileSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.HardwareTelemetryProfileStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.HardwareTelemetryProfileSpec
+  map:
+    fields:
+    - name: categories
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: collectEventLog
+      type:
+        scalar: boolean
+      default: true
+    - name: collectionInterval
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
+      default: 30s
+    - name: delivery
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.TelemetryDelivery
+      default:
+        mode: Polling
+    - name: metrics
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.TelemetryMetric
+          elementRelationship: atomic
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.HardwareTelemetryProfileStatus
+  map:
+    fields:
+    - name: appliedNodes
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.AppliedNodeStatus
+          elementRelationship: atomic
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: atomic
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.IP
   scalar: untyped
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
@@ -1470,6 +1560,25 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: status
       type:
         namedType: com.github.stmcginnis.gofish.schemas.Health
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.TelemetryDelivery
+  map:
+    fields:
+    - name: mode
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.DeliveryMode
+      default: Polling
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.TelemetryMetric
+  map:
+    fields:
+    - name: metricId
+      type:
+        scalar: string
+    - name: properties
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Toleration
   map:
     fields:

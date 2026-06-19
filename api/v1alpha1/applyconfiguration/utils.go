@@ -19,6 +19,8 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=metal.ironcore.dev, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithKind("AppliedNodeStatus"):
+		return &apiv1alpha1.AppliedNodeStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettings"):
 		return &apiv1alpha1.BIOSSettingsApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsFlowStatus"):
@@ -105,6 +107,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.EndpointSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FieldRefSelector"):
 		return &apiv1alpha1.FieldRefSelectorApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("HardwareTelemetryProfile"):
+		return &apiv1alpha1.HardwareTelemetryProfileApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("HardwareTelemetryProfileSpec"):
+		return &apiv1alpha1.HardwareTelemetryProfileSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("HardwareTelemetryProfileStatus"):
+		return &apiv1alpha1.HardwareTelemetryProfileStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImageSpec"):
 		return &apiv1alpha1.ImageSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImmutableObjectReference"):
@@ -173,6 +181,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.TaintApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Task"):
 		return &apiv1alpha1.TaskApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TelemetryDelivery"):
+		return &apiv1alpha1.TelemetryDeliveryApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TelemetryMetric"):
+		return &apiv1alpha1.TelemetryMetricApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Toleration"):
 		return &apiv1alpha1.TolerationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Variable"):

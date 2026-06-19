@@ -85,7 +85,7 @@ spec:
                 description: |-
                   BIOSSettingsRef is a reference to a biossettings object that specifies
                   the BIOS configuration for this server.
-                  Deprecated: use biosSettingsRefs instead. Will be removed in next release.
+                  Deprecated: use biosSettingsRefsList instead. Will be removed in next release.
                 properties:
                   name:
                     default: ""
@@ -98,10 +98,10 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              biosSettingsRefs:
+              biosSettingsRefsList:
                 description: |-
                   BIOSSettingsRefs is a list of references to BIOSSettings objects that specify
-                  the BIOS configuration for this server. Replaces the single biosSettingsRef to support
+                  the BIOS configuration for t1his server. Replaces the single biosSettingsRef to support
                   multiple simultaneous settings objects created.
                 items:
                   description: |-

@@ -1291,7 +1291,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: biosSettingsRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: biosSettingsRefs
+    - name: biosSettingsRefsList
       type:
         list:
           elementType:

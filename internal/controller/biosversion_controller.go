@@ -14,6 +14,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
@@ -73,29 +74,32 @@ func (r *BIOSVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *BIOSVersionReconciler) reconcileExists(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
-	if r.shouldDelete(ctx, biosVersion) {
+	ok, err := r.shouldDelete(ctx, biosVersion)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if ok {
 		return r.delete(ctx, biosVersion)
 	}
 	return r.reconcile(ctx, biosVersion)
 }
 
-func (r *BIOSVersionReconciler) shouldDelete(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) bool {
-	log := ctrl.LoggerFrom(ctx)
-	if biosVersion.DeletionTimestamp.IsZero() {
-		return false
-	}
-
-	if controllerutil.ContainsFinalizer(biosVersion, BIOSVersionFinalizer) &&
-		biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
-		if _, err := GetServerByName(ctx, r.Client, biosVersion.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
-			log.V(1).Info("Server not found, proceeding with deletion", "Server", biosVersion.Spec.ServerRef.Name)
-			return true
+func (r *BIOSVersionReconciler) shouldDelete(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (bool, error) {
+	isProgressing := func() (bool, error) {
+		if biosVersion.Status.State != metalv1alpha1.BIOSVersionStateInProgress {
+			return false, nil
 		}
-		log.V(1).Info("Postponing deletion as BIOS version update is in progress")
-		return false
+		if biosVersion.Spec.ServerRef != nil {
+			if _, err := GetServerByName(ctx, r.Client, biosVersion.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+				return false, nil
+			}
+		}
+		if biosVersion.Spec.ServerMaintenanceRef == nil {
+			return false, nil
+		}
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
 	}
-
-	return true
+	return shouldProceedWithDeletion(ctx, biosVersion, BIOSVersionFinalizer, isProgressing)
 }
 
 func (r *BIOSVersionReconciler) delete(ctx context.Context, biosVersion *metalv1alpha1.BIOSVersion) (ctrl.Result, error) {
@@ -980,20 +984,21 @@ func (r *BIOSVersionReconciler) enqueueBiosVersionByServerRefs(ctx context.Conte
 	}
 
 	for _, biosVersion := range biosVersionList.Items {
-		if biosVersion.Spec.ServerRef.Name == host.Name {
-			// states where we do not need to requeue for host changes
-			if biosVersion.Spec.ServerMaintenanceRef == nil ||
-				biosVersion.Status.State == metalv1alpha1.BIOSVersionStateCompleted ||
-				biosVersion.Status.State == metalv1alpha1.BIOSVersionStateFailed {
-				return nil
-			}
-			if biosVersion.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
-				return nil
-			}
-			return []ctrl.Request{{
-				NamespacedName: types.NamespacedName{Namespace: biosVersion.Namespace, Name: biosVersion.Name},
-			}}
+		if biosVersion.Spec.ServerRef == nil || biosVersion.Spec.ServerRef.Name != host.Name {
+			continue
 		}
+		// states where we do not need to requeue for host changes
+		if biosVersion.Spec.ServerMaintenanceRef == nil ||
+			biosVersion.Status.State == metalv1alpha1.BIOSVersionStateCompleted ||
+			biosVersion.Status.State == metalv1alpha1.BIOSVersionStateFailed {
+			return nil
+		}
+		if biosVersion.Spec.ServerMaintenanceRef.Name != host.Spec.ServerMaintenanceRef.Name {
+			return nil
+		}
+		return []ctrl.Request{{
+			NamespacedName: types.NamespacedName{Namespace: biosVersion.Namespace, Name: biosVersion.Name},
+		}}
 	}
 	return nil
 }
@@ -1019,6 +1024,9 @@ func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, ob
 	biosVersionList := &metalv1alpha1.BIOSVersionList{}
 	if err := clientutils.ListAndFilter(ctx, r.Client, biosVersionList, func(object client.Object) (bool, error) {
 		biosVersion := object.(*metalv1alpha1.BIOSVersion)
+		if biosVersion.Spec.ServerRef == nil {
+			return false, nil
+		}
 		if _, exists := serverMap[biosVersion.Spec.ServerRef.Name]; !exists {
 			return false, nil
 		}

@@ -101,19 +101,18 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	events := data.GetEvents() // Use new method to get events from either field
+	events := data.GetEvents()
 	for _, event := range events {
 		// Determine the component from the URI (e.g., .../Sensors/Fan1 -> Fan1)
 		component := "system"
-		if event.OriginOfCondition != "" {
-			parts := strings.Split(strings.TrimRight(event.OriginOfCondition, "/"), "/")
+		if event.OriginOfCondition.ODataID != "" {
+			parts := strings.Split(strings.TrimRight(event.OriginOfCondition.ODataID, "/"), "/")
 			component = parts[len(parts)-1]
 		}
-		event.OriginOfCondition = component
 		key := EventKey{
 			Source:    hostname,
-			Severity:  event.Severity,
-			EventID:   event.EventID,
+			Severity:  event.GetSeverity(),
+			EventID:   event.GetMessageID(),
 			Component: component,
 		}
 		c.alertCounts[key]++
@@ -124,6 +123,7 @@ func (c *RedfishEventCollector) UpdateFromEvent(hostname string, data EventData)
 // Describe and Collect implement the prometheus.Collector interface to expose metrics.
 func (c *RedfishEventCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.sensorDesc
+	ch <- c.alertDesc
 }
 
 // Collect gathers the latest metrics and sends them to Prometheus.

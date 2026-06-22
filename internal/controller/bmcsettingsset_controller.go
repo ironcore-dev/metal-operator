@@ -11,6 +11,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -106,9 +107,21 @@ func (r *BMCSettingsSetReconciler) delete(
 	}
 	delTableBMCSettings := map[string]struct{}{}
 	for _, bmcSettings := range ownedBMCSettings.Items {
-
-		if bmcSettings.Status.State != metalv1alpha1.BMCSettingsStateInProgress || len(bmcSettings.Spec.ServerMaintenanceRefs) == 0 {
-			// If no ServerMaintenanceRefs is set, the BMCSettings is not actively being processed
+		if len(bmcSettings.Spec.ServerMaintenanceRefs) == 0 {
+			delTableBMCSettings[bmcSettings.Name] = struct{}{}
+			continue
+		}
+		refs := make([]metalv1alpha1.ObjectReference, 0, len(bmcSettings.Spec.ServerMaintenanceRefs))
+		for _, item := range bmcSettings.Spec.ServerMaintenanceRefs {
+			if item.ServerMaintenanceRef != nil {
+				refs = append(refs, *item.ServerMaintenanceRef)
+			}
+		}
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, refs)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state for BMCSettings %s: %w", bmcSettings.Name, err)
+		}
+		if !active {
 			delTableBMCSettings[bmcSettings.Name] = struct{}{}
 		}
 	}
@@ -338,10 +351,23 @@ func (r *BMCSettingsSetReconciler) deleteOrphanedBMCSettings(
 	var errs []error
 	for _, bmcSettings := range bmcSettingsList.Items {
 		if _, ok := bmcMap[bmcSettings.Spec.BMCRef.Name]; !ok {
-			if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
-				log.V(1).Info("Waiting for BMCSettings to move out of InProgress state",
-					"BMCSettings", bmcSettings.Name, "status", bmcSettings.Status)
-				continue
+			if bmcSettings.Status.State == metalv1alpha1.BMCSettingsStateInProgress && len(bmcSettings.Spec.ServerMaintenanceRefs) > 0 {
+				refs := make([]metalv1alpha1.ObjectReference, 0, len(bmcSettings.Spec.ServerMaintenanceRefs))
+				for _, item := range bmcSettings.Spec.ServerMaintenanceRefs {
+					if item.ServerMaintenanceRef != nil {
+						refs = append(refs, *item.ServerMaintenanceRef)
+					}
+				}
+				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, refs)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to check maintenance state for BMCSettings %s: %w", bmcSettings.Name, err))
+					continue
+				}
+				if active {
+					log.V(1).Info("Waiting for BMCSettings maintenance to complete before deletion",
+						"BMCSettings", bmcSettings.Name, "status", bmcSettings.Status)
+					continue
+				}
 			}
 			if err := r.Delete(ctx, &bmcSettings); err != nil {
 				errs = append(errs, err)

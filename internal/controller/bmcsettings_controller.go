@@ -25,6 +25,7 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 	"github.com/stmcginnis/gofish/schemas"
 )
 
@@ -87,7 +88,11 @@ func (r *BMCSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 // - the referred BMC references another BMCSettings object with a lower version
 func (r *BMCSettingsReconciler) reconcileExists(ctx context.Context, settings *metalv1alpha1.BMCSettings) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	if r.shouldDelete(ctx, settings) {
+	ok, err := r.shouldDelete(ctx, settings)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if ok {
 		log.V(1).Info("Object is being deleted")
 		return r.delete(ctx, settings)
 	}
@@ -95,22 +100,23 @@ func (r *BMCSettingsReconciler) reconcileExists(ctx context.Context, settings *m
 	return r.reconcile(ctx, settings)
 }
 
-func (r *BMCSettingsReconciler) shouldDelete(ctx context.Context, bmcSetting *metalv1alpha1.BMCSettings) bool {
-	log := ctrl.LoggerFrom(ctx)
-	if bmcSetting.DeletionTimestamp.IsZero() {
-		return false
-	}
-
-	if controllerutil.ContainsFinalizer(bmcSetting, BMCSettingFinalizer) &&
-		bmcSetting.Status.State == metalv1alpha1.BMCSettingsStateInProgress {
-		if _, err := r.getBMC(ctx, bmcSetting); apierrors.IsNotFound(err) {
-			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcSetting.Spec.BMCRef.Name)
-			return true
+func (r *BMCSettingsReconciler) shouldDelete(ctx context.Context, bmcSetting *metalv1alpha1.BMCSettings) (bool, error) {
+	isProgressing := func() (bool, error) {
+		if bmcSetting.Status.State != metalv1alpha1.BMCSettingsStateInProgress {
+			return false, nil
 		}
-		log.V(1).Info("Postponing delete as Settings update is in progress")
-		return false
+		if _, err := r.getBMC(ctx, bmcSetting); apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		refs := make([]metalv1alpha1.ObjectReference, 0, len(bmcSetting.Spec.ServerMaintenanceRefs))
+		for _, item := range bmcSetting.Spec.ServerMaintenanceRefs {
+			if item.ServerMaintenanceRef != nil {
+				refs = append(refs, *item.ServerMaintenanceRef)
+			}
+		}
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, refs)
 	}
-	return true
+	return shouldProceedWithDeletion(ctx, bmcSetting, BMCSettingFinalizer, isProgressing)
 }
 
 func (r *BMCSettingsReconciler) delete(ctx context.Context, settings *metalv1alpha1.BMCSettings) (ctrl.Result, error) {

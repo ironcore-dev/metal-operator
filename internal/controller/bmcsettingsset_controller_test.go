@@ -733,6 +733,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
 
+		By("Ensuring BMCSettingsSet has a stable view of bmc01 before triggering retry")
+		Eventually(Object(bmcSettingsSet)).Should(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+		)
+		Consistently(Object(bmcSettingsSet), "200ms").Should(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+		)
+
 		By("Updating the BMCSettingsSet with retry annotation")
 		Eventually(Update(bmcSettingsSet, func() {
 			bmcSettingsSet.Annotations = map[string]string{

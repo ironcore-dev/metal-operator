@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 // log is for logging in this package.
@@ -75,11 +76,18 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
-func (v *BIOSSettingsCustomValidator) ValidateDelete(_ context.Context, obj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
+func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
 	settingsLog.Info("Validation for BIOSSettings upon deletion", "name", obj.GetName())
 
-	if obj.Status.State == metalv1alpha1.BIOSSettingsStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
-		return nil, apierrors.NewBadRequest("The bios settings in progress, unable to delete")
+	// Block deletion while the referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceDeleteInProgress(obj) && obj.Spec.ServerMaintenanceRef != nil {
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*obj.Spec.ServerMaintenanceRef})
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			return nil, apierrors.NewBadRequest("BIOSSettings is under active maintenance, unable to delete")
+		}
 	}
 
 	return nil, nil

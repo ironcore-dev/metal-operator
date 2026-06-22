@@ -29,6 +29,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -98,29 +99,32 @@ func (r *BIOSSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *BIOSSettingsReconciler) reconcileExists(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {
-	if r.shouldDelete(ctx, settings) {
+	ok, err := r.shouldDelete(ctx, settings)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if ok {
 		return r.delete(ctx, settings)
 	}
 	return r.reconcile(ctx, settings)
 }
 
-func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *metalv1alpha1.BIOSSettings) bool {
-	log := ctrl.LoggerFrom(ctx)
-	if settings.DeletionTimestamp.IsZero() {
-		return false
-	}
-	log.V(1).Info("Reconciling BIOSSettings")
-
-	if controllerutil.ContainsFinalizer(settings, BIOSSettingsFinalizer) &&
-		settings.Status.State == metalv1alpha1.BIOSSettingsStateInProgress {
-		if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
-			log.V(1).Info("Server not found, proceeding with deletion", "Server", settings.Spec.ServerRef.Name)
-			return true
+func (r *BIOSSettingsReconciler) shouldDelete(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (bool, error) {
+	isProgressing := func() (bool, error) {
+		if settings.Status.State != metalv1alpha1.BIOSSettingsStateInProgress {
+			return false, nil
 		}
-		log.V(1).Info("Postponing delete as BIOSSettings update is in progress")
-		return false
+		if settings.Spec.ServerRef != nil {
+			if _, err := GetServerByName(ctx, r.Client, settings.Spec.ServerRef.Name); apierrors.IsNotFound(err) {
+				return false, nil
+			}
+		}
+		if settings.Spec.ServerMaintenanceRef == nil {
+			return false, nil
+		}
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*settings.Spec.ServerMaintenanceRef})
 	}
-	return true
+	return shouldProceedWithDeletion(ctx, settings, BIOSSettingsFinalizer, isProgressing)
 }
 
 func (r *BIOSSettingsReconciler) delete(ctx context.Context, settings *metalv1alpha1.BIOSSettings) (ctrl.Result, error) {

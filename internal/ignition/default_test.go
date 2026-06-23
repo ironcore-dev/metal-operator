@@ -103,6 +103,14 @@ systemd:
 		})
 	})
 
+	Context("default ignition-template.yaml", func() {
+		It("should contain the ctr pull command with --skip-metadata flag", func() {
+			data, err := GenerateIgnitionDataFromFile("../../config/manager/ignition-template.yaml", testConfig)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(data)).To(ContainSubstring("ctr images pull --skip-metadata test-image:latest"))
+		})
+	})
+
 	Context("generateIgnitionDataFromTemplate", func() {
 		It("should render custom template correctly", func() {
 			customTemplate := `

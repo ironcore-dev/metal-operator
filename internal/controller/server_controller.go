@@ -4,6 +4,7 @@
 package controller
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -13,7 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -1284,8 +1285,8 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, bmcClient bmc.BMC
 		return fmt.Errorf("failed to get boot order: %w", err)
 	}
 
-	sort.Slice(server.Spec.BootOrder, func(i, j int) bool {
-		return server.Spec.BootOrder[i].Priority < server.Spec.BootOrder[j].Priority
+	slices.SortFunc(server.Spec.BootOrder, func(a, b metalv1alpha1.BootOrder) int {
+		return cmp.Compare(a.Priority, b.Priority)
 	})
 	newOrder := []string{}
 	change := len(order) != len(server.Spec.BootOrder)

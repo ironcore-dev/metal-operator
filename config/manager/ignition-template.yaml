@@ -36,6 +36,7 @@ systemd:
         [Service]
         Restart=on-failure
         RestartSec=20
+        # --skip-metadata skips fetching platform manifests not needed locally; requires containerd >= 1.4
         ExecStartPre=/usr/bin/ctr images pull --skip-metadata {{.Image}}
         ExecStartPre=-/usr/bin/ctr tasks delete --force metalprobe
         ExecStartPre=-/usr/bin/ctr containers delete metalprobe

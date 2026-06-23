@@ -1,5 +1,9 @@
 # Build the manager binary
+<<<<<<< HEAD
+FROM golang:1.26 AS builder
+=======
 FROM --platform=$BUILDPLATFORM golang:1.26.4 AS builder
+>>>>>>> tmp-original-23-06-26-01-04
 ARG TARGETOS
 ARG TARGETARCH
 

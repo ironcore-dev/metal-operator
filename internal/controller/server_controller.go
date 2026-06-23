@@ -113,6 +113,16 @@ type ServerReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
+<<<<<<< HEAD
+// TODO(user): Modify the Reconcile function to compare the state specified by
+// the Server object against the actual cluster state, and then
+// perform operations to make the cluster state reflect the state specified by
+// the user.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.24.1/pkg/reconcile
+=======
+>>>>>>> tmp-original-23-06-26-01-04
 func (r *ServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	server := &metalv1alpha1.Server{}
 	if err := r.Get(ctx, req.NamespacedName, server); err != nil {

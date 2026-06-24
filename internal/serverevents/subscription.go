@@ -12,7 +12,7 @@ import (
 )
 
 // SubscribeMetricsReport subscribes to Redfish metric reporting events for the given hostname and callback URL.
-func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
+func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient bmc.EventSubscriber) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
 		fmt.Sprintf("%s/serverevents/metricsreport/%s", url, hostname),
@@ -26,7 +26,7 @@ func SubscribeMetricsReport(ctx context.Context, url, hostname string, bmcClient
 }
 
 // SubscribeEvents creates a Redfish event subscription for events.
-func SubscribeEvents(ctx context.Context, url, hostname string, bmcClient bmc.BMC) (string, error) {
+func SubscribeEvents(ctx context.Context, url, hostname string, bmcClient bmc.EventSubscriber) (string, error) {
 	link, err := bmcClient.CreateEventSubscription(
 		ctx,
 		fmt.Sprintf("%s/serverevents/alerts/%s", url, hostname),

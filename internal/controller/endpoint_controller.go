@@ -163,7 +163,11 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 	}
 	log.V(1).Info("Reconciled Endpoint")
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{
+		Requeue:      false,
+		RequeueAfter: 0,
+		Priority:     nil,
+	}, nil
 }
 
 func (r *EndpointReconciler) applyBMC(ctx context.Context, bmcClient bmc.BMC, endpoint *metalv1alpha1.Endpoint, secret *metalv1alpha1.BMCSecret, m macdb.MacPrefix) error {

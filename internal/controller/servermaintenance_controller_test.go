@@ -543,6 +543,29 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
+	It("should transition ServerMaintenance to Pending state when its referenced Server no longer exists", func(ctx SpecContext) {
+		By("Creating a ServerMaintenance object")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-orphan",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef: &corev1.LocalObjectReference{Name: server.Name},
+				Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, serverMaintenance)
+
+		By("Deleting the Server")
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Eventually(Get(server)).ShouldNot(Succeed())
+
+		By("Expecting the ServerMaintenance to transition to Pending state")
+		Eventually(Object(serverMaintenance)).Should(HaveField("Status.State", Equal(metalv1alpha1.ServerMaintenanceStatePending)))
+	})
+
 	It("should complete deletion when the referenced Server is already gone", func(ctx SpecContext) {
 		By("Creating a ServerMaintenance object")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{

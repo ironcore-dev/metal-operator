@@ -143,6 +143,9 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 		vendors = DefaultVendors()
 	}
 	if factory, ok := vendors[Manufacturer(manufacturer)]; ok {
+		if factory == nil {
+			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", manufacturer)
+		}
 		return factory(base), nil
 	}
 	return base, nil

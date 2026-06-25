@@ -77,6 +77,21 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, maintenance
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get Server: %w", err)
 	}
+	// This needs to be checked because "Enforced" Maintenance Policy evicts the server from the current maintenance and assigns it to itself
+	// causing some other maintenance to be InMaintenance.
+	// In this case, we should not reconcile the maintenance because it is not the one holding the maintenance on server.
+	if server.Spec.ServerMaintenanceRef != nil {
+		if server.Spec.ServerMaintenanceRef.Name != maintenance.Name || server.Spec.ServerMaintenanceRef.Namespace != maintenance.Namespace {
+			log.V(1).Info("Server is already in maintenance with other tasks", "Server", server.Name)
+			if maintenance.Status.State != metalv1alpha1.ServerMaintenanceStatePending {
+				if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStatePending); err != nil || modified {
+					return ctrl.Result{}, err
+				}
+			}
+			return ctrl.Result{}, nil
+		}
+	}
+
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, maintenance, serverMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -112,20 +127,13 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 		return ctrl.Result{}, err
 	}
 
-	if server.Spec.ServerMaintenanceRef != nil {
-		if server.Spec.ServerMaintenanceRef.Name != maintenance.Name || server.Spec.ServerMaintenanceRef.Namespace != maintenance.Namespace {
-			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
-			return ctrl.Result{}, nil
-		}
-	} else {
-		deferMaintenance, err := r.shouldDeferToHigherPriorityMaintenance(ctx, maintenance)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if deferMaintenance {
-			log.V(1).Info("Deferring maintenance because higher-priority maintenance is pending", "Server", server.Name, "Priority", maintenance.Spec.Priority)
-			return ctrl.Result{}, nil
-		}
+	deferMaintenance, err := r.shouldDeferToHigherPriorityMaintenance(ctx, maintenance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if deferMaintenance {
+		log.V(1).Info("Deferring maintenance because higher-priority maintenance is pending", "Server", server.Name, "Priority", maintenance.Spec.Priority)
+		return ctrl.Result{}, nil
 	}
 
 	if server.Spec.ServerClaimRef == nil {
@@ -222,6 +230,9 @@ func (r *ServerMaintenanceReconciler) shouldDeferToHigherPriorityMaintenance(ctx
 func shouldRunBefore(a, b *metalv1alpha1.ServerMaintenance) bool {
 	if a.Spec.Priority != b.Spec.Priority {
 		return a.Spec.Priority > b.Spec.Priority
+	}
+	if a.Spec.Policy != b.Spec.Policy {
+		return a.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced
 	}
 	if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
 		return a.CreationTimestamp.Before(&b.CreationTimestamp)

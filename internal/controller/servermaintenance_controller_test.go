@@ -574,6 +574,88 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
 	})
 
+	It("should not allow an Enforced maintenance to steal the ref from an already-active maintenance", func(ctx SpecContext) {
+		By("Creating first ServerMaintenance with Enforced policy")
+		serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-enforced-maintenance-active",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "first-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance01)).To(Succeed())
+
+		By("Waiting for the first ServerMaintenance to reach InMaintenance state")
+		Eventually(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+		Consistently(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Verifying the Server's ServerMaintenanceRef points to the first maintenance")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+
+		By("Creating second Enforced ServerMaintenance for the same server")
+		serverMaintenance02 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-enforced-maintenance-challenger",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "second-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance02)).To(Succeed())
+
+		By("Ensuring the second Enforced maintenance stays Pending and does not steal the ref")
+		Eventually(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
+		)
+		Consistently(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
+		)
+
+		By("Verifying the first maintenance remains InMaintenance (not evicted to Pending)")
+		Consistently(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Verifying the Server's ServerMaintenanceRef is still held by the first maintenance")
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+
+		By("Deleting the first ServerMaintenance to release the server")
+		Expect(k8sClient.Delete(ctx, serverMaintenance01)).To(Succeed())
+		Eventually(Get(serverMaintenance01)).ShouldNot(Succeed())
+
+		By("Verifying the second maintenance can now proceed to InMaintenance")
+		Eventually(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Deleting the second ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance02)).To(Succeed())
+	})
+
 	It("should skip cleanup and remove finalizer when no finalizer is present on deletion", func(ctx SpecContext) {
 		By("Creating a ServerMaintenance object without going through reconciliation (no finalizer)")
 		serverMaintenance := &metalv1alpha1.ServerMaintenance{

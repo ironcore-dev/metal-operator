@@ -60,53 +60,53 @@ func init() {
 
 func main() { // nolint: gocyclo
 	var (
-		metricsAddr                        string
-		metricsCertPath                    string
-		metricsCertName                    string
-		metricsCertKey                     string
-		webhookCertPath                    string
-		webhookCertName                    string
-		webhookCertKey                     string
-		enableLeaderElection               bool
-		probeAddr                          string
-		secureMetrics                      bool
-		enableHTTP2                        bool
-		macPrefixesFile                    string
-		insecure                           bool
-		protocol                           string
-		skipCertValidation                 bool
-		managerNamespace                   string
-		probeImage                         string
-		probeOSImage                       string
-		registryPort                       int
-		registryProtocol                   string
-		registryURL                        string
-		eventPort                          int
-		eventURL                           string
-		eventProtocol                      string
-		registryClientTimeout              time.Duration
-		registryDataMaxAge                 time.Duration
-		registryResyncInterval             time.Duration
-		webhookPort                        int
-		enforceFirstBoot                   bool
-		enforcePowerOff                    bool
-		serverDiscoveryReclaimPolicy       string
-		discoveryIgnitionPath              string
-		serverResyncInterval               time.Duration
-		maintenanceResyncInterval          time.Duration
-		powerPollingInterval               time.Duration
-		powerPollingTimeout                time.Duration
-		resourcePollingInterval            time.Duration
-		resourcePollingTimeout             time.Duration
-		discoveryTimeout                   time.Duration
-		biosSettingsApplyTimeout           time.Duration
-		bmcFailureResetDelay               time.Duration
-		bmcResetResyncInterval             time.Duration
-		bmcResetWaitingInterval            time.Duration
-		serverMaxConcurrentReconciles      int
-		serverClaimMaxConcurrentReconciles int
-		dnsRecordTemplatePath              string
-		defaultFailedAutoRetryCount        int
+		metricsAddr                          string
+		metricsCertPath                      string
+		metricsCertName                      string
+		metricsCertKey                       string
+		webhookCertPath                      string
+		webhookCertName                      string
+		webhookCertKey                       string
+		enableLeaderElection                 bool
+		probeAddr                            string
+		secureMetrics                        bool
+		enableHTTP2                          bool
+		macPrefixesFile                      string
+		insecure                             bool
+		protocol                             string
+		skipCertValidation                   bool
+		managerNamespace                     string
+		probeImage                           string
+		probeOSImage                         string
+		registryPort                         int
+		registryProtocol                     string
+		registryURL                          string
+		eventPort                            int
+		eventURL                             string
+		eventProtocol                        string
+		registryClientTimeout                time.Duration
+		registryDataMaxAge                   time.Duration
+		registryResyncInterval               time.Duration
+		webhookPort                          int
+		enforceFirstBoot                     bool
+		enforcePowerOff                      bool
+		defaultDiscoveredServerReclaimPolicy string
+		discoveryIgnitionPath                string
+		serverResyncInterval                 time.Duration
+		maintenanceResyncInterval            time.Duration
+		powerPollingInterval                 time.Duration
+		powerPollingTimeout                  time.Duration
+		resourcePollingInterval              time.Duration
+		resourcePollingTimeout               time.Duration
+		discoveryTimeout                     time.Duration
+		biosSettingsApplyTimeout             time.Duration
+		bmcFailureResetDelay                 time.Duration
+		bmcResetResyncInterval               time.Duration
+		bmcResetWaitingInterval              time.Duration
+		serverMaxConcurrentReconciles        int
+		serverClaimMaxConcurrentReconciles   int
+		dnsRecordTemplatePath                string
+		defaultFailedAutoRetryCount          int
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -160,9 +160,9 @@ func main() { // nolint: gocyclo
 		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
 		"Enforce the power off of a Server when graceful shutdown fails.")
-	flag.StringVar(&serverDiscoveryReclaimPolicy, "server-discovery-reclaim-policy", "",
-		"Reclaim policy to set on servers at discovery time (Recycle or Retain). "+
-			"If unset, the API-level default (Recycle) applies.")
+	flag.StringVar(&defaultDiscoveredServerReclaimPolicy, "default-discovered-server-reclaim-policy",
+		string(metalv1alpha1.ServerReclaimPolicyRecycle),
+		"Default reclaimPolicy for Server objects discovered by the BMC controller.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -193,14 +193,12 @@ func main() { // nolint: gocyclo
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if serverDiscoveryReclaimPolicy != "" {
-		switch metalv1alpha1.ServerReclaimPolicy(serverDiscoveryReclaimPolicy) {
-		case metalv1alpha1.ServerReclaimPolicyRecycle, metalv1alpha1.ServerReclaimPolicyRetain:
-		default:
-			setupLog.Error(nil, "Invalid server discovery reclaim policy, must be 'Recycle' or 'Retain'",
-				"serverDiscoveryReclaimPolicy", serverDiscoveryReclaimPolicy)
-			os.Exit(1)
-		}
+	switch metalv1alpha1.ServerReclaimPolicy(defaultDiscoveredServerReclaimPolicy) {
+	case metalv1alpha1.ServerReclaimPolicyRecycle, metalv1alpha1.ServerReclaimPolicyRetain:
+	default:
+		setupLog.Error(nil, "Invalid default discovered server reclaim policy, must be 'Recycle' or 'Retain'",
+			"value", defaultDiscoveredServerReclaimPolicy)
+		os.Exit(1)
 	}
 
 	// Handle protocol and TLS certificate validation flags with backward compatibility
@@ -439,18 +437,18 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
-		Client:                 mgr.GetClient(),
-		Scheme:                 mgr.GetScheme(),
-		DefaultProtocol:        effectiveProtocol,
-		SkipCertValidation:     effectiveSkipCert,
-		BMCFailureResetDelay:   bmcFailureResetDelay,
-		BMCResetWaitTime:       bmcResetWaitingInterval,
-		BMCClientRetryInterval: bmcResetResyncInterval,
-		ManagerNamespace:       managerNamespace,
-		EventURL:               eventURL,
-		DNSRecordTemplate:      dnsRecordTemplate,
-		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		ServerDiscoveryReclaimPolicy: metalv1alpha1.ServerReclaimPolicy(serverDiscoveryReclaimPolicy),
+		Client:                               mgr.GetClient(),
+		Scheme:                               mgr.GetScheme(),
+		DefaultProtocol:                      effectiveProtocol,
+		SkipCertValidation:                   effectiveSkipCert,
+		BMCFailureResetDelay:                 bmcFailureResetDelay,
+		BMCResetWaitTime:                     bmcResetWaitingInterval,
+		BMCClientRetryInterval:               bmcResetResyncInterval,
+		ManagerNamespace:                     managerNamespace,
+		EventURL:                             eventURL,
+		DNSRecordTemplate:                    dnsRecordTemplate,
+		Conditions:                           conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		DefaultDiscoveredServerReclaimPolicy: metalv1alpha1.ServerReclaimPolicy(defaultDiscoveredServerReclaimPolicy),
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},

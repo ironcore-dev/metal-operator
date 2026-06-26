@@ -60,9 +60,9 @@ type BMCReconciler struct {
 	// DNSRecordTemplatePath is the path to the file containing the DNSRecord template.
 	DNSRecordTemplate string
 	Conditions        *conditionutils.Accessor
-	// ServerDiscoveryReclaimPolicy sets spec.reclaimPolicy on newly discovered servers.
+	// DefaultDiscoveredServerReclaimPolicy sets spec.reclaimPolicy on newly discovered servers.
 	// If empty, the API-level default (Recycle) applies.
-	ServerDiscoveryReclaimPolicy metalv1alpha1.ServerReclaimPolicy
+	DefaultDiscoveredServerReclaimPolicy metalv1alpha1.ServerReclaimPolicy
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -278,8 +278,8 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.SystemURI = s.URI
 			server.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmcObj.Name}
-			if r.ServerDiscoveryReclaimPolicy != "" {
-				server.Spec.ReclaimPolicy = r.ServerDiscoveryReclaimPolicy
+			if server.Spec.ReclaimPolicy == "" {
+				server.Spec.ReclaimPolicy = r.DefaultDiscoveredServerReclaimPolicy
 			}
 			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
 		})

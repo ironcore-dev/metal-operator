@@ -12,7 +12,6 @@ controllerManager:
       - "--leader-elect"
       - "--metrics-bind-address=:8443"
       - "--health-probe-bind-address=:8081"
-      - "--default-server-reclaim-policy=Recycle"
     resources:
       limits:
         cpu: 300m

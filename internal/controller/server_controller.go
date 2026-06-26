@@ -99,7 +99,6 @@ type ServerReconciler struct {
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
 	DiscoveryIgnitionPath   string
-	DefaultReclaimPolicy    metalv1alpha1.ServerReclaimPolicy
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -505,11 +504,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 			return modified, err
 		}
 
-		reclaimPolicy := server.Spec.ReclaimPolicy
-		if reclaimPolicy == "" {
-			reclaimPolicy = r.DefaultReclaimPolicy
-		}
-		switch reclaimPolicy {
+		switch server.Spec.ReclaimPolicy {
 		case metalv1alpha1.ServerReclaimPolicyRetain:
 			log.V(1).Info("Transitioning server to released state")
 			return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReleased)

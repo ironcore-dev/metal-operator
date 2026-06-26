@@ -90,7 +90,7 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
-		defaultServerReclaimPolicy         string
+		serverDiscoveryReclaimPolicy       string
 		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
@@ -160,9 +160,9 @@ func main() { // nolint: gocyclo
 		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
 		"Enforce the power off of a Server when graceful shutdown fails.")
-	flag.StringVar(&defaultServerReclaimPolicy, "default-server-reclaim-policy",
-		string(metalv1alpha1.ServerReclaimPolicyRecycle),
-		"Default reclaim policy for servers when spec.reclaimPolicy is unset (Recycle or Retain).")
+	flag.StringVar(&serverDiscoveryReclaimPolicy, "server-discovery-reclaim-policy", "",
+		"Reclaim policy to set on servers at discovery time (Recycle or Retain). "+
+			"If unset, the API-level default (Recycle) applies.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -192,6 +192,16 @@ func main() { // nolint: gocyclo
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if serverDiscoveryReclaimPolicy != "" {
+		switch metalv1alpha1.ServerReclaimPolicy(serverDiscoveryReclaimPolicy) {
+		case metalv1alpha1.ServerReclaimPolicyRecycle, metalv1alpha1.ServerReclaimPolicyRetain:
+		default:
+			setupLog.Error(nil, "Invalid server discovery reclaim policy, must be 'Recycle' or 'Retain'",
+				"serverDiscoveryReclaimPolicy", serverDiscoveryReclaimPolicy)
+			os.Exit(1)
+		}
+	}
 
 	// Handle protocol and TLS certificate validation flags with backward compatibility
 	var effectiveProtocol metalv1alpha1.ProtocolScheme
@@ -440,6 +450,7 @@ func main() { // nolint: gocyclo
 		EventURL:               eventURL,
 		DNSRecordTemplate:      dnsRecordTemplate,
 		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		ServerDiscoveryReclaimPolicy: metalv1alpha1.ServerReclaimPolicy(serverDiscoveryReclaimPolicy),
 		BMCOptions: bmc.Options{
 			BasicAuth: true,
 		},
@@ -463,7 +474,6 @@ func main() { // nolint: gocyclo
 		ResyncInterval:          serverResyncInterval,
 		EnforceFirstBoot:        enforceFirstBoot,
 		EnforcePowerOff:         enforcePowerOff,
-		DefaultReclaimPolicy:    metalv1alpha1.ServerReclaimPolicy(defaultServerReclaimPolicy),
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		DiscoveryIgnitionPath:   discoveryIgnitionPath,

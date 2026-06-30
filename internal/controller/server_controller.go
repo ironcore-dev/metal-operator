@@ -184,14 +184,15 @@ func (r *ServerReconciler) delete(ctx context.Context, server *metalv1alpha1.Ser
 		log.V(1).Info("Deleted server boot configuration")
 	}
 
-	if server.Spec.BIOSSettingsRef != nil {
-		if err := r.Delete(ctx, &metalv1alpha1.BIOSSettings{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: server.Spec.BIOSSettingsRef.Name,
-			}}); err != nil && !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to delete BIOS settings: %w", err)
+	for _, ref := range server.Spec.BIOSSettingsRefs {
+		biosSettings := &metalv1alpha1.BIOSSettings{}
+		if err := r.Get(ctx, client.ObjectKey{Name: ref.Name}, biosSettings); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("failed to get BIOSSettings for BIOS: %w", err)
+			}
+		} else if err := r.Delete(ctx, biosSettings); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to delete referred BIOSSettings. %w", err)
 		}
-		log.V(1).Info("BIOS settings was deleted")
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -233,24 +232,29 @@ func (r *BIOSSettingsSetReconciler) createMissingBIOSSettings(ctx context.Contex
 		serverWithSettings[settings.Spec.ServerRef.Name] = struct{}{}
 	}
 
+	// Fetch all BIOSSettings cluster-wide to detect same-version duplicates owned by other sets.
+	allBIOSSettings := &metalv1alpha1.BIOSSettingsList{}
+	if err := r.List(ctx, allBIOSSettings); err != nil {
+		return fmt.Errorf("failed to list all BIOSSettings: %w", err)
+	}
+	type serverVersion struct{ server, version string }
+	existingByServerVersion := make(map[serverVersion]struct{}, len(allBIOSSettings.Items))
+	for _, s := range allBIOSSettings.Items {
+		if s.Spec.ServerRef != nil {
+			existingByServerVersion[serverVersion{s.Spec.ServerRef.Name, s.Spec.Version}] = struct{}{}
+		}
+	}
+	desiredVersion := set.Spec.BIOSSettingsTemplate.Version
+
 	var errs []error
 	for _, server := range servers.Items {
 		if _, ok := serverWithSettings[server.Name]; !ok {
-			if server.Spec.BIOSSettingsRef != nil {
-				if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, &metalv1alpha1.BIOSSettings{}); err != nil {
-					if apierrors.IsNotFound(err) {
-						log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
-						// we will go ahead and create a new BIOSSettings for this server. the ref will be updated when the new BIOSSettings is created
-					} else {
-						log.Error(err, "Error when trying to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
-						// we will try this again in next reconciliation loop
-						continue
-					}
-				} else {
-					// the referenced BIOSSettings exists or unable to determining, so we skip creating a new one
-					log.V(1).Info("Server already has a BIOSSettings ref", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
-					continue
-				}
+			// Skip if another BIOSSettings already exists for this server at the same version —
+			// it was created by a different set and creating a duplicate would be a conflict.
+			if _, exists := existingByServerVersion[serverVersion{server.Name, desiredVersion}]; exists {
+				log.V(1).Info("BIOSSettings for this server and version already exists, skipping",
+					"server", server.Name, "version", desiredVersion)
+				continue
 			}
 			newBiosSettingsName := fmt.Sprintf("%s-%s", set.Name, server.Name)
 			var newBiosSetting *metalv1alpha1.BIOSSettings
@@ -403,12 +407,12 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 		}
 	}
 
-	// Additionally, check if the Server has a BIOSSettingsRef and enqueue its owner BIOSSettingsSet
-	if server.Spec.BIOSSettingsRef != nil {
+	// Additionally, check if the Server has BIOSSettingsRefs and enqueue their owner BIOSSettingsSets
+	for _, ref := range server.Spec.BIOSSettingsRefs {
 		settings := &metalv1alpha1.BIOSSettings{}
-		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, settings); err != nil {
-			log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
-			return nil
+		if err := r.Get(ctx, client.ObjectKey{Name: ref.Name}, settings); err != nil {
+			log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", ref.Name)
+			continue
 		}
 		owner := metav1.GetControllerOf(settings)
 		if owner != nil && owner.Kind == "BIOSSettingsSet" {
@@ -434,7 +438,7 @@ func (r *BIOSSettingsSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					oldServer := e.ObjectOld.(*metalv1alpha1.Server)
 					newServer := e.ObjectNew.(*metalv1alpha1.Server)
-					return labelChangeOrAnyFieldChangeInObject(e, []any{oldServer.Spec.BIOSSettingsRef}, []any{newServer.Spec.BIOSSettingsRef})
+					return labelChangeOrAnyFieldChangeInObject(e, []any{oldServer.Spec.BIOSSettingsRefs}, []any{newServer.Spec.BIOSSettingsRefs})
 				},
 			})).
 		Complete(r)

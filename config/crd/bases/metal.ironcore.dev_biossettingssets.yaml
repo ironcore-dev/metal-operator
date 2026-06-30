@@ -121,8 +121,6 @@ spec:
                     description: Version specifies the software version (e.g. BIOS,
                       BMC) these settings apply to.
                     type: string
-                required:
-                - version
                 type: object
               serverSelector:
                 description: ServerSelector specifies a label selector to identify

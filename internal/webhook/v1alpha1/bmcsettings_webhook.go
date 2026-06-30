@@ -45,12 +45,11 @@ type BMCSettingsCustomValidator struct {
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
 func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
 	bmcsettingslog.Info("Validation for BMCSettings upon creation", "name", obj.GetName())
-
-	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
-	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
+	list := &metalv1alpha1.BMCSettingsList{}
+	if err := v.Client.List(ctx, list); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, obj)
+	return nil, checkDuplicateBMCSettings(list, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -77,11 +76,11 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		}
 	}
 
-	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
-	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
+	list := &metalv1alpha1.BMCSettingsList{}
+	if err := v.Client.List(ctx, list); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, newObj)
+	return nil, checkDuplicateBMCSettings(list, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -105,24 +104,5 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *me
 		}
 	}
 
-	return nil, nil
-}
-
-func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSettingsList, settings *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
-	for _, bs := range settingsList.Items {
-		if settings.Name == bs.Name {
-			continue
-		}
-		if bs.Spec.BMCRef.Name == settings.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
-				settings.Spec.BMCRef.Name,
-				settings.Name,
-				bs.Spec.BMCRef.Name,
-				bs.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
-				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
-		}
-	}
 	return nil, nil
 }

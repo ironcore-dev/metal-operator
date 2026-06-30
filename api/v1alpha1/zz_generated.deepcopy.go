@@ -872,6 +872,13 @@ func (in *BMCSettingsTemplate) DeepCopyInto(out *BMCSettingsTemplate) {
 			(*out)[key] = val
 		}
 	}
+	if in.SettingsFlow != nil {
+		in, out := &in.SettingsFlow, &out.SettingsFlow
+		*out = make([]SettingsFlowItem, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Variables != nil {
 		in, out := &in.Variables, &out.Variables
 		*out = make([]Variable, len(*in))
@@ -920,6 +927,11 @@ func (in *BMCSpec) DeepCopyInto(out *BMCSpec) {
 		in, out := &in.BMCSettingRef, &out.BMCSettingRef
 		*out = new(v1.LocalObjectReference)
 		**out = **in
+	}
+	if in.BMCSettingsRefs != nil {
+		in, out := &in.BMCSettingsRefs, &out.BMCSettingsRefs
+		*out = make([]v1.LocalObjectReference, len(*in))
+		copy(*out, *in)
 	}
 	if in.Hostname != nil {
 		in, out := &in.Hostname, &out.Hostname
@@ -2203,6 +2215,11 @@ func (in *ServerSpec) DeepCopyInto(out *ServerSpec) {
 		in, out := &in.BIOSSettingsRef, &out.BIOSSettingsRef
 		*out = new(v1.LocalObjectReference)
 		**out = **in
+	}
+	if in.BIOSSettingsRefs != nil {
+		in, out := &in.BIOSSettingsRefs, &out.BIOSSettingsRefs
+		*out = make([]v1.LocalObjectReference, len(*in))
+		copy(*out, *in)
 	}
 	if in.Taints != nil {
 		in, out := &in.Taints, &out.Taints

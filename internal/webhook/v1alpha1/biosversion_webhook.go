@@ -43,12 +43,11 @@ type BIOSVersionCustomValidator struct {
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
 func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
 	versionLog.Info("Validation for BIOSVersion upon creation", "name", obj.GetName())
-
-	versions := &metalv1alpha1.BIOSVersionList{}
-	if err := v.List(ctx, versions); err != nil {
-		return nil, fmt.Errorf("failed to list BIOSVersion: %w", err)
+	list := &metalv1alpha1.BIOSVersionList{}
+	if err := v.List(ctx, list); err != nil {
+		return nil, fmt.Errorf("failed to list BIOSVersions: %w", err)
 	}
-	return checkForDuplicateBIOSVersionRefToServer(versions, obj)
+	return nil, checkDuplicateBIOSVersions(list, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
@@ -69,12 +68,11 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		}
 	}
 
-	versions := &metalv1alpha1.BIOSVersionList{}
-	if err := v.List(ctx, versions); err != nil {
-		return nil, fmt.Errorf("failed to list BIOSVersion: %w", err)
+	list := &metalv1alpha1.BIOSVersionList{}
+	if err := v.List(ctx, list); err != nil {
+		return nil, fmt.Errorf("failed to list BIOSVersions: %w", err)
 	}
-
-	return checkForDuplicateBIOSVersionRefToServer(versions, newObj)
+	return nil, checkDuplicateBIOSVersions(list, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
@@ -89,33 +87,6 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj *me
 		}
 		if active {
 			return nil, apierrors.NewBadRequest("BIOSVersion is under active maintenance, unable to delete")
-		}
-	}
-	return nil, nil
-}
-
-func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersionList, version *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
-	if version.Spec.ServerRef == nil {
-		return nil, nil
-	}
-
-	for _, bv := range versions.Items {
-		if version.Name == bv.Name {
-			continue
-		}
-		if bv.Spec.ServerRef == nil {
-			continue
-		}
-		if version.Spec.ServerRef.Name == bv.Spec.ServerRef.Name {
-			err := fmt.Errorf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
-				version.Spec.ServerRef.Name,
-				version.Name,
-				bv.Spec.ServerRef.Name,
-				bv.Name,
-			)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
-				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef").Child("name"), err)})
 		}
 	}
 	return nil, nil

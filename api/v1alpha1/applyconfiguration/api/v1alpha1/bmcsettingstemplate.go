@@ -16,8 +16,13 @@ import (
 type BMCSettingsTemplateApplyConfiguration struct {
 	// Version specifies the BMC firmware version for which the settings should be applied.
 	Version *string `json:"version,omitempty"`
-	// SettingsMap contains BMC settings as a map.
+	// SettingsMap contains BMC settings as a flat key/value map.
+	// Deprecated: use settingsFlow instead. This field is mutually exclusive with settingsFlow.
+	// This field will be removed in next release.
 	SettingsMap map[string]string `json:"settings,omitempty"`
+	// SettingsFlow contains BMC settings as a named, priority-ordered list of groups.
+	// Replaces the flat settings map. Preferred over settings;
+	SettingsFlow []SettingsFlowItemApplyConfiguration `json:"settingsFlow,omitempty"`
 	// Variables is a list of variables that can be used in the settings for templating.
 	Variables []VariableApplyConfiguration `json:"variables,omitempty"`
 	// RetryPolicy defines the retry behavior for automatic retries on transient failures.
@@ -50,6 +55,19 @@ func (b *BMCSettingsTemplateApplyConfiguration) WithSettingsMap(entries map[stri
 	}
 	for k, v := range entries {
 		b.SettingsMap[k] = v
+	}
+	return b
+}
+
+// WithSettingsFlow adds the given value to the SettingsFlow field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SettingsFlow field.
+func (b *BMCSettingsTemplateApplyConfiguration) WithSettingsFlow(values ...*SettingsFlowItemApplyConfiguration) *BMCSettingsTemplateApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSettingsFlow")
+		}
+		b.SettingsFlow = append(b.SettingsFlow, *values[i])
 	}
 	return b
 }

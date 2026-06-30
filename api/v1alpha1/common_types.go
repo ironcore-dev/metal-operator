@@ -259,17 +259,6 @@ func EqualIPPrefixes(a, b IPPrefix) bool {
 	return a == b
 }
 
-// DriftPolicy specifies what action to take when hardware deviates from the desired state.
-// +kubebuilder:validation:Enum=Observe;Suspend
-type DriftPolicy string
-
-const (
-	// DriftPolicyObserve detects drift and surfaces a DriftDetected condition but does not apply any hardware changes.
-	DriftPolicyObserve DriftPolicy = "Observe"
-	// DriftPolicySuspend completely freezes reconciliation: no drift detection, no status updates, no hardware actions.
-	DriftPolicySuspend DriftPolicy = "Suspend"
-)
-
 // TaintEffect defines the effect of a taint on a ServerClaim.
 // +kubebuilder:validation:Enum=NoBind;Evict
 type TaintEffect string

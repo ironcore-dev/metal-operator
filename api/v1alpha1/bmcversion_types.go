@@ -50,12 +50,6 @@ type BMCVersionSpec struct {
 	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
 	BMCVersionTemplate `json:",inline"`
 
-	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
-	// after the upgrade completes. Empty string (default) means the controller is fully active.
-	// Set by the parent CRD; must not be set manually.
-	// +optional
-	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
-
 	// ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers.
 	// +optional
 	ServerMaintenanceRefs []ObjectReference `json:"serverMaintenanceRefs,omitempty"`

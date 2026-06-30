@@ -45,9 +45,6 @@ type BMCSettingsCustomValidator struct {
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
 func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
 	bmcsettingslog.Info("Validation for BMCSettings upon creation", "name", obj.GetName())
-	if errs := validateDriftPolicy(obj, obj.Spec.DriftPolicy); len(errs) > 0 {
-		return nil, apierrors.NewInvalid(schema.GroupKind{Group: obj.GroupVersionKind().Group, Kind: obj.Kind}, obj.GetName(), errs)
-	}
 	list := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, list); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
@@ -77,10 +74,6 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 				schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: oldObj.Kind},
 				newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), msg.Error())})
 		}
-	}
-
-	if errs := validateDriftPolicy(newObj, newObj.Spec.DriftPolicy); len(errs) > 0 {
-		return nil, apierrors.NewInvalid(schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind}, newObj.GetName(), errs)
 	}
 
 	list := &metalv1alpha1.BMCSettingsList{}

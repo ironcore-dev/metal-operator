@@ -66,15 +66,6 @@ spec:
           spec:
             description: BIOSSettingsSpec defines the desired state of BIOSSettings.
             properties:
-              driftPolicy:
-                description: |-
-                  DriftPolicy controls how the controller reacts when hardware deviates from the desired state
-                  after the resource has been applied. Empty string (default) means the controller is fully active.
-                  Set by the parent CRD; must not be set manually.
-                enum:
-                - Observe
-                - Suspend
-                type: string
               retryPolicy:
                 description: RetryPolicy defines the retry behavior for automatic
                   retries on transient failures.

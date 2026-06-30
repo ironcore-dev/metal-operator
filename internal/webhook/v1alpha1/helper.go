@@ -29,21 +29,6 @@ func ShouldAllowForceDeleteInProgress(obj client.Object) bool {
 	return val == metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress
 }
 
-// validateDriftPolicy returns a validation error if driftPolicy is set on an object
-// that has no owner references. driftPolicy is managed exclusively by the parent CRD
-// and must not be set on standalone resources.
-func validateDriftPolicy(obj client.Object, driftPolicy metalv1alpha1.DriftPolicy) field.ErrorList {
-	if driftPolicy == "" || len(obj.GetOwnerReferences()) > 0 {
-		return nil
-	}
-	return field.ErrorList{
-		field.Forbidden(
-			field.NewPath("spec").Child("driftPolicy"),
-			"driftPolicy may only be set by the parent CRD via an owner reference; must not be set manually",
-		),
-	}
-}
-
 // checkDuplicateBMCSettings returns an error if another BMCSettings in the list targets
 // the same BMC and the same version as obj — a true conflict. Two objects for the same BMC
 // but different versions (e.g. hop stages) are permitted.

@@ -138,12 +138,6 @@ type NamespacedKeySelector struct {
 type BMCSettingsSpec struct {
 	BMCSettingsTemplate `json:",inline"`
 
-	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
-	// after the resource has been applied. Empty string (default) means the controller is fully active.
-	// Set by the parent CRD; must not be set manually.
-	// +optional
-	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
-
 	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
 	// server that needs to be updated with the BMC settings.
 	// +optional

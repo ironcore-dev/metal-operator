@@ -90,15 +90,6 @@ spec:
                 x-kubernetes-validations:
                 - message: bmcRef is immutable
                   rule: self == oldSelf
-              driftPolicy:
-                description: |-
-                  DriftPolicy controls how the controller reacts when hardware deviates from the desired state
-                  after the upgrade completes. Empty string (default) means the controller is fully active.
-                  Set by the parent CRD; must not be set manually.
-                enum:
-                - Observe
-                - Suspend
-                type: string
               image:
                 description: Image specifies the image to use to upgrade to the given
                   BMC version.

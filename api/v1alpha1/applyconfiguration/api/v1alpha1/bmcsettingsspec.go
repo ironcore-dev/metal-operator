@@ -16,10 +16,6 @@ import (
 // BMCSettingsSpec defines the desired state of BMCSettings.
 type BMCSettingsSpecApplyConfiguration struct {
 	BMCSettingsTemplateApplyConfiguration `json:",inline"`
-	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
-	// after the resource has been applied. Empty string (default) means the controller is fully active.
-	// Set by the parent CRD; must not be set manually.
-	DriftPolicy *apiv1alpha1.DriftPolicy `json:"driftPolicy,omitempty"`
 	// ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each
 	// server that needs to be updated with the BMC settings.
 	ServerMaintenanceRefs []ServerMaintenanceRefItemApplyConfiguration `json:"serverMaintenanceRefs,omitempty"`
@@ -94,14 +90,6 @@ func (b *BMCSettingsSpecApplyConfiguration) WithRetryPolicy(value *RetryPolicyAp
 // If called multiple times, the ServerMaintenancePolicy field is set to the value of the last call.
 func (b *BMCSettingsSpecApplyConfiguration) WithServerMaintenancePolicy(value apiv1alpha1.ServerMaintenancePolicy) *BMCSettingsSpecApplyConfiguration {
 	b.BMCSettingsTemplateApplyConfiguration.ServerMaintenancePolicy = &value
-	return b
-}
-
-// WithDriftPolicy sets the DriftPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DriftPolicy field is set to the value of the last call.
-func (b *BMCSettingsSpecApplyConfiguration) WithDriftPolicy(value apiv1alpha1.DriftPolicy) *BMCSettingsSpecApplyConfiguration {
-	b.DriftPolicy = &value
 	return b
 }
 

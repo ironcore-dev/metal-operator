@@ -52,12 +52,6 @@ type BIOSSettingsSpec struct {
 	// BIOSSettingsTemplate defines the template for BIOS Settings to be applied on the servers.
 	BIOSSettingsTemplate `json:",inline"`
 
-	// DriftPolicy controls how the controller reacts when hardware deviates from the desired state
-	// after the resource has been applied. Empty string (default) means the controller is fully active.
-	// Set by the parent CRD; must not be set manually.
-	// +optional
-	DriftPolicy DriftPolicy `json:"driftPolicy,omitempty"`
-
 	// ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server.
 	// +optional
 	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`

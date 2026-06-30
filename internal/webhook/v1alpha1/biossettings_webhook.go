@@ -42,9 +42,6 @@ type BIOSSettingsCustomValidator struct {
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
 func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
 	settingsLog.Info("Validation for BIOSSettings upon creation", "name", obj.GetName())
-	if errs := validateDriftPolicy(obj, obj.Spec.DriftPolicy); len(errs) > 0 {
-		return nil, apierrors.NewInvalid(schema.GroupKind{Group: obj.GroupVersionKind().Group, Kind: obj.Kind}, obj.GetName(), errs)
-	}
 	list := &metalv1alpha1.BIOSSettingsList{}
 	if err := v.List(ctx, list); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
@@ -62,10 +59,6 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 		return nil, apierrors.NewInvalid(
 			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
 			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
-	}
-
-	if errs := validateDriftPolicy(newObj, newObj.Spec.DriftPolicy); len(errs) > 0 {
-		return nil, apierrors.NewInvalid(schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind}, newObj.GetName(), errs)
 	}
 
 	list := &metalv1alpha1.BIOSSettingsList{}

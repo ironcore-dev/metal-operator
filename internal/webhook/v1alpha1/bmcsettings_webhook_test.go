@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -24,7 +25,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 	BeforeEach(func() {
 		BMCSettingsV1 = &metalv1alpha1.BMCSettings{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    "ns.Name",
 				GenerateName: "test-",
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{
@@ -43,8 +43,10 @@ var _ = Describe("BMCSettings Webhook", func() {
 	})
 
 	AfterEach(func() {
-		By("Deleting BMCSettings")
+		By("Deleting BMCSettings resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.BMCSettings{})).To(Succeed())
+		By("Deleting ServerMaintenance resources if created")
+		Expect(client.IgnoreNotFound(k8sClient.DeleteAllOf(ctx, &metalv1alpha1.ServerMaintenance{}))).To(Succeed())
 	})
 
 	Context("When creating or updating BMCSettings under Validating Webhook", func() {
@@ -53,7 +55,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 			By("Creating another BMCSettings with reference to existing referred BMC")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    "ns.Name",
 					GenerateName: "test-bmc-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
@@ -71,7 +72,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 			By("Creating another BMCSetting for different BMCRef")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    "ns.Name",
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
@@ -89,7 +89,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 			By("Creating another BMCSetting with different BMCRef")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    "ns.Name",
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
@@ -112,7 +111,6 @@ var _ = Describe("BMCSettings Webhook", func() {
 			By("Creating another BMCSetting with different BMCref")
 			BMCSettingsV2 := &metalv1alpha1.BMCSettings{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:    "ns.Name",
 					GenerateName: "test-",
 				},
 				Spec: metalv1alpha1.BMCSettingsSpec{
@@ -132,20 +130,39 @@ var _ = Describe("BMCSettings Webhook", func() {
 		})
 
 		It("should not allow update when settings are in progress, but should allow forcing it", func() {
+			By("Creating a ServerMaintenance in InMaintenance state")
+			sm := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-sm-",
+					Namespace:    metav1.NamespaceDefault,
+				},
+				Spec: metalv1alpha1.ServerMaintenanceSpec{
+					Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerRef: &v1.LocalObjectReference{Name: "foo"},
+				},
+			}
+			Expect(k8sClient.Create(ctx, sm)).To(Succeed())
+			Eventually(UpdateStatus(sm, func() {
+				sm.Status.State = metalv1alpha1.ServerMaintenanceStateInMaintenance
+			})).Should(Succeed())
+
 			By("Patching the BMCSettings V1 to InProgress state")
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
 			})).Should(Succeed())
-			By("mock servermaintenance Creation maintenance")
+
+			By("Setting ServerMaintenance reference on BMCSettings V1")
 			Eventually(Update(BMCSettingsV1, func() {
 				BMCSettingsV1.Spec.ServerMaintenanceRefs = []metalv1alpha1.ServerMaintenanceRefItem{
-					{ServerMaintenanceRef: &metalv1alpha1.ObjectReference{Name: "foobar-Maintenance"}},
+					{ServerMaintenanceRef: &metalv1alpha1.ObjectReference{Name: sm.Name, Namespace: sm.Namespace}},
 				}
 			})).Should(Succeed())
+
 			By("Updating an bmcSettings V1 spec, should fail to update when inProgress")
 			bmcSettingsV1Updated := BMCSettingsV1.DeepCopy()
 			bmcSettingsV1Updated.Spec.SettingsMap = map[string]string{"test": "value"}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().To(HaveOccurred())
+
 			By("Updating an bmcSettings V1 spec, should pass to update when inProgress with ForceUpdateResource finalizer")
 			bmcSettingsV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 			Expect(validator.ValidateUpdate(ctx, BMCSettingsV1, bmcSettingsV1Updated)).Error().ToNot(HaveOccurred())
@@ -153,12 +170,33 @@ var _ = Describe("BMCSettings Webhook", func() {
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateApplied
 			})).Should(Succeed())
+			Eventually(UpdateStatus(sm, func() {
+				sm.Status.State = metalv1alpha1.ServerMaintenanceStatePending
+			})).Should(Succeed())
 		})
 
-		It("should refuse to delete if InProgress", func() {
-			By("Patching the BMCSettings V1 to a InProgress state")
-			Eventually(UpdateStatus(BMCSettingsV1, func() {
-				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateInProgress
+		It("should refuse to delete while ServerMaintenance is active", func() {
+			By("Creating a ServerMaintenance in InMaintenance state")
+			sm := &metalv1alpha1.ServerMaintenance{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-sm-",
+					Namespace:    metav1.NamespaceDefault,
+				},
+				Spec: metalv1alpha1.ServerMaintenanceSpec{
+					Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
+					ServerRef: &v1.LocalObjectReference{Name: "foo"},
+				},
+			}
+			Expect(k8sClient.Create(ctx, sm)).To(Succeed())
+			Eventually(UpdateStatus(sm, func() {
+				sm.Status.State = metalv1alpha1.ServerMaintenanceStateInMaintenance
+			})).Should(Succeed())
+
+			By("Setting ServerMaintenance reference on BMCSettings V1")
+			Eventually(Update(BMCSettingsV1, func() {
+				BMCSettingsV1.Spec.ServerMaintenanceRefs = []metalv1alpha1.ServerMaintenanceRefItem{
+					{ServerMaintenanceRef: &metalv1alpha1.ObjectReference{Name: sm.Name, Namespace: sm.Namespace}},
+				}
 			})).Should(Succeed())
 
 			By("Deleting the BMCSettings V1 should fail")
@@ -166,6 +204,10 @@ var _ = Describe("BMCSettings Webhook", func() {
 
 			Eventually(UpdateStatus(BMCSettingsV1, func() {
 				BMCSettingsV1.Status.State = metalv1alpha1.BMCSettingsStateApplied
+			})).Should(Succeed())
+
+			Eventually(UpdateStatus(sm, func() {
+				sm.Status.State = metalv1alpha1.ServerMaintenanceStatePending
 			})).Should(Succeed())
 		})
 	})

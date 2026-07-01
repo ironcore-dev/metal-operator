@@ -317,7 +317,6 @@ var _ = Describe("BMCVersion Controller", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
@@ -378,7 +377,7 @@ var _ = Describe("BMCVersion Controller", func() {
 					Version:                 upgradeServerBMCVersion + " fail",
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: new(int32(failedAutoRetryCount))},
 				},
 			},
 		}

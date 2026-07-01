@@ -7,8 +7,10 @@ package v1alpha1
 
 import (
 	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -25,13 +27,52 @@ type EndpointApplyConfiguration struct {
 
 // Endpoint constructs a declarative configuration of the Endpoint type for use with
 // apply.
-func Endpoint(name, namespace string) *EndpointApplyConfiguration {
+func Endpoint(name string) *EndpointApplyConfiguration {
 	b := &EndpointApplyConfiguration{}
 	b.WithName(name)
-	b.WithNamespace(namespace)
 	b.WithKind("Endpoint")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractEndpointFrom extracts the applied configuration owned by fieldManager from
+// endpoint for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// endpoint must be a unmodified Endpoint API object that was retrieved from the Kubernetes API.
+// ExtractEndpointFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractEndpointFrom(endpoint *apiv1alpha1.Endpoint, fieldManager string, subresource string) (*EndpointApplyConfiguration, error) {
+	b := &EndpointApplyConfiguration{}
+	err := managedfields.ExtractInto(endpoint, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.Endpoint"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(endpoint.Name)
+
+	b.WithKind("Endpoint")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractEndpoint extracts the applied configuration owned by fieldManager from
+// endpoint. If no managedFields are found in endpoint for fieldManager, a
+// EndpointApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// endpoint must be a unmodified Endpoint API object that was retrieved from the Kubernetes API.
+// ExtractEndpoint provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractEndpoint(endpoint *apiv1alpha1.Endpoint, fieldManager string) (*EndpointApplyConfiguration, error) {
+	return ExtractEndpointFrom(endpoint, fieldManager, "")
+}
+
+// ExtractEndpointStatus extracts the applied configuration owned by fieldManager from
+// endpoint for the status subresource.
+func ExtractEndpointStatus(endpoint *apiv1alpha1.Endpoint, fieldManager string) (*EndpointApplyConfiguration, error) {
+	return ExtractEndpointFrom(endpoint, fieldManager, "status")
 }
 
 func (b EndpointApplyConfiguration) IsApplyConfiguration() {}

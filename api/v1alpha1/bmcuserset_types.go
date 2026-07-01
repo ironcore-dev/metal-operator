@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // BMCUserTemplate defines the template for the BMCUser Resource to be applied to the BMCs.
@@ -75,5 +76,8 @@ type BMCUserSetList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&BMCUserSet{}, &BMCUserSetList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &BMCUserSet{}, &BMCUserSetList{})
+		return nil
+	})
 }

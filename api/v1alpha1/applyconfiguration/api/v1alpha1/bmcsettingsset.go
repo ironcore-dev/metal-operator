@@ -6,8 +6,11 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -24,13 +27,52 @@ type BMCSettingsSetApplyConfiguration struct {
 
 // BMCSettingsSet constructs a declarative configuration of the BMCSettingsSet type for use with
 // apply.
-func BMCSettingsSet(name, namespace string) *BMCSettingsSetApplyConfiguration {
+func BMCSettingsSet(name string) *BMCSettingsSetApplyConfiguration {
 	b := &BMCSettingsSetApplyConfiguration{}
 	b.WithName(name)
-	b.WithNamespace(namespace)
 	b.WithKind("BMCSettingsSet")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractBMCSettingsSetFrom extracts the applied configuration owned by fieldManager from
+// bMCSettingsSet for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// bMCSettingsSet must be a unmodified BMCSettingsSet API object that was retrieved from the Kubernetes API.
+// ExtractBMCSettingsSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBMCSettingsSetFrom(bMCSettingsSet *apiv1alpha1.BMCSettingsSet, fieldManager string, subresource string) (*BMCSettingsSetApplyConfiguration, error) {
+	b := &BMCSettingsSetApplyConfiguration{}
+	err := managedfields.ExtractInto(bMCSettingsSet, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSet"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(bMCSettingsSet.Name)
+
+	b.WithKind("BMCSettingsSet")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractBMCSettingsSet extracts the applied configuration owned by fieldManager from
+// bMCSettingsSet. If no managedFields are found in bMCSettingsSet for fieldManager, a
+// BMCSettingsSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// bMCSettingsSet must be a unmodified BMCSettingsSet API object that was retrieved from the Kubernetes API.
+// ExtractBMCSettingsSet provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBMCSettingsSet(bMCSettingsSet *apiv1alpha1.BMCSettingsSet, fieldManager string) (*BMCSettingsSetApplyConfiguration, error) {
+	return ExtractBMCSettingsSetFrom(bMCSettingsSet, fieldManager, "")
+}
+
+// ExtractBMCSettingsSetStatus extracts the applied configuration owned by fieldManager from
+// bMCSettingsSet for the status subresource.
+func ExtractBMCSettingsSetStatus(bMCSettingsSet *apiv1alpha1.BMCSettingsSet, fieldManager string) (*BMCSettingsSetApplyConfiguration, error) {
+	return ExtractBMCSettingsSetFrom(bMCSettingsSet, fieldManager, "status")
 }
 
 func (b BMCSettingsSetApplyConfiguration) IsApplyConfiguration() {}

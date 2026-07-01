@@ -77,6 +77,21 @@ func (r *ServerMaintenanceReconciler) reconcile(ctx context.Context, maintenance
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get Server: %w", err)
 	}
+	// This needs to be checked because "Enforced" Maintenance Policy evicts the server from the current maintenance and assigns it to itself
+	// causing some other maintenance to be InMaintenance.
+	// In this case, we should not reconcile the maintenance because it is not the one holding the maintenance on server.
+	if server.Spec.ServerMaintenanceRef != nil {
+		if server.Spec.ServerMaintenanceRef.Name != maintenance.Name || server.Spec.ServerMaintenanceRef.Namespace != maintenance.Namespace {
+			log.V(1).Info("Server is already in maintenance with other tasks", "Server", server.Name)
+			if maintenance.Status.State != metalv1alpha1.ServerMaintenanceStatePending {
+				if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStatePending); err != nil || modified {
+					return ctrl.Result{}, err
+				}
+			}
+			return ctrl.Result{}, nil
+		}
+	}
+
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, maintenance, serverMaintenanceFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -112,20 +127,13 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 		return ctrl.Result{}, err
 	}
 
-	if server.Spec.ServerMaintenanceRef != nil {
-		if server.Spec.ServerMaintenanceRef.Name != maintenance.Name || server.Spec.ServerMaintenanceRef.Namespace != maintenance.Namespace {
-			log.V(1).Info("Server is already in maintenance", "Server", server.Name)
-			return ctrl.Result{}, nil
-		}
-	} else {
-		deferMaintenance, err := r.shouldDeferToHigherPriorityMaintenance(ctx, maintenance)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if deferMaintenance {
-			log.V(1).Info("Deferring maintenance because higher-priority maintenance is pending", "Server", server.Name, "Priority", maintenance.Spec.Priority)
-			return ctrl.Result{}, nil
-		}
+	deferMaintenance, err := r.shouldDeferToHigherPriorityMaintenance(ctx, maintenance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if deferMaintenance {
+		log.V(1).Info("Deferring maintenance because higher-priority maintenance is pending", "Server", server.Name, "Priority", maintenance.Spec.Priority)
+		return ctrl.Result{}, nil
 	}
 
 	if server.Spec.ServerClaimRef == nil {
@@ -154,21 +162,16 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 	if serverClaim.Annotations == nil {
 		serverClaim.Annotations = make(map[string]string)
 	}
-	serverClaim.Annotations[metalv1alpha1.ServerMaintenanceNeededLabelKey] = trueValue
-	if maintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] != "" {
-		serverClaim.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey] = maintenance.Annotations[metalv1alpha1.ServerMaintenanceReasonAnnotationKey]
-	}
+
 	if err := r.Patch(ctx, serverClaim, patch); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch ServerClaim: %w", err)
 	}
 	log.V(1).Info("Patched ServerClaim labels and annotations", "ServerClaim", client.ObjectKeyFromObject(serverClaim))
 	if maintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
-		annotations := serverClaim.GetAnnotations()
 		labels := serverClaim.GetLabels()
-		_, hasAnnotation := annotations[metalv1alpha1.ServerMaintenanceApprovedLabelKey]
 		_, hasLabel := labels[metalv1alpha1.ServerMaintenanceApprovedLabelKey]
 
-		if hasAnnotation || hasLabel {
+		if hasLabel {
 			log.V(1).Info("Server approved for maintenance", "Server", server.Name)
 			if err = r.updateServerRef(ctx, maintenance, server); err != nil {
 				return ctrl.Result{}, err
@@ -227,6 +230,9 @@ func (r *ServerMaintenanceReconciler) shouldDeferToHigherPriorityMaintenance(ctx
 func shouldRunBefore(a, b *metalv1alpha1.ServerMaintenance) bool {
 	if a.Spec.Priority != b.Spec.Priority {
 		return a.Spec.Priority > b.Spec.Priority
+	}
+	if a.Spec.Policy != b.Spec.Policy {
+		return a.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced
 	}
 	if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
 		return a.CreationTimestamp.Before(&b.CreationTimestamp)
@@ -348,16 +354,24 @@ func (r *ServerMaintenanceReconciler) handleFailedState(ctx context.Context, _ *
 func (r *ServerMaintenanceReconciler) delete(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting ServerMaintenance")
+	if !controllerutil.ContainsFinalizer(maintenance, serverMaintenanceFinalizer) {
+		return ctrl.Result{}, nil
+	}
 	if maintenance.Spec.ServerRef == nil {
 		return ctrl.Result{}, nil
 	}
 	server, err := GetServerByName(ctx, r.Client, maintenance.Spec.ServerRef.Name)
-	if err != nil {
+	if err == nil {
+		if err := r.cleanup(ctx, maintenance, server); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else if apierrors.IsNotFound(err) {
+		// note: if the server is already deleted, we can skip the cleanup and just remove the finalizer
+		log.V(1).Info("Server not found, skipping cleanup", "Server", maintenance.Spec.ServerRef.Name)
+	} else {
 		return ctrl.Result{}, err
 	}
-	if err := r.cleanup(ctx, server); err != nil {
-		return ctrl.Result{}, err
-	}
+
 	log.V(1).Info("Removed dependencies")
 
 	log.V(1).Info("Ensuring that the finalizer is removed")
@@ -370,55 +384,50 @@ func (r *ServerMaintenanceReconciler) delete(ctx context.Context, maintenance *m
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, server *metalv1alpha1.Server) error {
+func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 	if server == nil {
 		return nil
 	}
 
-	if server.Spec.ServerMaintenanceRef != nil {
+	if ref := server.Spec.ServerMaintenanceRef; ref != nil && ref.Name == maintenance.Name && ref.Namespace == maintenance.Namespace {
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
 			return fmt.Errorf("failed to remove ServerMaintenance ref from Server: %w", err)
 		}
-	}
-	if server.Spec.MaintenanceBootConfigurationRef != nil {
-		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
-				Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
-			},
-		}
-		if err := r.Delete(ctx, config); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return fmt.Errorf("failed to delete ServerBootConfiguration: %w", err)
+		if server.Spec.MaintenanceBootConfigurationRef != nil {
+			config := &metalv1alpha1.ServerBootConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      server.Spec.MaintenanceBootConfigurationRef.Name,
+					Namespace: server.Spec.MaintenanceBootConfigurationRef.Namespace,
+				},
 			}
-			log.V(1).Info("ServerBootConfiguration already deleted", "Config", client.ObjectKeyFromObject(config))
+			if err := r.Delete(ctx, config); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return fmt.Errorf("failed to delete ServerBootConfiguration: %w", err)
+				}
+				log.V(1).Info("ServerBootConfiguration already deleted", "Config", client.ObjectKeyFromObject(config))
+			}
+			if err := r.removeBootConfigRefFromServer(ctx, config, server); err != nil {
+				return fmt.Errorf("failed to remove ServerMaintenance boot config ref from Server: %w", err)
+			}
+			log.V(1).Info("Removed ServerMaintenance boot configuration ref from Server", "Server", server.Name)
 		}
-		if err := r.removeBootConfigRefFromServer(ctx, config, server); err != nil {
-			return fmt.Errorf("failed to remove ServerMaintenance boot config ref from Server: %w", err)
-		}
-		log.V(1).Info("Removed ServerMaintenance boot configuration ref from Server", "Server", server.Name)
-	}
 
-	if server.Spec.ServerClaimRef == nil {
-		return nil
-	}
-	serverClaim := &metalv1alpha1.ServerClaim{}
-	if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {
-		return fmt.Errorf("failed to get ServerClaim: %w", err)
-	}
-	serverClaimBase := serverClaim.DeepCopy()
-	metautils.DeleteAnnotations(serverClaim, []string{
-		metalv1alpha1.ServerMaintenanceApprovedLabelKey,
-		metalv1alpha1.ServerMaintenanceNeededLabelKey,
-		metalv1alpha1.ServerMaintenanceReasonAnnotationKey,
-	})
-	metautils.DeleteLabels(serverClaim, []string{
-		metalv1alpha1.ServerMaintenanceApprovedLabelKey,
-		metalv1alpha1.ServerMaintenanceNeededLabelKey,
-	})
-	if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {
-		return fmt.Errorf("failed to patch ServerClaim annotations: %w", err)
+		if server.Spec.ServerClaimRef == nil {
+			return nil
+		}
+		serverClaim := &metalv1alpha1.ServerClaim{}
+		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {
+			return fmt.Errorf("failed to get ServerClaim: %w", err)
+		}
+		serverClaimBase := serverClaim.DeepCopy()
+		metautils.DeleteLabels(serverClaim, []string{
+			metalv1alpha1.ServerMaintenanceApprovedLabelKey,
+			metalv1alpha1.ServerMaintenanceNeededLabelKey,
+		})
+		if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {
+			return fmt.Errorf("failed to patch ServerClaim annotations: %w", err)
+		}
 	}
 	return nil
 }
@@ -502,8 +511,7 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByClaimRefs() handler.Ev
 			return nil
 		}
 
-		annotations := claim.GetAnnotations()
-		if _, ok := annotations[metalv1alpha1.ServerMaintenanceNeededLabelKey]; !ok {
+		if _, ok := claim.Labels[metalv1alpha1.ServerMaintenanceNeededLabelKey]; !ok {
 			return nil
 		}
 

@@ -635,7 +635,7 @@ var _ = Describe("BMCSettings Controller", func() {
 					Version:                 "1.45.455b66-rev4",
 					SettingsMap:             bmcSetting,
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: new(int32(failedAutoRetryCount))},
 				}},
 		}
 		Expect(k8sClient.Create(ctx, bmcSettings)).To(Succeed())

@@ -6,8 +6,11 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -31,6 +34,47 @@ func ServerMaintenance(name, namespace string) *ServerMaintenanceApplyConfigurat
 	b.WithKind("ServerMaintenance")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractServerMaintenanceFrom extracts the applied configuration owned by fieldManager from
+// serverMaintenance for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// serverMaintenance must be a unmodified ServerMaintenance API object that was retrieved from the Kubernetes API.
+// ExtractServerMaintenanceFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractServerMaintenanceFrom(serverMaintenance *apiv1alpha1.ServerMaintenance, fieldManager string, subresource string) (*ServerMaintenanceApplyConfiguration, error) {
+	b := &ServerMaintenanceApplyConfiguration{}
+	err := managedfields.ExtractInto(serverMaintenance, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenance"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(serverMaintenance.Name)
+	b.WithNamespace(serverMaintenance.Namespace)
+
+	b.WithKind("ServerMaintenance")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractServerMaintenance extracts the applied configuration owned by fieldManager from
+// serverMaintenance. If no managedFields are found in serverMaintenance for fieldManager, a
+// ServerMaintenanceApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// serverMaintenance must be a unmodified ServerMaintenance API object that was retrieved from the Kubernetes API.
+// ExtractServerMaintenance provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractServerMaintenance(serverMaintenance *apiv1alpha1.ServerMaintenance, fieldManager string) (*ServerMaintenanceApplyConfiguration, error) {
+	return ExtractServerMaintenanceFrom(serverMaintenance, fieldManager, "")
+}
+
+// ExtractServerMaintenanceStatus extracts the applied configuration owned by fieldManager from
+// serverMaintenance for the status subresource.
+func ExtractServerMaintenanceStatus(serverMaintenance *apiv1alpha1.ServerMaintenance, fieldManager string) (*ServerMaintenanceApplyConfiguration, error) {
+	return ExtractServerMaintenanceFrom(serverMaintenance, fieldManager, "status")
 }
 
 func (b ServerMaintenanceApplyConfiguration) IsApplyConfiguration() {}

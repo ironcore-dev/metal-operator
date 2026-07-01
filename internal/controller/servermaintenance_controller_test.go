@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -57,8 +58,8 @@ var _ = Describe("ServerMaintenance Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
 		EnsureCleanState()
 	})
 
@@ -180,7 +181,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Ensuring that the ServerClaim has the maintenance needed label and annotation")
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
-			HaveField("ObjectMeta.Annotations", HaveKeyWithValue(metalv1alpha1.ServerMaintenanceNeededLabelKey, trueValue)),
 			HaveField("ObjectMeta.Labels", HaveKeyWithValue(metalv1alpha1.ServerMaintenanceNeededLabelKey, trueValue)),
 		))
 
@@ -191,15 +191,9 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving the maintenance")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
-		maintenanceAnnotations := map[string]string{
-			metalv1alpha1.ServerMaintenanceNeededLabelKey:      trueValue,
-			metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-maintenance",
-			metalv1alpha1.ServerMaintenanceApprovedLabelKey:    trueValue,
-		}
 		maintenanceLabels := map[string]string{
 			metalv1alpha1.ServerMaintenanceNeededLabelKey:   trueValue,
 			metalv1alpha1.ServerMaintenanceApprovedLabelKey: trueValue,
@@ -230,7 +224,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Checking the ServerClaim has the maintenance labels and annotations")
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
-			HaveField("ObjectMeta.Annotations", maintenanceAnnotations),
 			HaveField("ObjectMeta.Labels", maintenanceLabels),
 		))
 
@@ -251,7 +244,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Checking the ServerClaim is cleaned up")
 		Eventually(Object(serverClaim)).Should(SatisfyAll(
-			HaveField("ObjectMeta.Annotations", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededLabelKey))),
 			HaveField("ObjectMeta.Labels", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededLabelKey))),
 		))
 
@@ -433,7 +425,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving maintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
@@ -448,7 +439,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Eventually(Get(highPriorityMaintenance)).ShouldNot(Succeed())
 		By("Approving lowPriorityMaintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 		By("Ensuring low-priority maintenance can proceed afterwards")
@@ -528,7 +518,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving maintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
@@ -543,7 +532,6 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Approving lowPriorityMaintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
-			metautils.SetAnnotation(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
 		})).Should(Succeed())
 
@@ -553,5 +541,158 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Deleting unset-priority maintenance")
 		Expect(k8sClient.Delete(ctx, unsetPriorityMaintenance)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
+	})
+
+	It("should complete deletion when the referenced Server is already gone", func(ctx SpecContext) {
+		By("Creating a ServerMaintenance object")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-server-gone",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+
+		By("Waiting for the ServerMaintenance to reach InMaintenance state")
+		Eventually(Object(serverMaintenance)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Deleting the Server before deleting the ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Eventually(Get(server)).ShouldNot(Succeed())
+
+		By("Deleting the ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+
+		By("Ensuring the ServerMaintenance is fully deleted despite the Server being gone")
+		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
+	})
+
+	It("should not allow an Enforced maintenance to steal the ref from an already-active maintenance", func(ctx SpecContext) {
+		By("Creating first ServerMaintenance with Enforced policy")
+		serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-enforced-maintenance-active",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "first-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance01)).To(Succeed())
+
+		By("Waiting for the first ServerMaintenance to reach InMaintenance state")
+		Eventually(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+		Consistently(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Verifying the Server's ServerMaintenanceRef points to the first maintenance")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+
+		By("Creating second Enforced ServerMaintenance for the same server")
+		serverMaintenance02 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-enforced-maintenance-challenger",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "second-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance02)).To(Succeed())
+
+		By("Ensuring the second Enforced maintenance stays Pending and does not steal the ref")
+		Eventually(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
+		)
+		Consistently(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
+		)
+
+		By("Verifying the first maintenance remains InMaintenance (not evicted to Pending)")
+		Consistently(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Verifying the Server's ServerMaintenanceRef is still held by the first maintenance")
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+
+		By("Deleting the first ServerMaintenance to release the server")
+		Expect(k8sClient.Delete(ctx, serverMaintenance01)).To(Succeed())
+		Eventually(Get(serverMaintenance01)).ShouldNot(Succeed())
+
+		By("Verifying the second maintenance can now proceed to InMaintenance")
+		Eventually(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Deleting the second ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance02)).To(Succeed())
+	})
+
+	It("should skip cleanup and remove finalizer when no finalizer is present on deletion", func(ctx SpecContext) {
+		By("Creating a ServerMaintenance object without going through reconciliation (no finalizer)")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-no-finalizer",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+
+		By("Waiting for the finalizer to be added by the reconciler")
+		Eventually(Object(serverMaintenance)).Should(
+			HaveField("Finalizers", ContainElement(serverMaintenanceFinalizer)),
+		)
+
+		By("Setting ignore-reconciliation annotation to prevent the reconciler from re-adding the finalizer")
+		Eventually(Update(serverMaintenance, func() {
+			metav1.SetMetaDataAnnotation(&serverMaintenance.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationIgnore)
+		})).Should(Succeed())
+
+		By("Manually removing the finalizer to simulate a no-finalizer state")
+		Eventually(Update(serverMaintenance, func() {
+			serverMaintenance.Finalizers = nil
+		})).Should(Succeed())
+
+		By("Ensuring finalizers are empty before delete")
+		Expect(serverMaintenance.Finalizers).To(BeEmpty())
+
+		By("Deleting the ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+
+		By("Ensuring the ServerMaintenance is deleted immediately without cleanup side-effects")
+		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
 	})
 })

@@ -13,11 +13,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
+	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-
-	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
 var _ = Describe("BMCVersionSet Controller", func() {
@@ -250,8 +248,8 @@ var _ = Describe("BMCVersionSet Controller", func() {
 				Kind:               "BMCVersionSet",
 				Name:               bmcVersionSet.Name,
 				UID:                bmcVersionSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -265,8 +263,8 @@ var _ = Describe("BMCVersionSet Controller", func() {
 				Kind:               "BMCVersionSet",
 				Name:               bmcVersionSet.Name,
 				UID:                bmcVersionSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -352,8 +350,8 @@ var _ = Describe("BMCVersionSet Controller", func() {
 				Kind:               "BMCVersionSet",
 				Name:               bmcVersionSet.Name,
 				UID:                bmcVersionSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -365,8 +363,8 @@ var _ = Describe("BMCVersionSet Controller", func() {
 				Kind:               "BMCVersionSet",
 				Name:               bmcVersionSet.Name,
 				UID:                bmcVersionSet.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 		))
 
@@ -518,7 +516,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 					Version:                 upgradeServerBMCVersion + " fail",
 					Image:                   metalv1alpha1.ImageSpec{URI: upgradeServerBMCVersion + " fail"},
 					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
-					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: GetPtr(int32(failedAutoRetryCount))},
+					RetryPolicy:             &metalv1alpha1.RetryPolicy{MaxAttempts: new(int32(failedAutoRetryCount))},
 				},
 				BMCSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{

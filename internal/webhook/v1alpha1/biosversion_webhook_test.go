@@ -149,6 +149,22 @@ var _ = Describe("BIOSVersion Webhook", func() {
 	})
 
 	It("should not allow update when BIOSVersion is in progress, but should allow force update", func() {
+		By("Creating a ServerMaintenance in InMaintenance state")
+		sm := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-sm-",
+				Namespace:    metav1.NamespaceDefault,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: "foo"},
+			},
+		}
+		Expect(k8sClient.Create(ctx, sm)).To(Succeed())
+		Eventually(UpdateStatus(sm, func() {
+			sm.Status.State = metalv1alpha1.ServerMaintenanceStateInMaintenance
+		})).Should(Succeed())
+
 		By("Patching the BIOSVersion V1 to in-progress state")
 		Eventually(UpdateStatus(biosVersionV1, func() {
 			biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
@@ -156,15 +172,15 @@ var _ = Describe("BIOSVersion Webhook", func() {
 
 		By("Adding ServerMaintenance reference")
 		Eventually(Update(biosVersionV1, func() {
-			biosVersionV1.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: "maintenance"}
+			biosVersionV1.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: sm.Name, Namespace: sm.Namespace}
 		})).Should(Succeed())
 
-		By("Updating the BIOSVersion V1 spec should fail to update when in InProgress state")
+		By("Updating the BIOSVersion V1 spec should fail to update while maintenance is active")
 		biosVersionV1Updated := biosVersionV1.DeepCopy()
 		biosVersionV1Updated.Spec.Version = "P712"
 		Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().To(HaveOccurred())
 
-		By("Updating BIOSVersion V1 spec should succeed when InProgress with ForceUpdateInProgress annotation")
+		By("Updating BIOSVersion V1 spec should succeed with ForceUpdateInProgress annotation")
 		biosVersionV1Updated.Annotations = map[string]string{metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateInProgress}
 		Expect(validator.ValidateUpdate(ctx, biosVersionV1, biosVersionV1Updated)).Error().ToNot(HaveOccurred())
 
@@ -172,19 +188,43 @@ var _ = Describe("BIOSVersion Webhook", func() {
 		Eventually(UpdateStatus(biosVersionV1, func() {
 			biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateCompleted
 		})).Should(Succeed())
+
+		Eventually(UpdateStatus(sm, func() {
+			sm.Status.State = metalv1alpha1.ServerMaintenanceStatePending
+		})).Should(Succeed())
 	})
 
-	It("should refuse to delete if InProgress", func() {
-		By("Patching the BIOSVersion V1 to InProgress state")
-		Eventually(UpdateStatus(biosVersionV1, func() {
-			biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateInProgress
+	It("should refuse to delete while ServerMaintenance is active", func() {
+		By("Creating a ServerMaintenance in InMaintenance state")
+		sm := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-sm-",
+				Namespace:    metav1.NamespaceDefault,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				Policy:    metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerRef: &v1.LocalObjectReference{Name: "foo"},
+			},
+		}
+		Expect(k8sClient.Create(ctx, sm)).To(Succeed())
+		Eventually(UpdateStatus(sm, func() {
+			sm.Status.State = metalv1alpha1.ServerMaintenanceStateInMaintenance
 		})).Should(Succeed())
 
-		By("Validating deletion of BIOSVersion V1 should fail")
+		By("Setting ServerMaintenanceRef on BIOSVersion V1")
+		Eventually(Update(biosVersionV1, func() {
+			biosVersionV1.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: sm.Name, Namespace: sm.Namespace}
+		})).Should(Succeed())
+
+		By("Validating deletion of BIOSVersion V1 should fail while maintenance is active")
 		Expect(validator.ValidateDelete(ctx, biosVersionV1)).Error().To(HaveOccurred())
 
-		Eventually(UpdateStatus(biosVersionV1, func() {
-			biosVersionV1.Status.State = metalv1alpha1.BIOSVersionStateCompleted
+		By("Deactivating the ServerMaintenance")
+		Eventually(UpdateStatus(sm, func() {
+			sm.Status.State = metalv1alpha1.ServerMaintenanceStatePending
 		})).Should(Succeed())
+
+		By("Validating deletion of BIOSVersion V1 should succeed once maintenance is inactive")
+		Expect(validator.ValidateDelete(ctx, biosVersionV1)).Error().ToNot(HaveOccurred())
 	})
 })

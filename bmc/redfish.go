@@ -12,6 +12,7 @@ import (
 	"io"
 	"maps"
 	"math/big"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -64,14 +65,9 @@ type RedfishBaseBMC struct {
 	manufacturer string
 }
 
-var pxeBootWithSettingUEFIBootMode = schemas.Boot{
-	BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideMode:    schemas.UEFIBootSourceOverrideMode,
-	BootSourceOverrideTarget:  schemas.PxeBootSource,
-}
-var pxeBootWithoutSettingUEFIBootMode = schemas.Boot{
-	BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled,
-	BootSourceOverrideTarget:  schemas.PxeBootSource,
+var clearedBootOverride = schemas.Boot{
+	BootSourceOverrideEnabled: schemas.DisabledBootSourceOverrideEnabled,
+	BootSourceOverrideTarget:  schemas.NoneBootSource,
 }
 
 type InvalidBIOSSettingsError struct {
@@ -230,26 +226,65 @@ func (r *RedfishBaseBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	return servers, nil
 }
 
-// SetPXEBootOnce sets the boot device for the next system boot using Redfish.
-func (r *RedfishBaseBMC) SetPXEBootOnce(ctx context.Context, systemURI string) error {
+// SetBootOverride sets a Redfish boot source override targeting network boot.
+// With persistent=false it sets BootSourceOverrideEnabled=Once; with
+// persistent=true it sets Continuous, which is preserved across power cycles.
+// When the requested persistent override already matches the current state
+// the call is a no-op.
+func (r *RedfishBaseBMC) SetBootOverride(ctx context.Context, systemURI string, persistent bool) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	var setBoot schemas.Boot
+	wantEnabled := schemas.OnceBootSourceOverrideEnabled
+	if persistent {
+		wantEnabled = schemas.ContinuousBootSourceOverrideEnabled
+		if system.Boot.BootSourceOverrideEnabled == schemas.ContinuousBootSourceOverrideEnabled &&
+			system.Boot.BootSourceOverrideTarget == schemas.PxeBootSource &&
+			(system.Boot.BootSourceOverrideMode == "" ||
+				system.Boot.BootSourceOverrideMode == schemas.UEFIBootSourceOverrideMode) {
+			return nil
+		}
+	}
+
+	setBoot := schemas.Boot{
+		BootSourceOverrideEnabled: wantEnabled,
+		BootSourceOverrideTarget:  schemas.PxeBootSource,
+	}
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	// Only skip setting BootSourceOverrideMode for older BMCs that don't report it
+	// Only set BootSourceOverrideMode when the BMC reports it; older BMCs that
+	// don't expose it will reject the field.
 	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != schemas.UEFIBootSourceOverrideMode {
-		setBoot = pxeBootWithSettingUEFIBootMode
-	} else {
-		setBoot = pxeBootWithoutSettingUEFIBootMode
+		setBoot.BootSourceOverrideMode = schemas.UEFIBootSourceOverrideMode
 	}
 
 	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
+	log.V(2).Info("Setting boot override", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(&setBoot); err != nil {
-		return fmt.Errorf("failed to set the boot order: %w", err)
+		return fmt.Errorf("failed to set boot override: %w", err)
+	}
+	return nil
+}
+
+// ClearBootOverride disables any active Redfish boot source override so the
+// system uses its persistent boot order on the next power-on. No SetBoot call
+// is issued when the override is already disabled.
+func (r *RedfishBaseBMC) ClearBootOverride(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if system.Boot.BootSourceOverrideEnabled == "" ||
+		system.Boot.BootSourceOverrideEnabled == schemas.DisabledBootSourceOverrideEnabled {
+		return nil
+	}
+
+	setBoot := clearedBootOverride
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("Clearing boot override", "SystemURI", systemURI, "Boot settings", setBoot)
+	if err := system.SetBoot(&setBoot); err != nil {
+		return fmt.Errorf("failed to clear boot override: %w", err)
 	}
 	return nil
 }
@@ -769,7 +804,7 @@ func (r *RedfishBaseBMC) GetStorages(ctx context.Context, systemURI string) ([]S
 }
 
 func (r *RedfishBaseBMC) CreateOrUpdateAccount(
-	ctx context.Context, userName,
+	_ context.Context, userName,
 	role, password string, enabled bool,
 ) error {
 	service, err := r.client.GetService().AccountService()
@@ -783,24 +818,61 @@ func (r *RedfishBaseBMC) CreateOrUpdateAccount(
 	for _, a := range accounts {
 		if a.UserName == userName {
 			a.RoleID = role
-			a.UserName = userName
 			a.Enabled = enabled
+			// Always include the password in the same PATCH. Some BMCs (e.g. Dell iDRAC) return
+			// HTTP 400 when RoleId/Enabled are modified without a password in the request body.
+			if password != "" {
+				a.Password = password
+			}
 			if err := a.Update(); err != nil {
 				return fmt.Errorf("failed to update account: %w", err)
-			}
-			if password != "" {
-				if _, err := a.ChangePassword(password, r.options.Password); err != nil {
-					return fmt.Errorf("failed to change account password: %w", err)
-				}
 			}
 			return nil
 		}
 	}
-	_, err = service.CreateAccount(userName, password, role)
-	if err != nil {
-		return fmt.Errorf("failed to create account: %w", err)
+
+	// Try standard Redfish POST method first (per Redfish spec)
+	account, err := service.CreateAccount(userName, password, role)
+	if err == nil {
+		// POST succeeded - but CreateAccount always sets Enabled=true
+		// If caller requested enabled=false, we need to update it
+		if !enabled && account != nil {
+			account.Enabled = false
+			if err := account.Update(); err != nil {
+				return fmt.Errorf("failed to disable account after creation: %w", err)
+			}
+		}
+		return nil
 	}
-	return nil
+
+	// Check if error is HTTP 405 (Method Not Allowed)
+	// If so, fall back to empty-slot PATCH approach.
+	// Many BMC vendors (Dell, HPE, Lenovo, etc.) don't support POST to /AccountService/Accounts
+	// but do support PATCH to individual pre-allocated account slots.
+	var redfishErr *schemas.Error
+	if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusMethodNotAllowed {
+		// HTTP 405 received - try empty-slot PATCH approach as fallback
+		for _, a := range accounts {
+			// Check if slot is truly empty (no username set)
+			// Skip reserved/protected slots like slot 1 (root user on Dell iDRAC)
+			if a.UserName == "" && a.ID != "1" {
+				a.UserName = userName
+				a.RoleID = role
+				a.Enabled = enabled
+				a.Password = password
+
+				if err := a.Update(); err != nil {
+					return fmt.Errorf("failed to disable account: %w", err)
+				}
+				return nil
+			}
+		}
+		// No empty slots available for fallback method
+		return fmt.Errorf("failed to create account: POST method not supported (HTTP 405) and no available account slots found (all %d slots occupied)", len(accounts))
+	}
+
+	// For non-405 errors, return immediately (e.g., auth failure, network issue, etc.)
+	return fmt.Errorf("failed to create account: %w", err)
 }
 
 func (r *RedfishBaseBMC) DeleteAccount(ctx context.Context, userName, id string) error {
@@ -818,6 +890,18 @@ func (r *RedfishBaseBMC) DeleteAccount(ctx context.Context, userName, id string)
 		if a.UserName == userName && a.ID == id {
 			resp, err := r.client.Delete(a.ODataID)
 			if err != nil {
+				var redfishErr *schemas.Error
+				if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusMethodNotAllowed {
+					// HTTP 405: DELETE not supported - fall back to PATCH
+					// Clear username and disable account. Do NOT include Password field as some BMCs
+					// (e.g., Dell iDRAC) reject PATCH with empty username AND password field present.
+					a.UserName = ""
+					a.Enabled = false
+					if err := a.Update(); err != nil {
+						return fmt.Errorf("failed to delete account via PATCH on slot %s: %w", a.ID, err)
+					}
+					return nil
+				}
 				return err
 			}
 			if err = resp.Body.Close(); err != nil {
@@ -1136,7 +1220,7 @@ func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, e
 	return "", fmt.Errorf("existing subscription not found for destination: %s", destination)
 }
 
-func (r *RedfishBaseBMC) DeleteEventSubscription(ctx context.Context, uri string) error {
+func (r *RedfishBaseBMC) DeleteEventSubscription(_ context.Context, uri string) error {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {

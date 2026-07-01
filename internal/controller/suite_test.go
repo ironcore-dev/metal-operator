@@ -13,20 +13,15 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
+
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 
-	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
-	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
-	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
@@ -36,6 +31,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	"github.com/ironcore-dev/metal-operator/bmc"
+	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
+	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
+	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
+	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -81,7 +82,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.35.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.36.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error
@@ -125,7 +126,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Controller: config.Controller{
 				// need to skip unique controller name validation
 				// since all tests need a dedicated controller
-				SkipNameValidation: ptr.To(true),
+				SkipNameValidation: new(true),
 			},
 			Metrics: metricsserver.Options{
 				BindAddress: "0",
@@ -338,6 +339,14 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				PowerPollingTimeout:  200 * time.Millisecond,
 				BasicAuth:            true,
 			},
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerReadinessRuleReconciler{
+			Client: k8sManager.GetClient(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerReadinessRuleServerReconciler{
+			Client: k8sManager.GetClient(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		By("Starting the registry server")

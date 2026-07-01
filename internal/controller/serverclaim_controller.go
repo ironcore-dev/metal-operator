@@ -97,12 +97,6 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, cl
 		log.V(1).Info("Server gone")
 	}
 
-	if server.Spec.ServerClaimRef != nil {
-		if err := r.removeClaimRefFromServer(ctx, server); err != nil {
-			return fmt.Errorf("failed to remove claim ref from server: %w", err)
-		}
-	}
-
 	config := &metalv1alpha1.ServerBootConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      claim.Name,
@@ -116,10 +110,6 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, cl
 		log.V(1).Info("ServerBootConfiguration gone")
 	}
 
-	if err := r.removeBootConfigRefFromServerAndPowerOff(ctx, config, server); err != nil {
-		return fmt.Errorf("failed to remove boot config ref from server: %w", err)
-	}
-	log.V(1).Info("Removed boot config ref from server")
 	return nil
 }
 
@@ -276,26 +266,6 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, serv
 		Name:      config.Name,
 	}
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
-}
-
-func (r *ServerClaimReconciler) removeClaimRefFromServer(ctx context.Context, server *metalv1alpha1.Server) error {
-	serverBase := server.DeepCopy()
-	server.Spec.ServerClaimRef = nil
-	return r.Patch(ctx, server, client.MergeFrom(serverBase))
-}
-
-func (r *ServerClaimReconciler) removeBootConfigRefFromServerAndPowerOff(ctx context.Context, config *metalv1alpha1.ServerBootConfiguration, server *metalv1alpha1.Server) error {
-	if ref := server.Spec.BootConfigurationRef; ref == nil || (ref.Name != config.Name && ref.Namespace != config.Namespace) {
-		return nil
-	}
-
-	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = nil
-	server.Spec.Power = metalv1alpha1.PowerOff
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	return nil
 }
 
 func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1alpha1.ServerClaim) (*metalv1alpha1.Server, error) {

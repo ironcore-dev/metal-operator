@@ -155,14 +155,6 @@ func MustParseNewIP(s string) *IP {
 	return ip
 }
 
-func NewIPPtr(ip netip.Addr) *IP {
-	return &IP{ip}
-}
-
-func PtrToIP(addr IP) *IP {
-	return &addr
-}
-
 // IPPrefix represents a network prefix.
 // +nullable
 type IPPrefix struct {
@@ -261,10 +253,6 @@ func MustParseNewIPPrefix(s string) *IPPrefix {
 	prefix, err := ParseNewIPPrefix(s)
 	runtime.Must(err)
 	return prefix
-}
-
-func PtrToIPPrefix(prefix IPPrefix) *IPPrefix {
-	return &prefix
 }
 
 func EqualIPPrefixes(a, b IPPrefix) bool {

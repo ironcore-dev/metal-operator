@@ -15,6 +15,7 @@ metadata:
 spec:
   systemUUID: "123e4567-e89b-12d3-a456-426614174000"
   power: "Off"
+  reclaimPolicy: Recycle
   bmcRef:
     name: my-bmc
   bootOrder:
@@ -56,10 +57,12 @@ A server undergoes the following phases:
     - The server transitions to the `Reserved` state.
     - The server is allocated for a specific use or user.
 
-5. **Cleanup**:
-    - When the [`ServerClaim`](serverclaims.md) is removed, the server enters the Cleanup state.
-    - Sanitization processes are performed (e.g., wiping disks, resetting BIOS settings).
-      
+5. **Released**:
+    - Only entered when `spec.reclaimPolicy` is `Retain` and the [`ServerClaim`](serverclaims.md) has been deleted.
+    - The server is powered off and its `BootConfigurationRef` is cleared, but `spec.serverClaimRef` is kept.
+    - The server stays in `Released` until an operator manually clears `spec.serverClaimRef`, at which point it transitions back to `Available`.
+    - See [Reclaim Policy](#reclaim-policy) below.
+
 6. **Maintenance**:
     - Servers in the `Available` state can transition to `Maintenance`.
     - Maintenance tasks such as BIOS updates or hardware repairs are performed.
@@ -78,17 +81,49 @@ stateDiagram-v2
     Available --> Reserved : ServerClaim created
     Reserved --> Maintenance : Maintenance initiated
     Maintenance --> Reserved : Maintenance complete
-    Reserved --> Cleanup : ServerClaim removed
-    Cleanup --> Available : Cleanup complete
+    Reserved --> Available : ServerClaim removed (reclaimPolicy is Recycle)
+    Reserved --> Released : ServerClaim removed (reclaimPolicy is Retain)
+    Released --> Available : serverClaimRef cleared manually
     Available --> Maintenance : Maintenance initiated
     Maintenance --> Initial : Maintenance complete
     Available --> Error : Error detected
     Reserved --> Error : Error detected
     Discovery --> Error : Error detected
-    Cleanup --> Error : Error detected
+    Released --> Error : Error detected
     Maintenance --> Error : Error detected
     Error --> Maintenance : Enter maintenance to fix error
     Error --> Initial : Error resolved
+```
+
+## Reclaim Policy
+
+The `spec.reclaimPolicy` field controls what happens to a `Server` when its bound [`ServerClaim`](serverclaims.md) is deleted. Two values are supported, with `Recycle` as the default:
+
+| Value     | Behavior |
+|-----------|----------|
+| `Recycle` | When the claim is gone, the server is powered off, its `BootConfigurationRef` is cleared, `spec.serverClaimRef` is removed, and the server transitions directly back to `Available` so that it can be claimed again. |
+| `Retain`  | When the claim is gone, the server is powered off and its `BootConfigurationRef` is cleared, but `spec.serverClaimRef` is **not** removed. The server transitions to the `Released` state and remains there until an operator manually clears `spec.serverClaimRef`. Once cleared, the server transitions back to `Available`. |
+
+`Retain` is useful when human inspection is required between uses: for example, to forensically investigate a workload, audit disks, or run an out-of-band sanitization step before the server re-enters the pool. `Recycle` is the right choice for general-purpose pools where servers should be returned to `Available` automatically.
+
+Example using `Retain`:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: my-server
+spec:
+  systemUUID: "123e4567-e89b-12d3-a456-426614174000"
+  reclaimPolicy: Retain
+  bmcRef:
+    name: my-bmc
+```
+
+To return a `Released` server to the pool, remove the stale claim reference:
+
+```bash
+kubectl patch server my-server --type=merge -p '{"spec":{"serverClaimRef":null}}'
 ```
 
 ## Interaction with BMC

@@ -171,4 +171,12 @@ resources:
   kind: BMCSettingsSet
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: ServerReadinessRule
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

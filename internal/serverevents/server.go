@@ -63,12 +63,53 @@ func (e *EventData) GetEvents() []Event {
 	return e.Alerts
 }
 
+// OriginOfConditionRef handles both the official Redfish spec ({"@odata.id": "..."})
+// and Dell iDRAC which sends it as a plain string.
+type OriginOfConditionRef struct {
+	ODataID string
+}
+
+func (o *OriginOfConditionRef) UnmarshalJSON(data []byte) error {
+	var ref struct {
+		ODataID string `json:"@odata.id"`
+	}
+	if err := json.Unmarshal(data, &ref); err == nil {
+		o.ODataID = ref.ODataID
+		return nil
+	}
+	// Fall back to plain string (Dell iDRAC)
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	o.ODataID = s
+	return nil
+}
+
 type Event struct {
-	EventID           string `json:"EventId"`
-	Message           string `json:"Message"`
-	Severity          string `json:"Severity"`
-	EventTimestamp    string `json:"EventTimestamp"`
-	OriginOfCondition string `json:"OriginOfCondition"`
+	EventID           string               `json:"EventId"`
+	MessageID         string               `json:"MessageId"`
+	Message           string               `json:"Message"`
+	Severity          string               `json:"Severity"`        // deprecated since Redfish v1.5, kept for compatibility
+	MessageSeverity   string               `json:"MessageSeverity"` // preferred since Redfish v1.5
+	EventTimestamp    string               `json:"EventTimestamp"`
+	OriginOfCondition OriginOfConditionRef `json:"OriginOfCondition"`
+}
+
+// GetSeverity returns MessageSeverity if set, falling back to the deprecated Severity field.
+func (e *Event) GetSeverity() string {
+	if e.MessageSeverity != "" {
+		return e.MessageSeverity
+	}
+	return e.Severity
+}
+
+// GetMessageID returns MessageId if set, falling back to EventId.
+func (e *Event) GetMessageID() string {
+	if e.MessageID != "" {
+		return e.MessageID
+	}
+	return e.EventID
 }
 
 func NewServer(log logr.Logger, addr string) *Server {

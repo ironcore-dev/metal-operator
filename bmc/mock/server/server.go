@@ -493,8 +493,17 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mergeJSON(base, update)
-	s.saveResource(filePath, base)
 
+	// Keep the authentication store in sync when Password is updated via PATCH.
+	if newPwd, ok := update["Password"].(string); ok && newPwd != "" {
+		if username, ok := base["UserName"].(string); ok && username != "" {
+			s.mu.Lock()
+			s.accounts[username] = newPwd
+			s.mu.Unlock()
+		}
+	}
+
+	s.saveResource(filePath, base)
 	w.WriteHeader(http.StatusNoContent)
 }
 

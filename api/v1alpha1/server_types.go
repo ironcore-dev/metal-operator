@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Power defines the possible power states for a device.
@@ -81,6 +82,13 @@ type BootOrder struct {
 	Device string `json:"device"`
 }
 
+type ServerReclaimPolicy string
+
+const (
+	ServerReclaimPolicyRecycle ServerReclaimPolicy = "Recycle"
+	ServerReclaimPolicyRetain  ServerReclaimPolicy = "Retain"
+)
+
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// SystemUUID is the unique identifier for the server.
@@ -97,6 +105,15 @@ type ServerSpec struct {
 	// IndicatorLED specifies the desired state of the server's indicator LED.
 	// +optional
 	IndicatorLED IndicatorLED `json:"indicatorLED,omitempty"`
+
+	// ReclaimPolicy specifies how the server is reclaimed after use.
+	// Can be
+	// - Recycle (default), immediately transitioning the server to `Available` after use.
+	// - Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,
+	//   transitioning to `Available` once `spec.serverClaimRef` is removed.
+	// +kubebuilder:default=Recycle
+	// +kubebuilder:validation:Enum=Recycle;Retain
+	ReclaimPolicy ServerReclaimPolicy `json:"reclaimPolicy,omitempty"`
 
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	// +kubebuilder:validation:Optional
@@ -154,6 +171,9 @@ const (
 
 	// ServerStateReserved indicates that the server is reserved for a specific use or user.
 	ServerStateReserved ServerState = "Reserved"
+
+	// ServerStateReleased indicates that the server is released after use.
+	ServerStateReleased ServerState = "Released"
 
 	// ServerStateError indicates that there is an error with the server.
 	ServerStateError ServerState = "Error"
@@ -443,5 +463,8 @@ type ServerList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&Server{}, &ServerList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &Server{}, &ServerList{})
+		return nil
+	})
 }

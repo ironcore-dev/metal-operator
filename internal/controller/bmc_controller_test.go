@@ -14,7 +14,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -51,8 +50,8 @@ var _ = Describe("BMC Controller", func() {
 				Kind:               "Endpoint",
 				Name:               endpoint.Name,
 				UID:                endpoint.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
@@ -76,8 +75,8 @@ var _ = Describe("BMC Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
@@ -160,8 +159,8 @@ var _ = Describe("BMC Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("ObjectMeta.Labels", bmcLabels),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
@@ -237,8 +236,8 @@ var _ = Describe("BMC Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("ObjectMeta.Labels", bmcLabels),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
@@ -301,7 +300,7 @@ var _ = Describe("BMC Controller", func() {
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
 				},
-				Hostname: ptr.To("node001r-bb001.region.cloud.com"),
+				Hostname: new("node001r-bb001.region.cloud.com"),
 			},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(Succeed())
@@ -319,8 +318,8 @@ var _ = Describe("BMC Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue("hostname", "node001r-bb001.region.cloud.com")),
 			HaveField("Data", HaveKeyWithValue("ip", "127.0.0.1")),

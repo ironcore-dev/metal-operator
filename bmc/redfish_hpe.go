@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 )
 
@@ -175,7 +174,7 @@ func (r *HPERedfishBMC) hpeParseTaskDetails(_ context.Context, taskMonitorRespon
 		if len(tTask.Error.ExtendedInfo) > 0 {
 			if msgID, ok := tTask.Error.ExtendedInfo[0]["MessageId"]; ok && strings.Contains(msgID, "Success") {
 				task.TaskState = schemas.CompletedTaskState
-				task.PercentComplete = gofish.ToRef(uint(100))
+				task.PercentComplete = new(uint(100))
 				task.TaskStatus = schemas.OKHealth
 				return task, nil
 			}

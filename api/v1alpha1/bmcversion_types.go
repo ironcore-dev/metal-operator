@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type BMCVersionState string
@@ -111,5 +112,8 @@ type BMCVersionList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&BMCVersion{}, &BMCVersionList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &BMCVersion{}, &BMCVersionList{})
+		return nil
+	})
 }

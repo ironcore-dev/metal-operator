@@ -26,7 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -36,6 +35,95 @@ var _ = Describe("Server Controller", func() {
 
 	AfterEach(func(ctx SpecContext) {
 		EnsureCleanState()
+	})
+
+	It("should transition a server to released state and back to available", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with inline BMC configuration")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+				ReclaimPolicy: metalv1alpha1.ServerReclaimPolicyRetain,
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Updating the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("creating a server claim")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-claim",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				ServerRef: &v1.LocalObjectReference{
+					Name: server.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("waiting for the server to be reserved")
+		claimRef := metalv1alpha1.ImmutableObjectReference{
+			Namespace: claim.Namespace,
+			Name:      claim.Name,
+		}
+		Eventually(Object(server)).To(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", Equal(&claimRef)),
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+		))
+
+		By("deleting the server claim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+
+		By("waiting for the server claim to be gone")
+		Eventually(Get(claim)).To(Satisfy(apierrors.IsNotFound))
+
+		By("waiting for the server be released")
+		Eventually(Object(server)).To(SatisfyAll(
+			HaveField("Spec.ServerClaimRef", &claimRef),
+			HaveField("Status.State", metalv1alpha1.ServerStateReleased),
+		))
+
+		By("deleting the claim ref of the server")
+		Eventually(Update(server, func() {
+			server.Spec.ServerClaimRef = nil
+		})).To(Succeed())
+
+		By("waiting for the server to be available again")
+		Eventually(Object(server)).To(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
 	It("should initialize a Server from Endpoint", func(ctx SpecContext) {
@@ -81,8 +169,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
@@ -153,8 +241,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeNil()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
@@ -213,8 +301,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
@@ -233,8 +321,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "BMC",
 				Name:               bmc.Name,
 				UID:                bmc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.Power", metalv1alpha1.PowerOn),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
@@ -349,8 +437,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
 			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
@@ -408,8 +496,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerBootConfiguration",
 				Name:               bootConfig.Name,
 				UID:                bootConfig.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
 			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
@@ -878,8 +966,8 @@ var _ = Describe("Server Controller", func() {
 				Kind:               "ServerClaim",
 				Name:               claim.Name,
 				UID:                claim.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			})),
 			HaveField("Spec.ServerRef.Name", server.Name),
 			HaveField("Spec.Image", "foo:bar"),

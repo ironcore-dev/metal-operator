@@ -14,10 +14,11 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
 	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
 	"github.com/ironcore-dev/metal-operator/internal/serverevents"
 	webhookv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -622,6 +623,19 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "bmcuser")
 		os.Exit(1)
 	}
+	if err := (&controller.ServerReadinessRuleReconciler{
+		Client: mgr.GetClient(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "serverreadinessrule")
+		os.Exit(1)
+	}
+	if err := (&controller.ServerReadinessRuleServerReconciler{
+		Client: mgr.GetClient(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "serverreadinessruleserver")
+		os.Exit(1)
+	}
+	// +kubebuilder:scaffold:builder
 
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
